@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { Button } from '@luma/ui/components/primitives/button';
 import { DataTable } from '@luma/ui/components/primitives/data-table';
 import { Empty } from '@luma/ui/components/primitives/empty';
@@ -6,7 +7,7 @@ import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import type { ShopifyRecordRow } from '../domain/records.js';
 
 function sourceState(value: ShopifyRecordRow['fields'][string] | undefined) {
-  if (value == null) return 'Unknown';
+  if (value == null) return m.common_unknown();
   const text = String(value).toLowerCase().replaceAll('_', ' ');
 
   return text.charAt(0).toUpperCase() + text.slice(1);
@@ -24,21 +25,21 @@ export function CustomerTable({
 }) {
   return (
     <DataTable
-      caption="Customer order history"
+      caption={m.shopify_customers_table_caption()}
       rowKey={(row) => row.id}
       rows={rows}
       density="compact"
       variant="plain"
       empty={
         <Empty>
-          <h3>No orders in the available history</h3>
-          <p>Shopify returned no orders for this customer.</p>
+          <h3>{m.shopify_customers_empty_title()}</h3>
+          <p>{m.shopify_customers_empty_body()}</p>
         </Empty>
       }
       columns={[
         {
           key: 'order',
-          header: 'Order',
+          header: m.shopify_customers_column_order(),
           cell: (row) => (
             <Button
               variant="ghost"
@@ -54,23 +55,23 @@ export function CustomerTable({
         },
         {
           key: 'placed',
-          header: 'Placed',
+          header: m.shopify_customers_column_placed(),
           cell: (row) => <WorkspaceDate value={String(row.fields.Created)} />,
           hideOnNarrow: true,
         },
         {
           key: 'payment',
-          header: 'Payment',
+          header: m.shopify_customers_column_payment(),
           cell: (row) => sourceState(row.fields.Payment),
         },
         {
           key: 'fulfillment',
-          header: 'Fulfillment',
+          header: m.shopify_customers_column_fulfillment(),
           cell: (row) => sourceState(row.fields.Fulfillment),
         },
         {
           key: 'total',
-          header: 'Total',
+          header: m.shopify_customers_column_total(),
           numeric: true,
           cell: (row) => String(row.fields.Total),
         },

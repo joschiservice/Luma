@@ -1,4 +1,5 @@
 import type { HomeModule, HomeModuleId } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import {
   Activity,
   ChartNoAxesColumn,
@@ -20,81 +21,116 @@ export const homeSearch = z.object({
 
 export type HomeWindow = z.infer<typeof homeSearch>['window'];
 
-/** What each Home module shows, for headings and the module picker. */
+/**
+ * What each Home module shows, for headings and the module picker. Titles and descriptions are
+ * getters, so each read returns text in the active language.
+ */
 export const homeModules: Record<
   HomeModuleId,
   {
-    title: string;
-    description: string;
+    readonly title: string;
+    readonly description: string;
     size: HomeModule['size'];
     Icon: LucideIcon;
   }
 > = {
   attention: {
-    title: 'Needs your attention',
-    description:
-      'Approvals, manual steps and outcome checks from issues, workflows and apps, most urgent first.',
+    get title() {
+      return m.home_module_attention_title();
+    },
+    get description() {
+      return m.home_module_attention_description();
+    },
     size: 'full',
     Icon: Inbox,
   },
   handling: {
-    title: 'Luma is handling',
-    description:
-      'Issues Luma is investigating, fixing or checking without you.',
+    get title() {
+      return m.home_module_handling_title();
+    },
+    get description() {
+      return m.home_module_handling_description();
+    },
     size: 'half',
     Icon: CircleCheckBig,
   },
   connections: {
-    title: 'Connected systems',
-    description: 'Whether each connected system is sending recent data.',
+    get title() {
+      return m.home_module_connections_title();
+    },
+    get description() {
+      return m.home_module_connections_description();
+    },
     size: 'half',
     Icon: Plug,
   },
   activity: {
-    title: 'Recent activity',
-    description:
-      'The latest decisions, actions and verifications in this workspace.',
+    get title() {
+      return m.home_module_activity_title();
+    },
+    get description() {
+      return m.home_module_activity_description();
+    },
     size: 'full',
     Icon: Activity,
   },
   outcomes: {
-    title: 'Resolution outcomes',
-    description:
-      'Verified resolutions and how many Luma resolved without help.',
+    get title() {
+      return m.home_module_outcomes_title();
+    },
+    get description() {
+      return m.home_module_outcomes_description();
+    },
     size: 'half',
     Icon: Gauge,
   },
   'operational-metrics': {
-    title: 'Operational pulse',
-    description:
-      'Live counts across issues, monitored stock, purchase orders and connections.',
+    get title() {
+      return m.home_module_operational_metrics_title();
+    },
+    get description() {
+      return m.home_module_operational_metrics_description();
+    },
     size: 'full',
     Icon: ChartNoAxesColumn,
   },
   'order-metrics': {
-    title: 'Order flow',
-    description: 'Order volume and fulfillment timing for a chosen period.',
+    get title() {
+      return m.home_module_order_metrics_title();
+    },
+    get description() {
+      return m.home_module_order_metrics_description();
+    },
     size: 'full',
     Icon: ShoppingBag,
   },
   catalog: {
-    title: 'Catalog health',
-    description:
-      'SKUs whose store and ERP listings disagree, are missing or are not linked.',
+    get title() {
+      return m.home_module_catalog_title();
+    },
+    get description() {
+      return m.home_module_catalog_description();
+    },
     size: 'half',
     Icon: Package,
   },
   fulfillment: {
-    title: 'Fulfillment health',
-    description:
-      'Fulfillment that is on hold, delayed or failed, and shipments in transit.',
+    get title() {
+      return m.home_module_fulfillment_title();
+    },
+    get description() {
+      return m.home_module_fulfillment_description();
+    },
     size: 'half',
     Icon: Truck,
   },
   returns: {
-    title: 'Returns',
-    description:
-      'Return requests to review, returns ready to refund or close, and failed refund payments.',
+    get title() {
+      return m.home_module_returns_title();
+    },
+    get description() {
+      return m.home_module_returns_description();
+    },
     size: 'half',
     Icon: Undo2,
   },

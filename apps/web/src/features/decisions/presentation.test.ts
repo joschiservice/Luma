@@ -20,13 +20,13 @@ it('says who a decision waits for and only asks the reader when they can act', (
   });
   expect(
     decisionStatus({ reason: 'approval', response: 'awaiting_other' }).label,
-  ).toBe('Needs another approver');
+  ).toBe('Waiting for another approver');
   expect(decisionStatus({ reason: 'run', response: 'view_only' }).label).toBe(
     'Waiting for the requester',
   );
   expect(
     decisionStatus({ reason: 'recovery', response: 'view_only' }).label,
-  ).toBe('Outcome unconfirmed');
+  ).toBe('Outcome not confirmed');
   expect(actionable({ response: 'check' })).toBe(true);
   expect(actionable({ response: 'awaiting_other' })).toBe(false);
 });

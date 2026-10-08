@@ -41,26 +41,53 @@ export const correctionSnapshot = z.object({
 
 export type CorrectionSnapshot = z.infer<typeof correctionSnapshot>;
 
-/** Admits only ERP-to-Shopify reconciliation of fresh, known, whole-unit available quantities. */
-export function correctionBlocker(
+/** Why a stock correction can't be reviewed now. Interfaces translate these codes. */
+export type CorrectionBlockerReason =
+  'write_access' | 'untracked' | 'stale' | 'already_matches';
+
+const correctionBlockerText: Record<CorrectionBlockerReason, string> = {
+  write_access: 'Reconnect Shopify with inventory write access.',
+  untracked:
+    'Shopify did not confirm tracked inventory at this exact location.',
+  stale:
+    'Stock evidence is stale. Sync the ERP and refresh before reviewing a correction.',
+  already_matches:
+    'Shopify already matches the ERP quantity. No correction is needed.',
+};
+
+/**
+ * Admits only ERP-to-Shopify reconciliation of fresh, known, whole-unit available quantities.
+ * Returns the reason a correction is blocked, or null when it may be reviewed.
+ */
+export function correctionBlockerReason(
   snapshot: CorrectionSnapshot,
   _choice: CorrectionChoice,
   granted: readonly string[],
   now = new Date(),
-): string | null {
-  if (!granted.includes('inventory.available.reconcile'))
-    return 'Reconnect Shopify with inventory write access.';
+): CorrectionBlockerReason | null {
+  if (!granted.includes('inventory.available.reconcile')) return 'write_access';
   if (!snapshot.complete || !snapshot.tracked || snapshot.available === null)
-    return 'Shopify did not confirm tracked inventory at this exact location.';
+    return 'untracked';
   for (const observedAt of [snapshot.observedAt, snapshot.source.observedAt]) {
     const age = now.getTime() - Date.parse(observedAt);
-    if (age < 0 || age >= 5 * 60_000)
-      return 'Stock evidence is stale. Sync the ERP and refresh before reviewing a correction.';
+    if (age < 0 || age >= 5 * 60_000) return 'stale';
   }
   if (snapshot.available === snapshot.source.available)
-    return 'Shopify already matches the ERP quantity. No correction is needed.';
+    return 'already_matches';
 
   return null;
+}
+
+/** Explains in English why a correction is blocked, for API responses and logs. */
+export function correctionBlocker(
+  snapshot: CorrectionSnapshot,
+  choice: CorrectionChoice,
+  granted: readonly string[],
+  now = new Date(),
+): string | null {
+  const reason = correctionBlockerReason(snapshot, choice, granted, now);
+
+  return reason ? correctionBlockerText[reason] : null;
 }
 
 /** Requires a new complete Shopify read of the exact target and unchanged ERP authority. */

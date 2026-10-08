@@ -121,7 +121,7 @@ export const Conflict: Story = {
     await fillAndSubmit(canvasElement);
     const canvas = within(canvasElement);
     await expect(await canvas.findByRole('alert')).toHaveTextContent(
-      'This email is already in use.',
+      'This email address is already in use.',
     );
     await expect(canvas.getByRole('textbox', { name: 'Email' })).toHaveValue(
       'ada@example.com',
@@ -139,7 +139,7 @@ export const RequestFailure: Story = {
     await fillAndSubmit(canvasElement);
     const canvas = within(canvasElement);
     await expect(await canvas.findByRole('alert')).toHaveTextContent(
-      'We couldn’t save your changes. Try again.',
+      'Your change couldn’t be saved. Check your connection and try again.',
     );
     await expect(
       canvas.queryByText('Internal transport detail'),
@@ -158,7 +158,9 @@ export const InvalidResponse: Story = {
     await fillAndSubmit(canvasElement);
     await expect(
       await within(canvasElement).findByRole('alert'),
-    ).toHaveTextContent('We couldn’t save your changes. Try again.');
+    ).toHaveTextContent(
+      'Your change couldn’t be saved. Check your connection and try again.',
+    );
   },
 };
 

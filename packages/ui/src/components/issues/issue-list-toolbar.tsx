@@ -1,4 +1,5 @@
 import { caseClasses, type CaseQuery, caseStates } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { CircleDot, Flag, Shapes } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -6,14 +7,11 @@ import {
   type CollectionFilter,
   CollectionToolbar,
 } from '../primitives/collection-toolbar';
-import { caseLabel } from './case-investigation';
+import { caseStateLabel, issueKind, severityLabel } from './case-presentation';
 
 type Filters = Pick<CaseQuery, 'state' | 'class' | 'severity'>;
 
 const severities = ['high', 'medium'] as const;
-
-const options = (values: readonly string[]) =>
-  values.map((value) => ({ value, label: caseLabel(value) }));
 
 /** Presents issue views and editable filter chips through the shared collection toolbar. */
 export function IssueListToolbar({
@@ -38,10 +36,13 @@ export function IssueListToolbar({
           {
             kind: 'choice',
             key: 'severity',
-            label: 'Severity',
+            label: m.issues_filter_severity(),
             icon: Flag,
             value: filters.severity,
-            options: options(severities),
+            options: severities.map((value) => ({
+              value,
+              label: severityLabel(value),
+            })),
             onChange: (value) =>
               onFiltersChange({
                 severity: severities.find((item) => item === value),
@@ -50,10 +51,13 @@ export function IssueListToolbar({
           {
             kind: 'choice',
             key: 'class',
-            label: 'Issue type',
+            label: m.issues_filter_type(),
             icon: Shapes,
             value: filters.class,
-            options: options(caseClasses),
+            options: caseClasses.map((value) => ({
+              value,
+              label: issueKind({ class: value }).label,
+            })),
             onChange: (value) =>
               onFiltersChange({
                 class: caseClasses.find((item) => item === value),
@@ -62,10 +66,13 @@ export function IssueListToolbar({
           {
             kind: 'choice',
             key: 'state',
-            label: 'State',
+            label: m.common_status(),
             icon: CircleDot,
             value: filters.state,
-            options: options(caseStates),
+            options: caseStates.map((value) => ({
+              value,
+              label: caseStateLabel(value),
+            })),
             onChange: (value) =>
               onFiltersChange({
                 state: caseStates.find((item) => item === value),
@@ -82,7 +89,7 @@ export function IssueListToolbar({
       }
       onRefresh={onRefresh}
       refreshing={refreshing}
-      refreshLabel="Refresh issues"
+      refreshLabel={m.issues_refresh_issues()}
     />
   );
 }

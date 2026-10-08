@@ -1,6 +1,8 @@
+import { m } from '@luma/i18n/messages';
 import { LumaLockup } from '@luma/ui/components/primitives/brand';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Input } from '@luma/ui/components/primitives/input';
+import { LanguageSelect } from '@luma/ui/components/workspace/language-select';
 import { useForm } from '@tanstack/react-form';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
@@ -41,9 +43,7 @@ export function AuthForm({
     });
     if (session.error) {
       setChallenge(false);
-      setMessage(
-        'Your account request succeeded, but we couldn’t confirm your session. Try signing in.',
-      );
+      setMessage(m.identity_auth_session_unconfirmed());
 
       return;
     }
@@ -64,19 +64,17 @@ export function AuthForm({
       if (result.error) {
         setMessage(
           result.error.status === 400
-            ? 'Passkey sign-in was cancelled or timed out. Try again, or sign in with your email and password.'
+            ? m.identity_auth_passkey_canceled()
             : result.error.status === 401
-              ? 'That passkey isn’t registered with Luma. Sign in with your email and password.'
-              : 'Passkey sign-in failed. Try again when the service is available.',
+              ? m.identity_auth_passkey_unknown()
+              : m.identity_auth_passkey_failed(),
         );
 
         return;
       }
       await enter();
     } catch {
-      setMessage(
-        'We couldn’t reach the service. Check your connection and try again.',
-      );
+      setMessage(m.identity_error_network());
     } finally {
       lock.current = false;
       setPending(false);
@@ -86,7 +84,7 @@ export function AuthForm({
 
   const form = useForm({
     onSubmitInvalid: () => {
-      setMessage('Check the highlighted fields.');
+      setMessage(m.identity_auth_check_fields());
       requestAnimationFrame(() =>
         formElement.current
           ?.querySelector<HTMLInputElement>('input[aria-invalid="true"]')
@@ -109,8 +107,12 @@ export function AuthForm({
         if (result.error) {
           setMessage(
             signup
-              ? 'Account creation was not confirmed. Try signing in if you may already have an account, or check your details and retry.'
-              : 'Sign-in failed. Check your email and password, or try again when the service is available.',
+              ? m.identity_auth_signup_failed()
+              : result.error.status === 401
+                ? m.identity_auth_signin_invalid()
+                : result.error.status === 429
+                  ? m.identity_auth_signin_rate_limited()
+                  : m.identity_auth_signin_failed(),
           );
 
           return;
@@ -127,8 +129,8 @@ export function AuthForm({
       } catch {
         setMessage(
           signup
-            ? 'Account creation was not confirmed. Check your connection. Try signing in before creating another account.'
-            : 'We couldn’t reach the service. Check your connection and try again.',
+            ? m.identity_auth_signup_unconfirmed()
+            : m.identity_error_network(),
         );
       } finally {
         form.setFieldValue('password', '');
@@ -139,11 +141,15 @@ export function AuthForm({
     },
   });
 
+  const pendingLabel = signup
+    ? m.identity_auth_creating_account()
+    : m.identity_auth_signing_in();
+
   if (challenge)
     return (
       <AuthLayout
-        title="Confirm it’s you"
-        lead="Your account uses two-factor authentication."
+        title={m.identity_auth_challenge_title()}
+        lead={m.identity_auth_challenge_lead()}
       >
         <SecondFactorForm
           onVerified={enter}
@@ -157,11 +163,11 @@ export function AuthForm({
 
   return (
     <AuthLayout
-      title={signup ? 'Create your account' : 'Sign in to Luma'}
+      title={
+        signup ? m.identity_auth_signup_title() : m.identity_auth_signin_title()
+      }
       lead={
-        signup
-          ? 'Create your account, then set up or join a workspace.'
-          : 'Welcome back. Pick up where you left off.'
+        signup ? m.identity_auth_signup_lead() : m.identity_auth_signin_lead()
       }
     >
       <form
@@ -183,16 +189,16 @@ export function AuthForm({
             validators={{
               onChange:
                 name === 'name'
-                  ? z.string().trim().min(1, 'Enter your name.')
+                  ? z.string().trim().min(1, m.identity_auth_name_required())
                   : name === 'email'
-                    ? z.email('Enter a valid email address.')
+                    ? z.email(m.identity_auth_email_invalid())
                     : z
                         .string()
                         .min(
                           signup ? 12 : 1,
                           signup
-                            ? 'Use at least 12 characters.'
-                            : 'Enter your password.',
+                            ? m.identity_auth_password_too_short()
+                            : m.identity_auth_password_required(),
                         ),
             }}
           >
@@ -204,10 +210,10 @@ export function AuthForm({
                   <div className="form-field-label">
                     <label htmlFor={name}>
                       {name === 'name'
-                        ? 'Name'
+                        ? m.identity_auth_name_label()
                         : name === 'email'
-                          ? 'Email'
-                          : 'Password'}
+                          ? m.identity_auth_email_label()
+                          : m.identity_auth_password_label()}
                     </label>
                     {name === 'password' ? (
                       <Button
@@ -219,7 +225,9 @@ export function AuthForm({
                         aria-pressed={visible}
                         onClick={() => setVisible(!visible)}
                       >
-                        {visible ? 'Hide password' : 'Show password'}
+                        {visible
+                          ? m.identity_auth_password_hide()
+                          : m.identity_auth_password_show()}
                       </Button>
                     ) : null}
                   </div>
@@ -253,7 +261,7 @@ export function AuthForm({
                     {errors.length
                       ? errors.map((error) => error?.message).join(' ')
                       : name === 'password' && signup
-                        ? 'At least 12 characters.'
+                        ? m.identity_auth_password_help()
                         : ''}
                   </div>
                 </div>
@@ -262,16 +270,20 @@ export function AuthForm({
           </form.Field>
         ))}
         <p role="status" tabIndex={-1} ref={resultRef} className="form-message">
-          {pending ? 'Please wait…' : message}
+          {pending ? pendingLabel : message}
         </p>
         <Button size="lg" type="submit" disabled={pending}>
-          {pending ? 'Please wait…' : signup ? 'Create account' : 'Sign in'}
+          {pending
+            ? pendingLabel
+            : signup
+              ? m.identity_auth_signup_submit()
+              : m.identity_auth_signin_submit()}
         </Button>
       </form>
       {passkeys ? (
         <>
           <p className="auth-divider">
-            <span>or</span>
+            <span>{m.identity_auth_divider()}</span>
           </p>
           <Button
             variant="outline"
@@ -281,14 +293,16 @@ export function AuthForm({
             onClick={() => void signInWithPasskey()}
           >
             <KeyRound aria-hidden="true" />
-            Sign in with a passkey
+            {m.identity_auth_passkey_submit()}
           </Button>
         </>
       ) : null}
       <p className="auth-switch">
-        {signup ? 'Already have an account?' : 'New to Luma?'}{' '}
+        {signup ? m.identity_auth_has_account() : m.identity_auth_no_account()}{' '}
         <Link to={signup ? '/sign-in' : '/sign-up'} search={{ returnTo }}>
-          {signup ? 'Sign in' : 'Create account'}
+          {signup
+            ? m.identity_auth_signin_submit()
+            : m.identity_auth_signup_submit()}
         </Link>
       </p>
     </AuthLayout>
@@ -306,18 +320,20 @@ function AuthLayout({
 }) {
   return (
     <main className="auth-page">
-      <section className="auth-story" aria-label="About Luma">
-        <a className="entry-brand" href="/" aria-label="Luma home">
+      <section
+        className="auth-story"
+        aria-label={m.identity_auth_story_label()}
+      >
+        <a
+          className="entry-brand"
+          href="/"
+          aria-label={m.identity_brand_home_label()}
+        >
           <LumaLockup byAuren />
         </a>
         <div className="auth-story-copy">
-          <p className="auth-story-title">
-            Spend less time fixing the same order problems.
-          </p>
-          <p className="auth-story-lead">
-            Luma investigates problems across the systems you already use, makes
-            the changes you’ve agreed on, and checks that the fix worked.
-          </p>
+          <p className="auth-story-title">{m.identity_auth_story_title()}</p>
+          <p className="auth-story-lead">{m.identity_auth_story_lead()}</p>
         </div>
         <ResolutionStory />
       </section>
@@ -329,6 +345,9 @@ function AuthLayout({
           <h1>{title}</h1>
           <p className="auth-panel-lead">{lead}</p>
           {children}
+          <footer className="auth-panel-footer">
+            <LanguageSelect className="auth-language" />
+          </footer>
         </div>
       </section>
     </main>

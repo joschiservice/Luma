@@ -46,7 +46,7 @@ export const vocabulary: AuthoringVocabulary = {
     {
       kind: 'exception',
       label: 'When an issue is detected',
-      description: 'An operational issue is opened.',
+      description: 'Luma opens an operational issue.',
       executable: true,
       reason: null,
     },
@@ -55,7 +55,7 @@ export const vocabulary: AuthoringVocabulary = {
     {
       kind: 'read',
       label: 'Read current data',
-      description: 'Fetch fresh facts from a connected source.',
+      description: 'Get fresh data from a connected system.',
       executable: false,
       reason: builtIn,
     },
@@ -80,7 +80,7 @@ export const vocabulary: AuthoringVocabulary = {
         'Wait for someone who can approve changes to decide on the next action.',
       executable: false,
       reason:
-        'No installed adapter runs this in custom workflows in this workspace.',
+        'No installed app can run this in custom workflows in this workspace.',
     },
     {
       kind: 'wait',
@@ -112,7 +112,7 @@ export const vocabulary: AuthoringVocabulary = {
     },
     {
       kind: 'code',
-      label: 'Run a Code Step',
+      label: 'Run a code step',
       description: 'Compute values with sandboxed TypeScript.',
       executable: true,
       reason: null,

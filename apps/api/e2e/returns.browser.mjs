@@ -96,7 +96,7 @@ test('opens a return from its order, tells pending work from money returned and 
   await page.goto(`/app/${f.org.id}/returns`);
   await page.getByRole('heading', { name: 'Returns', exact: true }).waitFor();
   await page.getByRole('link', { name: '#1001-R1', exact: true }).waitFor();
-  await page.getByText(/JTL-Wawi does not share returns with Luma/).waitFor();
+  await page.getByText(/JTL-Wawi doesn’t share returns with Luma/).waitFor();
   expect(
     await page.getByRole('link', { name: '#1003-R1', exact: true }).count(),
   ).toBe(0);
@@ -131,7 +131,9 @@ test('opens a return from its order, tells pending work from money returned and 
   await page.getByText('Refund without a return', { exact: false }).waitFor();
   await search.fill('nothing');
   await search.press('Enter');
-  await page.getByRole('heading', { name: 'No returns match' }).waitFor();
+  await page
+    .getByRole('heading', { name: 'No returns match these filters' })
+    .waitFor();
 
   // G then T opens Returns from anywhere in the workspace.
   await page.goto(`/app/${f.org.id}/orders/${r.orders[1001]}`);

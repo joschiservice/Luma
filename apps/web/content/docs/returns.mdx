@@ -3,50 +3,62 @@ title: Follow returns and refunds
 description: See which returns need you, follow each one from request to refund, and tell a requested refund from money returned.
 ---
 
-Returns shows every return that a connected store shares with Luma, and every refund that no return settles. Each return keeps its order, items, reasons, refunds and the evidence Luma read. Luma reads returns; it does not approve, receive or refund them.
+Returns shows every return a connected store shares with Luma, and every refund that no return settles. Each return keeps its order, items, reasons, refunds and the evidence Luma read. Luma reads returns; it doesn’t approve, receive or refund them. You do that in your store, and Luma reads the result on its next sync. Open **Returns** in the sidebar or press **G**, then **T**.
 
-## Find pending work
+## Find returns that need you
 
 The cards at the top count returns in each open stage. Select a card to list those returns:
 
 - **To review**: a customer asked to return items. Approve or decline the request in your store.
 - **Waiting for items**: the return is approved and not every unit has arrived back.
-- **Ready to refund**: units remain that have not been refunded.
-- **Refund processing**: a refund payment is still with the payment provider. The customer has not received the money yet.
-- **Refund failed**: every refund payment attempt failed. Retry the refund in your store.
+- **Ready to refund**: the items are back, or weren’t expected back, and haven’t been refunded.
+- **Refund processing**: a refund payment is still with the payment provider. The customer hasn’t received the money yet.
+- **Refund failed**: every payment attempt for the refund failed. Retry the refund in your store.
 - **Ready to close**: the items are back and refunded, but the return is still open.
 
-The views group the same stages. **Needs action** lists returns waiting for you, oldest request first. **Waiting** lists returns waiting for the customer or the payment provider. **Done** lists closed, declined and cancelled returns and completed refunds.
+The views group the stages. **Needs action** lists requests to review, returns ready to refund or close, and failed refunds. **Waiting** lists returns waiting for the customer’s items or for a refund payment to finish. **Done** lists closed, declined and canceled returns and completed refunds. **All** lists everything.
 
-Search by return name, order number, return reason, or the return, refund or order ID in your store. Every filter is part of the address, so you can share it or pin it to the sidebar. Press G then T to open Returns.
+Search by return name, order number, return reason or the return, refund or order ID in your store. Narrow the list with **Stage** and **Source**, and sort by **Oldest request first**, **Newest request first** or **Latest activity first**. The view and filters are part of the page address, so you can share them or pin them to the sidebar.
 
 ## Money returned
 
-A refund counts as money returned only when its payment succeeded. Luma shows three amounts separately:
+A refund counts as money returned only when its payment succeeded. A return shows three amounts separately:
 
 - **Refunded to the customer** adds up successful refund payments.
-- **Processing** adds up refund payments that have not finished. This money has not reached the customer.
-- **Value of returned items** is what the returned units were worth after discounts. It is not an amount refunded.
+- **Processing** adds up refund payments that haven’t finished. The customer hasn’t received this money yet.
+- **Value of returned items** is what the returned units were worth after discounts. It isn’t an amount refunded.
 
-A refund recorded without a payment, for example a restock without money back, is shown as **Recorded without payment**. Failed payment attempts stay listed, even after a later attempt succeeded. Amounts in different currencies are never added together.
+A refund recorded without a payment, for example a restock without money back, shows as **Recorded without payment**, and no money was returned through it. Failed payment attempts stay listed, even after a later attempt succeeded. Amounts in different currencies are never added together; each payment is listed under **Refunds** instead.
 
 ## Read a return
 
 A return shows its next step and its progress from request to close, with the time each step happened in your store:
 
-- **Items** lists each returned item with its reason, and the units received, restocked and refunded. Open an item to see the product and its stock.
+- **Items** lists each returned item with its reason, and the units received, restocked and refunded. Open an item to see its product and stock.
 - **Refunds** lists each refund with every payment attempt and the units it covered.
-- **Money**, **Order** and **Source and evidence** show the amounts, the order this return belongs to, and when Luma last read the return.
-- For Shopify orders, the store's order details show the customer and payments, read live with your connection's permissions.
+- **Money** shows the amounts above.
+- **Order** shows the order the return belongs to, with its status, payment and total.
+- **Source and evidence** shows the store, the return’s ID, when Luma last read it and when it last synced returns.
+- **Source history** lists each state Luma read, newest first. It shows the state at that moment, not every change in between.
+- **Other returns of this order**, when there are any.
 
-You can open a return from **Returns and refunds** on an order.
+For Shopify orders, **Order details from Shopify** shows the customer, payments and events, read live with your connection’s permissions. You can also open a return from **Returns and refunds** on an order.
+
+## Wait for items to arrive back
+
+While a return is **Waiting for items**, its next step says how many units are still on their way and how many have arrived, for example “Waiting for 2 units to arrive back. 1 of 3 received.” Luma moves the return to **Ready to refund** once your store reports every unit received.
+
+If the store doesn’t report received items, the step says so rather than assuming the items arrived. Check the return in your store before you refund it.
 
 ## When returns are missing
 
 Returns appear only from connections that share them:
 
-- Shopify stores connected before returns were available must be reconnected to share returns and refunds. The Returns page names each store that needs it.
-- JTL-Wawi connections do not share returns with Luma. Returns handled only in JTL-Wawi are not shown.
-- Without the all-orders permission, Shopify shares returns for orders from the last 60 days.
+- **No connection shares returns yet** means none of your connected stores shares returns and refunds with Luma.
+- A Shopify store connected before Luma could read returns must be reconnected to share returns and refunds. The Returns page names each store that needs it. Someone with **Manage connections** can reconnect it; see [Apps and connections](/docs/apps-and-connections#change-or-reconnect-a-connection).
+- JTL-Wawi doesn’t share returns with Luma. Returns handled only in JTL-Wawi don’t appear here.
+- Shopify shares returns for orders from the last 60 days unless access to older orders is on for the store.
 
-Luma checks for new and changed returns every few minutes and reads every return again once a day. Data sync shows the progress for each store. If a step does not appear, such as items received, the return page says the store did not report it rather than assuming it happened.
+Luma checks for new and changed returns regularly and reads every return again once a day. [Data sync](/docs/data-sync) shows the progress for each store.
+
+Viewing returns needs **View returns**. Without it, Returns is hidden from the sidebar and search.

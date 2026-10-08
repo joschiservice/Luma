@@ -1,10 +1,12 @@
 import type { HomeModule, HomeModuleId, PinnedPage } from '@luma/api-contract';
 import { homeModuleIds } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Input } from '@luma/ui/components/primitives/input';
 import { Select } from '@luma/ui/components/primitives/select';
 import { Switch } from '@luma/ui/components/primitives/switch';
+import { LanguageSelect } from '@luma/ui/components/workspace/language-select';
 import {
   ArrowDown,
   ArrowUp,
@@ -28,47 +30,61 @@ import { SectionHeading } from './section-heading';
 
 const themes: {
   value: ThemePreference;
-  label: string;
-  description: string;
+  label: () => string;
+  description: () => string;
   Icon: typeof Sun;
 }[] = [
   {
     value: 'system',
-    label: 'System',
-    description: 'Follow your device setting',
+    label: m.settings_theme_system,
+    description: m.settings_theme_system_description,
     Icon: Monitor,
   },
   {
     value: 'light',
-    label: 'Light',
-    description: 'Canvas and graphite',
+    label: m.settings_theme_light,
+    description: m.settings_theme_light_description,
     Icon: Sun,
   },
   {
     value: 'dark',
-    label: 'Dark',
-    description: 'Deep surface and azure',
+    label: m.settings_theme_dark,
+    description: m.settings_theme_dark_description,
     Icon: Moon,
   },
 ];
 
-/** Lets the reader choose the theme and default sidebar width on this device. */
+/** Lets the reader choose the interface language, theme and default sidebar width on this device. */
 export function AppearanceSettings() {
   const theme = useThemePreference();
   const collapsed = useSidebarCollapsed();
   const titleId = useId();
   const descriptionId = useId();
+  const languageId = useId();
+  const languageDescriptionId = useId();
 
   return (
     <section>
       <SectionHeading
-        title="Appearance"
-        description="How Luma looks on this device. Light and dark are equally supported."
-        badge="This device"
+        title={m.settings_appearance_title()}
+        description={m.settings_appearance_description()}
+        badge={m.settings_badge_this_device()}
       />
       <div className="settings-panel">
+        <div className="settings-preference">
+          <span>
+            <strong id={languageId}>{m.settings_language_title()}</strong>
+            <span id={languageDescriptionId}>
+              {m.settings_language_description()}
+            </span>
+          </span>
+          <LanguageSelect
+            aria-labelledby={languageId}
+            aria-describedby={languageDescriptionId}
+          />
+        </div>
         <fieldset className="settings-themes">
-          <legend>Theme</legend>
+          <legend>{m.settings_theme_legend()}</legend>
           <div className="settings-theme-options">
             {themes.map(({ value, label, description, Icon }) => (
               <label key={value} className="settings-theme" data-theme={value}>
@@ -86,10 +102,10 @@ export function AppearanceSettings() {
                 </span>
                 <span className="settings-theme-label">
                   <Icon size={14} aria-hidden="true" />
-                  <strong>{label}</strong>
+                  <strong>{label()}</strong>
                 </span>
                 <span className="settings-theme-description">
-                  {description}
+                  {description()}
                 </span>
               </label>
             ))}
@@ -97,10 +113,9 @@ export function AppearanceSettings() {
         </fieldset>
         <div className="settings-preference">
           <span>
-            <strong id={titleId}>Collapse the sidebar</strong>
+            <strong id={titleId}>{m.settings_sidebar_collapse_title()}</strong>
             <span id={descriptionId}>
-              Show icons only and keep more room for your work. Press [ to
-              switch at any time.
+              {m.settings_sidebar_collapse_description()}
             </span>
           </span>
           <Switch
@@ -131,31 +146,30 @@ export function HomeSidebarSettings({
   const savePins = (next: PinnedPage[]) => workspace.save({ pinned: next });
   const ordered: HomeModuleId[] = [
     ...modules.map((module) => module.id),
-    ...homeModuleIds.filter((id) => !modules.some((m) => m.id === id)),
+    ...homeModuleIds.filter((id) => !modules.some((item) => item.id === id)),
   ];
 
   return (
     <section>
       <SectionHeading
-        title="Home & sidebar"
-        description="Choose what your Home shows and which pages stay pinned in your sidebar. Only you see these choices."
-        badge="Personal"
+        title={m.settings_home_title()}
+        description={m.settings_home_description()}
+        badge={m.settings_badge_personal()}
       />
       {workspace.conflict ? (
         <Alert tone="warning" role="status">
-          Your layout changed in another session. We loaded the latest version.
+          {m.settings_home_conflict()}
         </Alert>
       ) : workspace.saveFailed ? (
         <Alert tone="danger" role="alert">
-          Your last change couldn’t be saved. Check your connection and try
-          again.
+          {m.settings_home_save_failed()}
         </Alert>
       ) : null}
       <div className="settings-panel">
         <div className="settings-panel-heading">
           <div>
-            <h3>Home modules</h3>
-            <p>Shown modules appear on Home in this order.</p>
+            <h3>{m.settings_home_modules_title()}</h3>
+            <p>{m.settings_home_modules_description()}</p>
           </div>
           <Button
             variant="ghost"
@@ -163,10 +177,13 @@ export function HomeSidebarSettings({
             onClick={() => workspace.save({ home: null })}
           >
             <RotateCcw aria-hidden="true" />
-            Reset to default
+            {m.settings_home_reset()}
           </Button>
         </div>
-        <ul className="settings-modules" aria-label="Home modules">
+        <ul
+          className="settings-modules"
+          aria-label={m.settings_home_modules_title()}
+        >
           {ordered.map((id) => {
             const info = homeModules[id];
             const module = modules.find((item) => item.id === id);
@@ -182,7 +199,9 @@ export function HomeSidebarSettings({
                 {module ? (
                   <>
                     <Select<HomeModule['size']>
-                      aria-label={`${info.title} width`}
+                      aria-label={m.settings_home_module_width({
+                        module: info.title,
+                      })}
                       className="settings-module-size"
                       value={module.size}
                       onValueChange={(size) => {
@@ -194,14 +213,16 @@ export function HomeSidebarSettings({
                           );
                       }}
                       options={[
-                        { value: 'half', label: 'Half width' },
-                        { value: 'full', label: 'Full width' },
+                        { value: 'half', label: m.settings_home_width_half() },
+                        { value: 'full', label: m.settings_home_width_full() },
                       ]}
                     />
                     <Button
                       variant="ghost"
                       size="icon"
-                      aria-label={`Move ${info.title} earlier`}
+                      aria-label={m.settings_home_module_earlier({
+                        module: info.title,
+                      })}
                       disabled={index === 0}
                       onClick={() => saveHome(moveModule(modules, id, -1))}
                     >
@@ -210,7 +231,9 @@ export function HomeSidebarSettings({
                     <Button
                       variant="ghost"
                       size="icon"
-                      aria-label={`Move ${info.title} later`}
+                      aria-label={m.settings_home_module_later({
+                        module: info.title,
+                      })}
                       disabled={index === modules.length - 1}
                       onClick={() => saveHome(moveModule(modules, id, 1))}
                     >
@@ -219,7 +242,9 @@ export function HomeSidebarSettings({
                   </>
                 ) : null}
                 <Switch
-                  aria-label={`Show ${info.title} on Home`}
+                  aria-label={m.settings_home_module_show({
+                    module: info.title,
+                  })}
                   checked={Boolean(module)}
                   disabled={!workspace.layout}
                   onCheckedChange={(checked) =>
@@ -238,19 +263,16 @@ export function HomeSidebarSettings({
       <div className="settings-panel">
         <div className="settings-panel-heading">
           <div>
-            <h3>Pinned pages</h3>
-            <p>
-              Pin any page, including its filters, with the pin button in the
-              top bar. Rename pins here.
-            </p>
+            <h3>{m.settings_pins_title()}</h3>
+            <p>{m.settings_pins_description()}</p>
           </div>
         </div>
         {pinned.length ? (
-          <ul className="settings-pins" aria-label="Pinned pages">
+          <ul className="settings-pins" aria-label={m.settings_pins_title()}>
             {pinned.map((pin, index) => (
               <li key={pin.path}>
                 <Input
-                  aria-label={`Name for ${pin.label}`}
+                  aria-label={m.settings_pin_name({ pin: pin.label })}
                   defaultValue={pin.label}
                   maxLength={120}
                   onBlur={(event) => {
@@ -267,7 +289,7 @@ export function HomeSidebarSettings({
                 <Button
                   variant="ghost"
                   size="icon"
-                  aria-label={`Move ${pin.label} up`}
+                  aria-label={m.settings_pin_earlier({ pin: pin.label })}
                   disabled={index === 0}
                   onClick={() => {
                     const next = [...pinned];
@@ -280,7 +302,7 @@ export function HomeSidebarSettings({
                 <Button
                   variant="ghost"
                   size="icon"
-                  aria-label={`Unpin ${pin.label}`}
+                  aria-label={m.settings_pin_remove({ pin: pin.label })}
                   onClick={() =>
                     savePins(pinned.filter((item) => item.path !== pin.path))
                   }
@@ -291,10 +313,7 @@ export function HomeSidebarSettings({
             ))}
           </ul>
         ) : (
-          <p className="settings-note">
-            Nothing pinned yet. Open a page you use often and select the pin in
-            the top bar.
-          </p>
+          <p className="settings-note">{m.settings_pins_empty()}</p>
         )}
       </div>
     </section>

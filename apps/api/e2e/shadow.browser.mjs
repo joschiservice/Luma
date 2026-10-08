@@ -124,15 +124,15 @@ test('evaluates, retries, reloads and reviews a Shadow case through the real API
   await services.diagnoses.run(tenant, incident.id);
   await page.goto(`/app/${tenantId}/exceptions/${incident.id}?view=active`);
   await page
-    .getByRole('region', { name: 'Resolution', exact: true })
+    .getByRole('region', { name: 'Proposed change', exact: true })
     .locator('summary')
     .first()
     .click();
   await page
     .locator('summary')
-    .filter({ hasText: 'Evaluate a Workflow' })
+    .filter({ hasText: 'Test a Workflow on this issue' })
     .click();
-  const panel = page.getByRole('region', { name: 'Shadow evaluation' });
+  const panel = page.getByRole('region', { name: 'Workflow test' });
   let lost = false;
   const commands = [];
   await page.route('**/exceptions/*/shadow', async (route) => {
@@ -148,50 +148,53 @@ test('evaluates, retries, reloads and reviews a Shadow case through the real API
     }
     await route.continue();
   });
-  await panel.getByRole('button', { name: 'Run Shadow evaluation' }).click();
-  await panel.getByRole('button', { name: 'Retry evaluation' }).click();
-  await panel.getByText('Shadow — not executed', { exact: true }).waitFor();
+  await panel.getByRole('button', { name: 'Run test' }).click();
+  await panel.getByRole('button', { name: 'Retry test' }).click();
+  await panel
+    .getByText('Preview only. Nothing was changed.', { exact: true })
+    .waitFor();
   expect(commands).toHaveLength(2);
   expect(commands[0]).toEqual(commands[1]);
   await page.reload();
   await page
-    .getByRole('region', { name: 'Resolution', exact: true })
+    .getByRole('region', { name: 'Proposed change', exact: true })
     .locator('summary')
     .first()
     .click();
   await page
     .locator('summary')
-    .filter({ hasText: 'Evaluate a Workflow' })
+    .filter({ hasText: 'Test a Workflow on this issue' })
     .click();
   await panel
-    .getByText('No bound candidate was available for this case and Workflow.')
+    .getByText('The Workflow didn’t prepare a change for this issue.')
     .waitFor();
-  for (const name of ['Was an action needed?', 'Was this case eligible?']) {
+  for (const name of [
+    'Was a change needed?',
+    'Should this Workflow handle this issue?',
+  ]) {
     await panel.getByRole('combobox', { name }).click();
     await page.getByRole('option', { name: 'Yes', exact: true }).click();
   }
   await panel.getByRole('checkbox').check();
-  await panel.getByRole('button', { name: 'Save operator comparison' }).click();
-  await panel
-    .getByRole('heading', { name: 'Operator comparison recorded' })
-    .waitFor();
+  await panel.getByRole('button', { name: 'Save review' }).click();
+  await panel.getByRole('heading', { name: 'Review saved' }).waitFor();
   await page.reload();
   await page
-    .getByRole('region', { name: 'Resolution', exact: true })
+    .getByRole('region', { name: 'Proposed change', exact: true })
     .locator('summary')
     .first()
     .click();
   await page
     .locator('summary')
-    .filter({ hasText: 'Evaluate a Workflow' })
+    .filter({ hasText: 'Test a Workflow on this issue' })
     .click();
-  await panel
-    .getByRole('heading', { name: 'Operator comparison recorded' })
-    .waitFor();
+  await panel.getByRole('heading', { name: 'Review saved' }).waitFor();
   await panel.scrollIntoViewIfNeeded();
   await page.screenshot({ path: '/tmp/luma47-ui-live-case.png' });
-  await panel.getByRole('link', { name: 'Compare cases' }).click();
-  await page.getByText('1 case evaluated', { exact: true }).waitFor();
+  await panel
+    .getByRole('link', { name: 'Compare results across issues' })
+    .click();
+  await page.getByText('1 issue tested', { exact: true }).waitFor();
   await page.locator('#shadow-report').scrollIntoViewIfNeeded();
   await page.screenshot({ path: '/tmp/luma47-ui-live-report.png' });
   await page.setViewportSize({ width: 390, height: 844 });
@@ -219,21 +222,19 @@ test('evaluates, retries, reloads and reviews a Shadow case through the real API
   );
   await page.goto(`/app/${tenantId}/exceptions/${incident.id}?view=active`);
   await page
-    .getByRole('region', { name: 'Resolution', exact: true })
+    .getByRole('region', { name: 'Proposed change', exact: true })
     .locator('summary')
     .first()
     .click();
   await page
     .locator('summary')
-    .filter({ hasText: 'Evaluate a Workflow' })
+    .filter({ hasText: 'Test a Workflow on this issue' })
     .click();
   await page
     .getByText(
-      'Your role doesn’t include Activate playbooks, so you can’t evaluate or review Shadow predictions.',
+      'Your role doesn’t allow testing Workflows. Ask a workspace owner or admin for access.',
     )
     .waitFor();
-  expect(
-    await page.getByRole('button', { name: 'Run Shadow evaluation' }).count(),
-  ).toBe(0);
+  expect(await page.getByRole('button', { name: 'Run test' }).count()).toBe(0);
   expect(errors).toEqual([]);
 });

@@ -1,4 +1,5 @@
 import type { WorkflowTemplate } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
 import {
@@ -54,24 +55,32 @@ export function UseTemplateDialog({
         className="workflow-dialog authoring-use-dialog"
         showCloseButton={!locked}
       >
-        <DialogTitle>Use “{template.name}”</DialogTitle>
+        <DialogTitle>
+          {m.authoring_use_title({ template: template.name })}
+        </DialogTitle>
         <DialogDescription>
           {stage === 'requirements'
-            ? 'Check what this workflow needs, then choose where it applies.'
+            ? m.authoring_use_requirements_description()
             : stage === 'configure'
-              ? 'Choose the exact scope and limits. You review them before anything is activated.'
-              : 'The workflow is active for the scope you reviewed.'}
+              ? m.authoring_use_configure_description()
+              : m.authoring_use_done_description()}
         </DialogDescription>
-        <ol className="authoring-stages" aria-label="Progress">
+        <ol
+          className="authoring-stages"
+          aria-label={m.authoring_use_progress_label()}
+        >
           {(['requirements', 'configure', 'done'] as const).map(
             (item, index) => (
               <li key={item} aria-current={item === stage ? 'step' : undefined}>
-                {index + 1}.{' '}
-                {item === 'requirements'
-                  ? 'Requirements'
-                  : item === 'configure'
-                    ? 'Configure and review'
-                    : 'Active'}
+                {m.authoring_use_stage({
+                  position: index + 1,
+                  stage:
+                    item === 'requirements'
+                      ? m.authoring_use_stage_requirements()
+                      : item === 'configure'
+                        ? m.authoring_use_stage_configure()
+                        : m.authoring_template_active(),
+                })}
               </li>
             ),
           )}
@@ -82,9 +91,15 @@ export function UseTemplateDialog({
               {template.requirements.map((item) => (
                 <li key={item.label} data-met={item.met}>
                   {item.met ? (
-                    <Check size={15} aria-label="Done" />
+                    <Check
+                      size={15}
+                      aria-label={m.authoring_requirement_met()}
+                    />
                   ) : (
-                    <TriangleAlert size={15} aria-label="Missing" />
+                    <TriangleAlert
+                      size={15}
+                      aria-label={m.authoring_requirement_missing()}
+                    />
                   )}
                   <div>
                     <strong>{item.label}</strong>
@@ -95,16 +110,15 @@ export function UseTemplateDialog({
             </ul>
             {!ready ? (
               <Alert tone="warning" role="status">
-                Finish the missing items first. The links on the template card
-                open the right place.
+                {m.authoring_use_missing()}
               </Alert>
             ) : null}
             <div className="workflow-dialog-actions">
               <Button variant="outline" onClick={close}>
-                Cancel
+                {m.common_cancel()}
               </Button>
               <Button disabled={!ready} onClick={() => setStage('configure')}>
-                Continue
+                {m.common_continue()}
               </Button>
             </div>
           </>
@@ -136,19 +150,18 @@ export function UseTemplateDialog({
         ) : (
           <>
             <Alert tone="success" role="status">
-              Activated. Runs start when the trigger happens, and each action
-              still passes policy and approval checks.
+              {m.authoring_use_activated()}
             </Alert>
             <div className="workflow-dialog-actions">
               <Button variant="outline" onClick={close}>
-                Back to templates
+                {m.authoring_use_back()}
               </Button>
               <Link
                 className={buttonVariants()}
                 to="/app/$organizationId/workflows/$definitionId"
                 params={{ organizationId, definitionId: template.id }}
               >
-                Open workflow
+                {m.authoring_open_workflow()}
               </Link>
             </div>
           </>
@@ -187,12 +200,12 @@ function ReplenishmentStep({
             void setup.refetch();
           }}
         >
-          Retry
+          {m.common_retry()}
         </Button>
       </Alert>
     );
   if (!detail.data || !setup.data)
-    return <p role="status">Loading stock positions and suppliers…</p>;
+    return <p role="status">{m.authoring_use_loading_replenishment()}</p>;
 
   return (
     <ReplenishmentSetupFlow
@@ -229,11 +242,12 @@ function CaseStep({
       <Alert tone="danger" role="alert">
         <span>{workflowError(detail.error)}</span>
         <Button variant="outline" onClick={() => void detail.refetch()}>
-          Retry
+          {m.common_retry()}
         </Button>
       </Alert>
     );
-  if (!detail.data) return <p role="status">Loading the workflow…</p>;
+  if (!detail.data)
+    return <p role="status">{m.authoring_use_loading_workflow()}</p>;
 
   return (
     <CaseActivationForm
@@ -285,10 +299,7 @@ function ResolutionStep({
   if (!installed)
     return (
       <>
-        <p>
-          Luma adds the reviewed version of this workflow to your workspace
-          first. Adding it doesn’t activate anything.
-        </p>
+        <p>{m.authoring_use_install_description()}</p>
         {error ? (
           <Alert tone="danger" role="alert">
             {error}
@@ -296,10 +307,14 @@ function ResolutionStep({
         ) : null}
         <div className="workflow-dialog-actions">
           <Button variant="outline" disabled={pending} onClick={cancel}>
-            Cancel
+            {m.common_cancel()}
           </Button>
           <Button disabled={pending} onClick={() => void install()}>
-            {pending ? 'Adding…' : error ? 'Retry' : 'Add and continue'}
+            {pending
+              ? m.authoring_use_installing()
+              : error
+                ? m.common_retry()
+                : m.authoring_use_install()}
           </Button>
         </div>
       </>
@@ -309,11 +324,12 @@ function ResolutionStep({
       <Alert tone="danger" role="alert">
         <span>{workflowError(detail.error)}</span>
         <Button variant="outline" onClick={() => void detail.refetch()}>
-          Retry
+          {m.common_retry()}
         </Button>
       </Alert>
     );
-  if (!detail.data) return <p role="status">Loading connections…</p>;
+  if (!detail.data)
+    return <p role="status">{m.authoring_use_loading_connections()}</p>;
 
   return (
     <ActivationForm

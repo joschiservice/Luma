@@ -362,7 +362,9 @@ export const Queue: Story = {
       await canvas.findByText('Approve purchase-order draft for 50 × LAMP-01'),
     ).toBeVisible();
     await expect(canvas.getByText('3 min left')).toBeVisible();
-    await expect(canvas.getByText('Needs another approver')).toBeVisible();
+    await expect(
+      canvas.getByText('Waiting for another approver'),
+    ).toBeVisible();
     await expect(canvas.getByText('Check the outcome')).toBeVisible();
   },
 };

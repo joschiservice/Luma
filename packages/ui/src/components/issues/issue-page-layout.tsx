@@ -1,10 +1,12 @@
 import type { CaseDetail } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { type ReactNode, useContext, useEffect, useRef } from 'react';
 
 import { Button } from '../primitives/button';
 import { SectionNavigation } from '../primitives/section-navigation';
 import { WorkspaceHeaderSlot } from '../workspace/workspace-header-slot';
-import { caseLabel, CaseStatus } from './case-investigation';
+import { CaseStatus } from './case-investigation';
+import { freshnessLabel, issueKind, sourceLabel } from './case-presentation';
 import { IssueDetailViews } from './issue-collection';
 import { IssueRecordDetails } from './issue-record-details';
 import { IssuePageNavigation, IssueSection } from './issue-section';
@@ -37,7 +39,7 @@ export function IssuePageLayout({
     hasActions: Boolean(actions),
     issueId: item?.id,
   });
-  const title = item?.summary.replace(/\.+$/, '') ?? 'Issue details';
+  const title = item?.summary.replace(/\.+$/, '') ?? m.issues_section_details();
 
   useEffect(() => {
     root.current?.focus({ preventScroll: true });
@@ -67,13 +69,15 @@ export function IssuePageLayout({
                 {refresh}
                 {canReview ? (
                   <Button
-                    aria-label="Review resolution"
+                    aria-label={m.issues_page_review_change()}
                     onClick={() => jump('resolution')}
                   >
                     <span className="issue-page-desktop-label">
-                      Review resolution
+                      {m.issues_page_review_change()}
                     </span>
-                    <span className="issue-page-mobile-label">Review</span>
+                    <span className="issue-page-mobile-label">
+                      {m.issues_review_short()}
+                    </span>
                   </Button>
                 ) : null}
               </div>
@@ -85,15 +89,15 @@ export function IssuePageLayout({
               <>
                 <SectionNavigation
                   className="issue-page-sections"
-                  aria-label="Issue sections"
+                  aria-label={m.issues_sections_label()}
                   items={options}
                   value={current}
                   onValueChange={jump}
                 />
                 <div className="issue-page-mobile-nav" ref={mobileNavigation}>
-                  <span>On this page</span>
+                  <span>{m.issues_on_this_page()}</span>
                   <IssueSectionSelect
-                    label="On this page"
+                    label={m.issues_on_this_page()}
                     value={current}
                     options={options}
                     onNavigate={jump}
@@ -110,20 +114,20 @@ export function IssuePageLayout({
                 <IssueSection section="details">
                   <dl className="issue-page-facts">
                     <div>
-                      <dt>Source systems</dt>
+                      <dt>{m.issues_details_sources()}</dt>
                       <dd>
                         {item.sources.length
-                          ? item.sources.join(' · ')
-                          : 'Source system unknown'}
+                          ? item.sources.map(sourceLabel).join(' · ')
+                          : m.issues_source_system_unknown()}
                       </dd>
                     </div>
                     <div>
-                      <dt>Issue type</dt>
-                      <dd>{caseLabel(item.class)}</dd>
+                      <dt>{m.issues_filter_type()}</dt>
+                      <dd>{issueKind(item).label}</dd>
                     </div>
                     <div>
-                      <dt>Evidence freshness</dt>
-                      <dd>{caseLabel(item.freshness)}</dd>
+                      <dt>{m.issues_details_freshness()}</dt>
+                      <dd>{freshnessLabel(item.freshness)}</dd>
                     </div>
                   </dl>
                   <IssueRecordDetails item={item} expanded />

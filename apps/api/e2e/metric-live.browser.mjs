@@ -63,7 +63,7 @@ test('updates visible totals and cohorts, crosses deadlines, and measures delive
   });
   await page.goto(`/app/${f.org.id}/insights`);
   const section = page.getByRole('region', {
-    name: 'The work behind the numbers',
+    name: 'Orders that need work',
   });
   const values = section.locator('.order-metric-value');
   const hasCount = async (index, count) =>
@@ -72,11 +72,11 @@ test('updates visible totals and cohorts, crosses deadlines, and measures delive
         interval: 20,
         timeout: 10000,
       })
-      .toMatch(new RegExp(`^${count}observed`));
+      .toMatch(new RegExp(`^${count}orders? found`));
   await hasCount(0, 200);
   await section.getByText('Live updates', { exact: true }).waitFor();
   await page
-    .getByRole('region', { name: 'Your operational pulse' })
+    .getByRole('region', { name: 'Where work is waiting' })
     .getByText('Live updates', { exact: true })
     .waitFor();
   expect(streamResponses.map(({ status }) => status)).toEqual([200]);
@@ -161,7 +161,7 @@ test('updates visible totals and cohorts, crosses deadlines, and measures delive
   );
   await hasCount(0, 200);
   await section
-    .getByRole('button', { name: 'Inspect orders & definition' })
+    .getByRole('button', { name: 'Show matching orders' })
     .first()
     .click();
   const dialog = page.getByRole('dialog');
@@ -208,7 +208,7 @@ test('updates visible totals and cohorts, crosses deadlines, and measures delive
     "UPDATE connector_installations SET document=jsonb_set(document,'{status}','\"degraded\"') WHERE tenant_id=$1",
     [f.org.id],
   );
-  await section.getByText('Stale observations', { exact: true }).waitFor();
+  await section.getByText('Data out of date', { exact: true }).waitFor();
   await section.getByText('Live updates', { exact: true }).waitFor();
   await mkdir('/tmp/luma85-ui', { recursive: true });
   await section.screenshot({ path: '/tmp/luma85-ui/desktop.png' });

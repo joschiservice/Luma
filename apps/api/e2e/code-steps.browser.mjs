@@ -52,7 +52,9 @@ test('reviews and evaluates a code example on desktop and mobile', async ({
     path: '/tmp/luma51-browser/before.png',
     fullPage: true,
   });
-  await page.getByRole('button', { name: 'Code Steps', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Technical details', exact: true })
+    .click();
   await page.getByLabel('TypeScript source', { exact: true }).waitFor();
   await mkdir('/tmp/luma51-browser', { recursive: true });
   await page.screenshot({
@@ -72,9 +74,7 @@ test('reviews and evaluates a code example on desktop and mobile', async ({
   await page
     .getByLabel('Expected outputs', { exact: true })
     .fill('{"wrong":6}');
-  await page
-    .getByRole('button', { name: 'Run evaluation', exact: true })
-    .click();
+  await page.getByRole('button', { name: 'Run test', exact: true }).click();
   await page
     .getByText(
       'Example inputs and expected outputs must match the declared fields.',
@@ -90,9 +90,7 @@ test('reviews and evaluates a code example on desktop and mobile', async ({
   await page
     .getByLabel('Expected outputs', { exact: true })
     .fill('{"value":6}');
-  await page
-    .getByRole('button', { name: 'Run evaluation', exact: true })
-    .click();
+  await page.getByRole('button', { name: 'Run test', exact: true }).click();
   await page.getByText('Example passed', { exact: true }).waitFor();
   await page.screenshot({
     path: '/tmp/luma51-browser/evaluation-desktop.png',

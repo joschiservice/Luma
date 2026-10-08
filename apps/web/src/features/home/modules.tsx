@@ -1,5 +1,14 @@
 import type { OperationsOverview } from '@luma/api-contract';
 import {
+  formatList,
+  formatNumber,
+  formatPercent,
+  formatRelativeTime,
+  formatTime,
+} from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
+import {
   elapsed,
   issueStatus,
 } from '@luma/ui/components/issues/case-presentation';
@@ -69,11 +78,7 @@ export function AttentionModule({
   const now = useNow();
   if (decisions.isPending) return <ModuleSkeleton />;
   if (decisions.isError)
-    return (
-      <p className="home-note">
-        Decisions couldn’t be loaded. Open Needs you or try again shortly.
-      </p>
-    );
+    return <p className="home-note">{m.home_attention_failed()}</p>;
   const { items, counts, sources } = decisions.data;
   const missing = sources.filter((source) => source.state === 'unavailable');
 
@@ -81,8 +86,9 @@ export function AttentionModule({
     <>
       {missing.length ? (
         <p className="home-note">
-          {missing.map((source) => source.label).join(', ')} didn’t answer, so
-          some decisions may be missing.
+          {m.home_attention_sources_missing({
+            sources: formatList(missing.map((source) => source.label)),
+          })}
         </p>
       ) : null}
       {items.length ? (
@@ -120,25 +126,25 @@ export function AttentionModule({
         <div className="home-empty">
           <StateDot state="verified" />
           <div>
-            <strong>Nothing needs your decision.</strong>
+            <strong>{m.home_attention_empty_title()}</strong>
             <p>
               {overview.activeCount
-                ? `${overview.activeCount} ${overview.activeCount === 1 ? 'issue is' : 'issues are'} still in progress. Luma will ask when it needs you.`
-                : 'Luma will ask here when a decision needs you.'}
+                ? m.home_attention_empty_active({ count: overview.activeCount })
+                : m.home_attention_empty_idle()}
             </p>
           </div>
         </div>
       )}
       <footer className="home-module-footer">
         <span className="lu-numeric">
-          {counts.views.all} waiting · most urgent first
+          {m.home_attention_footer({ count: counts.views.all ?? 0 })}
         </span>
         <Link
           className="home-module-link"
           to="/app/$organizationId/needs-you"
           params={{ organizationId }}
         >
-          <LinkLabel>Open Needs you</LinkLabel>
+          <LinkLabel>{m.home_attention_link()}</LinkLabel>
         </Link>
       </footer>
     </>
@@ -161,19 +167,25 @@ export function HandlingModule({
     <>
       <dl className="home-stats">
         <div>
-          <dt>In progress</dt>
+          <dt>{m.home_handling_in_progress()}</dt>
           <dd className="lu-numeric">
-            {Math.max(0, overview.activeCount - overview.attentionCount)}
+            {formatNumber(
+              Math.max(0, overview.activeCount - overview.attentionCount),
+            )}
           </dd>
         </div>
         <div>
-          <dt>Verified</dt>
-          <dd className="lu-numeric">{overview.verifiedResolutions}</dd>
+          <dt>{m.home_handling_verified()}</dt>
+          <dd className="lu-numeric">
+            {formatNumber(overview.verifiedResolutions)}
+          </dd>
         </div>
         <div>
-          <dt>Without help</dt>
+          <dt>{m.home_handling_without_help()}</dt>
           <dd className="lu-numeric">
-            {overview.automaticallyResolved ?? '—'}
+            {overview.automaticallyResolved === null
+              ? m.common_empty_value()
+              : formatNumber(overview.automaticallyResolved)}
           </dd>
         </div>
       </dl>
@@ -203,19 +215,17 @@ export function HandlingModule({
           })}
         </ul>
       ) : (
-        <p className="home-note">
-          Luma isn’t working on any issues on its own right now.
-        </p>
+        <p className="home-note">{m.home_handling_empty()}</p>
       )}
       <footer className="home-module-footer">
-        <span>Counts cover the selected window</span>
+        <span>{m.home_handling_footer()}</span>
         <Link
           className="home-module-link"
           to="/app/$organizationId/exceptions"
           params={{ organizationId }}
           search={{ view: 'active' }}
         >
-          <LinkLabel>All open issues</LinkLabel>
+          <LinkLabel>{m.home_handling_link()}</LinkLabel>
         </Link>
       </footer>
     </>
@@ -227,17 +237,17 @@ function connectionState(connection: Connection): {
   label: string;
 } {
   if (connection.status === 'disconnected' || connection.status === 'revoked')
-    return { state: 'error', label: 'Disconnected' };
+    return { state: 'error', label: m.home_connection_disconnected() };
   if (connection.status === 'pending')
-    return { state: 'waiting', label: 'Awaiting validation' };
+    return { state: 'waiting', label: m.home_connection_pending() };
   if (connection.status === 'degraded')
-    return { state: 'attention', label: 'Degraded' };
+    return { state: 'attention', label: m.home_connection_degraded() };
   if (connection.freshness === 'stale')
-    return { state: 'attention', label: 'Data is stale' };
+    return { state: 'attention', label: m.home_connection_stale() };
   if (connection.freshness === 'unobserved')
-    return { state: 'waiting', label: 'No data yet' };
+    return { state: 'waiting', label: m.home_connection_unobserved() };
 
-  return { state: 'verified', label: 'Recent data' };
+  return { state: 'verified', label: m.home_connection_recent() };
 }
 
 /** Shows whether each connected system is sending recent observations. */
@@ -262,16 +272,19 @@ export function ConnectionsModule({
                   <strong>{connection.label}</strong>
                 </span>
                 <span className="home-row-status">
-                  {health.label}
-                  {connection.lastObservedAt ? (
-                    <span
-                      className="home-row-age"
-                      title={connection.lastObservedAt}
-                    >
-                      {' '}
-                      · {elapsed(connection.lastObservedAt)}
-                    </span>
-                  ) : null}
+                  {connection.lastObservedAt
+                    ? rich(m.home_connection_status_age, {
+                        status: health.label,
+                        age: (
+                          <span
+                            className="home-row-age"
+                            title={connection.lastObservedAt}
+                          >
+                            {formatRelativeTime(connection.lastObservedAt)}
+                          </span>
+                        ),
+                      })
+                    : health.label}
                 </span>
               </li>
             );
@@ -283,21 +296,23 @@ export function ConnectionsModule({
             <Plus size={16} />
           </span>
           <div>
-            <strong>No connected systems yet</strong>
-            <p>Connect Shopify or JTL so Luma can observe your operations.</p>
+            <strong>{m.home_connections_empty_title()}</strong>
+            <p>{m.home_connections_empty_description()}</p>
             <Link
               className={buttonVariants({ variant: 'outline', size: 'sm' })}
               to="/app/$organizationId/apps"
               params={{ organizationId }}
             >
-              Connect a system
+              {m.home_connections_connect()}
             </Link>
           </div>
         </div>
       )}
       <footer className="home-module-footer">
         <span>
-          Recent means observed within {overview.freshnessThresholdHours} hours
+          {m.home_connections_footer({
+            hours: overview.freshnessThresholdHours,
+          })}
         </span>
         <span className="home-module-links">
           <Link
@@ -305,14 +320,14 @@ export function ConnectionsModule({
             to="/app/$organizationId/sync"
             params={{ organizationId }}
           >
-            <LinkLabel>Data sync</LinkLabel>
+            <LinkLabel>{m.home_connections_sync_link()}</LinkLabel>
           </Link>
           <Link
             className="home-module-link"
             to="/app/$organizationId/apps"
             params={{ organizationId }}
           >
-            <LinkLabel>Manage apps</LinkLabel>
+            <LinkLabel>{m.home_connections_apps_link()}</LinkLabel>
           </Link>
         </span>
       </footer>
@@ -326,57 +341,60 @@ export function ActivityModule({ organizationId }: { organizationId: string }) {
   const activity = useQuery(
     activityOptions(organizationId, {}, true, timeZone),
   );
-  const time = new Intl.DateTimeFormat('en-GB', {
-    timeZone,
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 
   return (
     <>
       {activity.isPending ? (
         <ModuleSkeleton rows={4} />
       ) : activity.isError ? (
-        <p className="home-note">
-          Activity couldn’t be loaded. Try again shortly.
-        </p>
+        <p className="home-note">{m.home_activity_failed()}</p>
       ) : activity.data.items.length ? (
         <ol className="home-timeline">
           {activity.data.items.slice(0, 6).map((event) => (
             <li key={event.id}>
               <time dateTime={event.recordedAt} title={event.recordedAt}>
-                {time.format(new Date(event.recordedAt))}
+                {formatTime(event.recordedAt, { timeZone, timeStyle: 'short' })}
               </time>
               <StateDot state={activityState(event.outcome)} />
               <span className="home-timeline-text">
                 {event.summary ?? activityLabel(event.action)}
                 <small>
-                  {activityLabel(event.outcome)}
-                  {event.system ? ` · ${event.system}` : ''}
+                  {event.system
+                    ? m.home_activity_outcome_system({
+                        outcome: activityLabel(event.outcome),
+                        system: event.system,
+                      })
+                    : activityLabel(event.outcome)}
                 </small>
               </span>
             </li>
           ))}
         </ol>
       ) : (
-        <p className="home-note">
-          Nothing recorded in the last 30 days. Decisions and actions appear
-          here as they happen.
-        </p>
+        <p className="home-note">{m.home_activity_empty()}</p>
       )}
       <footer className="home-module-footer">
-        <span>Last 30 days</span>
+        <span>{m.home_activity_footer()}</span>
         <Link
           className="home-module-link"
           to="/app/$organizationId/activity"
           params={{ organizationId }}
         >
-          <LinkLabel>View all activity</LinkLabel>
+          <LinkLabel>{m.home_activity_link()}</LinkLabel>
         </Link>
       </footer>
     </>
   );
 }
+
+const coverageMessages = {
+  complete: m.home_outcomes_coverage_complete,
+  partial: m.home_outcomes_coverage_partial,
+  unavailable: m.home_outcomes_coverage_unavailable,
+} satisfies Record<
+  NonNullable<OperationsOverview['measurement']>['coverage'],
+  () => string
+>;
 
 /** Summarizes verified resolutions and how much Luma resolved without help. */
 export function OutcomesModule({
@@ -388,78 +406,81 @@ export function OutcomesModule({
 }) {
   const rate =
     overview.automation && overview.automation.denominator > 0
-      ? Math.round(
-          (overview.automation.numerator / overview.automation.denominator) *
-            100,
-        )
+      ? overview.automation.numerator / overview.automation.denominator
       : null;
 
   return (
     <>
       <div className="home-outcomes operations-metrics">
         <div>
-          <span>Verified resolutions</span>
+          <span>{m.home_outcomes_verified_label()}</span>
           <strong className="lu-numeric">
-            {overview.measurement?.verified ?? overview.verifiedResolutions}
+            {formatNumber(
+              overview.measurement?.verified ?? overview.verifiedResolutions,
+            )}
           </strong>
           <p>
             {overview.measurement
-              ? 'Live issues first detected in the selected window, with an independently verified outcome.'
-              : 'Outcomes confirmed in the source systems.'}
+              ? m.home_outcomes_verified_measured()
+              : m.home_outcomes_verified_basic()}
           </p>
         </div>
         <div>
-          <span>Resolved automatically</span>
+          <span>{m.home_outcomes_automatic_label()}</span>
           <strong
             className="lu-numeric"
             data-text={overview.automaticallyResolved === null ? '' : undefined}
           >
-            {overview.automaticallyResolved ?? 'Unavailable'}
+            {overview.automaticallyResolved === null
+              ? m.home_outcomes_unavailable()
+              : formatNumber(overview.automaticallyResolved)}
           </strong>
           <p>
             {overview.automaticallyResolved === null
               ? overview.measurement
-                ? `${overview.measurement.unknownAttribution} with unknown attribution; ${overview.measurement.human} with human involvement.`
-                : 'Human-work attribution is not available.'
-              : 'Verified without a person’s work.'}
+                ? m.home_outcomes_automatic_unknown({
+                    unknown: overview.measurement.unknownAttribution,
+                    human: overview.measurement.human,
+                  })
+                : m.home_outcomes_automatic_no_data()
+              : m.home_outcomes_automatic_verified()}
           </p>
         </div>
         <div>
-          <span>Eligible automation rate</span>
+          <span>{m.home_outcomes_rate_label()}</span>
           <strong
             className="lu-numeric"
             data-text={rate === null ? '' : undefined}
           >
             {rate !== null
-              ? `${rate}%`
+              ? formatPercent(rate)
               : overview.automation
-                ? '—'
-                : 'Unavailable'}
+                ? m.common_empty_value()
+                : m.home_outcomes_unavailable()}
           </strong>
           {rate !== null ? (
             <span className="home-meter" aria-hidden="true">
-              <span style={{ width: `${rate}%` }} />
+              <span style={{ width: `${Math.round(rate * 100)}%` }} />
             </span>
           ) : null}
           <p>
             {overview.automation
-              ? `${overview.automation.numerator} of ${overview.automation.denominator} eligible issues resolved correctly without help.`
+              ? m.home_outcomes_rate_detail({
+                  resolved: overview.automation.numerator,
+                  eligible: overview.automation.denominator,
+                })
               : overview.measurement
-                ? `${overview.measurement.unknownEligibility} unknown eligibility · ${overview.measurement.unknownEnvironment} unknown environment. A complete rate is unavailable.`
-                : 'Eligibility data is not available.'}
+                ? m.home_outcomes_rate_incomplete({
+                    eligibility: overview.measurement.unknownEligibility,
+                    environment: overview.measurement.unknownEnvironment,
+                  })
+                : m.home_outcomes_rate_no_data()}
           </p>
         </div>
       </div>
       <footer className="home-module-footer">
         {overview.measurement ? (
-          <span>
-            {overview.measurement.coverage === 'complete'
-              ? 'Complete for recorded live incidents.'
-              : overview.measurement.coverage === 'partial'
-                ? 'Partial measurement coverage.'
-                : 'No classified live cohort.'}{' '}
-            Provider data-through time is unknown.
-          </span>
+          <span>{coverageMessages[overview.measurement.coverage]()}</span>
         ) : null}
         {organizationId ? (
           <Link
@@ -467,7 +488,7 @@ export function OutcomesModule({
             to="/app/$organizationId/insights"
             params={{ organizationId }}
           >
-            Inspect outcome cohorts <ArrowRight size={14} aria-hidden="true" />
+            <LinkLabel>{m.home_outcomes_link()}</LinkLabel>
           </Link>
         ) : null}
       </footer>
@@ -480,11 +501,7 @@ export function CatalogModule({ organizationId }: { organizationId: string }) {
   const catalog = useQuery(productSummaryOptions(organizationId));
   if (catalog.isPending) return <ModuleSkeleton />;
   if (catalog.isError)
-    return (
-      <p className="home-note">
-        Catalog health couldn’t be loaded. Try again shortly.
-      </p>
-    );
+    return <p className="home-note">{m.home_catalog_failed()}</p>;
   const { counts, sources } = catalog.data;
   const views = [
     ['differs', 'attention'],
@@ -509,7 +526,7 @@ export function CatalogModule({ organizationId }: { organizationId: string }) {
                   <strong>{viewLabels[view]}</strong>
                 </span>
                 <span className="home-row-status">
-                  {counts[view]} {counts[view] === 1 ? 'SKU' : 'SKUs'}
+                  {m.home_catalog_skus({ count: counts[view] ?? 0 })}
                 </span>
               </Link>
             </li>
@@ -521,24 +538,24 @@ export function CatalogModule({ organizationId }: { organizationId: string }) {
             <Plus size={16} />
           </span>
           <div>
-            <strong>No product catalog yet</strong>
-            <p>
-              Products appear once a connected store or ERP shares its catalog.
-            </p>
+            <strong>{m.home_catalog_empty_title()}</strong>
+            <p>{m.home_catalog_empty_description()}</p>
             <Link
               className={buttonVariants({ variant: 'outline', size: 'sm' })}
               to="/app/$organizationId/sync"
               params={{ organizationId }}
             >
-              Open Data sync
+              {m.home_open_sync()}
             </Link>
           </div>
         </div>
       )}
       <footer className="home-module-footer">
         <span>
-          {counts.all} {counts.all === 1 ? 'SKU' : 'SKUs'} across{' '}
-          {sources.length} {sources.length === 1 ? 'source' : 'sources'}
+          {m.home_catalog_footer({
+            skus: counts.all ?? 0,
+            sources: sources.length,
+          })}
         </span>
         <span className="home-module-links">
           <Link
@@ -546,7 +563,7 @@ export function CatalogModule({ organizationId }: { organizationId: string }) {
             to="/app/$organizationId/products"
             params={{ organizationId }}
           >
-            <LinkLabel>Products</LinkLabel>
+            <LinkLabel>{m.home_catalog_link()}</LinkLabel>
           </Link>
         </span>
       </footer>
@@ -565,11 +582,7 @@ export function FulfillmentModule({
   );
   if (fulfillment.isPending) return <ModuleSkeleton />;
   if (fulfillment.isError)
-    return (
-      <p className="home-note">
-        Fulfillment health couldn’t be loaded. Try again shortly.
-      </p>
-    );
+    return <p className="home-note">{m.home_fulfillment_failed()}</p>;
   const { counts } = fulfillment.data;
   const views = [
     ['held', 'attention'],
@@ -594,8 +607,7 @@ export function FulfillmentModule({
                   <strong>{fulfillmentViewLabels[view]}</strong>
                 </span>
                 <span className="home-row-status">
-                  {counts[view]}{' '}
-                  {counts[view] === 1 ? 'fulfillment' : 'fulfillments'}
+                  {m.home_fulfillment_count({ count: counts[view] ?? 0 })}
                 </span>
               </Link>
             </li>
@@ -607,25 +619,24 @@ export function FulfillmentModule({
             <Plus size={16} />
           </span>
           <div>
-            <strong>No fulfillment reported yet</strong>
-            <p>
-              Fulfillment work and shipments appear once a connected store or
-              ERP reports them.
-            </p>
+            <strong>{m.home_fulfillment_empty_title()}</strong>
+            <p>{m.home_fulfillment_empty_description()}</p>
             <Link
               className={buttonVariants({ variant: 'outline', size: 'sm' })}
               to="/app/$organizationId/sync"
               params={{ organizationId }}
             >
-              Open Data sync
+              {m.home_open_sync()}
             </Link>
           </div>
         </div>
       )}
       <footer className="home-module-footer">
         <span>
-          {counts.attention} need{counts.attention === 1 ? 's' : ''} attention ·{' '}
-          {counts.open} open
+          {m.home_fulfillment_footer({
+            attention: counts.attention ?? 0,
+            open: counts.open ?? 0,
+          })}
         </span>
         <span className="home-module-links">
           <Link
@@ -633,7 +644,7 @@ export function FulfillmentModule({
             to="/app/$organizationId/fulfillment"
             params={{ organizationId }}
           >
-            <LinkLabel>Fulfillment</LinkLabel>
+            <LinkLabel>{m.home_fulfillment_link()}</LinkLabel>
           </Link>
         </span>
       </footer>
@@ -646,11 +657,7 @@ export function ReturnsModule({ organizationId }: { organizationId: string }) {
   const returns = useQuery(returnSummaryOptions(organizationId));
   if (returns.isPending) return <ModuleSkeleton />;
   if (returns.isError)
-    return (
-      <p className="home-note">
-        Returns couldn’t be loaded. Try again shortly.
-      </p>
-    );
+    return <p className="home-note">{m.home_returns_failed()}</p>;
   const { counts, sources } = returns.data;
   const sharing = sources.filter((source) => source.access === 'granted');
 
@@ -674,7 +681,7 @@ export function ReturnsModule({ organizationId }: { organizationId: string }) {
                     <strong>{stageLabels[stage]}</strong>
                   </span>
                   <span className="home-row-status">
-                    {count} {count === 1 ? 'return' : 'returns'}
+                    {m.home_returns_count({ count })}
                   </span>
                 </Link>
               </li>
@@ -688,12 +695,14 @@ export function ReturnsModule({ organizationId }: { organizationId: string }) {
           </span>
           <div>
             <strong>
-              {sharing.length ? 'No returns yet' : 'Returns are not shared yet'}
+              {sharing.length
+                ? m.home_returns_empty_title()
+                : m.home_returns_not_shared_title()}
             </strong>
             <p>
               {sharing.length
-                ? 'Returns appear here when a connected store reports one.'
-                : 'Returns appear once a connected store shares returns and refunds with Luma.'}
+                ? m.home_returns_empty_description()
+                : m.home_returns_not_shared_description()}
             </p>
             <Link
               className={buttonVariants({ variant: 'outline', size: 'sm' })}
@@ -704,14 +713,19 @@ export function ReturnsModule({ organizationId }: { organizationId: string }) {
               }
               params={{ organizationId }}
             >
-              {sharing.length ? 'Open Data sync' : 'Review connections'}
+              {sharing.length
+                ? m.home_open_sync()
+                : m.home_returns_review_connections()}
             </Link>
           </div>
         </div>
       )}
       <footer className="home-module-footer">
         <span>
-          {counts.views.action} need action · {counts.views.waiting} waiting
+          {m.home_returns_footer({
+            action: counts.views.action ?? 0,
+            waiting: counts.views.waiting ?? 0,
+          })}
         </span>
         <span className="home-module-links">
           <Link
@@ -719,7 +733,7 @@ export function ReturnsModule({ organizationId }: { organizationId: string }) {
             to="/app/$organizationId/returns"
             params={{ organizationId }}
           >
-            <LinkLabel>Returns</LinkLabel>
+            <LinkLabel>{m.home_returns_link()}</LinkLabel>
           </Link>
         </span>
       </footer>

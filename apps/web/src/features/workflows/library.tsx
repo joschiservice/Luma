@@ -1,6 +1,8 @@
 import './workflows.css';
 
 import type { WorkflowDraft, WorkflowSummary } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
@@ -35,13 +37,18 @@ import { draftsOptions } from './authoring/data';
 import { workflowError, workflowsOptions } from './data';
 import { OfflineNotice } from './offline';
 import { workflowCategoryLabel, workflowSystemLabel } from './presentation';
-import { needsAttention, ReadinessPills, RepairLink } from './readiness';
+import {
+  needsAttention,
+  ReadinessPills,
+  RepairLink,
+  unitCount,
+} from './readiness';
 
 /** Library views. Enablement and readiness are separate, so a view never hides a blocker. */
 export const statusNames = {
-  attention: 'Needs attention',
-  enabled: 'Enabled',
-  not_enabled: 'Not enabled',
+  attention: m.workflows_library_view_attention,
+  enabled: m.workflows_library_view_enabled,
+  not_enabled: m.workflows_library_view_not_enabled,
 };
 
 const libraryViews = ['all', 'attention', 'enabled', 'not_enabled'] as const;
@@ -175,7 +182,7 @@ export function WorkflowLibraryView({
   return (
     <div className="workflows-page workflow-library-page">
       <PageTitle
-        title="Workflows"
+        title={m.workflows_title()}
         actions={
           <Link
             className={buttonVariants()}
@@ -183,7 +190,7 @@ export function WorkflowLibraryView({
             params={{ organizationId }}
             search={{}}
           >
-            <Plus aria-hidden="true" /> New workflow
+            <Plus aria-hidden="true" /> {m.workflows_library_new()}
           </Link>
         }
       />
@@ -199,13 +206,16 @@ export function WorkflowLibraryView({
         <CollectionToolbar
           views={
             <CollectionViews
-              label="Workflow view"
+              label={m.workflows_library_view_label()}
               value={
                 libraryViews.find((view) => view === filters.status) ?? 'all'
               }
               views={libraryViews.map((value) => ({
                 value,
-                label: value === 'all' ? 'All workflows' : statusNames[value],
+                label:
+                  value === 'all'
+                    ? m.workflows_library_view_all()
+                    : statusNames[value](),
                 count: items ? count(value === 'all' ? '' : value) : undefined,
               }))}
               onChange={(view) =>
@@ -216,15 +226,15 @@ export function WorkflowLibraryView({
           search={{
             value: filters.q || undefined,
             onChange: (q) => change({ ...filters, q: q ?? '' }),
-            label: 'Search workflows',
-            placeholder: 'Search workflows…',
+            label: m.workflows_library_search_label(),
+            placeholder: m.workflows_library_search_placeholder(),
             maxLength: 200,
           }}
           filters={[
             {
               kind: 'choice',
               key: 'system',
-              label: 'System',
+              label: m.workflows_library_filter_system(),
               icon: Plug,
               value: filters.system || undefined,
               options: [
@@ -243,16 +253,15 @@ export function WorkflowLibraryView({
           onClear={() => change({ status: filters.status })}
           onRefresh={refresh}
           refreshing={refreshing}
-          refreshLabel="Refresh workflows"
+          refreshLabel={m.workflows_library_refresh()}
         />
         {error ? (
           <Alert tone="danger" role="alert" className="workflow-notice">
             <span>
-              {error}
-              {items ? ' The list below may be out of date.' : ''}
+              {items ? m.workflows_library_error_stale({ error }) : error}
             </span>
             <Button variant="outline" disabled={refreshing} onClick={refresh}>
-              Retry
+              {m.common_retry()}
             </Button>
           </Alert>
         ) : null}
@@ -261,27 +270,27 @@ export function WorkflowLibraryView({
         ) : !items?.length ? (
           <Empty className="workflow-empty">
             <Workflow size={28} aria-hidden="true" />
-            <h2>No published workflows</h2>
-            <p>
-              Start from a template or build your own. A reviewed version must
-              be published before it can be activated.
-            </p>
+            <h2>{m.workflows_library_empty_title()}</h2>
+            <p>{m.workflows_library_empty_body()}</p>
             <Link
               to="/app/$organizationId/workflows/new"
               params={{ organizationId }}
               search={{}}
             >
-              New workflow
+              {m.workflows_library_new()}
             </Link>
           </Empty>
         ) : !filtered?.length ? (
           <Empty className="workflow-empty">
             <Search size={24} aria-hidden="true" />
-            <h2>No matching workflows</h2>
-            <p>Try a different search, system or view.</p>
+            <h2>{m.workflows_library_filtered_title()}</h2>
+            <p>{m.workflows_library_filtered_body()}</p>
           </Empty>
         ) : (
-          <ul className="workflow-rows" aria-label="Workflows">
+          <ul
+            className="workflow-rows"
+            aria-label={m.workflows_library_list_label()}
+          >
             {filtered.map((item) => {
               const next = item.readiness.nextAction;
 
@@ -312,15 +321,23 @@ export function WorkflowLibraryView({
                       <span>{workflowCategoryLabel(item.category)}</span>
                       <span>
                         {item.systems.map(workflowSystemLabel).join(' · ') ||
-                          'No connected system'}
+                          m.workflows_library_no_system()}
                       </span>
                       <span>
-                        Covers{' '}
                         {item.readiness.coverage.covered === null
-                          ? 'unknown scope'
-                          : `${item.readiness.coverage.covered} ${item.readiness.coverage.covered === 1 ? item.readiness.coverage.unit : `${item.readiness.coverage.unit}s`}`}
+                          ? m.workflows_library_coverage_unknown()
+                          : m.workflows_library_covers({
+                              coverage: unitCount(
+                                item.readiness.coverage.covered,
+                                item.readiness.coverage.unit,
+                              ),
+                            })}
                       </span>
-                      <span>v{item.availableVersion}</span>
+                      <span>
+                        {m.workflows_version_short({
+                          version: item.availableVersion,
+                        })}
+                      </span>
                     </div>
                     <div
                       className="workflow-row-next"
@@ -328,7 +345,9 @@ export function WorkflowLibraryView({
                     >
                       {next.repair ? (
                         <>
-                          <span className="workflow-row-next-label">Next</span>
+                          <span className="workflow-row-next-label">
+                            {m.workflows_next()}
+                          </span>
                           <RepairLink
                             organizationId={organizationId}
                             definitionId={item.id}
@@ -362,8 +381,10 @@ export function WorkflowLibraryView({
         )}
         {!loading && items ? (
           <p role="status" className="workflow-count">
-            {filtered?.length ?? 0} of {items.length}{' '}
-            {items.length === 1 ? 'workflow' : 'workflows'}
+            {m.workflows_library_count({
+              shown: filtered?.length ?? 0,
+              total: items.length,
+            })}
           </p>
         ) : null}
       </div>
@@ -382,18 +403,18 @@ export function DraftList({
   canEdit: boolean;
 }) {
   const modes = {
-    template: 'From a template',
-    visual: 'Built visually',
-    code: 'Written in code',
-    language: 'Described in words',
-  } as const;
+    template: m.workflows_drafts_mode_template,
+    visual: m.workflows_drafts_mode_visual,
+    code: m.workflows_drafts_mode_code,
+    language: m.workflows_drafts_mode_language,
+  } satisfies Record<WorkflowDraft['mode'], () => string>;
 
   return (
     <section
       className="workflow-drafts"
       aria-labelledby="workflow-drafts-title"
     >
-      <h2 id="workflow-drafts-title">Drafts</h2>
+      <h2 id="workflow-drafts-title">{m.workflows_drafts_title()}</h2>
       <ul className="workflow-rows">
         {drafts.map((draft) => (
           <li key={draft.id}>
@@ -409,20 +430,33 @@ export function DraftList({
                 className="workflow-row-icon"
               />
               <div className="workflow-row-content">
-                <h3>{draft.content.definition.name || 'Untitled workflow'}</h3>
+                <h3>
+                  {draft.content.definition.name ||
+                    m.workflows_drafts_untitled()}
+                </h3>
                 <div className="workflow-row-meta">
-                  <span>{modes[draft.mode]}</span>
-                  <span>Version {draft.content.version}</span>
+                  <span>{modes[draft.mode]()}</span>
                   <span>
-                    Edited <WorkspaceDate value={draft.updatedAt} />
+                    {m.workflows_version({ version: draft.content.version })}
+                  </span>
+                  <span>
+                    {rich(m.workflows_drafts_edited, {
+                      date: <WorkspaceDate value={draft.updatedAt} />,
+                    })}
                   </span>
                   {draft.basedOn ? (
-                    <span>Edits {draft.basedOn.definitionId}</span>
+                    <span>
+                      {m.workflows_drafts_based_on({
+                        workflow: draft.basedOn.definitionId,
+                      })}
+                    </span>
                   ) : null}
                 </div>
               </div>
               <Badge tone="neutral">
-                {canEdit ? 'Draft' : 'Draft · read only'}
+                {canEdit
+                  ? m.workflows_drafts_badge()
+                  : m.workflows_drafts_badge_read_only()}
               </Badge>
               <ChevronRight
                 className="workflow-row-chevron"
@@ -442,7 +476,7 @@ export function WorkflowLoading({ detail = false }: { detail?: boolean }) {
   return (
     <div className="workflow-loading" role="status">
       <span className="sr-only">
-        {detail ? 'Loading workflow…' : 'Loading workflows…'}
+        {detail ? m.workflows_detail_loading() : m.workflows_library_loading()}
       </span>
       {[0, 1, 2].map((row) => (
         <div key={row} aria-hidden="true" className="workflow-skeleton">

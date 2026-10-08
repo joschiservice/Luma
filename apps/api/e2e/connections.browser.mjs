@@ -64,7 +64,8 @@ async function setup(page, provider, label, token = 'valid-test-token') {
     await install.click();
     // Installing asks for consent to the access the app requests.
     await page
-      .getByRole('button', { name: 'Install and grant access', exact: true })
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Install JTL', exact: true })
       .click();
   }
   await page
@@ -121,7 +122,7 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
   await page
     .getByLabel('JTL Cloud tenant ID')
     .fill('11111111-1111-4111-8111-111111111111');
-  await page.getByLabel(/Permit shipping-method corrections/).check();
+  await page.getByLabel(/Allow shipping method corrections/).check();
   const cloud = await save(page, 'Warehouse');
   await cloud.getByRole('button', { name: 'Validate access' }).click();
   await cloud.getByText('Read and write access', { exact: true }).waitFor();
@@ -237,9 +238,11 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
   await reconnected.getByRole('button', { name: 'Validate access' }).click();
   await reconnected.getByText('Validated', { exact: true }).waitFor();
   await shop.getByText('Disconnected', { exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Uninstall', exact: true }).click();
   await page
-    .getByRole('button', { name: 'Confirm uninstall', exact: true })
+    .getByRole('button', { name: 'Uninstall app', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: 'Uninstall and disconnect', exact: true })
     .click();
   await page
     .getByRole('button', { name: 'Install JTL', exact: true })
@@ -266,7 +269,7 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
   );
   await page.reload();
   await page
-    .getByText('Installing apps requires permission to manage apps', {
+    .getByText('Your role can’t install or uninstall apps', {
       exact: false,
     })
     .waitFor();
@@ -369,7 +372,7 @@ test('preserves non-secret input on errors, handles stale versions and unavailab
   await page.getByRole('button', { name: 'Refresh list' }).click();
   await page
     .getByRole('alert')
-    .filter({ hasText: 'Connection service unavailable.' })
+    .filter({ hasText: 'The connection service is unavailable.' })
     .waitFor();
   expect(await card.count()).toBe(0);
   await page.unroute('**/api/v1/organizations/*/connections');
@@ -396,7 +399,8 @@ test('starts Shopify authorization without token fields and reports callback out
     .getByRole('button', { name: 'Install Shopify', exact: true })
     .click();
   await page
-    .getByRole('button', { name: 'Install and grant access', exact: true })
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Install Shopify', exact: true })
     .click();
   await page
     .getByRole('button', { name: 'Add connection', exact: true })
@@ -405,13 +409,13 @@ test('starts Shopify authorization without token fields and reports callback out
     0,
   );
   await page
-    .getByText('Order history is limited to the last 60 days.', {
+    .getByText('Luma can read orders from the last 60 days.', {
       exact: false,
     })
     .waitFor();
   await page
     .getByText(
-      'Customer context is unavailable until Shopify approves access',
+      'Customer details aren’t available until Shopify approves access',
       { exact: false },
     )
     .waitFor();
@@ -434,7 +438,9 @@ test('starts Shopify authorization without token fields and reports callback out
   await page.waitForURL('https://dev-shop.myshopify.com/**');
   await page.goto(returnUrl + '?appResult=denied');
   await page
-    .getByText('Authorization needs attention. Add a connection to try again.')
+    .getByText(
+      'Authorization was declined, so no connection was added. Add the connection again to retry.',
+    )
     .waitFor();
   expect(errors).toEqual([]);
 }, 120000);

@@ -112,67 +112,67 @@ const metricSpecs: readonly (readonly [
   [
     'unknown_eligibility',
     'Unknown eligibility',
-    'Issues without a retained known eligibility assessment.',
+    'Issues with no recorded check of whether Luma may resolve them on its own.',
     'case',
   ],
   [
     'eligible',
     'Eligible issues',
-    'Issues explicitly assessed as eligible under a retained rule version.',
+    'Issues checked and found eligible for automatic resolution under a recorded rule version.',
     'case',
   ],
   [
     'verified',
     'Verified outcomes',
-    'Current authoritative, complete independent verification. Repeated problems create new linked incidents; earlier verified outcomes remain evidence.',
+    'Issues whose current outcome was confirmed by a complete, independent check. A repeated problem opens a new linked issue. Earlier verified outcomes stay as evidence.',
     'case',
   ],
   [
     'autonomous',
-    'Verified without help',
-    'Eligible, verified issues with complete attribution and no approval, repair or correction.',
+    'Resolved without help',
+    'Eligible, verified issues with a complete record showing nobody approved, repaired, or corrected anything.',
     'case',
   ],
   [
     'human',
     'Human involvement',
-    'Issues with a persisted approval, repair, correction or human disposition, across every attempt.',
+    'Issues where a person approved, repaired, corrected, or closed something, across every attempt.',
     'case',
   ],
   [
     'unknown',
-    'Unknown attribution',
-    'Issues without complete attribution over the current outcome interval.',
+    'Help unknown',
+    'Issues without a complete record of who acted before the current outcome.',
     'case',
   ],
   [
     'pending',
     'Awaiting verified outcome',
-    'Issues without a current independent verified outcome, including human dispositions.',
+    'Issues without a current independently verified outcome, including issues a person closed.',
     'case',
   ],
   [
     'recurrent',
     'Recurring issues',
-    'New incidents linked to a previous incident. Each recurrence is a separate counting unit.',
+    'New issues linked to an earlier one. Each recurrence counts separately.',
     'case',
   ],
   [
     'incorrect_actions',
     'Issues with incorrect actions',
-    'Distinct issues with evidence-backed incorrect action assessments; failures alone do not establish incorrectness.',
+    'Issues where evidence shows an action was wrong. A failed action alone doesn’t count as incorrect.',
     'case',
   ],
   [
     'time_to_outcome',
     'Median time to outcome',
-    'Median seconds from first detection to current independent verification, including all attempts.',
+    'Median time from first detection to the current independent check, across all attempts.',
     'second',
   ],
   [
     'unresolved_age',
     'Oldest pending outcome',
-    'Maximum seconds since first detection among issues awaiting independent verification.',
+    'Longest time since first detection among issues still waiting for an independent check.',
     'second',
   ],
 ];
@@ -188,7 +188,7 @@ export const resolutionMetricDefinitions: OperationalMetricDefinition[] =
     filters: ['environment', 'window'],
     permissions: 'workspace_member',
     timeSemantics:
-      'One incident ID, first detected in [asOf minus window, asOf). Current outcome at asOf. Default: live, seven days. Retries never add units.',
+      'Issues first detected in the selected period before the time shown, with their outcome at that time. Shows live issues from the last 7 days unless you choose otherwise. Retries don’t add issues.',
   }));
 
 /** Classifies persisted incident facts without treating missing attribution or action acceptance as autonomy. */

@@ -108,7 +108,7 @@ test('finds a held fulfillment, explains the next safe step and follows its orde
   // The order links back to the same fulfillment.
   await page.getByRole('link', { name: '#200', exact: true }).click();
   await page.waitForURL(`**/orders/*`);
-  await page.getByRole('link', { name: /^Open .* fulfillment$/ }).click();
+  await page.getByRole('link', { name: /^Open fulfillment: / }).click();
   await page.waitForURL(`**/fulfillment/${work.ids.held}*`);
   await page
     .getByRole('heading', { name: 'On hold: Incorrect address' })

@@ -48,7 +48,7 @@ test('explains measured and unknown outcomes, exposes evidence, and recovers fro
   page.setDefaultTimeout(15000);
   await page.goto(`/app/${f.org.id}/insights`);
   const section = page.getByRole('region', {
-    name: 'Verified outcomes & human work',
+    name: 'Verified outcomes and human help',
   });
   const value = (id) =>
     section.locator(`[data-metric="resolution.${id}"] .operational-value`);
@@ -62,15 +62,15 @@ test('explains measured and unknown outcomes, exposes evidence, and recovers fro
   await page.keyboard.press('Enter');
   const dialog = page.getByRole('dialog');
   await dialog.getByText('Partial coverage', { exact: true }).waitFor();
-  await dialog.getByText('Unknown attribution · 1', { exact: true }).waitFor();
+  await dialog.getByText('Help unknown · 1', { exact: true }).waitFor();
+  await dialog.getByText('No human help', { exact: true }).waitFor();
   await dialog
-    .getByText('Complete attribution · no human work', { exact: true })
-    .waitFor();
-  await dialog
-    .getByText('Evidence & measurement facts', { exact: false })
+    .getByText('Evidence and measurement history', { exact: false })
     .click();
   await dialog
-    .getByText('eligible · partner-rule/1 · supported', { exact: true })
+    .getByText('Eligible for automation · partner-rule/1 · supported', {
+      exact: true,
+    })
     .waitFor();
   await expect(dialog.getByText(a.evidence, { exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
@@ -85,19 +85,19 @@ test('explains measured and unknown outcomes, exposes evidence, and recovers fro
     reasonCode: 'outside_scope',
   });
   await expect(value('autonomous')).toHaveText('0 known');
-  await page.getByRole('combobox', { name: 'Outcome environment' }).click();
-  await page.getByRole('option', { name: 'Synthetic', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Environment' }).click();
+  await page.getByRole('option', { name: 'Simulated', exact: true }).click();
   await expect(
     page.getByText('Excluded from live results', { exact: true }),
   ).toBeVisible();
   await expect(value('verified')).toHaveText('1');
-  await page.getByRole('combobox', { name: 'Outcome environment' }).click();
-  await page.getByRole('option', { name: 'Shadow', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Environment' }).click();
+  await page.getByRole('option', { name: 'Shadow mode', exact: true }).click();
   await expect(value('verified')).toHaveText('—');
   await section.locator('[data-metric="resolution.verified"]').click();
   await dialog.getByText('No matching records', { exact: true }).waitFor();
   await page.keyboard.press('Escape');
-  await page.getByRole('combobox', { name: 'Outcome environment' }).click();
+  await page.getByRole('combobox', { name: 'Environment' }).click();
   await page
     .getByRole('option', { name: 'Live operations', exact: true })
     .click();
@@ -125,9 +125,7 @@ test('explains measured and unknown outcomes, exposes evidence, and recovers fro
     fullPage: true,
   });
   await section.locator('[data-metric="resolution.human"]').click();
-  await dialog
-    .getByText('Human involvement recorded', { exact: true })
-    .waitFor();
+  await dialog.getByText('A person helped', { exact: true }).waitFor();
   await expect
     .poll(() => dialog.evaluate((el) => window.getComputedStyle(el).opacity))
     .toBe('1');
@@ -189,7 +187,7 @@ test('explains measured and unknown outcomes, exposes evidence, and recovers fro
     204,
   );
   await section
-    .getByText('Workspace access changed', { exact: true })
+    .getByText('Your workspace access changed', { exact: true })
     .waitFor();
   expect(await section.locator('[data-metric]').count()).toBe(0);
   expect(errors).toEqual([]);

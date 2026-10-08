@@ -1,6 +1,9 @@
 import './sync.css';
 
 import type { IdentityDetail, LinkInput } from '@luma/api-contract';
+import { formatCurrency, formatList } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -91,7 +94,7 @@ export function IdentityLinks({
       setError(
         cause instanceof IdentityError && cause.message
           ? cause.message
-          : 'Luma could not send this request. Try again.',
+          : m.sync_links_request_failed(),
       );
       throw cause;
     }
@@ -101,11 +104,11 @@ export function IdentityLinks({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Linked sources</CardTitle>
+          <CardTitle>{m.sync_links_title()}</CardTitle>
         </CardHeader>
         <CardContent>
           <p role="status" className="sync-identity-note">
-            Loading linked sources…
+            {m.sync_links_loading()}
           </p>
         </CardContent>
       </Card>
@@ -114,9 +117,9 @@ export function IdentityLinks({
   if (!detail)
     return (
       <Alert tone="danger" role="alert">
-        Linked sources could not be loaded.{' '}
+        {m.sync_links_load_failed()}{' '}
         <Button variant="outline" onClick={() => void query.refetch()}>
-          Retry
+          {m.common_retry()}
         </Button>
       </Alert>
     );
@@ -152,11 +155,7 @@ export function IdentityLinksView({
   const [reason, setReason] = useState('');
   const [sending, setSending] = useState(false);
   const order = detail.entity.kind === 'order';
-  const noun = order
-    ? 'order'
-    : detail.entity.kind === 'location'
-      ? 'location'
-      : 'SKU';
+  const location = detail.entity.kind === 'location';
   const latest = detail.requests[0];
   const busy =
     sending || latest?.state === 'requested' || latest?.state === 'running';
@@ -169,16 +168,13 @@ export function IdentityLinksView({
     <Card className="sync-identity" as="section">
       <CardHeader>
         <div>
-          <CardTitle>Linked sources</CardTitle>
+          <CardTitle>{m.sync_links_title()}</CardTitle>
           <CardDescription>
-            {order ? (
-              'Confirm which source records represent this order. Each source keeps its own lines, shipments and evidence. Suggestions are never linked automatically.'
-            ) : (
-              <>
-                Each source keeps its own ID. Luma treats records from different
-                sources as the same {noun} only after a person links them.
-              </>
-            )}
+            {order
+              ? m.sync_links_description_order()
+              : location
+                ? m.sync_links_description_location()
+                : m.sync_links_description_sku()}
           </CardDescription>
         </div>
       </CardHeader>
@@ -190,26 +186,28 @@ export function IdentityLinksView({
                 <strong>{source.connectionLabel}</strong>
                 <small>
                   <span title={source.externalId}>
-                    {providerName(source.provider)} ID{' '}
-                    {sourceId(source.externalId)}
+                    {m.sync_links_source_id({
+                      provider: providerName(source.provider),
+                      id: sourceId(source.externalId),
+                    })}
                   </span>
                   {source.order?.number
-                    ? ` · Order ${source.order.number}`
+                    ? ` · ${m.sync_links_source_order({ number: source.order.number })}`
                     : ''}
                   {source.codes.length
-                    ? ` · SKU ${source.codes.join(', ')}`
+                    ? ` · ${m.sync_links_source_sku({ codes: formatList(source.codes) })}`
                     : ''}
                   {source.titles.length ? ` · ${source.titles[0]}` : ''}
                 </small>
               </span>
               <Badge tone={source.revisedAt ? 'info' : 'neutral'}>
                 {source.method.startsWith('Linked')
-                  ? 'Linked by a person'
+                  ? m.sync_links_method_linked()
                   : source.method.startsWith('Unlinked')
-                    ? 'Unlinked'
+                    ? m.sync_links_method_unlinked()
                     : source.method.startsWith('Imported')
-                      ? 'Imported'
-                      : 'Mapped'}
+                      ? m.sync_links_method_imported()
+                      : m.sync_links_method_matched()}
               </Badge>
               {detail.canManage && detail.sources.length > 1 ? (
                 <Button
@@ -218,7 +216,7 @@ export function IdentityLinksView({
                   disabled={busy}
                   onClick={() => open({ operation: 'unlink', source })}
                 >
-                  <Unlink aria-hidden="true" /> Unlink
+                  <Unlink aria-hidden="true" /> {m.sync_links_unlink()}
                 </Button>
               ) : null}
             </li>
@@ -226,12 +224,15 @@ export function IdentityLinksView({
         </ul>
         {detail.suggestions.length ? (
           <div className="sync-identity-suggestions">
-            <h3>Possibly the same {noun}</h3>
+            <h3>
+              {order
+                ? m.sync_links_suggestions_order()
+                : location
+                  ? m.sync_links_suggestions_location()
+                  : m.sync_links_suggestions_sku()}
+            </h3>
             {order && detail.suggestions.length > 1 ? (
-              <Alert>
-                More than one order shares this reference. Check each source
-                record before choosing.
-              </Alert>
+              <Alert>{m.sync_links_suggestions_ambiguous()}</Alert>
             ) : null}
             <ul className="sync-identity-sources">
               {detail.suggestions.map((suggestion) => (
@@ -251,9 +252,11 @@ export function IdentityLinksView({
                     </strong>
                     <small>
                       {suggestion.reason} ·{' '}
-                      {suggestion.sources
-                        .map((source) => source.connectionLabel)
-                        .join(', ')}
+                      {formatList(
+                        suggestion.sources.map(
+                          (source) => source.connectionLabel,
+                        ),
+                      )}
                     </small>
                     {order ? (
                       <OrderMatchFacts sources={suggestion.sources} />
@@ -271,12 +274,14 @@ export function IdentityLinksView({
                           label: suggestion.label,
                           reason: order
                             ? ''
-                            : `${suggestion.reason}; confirmed as the same item`,
+                            : m.sync_links_reason_prefill({
+                                reason: suggestion.reason,
+                              }),
                           sources: suggestion.sources,
                         })
                       }
                     >
-                      <Link2 aria-hidden="true" /> Link
+                      <Link2 aria-hidden="true" /> {m.sync_links_link()}
                     </Button>
                   ) : null}
                 </li>
@@ -298,19 +303,32 @@ export function IdentityLinksView({
         {latest ? (
           latest.state === 'failed' ? (
             <Alert tone="danger" role="alert">
-              {latest.message ?? 'The last request failed.'}
+              {latest.message ?? m.sync_links_last_failed()}
             </Alert>
           ) : busy ? (
             <Alert role="status">
-              {latest.operation === 'link' ? 'Linking' : 'Unlinking'} records.
-              {order
-                ? 'Luma is updating the order and its source records.'
-                : 'Luma is regrouping stock, products and order lines.'}
+              {latest.operation === 'link'
+                ? order
+                  ? m.sync_links_linking_order()
+                  : m.sync_links_linking_sku()
+                : order
+                  ? m.sync_links_unlinking_order()
+                  : m.sync_links_unlinking_sku()}
             </Alert>
           ) : (
             <p className="sync-identity-note">
-              Last change: {latest.operation === 'link' ? 'linked' : 'unlinked'}{' '}
-              <WorkspaceDate value={latest.completedAt ?? latest.createdAt} />.{' '}
+              {rich(
+                latest.operation === 'link'
+                  ? m.sync_links_last_linked
+                  : m.sync_links_last_unlinked,
+                {
+                  date: (
+                    <WorkspaceDate
+                      value={latest.completedAt ?? latest.createdAt}
+                    />
+                  ),
+                },
+              )}{' '}
               {latest.reason}
             </p>
           )
@@ -327,17 +345,29 @@ export function IdentityLinksView({
           <DialogContent>
             <DialogTitle>
               {pending?.operation === 'link'
-                ? `Link ${pending.label} to ${detail.entity.label}?`
-                : `Unlink ${pending?.operation === 'unlink' ? pending.source.connectionLabel : ''}?`}
+                ? m.sync_links_link_title({
+                    other: pending.label,
+                    record: detail.entity.label,
+                  })
+                : m.sync_links_unlink_title({
+                    source:
+                      pending?.operation === 'unlink'
+                        ? pending.source.connectionLabel
+                        : '',
+                  })}
             </DialogTitle>
             <DialogDescription>
               {order
                 ? pending?.operation === 'link'
-                  ? 'Both source versions will appear on this order. Lines and shipments stay separate. Old links and evidence remain reachable. You can unlink later.'
-                  : 'This source becomes a separate order again, with its own lines and shipments. The change and your reason are recorded.'
-                : pending?.operation === 'link'
-                  ? 'Luma will treat both records as one SKU: stock, products and order lines from each source are grouped here, while each source keeps its own quantities. You can unlink later; the change is recorded.'
-                  : 'This source becomes its own SKU again. Its stock, products and order lines move with it. The change is recorded.'}
+                  ? m.sync_links_link_order_description()
+                  : m.sync_links_unlink_order_description()
+                : location
+                  ? pending?.operation === 'link'
+                    ? m.sync_links_link_location_description()
+                    : m.sync_links_unlink_location_description()
+                  : pending?.operation === 'link'
+                    ? m.sync_links_link_sku_description()
+                    : m.sync_links_unlink_sku_description()}
             </DialogDescription>
             {order && pending?.operation === 'link' ? (
               <div className="sync-order-match">
@@ -357,7 +387,7 @@ export function IdentityLinksView({
               </Alert>
             ) : null}
             <label className="sync-identity-reason">
-              <span>Why is this correct?</span>
+              <span>{m.sync_links_reason_label()}</span>
               <Textarea
                 value={reason}
                 maxLength={2000}
@@ -366,7 +396,7 @@ export function IdentityLinksView({
             </label>
             <div className="sync-dialog-actions">
               <Button variant="outline" onClick={() => setPending(null)}>
-                Cancel
+                {m.common_cancel()}
               </Button>
               <Button
                 disabled={!reason.trim() || sending}
@@ -400,8 +430,8 @@ export function IdentityLinksView({
                 }}
               >
                 {pending?.operation === 'link'
-                  ? 'Link records'
-                  : 'Unlink source'}
+                  ? m.sync_links_link_confirm()
+                  : m.sync_links_unlink_confirm()}
               </Button>
             </div>
           </DialogContent>
@@ -421,27 +451,47 @@ export function OrderMatchFacts({ sources }: { sources: Source[] }) {
         >
           <strong>{source.connectionLabel}</strong>
           <small>
-            {providerName(source.provider)} ID {sourceId(source.externalId)}
+            {m.sync_links_source_id({
+              provider: providerName(source.provider),
+              id: sourceId(source.externalId),
+            })}
           </small>
           {source.order?.externalNumber ? (
-            <small>External order number: {source.order.externalNumber}</small>
+            <small>
+              {m.sync_links_fact_external_number({
+                number: source.order.externalNumber,
+              })}
+            </small>
           ) : null}
           <small>
-            Placed:{' '}
-            {source.order?.placedAt ? (
-              <WorkspaceDate value={source.order.placedAt} />
-            ) : (
-              'Unknown'
-            )}
+            {rich(m.sync_links_fact_placed, {
+              date: source.order?.placedAt ? (
+                <WorkspaceDate value={source.order.placedAt} />
+              ) : (
+                m.common_unknown()
+              ),
+            })}
           </small>
           <small>
-            Total:{' '}
-            {source.order?.total
-              ? `${source.order.total.amount} ${source.order.total.currency}`
-              : 'Unknown'}
+            {m.sync_links_fact_total({
+              total: source.order?.total
+                ? orderTotal(source.order.total)
+                : m.common_unknown(),
+            })}
           </small>
         </div>
       ))}
     </div>
   );
+}
+
+/** Formats a source order total in the active language, keeping the raw value if it isn’t numeric. */
+function orderTotal(total: { amount: string; currency: string }) {
+  const amount = Number(total.amount);
+  if (!Number.isFinite(amount)) return `${total.amount} ${total.currency}`;
+  try {
+    return formatCurrency(amount, total.currency);
+  } catch {
+    return `${total.amount} ${total.currency}`;
+  }
 }

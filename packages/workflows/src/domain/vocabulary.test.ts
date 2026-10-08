@@ -130,7 +130,7 @@ describe('authoring vocabulary', () => {
     ).toEqual(
       expect.objectContaining({
         executable: false,
-        reason: expect.stringContaining('No installed adapter'),
+        reason: expect.stringContaining('No installed app'),
       }),
     );
     expect(vocabulary.capabilities[0]).toEqual(

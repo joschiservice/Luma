@@ -7,6 +7,8 @@ import {
   returnStageSchema,
   type ReturnView,
 } from '@luma/api-contract';
+import { formatNumber, formatRelativeTime } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -37,7 +39,6 @@ import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
 import { recordReturnPath } from '../records/data';
 import { SyncCoverage } from '../sync/coverage';
-import { ago } from '../sync/presentation';
 import {
   defaultSort,
   defaultView,
@@ -64,21 +65,28 @@ const subscribe = (changed: () => void) => onlineManager.subscribe(changed);
 const onlineSnapshot = () => onlineManager.isOnline();
 const serverSnapshot = () => true;
 
-const stageHints: Partial<Record<ReturnStage, string>> = {
-  requested: 'Approve or decline',
-  awaiting_items: 'With the customer',
-  awaiting_refund: 'Issue the refund',
-  refund_pending: 'With the payment provider',
-  refund_failed: 'Retry the refund',
-  ready_to_close: 'Close the return',
+const stageHints: Partial<Record<ReturnStage, () => string>> = {
+  requested: m.returns_stage_hint_requested,
+  awaiting_items: m.returns_stage_hint_awaiting_items,
+  awaiting_refund: m.returns_stage_hint_awaiting_refund,
+  refund_pending: m.returns_stage_hint_refund_pending,
+  refund_failed: m.returns_stage_hint_refund_failed,
+  ready_to_close: m.returns_stage_hint_ready_to_close,
 };
 
 const sorts: readonly ReturnSort[] = ['oldest', 'newest', 'activity'];
 
-const sortLabels: Record<ReturnSort, string> = {
-  oldest: 'Oldest request first',
-  newest: 'Newest request first',
-  activity: 'Latest activity first',
+const sortLabels: Record<ReturnSort, () => string> = {
+  oldest: m.returns_sort_oldest,
+  newest: m.returns_sort_newest,
+  activity: m.returns_sort_activity,
+};
+
+const emptyViewTitles: Record<ReturnView, () => string> = {
+  action: m.returns_empty_view_action_title,
+  waiting: m.returns_empty_view_waiting_title,
+  done: m.returns_empty_view_done_title,
+  all: m.returns_empty_view_all_title,
 };
 
 /** Connects the returns list to workspace-scoped queries and shareable URL filters. */
@@ -151,7 +159,7 @@ function StageStrip({
   choose: (stage: ReturnStage | undefined) => void;
 }) {
   return (
-    <section className="returns-stages" aria-label="Pending work by stage">
+    <section className="returns-stages" aria-label={m.returns_stages_label()}>
       {workStages.map((stage) => {
         const count = list.counts.stages[stage] ?? 0;
         const active = selected === stage;
@@ -170,8 +178,8 @@ function StageStrip({
               <StateDot state={count ? stageStates[stage] : 'idle'} />
               <span>{stageLabels[stage]}</span>
             </span>
-            <strong>{count.toLocaleString()}</strong>
-            <small>{stageHints[stage]}</small>
+            <strong>{formatNumber(count)}</strong>
+            <small>{stageHints[stage]?.()}</small>
           </button>
         );
       })}
@@ -186,12 +194,14 @@ function returnColumns(
 ): DataTableColumn<ReturnListItem>[] {
   const source = (connectionId: string) =>
     list.sources.find((item) => item.connectionId === connectionId);
+  const sourceLabel = (connectionId: string) =>
+    source(connectionId)?.label ?? m.returns_source_fallback();
   const now = Date.parse(list.asOf);
 
   return [
     {
       key: 'return',
-      header: 'Return',
+      header: m.returns_column_return(),
       cell: (item) => (
         <div className="returns-cell">
           <DataTableRowLink
@@ -207,17 +217,20 @@ function returnColumns(
           </DataTableRowLink>
           <small>
             {item.kind === 'refund'
-              ? 'Refund without a return'
-              : `Order ${item.order.displayNumber ?? item.order.id.slice(0, 8)}`}
-            {' · '}
-            {source(item.connectionId)?.label ?? 'Connected source'}
+              ? m.returns_row_refund_context({
+                  source: sourceLabel(item.connectionId),
+                })
+              : m.returns_row_order_context({
+                  order: item.order.displayNumber ?? item.order.id.slice(0, 8),
+                  source: sourceLabel(item.connectionId),
+                })}
           </small>
         </div>
       ),
     },
     {
       key: 'stage',
-      header: 'Stage',
+      header: m.returns_column_stage(),
       cell: (item) => (
         <div className="returns-cell">
           <StatePill state={stageStates[item.stage]}>
@@ -231,34 +244,41 @@ function returnColumns(
     },
     {
       key: 'items',
-      header: 'Items',
+      header: m.returns_column_items(),
       hideOnNarrow: true,
       cell: (item) =>
         item.kind === 'refund' ? (
           <span className="returns-muted">
             {item.refundedUnits
-              ? `${units(item.refundedUnits)} refunded`
-              : 'No items'}
+              ? m.returns_row_units_refunded({
+                  units: units(item.refundedUnits),
+                })
+              : m.returns_row_no_items()}
           </span>
         ) : (
           <div className="returns-cell">
             <span>
               {item.received === null
-                ? `${units(item.quantity)} requested`
-                : `${units(item.received)} of ${units(item.quantity)} received`}
+                ? m.returns_row_units_requested({ units: units(item.quantity) })
+                : m.returns_row_units_received({
+                    received: units(item.received),
+                    quantity: units(item.quantity),
+                  })}
             </span>
             <small>
               {item.reasons.length
                 ? item.reasons.slice(0, 2).join(', ')
-                : 'No reason given'}
-              {item.reasons.length > 2 ? ` +${item.reasons.length - 2}` : ''}
+                : m.returns_row_no_reason()}
+              {item.reasons.length > 2
+                ? ` +${formatNumber(item.reasons.length - 2)}`
+                : ''}
             </small>
           </div>
         ),
     },
     {
       key: 'refund',
-      header: 'Refund',
+      header: m.returns_column_refund(),
       cell: (item) => (
         <div className="returns-cell">
           <span
@@ -274,8 +294,9 @@ function returnColumns(
           {item.refund.failedAttempts && item.refund.state !== 'failed' ? (
             <small>
               <Badge tone="danger">
-                {item.refund.failedAttempts} failed{' '}
-                {item.refund.failedAttempts === 1 ? 'payment' : 'payments'}
+                {m.returns_row_failed_payments({
+                  count: item.refund.failedAttempts,
+                })}
               </Badge>
             </small>
           ) : null}
@@ -284,21 +305,21 @@ function returnColumns(
     },
     {
       key: 'requested',
-      header: 'Requested',
+      header: m.returns_column_requested(),
       hideOnNarrow: true,
       cell: (item) =>
         item.requestedAt ? (
           <div className="returns-cell">
             <WorkspaceDate value={item.requestedAt} />
-            <small>{ago(item.requestedAt, now)}</small>
+            <small>{formatRelativeTime(item.requestedAt, now)}</small>
           </div>
         ) : (
-          <span className="returns-muted">Not reported</span>
+          <span className="returns-muted">{m.common_not_reported()}</span>
         ),
     },
     {
       key: 'activity',
-      header: 'Last activity',
+      header: m.returns_column_activity(),
       hideOnNarrow: true,
       cell: (item) => <WorkspaceDate value={item.activityAt} />,
     },
@@ -352,7 +373,7 @@ export function ReturnsView({
   const missingAccess = sources.filter((source) => source.access !== 'granted');
   const sourceLabel = (id: string | undefined) =>
     sources.find((source) => source.connectionId === id)?.label ??
-    'Selected source';
+    m.returns_filter_selected_source();
   // Only sources that share returns are offered; a linked source stays readable as a chip.
   const sourceOptions = (sharing.length > 1 ? sharing : []).map((source) => ({
     value: source.connectionId,
@@ -375,8 +396,8 @@ export function ReturnsView({
 
   return (
     <main className="returns-page">
-      {from ? <Link to={from}>← Back to context</Link> : null}
-      <PageTitle title="Returns" />
+      {from ? <Link to={from}>← {m.returns_back_to_context()}</Link> : null}
+      <PageTitle title={m.returns_page_title()} />
       {shownList ? (
         <StageStrip
           list={shownList}
@@ -385,12 +406,12 @@ export function ReturnsView({
         />
       ) : null}
       <CollectionToolbar
-        refreshLabel="Refresh returns"
+        refreshLabel={m.returns_list_refresh()}
         refreshing={refreshing}
         onRefresh={refresh}
         views={
           <CollectionViews
-            label="Return views"
+            label={m.returns_list_views_label()}
             value={view}
             views={views.map((option) => ({
               value: option,
@@ -405,14 +426,14 @@ export function ReturnsView({
         search={{
           value: search.q,
           onChange: (q) => update({ q }),
-          label: 'Search returns',
-          placeholder: 'Return, order number, reason or source ID…',
+          label: m.returns_list_search_label(),
+          placeholder: m.returns_list_search_placeholder(),
         }}
         filters={[
           {
             kind: 'choice',
             key: 'stage',
-            label: 'Stage',
+            label: m.returns_filter_stage(),
             icon: CircleDot,
             value: search.stage,
             options: returnStageSchema.options.map((value) => ({
@@ -427,7 +448,7 @@ export function ReturnsView({
           {
             kind: 'choice',
             key: 'connectionId',
-            label: 'Source',
+            label: m.returns_filter_source(),
             icon: Plug,
             value: search.connectionId,
             options: sourceOptions,
@@ -436,7 +457,10 @@ export function ReturnsView({
         ]}
         sort={{
           value: sort,
-          options: sorts.map((value) => ({ value, label: sortLabels[value] })),
+          options: sorts.map((value) => ({
+            value,
+            label: sortLabels[value](),
+          })),
           onChange: (value) => {
             const next = sorts.find((item) => item === value);
             update({ sort: next === defaultSort(view) ? undefined : next });
@@ -447,10 +471,7 @@ export function ReturnsView({
         }
       />
       {coverage}
-      <p className="returns-note">
-        Luma reads returns from your store and never approves, receives or
-        refunds them. Only successful refund payments count as money returned.
-      </p>
+      <p className="returns-note">{m.returns_list_note()}</p>
       {missingAccess.map((source) => (
         <Alert key={source.connectionId} tone="info">
           <p>{accessMessage(source)}</p>
@@ -458,26 +479,22 @@ export function ReturnsView({
             to="/app/$organizationId/connections"
             params={{ organizationId }}
           >
-            Review connections
+            {m.returns_review_connections()}
           </Link>
         </Alert>
       ))}
-      {offline ? (
-        <Alert role="status">
-          You are offline. Reconnect to refresh returns.
-        </Alert>
-      ) : null}
+      {offline ? <Alert role="status">{m.returns_list_offline()}</Alert> : null}
       {error ? (
         <Alert tone="danger" role="alert">
           {stale
-            ? 'Returns could not be refreshed. The list below may be out of date.'
-            : error}{' '}
+            ? m.returns_list_refresh_failed()
+            : `${m.returns_list_load_failed()} ${error}`}{' '}
           <Button variant="outline" onClick={refresh}>
-            Retry
+            {m.common_retry()}
           </Button>
           {search.cursor ? (
             <Button variant="ghost" onClick={() => update({})}>
-              Go to first page
+              {m.returns_go_first_page()}
             </Button>
           ) : null}
         </Alert>
@@ -486,7 +503,9 @@ export function ReturnsView({
         <>
           <DataTable
             className="returns-list-table"
-            caption={`${search.stage ? stageLabels[search.stage] : viewLabels[view]} returns and refunds`}
+            caption={m.returns_list_caption({
+              view: search.stage ? stageLabels[search.stage] : viewLabels[view],
+            })}
             columns={returnColumns(organizationId, search, shownList)}
             rows={shownList.items}
             rowKey={(item) => item.id}
@@ -504,8 +523,15 @@ export function ReturnsView({
           {shownList.items.length ? (
             <div className="returns-pagination">
               <span>
-                {shownList.items.length} of {matching.toLocaleString()}
-                {search.cursor ? ' on this page' : ''}
+                {search.cursor
+                  ? m.returns_list_page_count_paged({
+                      shown: shownList.items.length,
+                      total: matching,
+                    })
+                  : m.returns_list_page_count({
+                      shown: shownList.items.length,
+                      total: matching,
+                    })}
               </span>
               <div>
                 {previous ? (
@@ -514,12 +540,12 @@ export function ReturnsView({
                     disabled={refreshing}
                     onClick={previous}
                   >
-                    Previous page
+                    {m.returns_previous_page()}
                   </Button>
                 ) : null}
                 {search.cursor ? (
                   <Button variant="ghost" onClick={() => update({})}>
-                    First page
+                    {m.returns_first_page()}
                   </Button>
                 ) : null}
                 <Button
@@ -527,7 +553,7 @@ export function ReturnsView({
                   disabled={!next || refreshing}
                   onClick={next}
                 >
-                  Next page
+                  {m.returns_next_page()}
                 </Button>
               </div>
             </div>
@@ -535,7 +561,7 @@ export function ReturnsView({
         </>
       ) : loading && !error ? (
         <div className="returns-loading" role="status">
-          <span className="sr-only">Loading returns…</span>
+          <span className="sr-only">{m.returns_list_loading()}</span>
           {Array.from({ length: 5 }, (_, i) => (
             <span className="lu-skeleton" key={i} />
           ))}
@@ -565,10 +591,10 @@ function ReturnsEmpty({
     return (
       <Empty>
         <Search size={30} aria-hidden="true" />
-        <h2>No returns match</h2>
-        <p>Try another return name, order number, reason or source.</p>
+        <h2>{m.returns_empty_filtered_title()}</h2>
+        <p>{m.returns_empty_filtered_body()}</p>
         <Button onClick={clear} variant="outline">
-          Clear filters
+          {m.common_clear_filters()}
         </Button>
       </Empty>
     );
@@ -582,16 +608,16 @@ function ReturnsEmpty({
         <h2>
           {sharing
             ? importing
-              ? 'Importing returns'
-              : 'No returns yet'
-            : 'Returns are not shared yet'}
+              ? m.returns_empty_importing_title()
+              : m.returns_empty_none_title()
+            : m.returns_empty_not_shared_title()}
         </h2>
         <p>
           {sharing
             ? importing
-              ? 'Luma is reading return history from your store. Returns appear here as they are imported.'
-              : 'No connected store has reported a return or refund. New returns appear here after the next sync.'
-            : 'Returns appear here once a connected store shares returns and refunds with Luma.'}
+              ? m.returns_empty_importing_body()
+              : m.returns_empty_none_body()
+            : m.returns_empty_not_shared_body()}
         </p>
         <Link
           to={
@@ -601,7 +627,9 @@ function ReturnsEmpty({
           }
           params={{ organizationId }}
         >
-          {sharing ? 'Open Data sync' : 'Review connections'}
+          {sharing
+            ? m.returns_open_data_sync()
+            : m.returns_review_connections()}
         </Link>
       </Empty>
     );
@@ -610,22 +638,18 @@ function ReturnsEmpty({
   return (
     <Empty>
       <CircleCheck size={30} aria-hidden="true" />
-      <h2>
-        {view === 'action'
-          ? 'Nothing needs action'
-          : `No ${viewLabels[view].toLowerCase()} returns`}
-      </h2>
+      <h2>{emptyViewTitles[view]()}</h2>
       <p>
-        {view === 'action'
-          ? `Every return is waiting on the customer or payment provider, or is done. ${
-              list.counts.views.waiting
-                ? `${list.counts.views.waiting.toLocaleString()} waiting.`
-                : ''
-            }`
-          : 'Other views have returns.'}
+        {view !== 'action'
+          ? m.returns_empty_view_other_body()
+          : list.counts.views.waiting
+            ? m.returns_empty_view_action_body_waiting({
+                count: list.counts.views.waiting,
+              })
+            : m.returns_empty_view_action_body()}
       </p>
       <Button onClick={showAll} variant="outline">
-        Show all returns
+        {m.returns_show_all()}
       </Button>
     </Empty>
   );

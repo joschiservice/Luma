@@ -30,7 +30,7 @@ it('puts decisions for a person ahead of Luma’s progress', () => {
   ).toEqual({ state: 'approval', label: 'Needs approval' });
   expect(issueStatus(base)).toEqual({
     state: 'running',
-    label: 'Applying fix',
+    label: 'Sending change',
   });
 });
 

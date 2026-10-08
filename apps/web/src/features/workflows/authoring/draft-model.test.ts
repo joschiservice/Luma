@@ -208,7 +208,7 @@ describe('builder palette and scanning', () => {
       { id: 'ok', kind: 'approval', forStep: '', expiresAfterSeconds: 3600 },
       ...createSteps('capability', content, vocabulary),
     ]);
-    expect(stepFacts(withAction, 0)).toEqual(['Decide within 1 h']);
+    expect(stepFacts(withAction, 0)).toEqual(['Decide within 1 hour']);
     expect(stepFacts(withAction, 1)).toEqual([
       'Medium risk',
       'Asks a person first',

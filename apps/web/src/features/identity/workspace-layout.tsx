@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { Button } from '@luma/ui/components/primitives/button';
 import {
   Dialog,
@@ -83,18 +84,29 @@ export function WorkspaceLayout({
             data-assistant={assistant && assistantOpen ? 'open' : 'closed'}
           >
             <a className="skip-link" href="#workspace-content">
-              Skip to content
+              {m.identity_layout_skip()}
             </a>
-            <aside className="desk-sidebar" aria-label="Workspace">
+            <aside
+              className="desk-sidebar"
+              aria-label={m.identity_layout_sidebar_label()}
+            >
               <div className="sidebar-top">
                 {workspaceSwitcher}
                 <Button
                   variant="ghost"
                   size="icon"
                   className="sidebar-collapse"
-                  aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                  aria-label={
+                    collapsed
+                      ? m.identity_layout_sidebar_expand()
+                      : m.identity_layout_sidebar_collapse()
+                  }
                   aria-pressed={collapsed}
-                  title={`${collapsed ? 'Expand' : 'Collapse'} sidebar ( [ )`}
+                  title={
+                    collapsed
+                      ? m.identity_layout_sidebar_expand_hint()
+                      : m.identity_layout_sidebar_collapse_hint()
+                  }
                   onClick={() => setSidebarCollapsed(!collapsed)}
                 >
                   <PanelLeft aria-hidden="true" />
@@ -110,7 +122,11 @@ export function WorkspaceLayout({
                   <Dialog open={open} onOpenChange={setOpen}>
                     <DialogTrigger
                       render={
-                        <Button variant="ghost" size="icon" aria-label="Menu" />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={m.identity_layout_menu()}
+                        />
                       }
                     >
                       <Menu aria-hidden="true" />
@@ -119,9 +135,11 @@ export function WorkspaceLayout({
                       className="navigation-drawer"
                       showCloseButton={false}
                     >
-                      <DialogTitle className="sr-only">Navigation</DialogTitle>
+                      <DialogTitle className="sr-only">
+                        {m.identity_layout_navigation_title()}
+                      </DialogTitle>
                       <DialogDescription className="sr-only">
-                        Choose a destination in this workspace.
+                        {m.identity_layout_navigation_description()}
                       </DialogDescription>
                       <div className="sidebar-top">{workspaceSwitcher}</div>
                       <div className="sidebar-scroll">
@@ -131,7 +149,10 @@ export function WorkspaceLayout({
                     </DialogContent>
                   </Dialog>
                 </div>
-                <nav className="header-context" aria-label="Breadcrumb">
+                <nav
+                  className="header-context"
+                  aria-label={m.identity_layout_breadcrumb()}
+                >
                   <span className="workspace-default-breadcrumb">
                     {context}
                   </span>

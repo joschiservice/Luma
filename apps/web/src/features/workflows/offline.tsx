@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { onlineManager } from '@tanstack/react-query';
 import { useSyncExternalStore } from 'react';
@@ -12,8 +13,7 @@ export function OfflineNotice() {
 
   return online ? null : (
     <Alert tone="warning" role="status" className="workflow-notice">
-      You are offline. Previously loaded information may be outdated. Reconnect
-      and refresh before changing activations.
+      {m.workflows_offline()}
     </Alert>
   );
 }

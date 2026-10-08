@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import type { ReactNode } from 'react';
 
 import { cn } from '../../lib/utils';
@@ -14,7 +15,7 @@ export function SectionNavigation({
   items,
   value,
   onValueChange,
-  title = 'On this page',
+  title = m.ui_section_navigation_title(),
   'aria-label': ariaLabel = title,
   className,
   renderItem,

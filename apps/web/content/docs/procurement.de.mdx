@@ -1,0 +1,89 @@
+---
+title: Lieferantenbestellungen vom Entwurf bis zum Wareneingang verfolgen
+description: Erstellen Sie Lieferantenbestellungen, senden Sie sie über JTL-Wawi an Lieferanten, verfolgen Sie Bestätigungen und Wareneingänge und reagieren Sie auf Änderungen und verpasste Fristen.
+---
+
+**Beschaffung** zeigt Ihre Lieferanten und Lieferantenbestellungen, wo jede Bestellung steht und wer als Nächstes handelt. Öffnen Sie sie in der Seitenleiste oder drücken Sie **G** und dann **P**. Mit **Beschaffung ansehen** sehen Sie alles. Zum Erstellen, Senden und Ändern von Bestellungen brauchen Sie **Beschaffung verwalten**.
+
+## Wie eine Bestellung voranschreitet [#how-an-order-progresses]
+
+Jede Lieferantenbestellung durchläuft vier Meilensteine, damit ein Entwurf nie mit Ware unterwegs verwechselt wird:
+
+- **Erstellt**: Die Bestellung existiert in Luma. An den Lieferanten ist noch nichts gegangen.
+- **Gesendet**: Luma hat die Bestellung in Ihrer Warenwirtschaft, etwa JTL-Wawi, angelegt, und ein separater Abruf hat sie dort gefunden. Ihre Warenwirtschaft gibt sie an den Lieferanten weiter.
+- **Vom Lieferanten bestätigt**: Der Lieferant hat Mengen und Termine bestätigt, gelesen aus Ihrer Warenwirtschaft oder erfasst aus einer Lieferantennachricht.
+- **Ware eingegangen**: In Ihrer Warenwirtschaft wurden Einheiten als eingegangen gebucht. Nur diese Buchung zählt. Die Aussage eines Lieferanten, die Ware sei versandt, oder das Abschließen der Bestellung in Luma zählt nicht.
+
+Die Phase der Bestellung fasst das zusammen, von **Entwurf, nicht gesendet** über **Wartet auf Genehmigung**, **Wird gesendet**, **Gesendet, wartet auf Lieferant**, **Vom Lieferanten bestätigt** oder **Mit Änderungen bestätigt** bis zu **Teilweise eingegangen** und **Eingegangen**. **Senden fehlgeschlagen**, **Abgeschlossen** und **Storniert** beenden oder unterbrechen den Weg.
+
+## Bestellung oder Lieferant finden [#find-an-order-or-supplier]
+
+Wechseln Sie oben zwischen **Lieferantenbestellungen** und **Lieferanten**. Bei Bestellungen zeigen die Kacheln **Antwort nötig**, **Wartet auf Lieferant** und **Nicht gesendete Entwürfe** die passenden Bestellungen. Sie können außerdem nach **Phase** filtern und nach Referenz, Lieferant oder SKU suchen. Jede Zeile zeigt die Phase, die nächste erwartete Lieferung und unter **Zuständig**, wer als Nächstes handelt: Einkauf, eine genehmigende Person, der Lieferant, das Lager, Luma oder niemand.
+
+Lieferanten und Lieferantenbestellungen finden Sie auch über die Suche mit ⌘ K oder Strg K.
+
+## Entwurf erstellen [#create-a-draft]
+
+1. Wählen Sie **Lieferant hinzufügen** und füllen Sie **Name des Lieferanten** aus. Gibt es den Lieferanten auch in einem anderen System, ergänzen Sie seine ID als externe Referenz.
+2. Wählen Sie **Neue Lieferantenbestellung**, geben Sie eine **Bestellreferenz** ein, wählen Sie den Lieferanten und fügen Sie Positionen mit SKU, Beschreibung, Menge und Einheit hinzu.
+3. Wählen Sie **Entwurf erstellen**. An den Lieferanten geht nichts, bis Sie die Bestellung senden.
+
+**Als offen markieren** hält fest, dass die Bestellung in Arbeit ist, ohne sie zu senden. **Bestellung abschließen** markiert sie in Luma als erledigt und storniert sie nicht in Ihrer Warenwirtschaft. **Bestellung stornieren** beendet sie. Jede Statusänderung braucht einen Grund, und abgeschlossene oder stornierte Bestellungen behalten ihren Verlauf. Bestellungen mit **Außerhalb von Luma verwaltet** gehören zu einem anderen System und lassen sich hier nicht ändern.
+
+Auch Nachschub-Workflows können Bestellungen entwerfen. Eine solche Bestellung zeigt **Grund der Bestellung**: den Bestand, der unter den Mindestbestand der Regel gefallen ist, die vorgeschlagene Menge, wer sie genehmigt hat und ob Luma den Entwurf geprüft hat.
+
+## Lieferant verknüpfen [#link-a-supplier]
+
+Um Bestellungen aus Luma zu senden, verknüpfen Sie den Lieferanten mit demselben Lieferanten in Ihrer Warenwirtschaft. Wählen Sie auf der Seite des Lieferanten **Mit Warenwirtschaft verknüpfen** oder in einer Bestellung **Lieferant verknüpfen**. Wählen Sie die **Warenwirtschaft** und den **Lieferant in diesem System**, legen Sie **Bestätigung erwarten innerhalb von (Stunden)** fest und wählen Sie **Verknüpfung speichern**. Nach dieser Zeit erscheint eine unbestätigte Bestellung in [Wartet auf Sie](/docs/needs-you).
+
+Die Verbindung muss das Senden von Lieferantenbestellungen erlauben. Kann keine Ihrer Verbindungen Lieferanten auflisten, verbinden Sie JTL-Wawi unter Apps mit aktiviertem **Senden genehmigter Lieferantenbestellungen erlauben**; siehe [Apps installieren und Systeme verbinden](/docs/apps-and-connections#choose-what-luma-may-change-in-jtl).
+
+Jeder Artikel der Bestellung muss außerdem als Artikel in der Warenwirtschaft existieren. Verhindert etwas das Senden, listet die Bestellung es unter **Vor dem Senden**. Preise und Steuern kommen aus den Lieferantenkonditionen in Ihrer Warenwirtschaft; Luma legt sie nicht fest.
+
+## Bestellung senden [#send-an-order]
+
+1. Wählen Sie bei einem Entwurf oder einer offenen Bestellung **An Lieferanten senden**.
+2. Prüfen Sie **Was gesendet wird** und wählen Sie unter **Gewünschter Liefertermin** ein Datum.
+3. Wählen Sie **Genehmigung anfordern**.
+
+Das Senden ist eine Zusage an den Lieferanten, daher muss eine andere Person, die Änderungen genehmigen darf, es genehmigen. Sie sieht die Anfrage in „Wartet auf Sie“ und in der Bestellung, mit **Genehmigen und senden** und **Ablehnen**. Die Anfrage läuft nach 24 Stunden ab; die Bestellung zeigt, wann. Nach der Genehmigung legt Luma die Bestellung einmal in Ihrer Warenwirtschaft an und prüft dann, ob sie angekommen ist. Hat das Senden nicht begonnen, kann die anfragende Person **Jetzt senden** wählen.
+
+Zum Genehmigen braucht eine Person **Beschaffung verwalten**, **Änderungen genehmigen oder ablehnen** und die JTL-App-Berechtigung **Lieferantenbestellungen an JTL senden**, und sie darf die Anfrage nicht selbst gestellt haben.
+
+## Prüfen, ob sie angekommen ist [#check-that-it-arrived]
+
+- **Wird gesendet**: Luma legt die Bestellung an. Bestätigt Ihre Warenwirtschaft die Anfrage nicht, prüft Luma, ob die Bestellung angelegt wurde, und sendet sie nie ein zweites Mal. Mit der Schaltfläche **… prüfen**, die den Namen Ihrer Verbindung trägt, rufen Sie Ihre Warenwirtschaft sofort ab.
+- **Gesendet, wartet auf Lieferant**: Ein separater Abruf hat die Bestellung in Ihrer Warenwirtschaft gefunden.
+- **Senden fehlgeschlagen**: Ihre Warenwirtschaft hat die Bestellung nicht angelegt. Die Meldung nennt den Grund. Beheben Sie die Ursache und senden Sie erneut.
+- Wurde das Senden abgelehnt oder ist die Genehmigungsanfrage abgelaufen, wurde nichts gesendet. Sie können erneut senden.
+
+Unter **Abrufe aus der Warenwirtschaft** listet die Bestellung jeden Abruf, den Luma gemacht hat.
+
+## Den Lieferanten verfolgen [#follow-the-supplier]
+
+Luma liest die Bestellung regelmäßig aus Ihrer Warenwirtschaft und erfasst jede Bestätigung und jeden Wareneingang. Wählen Sie **Auf Änderungen prüfen**, um sie sofort abzurufen. **Positionen und Bestand** zeigt für jede Position, was bestellt, bestätigt und eingegangen ist, was noch offen ist, gewünschte und zugesagte Termine sowie den aktuellen Bestand des Artikels.
+
+Bestätigt ein Lieferant weniger Einheiten oder einen späteren Termin, braucht die Bestellung eine Antwort. Wählen Sie **Annehmen oder nachfassen** und dann:
+
+- **Änderung annehmen**: Luma erwartet ab jetzt die geänderte Menge oder den geänderten Termin.
+- **Beim Lieferanten nachfassen**: Notieren Sie, was Sie getan haben, etwa eine E-Mail an den Lieferanten, und wann Luma unter **Erneut prüfen am** wieder nachsehen soll. Ändert sich bis dahin nichts, kehrt die Bestellung in „Wartet auf Sie“ zurück.
+
+Bei einer verpassten Bestätigung oder einer überfälligen Lieferung wählen Sie auf dieselbe Weise **Nachfassen erfassen**. Diese Fälle kommen zurück, bis sie erledigt sind.
+
+## Lieferantennachrichten erfassen [#record-supplier-messages]
+
+Wählen Sie **Nachricht hinzufügen** und fügen Sie die E-Mail, die Portalnachricht oder Telefonnotizen des Lieferanten ein. Fügen Sie dieselbe E-Mail zweimal hinzu, bleibt eine Kopie.
+
+Liest Ihr Workspace Nachrichten automatisch, wählen Sie **Hinzufügen und lesen**. Luma listet jede Zusage des Lieferanten, etwa bestätigte Mengen, Liefertermine, Versand und Bedingungen, und markiert die Worte, aus denen sie stammt. Änderungen, Bedingungen und unklare Formulierungen warten auf Ihre Prüfung: **Bestätigen**, **Bestätigen und annehmen** oder ablehnen können Sie sie in der Bestellung oder in „Wartet auf Sie“.
+
+Sie können Zusagen jederzeit selbst erfassen: Markieren Sie die Worte, die sie enthalten, und wählen Sie **Als Zusage erfassen**. Um eine erfasste Zusage zu berichtigen, wählen Sie **Korrigieren** und nennen einen Grund. Korrekturen werden dem **Verlauf der Zusagen** hinzugefügt; nichts wird überschrieben.
+
+Luma entfernt den Nachrichtentext nach einer Aufbewahrungsfrist; **Nachrichtendetails** zeigt das Datum. Personen mit **Beschaffung verwalten** können **Nachrichtentext jetzt entfernen** wählen. Erfasste Zusagen bleiben erhalten.
+
+## Lieferantenseiten [#supplier-pages]
+
+Die Seite eines Lieferanten zeigt die Zahlen **Offene Bestellungen**, **Wartet auf Lieferant**, **Antwort nötig** und **Überfällig**, dazu jede Lieferantenbestellung mit ihrer Phase, letzte Nachrichten und zugehörige Probleme. **Artikel und Bestand** listet, was Sie bei dem Lieferanten kaufen, mit **Jetzt verfügbar** und **Bestellt**. „Bestellt“ zählt Entwürfe und offene Lieferantenbestellungen und ist kein bestätigter Zulauf.
+
+## Nachschub [#replenishment]
+
+Der Bereich **Nachschub** in der Beschaffung zeigt, wie viele Bestandspositionen Ihre Nachschubregeln überwachen und was als Nächstes zu beheben ist. **Bestandsregeln verwalten** öffnet den Nachschub-Workflow; siehe [Workflows](/docs/workflows).

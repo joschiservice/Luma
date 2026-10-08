@@ -156,18 +156,21 @@ test('finds an order by number or SKU, explains it and pages a historical import
   await page.keyboard.press('g');
   await page.keyboard.press('o');
   await page.getByRole('heading', { name: 'Orders', exact: true }).waitFor();
-  await page.getByText('1–50 orders').waitFor();
+  const orderRange = page
+    .getByRole('navigation', { name: 'Order pages' })
+    .getByRole('status');
+  await expect(orderRange).toHaveText('1–50');
   await page.getByRole('button', { name: 'Next' }).click();
-  await page.getByText('51–100 orders').waitFor();
+  await expect(orderRange).toHaveText('51–100');
   await page
     .getByRole('navigation', { name: 'Order pages' })
     .screenshot({ path: '/tmp/luma116-order-pagination.png' });
   expect(new URL(page.url()).searchParams.get('page')).toBe('2');
   await page.getByRole('button', { name: 'Previous' }).click();
-  await page.getByText('1–50 orders').waitFor();
+  await expect(orderRange).toHaveText('1–50');
 
   await page.getByRole('tab', { name: 'Overdue', exact: true }).click();
-  await page.getByText('1–1 orders').waitFor();
+  await expect(orderRange).toHaveText('1–1');
   await page.getByRole('link', { name: '#2003' }).waitFor();
   await page.getByRole('tab', { name: 'All orders' }).click();
 
@@ -184,12 +187,14 @@ test('finds an order by number or SKU, explains it and pages a historical import
 
   await page.getByRole('searchbox', { name: 'Search orders' }).fill('TOTE-red');
   await page.keyboard.press('Enter');
-  await page.getByText('1–1 orders').waitFor();
+  await expect(orderRange).toHaveText('1–1');
   await page.getByRole('link', { name: '#2001' }).click();
   await page.getByRole('heading', { name: '#2001', level: 1 }).waitFor();
   await page.getByRole('heading', { name: 'Current state' }).waitFor();
   await page
-    .getByText('Payment differs: Tokyo store paid; JTL-Wawi payment pending.')
+    .getByText(
+      'Payment differs between sources: “Paid” in Tokyo store and “Payment pending” in JTL-Wawi.',
+    )
     .waitFor();
   await page.getByRole('cell', { name: '2', exact: true }).first().waitFor();
   await page.getByText('Canvas tote').first().waitFor();
@@ -227,7 +232,7 @@ test('finds an order by number or SKU, explains it and pages a historical import
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/app/${fixture.org.id}/orders?sort=number&direction=asc`);
-  await page.getByText('1–50 orders').waitFor();
+  await expect(orderRange).toHaveText('1–50');
   expect(
     await page
       .getByRole('columnheader', { name: /Order/ })

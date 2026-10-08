@@ -1,6 +1,9 @@
 import './procurement.css';
 
 import type { SupplierContext, SupplierRecord } from '@luma/api-contract';
+import { formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -14,10 +17,11 @@ import { Empty } from '@luma/ui/components/primitives/empty';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { quantityWithUnit } from '@luma/ui/lib/units';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { ArrowLeft, Building2, Plus, RefreshCw } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { useState } from 'react';
 
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
@@ -68,13 +72,13 @@ function Stat({
   label,
   tone,
 }: {
-  value: ReactNode;
+  value: number;
   label: string;
   tone?: 'attention';
 }) {
   return (
     <div className="procurement-stat" data-tone={tone}>
-      <strong>{value}</strong>
+      <strong>{formatNumber(value)}</strong>
       <span>{label}</span>
     </div>
   );
@@ -120,27 +124,35 @@ export function SupplierRecordView({
         search={{ view: 'suppliers', q: '', status: '' }}
       >
         <ArrowLeft size={14} aria-hidden="true" />
-        Suppliers
+        {m.procurement_supplier_back()}
       </Link>
       <PageHeader
-        title={supplier?.name ?? 'Supplier'}
+        title={supplier?.name ?? m.procurement_supplier_title_fallback()}
         icon={<DomainIcon domain="procurement" size="md" />}
         description={
           supplier
             ? supplier.link
-              ? `Linked to ${supplier.link.name ?? `supplier ${supplier.link.externalId}`} in ${record?.connection?.label ?? 'a purchasing system'}`
-              : 'Not linked to a purchasing system. Orders are tracked in Luma only.'
-            : 'Orders, commitments and stock for one supplier.'
+              ? linkedDescription(
+                  supplier.link.name ??
+                    m.procurement_supplier_external({
+                      id: supplier.link.externalId,
+                    }),
+                  record?.connection?.label,
+                )
+              : m.procurement_supplier_unlinked()
+            : m.procurement_supplier_description_fallback()
         }
         actions={
           record?.canManage ? (
             <>
               <Button variant="outline" onClick={() => setDialog('link')}>
-                {supplier?.link ? 'Change link' : 'Link to purchasing system'}
+                {supplier?.link
+                  ? m.procurement_supplier_change_link()
+                  : m.procurement_supplier_link_system()}
               </Button>
               <Button onClick={() => setDialog('order')}>
                 <Plus size={15} aria-hidden="true" />
-                New purchase order
+                {m.procurement_list_new_order()}
               </Button>
             </>
           ) : null
@@ -151,49 +163,55 @@ export function SupplierRecordView({
           {supplier ? (
             supplier.link ? (
               record?.connection?.status === 'active' ? (
-                <StatePill state="verified">Purchasing link active</StatePill>
+                <StatePill state="verified">
+                  {m.procurement_supplier_link_active()}
+                </StatePill>
               ) : (
                 <StatePill state="attention">
-                  Purchasing connection unavailable
+                  {m.procurement_supplier_connection_unavailable()}
                 </StatePill>
               )
             ) : (
-              <StatePill state="idle">Not linked</StatePill>
+              <StatePill state="idle">{m.procurement_not_linked()}</StatePill>
             )
           ) : null}
           {record ? (
-            <Badge>Confirms within {record.confirmationHours} h</Badge>
+            <Badge>
+              {m.procurement_supplier_confirmation_window({
+                hours: record.confirmationHours,
+              })}
+            </Badge>
           ) : null}
         </span>
         <Button variant="ghost" disabled={refreshing} onClick={reload}>
           <RefreshCw size={14} aria-hidden="true" />
-          Refresh
+          {m.common_refresh()}
         </Button>
       </div>
       {error === 'missing' ? (
         <Empty>
           <Building2 size={30} aria-hidden="true" />
-          <h2>Supplier not found</h2>
-          <p>This supplier is not in this workspace.</p>
+          <h2>{m.procurement_supplier_missing_title()}</h2>
+          <p>{m.procurement_supplier_missing_body()}</p>
           <Link
             to="/app/$organizationId/procurement"
             params={{ organizationId }}
             search={{ view: 'suppliers', q: '', status: '' }}
           >
-            Browse suppliers
+            {m.procurement_supplier_missing_link()}
           </Link>
         </Empty>
       ) : error ? (
         <Alert tone="danger" role="alert">
           {error}{' '}
           <Button variant="outline" onClick={reload}>
-            Retry
+            {m.common_retry()}
           </Button>
         </Alert>
       ) : null}
       {!record && loading && !error ? (
         <div className="procurement-skeleton" role="status">
-          <span className="sr-only">Loading supplier…</span>
+          <span className="sr-only">{m.procurement_supplier_loading()}</span>
           {Array.from({ length: 3 }, (_, i) => (
             <span className="lu-skeleton" key={i} />
           ))}
@@ -201,17 +219,26 @@ export function SupplierRecordView({
       ) : null}
       {record && supplier ? (
         <>
-          <section className="procurement-stats" aria-label="Supplier summary">
-            <Stat value={live.length} label="Open commitments" />
-            <Stat value={waiting.length} label="Awaiting confirmation" />
+          <section
+            className="procurement-stats"
+            aria-label={m.procurement_supplier_summary()}
+          >
+            <Stat
+              value={live.length}
+              label={m.procurement_supplier_stat_open()}
+            />
+            <Stat
+              value={waiting.length}
+              label={m.procurement_supplier_stat_waiting()}
+            />
             <Stat
               value={attention.length}
-              label="Need a response"
+              label={m.procurement_supplier_stat_attention()}
               {...(attention.length ? { tone: 'attention' as const } : {})}
             />
             <Stat
               value={overdue.length}
-              label="Overdue"
+              label={m.procurement_supplier_stat_overdue()}
               {...(overdue.length ? { tone: 'attention' as const } : {})}
             />
           </section>
@@ -222,18 +249,20 @@ export function SupplierRecordView({
                 aria-labelledby="supplier-orders"
               >
                 <div className="procurement-section-heading">
-                  <h2 id="supplier-orders">Purchase orders</h2>
-                  <span>{orders.length}</span>
+                  <h2 id="supplier-orders">
+                    {m.procurement_supplier_orders_title()}
+                  </h2>
+                  <span>{formatNumber(orders.length)}</span>
                 </div>
                 <DataTable
-                  caption="Purchase orders for this supplier"
+                  caption={m.procurement_supplier_orders_caption()}
                   density="compact"
                   rows={orders}
                   rowKey={(row) => row.order.id}
                   columns={[
                     {
                       key: 'reference',
-                      header: 'Order',
+                      header: m.procurement_column_order(),
                       cell: (row) => (
                         <span className="procurement-cell">
                           <DataTableRowLink
@@ -251,46 +280,60 @@ export function SupplierRecordView({
                           </DataTableRowLink>
                           <small>
                             {row.externalOrderNumber
-                              ? `${record.connection?.label ?? 'Purchasing'} ${row.externalOrderNumber}`
-                              : `Created `}
-                            {row.externalOrderNumber ? null : (
-                              <WorkspaceDate value={row.order.createdAt} />
-                            )}
+                              ? record.connection?.label
+                                ? m.procurement_external_order_number({
+                                    system: record.connection.label,
+                                    number: row.externalOrderNumber,
+                                  })
+                                : m.procurement_erp_order_number({
+                                    number: row.externalOrderNumber,
+                                  })
+                              : rich(m.procurement_supplier_order_created, {
+                                  date: (
+                                    <WorkspaceDate
+                                      value={row.order.createdAt}
+                                    />
+                                  ),
+                                })}
                           </small>
                         </span>
                       ),
                     },
                     {
                       key: 'stage',
-                      header: 'Stage',
+                      header: m.procurement_column_stage(),
                       cell: (row) => <StagePill stage={row.stage} />,
                     },
                     {
                       key: 'expected',
-                      header: 'Expected',
+                      header: m.procurement_column_expected(),
                       hideOnNarrow: true,
                       cell: (row) =>
                         row.progress.expectedDate ? (
                           calendarDate(row.progress.expectedDate)
                         ) : (
-                          <span className="procurement-muted">—</span>
+                          <span className="procurement-muted">
+                            {m.common_empty_value()}
+                          </span>
                         ),
                     },
                     {
                       key: 'next',
-                      header: 'Next',
+                      header: m.procurement_column_next_step(),
                       hideOnNarrow: true,
                       cell: (row) => (
                         <span className="procurement-cell">
                           <span>{row.progress.next.title}</span>
-                          <small>{ownerLabels[row.progress.next.owner]}</small>
+                          <small>
+                            {ownerLabels[row.progress.next.owner]()}
+                          </small>
                         </span>
                       ),
                     },
                   ]}
                   empty={
                     <p className="procurement-empty">
-                      No purchase orders with this supplier yet.
+                      {m.procurement_supplier_orders_empty()}
                     </p>
                   }
                 />
@@ -306,19 +349,18 @@ export function SupplierRecordView({
                 className="procurement-side"
                 aria-labelledby="supplier-details"
               >
-                <h2 id="supplier-details">Details</h2>
+                <h2 id="supplier-details">{m.common_details()}</h2>
                 <dl className="procurement-side-facts">
                   <div>
-                    <dt>Purchasing system</dt>
+                    <dt>{m.procurement_supplier_purchasing_system()}</dt>
                     <dd>
                       {record.connection?.label ?? (
-                        <span className="procurement-muted">Not linked</span>
+                        <span className="procurement-muted">
+                          {m.procurement_not_linked()}
+                        </span>
                       )}
                       {record.connection && !record.connection.canSubmit ? (
-                        <small>
-                          Can’t place orders. Reconnect with purchase-order
-                          access.
-                        </small>
+                        <small>{m.procurement_supplier_cannot_send()}</small>
                       ) : null}
                     </dd>
                   </div>
@@ -331,7 +373,7 @@ export function SupplierRecordView({
                     </div>
                   ))}
                   <div>
-                    <dt>Added</dt>
+                    <dt>{m.procurement_column_added()}</dt>
                     <dd>
                       <WorkspaceDate value={supplier.createdAt} />
                     </dd>
@@ -343,7 +385,9 @@ export function SupplierRecordView({
                 className="procurement-side"
                 aria-labelledby="supplier-messages-recent"
               >
-                <h2 id="supplier-messages-recent">Recent messages</h2>
+                <h2 id="supplier-messages-recent">
+                  {m.procurement_supplier_messages_title()}
+                </h2>
                 {record.communications.length ? (
                   <ul className="procurement-side-list">
                     {record.communications.slice(0, 6).map((c) => (
@@ -357,10 +401,14 @@ export function SupplierRecordView({
                             }}
                             hash="supplier-messages"
                           >
-                            {c.subject || 'Supplier message'}
+                            {c.subject ||
+                              m.procurement_supplier_message_fallback()}
                           </Link>
                         ) : (
-                          <span>{c.subject || 'Supplier message'}</span>
+                          <span>
+                            {c.subject ||
+                              m.procurement_supplier_message_fallback()}
+                          </span>
                         )}
                         <small>
                           {c.from} · <WorkspaceDate value={c.receivedAt} />
@@ -369,7 +417,9 @@ export function SupplierRecordView({
                     ))}
                   </ul>
                 ) : (
-                  <p className="procurement-note">No messages recorded.</p>
+                  <p className="procurement-note">
+                    {m.procurement_supplier_messages_empty()}
+                  </p>
                 )}
               </Card>
               {context?.issues.length ? (
@@ -378,7 +428,7 @@ export function SupplierRecordView({
                   className="procurement-side"
                   aria-labelledby="supplier-issues"
                 >
-                  <h2 id="supplier-issues">Related issues</h2>
+                  <h2 id="supplier-issues">{m.procurement_related_issues()}</h2>
                   <ul className="procurement-side-list">
                     {context.issues.map((issue) => (
                       <li key={issue.id}>
@@ -427,6 +477,12 @@ export function SupplierRecordView({
   );
 }
 
+function linkedDescription(supplier: string, system: string | undefined) {
+  return system
+    ? m.procurement_supplier_linked({ supplier, system })
+    : m.procurement_supplier_linked_generic({ supplier });
+}
+
 /** SKUs ordered from this supplier with current stock and units still on order. */
 function SuppliedStock({
   organizationId,
@@ -438,25 +494,25 @@ function SuppliedStock({
   return (
     <section className="procurement-section" aria-labelledby="supplied-stock">
       <div className="procurement-section-heading">
-        <h2 id="supplied-stock">Supplied items and stock</h2>
+        <h2 id="supplied-stock">{m.procurement_supplied_title()}</h2>
         {context?.truncated ? (
-          <span>Showing the 50 most recent SKUs</span>
+          <span>{m.procurement_supplied_truncated({ count: 50 })}</span>
         ) : null}
       </div>
       {!context ? (
         <p className="procurement-note" role="status">
-          Loading stock…
+          {m.procurement_supplied_loading()}
         </p>
       ) : (
         <DataTable
-          caption="SKUs ordered from this supplier"
+          caption={m.procurement_supplied_caption()}
           density="compact"
           rows={context.skus}
           rowKey={(row) => row.sku}
           columns={[
             {
               key: 'sku',
-              header: 'SKU',
+              header: m.procurement_supplied_sku(),
               cell: (row) => (
                 <span className="procurement-cell">
                   {row.skuId ? (
@@ -471,14 +527,16 @@ function SuppliedStock({
                   )}
                   <small>
                     <code>{row.positions[0]?.sku ?? row.sku}</code>
-                    {row.skuId ? '' : ' · not a known SKU'}
+                    {row.skuId
+                      ? ''
+                      : ` · ${m.procurement_supplied_unknown_sku()}`}
                   </small>
                 </span>
               ),
             },
             {
               key: 'stock',
-              header: 'Available now',
+              header: m.procurement_supplied_available(),
               cell: (row) =>
                 row.positions.length ? (
                   <span className="procurement-cell">
@@ -489,9 +547,14 @@ function SuppliedStock({
                         params={{ organizationId, positionId: position.id }}
                       >
                         {position.sources
-                          .map(
-                            (s) =>
-                              `${s.deleted ? 'removed' : stockQuantity(s.available)} ${position.unit}`,
+                          .map((s) =>
+                            s.deleted
+                              ? m.procurement_stock_removed()
+                              : quantityWithUnit(
+                                  stockQuantity(s.available),
+                                  position.unit,
+                                  s.available ?? '',
+                                ),
                           )
                           .join(' / ')}{' '}
                         <small>{position.location}</small>
@@ -499,34 +562,41 @@ function SuppliedStock({
                     ))}
                   </span>
                 ) : (
-                  <span className="procurement-muted">No stock observed</span>
+                  <span className="procurement-muted">
+                    {m.procurement_stock_none()}
+                  </span>
                 ),
             },
             {
               key: 'onOrder',
-              header: 'On order here',
+              header: m.procurement_supplied_on_order(),
               numeric: true,
               cell: (row) =>
                 row.onOrder.length ? (
                   row.onOrder
-                    .map((o) => `${quantity(o.quantity)} ${o.unit}`)
+                    .map((o) =>
+                      quantityWithUnit(
+                        quantity(o.quantity),
+                        o.unit,
+                        o.quantity,
+                      ),
+                    )
                     .join(' · ')
                 ) : (
-                  <span className="procurement-muted">—</span>
+                  <span className="procurement-muted">
+                    {m.common_empty_value()}
+                  </span>
                 ),
             },
           ]}
           empty={
             <p className="procurement-empty">
-              Items appear here once they are on an order with this supplier.
+              {m.procurement_supplied_empty()}
             </p>
           }
         />
       )}
-      <p className="procurement-note">
-        Units on order are draft or open purchase orders, not confirmed incoming
-        stock.
-      </p>
+      <p className="procurement-note">{m.procurement_supplied_note()}</p>
     </section>
   );
 }

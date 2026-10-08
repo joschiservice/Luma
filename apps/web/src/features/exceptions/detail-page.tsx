@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { caseLabel } from '@luma/ui/components/issues/case-investigation';
 import { IssuePageLayout } from '@luma/ui/components/issues/issue-page-layout';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -61,9 +62,10 @@ function IssueWorkspace({
             to="/app/$organizationId/exceptions/$exceptionId"
             params={{ organizationId, exceptionId }}
             search={search}
-            aria-label="Back to issues"
+            aria-label={m.exceptions_back_label()}
           >
-            <ArrowLeft size={16} aria-hidden="true" /> Issues
+            <ArrowLeft size={16} aria-hidden="true" />{' '}
+            {m.exceptions_back_text()}
           </Link>
           {item?.subject.kind === 'sku' ? (
             <Link
@@ -77,7 +79,7 @@ function IssueWorkspace({
                 from: `${location.pathname}${location.searchStr}`,
               }}
             >
-              Inspect inventory <ArrowRight size={14} />
+              {m.exceptions_inspect_inventory()} <ArrowRight size={14} />
             </Link>
           ) : null}
           {item?.subject.kind === 'sku' ? (
@@ -89,7 +91,7 @@ function IssueWorkspace({
                 from: `${location.pathname}${location.searchStr}`,
               }}
             >
-              Inspect product <ArrowRight size={14} />
+              {m.exceptions_inspect_product()} <ArrowRight size={14} />
             </Link>
           ) : null}
           {connection ? (
@@ -103,8 +105,8 @@ function IssueWorkspace({
               hash={`connection-${connection.id}`}
             >
               {connection.status === 'active'
-                ? 'Open connection'
-                : `Reconnect ${connection.label}`}{' '}
+                ? m.exceptions_open_connection()
+                : m.exceptions_reconnect({ connection: connection.label })}{' '}
               <ArrowRight size={14} aria-hidden="true" />
             </Link>
           ) : null}
@@ -115,7 +117,7 @@ function IssueWorkspace({
                 params={{ organizationId, fulfillmentId: item.subject.id }}
                 search={{ from: `${location.pathname}${location.searchStr}` }}
               >
-                Inspect fulfillment <ArrowRight size={14} />
+                {m.exceptions_inspect_fulfillment()} <ArrowRight size={14} />
               </Link>
             ) : (
               <Link
@@ -127,7 +129,7 @@ function IssueWorkspace({
                   from: `${location.pathname}${location.searchStr}`,
                 }}
               >
-                Inspect fulfillment <ArrowRight size={14} />
+                {m.exceptions_inspect_fulfillment()} <ArrowRight size={14} />
               </Link>
             )
           ) : null}
@@ -143,9 +145,10 @@ function IssueWorkspace({
                   : undefined,
                 from: `${location.pathname}${location.searchStr}`,
               }}
-              aria-label="Find underlying records"
+              aria-label={m.exceptions_find_records_label()}
             >
-              Find records <ArrowRight size={14} aria-hidden="true" />
+              {m.exceptions_find_records()}{' '}
+              <ArrowRight size={14} aria-hidden="true" />
             </Link>
           ) : null}
         </>
@@ -153,12 +156,12 @@ function IssueWorkspace({
       refresh={
         <Button
           variant="outline"
-          aria-label="Refresh"
+          aria-label={m.common_refresh()}
           disabled={observation.snapshot.isFetching}
           onClick={observation.restart}
         >
           <RefreshCw size={14} aria-hidden="true" />
-          <span className="issue-page-desktop-label">Refresh</span>
+          <span className="issue-page-desktop-label">{m.common_refresh()}</span>
         </Button>
       }
       canReview={Boolean(
@@ -174,7 +177,10 @@ function IssueWorkspace({
             connectionLabels={Object.fromEntries(
               (connections.data ?? []).map((connection) => [
                 connection.id,
-                `${connection.label} · ${caseLabel(connection.target.kind)}`,
+                m.exceptions_connection_label({
+                  connection: connection.label,
+                  system: caseLabel(connection.target.kind),
+                }),
               ]),
             )}
           />

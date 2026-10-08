@@ -5,4 +5,8 @@ import { StockPage } from '../features/inventory/detail';
 
 export const Route = createFileRoute(
   '/app/$organizationId/inventory/$positionId',
-)({ validateSearch: inventorySearch, component: StockPage });
+)({
+  validateSearch: inventorySearch,
+  staticData: { help: 'inventory' },
+  component: StockPage,
+});

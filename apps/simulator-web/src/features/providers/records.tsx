@@ -208,7 +208,7 @@ function RecordPages({
             pageSize={pageSize}
             hasNext={records.data.next !== null}
             disabled={records.isFetching && records.isPlaceholderData}
-            itemLabel="records"
+            emptyLabel="No records"
             label="Record pages"
             onPrevious={
               cursors.length > 1

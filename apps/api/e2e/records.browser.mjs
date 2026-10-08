@@ -73,7 +73,7 @@ test('searches scoped records and returns from a metric to the same cohort', asy
   await page.getByRole('heading', { name: 'Records', exact: true }).waitFor();
   await page.getByRole('link', { name: /#1000/ }).click();
   await page.getByRole('heading', { name: '#1000' }).waitFor();
-  await page.getByRole('heading', { name: 'Source facts' }).waitFor();
+  await page.getByRole('heading', { name: 'Data from sources' }).waitFor();
   await page.screenshot({
     path: '/tmp/luma97-record-desktop.png',
     fullPage: true,
@@ -103,7 +103,7 @@ test('searches scoped records and returns from a metric to the same cohort', asy
 
   await page.goto(`/app/${fixture.org.id}/insights`);
   await page
-    .getByRole('button', { name: 'Inspect orders & definition' })
+    .getByRole('button', { name: 'Show matching orders' })
     .first()
     .click();
   const dialog = page.getByRole('dialog');

@@ -169,13 +169,13 @@ export const HeldOrder: Story = {
     );
     await expect(await canvas.findByText('Release hold 17 only')).toBeVisible();
     await expect(
-      canvas.queryByRole('button', { name: 'Run approved action' }),
+      canvas.queryByRole('button', { name: 'Send to Shopify' }),
     ).not.toBeInTheDocument();
     await userEvent.click(
       canvas.getByRole('button', { name: 'Check approval' }),
     );
     await userEvent.click(
-      await canvas.findByRole('button', { name: 'Run approved action' }),
+      await canvas.findByRole('button', { name: 'Send to Shopify' }),
     );
     await expect(
       await canvas.findByText('Shopify accepted', { exact: true }),
@@ -209,12 +209,12 @@ export const Uncertain: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(
-      await canvas.findByText('Acceptance uncertain', undefined, {
+      await canvas.findByText('Outcome unclear', undefined, {
         timeout: 10000,
       }),
     ).toBeVisible();
     await expect(
-      canvas.queryByRole('button', { name: 'Run approved action' }),
+      canvas.queryByRole('button', { name: 'Send to Shopify' }),
     ).not.toBeInTheDocument();
   },
 };

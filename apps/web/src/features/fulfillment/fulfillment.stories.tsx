@@ -346,7 +346,7 @@ function Content({ state }: { state: string }) {
       }
       loading={state === 'loading'}
       offline={state === 'offline'}
-      error={state === 'error' ? 'Fulfillment could not be loaded.' : undefined}
+      error={state === 'error' ? 'Service unavailable.' : undefined}
     />
   );
 }
@@ -386,7 +386,7 @@ export const Attention: Story = {
       await canvas.findByRole('link', { name: '#1042' }),
     ).toBeVisible();
     await expect(canvas.getByText('Held: Incorrect address.')).toBeVisible();
-    await expect(canvas.getByText('Past fulfill-by')).toBeVisible();
+    await expect(canvas.getByText('Past fulfill-by date')).toBeVisible();
     await userEvent.click(canvas.getByRole('tab', { name: /On hold/ }));
     await expect(canvas.getByRole('tab', { name: /On hold/ })).toHaveAttribute(
       'aria-selected',
@@ -447,7 +447,7 @@ export const HeldDetail: Story = {
     ).toBeVisible();
     await expect(
       canvas.getByText(
-        'Changes the shipping method. It does not ship the order.',
+        'Changes the shipping method. It doesn’t ship the order.',
       ),
     ).toBeVisible();
     await expect(canvas.getByText('No progress seen since')).toBeVisible();

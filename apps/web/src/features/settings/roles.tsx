@@ -1,3 +1,5 @@
+import { formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -40,9 +42,9 @@ export function RoleMark({ role }: { role: Pick<WorkspaceRole, 'key'> }) {
 
 /** Summarizes a role's reach in a few words, such as "12 of 31 permissions". */
 export function roleReach(role: WorkspaceRole, total: number) {
-  if (role.allAppPermissions) return 'Every permission';
+  if (role.allAppPermissions) return m.settings_role_every_permission();
 
-  return `${role.permissions.length} of ${total} permission${total === 1 ? '' : 's'}`;
+  return m.settings_role_reach({ count: role.permissions.length, total });
 }
 
 /**
@@ -77,15 +79,15 @@ export function RolesSettings({
         <div />
         <div />
         <div />
-        Loading roles…
+        {m.settings_roles_loading()}
       </div>
     );
   if (roles.isError)
     return (
       <Alert tone="danger" role="alert">
-        Roles could not be loaded. Check your connection and try again.{' '}
+        {m.settings_roles_load_failed()}{' '}
         <Button variant="outline" onClick={() => void roles.refetch()}>
-          Retry
+          {m.common_retry()}
         </Button>
       </Alert>
     );
@@ -115,9 +117,9 @@ export function RolesSettings({
   if (roleId && !selected)
     return (
       <Alert tone="warning">
-        This role no longer exists in this workspace.{' '}
+        {m.settings_roles_missing()}{' '}
         <Button variant="outline" onClick={() => open(undefined)}>
-          Show all roles
+          {m.settings_roles_show_all()}
         </Button>
       </Alert>
     );
@@ -159,18 +161,18 @@ export function RolesSettings({
         <span className="roles-row-identity">
           <strong>
             {role.name}
-            {role.builtIn ? <Badge>Built-in</Badge> : null}
-            {role.archived ? <Badge tone="warning">Archived</Badge> : null}
+            {role.builtIn ? <Badge>{m.settings_role_built_in()}</Badge> : null}
+            {role.archived ? (
+              <Badge tone="warning">{m.settings_role_archived()}</Badge>
+            ) : null}
             {access.role?.id === role.id ? (
-              <Badge tone="accent">Your role</Badge>
+              <Badge tone="accent">{m.settings_role_yours()}</Badge>
             ) : null}
           </strong>
-          <span>{role.description || 'No description'}</span>
+          <span>{role.description || m.settings_role_no_description()}</span>
         </span>
         <span className="roles-row-meta">
-          <span>
-            {role.memberCount} {role.memberCount === 1 ? 'person' : 'people'}
-          </span>
+          <span>{m.settings_role_people({ count: role.memberCount })}</span>
           <span>{roleReach(role, total)}</span>
         </span>
         <ChevronRight size={16} aria-hidden="true" />
@@ -183,32 +185,33 @@ export function RolesSettings({
       <header className="settings-section-heading">
         <div>
           <h2 id="roles-title">
-            Roles <Badge>{active.length}</Badge>
+            {m.settings_roles_title()}{' '}
+            <Badge>{formatNumber(active.length)}</Badge>
           </h2>
-          <p>Decide what each person can see and do in this workspace.</p>
+          <p>{m.settings_roles_description()}</p>
         </div>
         {manage ? (
           <Button onClick={() => duplicate(null)}>
-            <Plus size={15} /> Create role
+            <Plus size={15} aria-hidden="true" /> {m.settings_roles_create()}
           </Button>
         ) : null}
       </header>
-      <ul className="roles-list" aria-label="Roles">
+      <ul className="roles-list" aria-label={m.settings_roles_list_label()}>
         {active.map(row)}
       </ul>
       {archived.length ? (
         <Disclosure className="roles-archived">
-          <summary>Archived roles ({archived.length})</summary>
+          <summary>
+            {m.settings_roles_archived_summary({ count: archived.length })}
+          </summary>
           <ul className="roles-list">{archived.map(row)}</ul>
         </Disclosure>
       ) : null}
       <p className="settings-note">
         <Info size={14} aria-hidden="true" />
-        Built-in roles gain new permissions as Luma adds features. Custom roles
-        only change when someone edits them, so new features stay off until you
-        grant them.{' '}
+        {m.settings_roles_note()}{' '}
         <a href="/docs/roles-and-permissions" target="_blank" rel="noreferrer">
-          Learn about roles
+          {m.settings_roles_learn_more()}
         </a>
       </p>
       <CreateRoleDialog

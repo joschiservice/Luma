@@ -1,6 +1,9 @@
 import './returns.css';
 
 import type { ReturnDetail } from '@luma/api-contract';
+import { formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -39,7 +42,6 @@ import {
   paymentLabels,
   statusLabels,
 } from '../orders/presentation';
-import { systemName } from '../products/presentation';
 import { recordReturnPath } from '../records/data';
 import { returnFilters, returnOptions, type ReturnsSearch } from './data';
 import {
@@ -50,6 +52,7 @@ import {
   restockLabels,
   returnLabel,
   returnSteps,
+  returnSystem,
   showsRefundState,
   stageLabels,
   stageStates,
@@ -166,26 +169,44 @@ const stepIcons = {
 };
 
 const stepStateLabels = {
-  done: 'Done',
-  current: 'Current step',
-  upcoming: 'Not reached',
-  failed: 'Stopped',
-  skipped: 'Not needed',
-  unreported: 'Not reported by the source',
+  done: m.returns_step_state_done,
+  current: m.returns_step_state_current,
+  upcoming: m.returns_step_state_upcoming,
+  failed: m.returns_step_state_failed,
+  skipped: m.returns_step_state_skipped,
+  unreported: m.returns_step_state_unreported,
 };
+
+const historyStatuses: Record<string, () => string> = {
+  requested: m.returns_history_status_requested,
+  open: m.returns_history_status_open,
+  closed: m.returns_history_status_closed,
+  declined: m.returns_history_status_declined,
+  cancelled: m.returns_history_status_cancelled,
+};
+
+/** Names a return state read from the source, keeping unrecognized statuses readable. */
+function historyStatus(status: string | null) {
+  if (status === null || status === 'unknown')
+    return m.returns_history_status_unknown();
+
+  return (
+    historyStatuses[status]?.() ?? m.returns_history_status_other({ status })
+  );
+}
 
 /** Shows a return's progress from request to close, with each step's source time. */
 function ReturnProgress({ detail }: { detail: ReturnDetail }) {
   const steps = returnSteps(detail);
 
   return (
-    <ol className="returns-steps" aria-label="Return progress">
+    <ol className="returns-steps" aria-label={m.returns_progress_label()}>
       {steps.map((step) => (
         <li key={step.key} data-state={step.state}>
           <span className="returns-step-marker">{stepIcons[step.state]}</span>
           <span className="returns-step-body">
             <strong>{step.label}</strong>
-            <span className="sr-only">{stepStateLabels[step.state]}. </span>
+            <span className="sr-only">{stepStateLabels[step.state]()}. </span>
             <small>{step.detail}</small>
             {step.at ? (
               <small>
@@ -207,46 +228,43 @@ function MoneySummary({ detail }: { detail: ReturnDetail }) {
 
   return (
     <Section
-      title="Money"
-      description="Only successful refund payments count as money returned."
+      title={m.returns_money_title()}
+      description={m.returns_money_description()}
     >
       <dl className="returns-money-summary">
         <div data-tone="success">
-          <dt>Refunded to the customer</dt>
+          <dt>{m.returns_money_refunded()}</dt>
           <dd>
-            <span>{refunded ?? 'Nothing yet'}</span>
+            <span>{refunded ?? m.returns_money_nothing_yet()}</span>
           </dd>
         </div>
         <div data-tone={pending ? 'info' : undefined}>
-          <dt>Processing</dt>
+          <dt>{m.returns_money_processing()}</dt>
           <dd>
-            <span>{pending ?? 'None'}</span>
-            {pending ? <small>Not received by the customer yet</small> : null}
+            <span>{pending ?? m.returns_money_none()}</span>
+            {pending ? <small>{m.returns_money_not_received()}</small> : null}
           </dd>
         </div>
         {refund.failedAttempts ? (
           <div data-tone="danger">
-            <dt>Failed payment attempts</dt>
+            <dt>{m.returns_money_failed_attempts()}</dt>
             <dd>
-              <span>{refund.failedAttempts}</span>
+              <span>{formatNumber(refund.failedAttempts)}</span>
             </dd>
           </div>
         ) : null}
         {detail.item.kind === 'return' ? (
           <div>
-            <dt>Value of returned items</dt>
+            <dt>{m.returns_money_item_value()}</dt>
             <dd>
-              <span>{formatMoney(value) ?? 'Not reported'}</span>
-              <small>After discounts; not an amount refunded</small>
+              <span>{formatMoney(value) ?? m.common_not_reported()}</span>
+              <small>{m.returns_money_item_value_hint()}</small>
             </dd>
           </div>
         ) : null}
       </dl>
       {refund.currency === null && refund.state !== 'none' ? (
-        <p className="returns-note">
-          Refund payments use several currencies, so Luma does not add them up.
-          Each payment is listed under Refunds.
-        </p>
+        <p className="returns-note">{m.returns_money_several_currencies()}</p>
       ) : null}
     </Section>
   );
@@ -256,8 +274,8 @@ function MoneySummary({ detail }: { detail: ReturnDetail }) {
 function Refunds({ detail }: { detail: ReturnDetail }) {
   return (
     <Section
-      title="Refunds"
-      description="Each refund with every payment attempt, as the source reports them."
+      title={m.returns_refunds_title()}
+      description={m.returns_refunds_description()}
     >
       {detail.refunds.length ? (
         <ol className="returns-refunds">
@@ -267,7 +285,9 @@ function Refunds({ detail }: { detail: ReturnDetail }) {
             return (
               <li key={refund.id}>
                 <div className="returns-refund-head">
-                  <strong>Refund {index + 1}</strong>
+                  <strong>
+                    {m.returns_refunds_item({ index: index + 1 })}
+                  </strong>
                   {refund.transactions.length === 1 ? null : (
                     <Badge tone={transactionTones[outcome]}>
                       {refund.transactions.length
@@ -277,14 +297,16 @@ function Refunds({ detail }: { detail: ReturnDetail }) {
                   )}
                   {refund.createdAt ? (
                     <small>
-                      Created <WorkspaceDate value={refund.createdAt} />
+                      {rich(m.returns_refunds_created, {
+                        date: <WorkspaceDate value={refund.createdAt} />,
+                      })}
                     </small>
                   ) : null}
                 </div>
                 {refund.transactions.length ? (
                   <ul
                     className="returns-payments"
-                    aria-label="Payment attempts"
+                    aria-label={m.returns_refunds_payments_label()}
                   >
                     {refund.transactions.map((transaction, position) => (
                       <li key={position}>
@@ -298,7 +320,7 @@ function Refunds({ detail }: { detail: ReturnDetail }) {
                           {transaction.processedAt ? (
                             <WorkspaceDate value={transaction.processedAt} />
                           ) : (
-                            'Not processed yet'
+                            m.returns_refunds_not_processed()
                           )}
                           {transaction.gateway
                             ? ` · ${transaction.gateway.replaceAll('_', ' ')}`
@@ -309,26 +331,32 @@ function Refunds({ detail }: { detail: ReturnDetail }) {
                   </ul>
                 ) : (
                   <p className="returns-note">
-                    No payment is attached to this refund, so no money was
-                    returned through it.
+                    {m.returns_refunds_no_payment()}
                   </p>
                 )}
                 {refund.lines.length ? (
                   <p className="returns-note">
                     {refund.lines
-                      .map(
-                        (line) =>
-                          `${units(line.quantity)} × ${line.title ?? 'Order line'} · ${restockLabels[line.restock]}`,
+                      .map((line) =>
+                        m.returns_refunds_line({
+                          quantity: units(line.quantity),
+                          item: line.title ?? m.returns_refunds_order_line(),
+                          restock: restockLabels[line.restock],
+                        }),
                       )
                       .join('; ')}
                   </p>
                 ) : null}
                 <small className="returns-muted">
                   {refund.total
-                    ? `Source total ${formatMoney(refund.total)} · `
+                    ? `${m.returns_refunds_source_total({ total: formatMoney(refund.total) ?? '' })} · `
                     : ''}
-                  {refund.externalId ? `Source ID ${refund.externalId} · ` : ''}
-                  Read <WorkspaceDate value={refund.observedAt} />
+                  {refund.externalId
+                    ? `${m.returns_refunds_source_id({ id: refund.externalId })} · `
+                    : ''}
+                  {rich(m.returns_refunds_read, {
+                    date: <WorkspaceDate value={refund.observedAt} />,
+                  })}
                 </small>
               </li>
             );
@@ -337,8 +365,8 @@ function Refunds({ detail }: { detail: ReturnDetail }) {
       ) : (
         <p className="returns-note">
           {detail.item.stage === 'declined' || detail.item.stage === 'cancelled'
-            ? 'No refund is expected for this return.'
-            : 'No refund has been issued for this return yet.'}
+            ? m.returns_refunds_none_expected()
+            : m.returns_refunds_none_yet()}
         </p>
       )}
     </Section>
@@ -355,12 +383,12 @@ function Items({
 }) {
   return (
     <Section
-      title="Items"
-      description="Requested units with the reason given, and what the source reports as received and refunded."
+      title={m.returns_items_title()}
+      description={m.returns_items_description()}
     >
       <DataTable
         className="returns-items"
-        caption="Returned items"
+        caption={m.returns_items_caption()}
         rows={detail.lines}
         rowKey={(line) =>
           `${line.orderLineId ?? 'unmatched'}:${line.reason}:${line.quantity}`
@@ -368,7 +396,7 @@ function Items({
         columns={[
           {
             key: 'item',
-            header: 'Item',
+            header: m.returns_items_column_item(),
             cell: (line) => (
               <span className="returns-cell">
                 {line.skuId ? (
@@ -376,64 +404,74 @@ function Items({
                     to="/app/$organizationId/products/$skuId"
                     params={{ organizationId, skuId: line.skuId }}
                   >
-                    {line.title ?? line.skuCode ?? 'Order line'}
+                    {line.title ??
+                      line.skuCode ??
+                      m.returns_refunds_order_line()}
                   </Link>
                 ) : (
                   <span>
                     {line.title ??
                       (line.orderLineId
-                        ? 'Order line'
-                        : 'Not matched to an order line')}
+                        ? m.returns_refunds_order_line()
+                        : m.returns_items_unmatched())}
                   </span>
                 )}
-                <small>{line.skuCode ? `SKU ${line.skuCode}` : 'No SKU'}</small>
+                <small>
+                  {line.skuCode
+                    ? m.returns_items_sku({ sku: line.skuCode })
+                    : m.returns_items_no_sku()}
+                </small>
               </span>
             ),
           },
           {
             key: 'quantity',
-            header: 'Returned',
+            header: m.returns_items_column_returned(),
             numeric: true,
             cell: (line) => units(line.quantity),
           },
           {
             key: 'reason',
-            header: 'Reason',
-            cell: (line) => line.reason ?? 'Not given',
+            header: m.returns_items_column_reason(),
+            cell: (line) => line.reason ?? m.returns_items_no_reason(),
           },
           {
             key: 'received',
-            header: 'Received',
+            header: m.returns_items_column_received(),
             numeric: true,
             cell: (line) =>
               line.received === null ? (
-                <span className="returns-muted">Not reported</span>
+                <span className="returns-muted">{m.common_not_reported()}</span>
               ) : (
                 <span className="returns-cell">
                   <span>{units(line.received)}</span>
                   {line.restocked !== null && Number(line.restocked) > 0 ? (
-                    <small>{units(line.restocked)} restocked</small>
+                    <small>
+                      {m.returns_items_restocked({
+                        units: units(line.restocked),
+                      })}
+                    </small>
                   ) : null}
                 </span>
               ),
           },
           {
             key: 'refunded',
-            header: 'Refunded',
+            header: m.returns_items_column_refunded(),
             numeric: true,
             cell: (line) =>
               line.refunded === null ? (
-                <span className="returns-muted">Not reported</span>
+                <span className="returns-muted">{m.common_not_reported()}</span>
               ) : (
                 units(line.refunded)
               ),
           },
           {
             key: 'value',
-            header: 'Value',
+            header: m.returns_items_column_value(),
             numeric: true,
             hideOnNarrow: true,
-            cell: (line) => formatMoney(line.value) ?? '—',
+            cell: (line) => formatMoney(line.value) ?? m.common_empty_value(),
           },
         ]}
       />
@@ -466,8 +504,7 @@ export function ReturnDetailView({
 }) {
   const from = recordReturnPath(organizationId, search.from);
   const item = detail?.item;
-  const system = detail?.source?.system ?? null;
-  const store = system ? systemName(system) : 'the source';
+  const system = returnSystem(detail?.source?.system ?? null);
   const here = item
     ? `/app/${encodeURIComponent(organizationId)}/returns/${item.id}`
     : '';
@@ -476,8 +513,8 @@ export function ReturnDetailView({
     <main className="returns-page">
       {from ? (
         <Link className="returns-back" to={from}>
-          <ArrowLeft size={14} />
-          Back to context
+          <ArrowLeft size={14} aria-hidden="true" />
+          {m.returns_back_to_context()}
         </Link>
       ) : (
         <Link
@@ -486,17 +523,22 @@ export function ReturnDetailView({
           params={{ organizationId }}
           search={returnFilters(search)}
         >
-          <ArrowLeft size={14} />
-          Back to returns
+          <ArrowLeft size={14} aria-hidden="true" />
+          {m.returns_back_to_returns()}
         </Link>
       )}
       <PageHeader
-        title={item ? returnLabel(item) : 'Return'}
+        title={item ? returnLabel(item) : m.returns_detail_title_fallback()}
         icon={<DomainIcon domain="returns" size="md" />}
         description={
           item
-            ? `${item.kind === 'refund' ? 'Refund without a return' : 'Return'} for order ${item.order.displayNumber ?? item.order.id.slice(0, 8)} · ${detail?.source?.label ?? 'Connected source'}`
-            : 'Follow a return from request to refund.'
+            ? (item.kind === 'refund'
+                ? m.returns_detail_description_refund
+                : m.returns_detail_description_return)({
+                order: item.order.displayNumber ?? item.order.id.slice(0, 8),
+                source: detail?.source?.label ?? m.returns_source_fallback(),
+              })
+            : m.returns_detail_description_fallback()
         }
       />
       <div className="returns-detail-toolbar">
@@ -520,50 +562,45 @@ export function ReturnDetailView({
                 </Badge>
               ) : null}
               {item.deleted ? (
-                <Badge tone="warning">Removed at source</Badge>
+                <Badge tone="warning">{m.returns_removed_at_source()}</Badge>
               ) : null}
             </>
           ) : null}
         </span>
         <Button variant="outline" disabled={refreshing} onClick={refresh}>
-          <RefreshCw size={14} />
-          Refresh return
+          <RefreshCw size={14} aria-hidden="true" />
+          {m.returns_detail_refresh()}
         </Button>
       </div>
       {offline ? (
-        <Alert role="status">
-          You are offline. The return below may be out of date.
-        </Alert>
+        <Alert role="status">{m.returns_detail_offline()}</Alert>
       ) : null}
       {error === 'missing' ? (
         <Empty>
           <Undo2 size={30} aria-hidden="true" />
-          <h2>Return not found</h2>
-          <p>
-            This return is not in this workspace, or no source reports it
-            anymore.
-          </p>
+          <h2>{m.returns_detail_missing_title()}</h2>
+          <p>{m.returns_detail_missing_body()}</p>
           <Link to="/app/$organizationId/returns" params={{ organizationId }}>
-            Browse returns
+            {m.returns_detail_browse()}
           </Link>
         </Empty>
       ) : error === 'access' ? (
         <Alert tone="danger" role="alert">
-          You no longer have access to returns in this workspace.
+          {m.returns_detail_no_access()}
         </Alert>
       ) : error ? (
         <Alert tone="danger" role="alert">
           {detail
-            ? 'This return could not be refreshed. The details below may be out of date.'
-            : 'This return could not be loaded.'}{' '}
+            ? m.returns_detail_refresh_failed()
+            : m.returns_detail_load_failed()}{' '}
           <Button variant="outline" onClick={refresh}>
-            Retry
+            {m.common_retry()}
           </Button>
         </Alert>
       ) : null}
       {loading && !error ? (
         <div className="returns-loading" role="status">
-          <span className="sr-only">Loading return…</span>
+          <span className="sr-only">{m.returns_detail_loading()}</span>
           {Array.from({ length: 3 }, (_, i) => (
             <span className="lu-skeleton" key={i} />
           ))}
@@ -578,16 +615,15 @@ export function ReturnDetailView({
           >
             <h2 id="return-next-step">
               {item.group === 'action'
-                ? `Next step: ${stageLabels[item.stage].toLowerCase()}`
+                ? m.returns_detail_next_step({ stage: stageLabels[item.stage] })
                 : item.group === 'waiting'
                   ? stageLabels[item.stage]
-                  : 'Nothing pending'}
+                  : m.returns_detail_nothing_pending()}
             </h2>
-            <p>{nextStep(item, system)}</p>
+            <p>{nextStep(item, detail.source?.system ?? null)}</p>
             {item.group === 'action' ? (
               <p className="returns-note">
-                Luma does not approve, receive or refund returns. Do it in{' '}
-                {store}; Luma reads the result on its next sync.
+                {m.returns_detail_luma_note({ system })}
               </p>
             ) : null}
           </section>
@@ -600,15 +636,17 @@ export function ReturnDetailView({
               <Refunds detail={detail} />
               {orderContext ? (
                 <Section
-                  title={`${store} order details`}
-                  description={`Customer, payments and source events for this order, read live from ${store} with the connection’s permissions.`}
+                  title={m.returns_order_details_title({ system })}
+                  description={m.returns_order_details_description({
+                    system,
+                  })}
                 >
                   {orderContext}
                 </Section>
               ) : null}
               <Section
-                title="Observed history"
-                description="Each entry is a state Luma read from the source, newest first. It shows what the source reported at that time, not every change it made."
+                title={m.returns_history_title()}
+                description={m.returns_history_description()}
               >
                 <ol className="returns-history">
                   {detail.history.entries.map((entry) => (
@@ -616,37 +654,54 @@ export function ReturnDetailView({
                       <span className="returns-cell">
                         <strong>
                           {entry.entityKind === 'return'
-                            ? `Return ${entry.status ?? 'unknown'}`
-                            : 'Refund recorded'}
-                          {entry.deleted ? ' · removed' : ''}
+                            ? historyStatus(entry.status)
+                            : m.returns_history_refund_recorded()}
+                          {entry.deleted
+                            ? ` · ${m.returns_history_removed()}`
+                            : ''}
                         </strong>
                         <small>
-                          Source time{' '}
-                          {entry.sourceUpdatedAt ? (
-                            <WorkspaceDate value={entry.sourceUpdatedAt} />
-                          ) : (
-                            'not reported'
-                          )}
-                          {' · Read '}
-                          <WorkspaceDate value={entry.observedAt} />
+                          {entry.sourceUpdatedAt
+                            ? rich(m.returns_history_times, {
+                                source: (
+                                  <WorkspaceDate
+                                    value={entry.sourceUpdatedAt}
+                                  />
+                                ),
+                                read: (
+                                  <WorkspaceDate value={entry.observedAt} />
+                                ),
+                              })
+                            : rich(m.returns_history_times_unreported, {
+                                read: (
+                                  <WorkspaceDate value={entry.observedAt} />
+                                ),
+                              })}
                         </small>
                       </span>
-                      {entry.current ? <Badge>Current</Badge> : null}
+                      {entry.current ? (
+                        <Badge>{m.returns_history_current()}</Badge>
+                      ) : null}
                     </li>
                   ))}
                 </ol>
                 {detail.history.truncated ? (
-                  <p className="returns-note">Showing the latest 50 reads.</p>
+                  <p className="returns-note">
+                    {m.returns_history_truncated()}
+                  </p>
                 ) : null}
               </Section>
             </div>
-            <aside className="returns-inspector" aria-label="Return context">
+            <aside
+              className="returns-inspector"
+              aria-label={m.returns_context_label()}
+            >
               <MoneySummary detail={detail} />
-              <Section title="Order">
+              <Section title={m.returns_order_title()}>
                 {detail.order ? (
                   <dl className="returns-facts">
                     <div>
-                      <dt>Order</dt>
+                      <dt>{m.returns_order_title()}</dt>
                       <dd>
                         <Link
                           to="/app/$organizationId/orders/$orderId"
@@ -663,79 +718,89 @@ export function ReturnDetailView({
                       </dd>
                     </div>
                     <div>
-                      <dt>Status</dt>
+                      <dt>{m.returns_order_status()}</dt>
                       <dd>
                         {statusLabels[detail.order.status] ??
                           detail.order.status}
                       </dd>
                     </div>
                     <div>
-                      <dt>Payment</dt>
+                      <dt>{m.returns_order_payment()}</dt>
                       <dd>
                         {paymentLabels[detail.order.paymentStatus] ??
                           detail.order.paymentStatus}
                       </dd>
                     </div>
                     <div>
-                      <dt>Total</dt>
+                      <dt>{m.returns_order_total()}</dt>
                       <dd>
-                        {formatMoney(detail.order.total) ?? 'Not reported'}
+                        {formatMoney(detail.order.total) ??
+                          m.common_not_reported()}
                       </dd>
                     </div>
                     <div>
-                      <dt>Placed</dt>
+                      <dt>{m.returns_order_placed()}</dt>
                       <dd>
                         {detail.order.placedAt ? (
                           <WorkspaceDate value={detail.order.placedAt} />
                         ) : (
-                          'Not reported'
+                          m.common_not_reported()
                         )}
                       </dd>
                     </div>
                   </dl>
                 ) : (
-                  <p className="returns-note">
-                    The order is no longer reported by this source.
-                  </p>
+                  <p className="returns-note">{m.returns_order_missing()}</p>
                 )}
               </Section>
-              <Section title="Source and evidence">
+              <Section title={m.returns_evidence_title()}>
                 <dl className="returns-facts">
                   <div>
-                    <dt>Source</dt>
-                    <dd>{detail.source?.label ?? 'Connected source'}</dd>
-                  </div>
-                  <div>
-                    <dt>Source ID</dt>
+                    <dt>{m.returns_evidence_source()}</dt>
                     <dd>
-                      <code>{item.externalId ?? 'Not mapped'}</code>
+                      {detail.source?.label ?? m.returns_source_fallback()}
                     </dd>
                   </div>
                   <div>
-                    <dt>Read</dt>
+                    <dt>{m.returns_evidence_source_id()}</dt>
+                    <dd>
+                      <code>
+                        {item.externalId ?? m.returns_evidence_not_linked()}
+                      </code>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{m.returns_evidence_read()}</dt>
                     <dd>
                       <WorkspaceDate value={item.observedAt} />
                     </dd>
                   </div>
                   <div>
-                    <dt>Last source activity</dt>
+                    <dt>{m.returns_evidence_activity()}</dt>
                     <dd>
                       <WorkspaceDate value={item.activityAt} />
                     </dd>
                   </div>
                   {detail.source?.lastReadAt ? (
                     <div>
-                      <dt>Last returns sync</dt>
+                      <dt>{m.returns_evidence_last_sync()}</dt>
                       <dd>
-                        <WorkspaceDate value={detail.source.lastReadAt} />
-                        {detail.source.failing ? ' · retrying' : ''}
+                        {detail.source.failing ? (
+                          rich(m.returns_evidence_retrying, {
+                            date: (
+                              <WorkspaceDate value={detail.source.lastReadAt} />
+                            ),
+                          })
+                        ) : (
+                          <WorkspaceDate value={detail.source.lastReadAt} />
+                        )}
                       </dd>
                     </div>
                   ) : null}
                 </dl>
               </Section>
               {detail.related.length ? (
-                <Section title="Other returns of this order">
+                <Section title={m.returns_related_title()}>
                   <ul className="returns-related">
                     {detail.related.map((other) => (
                       <li key={other.id}>

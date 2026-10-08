@@ -230,7 +230,7 @@ function Preview({
 
   return (
     <>
-      <StoryShell page="Workflows">
+      <StoryShell page="workflows">
         {['member', 'admin', 'blocked'].includes(state) ? (
           <div className="workflows-page">
             <WorkflowDetailView

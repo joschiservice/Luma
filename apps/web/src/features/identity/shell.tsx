@@ -1,3 +1,5 @@
+import { formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { WorkspaceTimezone } from '@luma/ui/components/primitives/workspace-date';
@@ -69,8 +71,10 @@ function NavigationLink({
       <span className="sidebar-link-label">{label}</span>
       {count ? (
         <span className="sidebar-link-count">
-          {count}
-          <span className="sr-only"> need you</span>
+          <span aria-hidden="true">{formatNumber(count)}</span>
+          <span className="sr-only">
+            {m.identity_nav_waiting_count({ count })}
+          </span>
         </span>
       ) : null}
     </Link>
@@ -111,12 +115,12 @@ function Navigation({
   );
 
   return (
-    <nav aria-label="Workspace navigation" className="sidebar-nav">
+    <nav aria-label={m.identity_nav_label()} className="sidebar-nav">
       <ul className="sidebar-list">{group('core').map(link)}</ul>
       <PinnedNavigation organizationId={organizationId} close={close} />
       <section className="sidebar-section" aria-labelledby="nav-operations">
         <h2 className="sidebar-section-label" id="nav-operations">
-          Operations
+          {m.identity_nav_operations()}
         </h2>
         <ul className="sidebar-list">{group('operations').map(link)}</ul>
       </section>
@@ -208,7 +212,9 @@ function TenantShell({ organizationId }: { organizationId: string }) {
     <WorkspaceLayout
       workspaceSwitcher={
         <WorkspaceSwitcher
-          workspace={organization?.name ?? 'Workspace'}
+          workspace={
+            organization?.name ?? m.identity_shell_workspace_fallback()
+          }
           workspaceId={organizationId}
           workspaces={organizations.data.map((org) => ({
             id: org.id,
@@ -259,7 +265,7 @@ function TenantShell({ organizationId }: { organizationId: string }) {
       }
       accountMenu={
         <WorkspaceAccountMenu
-          name={session?.user.name ?? 'Account'}
+          name={session?.user.name ?? m.identity_shell_account_fallback()}
           email={session?.user.email}
           theme={theme}
           onThemeChange={setThemePreference}
@@ -277,14 +283,14 @@ function TenantShell({ organizationId }: { organizationId: string }) {
         {settings.isError ? (
           <Alert tone="warning" role="status" className="desk-alert">
             {settings.data
-              ? 'Workspace settings could not refresh. Dates use the last known timezone.'
-              : 'Display timezone unavailable. Dates are shown in UTC.'}
+              ? m.identity_shell_timezone_stale()
+              : m.identity_shell_timezone_unavailable()}
           </Alert>
         ) : null}
         {page.permission && !permissions.can(page.permission) ? (
           <NoAccess
             organizationId={organizationId}
-            area={page.area ?? page.label.toLowerCase()}
+            area={page.area ?? page.label}
             permission={page.permission}
           />
         ) : (

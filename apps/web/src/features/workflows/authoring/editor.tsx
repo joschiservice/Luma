@@ -9,6 +9,7 @@ import type {
   WorkflowDraft,
   WorkflowDraftContent,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -91,15 +92,15 @@ interface Snapshot {
   mode: AuthoringMode;
 }
 
-const statusText: Record<SaveStatus, string> = {
-  saved: 'All changes saved',
-  unsaved: 'Unsaved changes',
-  saving: 'Saving…',
-  retrying: 'Retrying save…',
-  conflict: 'Someone else saved a newer version',
-  failed: 'Changes not saved',
-  forbidden: 'You can no longer edit this draft',
-};
+const statusText = {
+  saved: m.authoring_save_saved,
+  unsaved: m.authoring_save_unsaved,
+  saving: m.common_saving,
+  retrying: m.authoring_save_retrying,
+  conflict: m.authoring_save_conflict,
+  failed: m.authoring_save_failed,
+  forbidden: m.authoring_save_forbidden,
+} satisfies Record<SaveStatus, () => string>;
 
 /**
  * Keeps local edits, autosaves them against the loaded revision and never overwrites someone
@@ -298,11 +299,11 @@ export function DraftEditorPage({
         <Alert tone="danger" role="alert" className="workflow-notice">
           <span>
             {failure instanceof IdentityError && failure.status === 404
-              ? 'This draft was discarded or doesn’t exist.'
+              ? m.authoring_draft_not_found()
               : workflowError(failure)}
           </span>
           <Link to="/app/$organizationId/workflows" params={{ organizationId }}>
-            Back to workflows
+            {m.authoring_back_to_workflows()}
           </Link>
         </Alert>
       ) : !draft.data || !vocabulary.data || !context.data ? (
@@ -468,41 +469,48 @@ export function DraftEditor({
       <WorkspaceBreadcrumb>
         <Workflow size={16} aria-hidden="true" />
         <Link to="/app/$organizationId/workflows" params={{ organizationId }}>
-          Workflows
+          {m.authoring_breadcrumb_workflows()}
         </Link>
         <ChevronRight size={14} aria-hidden="true" />
         <span aria-current="page">
-          {snapshot.content.definition.name || 'Untitled workflow'}
+          {snapshot.content.definition.name || m.authoring_untitled()}
         </span>
       </WorkspaceBreadcrumb>
       <div className="authoring-editor-bar">
         <div className="authoring-editor-title">
           <p className="workflow-eyebrow">
             {draft.basedOn
-              ? `Editing ${draft.basedOn.definitionId} · from version ${draft.basedOn.version}`
-              : 'New workflow'}
+              ? m.authoring_editor_based_on({
+                  workflow: draft.basedOn.definitionId,
+                  version: draft.basedOn.version,
+                })
+              : m.authoring_gallery_title()}
           </p>
-          <h1>{snapshot.content.definition.name || 'Untitled workflow'}</h1>
+          <h1>{snapshot.content.definition.name || m.authoring_untitled()}</h1>
         </div>
         <Badge tone={draft.state === 'published' ? 'success' : 'neutral'}>
           {draft.state === 'published'
-            ? `Published as ${draft.published?.version}`
-            : `Draft · version ${snapshot.content.version}`}
+            ? m.authoring_editor_published_badge({
+                version: draft.published?.version ?? '',
+              })
+            : m.authoring_editor_draft_badge({
+                version: snapshot.content.version,
+              })}
         </Badge>
         <span
           className="authoring-save-status"
           role="status"
           aria-live="polite"
         >
-          {editable ? statusText[status] : 'Read only'}
+          {editable ? statusText[status]() : m.authoring_editor_view_only()}
         </span>
         {editable ? (
           <div className="authoring-editor-actions">
             <Button
               variant="ghost"
               size="icon"
-              aria-label="Undo"
-              title="Undo (Ctrl+Z)"
+              aria-label={m.authoring_editor_undo()}
+              title={m.authoring_editor_undo_shortcut()}
               disabled={!session.canUndo || readOnly}
               onClick={session.undo}
             >
@@ -511,36 +519,36 @@ export function DraftEditor({
             <Button
               variant="ghost"
               size="icon"
-              aria-label="Redo"
-              title="Redo (Ctrl+Shift+Z)"
+              aria-label={m.authoring_editor_redo()}
+              title={m.authoring_editor_redo_shortcut()}
               disabled={!session.canRedo || readOnly}
               onClick={session.redo}
             >
               <Redo2 aria-hidden="true" />
             </Button>
             <Button variant="outline" onClick={() => setDiscarding(true)}>
-              Discard
+              {m.authoring_editor_discard()}
             </Button>
             <Button
               disabled={status !== 'saved' || !current || readOnly}
               onClick={() => setPublishing(true)}
             >
-              Publish…
+              {m.authoring_editor_publish()}
             </Button>
           </div>
         ) : null}
       </div>
       {!canManage ? (
         <Alert tone="neutral" className="workflow-notice">
-          Your role doesn’t include Author workflows, so you can only review
-          this draft.
+          {m.authoring_editor_view_only_notice()}
         </Alert>
       ) : null}
       {draft.state === 'published' && draft.published ? (
         <Alert tone="success" className="workflow-notice">
           <span>
-            This draft was published as version {draft.published.version}. Edit
-            the workflow to start a new draft.
+            {m.authoring_editor_published_notice({
+              version: draft.published.version,
+            })}
           </span>
           <Link
             to="/app/$organizationId/workflows/$definitionId"
@@ -549,25 +557,24 @@ export function DraftEditor({
               definitionId: snapshot.content.definition.id,
             }}
           >
-            Open workflow
+            {m.authoring_open_workflow()}
           </Link>
         </Alert>
       ) : null}
       {status === 'conflict' ? (
         <Alert tone="warning" role="alert" className="workflow-notice">
-          <span>
-            Someone else saved this draft while you were editing. Your recent
-            changes weren’t saved. Reload to continue from their version.
-          </span>
+          <span>{m.authoring_editor_conflict()}</span>
           <Button variant="outline" onClick={reload}>
-            Reload latest
+            {m.authoring_editor_reload()}
           </Button>
         </Alert>
       ) : status === 'failed' ? (
         <Alert tone="danger" role="alert" className="workflow-notice">
-          <span>{session.error} Your changes are kept here.</span>
+          <span>
+            {m.authoring_editor_save_failed({ error: session.error })}
+          </span>
           <Button variant="outline" onClick={session.retrySave}>
-            Retry save
+            {m.authoring_editor_retry_save()}
           </Button>
         </Alert>
       ) : status === 'forbidden' ? (
@@ -577,12 +584,15 @@ export function DraftEditor({
       ) : null}
       {live.error ? (
         <Alert tone="warning" className="workflow-notice">
-          Couldn’t check the draft. {live.error}
+          {m.authoring_editor_check_failed({ error: live.error })}
         </Alert>
       ) : null}
-      <section className="authoring-overview" aria-label="Draft summary">
+      <section
+        className="authoring-overview"
+        aria-label={m.authoring_editor_summary_label()}
+      >
         <p className="authoring-summary">
-          {validation?.summary ?? 'Checking the draft…'}
+          {validation?.summary ?? m.authoring_editor_checking()}
         </p>
         <div className="authoring-counts">
           <Badge
@@ -595,21 +605,20 @@ export function DraftEditor({
             }
           >
             {!validation || !current
-              ? 'Checking…'
+              ? m.authoring_checking()
               : errors.length
-                ? `${errors.length} problem${errors.length === 1 ? '' : 's'} block publishing`
-                : 'Ready to publish'}
+                ? m.authoring_editor_blocking({ count: errors.length })
+                : m.authoring_editor_ready()}
           </Badge>
           {warnings.length ? (
             <Badge tone="warning">
-              {warnings.length} part{warnings.length === 1 ? '' : 's'} can’t run
-              in this workspace yet
+              {m.authoring_editor_limited({ count: warnings.length })}
             </Badge>
           ) : null}
         </div>
         {errors.length || warnings.length ? (
           <Disclosure className="authoring-problems">
-            <summary>Show what to fix</summary>
+            <summary>{m.authoring_editor_show_problems()}</summary>
             <ul>
               {[...errors, ...warnings].map((item, index) => (
                 <li
@@ -619,8 +628,15 @@ export function DraftEditor({
                   <button type="button" onClick={() => select(item)}>
                     <strong>
                       {item.stepIndex === null
-                        ? 'Workflow settings'
-                        : `Step ${item.stepIndex + 1}${item.stepId ? ` (${item.stepId})` : ''}`}
+                        ? m.authoring_workflow_settings()
+                        : item.stepId
+                          ? m.authoring_editor_problem_step_named({
+                              position: item.stepIndex + 1,
+                              step: item.stepId,
+                            })
+                          : m.authoring_editor_problem_step({
+                              position: item.stepIndex + 1,
+                            })}
                     </strong>
                     <span>{item.message}</span>
                   </button>
@@ -643,19 +659,23 @@ export function DraftEditor({
         onValueChange={(value) => setView(value as EditorView)}
         className="authoring-tabs"
       >
-        <TabsList aria-label="Editor view">
-          <TabsTrigger value="build">Build</TabsTrigger>
-          <TabsTrigger value="code">Code</TabsTrigger>
-          {testPanel ? <TabsTrigger value="test">Test</TabsTrigger> : null}
+        <TabsList aria-label={m.authoring_editor_tabs_label()}>
+          <TabsTrigger value="build">
+            {m.authoring_editor_tab_build()}
+          </TabsTrigger>
+          <TabsTrigger value="code">
+            {m.authoring_editor_tab_code()}
+          </TabsTrigger>
+          {testPanel ? (
+            <TabsTrigger value="test">
+              {m.authoring_editor_tab_test()}
+            </TabsTrigger>
+          ) : null}
         </TabsList>
         <TabsContent value="build">
           {formatted ? (
             <Alert tone="neutral" className="workflow-notice">
-              <span>
-                The code view has comments or formatting the builder can’t keep,
-                so the builder is read-only. Edit in the code view, or switch to
-                the standard format.
-              </span>
+              <span>{m.authoring_editor_formatted()}</span>
               {!readOnly ? (
                 <Button
                   variant="outline"
@@ -663,7 +683,7 @@ export function DraftEditor({
                     session.change({ codeView: null, mode: 'visual' })
                   }
                 >
-                  Use the standard format
+                  {m.authoring_editor_use_standard_format()}
                 </Button>
               ) : null}
             </Alert>
@@ -693,7 +713,7 @@ export function DraftEditor({
               }
             />
           ) : (
-            <p role="status">Preparing the code view…</p>
+            <p role="status">{m.authoring_editor_preparing_code()}</p>
           )}
         </TabsContent>
         {testPanel ? (
@@ -801,10 +821,9 @@ function DiscardDialog({
   return (
     <Dialog open={open} onOpenChange={(value) => !value && !pending && close()}>
       <DialogContent className="workflow-dialog">
-        <DialogTitle>Discard this draft?</DialogTitle>
+        <DialogTitle>{m.authoring_discard_title()}</DialogTitle>
         <DialogDescription>
-          The draft and its unsaved changes are removed. Published versions
-          aren’t affected.
+          {m.authoring_discard_description()}
         </DialogDescription>
         {error ? (
           <Alert tone="danger" role="alert">
@@ -813,7 +832,7 @@ function DiscardDialog({
         ) : null}
         <div className="workflow-dialog-actions">
           <Button variant="outline" disabled={pending} onClick={close}>
-            Keep editing
+            {m.authoring_discard_keep()}
           </Button>
           <Button
             variant="destructive"
@@ -831,7 +850,9 @@ function DiscardDialog({
               }
             }}
           >
-            {pending ? 'Discarding…' : 'Discard draft'}
+            {pending
+              ? m.authoring_discard_pending()
+              : m.authoring_discard_confirm()}
           </Button>
         </div>
       </DialogContent>

@@ -5,6 +5,9 @@ import type {
   WorkflowDetail,
   WorkflowRunView,
 } from '@luma/api-contract';
+import { formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -26,6 +29,7 @@ import {
   WorkspaceTimezone,
 } from '@luma/ui/components/primitives/workspace-date';
 import { workspaceDateValue } from '@luma/ui/lib/timezone';
+import { quantityUnit } from '@luma/ui/lib/units';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation } from '@tanstack/react-router';
 import { ArrowRight, PackageCheck, Plus, ShieldCheck } from 'lucide-react';
@@ -46,11 +50,19 @@ import { ReplenishmentSetupFlow, setupLimit } from './replenishment-setup';
 type Rule = ReplenishmentSetup['rules'][number];
 
 function ruleStatus(rule: Rule): [string, OperationalState] {
-  if (!rule.active) return ['Revoked', 'idle'];
-  if (rule.status.state === 'blocked') return ['Stock not usable', 'error'];
-  if (rule.waitingRunId) return ['Waiting for approval', 'approval'];
+  if (!rule.active) return [m.workflows_rule_revoked(), 'idle'];
+  if (rule.status.state === 'blocked')
+    return [m.workflows_rule_blocked(), 'error'];
+  if (rule.waitingRunId) return [m.workflows_rule_waiting(), 'approval'];
 
-  return ['Watching', 'running'];
+  return [m.workflows_rule_watching(), 'running'];
+}
+
+/** Shows a quantity in the active language, or a dash when it wasn't recorded. */
+function quantity(value: number | null | undefined) {
+  return value === null || value === undefined
+    ? m.common_empty_value()
+    : formatNumber(value);
 }
 
 /**
@@ -89,7 +101,7 @@ export function ReplenishmentPanel({
     mutationFn: (body: { id: string; activationId: string }) =>
       startReplenishment(organizationId, body),
     onSuccess: async () => {
-      setNotice('Stock checked. Follow the proposal and outcome in Activity.');
+      setNotice(m.workflows_stock_checked_notice());
       await refresh();
     },
   });
@@ -136,8 +148,8 @@ export function ReplenishmentPanel({
     <Card as="section" className="workflow-section replenishment-panel">
       <div className="workflows-heading">
         <div>
-          <p className="workflow-eyebrow">Stock → purchase order</p>
-          <CardTitle as="h2">Stock rules</CardTitle>
+          <p className="workflow-eyebrow">{m.workflows_rules_eyebrow()}</p>
+          <CardTitle as="h2">{m.workflows_rules_title()}</CardTitle>
         </div>
         <Button
           disabled={!canSetUp}
@@ -146,37 +158,29 @@ export function ReplenishmentPanel({
           }
           onClick={() => setOpen(true)}
         >
-          <Plus size={15} aria-hidden="true" /> Add stock rules
+          <Plus size={15} aria-hidden="true" /> {m.workflows_rules_add()}
         </Button>
       </div>
-      <p>
-        Each rule watches one stock position. When available stock falls below
-        its minimum, Luma proposes a purchase-order draft that reaches the
-        target, waits for approval and verifies the draft. Draft and open orders
-        for the same SKU prevent duplicates.
-      </p>
+      <p>{m.workflows_rules_description()}</p>
       {data && !canSetUp ? (
         <p id="replenishment-setup-reason" className="workflow-caption">
           {!data.available
-            ? 'Setup is unavailable while the workflow worker is disconnected.'
-            : 'Your role doesn’t include Manage procurement, so you can’t add or revoke stock rules.'}
+            ? m.workflows_rules_unavailable_reason()
+            : m.workflows_rules_cannot_manage()}
         </p>
       ) : null}
       {query.isPending ? (
-        <p role="status">Loading stock and suppliers…</p>
+        <p role="status">{m.workflows_rules_loading()}</p>
       ) : query.error ? (
         <Alert tone="danger" role="alert">
           {workflowError(query.error)}{' '}
           <Button variant="ghost" onClick={() => void query.refetch()}>
-            Retry
+            {m.common_retry()}
           </Button>
         </Alert>
       ) : null}
       {data && !data.available ? (
-        <Alert tone="warning">
-          The workflow worker isn’t connected, so Luma can’t check stock or
-          create orders. Whoever runs this Luma server needs to start it.
-        </Alert>
+        <Alert tone="warning">{m.workflows_rules_worker_offline()}</Alert>
       ) : null}
       {notice ? (
         <Alert tone="success" role="status">
@@ -191,7 +195,7 @@ export function ReplenishmentPanel({
               variant="outline"
               onClick={() => start.mutate(start.variables!)}
             >
-              Retry stock check
+              {m.workflows_rules_retry_check()}
             </Button>
           ) : null}
         </Alert>
@@ -199,14 +203,16 @@ export function ReplenishmentPanel({
       {data && active.length ? (
         <p className="replenishment-summary" aria-live="polite">
           <strong>
-            {active.length} active {active.length === 1 ? 'rule' : 'rules'}
+            {m.workflows_rules_active_count({ count: active.length })}
           </strong>
           {blocked.length ? (
-            <span data-tone="error">{blocked.length} with unusable stock</span>
+            <span data-tone="error">
+              {m.workflows_rules_blocked_count({ count: blocked.length })}
+            </span>
           ) : null}
           {waiting.length ? (
             <span data-tone="approval">
-              {waiting.length} waiting for approval
+              {m.workflows_rules_waiting_count({ count: waiting.length })}
             </span>
           ) : null}
         </p>
@@ -214,22 +220,23 @@ export function ReplenishmentPanel({
       {data && !active.length ? (
         <Empty className="workflow-section-empty">
           <PackageCheck size={26} aria-hidden="true" />
-          <h3>{revoked.length ? 'No active rules' : 'No stock rules yet'}</h3>
-          <p>
-            Choose up to {setupLimit} stock positions, a supplier, a minimum and
-            a target. Each proposal keeps its evidence and approval history.
-          </p>
+          <h3>
+            {revoked.length
+              ? m.workflows_rules_empty_revoked()
+              : m.workflows_rules_empty()}
+          </h3>
+          <p>{m.workflows_rules_empty_body({ limit: setupLimit })}</p>
           {!data.suppliers.length ? (
             <Link
               to="/app/$organizationId/procurement"
               params={{ organizationId }}
               search={{ view: 'suppliers', q: '', status: '' }}
             >
-              Add a supplier in Procurement <ArrowRight size={14} />
+              {m.workflows_rules_add_supplier()} <ArrowRight size={14} />
             </Link>
           ) : !data.positions.length ? (
             <Link to="/app/$organizationId/apps" params={{ organizationId }}>
-              Connect an inventory source <ArrowRight size={14} />
+              {m.workflows_rules_connect_source()} <ArrowRight size={14} />
             </Link>
           ) : null}
         </Empty>
@@ -238,7 +245,7 @@ export function ReplenishmentPanel({
       {revoked.length ? (
         <Disclosure>
           <summary>
-            Revoked rules ({revoked.length}). Kept for history; they never run.
+            {m.workflows_rules_revoked_summary({ count: revoked.length })}
           </summary>
           <div className="replenishment-rules">{revoked.map(card)}</div>
         </Disclosure>
@@ -246,8 +253,9 @@ export function ReplenishmentPanel({
       <div className="workflow-approval-note">
         <ShieldCheck size={17} aria-hidden="true" />
         <p>
-          {detail.summary.readiness.approval.summary} Approval never bypasses
-          fresh stock, active rules or duplicate-order checks.
+          {m.workflows_rules_approval_note({
+            summary: detail.summary.readiness.approval.summary,
+          })}
         </p>
       </div>
       <Dialog
@@ -260,10 +268,9 @@ export function ReplenishmentPanel({
           className="workflow-dialog replenishment-setup-dialog"
           showCloseButton={!locked}
         >
-          <DialogTitle>Add stock rules</DialogTitle>
+          <DialogTitle>{m.workflows_rules_add()}</DialogTitle>
           <DialogDescription>
-            Choose up to {setupLimit} stock positions and review exactly what
-            each rule would do before Luma starts watching them.
+            {m.workflows_rules_dialog_description({ limit: setupLimit })}
           </DialogDescription>
           {data ? (
             <ReplenishmentSetupFlow
@@ -276,9 +283,7 @@ export function ReplenishmentPanel({
               done={(changed) => {
                 setOpen(false);
                 if (changed) {
-                  setNotice(
-                    'Stock rules saved. Luma now watches the activated positions.',
-                  );
+                  setNotice(m.workflows_rules_saved());
                   void refresh();
                 }
               }}
@@ -328,22 +333,27 @@ function RuleCard({
       </div>
       <dl className="replenishment-metrics">
         <div>
-          <dt>Available</dt>
+          <dt>{m.workflows_rule_available()}</dt>
           <dd>
-            {stock?.available ?? '—'} <small>{stock?.unit}</small>
+            {quantity(stock?.available)}{' '}
+            <small>
+              {stock?.unit
+                ? quantityUnit(stock.unit, stock.available ?? '')
+                : null}
+            </small>
           </dd>
         </div>
         <div>
-          <dt>Below minimum</dt>
-          <dd>{rule.minimum}</dd>
+          <dt>{m.workflows_rule_minimum()}</dt>
+          <dd>{quantity(rule.minimum)}</dd>
         </div>
         <div>
-          <dt>Replenish to</dt>
-          <dd>{rule.target}</dd>
+          <dt>{m.workflows_rule_target()}</dt>
+          <dd>{quantity(rule.target)}</dd>
         </div>
         <div>
-          <dt>High risk above</dt>
-          <dd>{rule.approvalQuantity}</dd>
+          <dt>{m.workflows_rule_high_risk()}</dt>
+          <dd>{quantity(rule.approvalQuantity)}</dd>
         </div>
       </dl>
       {rule.active && rule.status.state === 'blocked' ? (
@@ -365,20 +375,18 @@ function RuleCard({
                   : 'neutral'
             }
           >
-            Latest run
+            {m.workflows_rule_latest_run()}
           </Badge>{' '}
           {rule.latestRun.summary} <WorkspaceDate value={rule.latestRun.at} />
         </p>
       ) : null}
       <div className="replenishment-rule-footer">
         <span>
-          {stock ? (
-            <>
-              Stock read <WorkspaceDate value={stock.observedAt} />
-            </>
-          ) : (
-            'No stock read from the source'
-          )}
+          {stock
+            ? rich(m.workflows_rule_stock_read, {
+                date: <WorkspaceDate value={stock.observedAt} />,
+              })
+            : m.workflows_rule_no_stock()}
         </span>
         <div className="replenishment-rule-actions">
           <Link
@@ -387,14 +395,15 @@ function RuleCard({
             params={{ organizationId, positionId: rule.positionId }}
             search={{ from: here }}
           >
-            Stock record <ArrowRight size={13} aria-hidden="true" />
+            {m.workflows_rule_stock_record()}{' '}
+            <ArrowRight size={13} aria-hidden="true" />
           </Link>
           {rule.waitingRunId ? (
             <RepairLink
               organizationId={organizationId}
               definitionId={definitionId}
               repair={{
-                label: 'Review decision',
+                label: m.workflows_rule_review_decision(),
                 destination: 'needs_you',
                 recordId: `replenishment:${rule.waitingRunId}`,
               }}
@@ -405,7 +414,7 @@ function RuleCard({
               organizationId={organizationId}
               definitionId={definitionId}
               repair={{
-                label: 'Purchase order',
+                label: m.workflows_rule_purchase_order(),
                 destination: 'purchase_order',
                 recordId: rule.latestRun.purchaseOrderId,
               }}
@@ -421,13 +430,23 @@ function RuleCard({
               }
               onClick={start}
             >
-              {starting ? 'Checking stock…' : 'Check stock now'}
+              {starting
+                ? m.workflows_rule_checking()
+                : m.workflows_rule_check_now()}
             </Button>
           ) : null}
         </div>
       </div>
     </article>
   );
+}
+
+/** Labels a recorded decision; outcomes Luma doesn't know stay as recorded. */
+function decisionLabel(outcome: string) {
+  if (outcome === 'approved') return m.workflows_review_decision_approved();
+  if (outcome === 'rejected') return m.workflows_review_decision_rejected();
+
+  return outcome.replaceAll('_', ' ');
 }
 
 /** Keeps the human decision next to its quantity and exposes only independently verified orders as success. */
@@ -469,19 +488,27 @@ export function ReplenishmentRunReview({
     ?.values.committed;
 
   return (
-    <div className="replenishment-review" aria-label="Procurement run context">
+    <div
+      className="replenishment-review"
+      aria-label={m.workflows_review_label()}
+    >
       {query.isPending ? (
-        <p role="status">Loading procurement context…</p>
+        <p role="status">{m.workflows_review_loading()}</p>
       ) : null}
       {review ? (
         <>
           <div className="workflows-heading">
             <div>
-              <span className="workflow-eyebrow">REPLENISHMENT CONTEXT</span>
+              <span className="workflow-eyebrow">
+                {m.workflows_review_eyebrow()}
+              </span>
               <h3>
                 {review.quantity === null
                   ? review.sku
-                  : `${review.quantity} × ${review.sku}`}
+                  : m.workflows_review_quantity_sku({
+                      quantity: quantity(review.quantity),
+                      sku: review.sku,
+                    })}
               </h3>
             </div>
             <Badge
@@ -490,44 +517,53 @@ export function ReplenishmentRunReview({
               }
             >
               {review.verification.state === 'verified'
-                ? 'Draft verified'
-                : 'Not verified'}
+                ? m.workflows_review_draft_verified()
+                : m.workflows_review_not_verified()}
             </Badge>
           </div>
           <dl
             className="replenishment-metrics"
-            aria-label="Recorded stock context"
+            aria-label={m.workflows_review_stock_label()}
           >
             <div>
-              <dt>Stock at check</dt>
+              <dt>{m.workflows_review_stock_at_check()}</dt>
               <dd>
-                {review.stock.available ?? '—'}{' '}
-                <small>{review.stock.unit}</small>
+                {quantity(review.stock.available)}{' '}
+                <small>
+                  {review.stock.unit
+                    ? quantityUnit(
+                        review.stock.unit,
+                        review.stock.available ?? '',
+                      )
+                    : null}
+                </small>
               </dd>
             </div>
             <div>
-              <dt>Below minimum</dt>
-              <dd>{review.stock.minimum}</dd>
+              <dt>{m.workflows_rule_minimum()}</dt>
+              <dd>{quantity(review.stock.minimum)}</dd>
             </div>
             <div>
-              <dt>Replenish to</dt>
-              <dd>{review.stock.target}</dd>
+              <dt>{m.workflows_rule_target()}</dt>
+              <dd>{quantity(review.stock.target)}</dd>
             </div>
             <div>
-              <dt>Proposed quantity</dt>
-              <dd>{review.quantity ?? '—'}</dd>
+              <dt>{m.workflows_review_proposed()}</dt>
+              <dd>{quantity(review.quantity)}</dd>
             </div>
           </dl>
           {review.stock.checkedAt ? (
             <p>
-              Stock checked <WorkspaceDate value={review.stock.checkedAt} />
+              {rich(m.workflows_review_stock_checked, {
+                date: <WorkspaceDate value={review.stock.checkedAt} />,
+              })}
             </p>
           ) : (
-            <p>Stock evidence has not been recorded.</p>
+            <p>{m.workflows_review_no_stock_check()}</p>
           )}
           <dl className="procurement-run-objects">
             <div>
-              <dt>Supplier</dt>
+              <dt>{m.workflows_review_supplier()}</dt>
               <dd>
                 <Link
                   to="/app/$organizationId/procurement"
@@ -539,18 +575,22 @@ export function ReplenishmentRunReview({
               </dd>
             </div>
             <div>
-              <dt>Decision</dt>
+              <dt>{m.workflows_review_decision()}</dt>
               <dd>
-                {review.decision?.outcome.replaceAll('_', ' ') ??
-                  'No decision recorded'}
+                {review.decision
+                  ? decisionLabel(review.decision.outcome)
+                  : m.workflows_review_no_decision()}
               </dd>
             </div>
             <div>
-              <dt>Purchase order</dt>
+              <dt>{m.workflows_review_purchase_order()}</dt>
               <dd>
                 {review.purchaseOrder
-                  ? `${review.purchaseOrder.reference} · ${review.purchaseOrder.status}`
-                  : 'No order created'}
+                  ? m.workflows_review_order_status({
+                      reference: review.purchaseOrder.reference,
+                      status: review.purchaseOrder.status,
+                    })
+                  : m.workflows_review_no_order()}
               </dd>
             </div>
           </dl>
@@ -564,35 +604,35 @@ export function ReplenishmentRunReview({
             }
           >
             {review.verification.state === 'verified'
-              ? 'The draft, supplier and quantity were independently verified. Stock receipt is not part of this outcome.'
+              ? m.workflows_review_verified()
               : review.verification.state === 'failed'
-                ? 'The purchase order differs from the expected draft. Review the order before continuing.'
+                ? m.workflows_review_failed()
                 : review.verification.state === 'inconclusive'
-                  ? 'The purchase-order result could not be confirmed. Review the recorded evidence.'
+                  ? m.workflows_review_inconclusive()
                   : review.purchaseOrder
-                    ? 'The purchase order exists. Independent verification is still pending.'
-                    : 'No verified purchase-order outcome recorded.'}
+                    ? m.workflows_review_pending()
+                    : m.workflows_review_none()}
             {review.verification.recordedAt ? (
               <span>
                 {' '}
-                Checked <WorkspaceDate value={review.verification.recordedAt} />
-                .
+                {rich(m.workflows_review_checked_at, {
+                  date: (
+                    <WorkspaceDate value={review.verification.recordedAt} />
+                  ),
+                })}
               </span>
             ) : null}
           </Alert>
         </>
       ) : null}
       {run.processState === 'ended' && committed ? (
-        <Alert tone="neutral">
-          An existing draft or open purchase order covers this SKU. No new order
-          was created.
-        </Alert>
+        <Alert tone="neutral">{m.workflows_review_covered()}</Alert>
       ) : null}
       {query.error ? (
         <Alert tone="danger">
           {workflowError(query.error)}{' '}
           <Button variant="ghost" onClick={() => void query.refetch()}>
-            Refresh review
+            {m.workflows_review_refresh()}
           </Button>
         </Alert>
       ) : null}
@@ -600,8 +640,8 @@ export function ReplenishmentRunReview({
         <>
           <p>
             {review.canRespond
-              ? 'Review this quantity and supplier before approving the draft.'
-              : 'Waiting for someone else who can approve changes. Stock evidence must still be fresh when approved.'}
+              ? m.workflows_review_can_respond()
+              : m.workflows_review_waiting_other()}
           </p>
           {review.canRespond && review.decisionId ? (
             <div className="workflow-dialog-actions">
@@ -615,7 +655,7 @@ export function ReplenishmentRunReview({
                   })
                 }
               >
-                Reject proposal
+                {m.workflows_review_reject()}
               </Button>
               <Button
                 disabled={mutation.isPending || mutation.isSuccess}
@@ -626,7 +666,11 @@ export function ReplenishmentRunReview({
                   })
                 }
               >
-                Approve {review.quantity} units
+                {review.quantity === null
+                  ? m.workflows_review_approve()
+                  : m.workflows_review_approve_units({
+                      quantity: review.quantity,
+                    })}
               </Button>
             </div>
           ) : null}
@@ -634,15 +678,14 @@ export function ReplenishmentRunReview({
       ) : null}
       {mutation.isSuccess && review?.verification.state === 'not_verified' ? (
         <Alert tone="success" role="status">
-          Decision recorded. The workflow will check current stock and policy
-          before continuing.
+          {m.workflows_review_decision_recorded()}
         </Alert>
       ) : null}
       {mutation.error ? (
         <Alert tone="danger" role="alert">
           {workflowError(mutation.error)}{' '}
           <Button variant="ghost" onClick={() => void query.refetch()}>
-            Refresh review
+            {m.workflows_review_refresh()}
           </Button>
         </Alert>
       ) : null}
@@ -655,14 +698,16 @@ export function ReplenishmentRunReview({
           to: workspaceDateValue(new Date(lastRecordedAt), timeZone),
         }}
       >
-        View run activity <ArrowRight size={14} aria-hidden="true" />
+        {m.workflows_review_activity()}{' '}
+        <ArrowRight size={14} aria-hidden="true" />
       </Link>
       {typeof orderId === 'string' ? (
         <Link
           to="/app/$organizationId/procurement/$purchaseOrderId"
           params={{ organizationId, purchaseOrderId: orderId }}
         >
-          Inspect purchase order <ArrowRight size={14} aria-hidden="true" />
+          {m.workflows_review_open_order()}{' '}
+          <ArrowRight size={14} aria-hidden="true" />
         </Link>
       ) : null}
     </div>

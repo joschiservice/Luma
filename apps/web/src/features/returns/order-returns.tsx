@@ -1,6 +1,7 @@
 import './returns.css';
 
 import type { OrderDetail } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { Link } from '@tanstack/react-router';
 import { ArrowRight } from 'lucide-react';
@@ -11,7 +12,6 @@ import {
   returnLabel,
   stageLabels,
   stageStates,
-  units,
 } from './presentation';
 
 /** Lists an order's returns and refunds with their stage; each opens its return. */
@@ -26,12 +26,12 @@ export function OrderReturns({
 }) {
   const label = (connectionId: string) =>
     detail.sources.find((source) => source.connectionId === connectionId)
-      ?.label ?? 'Connected source';
+      ?.label ?? m.returns_source_fallback();
 
   return (
     <OrderSection
-      title="Returns and refunds"
-      description="Returns and refunds imported from each source. Only successful refund payments count as money returned."
+      title={m.returns_order_section_title()}
+      description={m.returns_order_section_description()}
     >
       {detail.returns.length ? (
         <ul className="order-list order-returns">
@@ -39,8 +39,11 @@ export function OrderReturns({
             <li key={item.id}>
               <span className="returns-cell">
                 <strong>
-                  {returnLabel(item)}
-                  {item.deleted ? ' · removed at source' : ''}
+                  {item.deleted
+                    ? m.returns_order_section_removed({
+                        label: returnLabel(item),
+                      })
+                    : returnLabel(item)}
                 </strong>
                 <span>
                   <StatePill state={stageStates[item.stage]}>
@@ -48,12 +51,16 @@ export function OrderReturns({
                   </StatePill>
                 </span>
                 <small>
-                  {label(item.connectionId)}
                   {item.kind === 'return'
-                    ? ` · ${units(item.quantity)} ${item.quantity === '1' ? 'unit' : 'units'}`
-                    : ''}
-                  {' · '}
-                  {refundSummary(item)}
+                    ? m.returns_order_section_units({
+                        source: label(item.connectionId),
+                        units: Number(item.quantity),
+                        refund: refundSummary(item),
+                      })
+                    : m.returns_order_section_refund({
+                        source: label(item.connectionId),
+                        refund: refundSummary(item),
+                      })}
                 </small>
               </span>
               <Link
@@ -61,15 +68,13 @@ export function OrderReturns({
                 params={{ organizationId, returnId: item.id }}
                 search={{ from }}
               >
-                Open <ArrowRight size={13} aria-hidden="true" />
+                {m.common_open()} <ArrowRight size={13} aria-hidden="true" />
               </Link>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="order-note">
-          No return or refund is imported for this order.
-        </p>
+        <p className="order-note">{m.returns_order_section_empty()}</p>
       )}
     </OrderSection>
   );

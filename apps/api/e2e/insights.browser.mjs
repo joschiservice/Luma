@@ -71,7 +71,7 @@ test('opens the exact records behind a chart point and returns to them', async (
   // Sources without an import are named, and unknown history is never shown as complete.
   const card = page.locator('section[data-chart="orders"]');
   await expect(card).toContainText('Partial coverage');
-  await expect(card).toContainText('Observed records only');
+  await expect(card).toContainText('Not fully imported');
   // Without replenishment rules, stock risk says why instead of showing zeros.
   await expect(page.locator('section[data-chart="stock"]')).toContainText(
     'stock risk is unknown, not zero',
@@ -238,6 +238,6 @@ test('keeps a 503 chart stable during live import events and supports explicit r
   failing = false;
   await card.getByRole('button', { name: 'Try again' }).click();
   await expect(card.getByRole('alert')).toBeHidden();
-  await expect(card).toContainText('Nothing can report orders yet');
+  await expect(card).toContainText('No source reports orders yet');
   expect(requests).toBe(initialRequests + 1);
 });

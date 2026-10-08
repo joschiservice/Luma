@@ -179,7 +179,7 @@ function Preview({ scenario = 'review' }: { scenario?: Scenario }) {
   return (
     <main className="inventory-page">
       <style>{appStyles}</style>
-      <PageHeader title="LINEN-SHIRT-M" description="Tokyo warehouse · each" />
+      <PageHeader title="LINEN-SHIRT-M" description="Tokyo warehouse · units" />
       <Suspense fallback={<p>Loading correction…</p>}>
         {Correction ? (
           <Correction positionId={positionId} services={services} />
@@ -216,7 +216,7 @@ export const Review: Story = {
       ),
     ).resolves.toBeVisible();
     expect(
-      canvas.queryByRole('button', { name: 'Apply to Shopify' }),
+      canvas.queryByRole('button', { name: 'Send to Shopify' }),
     ).toBeNull();
   },
 };

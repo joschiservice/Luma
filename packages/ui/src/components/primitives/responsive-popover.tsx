@@ -1,4 +1,5 @@
 import { Popover } from '@base-ui/react/popover';
+import { m } from '@luma/i18n/messages';
 import { X } from 'lucide-react';
 import { type ReactElement, type ReactNode } from 'react';
 
@@ -39,7 +40,7 @@ export function ResponsivePopover({
                   <Button
                     variant="ghost"
                     size="icon"
-                    aria-label="Close picker"
+                    aria-label={m.common_close()}
                   />
                 }
               >

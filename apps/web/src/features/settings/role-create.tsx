@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { Button } from '@luma/ui/components/primitives/button';
 import {
   Dialog,
@@ -73,7 +74,9 @@ function CreateRoleForm({
   start: (draft: RoleDraft) => void;
 }) {
   const access = usePermissions(organizationId);
-  const [name, setName] = useState(base ? `${base.name} copy` : '');
+  const [name, setName] = useState(
+    base ? m.settings_role_create_copy_name({ name: base.name }) : '',
+  );
   const [description, setDescription] = useState(base?.description ?? '');
   const [from, setFrom] = useState(base?.id ?? 'blank');
   const source = roles.find((role) => role.id === from) ?? null;
@@ -83,7 +86,7 @@ function CreateRoleForm({
       role.name.trim().toLowerCase() === name.trim().toLowerCase(),
   );
   const options = [
-    { value: 'blank', label: 'No permissions' },
+    { value: 'blank', label: m.settings_role_create_blank() },
     ...roles
       .filter((role) => !role.archived)
       .map((role) => ({ value: role.id, label: role.name })),
@@ -95,11 +98,12 @@ function CreateRoleForm({
   return (
     <>
       <DialogTitle>
-        {base ? `Duplicate ${base.name}` : 'Create a role'}
+        {base
+          ? m.settings_role_create_duplicate_title({ role: base.name })
+          : m.settings_role_create_title()}
       </DialogTitle>
       <DialogDescription>
-        Name the role and choose where to start. You’ll review every permission
-        before anything is saved.
+        {m.settings_role_create_description()}
       </DialogDescription>
       <form
         className="settings-dialog-form"
@@ -115,7 +119,7 @@ function CreateRoleForm({
           });
         }}
       >
-        <label htmlFor="role-name">Name</label>
+        <label htmlFor="role-name">{m.settings_role_name_label()}</label>
         <Input
           id="role-name"
           required
@@ -124,25 +128,29 @@ function CreateRoleForm({
           autoFocus
           aria-invalid={taken || undefined}
           aria-describedby={taken ? 'role-name-taken' : undefined}
-          placeholder="For example, Buyer"
+          placeholder={m.settings_role_name_placeholder()}
           onChange={(event) => setName(event.target.value)}
         />
         {taken ? (
           <p className="roles-field-error" id="role-name-taken">
-            Another role already has this name.
+            {m.settings_role_name_taken()}
           </p>
         ) : null}
-        <label htmlFor="role-description">Description</label>
+        <label htmlFor="role-description">
+          {m.settings_role_description_label()}
+        </label>
         <Textarea
           id="role-description"
           maxLength={300}
           rows={2}
           className="min-h-16"
           value={description}
-          placeholder="Who should have this role and what they work on"
+          placeholder={m.settings_role_description_placeholder()}
           onChange={(event) => setDescription(event.target.value)}
         />
-        <label id="role-from-label">Start from</label>
+        <label id="role-from-label">
+          {m.settings_role_create_from_label()}
+        </label>
         <Select
           aria-labelledby="role-from-label"
           options={options}
@@ -153,18 +161,19 @@ function CreateRoleForm({
         />
         {source?.allAppPermissions ? (
           <p className="settings-note">
-            App permissions are not copied from {source.name}. Grant the ones
-            this role needs in the next step.
+            {m.settings_role_create_apps_not_copied({ role: source.name })}
           </p>
         ) : null}
         {withheld.length ? (
           <p className="settings-note">
-            {withheld.length} permission{withheld.length === 1 ? '' : 's'} from{' '}
-            {source?.name} stay off because your role doesn’t include them.
+            {m.settings_role_create_withheld({
+              count: withheld.length,
+              role: source?.name ?? '',
+            })}
           </p>
         ) : null}
         <Button type="submit" disabled={!name.trim() || taken}>
-          Continue to permissions
+          {m.settings_role_create_continue()}
         </Button>
       </form>
     </>

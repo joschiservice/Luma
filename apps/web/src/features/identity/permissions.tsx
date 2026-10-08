@@ -1,3 +1,5 @@
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { buttonVariants } from '@luma/ui/components/primitives/button';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { useQuery } from '@tanstack/react-query';
@@ -7,6 +9,7 @@ import { useMemo } from 'react';
 
 import { rolesOptions } from '../settings/roles-data';
 import { contextOptions } from './data';
+import { permissionLabel, roleName } from './permission-text';
 
 /**
  * Reports whether a role is the built-in Owner role. Ownership is a role rather than a
@@ -67,13 +70,17 @@ export function useCan(organizationId: string, permission: string) {
   return usePermissions(organizationId).can(permission);
 }
 
-/** Looks up a permission's people-facing label, falling back to its key. */
+/**
+ * Looks up a permission's people-facing label in the interface language. Permissions the client
+ * doesn't know use the workspace catalog's label, then the key.
+ */
 export function usePermissionLabel(organizationId: string, permission: string) {
   const roles = useQuery({ ...rolesOptions(organizationId), retry: false });
 
-  return (
+  return permissionLabel(
+    permission,
     roles.data?.permissions.find((item) => item.key === permission)?.label ??
-    permission
+      permission,
   );
 }
 
@@ -87,7 +94,7 @@ export function NoAccess({
   permission,
 }: {
   organizationId: string;
-  /** What the page shows, such as "orders". */
+  /** What the page shows in the active language, such as "orders", or an app's name. */
   area: string;
   permission: string;
 }) {
@@ -97,10 +104,16 @@ export function NoAccess({
   return (
     <Empty className="no-access" aria-labelledby="no-access-title">
       <LockKeyhole aria-hidden="true" />
-      <h2 id="no-access-title">You don’t have access to {area}</h2>
+      <h2 id="no-access-title">{m.identity_access_title({ area })}</h2>
       <p>
-        {role ? `Your ${role.name} role` : 'Your role'} doesn’t include{' '}
-        <strong>{label}</strong>. Ask a workspace admin if you need it.
+        {role
+          ? rich(m.identity_access_role_missing, {
+              role: roleName(role),
+              permission: <strong>{label}</strong>,
+            })
+          : rich(m.identity_access_missing, {
+              permission: <strong>{label}</strong>,
+            })}
       </p>
       <Link
         className={buttonVariants({ variant: 'outline' })}
@@ -108,7 +121,7 @@ export function NoAccess({
         params={{ organizationId, section: 'roles' }}
         search={role ? { role: role.id } : {}}
       >
-        See what your role allows
+        {m.identity_access_see_role()}
       </Link>
     </Empty>
   );
@@ -128,7 +141,8 @@ export function MissingPermission({
 
   return (
     <span className="missing-permission" id={id}>
-      <LockKeyhole size={12} aria-hidden="true" /> Requires {label}
+      <LockKeyhole size={12} aria-hidden="true" />{' '}
+      {m.identity_access_requires({ permission: label })}
     </span>
   );
 }

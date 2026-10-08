@@ -1,4 +1,6 @@
 import type { OrderDetail, OrderSourceFacts } from '@luma/api-contract';
+import { formatList } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
 import {
@@ -27,25 +29,25 @@ function lineColumns(
   return [
     {
       key: 'item',
-      header: 'Item',
+      header: m.orders_lines_column_item(),
       cell: (line) => (
         <span className="orders-cell-stack">
-          <span>{line.title ?? line.skuCode ?? 'Untitled item'}</span>
+          <span>{line.title ?? line.skuCode ?? m.orders_lines_untitled()}</span>
           <small>
-            {line.skuCode ? `SKU ${line.skuCode}` : 'No SKU text'}
+            {line.skuCode
+              ? m.orders_lines_sku({ sku: line.skuCode })
+              : m.orders_lines_no_sku()}
+            {' · '}
             {line.skuId ? (
-              <>
-                {' · '}
-                <Link
-                  to="/app/$organizationId/products/$skuId"
-                  params={{ organizationId, skuId: line.skuId }}
-                  search={{ from }}
-                >
-                  Product and stock
-                </Link>
-              </>
+              <Link
+                to="/app/$organizationId/products/$skuId"
+                params={{ organizationId, skuId: line.skuId }}
+                search={{ from }}
+              >
+                {m.orders_lines_product_link()}
+              </Link>
             ) : (
-              ' · SKU not mapped'
+              m.orders_lines_sku_unlinked()
             )}
           </small>
         </span>
@@ -53,32 +55,32 @@ function lineColumns(
     },
     {
       key: 'ordered',
-      header: 'Ordered',
+      header: m.orders_lines_column_ordered(),
       numeric: true,
       cell: (line) => formatQuantity(line.quantity, line.unit),
     },
     {
       key: 'cancelled',
-      header: 'Cancelled',
+      header: m.orders_lines_column_cancelled(),
       numeric: true,
       cell: (line) =>
         line.cancelledQuantity === null
-          ? 'Not reported'
+          ? m.common_not_reported()
           : formatQuantity(line.cancelledQuantity, line.unit),
     },
     {
       key: 'fulfilled',
-      header: 'Fulfilled',
+      header: m.orders_lines_column_fulfilled(),
       numeric: true,
       cell: (line) => formatQuantity(line.fulfilledQuantity, line.unit),
     },
     {
       key: 'remaining',
-      header: 'Remaining',
+      header: m.orders_lines_column_remaining(),
       numeric: true,
       cell: (line) =>
         line.remainingQuantity === null
-          ? 'Unknown'
+          ? m.common_unknown()
           : formatQuantity(line.remainingQuantity, line.unit),
     },
   ];
@@ -103,14 +105,14 @@ export function OrderLines({
 }) {
   return (
     <OrderSection
-      title="Lines"
-      description="Fulfilled quantities count shipped, delivered or completed work reported by the same source."
+      title={m.orders_lines_title()}
+      description={m.orders_lines_description()}
     >
       {detail.sources.length > 1 ? (
         <div
           className="order-source-switch"
           role="group"
-          aria-label="Source for lines"
+          aria-label={m.orders_lines_source_switch()}
         >
           {detail.sources.map((source) => (
             <Button
@@ -127,14 +129,12 @@ export function OrderLines({
       ) : null}
       {shown ? (
         <DataTable
-          caption={`Lines reported by ${shown.label}`}
+          caption={m.orders_lines_caption({ source: shown.label })}
           columns={lineColumns(organizationId, from)}
           rows={shown.lines}
           rowKey={(line) => line.id}
           density="compact"
-          empty={
-            <p className="order-note">This source reports no order lines.</p>
-          }
+          empty={<p className="order-note">{m.orders_lines_empty()}</p>}
         />
       ) : null}
     </OrderSection>
@@ -142,58 +142,87 @@ export function OrderLines({
 }
 
 type ComparedFact = {
-  label: string;
+  key: string;
+  label: () => string;
   field?: string;
   value: (source: OrderSourceFacts) => ReactNode;
 };
 
 const comparedFacts: ComparedFact[] = [
-  { label: 'Number', value: (source) => source.displayNumber ?? '—' },
   {
-    label: 'Status',
+    key: 'number',
+    label: m.orders_comparison_number,
+    value: (source) => source.displayNumber ?? m.common_empty_value(),
+  },
+  {
+    key: 'status',
+    label: m.orders_comparison_status,
     field: 'status',
     value: (source) => statusLabels[source.status] ?? source.status,
   },
   {
-    label: 'Payment',
+    key: 'payment',
+    label: m.orders_comparison_payment,
     field: 'paymentStatus',
     value: (source) =>
       paymentLabels[source.paymentStatus] ?? source.paymentStatus,
   },
   {
-    label: 'Total',
+    key: 'total',
+    label: m.orders_comparison_total,
     field: 'total',
-    value: (source) => formatMoney(source.total) ?? 'Not reported',
+    value: (source) => formatMoney(source.total) ?? m.common_not_reported(),
   },
   {
-    label: 'Ordered items',
+    key: 'items',
+    label: m.orders_comparison_items,
     field: 'lines',
     value: (source) =>
-      source.lines
-        .map(
-          (line) =>
-            `${formatQuantity(line.quantity, line.unit)} × ${line.skuCode ?? line.title ?? 'item'}`,
-        )
-        .join(', ') || 'None',
+      source.lines.length
+        ? formatList(
+            source.lines.map((line) =>
+              m.orders_comparison_item({
+                quantity: formatQuantity(line.quantity, line.unit),
+                item: line.skuCode ?? line.title ?? m.orders_lines_untitled(),
+              }),
+            ),
+            { type: 'unit' },
+          )
+        : m.common_none(),
   },
-  { label: 'Fulfillment', value: (source) => fulfillmentLabel(source) },
   {
-    label: 'Placed',
+    key: 'fulfillment',
+    label: m.orders_comparison_fulfillment,
+    value: (source) => fulfillmentLabel(source),
+  },
+  {
+    key: 'placed',
+    label: m.orders_comparison_placed,
     value: (source) =>
-      source.placedAt ? <WorkspaceDate value={source.placedAt} /> : '—',
+      source.placedAt ? (
+        <WorkspaceDate value={source.placedAt} />
+      ) : (
+        m.common_empty_value()
+      ),
   },
   {
-    label: 'Due',
+    key: 'due',
+    label: m.orders_comparison_due,
     value: (source) =>
-      source.dueAt ? <WorkspaceDate value={source.dueAt} /> : '—',
+      source.dueAt ? (
+        <WorkspaceDate value={source.dueAt} />
+      ) : (
+        m.common_empty_value()
+      ),
   },
   {
-    label: 'Source updated',
+    key: 'source-updated',
+    label: m.orders_comparison_source_updated,
     value: (source) =>
       source.sourceUpdatedAt ? (
         <WorkspaceDate value={source.sourceUpdatedAt} />
       ) : (
-        'Not reported'
+        m.common_not_reported()
       ),
   },
 ];
@@ -204,33 +233,35 @@ export function SourceComparison({ detail }: { detail: OrderDetail }) {
   const columns: DataTableColumn<ComparedFact>[] = [
     {
       key: 'field',
-      header: 'Field',
+      header: m.orders_comparison_field(),
       cell: (fact) => (
         <span className="order-comparison-field">
-          {fact.label}
+          {fact.label()}
           {fact.field && differs.has(fact.field) ? (
-            <Badge tone="warning">Differs</Badge>
+            <Badge tone="warning">{m.orders_comparison_differs()}</Badge>
           ) : null}
         </span>
       ),
     },
     ...detail.sources.map((source) => ({
       key: source.connectionId,
-      header: `${source.label}${source.deleted ? ' (removed)' : ''}`,
+      header: source.deleted
+        ? m.orders_source_removed({ source: source.label })
+        : source.label,
       cell: (fact: ComparedFact) => fact.value(source),
     })),
   ];
 
   return (
     <OrderSection
-      title="Source comparison"
-      description="Each source keeps its own facts. Order numbers and dates are shown but not compared, because systems assign them independently."
+      title={m.orders_comparison_title()}
+      description={m.orders_comparison_description()}
     >
       <DataTable
-        caption="Facts reported by each source"
+        caption={m.orders_comparison_caption()}
         columns={columns}
         rows={comparedFacts}
-        rowKey={(fact) => fact.label}
+        rowKey={(fact) => fact.key}
         density="compact"
       />
     </OrderSection>

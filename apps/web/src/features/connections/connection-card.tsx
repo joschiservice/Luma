@@ -2,6 +2,7 @@ import {
   type InstalledConnection,
   type SyncConnectionView,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
 import {
@@ -24,7 +25,12 @@ import { useEffect, useRef, useState } from 'react';
 import { AppExtension } from '../apps/extension';
 import { connectionSummary } from '../sync/presentation';
 import { changeConnection, connectionError } from './data';
-import { capabilities, statuses } from './presentation';
+import {
+  capabilities,
+  connectionKindName,
+  connectionSystem,
+  statuses,
+} from './presentation';
 import { ProviderIcon } from './provider-icon';
 
 /**
@@ -69,6 +75,7 @@ export function ConnectionCard({
     connection.status === 'active' && appAvailable
       ? connection.permissions.filter((p) => connection.granted.includes(p))
       : [];
+  const system = connectionSystem(connection.target.kind);
   const target = Object.entries(connection.target)
     .filter(([key]) => key !== 'kind')
     .map(([, value]) => value)
@@ -83,10 +90,10 @@ export function ConnectionCard({
       const result = await changeConnection(organizationId, connection, action);
       setMessage(
         action === 'disconnect'
-          ? 'Connection disconnected.'
+          ? m.connections_disconnected()
           : result.status === 'active'
-            ? 'Access validated.'
-            : 'Validation did not confirm all requested permissions. Check provider access and credentials.',
+            ? m.connections_validated()
+            : m.connections_validation_incomplete(),
       );
       setDialog(null);
     } catch (error) {
@@ -110,7 +117,9 @@ export function ConnectionCard({
         <div className="connection-identity">
           <ProviderIcon provider={connection.target.kind} />
           <div>
-            <p className="eyebrow">{connection.target.kind}</p>
+            <p className="eyebrow">
+              {connectionKindName(connection.target.kind)}
+            </p>
             <CardTitle as="h3">{connection.label}</CardTitle>
           </div>
         </div>
@@ -129,14 +138,14 @@ export function ConnectionCard({
       <p className="connection-target">{target}</p>
       <p className="connection-description">
         {!appAvailable
-          ? 'This app is unavailable in the workspace. Historical connection data remains accessible.'
+          ? m.connections_card_app_unavailable()
           : terminal
-            ? 'Access stopped. Add a connection to reconnect.'
+            ? m.connections_card_disconnected()
             : revoked
-              ? 'The provider stopped accepting Luma’s access. Reconnect to resume reads and changes.'
+              ? m.connections_card_revoked({ system })
               : connection.status === 'active'
-                ? 'Credentials and requested permissions validated.'
-                : 'Validate access or open connection settings to restore access.'}
+                ? m.connections_card_active()
+                : m.connections_card_needs_validation()}
       </p>
       {summary ? (
         <p className="connection-sync">
@@ -144,7 +153,7 @@ export function ConnectionCard({
           <span>
             {summary.text}{' '}
             <Link to="/app/$organizationId/sync" params={{ organizationId }}>
-              View data sync
+              {m.connections_card_view_sync()}
             </Link>
           </span>
         </p>
@@ -153,10 +162,10 @@ export function ConnectionCard({
         <h4>
           <ShieldCheck size={15} aria-hidden="true" />
           {permitted.some((p) => p.endsWith('.write'))
-            ? 'Read and write access'
+            ? m.connections_access_read_write()
             : permitted.length
-              ? 'Read-only access'
-              : 'No capabilities enabled'}
+              ? m.connections_access_read_only()
+              : m.connections_access_none()}
         </h4>
         <ul className="connection-capabilities">
           {connection.permissions.map((permission) => (
@@ -171,10 +180,10 @@ export function ConnectionCard({
               </span>
               <span>
                 {permitted.includes(permission)
-                  ? 'Permitted'
+                  ? m.connections_permission_permitted()
                   : connection.granted.includes(permission) && !terminal
-                    ? 'Verified · not enabled'
-                    : 'Not enabled'}
+                    ? m.connections_permission_granted()
+                    : m.connections_permission_not_enabled()}
               </span>
             </li>
           ))}
@@ -189,16 +198,18 @@ export function ConnectionCard({
             <DialogTrigger
               render={<Button variant={revoked ? 'default' : 'outline'} />}
             >
-              {revoked ? 'Reconnect' : 'Connection settings'}
+              {revoked ? m.connections_reconnect() : m.connections_settings()}
             </DialogTrigger>
             <DialogContent className="connection-dialog">
               <DialogTitle>
                 {revoked
-                  ? `Reconnect ${connection.label}`
-                  : 'Connection settings'}
+                  ? m.connections_reconnect_title({
+                      connection: connection.label,
+                    })
+                  : m.connections_settings()}
               </DialogTitle>
               <DialogDescription>
-                Manage this connection through its app.
+                {m.connections_settings_description()}
               </DialogDescription>
               <AppExtension
                 appId={connection.appId}
@@ -221,7 +232,9 @@ export function ConnectionCard({
               connection.management.includes('check')) ? (
               <Button disabled={pending} onClick={() => void run('check')}>
                 <ShieldCheck size={14} aria-hidden="true" />
-                {pending ? 'Please wait…' : 'Validate access'}
+                {pending
+                  ? m.connections_validating()
+                  : m.connections_validate()}
               </Button>
             ) : null}
             <Dialog
@@ -236,14 +249,17 @@ export function ConnectionCard({
               <DialogTrigger
                 render={<Button variant="ghost" disabled={pending} />}
               >
-                <Unplug size={14} aria-hidden="true" /> Disconnect
+                <Unplug size={14} aria-hidden="true" />{' '}
+                {m.connections_disconnect()}
               </DialogTrigger>
               <DialogContent className="connection-dialog">
-                <DialogTitle>Disconnect {connection.label}?</DialogTitle>
+                <DialogTitle>
+                  {m.connections_disconnect_title({
+                    connection: connection.label,
+                  })}
+                </DialogTitle>
                 <DialogDescription>
-                  Luma will delete stored credentials and stop new reads and
-                  writes. Requests already sent may finish. This does not revoke
-                  the provider token; revoke it with the provider if needed.
+                  {m.connections_disconnect_description({ system })}
                 </DialogDescription>
                 <div className="connection-actions">
                   <Button
@@ -251,13 +267,15 @@ export function ConnectionCard({
                     disabled={pending}
                     onClick={() => setDialog(null)}
                   >
-                    Cancel
+                    {m.common_cancel()}
                   </Button>
                   <Button
                     disabled={pending}
                     onClick={() => void run('disconnect')}
                   >
-                    {pending ? 'Disconnecting…' : 'Confirm disconnect'}
+                    {pending
+                      ? m.connections_disconnecting()
+                      : m.connections_disconnect_confirm()}
                   </Button>
                 </div>
                 <p role="status">{message}</p>

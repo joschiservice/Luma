@@ -1,4 +1,5 @@
 import type { SyncOverview } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import {
   createMemoryHistory,
@@ -45,11 +46,7 @@ function Preview({
               organizationId={organizationId}
               overview={overviews[state]}
               loading={state === 'loading'}
-              error={
-                state === 'error'
-                  ? 'Sync status could not be loaded.'
-                  : undefined
-              }
+              error={state === 'error' ? m.sync_load_failed() : undefined}
               canManage={canManage}
               command={() => undefined}
               refresh={() => undefined}
@@ -96,7 +93,7 @@ export const UpToDate: Story = {
       await canvas.findByText('Only recent orders were shared'),
     ).toBeVisible();
     await expect(
-      canvas.getByText(/didn’t share orders placed before Jul 31, 2026/),
+      canvas.getByText(/didn’t share orders placed before 31 Jul 2026/),
     ).toBeVisible();
   },
 };
@@ -147,7 +144,7 @@ export const RecentHistoryAvailable: Story = {
     ).toBeVisible();
     await expect(
       canvas.getByText(
-        /^Orders since.*Older history continues in the background/,
+        /^Orders since.*Older history continues to import in the background/,
       ),
     ).toBeVisible();
   },

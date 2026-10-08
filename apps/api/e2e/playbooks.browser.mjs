@@ -156,7 +156,7 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
   await dialog
     .getByRole('button', { name: 'Activate reviewed version', exact: true })
     .click();
-  await dialog.getByRole('button', { name: 'Retry same activation' }).click();
+  await dialog.getByRole('button', { name: 'Retry activation' }).click();
   await page.getByText('Version 0.1.0 · Active', { exact: true }).waitFor();
   await page.getByRole('heading', { name: 'Running' }).waitFor();
   // Losing write access keeps the workflow enabled but visibly blocked, with the repair.
@@ -287,7 +287,7 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
   expect(await page.locator('body').innerText()).not.toMatch(/playbook/i);
 
   await page.getByText('Orders: Order 1042', { exact: true }).waitFor();
-  await page.getByText('Exact scope and review', { exact: true }).click();
+  await page.getByText('Scope and review details', { exact: true }).click();
   await page.getByText(`Orders: ${targetId}`, { exact: true }).waitFor();
   await mkdir('/tmp/luma72-browser', { recursive: true });
   await page.screenshot({
@@ -354,7 +354,7 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
   await page.reload();
   await page
     .getByText(
-      'You can inspect workflows. Your role doesn’t include Activate playbooks, so you can’t activate or revoke them.',
+      'You can view this workflow. Your role doesn’t allow activating workflows, so you can’t activate or revoke it.',
     )
     .waitFor();
   expect(

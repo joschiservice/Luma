@@ -1,12 +1,13 @@
+import { m } from '@luma/i18n/messages';
 import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 
 import { DocsPortal } from '../features/help/portal';
-import { source } from '../features/help/source';
+import { docPage } from '../features/help/source';
 
 export const Route = createFileRoute('/docs/$')({
   loader: async ({ params }) => {
     const slug = params._splat ?? '';
-    const page = source.getPage(slug.split('/'));
+    const page = docPage(slug)?.page;
     if (!page) throw notFound();
     await page.data.preload();
 
@@ -14,21 +15,19 @@ export const Route = createFileRoute('/docs/$')({
   },
   head: ({ loaderData }) => ({
     meta: [
-      { title: `${loaderData?.title ?? 'Documentation'} · Luma` },
+      { title: `${loaderData?.title ?? m.docs_title()} · Luma` },
       {
         name: 'description',
-        content: loaderData?.description ?? 'Luma documentation',
+        content: loaderData?.description ?? m.docs_meta_description(),
       },
     ],
   }),
   component: Documentation,
   notFoundComponent: () => (
     <main className="docs-missing">
-      <h1>Guide not found</h1>
-      <p>This documentation page does not exist.</p>
-      <Link to="/docs/$" params={{ _splat: 'issues' }}>
-        Browse issue guides
-      </Link>
+      <h1>{m.docs_missing_title()}</h1>
+      <p>{m.docs_missing_body()}</p>
+      <Link to="/docs">{m.docs_missing_link()}</Link>
     </main>
   ),
 });

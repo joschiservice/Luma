@@ -1,6 +1,9 @@
 import './order-metrics.css';
 
 import type { MetricRequest, MetricResponse } from '@luma/api-contract';
+import { formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import {
   CaseLoading,
   CaseNotice,
@@ -27,12 +30,22 @@ import {
 import { useRef, useState } from 'react';
 
 import { IdentityError } from '../identity/data';
+import {
+  metricDescription,
+  metricTimeSemantics,
+  metricTitle,
+} from './metric-text';
 import { metricsOptions } from './metrics-data';
 import { type LiveMetricView, usePagedMetric } from './metrics-live';
 
 type Metric = MetricResponse['metrics'][number];
 
 const icons = [PackageOpen, Clock3, ListChecks];
+
+const coverageLabels = {
+  partial: m.overview_orders_coverage_partial,
+  unavailable: m.overview_orders_coverage_unavailable,
+} satisfies Record<MetricResponse['coverage'], () => string>;
 
 /** The order view a page requests in its metric summary. */
 export const orderMetricRequest: MetricRequest = {};
@@ -97,9 +110,9 @@ function LiveOrderMetrics({
     <section className="order-metrics" aria-labelledby="order-metrics-title">
       <header className="order-metrics-heading">
         <div>
-          <p className="order-metrics-eyebrow">Order operations</p>
-          <h2 id="order-metrics-title">The work behind the numbers</h2>
-          <p>One order, one count — across connected systems.</p>
+          <p className="order-metrics-eyebrow">{m.overview_orders_eyebrow()}</p>
+          <h2 id="order-metrics-title">{m.overview_orders_title()}</h2>
+          <p>{m.overview_orders_description()}</p>
         </div>
         <Button
           variant="outline"
@@ -111,8 +124,8 @@ function LiveOrderMetrics({
             connection === 'denied'
           }
         >
-          <RefreshCw size={14} />
-          Refresh orders
+          <RefreshCw size={14} aria-hidden="true" />
+          {m.overview_orders_refresh()}
         </Button>
       </header>
       <div
@@ -129,46 +142,46 @@ function LiveOrderMetrics({
           }
         >
           {connection === 'denied'
-            ? 'Access changed'
+            ? m.overview_live_access_changed()
             : query.isPaused || connection === 'offline'
-              ? 'Offline'
+              ? m.overview_live_offline()
               : query.isError
-                ? 'Updates unavailable'
+                ? m.overview_live_unavailable()
                 : connection === 'live'
                   ? query.isFetching
-                    ? 'Updating'
-                    : 'Live updates'
+                    ? m.overview_live_updating()
+                    : m.overview_live_on()
                   : connection === 'syncing'
-                    ? 'Updating'
+                    ? m.overview_live_updating()
                     : connection === 'connecting'
-                      ? 'Connecting'
-                      : 'Reconnecting'}
+                      ? m.overview_live_connecting()
+                      : m.overview_live_reconnecting()}
         </Badge>
         <span>
           {connection === 'denied'
-            ? 'Your workspace access changed. Sign in again to continue.'
+            ? m.overview_orders_status_denied()
             : connection === 'reconnecting'
-              ? 'Live updates interrupted. Rechecking current counts.'
-              : 'Counts and matching orders update together.'}
+              ? m.overview_orders_status_reconnecting()
+              : m.overview_orders_status_default()}
         </span>
       </div>
       {connection === 'denied' ? null : query.isPaused ||
         connection === 'offline' ? (
-        <CaseNotice title="Order updates paused">
-          Reconnect to load current order counts.
+        <CaseNotice title={m.overview_orders_paused_title()}>
+          {m.overview_orders_paused_body()}
         </CaseNotice>
       ) : query.isError ? (
         <CaseNotice
           error
           title={
             conflict
-              ? 'The matching orders changed'
-              : 'Order metrics unavailable'
+              ? m.overview_orders_conflict_title()
+              : m.overview_orders_error_title()
           }
         >
           {conflict
-            ? 'Refresh orders to inspect a new, consistent snapshot.'
-            : 'Refresh orders to try again. Previous counts are hidden.'}
+            ? m.overview_orders_conflict_body()
+            : m.overview_orders_error_body()}
         </CaseNotice>
       ) : query.isPending ? (
         <CaseLoading />
@@ -186,24 +199,26 @@ function LiveOrderMetrics({
                 >
                   <div className="order-metric-label">
                     <Icon size={18} aria-hidden="true" />
-                    <h3>{item.definition.title}</h3>
+                    <h3>{metricTitle(item.definition)}</h3>
                     <Badge tone="neutral">
                       {data.coverage === 'unavailable'
-                        ? 'Unavailable'
-                        : 'Partial'}
+                        ? m.overview_orders_badge_unavailable()
+                        : m.overview_orders_badge_partial()}
                     </Badge>
                   </div>
                   <div className="order-metric-value">
                     {data.coverage === 'unavailable'
-                      ? '—'
-                      : item.observedCount.toLocaleString()}
+                      ? m.common_empty_value()
+                      : formatNumber(item.observedCount)}
                     <span>
                       {data.coverage === 'unavailable'
-                        ? 'Awaiting order observations'
-                        : 'observed orders'}
+                        ? m.overview_orders_value_none()
+                        : m.overview_orders_value_unit({
+                            count: item.observedCount,
+                          })}
                     </span>
                   </div>
-                  <p>{item.definition.description}</p>
+                  <p>{metricDescription(item.definition)}</p>
                   <Button
                     variant="ghost"
                     onClick={(event) => {
@@ -212,7 +227,7 @@ function LiveOrderMetrics({
                       setOpen(true);
                     }}
                   >
-                    Inspect orders & definition{' '}
+                    {m.overview_orders_inspect()}{' '}
                     <ArrowRight size={14} aria-hidden="true" />
                   </Button>
                 </Card>
@@ -222,24 +237,20 @@ function LiveOrderMetrics({
           <div className="order-metrics-provenance">
             <Badge tone={data.freshness === 'fresh' ? 'neutral' : 'warning'}>
               {data.freshness === 'fresh'
-                ? 'Recent observations'
+                ? m.overview_orders_freshness_fresh()
                 : data.freshness === 'stale'
-                  ? 'Stale observations'
-                  : 'No observations'}
+                  ? m.overview_orders_freshness_stale()
+                  : m.overview_orders_freshness_none()}
             </Badge>
             <span>
-              Source observation age:{' '}
               {data.observedAt
-                ? observationAge(data.readAt, data.observedAt)
-                : 'unknown'}{' '}
-              · Latest source observation{' '}
-              {data.observedAt ? (
-                <WorkspaceDate value={data.observedAt} />
-              ) : (
-                'unavailable'
-              )}{' '}
-              · Evaluated <WorkspaceDate value={data.asOf} /> · Complete totals
-              unavailable.
+                ? rich(m.overview_orders_provenance, {
+                    time: <WorkspaceDate value={data.observedAt} />,
+                    asOf: <WorkspaceDate value={data.asOf} />,
+                  })
+                : rich(m.overview_orders_provenance_none, {
+                    asOf: <WorkspaceDate value={data.asOf} />,
+                  })}
             </span>
           </div>
         </>
@@ -248,58 +259,58 @@ function LiveOrderMetrics({
         <DialogContent className="order-cohort-dialog" finalFocus={trigger}>
           <DialogHeader>
             <DialogTitle>
-              {metric?.definition.title ?? 'Order records'}
+              {metric
+                ? metricTitle(metric.definition)
+                : m.overview_orders_dialog_title_fallback()}
             </DialogTitle>
             <DialogDescription>
-              Inspect the counting rule and matching orders from one consistent
-              snapshot. Live updates return this list to the first page.
+              {m.overview_orders_dialog_description()}
             </DialogDescription>
           </DialogHeader>
           {metric && data ? (
             <>
               <div className="order-cohort-definition">
                 <Badge tone="neutral">
-                  Definition v{metric.definition.version}
+                  {m.overview_orders_rule_version({
+                    version: metric.definition.version,
+                  })}
                 </Badge>
-                <p>{metric.definition.description}</p>
-                <p>{metric.definition.timeSemantics}</p>
+                <p>{metricDescription(metric.definition)}</p>
+                <p>{metricTimeSemantics(metric.definition)}</p>
               </div>
               <dl className="order-cohort-facts">
                 <div>
-                  <dt>Known matches</dt>
-                  <dd>{metric.observedCount}</dd>
+                  <dt>{m.overview_orders_fact_matching()}</dt>
+                  <dd>{formatNumber(metric.observedCount)}</dd>
                 </div>
                 <div>
-                  <dt>Unknown classification</dt>
-                  <dd>{metric.unknownCount}</dd>
+                  <dt>{m.common_unknown()}</dt>
+                  <dd>{formatNumber(metric.unknownCount)}</dd>
                 </div>
                 <div>
-                  <dt>Source coverage</dt>
-                  <dd>{data.coverage}</dd>
+                  <dt>{m.overview_orders_fact_coverage()}</dt>
+                  <dd>{coverageLabels[data.coverage]()}</dd>
                 </div>
               </dl>
               <p className="order-cohort-note">
                 {data.coverageExplanation}{' '}
-                {metric.unknownCount
-                  ? 'Unknown orders are excluded from the known matches.'
-                  : ''}
+                {metric.unknownCount ? m.overview_orders_unknown_note() : ''}
               </p>
               <div className="order-cohort-timestamps">
+                <span>{m.overview_orders_scope()}</span>
                 <span>
-                  Scope: all workspace connections · Current accepted state
+                  {rich(m.overview_orders_calculated, {
+                    time: <WorkspaceDate value={data.asOf} />,
+                  })}
                 </span>
                 <span>
-                  Evaluated <WorkspaceDate value={data.asOf} />
+                  {data.observedAt
+                    ? rich(m.overview_orders_latest, {
+                        time: <WorkspaceDate value={data.observedAt} />,
+                      })
+                    : m.overview_orders_latest_none()}
                 </span>
-                <span>
-                  Latest observation{' '}
-                  {data.observedAt ? (
-                    <WorkspaceDate value={data.observedAt} />
-                  ) : (
-                    'unavailable'
-                  )}
-                </span>
-                <span>Complete data through: unavailable</span>
+                <span>{m.overview_orders_completeness()}</span>
               </div>
               <Cohort metric={metric} organizationId={organizationId} />
               <Link
@@ -308,14 +319,21 @@ function LiveOrderMetrics({
                 params={{ organizationId }}
                 search={{ view: cohortViews[metric.definition.id] }}
               >
-                Open these orders in Orders{' '}
+                {m.overview_orders_open_in_orders()}{' '}
                 <ArrowRight size={12} aria-hidden="true" />
               </Link>
               <div className="order-cohort-pagination">
                 <span>
                   {metric.observedCount
-                    ? `${Math.min(data.offset + 1, metric.observedCount)}–${Math.min(data.offset + metric.items.length, metric.observedCount)} of ${metric.observedCount} known matches`
-                    : 'No known matching orders'}
+                    ? m.overview_orders_range({
+                        from: Math.min(data.offset + 1, metric.observedCount),
+                        to: Math.min(
+                          data.offset + metric.items.length,
+                          metric.observedCount,
+                        ),
+                        total: metric.observedCount,
+                      })
+                    : m.overview_orders_none()}
                 </span>
                 <div>
                   <Button
@@ -329,7 +347,7 @@ function LiveOrderMetrics({
                       })
                     }
                   >
-                    Previous
+                    {m.common_previous()}
                   </Button>
                   <Button
                     variant="outline"
@@ -346,7 +364,7 @@ function LiveOrderMetrics({
                       })
                     }
                   >
-                    Next
+                    {m.common_next()}
                   </Button>
                 </div>
               </div>
@@ -357,12 +375,14 @@ function LiveOrderMetrics({
             <CaseNotice
               error
               title={
-                conflict ? 'The matching orders changed' : 'Records unavailable'
+                conflict
+                  ? m.overview_orders_conflict_title()
+                  : m.overview_orders_records_error_title()
               }
             >
-              Refresh to inspect current records.{' '}
+              {m.overview_orders_records_error_body()}{' '}
               <Button variant="outline" onClick={refresh}>
-                Refresh orders
+                {m.overview_orders_refresh()}
               </Button>
             </CaseNotice>
           )}
@@ -384,20 +404,22 @@ function Cohort({
     return (
       <div className="order-cohort-empty">
         <PackageOpen size={28} aria-hidden="true" />
-        <strong>No observed matches</strong>
-        <p>
-          Incomplete source coverage means this does not establish a complete
-          zero.
-        </p>
+        <strong>{m.overview_orders_empty_title()}</strong>
+        <p>{m.overview_orders_empty_body()}</p>
       </div>
     );
 
   return (
-    <ul className="order-cohort-list" aria-label="Matching orders">
+    <ul
+      className="order-cohort-list"
+      aria-label={m.overview_orders_list_label()}
+    >
       {metric.items.map((order) => (
         <li key={order.id}>
           <div>
-            <strong>{order.displayNumber ?? 'Order without a number'}</strong>
+            <strong>
+              {order.displayNumber ?? m.overview_orders_no_number()}
+            </strong>
             <code title={order.id}>{order.id}</code>
             <Link
               to="/app/$organizationId/orders/$orderId"
@@ -406,16 +428,19 @@ function Cohort({
                 from: `${location.pathname}?metric=${encodeURIComponent(metric.definition.id)}`,
               }}
             >
-              Open order <ArrowRight size={12} aria-hidden="true" />
+              {m.overview_orders_open_order()}{' '}
+              <ArrowRight size={12} aria-hidden="true" />
             </Link>
           </div>
           <div>
             {order.dueAt ? (
               <span>
-                Due <WorkspaceDate value={order.dueAt} />
+                {rich(m.overview_orders_due, {
+                  time: <WorkspaceDate value={order.dueAt} />,
+                })}
               </span>
             ) : (
-              <span>No source deadline</span>
+              <span>{m.overview_orders_no_due()}</span>
             )}
             {order.issueIds.map((id) => (
               <Link
@@ -424,7 +449,8 @@ function Cohort({
                 params={{ organizationId, exceptionId: id }}
                 search={{ view: 'needs_you' }}
               >
-                Review issue <ArrowRight size={12} aria-hidden="true" />
+                {m.overview_orders_review_issue()}{' '}
+                <ArrowRight size={12} aria-hidden="true" />
               </Link>
             ))}
           </div>
@@ -440,14 +466,3 @@ const cohortViews = {
   'orders.overdue': 'overdue',
   'orders.attention': 'needs_you',
 } as const;
-
-function observationAge(readAt: string, observedAt: string) {
-  const seconds = Math.max(
-    0,
-    Math.floor((Date.parse(readAt) - Date.parse(observedAt)) / 1000),
-  );
-  if (seconds < 60) return `${seconds}s`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-
-  return `${Math.floor(seconds / 3600)}h`;
-}

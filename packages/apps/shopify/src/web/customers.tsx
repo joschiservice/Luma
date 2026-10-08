@@ -1,6 +1,7 @@
 import './customers.css';
 
 import type { AppUiProps } from '@luma/app-host/web';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Pagination } from '@luma/ui/components/primitives/pagination';
@@ -65,7 +66,9 @@ function CustomerOrders({
     <div className="customer-orders" aria-busy={read.pending}>
       <div className="customer-orders-toolbar">
         <span className="customer-orders-meta">
-          {read.data ? `Read from ${read.data.shop}` : 'Reading from Shopify…'}
+          {read.data
+            ? m.shopify_customers_read_from({ shop: read.data.shop })
+            : m.shopify_customers_reading()}
         </span>
         <Button
           variant="ghost"
@@ -76,24 +79,23 @@ function CustomerOrders({
           }}
           disabled={read.pending}
         >
-          Refresh orders
+          {m.shopify_customers_refresh()}
         </Button>
       </div>
       {read.pending ? (
         <p role="status" className="customer-orders-meta">
-          Loading order history…
+          {m.shopify_customers_loading()}
         </p>
       ) : read.error ? (
         <Alert tone="danger" role="alert">
           {read.error}{' '}
           <Button variant="outline" onClick={read.refresh}>
-            Retry
+            {m.common_retry()}
           </Button>
         </Alert>
       ) : orders?.status !== 'available' ? (
         <Alert role="status">
-          {orders?.message ??
-            'Shopify did not return this customer’s order history.'}
+          {orders?.message ?? m.shopify_customers_history_unavailable()}
         </Alert>
       ) : (
         <>
@@ -120,8 +122,10 @@ function CustomerOrders({
                 setSelectedOrder('');
                 setCursors([...cursors, read.data?.nextCursor ?? undefined]);
               }}
-              itemLabel="orders"
-              label="Order history pages"
+              formatTotal={(count) =>
+                m.shopify_customers_pagination_total({ count })
+              }
+              label={m.shopify_customers_pagination_label()}
             />
           ) : null}
           {selected ? (

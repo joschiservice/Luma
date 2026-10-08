@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Input } from '@luma/ui/components/primitives/input';
 import { useRef, useState } from 'react';
@@ -38,8 +39,8 @@ export function SecondFactorForm({
       setInvalid(true);
       setMessage(
         backup
-          ? 'Enter one of your backup codes.'
-          : 'Enter the 6-digit code from your authenticator app.',
+          ? m.identity_factor_backup_required()
+          : m.identity_factor_code_required(),
       );
       input.current?.focus();
 
@@ -57,22 +58,20 @@ export function SecondFactorForm({
         const errorCode = result.error.code ?? '';
         if (expiredCodes.has(errorCode)) {
           setExpired(true);
-          setMessage('This sign-in attempt expired. Sign in again.');
+          setMessage(m.identity_factor_expired());
         } else if (errorCode === 'ACCOUNT_TEMPORARILY_LOCKED') {
           setExpired(true);
-          setMessage(
-            'Too many incorrect codes. Wait 15 minutes, then sign in again.',
-          );
+          setMessage(m.identity_factor_locked());
         } else if (result.error.status === 429) {
-          setMessage('Too many attempts. Wait a moment and try again.');
+          setMessage(m.identity_factor_rate_limited());
         } else if (result.error.status >= 500) {
-          setMessage('We couldn’t check the code. Try again.');
+          setMessage(m.identity_factor_unavailable());
         } else {
           setInvalid(true);
           setMessage(
             backup
-              ? 'That backup code didn’t work. Each code works once.'
-              : 'That code didn’t work. Check your authenticator app and try again.',
+              ? m.identity_factor_backup_invalid()
+              : m.identity_factor_code_invalid(),
           );
         }
         setCode('');
@@ -81,9 +80,7 @@ export function SecondFactorForm({
       }
       await onVerified();
     } catch {
-      setMessage(
-        'We couldn’t reach the service. Check your connection and try again.',
-      );
+      setMessage(m.identity_error_network());
     } finally {
       lock.current = false;
       setPending(false);
@@ -98,7 +95,7 @@ export function SecondFactorForm({
           {message}
         </p>
         <Button size="lg" onClick={onRestart}>
-          Sign in again
+          {m.identity_factor_sign_in_again()}
         </Button>
       </div>
     );
@@ -114,7 +111,9 @@ export function SecondFactorForm({
     >
       <div className="form-field">
         <label htmlFor="verification-code">
-          {backup ? 'Backup code' : 'Authentication code'}
+          {backup
+            ? m.identity_factor_backup_label()
+            : m.identity_factor_code_label()}
         </label>
         <Input
           ref={input}
@@ -136,15 +135,15 @@ export function SecondFactorForm({
         />
         <div id="verification-code-help" className="field-help">
           {backup
-            ? 'Each backup code works once.'
-            : 'The 6-digit code shown for Luma in your authenticator app.'}
+            ? m.identity_factor_backup_help()
+            : m.identity_factor_code_help()}
         </div>
       </div>
       <p role="status" tabIndex={-1} ref={resultRef} className="form-message">
-        {pending ? 'Checking…' : message}
+        {pending ? m.identity_factor_checking() : message}
       </p>
       <Button size="lg" type="submit" disabled={pending}>
-        {pending ? 'Checking…' : 'Verify'}
+        {pending ? m.identity_factor_checking() : m.identity_factor_verify()}
       </Button>
       <div className="auth-factor-actions">
         <Button
@@ -160,7 +159,9 @@ export function SecondFactorForm({
             input.current?.focus();
           }}
         >
-          {backup ? 'Use your authenticator app' : 'Use a backup code'}
+          {backup
+            ? m.identity_factor_use_app()
+            : m.identity_factor_use_backup()}
         </Button>
         <Button
           variant="ghost"
@@ -169,7 +170,7 @@ export function SecondFactorForm({
           disabled={pending}
           onClick={onRestart}
         >
-          Start over
+          {m.identity_factor_start_over()}
         </Button>
       </div>
     </form>

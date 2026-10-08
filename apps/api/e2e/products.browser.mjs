@@ -48,10 +48,10 @@ test('finds a SKU, compares its store and ERP listings and follows affected orde
   expect(text).toContain('Tokyo store');
   expect(text).toContain('JTL-Wawi');
   expect(text).toContain('Canvas tote bag');
-  expect(text).toContain('26.00 (currency not reported)');
+  expect(text).toContain('26.00, currency not reported');
   await page.getByRole('link', { name: '#101', exact: true }).waitFor();
   await page
-    .getByRole('img', { name: /Tokyo store: 3 each in 1 order/ })
+    .getByRole('img', { name: /Tokyo store: 3 units in 1 order/ })
     .waitFor();
   await page.screenshot({
     path: '/tmp/luma101-detail-light.png',

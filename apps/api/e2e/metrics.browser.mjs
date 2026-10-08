@@ -45,21 +45,19 @@ test('explains unknown order totals, opens accessible cohorts and recovers from 
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(`/app/${f.org.id}/insights`);
   const section = page.getByRole('region', {
-    name: 'The work behind the numbers',
+    name: 'Orders that need work',
   });
-  await section.getByText('Awaiting order observations').first().waitFor();
-  expect(await section.getByText('Awaiting order observations').count()).toBe(
-    3,
-  );
+  await section.getByText('No order data yet').first().waitFor();
+  expect(await section.getByText('No order data yet').count()).toBe(3);
   await section
-    .getByRole('button', { name: 'Inspect orders & definition' })
+    .getByRole('button', { name: 'Show matching orders' })
     .first()
     .click();
   const dialog = page.getByRole('dialog');
   await dialog
     .getByRole('heading', { name: 'Open orders', exact: true })
     .waitFor();
-  await dialog.getByText('No observed matches').waitFor();
+  await dialog.getByText('No matching orders found').waitFor();
   expect(
     await dialog
       .getByRole('button', { name: 'Next', exact: true })
@@ -74,7 +72,7 @@ test('explains unknown order totals, opens accessible cohorts and recovers from 
   await expect
     .poll(() =>
       section
-        .getByRole('button', { name: 'Inspect orders & definition' })
+        .getByRole('button', { name: 'Show matching orders' })
         .first()
         .evaluate((el) => el === document.activeElement),
     )
@@ -119,26 +117,24 @@ test('explains unknown order totals, opens accessible cohorts and recovers from 
     .getByRole('button', { name: 'Refresh orders', exact: true })
     .click();
   await section
-    .getByText('Order metrics unavailable', { exact: true })
+    .getByText('Order counts unavailable', { exact: true })
     .waitFor();
-  expect(await section.getByText('Awaiting order observations').count()).toBe(
-    0,
-  );
+  expect(await section.getByText('No order data yet').count()).toBe(0);
   await section
     .getByRole('button', { name: 'Refresh orders', exact: true })
     .click();
-  await section.getByText('Awaiting order observations').first().waitFor();
+  await section.getByText('No order data yet').first().waitFor();
   const seed = await seedMetricOrders(t, f);
   for (let i = 0; i < 25; i++) await seed(i);
   await section
     .getByRole('button', { name: 'Refresh orders', exact: true })
     .click();
-  await section.getByText('observed orders', { exact: true }).first().waitFor();
+  await section.getByText('orders found', { exact: true }).first().waitFor();
   await section
-    .getByRole('button', { name: 'Inspect orders & definition' })
+    .getByRole('button', { name: 'Show matching orders' })
     .first()
     .click();
-  await dialog.getByText('1–20 of 25 known matches').waitFor();
+  await dialog.getByText('1–20 of 25 matching orders').waitFor();
   expect(
     await dialog
       .getByRole('list', { name: 'Matching orders' })
@@ -146,7 +142,7 @@ test('explains unknown order totals, opens accessible cohorts and recovers from 
       .count(),
   ).toBe(20);
   await dialog.getByRole('button', { name: 'Next', exact: true }).click();
-  await dialog.getByText('21–25 of 25 known matches').waitFor();
+  await dialog.getByText('21–25 of 25 matching orders').waitFor();
   await expect
     .poll(() => dialog.evaluate((el) => window.getComputedStyle(el).opacity))
     .toBe('1');
@@ -155,7 +151,7 @@ test('explains unknown order totals, opens accessible cohorts and recovers from 
     fullPage: true,
   });
   await seed(26);
-  await dialog.getByText('1–20 of 26 known matches').waitFor();
+  await dialog.getByText('1–20 of 26 matching orders').waitFor();
   await page.keyboard.press('Escape');
   await dialog.waitFor({ state: 'hidden' });
   await page.setViewportSize({ width: 1440, height: 1100 });

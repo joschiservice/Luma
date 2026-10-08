@@ -218,7 +218,7 @@ export const OrdersWithImportedHistory: Story = {
     });
     const bars = within(chart).getAllByRole('button');
     await expect(bars[0]).toHaveAccessibleName(
-      'Fri, Sep 18: Not imported: this period is before the imported history, so its count is unknown.',
+      'Fri 18 Sept: Not imported: this period is before the imported history, so its count is unknown.',
     );
     await expect(canvas.getByText(/without a placed time/)).toBeVisible();
     await userEvent.click(canvas.getByRole('button', { name: /^Open\s*39$/ }));

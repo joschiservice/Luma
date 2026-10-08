@@ -1,26 +1,22 @@
 import type { CaseDetail, CaseReview, Diagnosis } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { ChevronRight } from 'lucide-react';
 import { type ReactNode, useContext } from 'react';
 
 import { Button } from '../primitives/button';
 import { Disclosure } from '../primitives/disclosure';
+import { quantityLabel, sourceLabel, unitLabel } from './case-presentation';
 import { IssuePageNavigation } from './issue-section';
 
-/** Removes insignificant decimal zeros without rounding recorded quantities. */
-function quantityLabel(value: string) {
-  return value.includes('.')
-    ? value.replace(/0+$/, '').replace(/\.$/, '')
-    : value;
-}
-
+/** Rewrites known inventory steps in plain language; other steps keep the investigation’s text. */
 function stepLabel(step: Diagnosis['nextSteps'][number]) {
   switch (step.code) {
     case 'reread_inventory':
-      return 'Check current stock in both systems.';
+      return m.issues_overview_step_reread_inventory();
     case 'manual_inventory_review':
-      return 'If the difference remains, ask an authorized operator to review the correction.';
+      return m.issues_overview_step_manual_inventory_review();
     case 'review_mapping_authority':
-      return 'Confirm the stock mappings, units, and source of truth before choosing a correction.';
+      return m.issues_overview_step_review_mapping_authority();
     default:
       return step.text;
   }
@@ -62,15 +58,16 @@ export function IssueOverview({
   const quantity = diagnosis?.impact.exposedQuantity;
   const formattedQuantity = quantity != null ? quantityLabel(quantity) : null;
   const unit =
-    diagnosis?.impact.unit === 'each'
-      ? formattedQuantity === '1'
-        ? 'unit'
-        : 'units'
-      : diagnosis?.impact.unit;
+    quantity != null && diagnosis?.impact.unit
+      ? unitLabel(diagnosis.impact.unit, quantity)
+      : null;
   const summary = (diagnosis?.summary ?? item.summary).replace(
     /^Selling availability exceeds the configured authority by (-?\d+(?:\.\d+)?) (.+)\.$/,
     (_, amount: string, measure: string) =>
-      `Selling availability is ${quantityLabel(amount)} ${measure === 'each' ? (quantityLabel(amount) === '1' ? 'unit' : 'units') : measure} above the configured stock authority.`,
+      m.issues_overview_summary_excess({
+        quantity: quantityLabel(amount),
+        unit: unitLabel(measure, amount),
+      }),
   );
   const limitations = [
     ...new Set(
@@ -79,7 +76,7 @@ export function IssueOverview({
         .map((text) =>
           text ===
           'Current adapters do not provide a safe write or retry capability.'
-            ? 'Automatic correction and retries are not available for this issue.'
+            ? m.issues_overview_no_automatic_fix()
             : text,
         ),
     ),
@@ -89,12 +86,6 @@ export function IssueOverview({
     string,
     { title: string | null; sku: string | null; sources: Set<string> }
   >();
-  const sourceNames: Record<string, string> = {
-    shopify: 'Shopify',
-    jtl: 'JTL',
-    'jtl-onprem': 'JTL-Wawi',
-    'jtl-cloud': 'JTL Cloud',
-  };
   for (const product of item.productIdentities ?? []) {
     const key = JSON.stringify([product.title, product.sku]);
     const group = products.get(key) ?? {
@@ -102,7 +93,7 @@ export function IssueOverview({
       sku: product.sku,
       sources: new Set<string>(),
     };
-    group.sources.add(sourceNames[product.source] ?? product.source);
+    group.sources.add(sourceLabel(product.source));
     products.set(key, group);
   }
 
@@ -116,14 +107,17 @@ export function IssueOverview({
               <p key={key}>
                 {product.title ? <span>{product.title}</span> : null}
                 {product.title && product.sku ? ' · ' : ''}
-                {product.sku ? <span>SKU: {product.sku}</span> : null}
+                {product.sku ? (
+                  <span>{m.issues_overview_sku({ sku: product.sku })}</span>
+                ) : null}
                 <span> · {[...product.sources].join(' · ')}</span>
               </p>
             ))
           ) : (
             <p>
-              {item.subject.kind === 'sku' ? 'SKU ID' : 'Subject ID'}:{' '}
-              {item.subject.id}
+              {item.subject.kind === 'sku'
+                ? m.issues_overview_sku({ sku: item.subject.id })
+                : m.issues_overview_subject({ id: item.subject.id })}
             </p>
           )}
         </div>
@@ -131,8 +125,8 @@ export function IssueOverview({
           <p className="issue-overview-impact">
             <span>
               {historical || unconfirmed
-                ? 'Recorded potential exposure'
-                : 'Potential exposure'}
+                ? m.issues_exposure_label_recorded()
+                : m.issues_exposure_label()}
             </span>
             {': '}
             <strong>
@@ -141,17 +135,19 @@ export function IssueOverview({
             </strong>
             {' · '}
             {item.class === 'inventory_mismatch'
-              ? 'Overselling has not been confirmed.'
-              : 'Does not confirm realized losses.'}
+              ? m.issues_overview_overselling_unconfirmed()
+              : m.issues_overview_losses_unconfirmed()}
           </p>
         ) : null}
       </div>
       {children}
       <div className="issue-overview-action">
-        <h3 className="issue-overview-action-label">Next action</h3>
+        <h3 className="issue-overview-action-label">
+          {m.issues_overview_next_action()}
+        </h3>
         {needsReview ? (
           <Button onClick={() => navigate?.('resolution')}>
-            Review proposed change
+            {m.issues_review_proposed_change()}
           </Button>
         ) : null}
         {steps[0] ? (
@@ -159,7 +155,9 @@ export function IssueOverview({
             <p className="issue-overview-next">{stepLabel(steps[0])}</p>
             {steps[1] ? (
               <p>
-                <span className="case-caption">Then: </span>
+                <span className="case-caption">
+                  {m.issues_overview_then()}{' '}
+                </span>
                 {stepLabel(steps[1])}
               </p>
             ) : null}
@@ -171,7 +169,7 @@ export function IssueOverview({
             <Disclosure className="issue-overview-checks">
               <summary>
                 <ChevronRight size={14} aria-hidden="true" />
-                Checks and verification
+                {m.issues_overview_checks()}
               </summary>
               {item.attention.required ? (
                 <p>{item.attention.explanation}</p>
@@ -183,7 +181,7 @@ export function IssueOverview({
                     {stepLabel(step) !== step.text ? <p>{step.text}</p> : null}
                     {step.preconditions.length ? (
                       <>
-                        <h5>Before proceeding</h5>
+                        <h5>{m.issues_step_before()}</h5>
                         <ul>
                           {step.preconditions.map((text) => (
                             <li key={text}>{text}</li>
@@ -191,7 +189,7 @@ export function IssueOverview({
                         </ul>
                       </>
                     ) : null}
-                    <h5>Expected result and verification</h5>
+                    <h5>{m.issues_step_expected()}</h5>
                     <ul>
                       {step.verificationCriteria.map((text) => (
                         <li key={text}>{text}</li>
@@ -205,12 +203,12 @@ export function IssueOverview({
         ) : (
           <p>
             {unconfirmed
-              ? 'Reconnect or refresh to confirm the next action.'
+              ? m.issues_overview_unconfirmed()
               : historical
-                ? 'These findings are historical. Check fresh observations before choosing a correction.'
+                ? m.issues_overview_historical()
                 : item.diagnosisStatus === 'pending'
-                  ? 'Wait for the investigation to finish before choosing a correction.'
-                  : 'No current recommendation is available.'}
+                  ? m.issues_overview_pending()
+                  : m.issues_recommendation_none()}
           </p>
         )}
       </div>

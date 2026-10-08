@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { cn } from '@luma/ui/lib/utils';
 import { Loader2Icon } from 'lucide-react';
 import type { ComponentProps } from 'react';
@@ -8,7 +9,7 @@ function Spinner({ className, ...props }: ComponentProps<'svg'>) {
     <Loader2Icon
       data-slot="spinner"
       role="status"
-      aria-label="Loading"
+      aria-label={m.ui_spinner_label()}
       className={cn(
         'size-4 animate-spin motion-reduce:animate-none',
         className,

@@ -209,7 +209,9 @@ export const On: Story = {
   args: { state: 'on' },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(await canvas.findByText(/Runs as you/)).toBeVisible();
+    await expect(
+      await canvas.findByText(/Runs use your permissions/),
+    ).toBeVisible();
     await expect(
       canvas.getByRole('button', { name: 'Turn off' }),
     ).toBeVisible();
@@ -232,7 +234,7 @@ export const Member: Story = {
     const canvas = within(canvasElement);
     await expect(
       await canvas.findByText(
-        'Your role doesn’t include Publish and enable workflows, so you can’t turn this workflow on or off.',
+        'Your role doesn’t allow enabling workflows, so you can’t turn this workflow on or off.',
       ),
     ).toBeVisible();
   },

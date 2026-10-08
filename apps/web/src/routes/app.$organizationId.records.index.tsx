@@ -5,5 +5,6 @@ import { RecordsPage } from '../features/records/page';
 
 export const Route = createFileRoute('/app/$organizationId/records/')({
   validateSearch: recordsSearch,
+  staticData: { help: 'records' },
   component: RecordsPage,
 });

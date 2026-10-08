@@ -1,5 +1,7 @@
+import { m } from '@luma/i18n/messages';
 import { LumaLockup, LumaMark } from '@luma/ui/components/primitives/brand';
 import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
+import { LanguageSelect } from '@luma/ui/components/workspace/language-select';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { type ReactNode, useEffect } from 'react';
@@ -10,7 +12,11 @@ import { retainInvitationToken } from './invitation-return';
 /** Renders the Luma lockup linked to the public home page. */
 export function Brand() {
   return (
-    <a className="entry-brand" href="/" aria-label="Luma home">
+    <a
+      className="entry-brand"
+      href="/"
+      aria-label={m.identity_brand_home_label()}
+    >
       <LumaLockup />
     </a>
   );
@@ -35,7 +41,8 @@ export function EntryFrame({
       </header>
       <div className="entry-body">{children}</div>
       <footer className="entry-footer">
-        Luma is built by Auren Labs with a small group of design partners.
+        <p>{m.identity_entry_footer()}</p>
+        <LanguageSelect className="entry-language" />
       </footer>
     </main>
   );
@@ -46,7 +53,7 @@ export function Pending() {
   return (
     <div className="status-page status-pending" role="status">
       <LumaMark className="status-mark" />
-      <span>Opening your workspace…</span>
+      <span>{m.identity_pending_workspace()}</span>
     </div>
   );
 }
@@ -88,21 +95,21 @@ export function Failure({
       <section className="status-panel">
         <h1>
           {status === 404
-            ? 'Workspace unavailable'
+            ? m.identity_failure_not_found_title()
             : status === 403
-              ? 'Permission denied'
-              : 'We couldn’t connect'}
+              ? m.identity_failure_forbidden_title()
+              : m.identity_failure_unavailable_title()}
         </h1>
         <p>
           {status === 404
-            ? 'This workspace is unavailable or you no longer have access.'
+            ? m.identity_failure_not_found_body()
             : status === 403
-              ? 'You do not have permission to open this page.'
-              : 'Your session may still be active. Check your connection and try again.'}
+              ? m.identity_failure_forbidden_body()
+              : m.identity_failure_unavailable_body()}
         </p>
         <div className="status-actions">
           {status !== 403 && status !== 404 ? (
-            <Button onClick={retry}>Try again</Button>
+            <Button onClick={retry}>{m.common_try_again()}</Button>
           ) : null}
           <Link
             to="/app/workspaces"
@@ -110,7 +117,7 @@ export function Failure({
               variant: status !== 403 && status !== 404 ? 'outline' : 'default',
             })}
           >
-            Choose a workspace
+            {m.identity_failure_choose_workspace()}
           </Link>
         </div>
       </section>

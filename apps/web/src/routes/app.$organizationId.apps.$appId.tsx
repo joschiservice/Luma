@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { AppExtension } from '../features/apps/extension';
 
 export const Route = createFileRoute('/app/$organizationId/apps/$appId')({
+  staticData: { help: 'apps-and-connections' },
   component: AppPage,
 });
 

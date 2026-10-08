@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import type { Domain } from '@luma/ui/components/primitives/domain-icon';
 import {
   Activity,
@@ -45,9 +46,11 @@ export type DestinationPath =
 
 export type WorkspaceDestination = {
   path: DestinationPath;
-  label: string;
+  /** The localized page name, read in the active language each time. */
+  readonly label: string;
   Icon: LucideIcon;
-  description: string;
+  /** A localized one-line summary of the page, read in the active language each time. */
+  readonly description: string;
   group: DestinationGroup;
   /** Domain landmark shown instead of a functional icon. */
   domain?: Domain;
@@ -55,182 +58,211 @@ export type WorkspaceDestination = {
   shortcut: string;
   /** The permission needed to open the page; without one, every member can open it. */
   permission?: string;
-  /** What the page shows, for the no-access explanation. */
-  area?: string;
+  /** What the page shows, for the no-access explanation, in the active language. */
+  readonly area?: string | undefined;
 };
+
+type DestinationInput = Omit<
+  WorkspaceDestination,
+  'label' | 'description' | 'area'
+> & {
+  label: () => string;
+  description: () => string;
+  area?: () => string;
+};
+
+/**
+ * Keeps a destination's text as getters so module-level navigation data still renders in the
+ * language of each request.
+ */
+function destination({
+  label,
+  description,
+  area,
+  ...rest
+}: DestinationInput): WorkspaceDestination {
+  return {
+    ...rest,
+    get label() {
+      return label();
+    },
+    get description() {
+      return description();
+    },
+    get area() {
+      return area?.();
+    },
+  };
+}
 
 /** Pages available through workspace navigation, search and `G` shortcuts. */
 export const workspaceDestinations: readonly WorkspaceDestination[] = [
-  {
+  destination({
     path: 'home',
-    label: 'Home',
+    label: m.identity_nav_home,
     Icon: House,
-    description: 'What needs your attention and what Luma is handling',
+    description: m.identity_nav_home_description,
     group: 'core',
     shortcut: 'h',
-  },
-  {
+  }),
+  destination({
     path: 'needs-you',
-    label: 'Needs you',
+    label: m.identity_nav_needs_you,
     Icon: Hand,
-    description:
-      'Approvals, manual steps and outcome checks waiting on a person',
+    description: m.identity_nav_needs_you_description,
     group: 'core',
     shortcut: 'n',
-  },
-  {
+  }),
+  destination({
     path: 'exceptions',
-    label: 'Issues',
+    label: m.identity_nav_issues,
     Icon: Inbox,
-    description: 'Investigate and resolve issues',
+    description: m.identity_nav_issues_description,
     group: 'core',
     shortcut: 'i',
     permission: 'issues.read',
-    area: 'issues',
-  },
-  {
+    area: m.identity_nav_issues_area,
+  }),
+  destination({
     path: 'records',
-    label: 'Records',
+    label: m.identity_nav_records,
     Icon: Database,
-    description: 'Search orders, stock, fulfillments and related records',
+    description: m.identity_nav_records_description,
     group: 'core',
     shortcut: 'r',
-  },
-  {
+  }),
+  destination({
     path: 'activity',
-    label: 'Activity',
+    label: m.identity_nav_activity,
     Icon: Activity,
-    description: 'Follow workspace activity',
+    description: m.identity_nav_activity_description,
     group: 'core',
     shortcut: 'a',
     permission: 'activity.read',
-    area: 'workspace activity',
-  },
-  {
+    area: m.identity_nav_activity_area,
+  }),
+  destination({
     path: 'insights',
-    label: 'Insights',
+    label: m.identity_nav_insights,
     Icon: ChartNoAxesColumn,
-    description: 'Live operational metrics and order flow',
+    description: m.identity_nav_insights_description,
     group: 'core',
     shortcut: 'm',
     permission: 'insights.read',
-    area: 'insights',
-  },
-  {
+    area: m.identity_nav_insights_area,
+  }),
+  destination({
     path: 'orders',
-    label: 'Orders',
+    label: m.identity_nav_orders,
     Icon: Receipt,
-    description: 'Search order history, fulfillment progress and source facts',
+    description: m.identity_nav_orders_description,
     group: 'operations',
     domain: 'orders',
     shortcut: 'o',
     permission: 'orders.read',
-    area: 'orders',
-  },
-  {
+    area: m.identity_nav_orders_area,
+  }),
+  destination({
     path: 'customers',
-    label: 'Customers',
+    label: m.identity_nav_customers,
     Icon: Users,
-    description: 'Customer identity, order history and service context',
+    description: m.identity_nav_customers_description,
     group: 'operations',
     domain: 'customers',
     shortcut: 'u',
     permission: 'customers.read',
-    area: 'customers',
-  },
-  {
+    area: m.identity_nav_customers_area,
+  }),
+  destination({
     path: 'products',
-    label: 'Products',
+    label: m.identity_nav_products,
     Icon: Package,
-    description:
-      'Compare SKU listings, prices and status across your store and ERP',
+    description: m.identity_nav_products_description,
     group: 'operations',
     domain: 'products',
     shortcut: 'k',
     permission: 'products.read',
-    area: 'products',
-  },
-  {
+    area: m.identity_nav_products_area,
+  }),
+  destination({
     path: 'returns',
-    label: 'Returns',
+    label: m.identity_nav_returns,
     Icon: Undo2,
-    description:
-      'Follow returns from request to refund, with pending work and money returned',
+    description: m.identity_nav_returns_description,
     group: 'operations',
     domain: 'returns',
     shortcut: 't',
     permission: 'returns.read',
-    area: 'returns',
-  },
-  {
+    area: m.identity_nav_returns_area,
+  }),
+  destination({
     path: 'inventory',
-    label: 'Inventory',
+    label: m.identity_nav_inventory,
     Icon: Boxes,
-    description: 'Compare stock across SKUs, locations and sources',
+    description: m.identity_nav_inventory_description,
     group: 'operations',
     domain: 'inventory',
     shortcut: 'v',
     permission: 'inventory.read',
-    area: 'inventory',
-  },
-  {
+    area: m.identity_nav_inventory_area,
+  }),
+  destination({
     path: 'fulfillment',
-    label: 'Fulfillment',
+    label: m.identity_nav_fulfillment,
     Icon: Truck,
-    description:
-      'Held, delayed and in-transit fulfillment with the next safe step',
+    description: m.identity_nav_fulfillment_description,
     group: 'operations',
     domain: 'fulfillment',
     shortcut: 'f',
     permission: 'fulfillment.read',
-    area: 'fulfillment',
-  },
-  {
+    area: m.identity_nav_fulfillment_area,
+  }),
+  destination({
     path: 'workflows',
-    label: 'Workflows',
+    label: m.identity_nav_workflows,
     Icon: Workflow,
-    description: 'Review and run the workflows behind your operations',
+    description: m.identity_nav_workflows_description,
     group: 'operations',
     domain: 'workflows',
     shortcut: 'w',
     permission: 'workflows.read',
-    area: 'workflows',
-  },
-  {
+    area: m.identity_nav_workflows_area,
+  }),
+  destination({
     path: 'procurement',
-    label: 'Procurement',
+    label: m.identity_nav_procurement,
     Icon: ShoppingCart,
-    description: 'Manage suppliers and purchase orders',
+    description: m.identity_nav_procurement_description,
     group: 'operations',
     domain: 'procurement',
     shortcut: 'p',
     permission: 'procurement.read',
-    area: 'procurement',
-  },
-  {
+    area: m.identity_nav_procurement_area,
+  }),
+  destination({
     path: 'apps',
-    label: 'Apps',
+    label: m.identity_nav_apps,
     Icon: Blocks,
-    description: 'Install apps and manage connected systems',
+    description: m.identity_nav_apps_description,
     group: 'workspace',
     shortcut: 'c',
-  },
-  {
+  }),
+  destination({
     path: 'sync',
-    label: 'Data sync',
+    label: m.identity_nav_sync,
     Icon: DatabaseZap,
-    description: 'History imports, sync health and record coverage by source',
+    description: m.identity_nav_sync_description,
     group: 'workspace',
     shortcut: 'd',
-  },
-  {
+  }),
+  destination({
     path: 'settings',
-    label: 'Settings',
+    label: m.identity_nav_settings,
     Icon: Settings,
-    description: 'Workspace, team, notifications, and approvals',
+    description: m.identity_nav_settings_description,
     group: 'workspace',
     shortcut: 's',
-  },
+  }),
 ];
 
 /** Finds the destination that owns a workspace URL, defaulting to Home. */

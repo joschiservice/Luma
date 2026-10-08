@@ -1,0 +1,7 @@
+{
+  "extends": "@luma/typescript-config/react.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
+}

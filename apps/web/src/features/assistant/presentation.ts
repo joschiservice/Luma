@@ -5,6 +5,7 @@ import type {
   AssistantStep,
   AssistantTurn,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import type { Domain } from '@luma/ui/components/primitives/domain-icon';
 
 export type Inline =
@@ -112,41 +113,38 @@ export const recordDomain: Record<AssistantRecordKind, Domain> = {
   return: 'returns',
 };
 
-const recordNoun: Record<AssistantRecordKind, string> = {
-  order: 'Order',
-  issue: 'Issue',
-  stock_position: 'Stock',
-  fulfillment: 'Fulfillment',
-  return: 'Return',
-};
-
 /** "Issue · Stuck fulfillment"; other labels already name their kind. */
 export function citationTitle(citation: AssistantCitation) {
-  return citation.kind === 'issue' || citation.kind === 'stock_position'
-    ? `${recordNoun[citation.kind]} · ${citation.label}`
-    : citation.label;
+  if (citation.kind === 'issue')
+    return m.assistant_citation_issue({ label: citation.label });
+  if (citation.kind === 'stock_position')
+    return m.assistant_citation_stock({ label: citation.label });
+
+  return citation.label;
 }
 
 /** Shown when a step's outcome is not a plain success. */
-export const stepOutcomeLabel: Record<AssistantStep['outcome'], string | null> =
-  {
-    ok: null,
-    invalid_arguments: 'Retried with corrected filters',
-    not_found: 'Not found',
-    failed: 'Couldn’t read',
-    skipped: 'Skipped',
-  };
+export const stepOutcomeLabel: Record<
+  AssistantStep['outcome'],
+  (() => string) | null
+> = {
+  ok: null,
+  invalid_arguments: m.assistant_step_retried,
+  not_found: m.assistant_step_not_found,
+  failed: m.assistant_step_failed,
+  skipped: m.assistant_step_skipped,
+};
 
-/** "Read 3 times · 12 records" for the collapsed step list. */
+/** "3 reads · 12 records" for the collapsed step list. */
 export function stepsSummary(steps: readonly AssistantStep[]) {
   const reads = steps.filter((step) => step.outcome !== 'skipped').length;
   const records = steps.reduce((total, step) => total + step.records, 0);
   const failed = steps.some((step) => step.outcome === 'failed');
 
   return [
-    reads === 1 ? '1 read' : `${reads} reads`,
-    records === 1 ? '1 record' : `${records} records`,
-    failed ? 'a read failed' : null,
+    m.assistant_steps_reads({ count: reads }),
+    m.assistant_steps_records({ count: records }),
+    failed ? m.assistant_steps_read_failed() : null,
   ]
     .filter(Boolean)
     .join(' · ');
@@ -186,18 +184,18 @@ export function historyFor(exchanges: readonly Exchange[]): AssistantTurn[] {
   }));
 }
 
-const suggestionsByKind: [AssistantRecordKind, string][] = [
-  ['order', 'Which orders from last week are still unfulfilled?'],
-  ['issue', 'What needs my attention right now?'],
-  ['fulfillment', 'Which shipments are stalled or delayed?'],
-  ['stock_position', 'Where do stock sources disagree?'],
-  ['return', 'Which returns are waiting for a refund?'],
+const suggestionsByKind: [AssistantRecordKind, () => string][] = [
+  ['order', m.assistant_suggestion_orders],
+  ['issue', m.assistant_suggestion_issues],
+  ['fulfillment', m.assistant_suggestion_fulfillment],
+  ['stock_position', m.assistant_suggestion_stock],
+  ['return', m.assistant_suggestion_returns],
 ];
 
-/** Starter questions for the records this workspace's assistant can read. */
+/** Localized starter questions for the records this workspace's assistant can read. */
 export function suggestionsFor(reads: readonly AssistantRecordKind[]) {
   return suggestionsByKind
     .filter(([kind]) => reads.includes(kind))
-    .map(([, question]) => question)
+    .map(([, question]) => question())
     .slice(0, 4);
 }

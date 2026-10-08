@@ -1,5 +1,6 @@
 import { type InstallationInput } from '@luma/api-contract';
 import type { AppUiProps } from '@luma/app-host/web';
+import { m } from '@luma/i18n/messages';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Input } from '@luma/ui/components/primitives/input';
 import { useForm } from '@tanstack/react-form';
@@ -105,7 +106,13 @@ export default function JtlSettings({
           parsed.error.issues.map((issue) => String(issue.path.at(-1) ?? '')),
         );
         setMessage(
-          'Check all fields. Use a valid cloud tenant ID or an HTTPS API URL ending in /. Credentials are required; on-premise also requires a challenge code.',
+          connection
+            ? provider === 'jtl-onprem'
+              ? m.jtl_setup_invalid_replace_onprem()
+              : m.jtl_setup_invalid_replace_cloud()
+            : provider === 'jtl-onprem'
+              ? m.jtl_setup_invalid_onprem()
+              : m.jtl_setup_invalid_cloud(),
         );
         result.current?.focus();
 
@@ -138,14 +145,14 @@ export default function JtlSettings({
       ? (['label', 'jtlTenantId'] as const)
       : (['label', 'baseUrl', 'appId', 'appVersion'] as const);
   const labels = {
-    label: 'Connection name',
-    shop: 'Shop hostname',
-    jtlTenantId: 'JTL Cloud tenant ID',
-    baseUrl: 'HTTPS API URL',
-    appId: 'App ID',
-    appVersion: 'App version',
-    token: 'Access token',
-    challengeCode: 'Challenge code',
+    label: m.jtl_setup_label_name,
+    shop: m.jtl_setup_label_shop,
+    jtlTenantId: m.jtl_setup_label_tenant,
+    baseUrl: m.jtl_setup_label_base_url,
+    appId: m.jtl_setup_label_app_id,
+    appVersion: m.jtl_setup_label_app_version,
+    token: m.jtl_setup_label_token,
+    challengeCode: m.jtl_setup_label_challenge,
   };
 
   return (
@@ -160,21 +167,21 @@ export default function JtlSettings({
     >
       {!connection ? (
         <label>
-          Connection type
+          {m.jtl_setup_type_label()}
           <select
-            aria-label="Connection type"
+            aria-label={m.jtl_setup_type_label()}
             value={kind}
             onChange={(event) => setKind(event.target.value)}
           >
-            <option value="jtl-cloud">JTL Cloud</option>
-            <option value="jtl-onprem">JTL-Wawi on-premise</option>
+            <option value="jtl-cloud">{m.jtl_setup_type_cloud()}</option>
+            <option value="jtl-onprem">{m.jtl_setup_type_onprem()}</option>
           </select>
         </label>
       ) : null}
       <p className="field-help">
         {provider === 'jtl-cloud'
-          ? 'Use the tenant ID and access token from your JTL Cloud installation. Grant access to orders, products, inventory and fulfillment.'
-          : 'Register your app with JTL-Wawi. Use its token and challenge code. Your administrator must approve the API network destination.'}
+          ? m.jtl_setup_help_cloud()
+          : m.jtl_setup_help_onprem()}
       </p>
       {[
         ...fields,
@@ -185,7 +192,7 @@ export default function JtlSettings({
           {(field) => (
             <div className="form-field">
               <label htmlFor={`connection-${name}`}>
-                {labels[name as keyof typeof labels]}
+                {labels[name as keyof typeof labels]()}
               </label>
               <Input
                 id={`connection-${name}`}
@@ -214,10 +221,7 @@ export default function JtlSettings({
       ))}
       {!connection ? (
         <>
-          <p className="field-help">
-            Requests read access to orders, products, inventory and fulfillment.
-            Provider validation determines whether access can be enabled.
-          </p>
+          <p className="field-help">{m.jtl_setup_read_access()}</p>
           {
             <form.Field name="write">
               {(field) => (
@@ -228,8 +232,7 @@ export default function JtlSettings({
                     onChange={(e) => field.handleChange(e.target.checked)}
                     disabled={pending}
                   />
-                  Permit shipping-method corrections (requires salesorders.read,
-                  salesorders.write and provider idempotency support)
+                  {m.jtl_setup_shipping_write()}
                 </label>
               )}
             </form.Field>
@@ -243,9 +246,7 @@ export default function JtlSettings({
                   onChange={(e) => field.handleChange(e.target.checked)}
                   disabled={pending}
                 />
-                Permit submitting approved purchase orders (requires
-                suppliers.read, purchaseorders.read, purchaseorders.write and
-                items.read)
+                {m.jtl_setup_purchasing()}
               </label>
             )}
           </form.Field>
@@ -254,15 +255,13 @@ export default function JtlSettings({
       <p id="connection-result" role="alert" ref={result} tabIndex={-1}>
         {message}
       </p>
-      {uncertain ? (
-        <p>Close this form and refresh the list before submitting again.</p>
-      ) : null}
+      {uncertain ? <p>{m.jtl_setup_uncertain()}</p> : null}
       <Button type="submit" disabled={pending || uncertain}>
         {pending
-          ? 'Saving…'
+          ? m.common_saving()
           : connection
-            ? 'Confirm replacement'
-            : 'Save connection'}
+            ? m.jtl_setup_confirm_replacement()
+            : m.jtl_setup_save()}
       </Button>
     </form>
   );

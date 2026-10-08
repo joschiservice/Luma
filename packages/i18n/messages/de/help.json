@@ -1,0 +1,10 @@
+{
+  "help_button_label": "Hilfe zu dieser Seite",
+  "help_drawer_description": "Anleitungen zur Seite, auf der Sie gerade arbeiten.",
+  "help_load_failed": "Diese Anleitung konnte nicht geladen werden.",
+  "help_load_failed_link": "Anleitung in neuem Tab öffnen",
+  "help_open_full": "Vollständige Dokumentation öffnen",
+  "help_new_tab": "(öffnet in neuem Tab)",
+  "help_guides_label": "Anleitungen",
+  "help_guides_heading": "Alle Anleitungen"
+}

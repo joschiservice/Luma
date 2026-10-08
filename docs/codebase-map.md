@@ -33,6 +33,7 @@ conventions only; it does not list files.
 | HTTP schemas, typed client, OpenAPI                              | `@luma/api-contract`                                                                     |
 | Shared technical infrastructure, model gateway                   | `@luma/platform`; validated settings in `@luma/config`                                   |
 | Shared components and design tokens                              | `@luma/ui`                                                                               |
+| Interface languages, message catalogs, formatting                | `@luma/i18n`                                                                             |
 
 Processes: `apps/api` (HTTP), `apps/worker` (Temporal worker and the commerce sync process
 with scheduled detection), `apps/web` (product UI), `apps/simulator` and
@@ -48,7 +49,8 @@ with scheduled detection), `apps/web` (product UI), `apps/simulator` and
 - **Contracts:** `packages/api-contract/src/<feature>.ts` for schemas and `contracts/` for
   routes.
 - **Web features:** `apps/web/src/features/<feature>`, usually with `page.tsx`,
-  `detail.tsx`, URL state in `data.ts` and wording in `presentation.ts`. Shell, navigation
+  `detail.tsx`, URL state in `data.ts` and wording in `presentation.ts`; text comes from the
+  feature's namespace in the `@luma/i18n` catalogs. Shell, navigation
   and the command menu are in `features/identity`; Home modules are in `features/home`.
 - **Migrations:** numbered SQL in `packages/application-runtime/migrations`; the simulator
   has its own in `apps/simulator/migrations`.

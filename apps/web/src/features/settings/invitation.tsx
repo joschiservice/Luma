@@ -1,3 +1,5 @@
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -16,6 +18,7 @@ import {
   forgetInvitationToken,
   invitationToken,
 } from '../identity/invitation-return';
+import { roleName } from '../identity/permission-text';
 import { settingsApi, SettingsError } from './data';
 
 /** Reviews an email-bound invitation and reconciles acceptance before opening the workspace. */
@@ -87,7 +90,7 @@ export function AcceptInvitation() {
       setError(
         error instanceof Error
           ? error.message
-          : 'Could not confirm acceptance. Check your connection and try again.',
+          : m.settings_invitation_accept_failed(),
       );
     } finally {
       setPending(false);
@@ -95,30 +98,37 @@ export function AcceptInvitation() {
   }
 
   return (
-    <EntryFrame actions={<a href="/sign-out">Use a different account</a>}>
+    <EntryFrame
+      actions={<a href="/sign-out">{m.settings_invitation_other_account()}</a>}
+    >
       <section className="entry-panel invitation-card">
         <span className="entry-panel-icon" aria-hidden="true">
           <MailCheck size={18} />
         </span>
         <h1>
           {invitation.data
-            ? `Join ${invitation.data.name}`
-            : 'Workspace invitation'}
+            ? m.settings_invitation_join_title({
+                workspace: invitation.data.name,
+              })
+            : m.settings_invitation_title()}
         </h1>
         {invitation.isPending ? (
-          <p role="status">Checking your invitation…</p>
+          <p role="status">{m.settings_invitation_checking()}</p>
         ) : invitation.error ? (
           <Alert tone="danger">{invitation.error.message}</Alert>
         ) : (
           <>
             <p>
-              You’re invited with the{' '}
-              <strong>{invitation.data.role.name}</strong> role using{' '}
-              <strong>{invitation.data.email}</strong>.
+              {rich(m.settings_invitation_details, {
+                role: <strong>{roleName(invitation.data.role)}</strong>,
+                email: <strong>{invitation.data.email}</strong>,
+              })}
             </p>
-            <p>Accept to access this workspace and its operations.</p>
+            <p>{m.settings_invitation_accept_help()}</p>
             <Button disabled={pending} onClick={() => void accept()}>
-              {pending ? 'Joining workspace…' : 'Accept invitation'}
+              {pending
+                ? m.settings_invitation_joining()
+                : m.settings_invitation_accept()}
             </Button>
           </>
         )}
@@ -128,7 +138,7 @@ export function AcceptInvitation() {
           </Alert>
         ) : null}
         <Link className="entry-back" to="/app">
-          Back to your workspaces
+          {m.settings_invitation_back()}
         </Link>
       </section>
     </EntryFrame>

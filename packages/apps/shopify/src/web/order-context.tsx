@@ -1,4 +1,6 @@
 import type { AppUiProps } from '@luma/app-host/web';
+import { formatDateTime } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { Button } from '@luma/ui/components/primitives/button';
 import { useState } from 'react';
 
@@ -45,17 +47,12 @@ export function ShopifyOrderContext({
     ),
   );
   if (!numeric)
-    return (
-      <p className="field-help">
-        This order has no Shopify order ID, so live Shopify details are not
-        available.
-      </p>
-    );
+    return <p className="field-help">{m.shopify_context_no_order_id()}</p>;
 
   return (
     <section
       className="shopify-order-context"
-      aria-label="Shopify order details"
+      aria-label={m.shopify_context_label()}
       aria-busy={read.pending}
     >
       <div className="shopify-order-context-head">
@@ -66,13 +63,16 @@ export function ShopifyOrderContext({
             size="sm"
             onClick={() => setTrail(trail.slice(0, -1))}
           >
-            Back
+            {m.common_back()}
           </Button>
         ) : null}
         <p className="field-help">
           {detail
-            ? `Read live from ${detail.shop} at ${new Date(detail.observedAt).toLocaleString()}`
-            : 'Live Shopify details'}
+            ? m.shopify_context_read_at({
+                shop: detail.shop,
+                time: formatDateTime(detail.observedAt),
+              })
+            : m.shopify_context_live()}
         </p>
         <Button
           type="button"
@@ -80,9 +80,9 @@ export function ShopifyOrderContext({
           size="sm"
           disabled={read.pending}
           onClick={read.refresh}
-          aria-label="Refresh Shopify details"
+          aria-label={m.shopify_context_refresh_label()}
         >
-          Refresh
+          {m.common_refresh()}
         </Button>
         {detail ? (
           <a
@@ -91,12 +91,12 @@ export function ShopifyOrderContext({
             target="_blank"
             rel="noreferrer"
           >
-            Open in Shopify admin
+            {m.shopify_context_open_admin()}
           </a>
         ) : null}
       </div>
       {read.error ? <p role="alert">{read.error}</p> : null}
-      {read.pending ? <p role="status">Loading Shopify details…</p> : null}
+      {read.pending ? <p role="status">{m.shopify_context_loading()}</p> : null}
       {detail ? (
         <div aria-live="polite">
           {organizationId
@@ -109,7 +109,7 @@ export function ShopifyOrderContext({
                     link.id,
                   )}
                 >
-                  Open customer workspace →
+                  {m.shopify_context_open_customer()}
                 </a>
               ))
             : null}

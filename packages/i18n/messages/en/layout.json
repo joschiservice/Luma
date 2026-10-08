@@ -1,0 +1,8 @@
+{
+  "layout_pin_current": "Pin this page to the sidebar",
+  "layout_pin_unpin_current": "Unpin this page",
+  "layout_pin_limit": "{count, plural, one {You can pin up to {count, number} page} other {You can pin up to {count, number} pages}}",
+  "layout_pin_fallback_label": "Pinned page",
+  "layout_pinned_heading": "Pinned",
+  "layout_pin_unpin": "Unpin {page}"
+}

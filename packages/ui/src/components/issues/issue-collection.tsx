@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { ArrowLeft } from 'lucide-react';
 import {
   createContext,
@@ -146,6 +147,7 @@ type CollectionProps<T extends { id: string }> = {
   previewCount?: number;
   triggerLabel?: string;
   title: string;
+  /** `events` counts history events; any other value counts evidence records. */
   noun: string;
   items: T[];
   renderItems: (items: T[]) => ReactNode;
@@ -177,9 +179,17 @@ export function IssueCollection<T extends { id: string }>(
           onClick={() => context.open(id)}
         >
           {props.triggerLabel ??
-            (props.hasMore
-              ? `View ${props.noun}`
-              : `View all ${props.items.length} ${props.noun}`)}
+            (props.noun === 'events'
+              ? props.hasMore
+                ? m.issues_collection_view_events()
+                : m.issues_collection_view_all_events({
+                    count: props.items.length,
+                  })
+              : props.hasMore
+                ? m.issues_collection_view_evidence()
+                : m.issues_collection_view_all_evidence({
+                    count: props.items.length,
+                  }))}
         </Button>
       ) : null}
       {context.active === id && context.outlet
@@ -232,6 +242,8 @@ function CollectionView<T extends { id: string }>({
   );
   const start = currentPage * pageSize;
   const visible = filtered.slice(start, start + pageSize);
+  const events = noun === 'events';
+  const count = { count: items.length };
 
   function changePage(next: number) {
     setPage(next);
@@ -249,15 +261,20 @@ function CollectionView<T extends { id: string }>({
         ? createPortal(
             <>
               <Button variant="ghost" onClick={onBack}>
-                <ArrowLeft aria-hidden="true" /> Back to issue
+                <ArrowLeft aria-hidden="true" /> {m.issues_collection_back()}
               </Button>
               <div className="issue-collection-heading">
                 <h2 ref={heading} tabIndex={-1}>
                   {title}
                 </h2>
                 <span>
-                  {items.length} {noun === 'events' ? 'events' : 'records'}
-                  {hasMore ? ' loaded' : ''}
+                  {events
+                    ? hasMore
+                      ? m.issues_collection_events_loaded(count)
+                      : m.issues_collection_events_count(count)
+                    : hasMore
+                      ? m.issues_collection_evidence_loaded(count)
+                      : m.issues_collection_evidence_count(count)}
                 </span>
               </div>
               {context.issueTitle ? (
@@ -267,7 +284,7 @@ function CollectionView<T extends { id: string }>({
             context.headerOutlet,
           )
         : null}
-      <p className="case-caption">Newest first</p>
+      <p className="case-caption">{m.issues_newest_first()}</p>
       <div className="issue-collection-filters">
         {filters.map((filter) => (
           <label key={filter.label}>
@@ -280,7 +297,7 @@ function CollectionView<T extends { id: string }>({
                 setPage(0);
               }}
               options={[
-                { value: '', label: 'All' },
+                { value: '', label: m.common_all() },
                 ...[...new Set(items.map(filter.value))]
                   .filter(Boolean)
                   .sort()
@@ -299,38 +316,45 @@ function CollectionView<T extends { id: string }>({
             changePage(0);
           }}
         >
-          New records available · Update list
+          {m.issues_collection_new_entries()}
         </Button>
       ) : null}
       {hasMore ? (
-        <p className="case-caption">
-          Filters apply to loaded records. Load older records to search further
-          back.
-        </p>
+        <p className="case-caption">{m.issues_collection_filters_loaded()}</p>
       ) : null}
-      {visible.length ? renderItems(visible) : <p>No matching {noun}.</p>}
+      {visible.length ? (
+        renderItems(visible)
+      ) : (
+        <p>{m.issues_collection_no_matches()}</p>
+      )}
       <nav
         className="issue-collection-pagination"
-        aria-label={`${title} pages`}
+        aria-label={m.issues_collection_pages({ title })}
       >
         <span role="status">
           {filtered.length
-            ? `${start + 1}–${start + visible.length} of ${filtered.length}${hasMore ? ' loaded' : ''}`
-            : '0 results'}
+            ? (hasMore
+                ? m.issues_collection_range_loaded
+                : m.issues_collection_range)({
+                start: start + 1,
+                end: start + visible.length,
+                total: filtered.length,
+              })
+            : m.issues_collection_no_results()}
         </span>
         <Button
           variant="outline"
           disabled={currentPage === 0}
           onClick={() => changePage(currentPage - 1)}
         >
-          Previous
+          {m.common_previous()}
         </Button>
         <Button
           variant="outline"
           disabled={start + pageSize >= filtered.length}
           onClick={() => changePage(currentPage + 1)}
         >
-          Next
+          {m.common_next()}
         </Button>
       </nav>
       {hasMore && onLoadMore ? (
@@ -342,7 +366,11 @@ function CollectionView<T extends { id: string }>({
             onLoadMore();
           }}
         >
-          {loading ? 'Loading…' : `Load older ${noun}`}
+          {loading
+            ? m.common_loading()
+            : events
+              ? m.issues_collection_load_older_events()
+              : m.issues_collection_load_older_evidence()}
         </Button>
       ) : null}
     </Card>

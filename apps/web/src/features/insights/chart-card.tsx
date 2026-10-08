@@ -1,4 +1,7 @@
 import type { InsightChart, InsightChartResponse } from '@luma/api-contract';
+import { formatNumber, formatTime } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import {
   BarChart,
@@ -23,11 +26,11 @@ import { Link } from '@tanstack/react-router';
 import { RefreshCw } from 'lucide-react';
 import { useId, useState } from 'react';
 
-import { count } from '../sync/presentation';
 import type { InsightsError } from './data';
 import {
   amount,
   chartCategories,
+  chartLabel,
   chartSeries,
   coverageBadge,
   dataThroughText,
@@ -46,24 +49,24 @@ export type Selection = {
   series?: string | undefined;
 };
 
-const errorText: Record<InsightsError, { title: string; body: string }> = {
+const errorText = {
   access: {
-    title: 'Workspace access changed',
-    body: 'Sign in again or ask an owner for access to see this chart.',
+    title: m.insights_error_access_title,
+    body: m.insights_error_access_body,
   },
   outdated: {
-    title: 'Chart unavailable',
-    body: 'The chart request was rejected. Refresh to try again.',
+    title: m.insights_error_unavailable_title,
+    body: m.insights_error_outdated_body,
   },
   preparing: {
-    title: 'Order history is being prepared',
-    body: 'Luma is rebuilding the order list after an update. Try again in a few minutes.',
+    title: m.insights_error_preparing_title,
+    body: m.insights_error_preparing_body,
   },
   unavailable: {
-    title: 'Chart unavailable',
-    body: 'Luma couldn’t read this chart. Earlier values are hidden so they aren’t mistaken for current ones.',
+    title: m.insights_error_unavailable_title,
+    body: m.insights_error_unavailable_body,
   },
-};
+} satisfies Record<InsightsError, { title: () => string; body: () => string }>;
 
 /**
  * One operational chart with its definition, a table twin, coverage and data-through time.
@@ -98,6 +101,7 @@ export function ChartCard({
   const titleId = useId();
   const [view, setView] = useState<'chart' | 'table'>('chart');
   const badge = data && !error ? coverageBadge(data) : null;
+  const title = definition.title();
 
   return (
     <Card
@@ -108,8 +112,8 @@ export function ChartCard({
     >
       <header className="insights-card-header">
         <DomainIcon domain={definition.domain} size="sm" />
-        <h3 id={titleId}>{definition.title}</h3>
-        <p className="insights-card-description">{definition.description}</p>
+        <h3 id={titleId}>{title}</h3>
+        <p className="insights-card-description">{definition.description()}</p>
         <div className="insights-card-actions">
           {badge && <Badge tone={badge.tone}>{badge.label}</Badge>}
           <Tabs
@@ -119,11 +123,15 @@ export function ChartCard({
             }
           >
             <TabsList
-              aria-label={`${definition.title} view`}
+              aria-label={m.insights_card_view_label({ chart: title })}
               activateOnFocus={false}
             >
-              <TabsTrigger value="chart">Chart</TabsTrigger>
-              <TabsTrigger value="table">Table</TabsTrigger>
+              <TabsTrigger value="chart">
+                {m.insights_card_view_chart()}
+              </TabsTrigger>
+              <TabsTrigger value="table">
+                {m.insights_card_view_table()}
+              </TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
@@ -131,18 +139,18 @@ export function ChartCard({
       <div className="insights-card-body">
         {error ? (
           <div className="insights-card-state" role="alert">
-            <strong>{errorText[error].title}</strong>
-            <p>{errorText[error].body}</p>
+            <strong>{errorText[error].title()}</strong>
+            <p>{errorText[error].body()}</p>
             <Button variant="outline" size="sm" onClick={onRetry}>
               <RefreshCw size={14} />
-              Try again
+              {m.common_try_again()}
             </Button>
           </div>
         ) : loading || !data ? (
           <div
             className="insights-card-skeleton lu-skeleton"
             role="status"
-            aria-label={`Loading ${definition.title.toLowerCase()}`}
+            aria-label={m.insights_card_loading({ chart: title })}
           />
         ) : data.coverage.state === 'unavailable' ? (
           <Unavailable chart={chart} organizationId={organizationId} />
@@ -173,11 +181,11 @@ function Unavailable({
 
   return (
     <div className="insights-card-state">
-      <strong>Nothing can report {definition.many} yet</strong>
+      <strong>{definition.unavailable()}</strong>
       <p>
         {chart === 'stock'
-          ? 'No position has an active replenishment rule, so stock risk is unknown, not zero.'
-          : `No connected source in this scope reads ${definition.many}, so the count is unknown, not zero.`}
+          ? m.insights_stock_unavailable_body()
+          : m.insights_unavailable_body()}
       </p>
       {chart === 'stock' ? (
         <Link
@@ -185,11 +193,11 @@ function Unavailable({
           params={{ organizationId, definitionId: 'inventory-replenishment' }}
           hash="rules"
         >
-          Set up replenishment rules
+          {m.insights_unavailable_setup_rules()}
         </Link>
       ) : (
         <Link to="/app/$organizationId/apps" params={{ organizationId }}>
-          Connect a source
+          {m.insights_unavailable_connect_source()}
         </Link>
       )}
     </div>
@@ -215,23 +223,29 @@ function Content({
   const series = chartSeries(data);
   const categories = chartCategories(data, timeZone);
   const multiple = series.length > 1;
-  const label = `${definition.title}${
-    data.window ? `, ${rangeLabels[data.window.range].toLowerCase()}` : ''
-  }`;
+  const label = chartLabel(data);
+  const total = rich(definition.amount, {
+    count: data.total,
+    value: <strong>{formatNumber(data.total)}</strong>,
+  });
 
   return (
     <>
       <p className="insights-total" aria-live="polite">
-        <strong>{count(data.total)}</strong>{' '}
-        {data.total === 1 ? definition.one : definition.many}
         {data.window
-          ? ` · ${windowLabel(data.window)}`
-          : ` · now, ${new Intl.DateTimeFormat('en-US', {
-              hour: '2-digit',
-              minute: '2-digit',
-              hourCycle: 'h23',
-              timeZone,
-            }).format(new Date(data.asOf))}`}
+          ? rich(m.insights_total_window, {
+              amount: <>{total}</>,
+              window: windowLabel(data.window),
+            })
+          : rich(m.insights_total_now, {
+              amount: <>{total}</>,
+              time: formatTime(data.asOf, {
+                hour: '2-digit',
+                minute: '2-digit',
+                hourCycle: 'h23',
+                timeZone,
+              }),
+            })}
       </p>
       {view === 'chart' ? (
         <>
@@ -260,11 +274,7 @@ function Content({
             }
           />
           {data.total === 0 && (
-            <p className="insights-empty-note">
-              {data.window
-                ? `No ${definition.many} in this period from the sources in scope.`
-                : `No ${definition.many} right now.`}
-            </p>
+            <p className="insights-empty-note">{definition.empty()}</p>
           )}
         </>
       ) : (
@@ -292,40 +302,53 @@ function ChartTable({
   caption: string;
   onSelect: (selection: Selection) => void;
 }) {
-  const definition = definitions[data.chart];
   const series = chartSeries(data);
+  const cellLabel = (row: Row, value: number, id?: string) => {
+    const name = id ? series.find((s) => s.id === id)?.label : undefined;
+
+    return name
+      ? m.insights_table_cell_series({
+          amount: amount(data.chart, value),
+          category: row.label,
+          series: name,
+        })
+      : m.insights_table_cell({
+          amount: amount(data.chart, value),
+          category: row.label,
+        });
+  };
   const cell = (row: Row, value: number, id?: string) =>
     row.unknown ? (
-      <span className="insights-unknown">Unknown</span>
+      <span className="insights-unknown">{m.common_unknown()}</span>
     ) : value ? (
       <button
         type="button"
         className="insights-cell-link"
-        aria-label={`${amount(data.chart, value)}, ${row.label}${
-          id ? `, ${series.find((s) => s.id === id)?.label}` : ''
-        }. Show the records.`}
+        aria-label={cellLabel(row, value, id)}
         onClick={() =>
           onSelect({ point: row.key, ...(id ? { series: id } : {}) })
         }
       >
-        {count(value)}
+        {formatNumber(value)}
       </button>
     ) : (
-      <span className="insights-zero">0</span>
+      <span className="insights-zero">{formatNumber(0)}</span>
     );
   const columns: DataTableColumn<Row>[] = [
     {
       key: 'label',
       header: data.window
         ? data.window.bucket === 'day'
-          ? 'Day'
-          : 'Week'
-        : 'Group',
+          ? m.insights_table_day()
+          : m.insights_table_week()
+        : m.insights_table_group(),
       cell: (row) => (
         <span className="insights-row-label">
           {row.label}
           {(row.unknown ?? row.note) && (
-            <small>{row.unknown ? 'Not imported' : row.note}</small>
+            <small>
+              {row.unknown ? m.insights_table_not_imported() : row.note}
+            </small>
           )}
         </span>
       ),
@@ -341,7 +364,10 @@ function ChartTable({
       : []),
     {
       key: 'total',
-      header: series.length > 1 ? 'Total' : definition.series[0]!.label,
+      header:
+        series.length > 1
+          ? m.insights_table_total()
+          : (series[0]?.label ?? m.insights_table_total()),
       numeric: true,
       cell: (row) => cell(row, row.total),
     },
@@ -376,22 +402,22 @@ function Coverage({
     <footer className="insights-coverage">
       <dl>
         <div>
-          <dt>Window</dt>
+          <dt>{m.insights_coverage_period()}</dt>
           <dd>
             {data.window
-              ? `${rangeLabels[data.window.range]} · ${windowLabel(data.window)} · ${data.window.timeZone}`
-              : 'Current state; past states aren’t reconstructed'}
+              ? `${rangeLabels[data.window.range]()} · ${windowLabel(data.window)} · ${data.window.timeZone}`
+              : m.insights_coverage_current()}
           </dd>
         </div>
         <div>
-          <dt>Data through</dt>
+          <dt>{m.insights_coverage_data_through()}</dt>
           <dd>{dataThroughText(data, timeZone)}</dd>
         </div>
         <div>
-          <dt>Sources</dt>
+          <dt>{m.common_sources()}</dt>
           <dd>
             {data.sourceFilter === 'not_applicable' ? (
-              'Luma’s own records; the source filter doesn’t apply'
+              m.insights_coverage_own_records()
             ) : data.coverage.sources.length ? (
               <ul className="insights-sources">
                 {data.coverage.sources.map((source) => (
@@ -405,7 +431,7 @@ function Coverage({
                 ))}
               </ul>
             ) : (
-              'None in scope'
+              m.insights_coverage_no_sources()
             )}
           </dd>
         </div>
@@ -417,8 +443,8 @@ function Coverage({
       ))}
       {definition.limit && (
         <Disclosure variant="plain" className="insights-limit">
-          <summary>What this chart doesn’t show</summary>
-          <p>{definition.limit}</p>
+          <summary>{m.insights_coverage_limit_summary()}</summary>
+          <p>{definition.limit()}</p>
         </Disclosure>
       )}
     </footer>

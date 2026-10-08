@@ -1,4 +1,6 @@
 import type { WorkflowRunView, WorkflowVersionView } from '@luma/api-contract';
+import { formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
@@ -7,7 +9,22 @@ import { useState } from 'react';
 
 import { cancelCodeStep } from './code-data';
 
-/** Shows sandbox evidence and lets people who can manage workflow triggers stop unfinished code instructions. */
+type CodeOutcome = NonNullable<
+  NonNullable<WorkflowRunView['processSteps']>[number]['code']
+>['outcome'];
+
+/** Short labels for how a code step ended. */
+const codeOutcomeLabels = {
+  completed: m.workflows_code_outcome_completed,
+  code_error: m.workflows_code_outcome_code_error,
+  resource_limit: m.workflows_code_outcome_resource_limit,
+  cancelled: m.workflows_code_outcome_cancelled,
+  invalid_output: m.workflows_code_outcome_invalid_output,
+  capability_denied: m.workflows_code_outcome_capability_denied,
+  unavailable: m.workflows_code_outcome_unavailable,
+} satisfies Record<CodeOutcome, () => string>;
+
+/** Shows isolated code results and lets people who can manage workflow triggers stop unfinished code instructions. */
 export function CodeRunDetails({
   run,
   version,
@@ -40,7 +57,7 @@ export function CodeRunDetails({
       setStopped((items) => [...items, stepId]);
       await refresh();
     } catch {
-      setError('Cancellation could not be confirmed. Refresh and try again.');
+      setError(m.workflows_code_run_stop_failed());
     } finally {
       setPending('');
     }
@@ -56,42 +73,47 @@ export function CodeRunDetails({
         return (
           <Disclosure key={step.id}>
             <summary>
-              {step.id} ·{' '}
-              {record?.code?.outcome.replaceAll('_', ' ') ??
-                (stopped.includes(step.id)
-                  ? 'Stop requested'
-                  : 'Code execution')}
+              {m.workflows_code_run_summary({
+                step: step.id,
+                status: record?.code
+                  ? codeOutcomeLabels[record.code.outcome]()
+                  : stopped.includes(step.id)
+                    ? m.workflows_code_run_stop_requested()
+                    : m.workflows_code_run_pending(),
+              })}
             </summary>
             {record?.code ? (
               <>
                 <p>
-                  {record.code.wallTimeMs} ms · {record.code.requests}{' '}
-                  capability requests
+                  {m.workflows_code_run_telemetry({
+                    duration: formatNumber(record.code.wallTimeMs),
+                    requests: record.code.requests,
+                  })}
                 </p>
                 <pre>{JSON.stringify(record.values, null, 2)}</pre>
                 <p>
-                  Input digest: <code>{record.code.inputDigest}</code>
+                  {m.workflows_code_run_input_fingerprint()}{' '}
+                  <code>{record.code.inputDigest}</code>
                 </p>
               </>
             ) : canManage &&
               !terminal &&
               !['scheduled', 'cancelled'].includes(run.triggerState ?? '') ? (
               <>
-                <p>
-                  Stopping prevents new requests. Already admitted actions may
-                  still complete.
-                </p>
+                <p>{m.workflows_code_run_stop_help()}</p>
                 <Button
                   variant="outline"
                   disabled={!!pending || stopped.includes(step.id)}
                   onClick={() => void stop(step.id)}
                 >
                   <Square size={14} />
-                  {stopped.includes(step.id) ? 'Stop requested' : 'Stop code'}
+                  {stopped.includes(step.id)
+                    ? m.workflows_code_run_stop_requested()
+                    : m.workflows_code_run_stop()}
                 </Button>
               </>
             ) : (
-              <p>No code result recorded.</p>
+              <p>{m.workflows_code_run_no_result()}</p>
             )}
           </Disclosure>
         );

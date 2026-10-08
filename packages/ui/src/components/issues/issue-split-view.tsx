@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 import {
@@ -57,7 +58,7 @@ export function IssueSplitView({
         </ResizablePanel>
         <ResizableHandle
           withHandle
-          aria-label="Resize issue panel"
+          aria-label={m.issues_panel_resize()}
           disabled={singlePane}
         />
         <ResizablePanel

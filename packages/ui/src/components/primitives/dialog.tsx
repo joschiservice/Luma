@@ -1,4 +1,5 @@
 import { Dialog as DialogPrimitive } from '@base-ui/react/dialog';
+import { m } from '@luma/i18n/messages';
 import { Button } from '@luma/ui/components/primitives/button';
 import { cn } from '@luma/ui/lib/utils';
 import { XIcon } from 'lucide-react';
@@ -92,7 +93,7 @@ function DialogContent({
             }
           >
             <XIcon />
-            <span className="sr-only">Close</span>
+            <span className="sr-only">{m.common_close()}</span>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Popup>
@@ -132,7 +133,7 @@ function DialogFooter({
       {children}
       {showCloseButton && (
         <DialogPrimitive.Close render={<Button variant="outline" />}>
-          Close
+          {m.common_close()}
         </DialogPrimitive.Close>
       )}
     </div>

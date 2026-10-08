@@ -6,61 +6,84 @@ import type {
   ReturnStage,
   ReturnView,
 } from '@luma/api-contract';
+import { formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import type { OperationalState } from '@luma/ui/components/primitives/state';
 
 import { formatMoney } from '../orders/presentation';
-import { systemName } from '../products/presentation';
 
-export const viewLabels: Record<ReturnView, string> = {
-  action: 'Needs action',
-  waiting: 'Waiting',
-  done: 'Done',
-  all: 'All',
-};
+/** The system a return comes from, for messages that name it. */
+export type ReturnSystem = 'shopify' | 'jtl' | 'other';
 
-export const viewDescriptions: Record<ReturnView, string> = {
-  action:
-    'Requests to review, returns ready to refund or close, and refunds whose payment failed.',
-  waiting:
-    'Returns waiting for the customer’s items or for a refund payment to finish processing.',
-  done: 'Closed, declined and cancelled returns, and completed refunds.',
-  all: 'Every imported return, and refunds that no return settles.',
-};
+/** Maps a source system ID to the name messages use for it. */
+export function returnSystem(system: string | null): ReturnSystem {
+  if (system === 'shopify') return 'shopify';
+  if (system?.startsWith('jtl')) return 'jtl';
 
-export const stageLabels: Record<ReturnStage, string> = {
-  requested: 'To review',
-  awaiting_items: 'Waiting for items',
-  awaiting_refund: 'Ready to refund',
-  refund_pending: 'Refund processing',
-  refund_failed: 'Refund failed',
-  ready_to_close: 'Ready to close',
-  closed: 'Closed',
-  declined: 'Declined',
-  cancelled: 'Cancelled',
-  refunded: 'Refunded',
-  refund_recorded: 'No money refunded',
-  unknown: 'Status not recognized',
-};
+  return 'other';
+}
 
-export const stageDescriptions: Record<ReturnStage, string> = {
-  requested:
-    'Customers asked to return these items. Approve or decline each request in your store.',
-  awaiting_items: 'Approved returns whose items have not all arrived back yet.',
-  awaiting_refund:
-    'Units are back, or were never expected back, and have not been refunded.',
-  refund_pending:
-    'A refund payment is processing. The customer has not received the money yet.',
-  refund_failed:
-    'Every refund payment attempt failed. Retry the refund in your store.',
-  ready_to_close: 'Received and refunded returns that are still open.',
-  closed: 'Returns the source closed.',
-  declined: 'Return requests the merchant declined.',
-  cancelled: 'Returns cancelled at the source.',
-  refunded: 'Refunds without a return whose payment succeeded.',
-  refund_recorded:
-    'Refunds recorded without a payment, for example a restock without money back.',
-  unknown: 'Returns with a status Luma does not recognize.',
-};
+const stageLabelMessages = {
+  requested: m.returns_stage_requested,
+  awaiting_items: m.returns_stage_awaiting_items,
+  awaiting_refund: m.returns_stage_awaiting_refund,
+  refund_pending: m.returns_stage_refund_pending,
+  refund_failed: m.returns_stage_refund_failed,
+  ready_to_close: m.returns_stage_ready_to_close,
+  closed: m.returns_stage_closed,
+  declined: m.returns_stage_declined,
+  cancelled: m.returns_stage_cancelled,
+  refunded: m.returns_stage_refunded,
+  refund_recorded: m.returns_stage_refund_recorded,
+  unknown: m.returns_stage_unknown,
+} satisfies Record<ReturnStage, () => string>;
+
+const stageDescriptionMessages = {
+  requested: m.returns_stage_requested_description,
+  awaiting_items: m.returns_stage_awaiting_items_description,
+  awaiting_refund: m.returns_stage_awaiting_refund_description,
+  refund_pending: m.returns_stage_refund_pending_description,
+  refund_failed: m.returns_stage_refund_failed_description,
+  ready_to_close: m.returns_stage_ready_to_close_description,
+  closed: m.returns_stage_closed_description,
+  declined: m.returns_stage_declined_description,
+  cancelled: m.returns_stage_cancelled_description,
+  refunded: m.returns_stage_refunded_description,
+  refund_recorded: m.returns_stage_refund_recorded_description,
+  unknown: m.returns_stage_unknown_description,
+} satisfies Record<ReturnStage, () => string>;
+
+/** Reads each message when accessed, so labels follow the active language. */
+function localized<K extends string>(
+  messages: Record<K, () => string>,
+): Record<K, string> {
+  const labels = {} as Record<K, string>;
+  for (const key of Object.keys(messages) as K[])
+    Object.defineProperty(labels, key, {
+      enumerable: true,
+      get: () => messages[key](),
+    });
+
+  return labels;
+}
+
+export const stageLabels = localized(stageLabelMessages);
+
+export const stageDescriptions = localized(stageDescriptionMessages);
+
+export const viewLabels = localized({
+  action: m.returns_view_action,
+  waiting: m.returns_view_waiting,
+  done: m.returns_view_done,
+  all: m.returns_view_all,
+} satisfies Record<ReturnView, () => string>);
+
+export const viewDescriptions = localized({
+  action: m.returns_view_action_description,
+  waiting: m.returns_view_waiting_description,
+  done: m.returns_view_done_description,
+  all: m.returns_view_all_description,
+} satisfies Record<ReturnView, () => string>);
 
 export const stageStates: Record<ReturnStage, OperationalState> = {
   requested: 'approval',
@@ -87,19 +110,19 @@ export const workStages: ReturnStage[] = [
   'ready_to_close',
 ];
 
-export const refundLabels: Record<RefundState, string> = {
-  none: 'Not refunded',
-  recorded: 'Recorded without payment',
-  pending: 'Payment processing',
-  failed: 'Payment failed',
-  partial: 'Partly refunded',
-  refunded: 'Refunded',
-};
+export const refundLabels = localized({
+  none: m.returns_refund_none,
+  recorded: m.returns_refund_recorded,
+  pending: m.returns_refund_pending,
+  failed: m.returns_refund_failed,
+  partial: m.returns_refund_partial,
+  refunded: m.returns_refund_refunded,
+} satisfies Record<RefundState, () => string>);
 
-const declineLabels = {
-  return_period_ended: 'the return period ended',
-  final_sale: 'the item was a final sale',
-  other: 'the merchant declined it',
+const declineDetails = {
+  return_period_ended: m.returns_step_declined_return_period_ended,
+  final_sale: m.returns_step_declined_final_sale,
+  other: m.returns_step_declined_other,
 } as const;
 
 const number = (value: string | null) =>
@@ -107,11 +130,7 @@ const number = (value: string | null) =>
 
 /** Formats a decimal unit count; fractional counts keep their precision. */
 export const units = (value: string | null) =>
-  value === null ? '—' : Number(value).toLocaleString();
-
-function plural(count: number, one: string, many = `${one}s`) {
-  return `${count.toLocaleString()} ${count === 1 ? one : many}`;
-}
+  value === null ? m.common_empty_value() : formatNumber(Number(value));
 
 /** Formats an amount in the refund currency, or null when there is none. */
 export function refundMoney(amount: string | null, currency: string | null) {
@@ -126,7 +145,9 @@ export function returnLabel(
 
   return (
     item.name ??
-    (item.kind === 'refund' ? `Refund on ${order}` : `Return on ${order}`)
+    (item.kind === 'refund'
+      ? m.returns_label_refund({ order })
+      : m.returns_label_return({ order }))
   );
 }
 
@@ -143,23 +164,33 @@ export const showsRefundState = (
   item: Pick<ReturnListItem, 'stage' | 'refund'>,
 ) => item.refund.state !== 'none' && !refundStages.has(item.stage);
 
+/** Describes refunded and processing amounts together, or null when there are none. */
+function amounts(refunded: string | null, pending: string | null) {
+  if (refunded && pending)
+    return m.returns_refund_amount_refunded_processing({ refunded, pending });
+  if (refunded) return m.returns_refund_amount_refunded({ amount: refunded });
+  if (pending) return m.returns_refund_amount_processing({ amount: pending });
+
+  return null;
+}
+
 /**
  * Summarizes refund payments without calling pending, failed or recorded refunds money
  * returned. Amounts are shown only from payment outcomes.
  */
 export function refundSummary(item: Pick<ReturnListItem, 'refund'>) {
   const { refund } = item;
-  const refunded = refundMoney(refund.refunded, refund.currency);
-  const pending = refundMoney(refund.pending, refund.currency);
-  const parts = [
-    refunded ? `${refunded} refunded` : null,
-    pending ? `${pending} processing` : null,
-  ].filter(Boolean);
-  if (parts.length) return parts.join(' · ');
+  const money = amounts(
+    refundMoney(refund.refunded, refund.currency),
+    refundMoney(refund.pending, refund.currency),
+  );
+  if (money) return money;
   if (refund.state === 'failed')
-    return `${plural(refund.failedAttempts, 'payment')} failed`;
+    return m.returns_refund_payments_failed({ count: refund.failedAttempts });
   if (refund.currency === null && refund.state !== 'none')
-    return `${refundLabels[refund.state]} · several currencies`;
+    return m.returns_refund_several_currencies({
+      state: refundLabels[refund.state],
+    });
 
   return refundLabels[refund.state];
 }
@@ -170,43 +201,51 @@ export function nextStep(
     ReturnListItem,
     'stage' | 'quantity' | 'received' | 'refundedUnits' | 'refund'
   >,
-  system: string | null,
+  source: string | null,
 ) {
-  const source = system ? systemName(system) : 'the source';
-  const store = source === 'Connected source' ? 'the source' : source;
+  const system = returnSystem(source);
   const quantity = number(item.quantity) ?? 0;
   const received = number(item.received);
   const refunded = number(item.refundedUnits);
   const pending = refundMoney(item.refund.pending, item.refund.currency);
   switch (item.stage) {
     case 'requested':
-      return `Review the request and approve or decline it in ${store}.`;
+      return m.returns_next_requested({ system });
     case 'awaiting_items':
       return received === null
-        ? 'Waiting for the customer to send the items back.'
-        : `Waiting for ${plural(quantity - received, 'unit')} to arrive back (${received.toLocaleString()} of ${quantity.toLocaleString()} received).`;
+        ? m.returns_next_awaiting_items_unreported()
+        : m.returns_next_awaiting_items({
+            remaining: quantity - received,
+            received,
+            quantity,
+          });
     case 'awaiting_refund':
       return refunded !== null && refunded > 0
-        ? `Refund the remaining ${plural(quantity - refunded, 'unit')} in ${store}.`
-        : `The items are back. Issue the refund in ${store}.`;
+        ? m.returns_next_refund_remaining({
+            remaining: quantity - refunded,
+            system,
+          })
+        : m.returns_next_issue_refund({ system });
     case 'refund_pending':
-      return `${pending ?? 'A refund'} is processing with the payment provider. The customer has not received it yet.`;
+      return pending
+        ? m.returns_next_refund_pending_amount({ amount: pending })
+        : m.returns_next_refund_pending();
     case 'refund_failed':
-      return `The refund payment failed. Retry the refund in ${store}.`;
+      return m.returns_next_refund_failed({ system });
     case 'ready_to_close':
-      return `Items are back and refunded. Close the return in ${store}.`;
+      return m.returns_next_ready_to_close({ system });
     case 'closed':
-      return 'Closed at the source. Nothing is pending.';
+      return m.returns_next_closed();
     case 'declined':
-      return 'Declined at the source. No items or money are expected.';
+      return m.returns_next_declined();
     case 'cancelled':
-      return 'Cancelled at the source. Nothing is pending.';
+      return m.returns_next_cancelled();
     case 'refunded':
-      return 'The refund payment succeeded.';
+      return m.returns_next_refunded();
     case 'refund_recorded':
-      return `${store} recorded this refund without a payment, so no money was returned.`;
+      return m.returns_next_refund_recorded({ system });
     case 'unknown':
-      return `${store} reported a return status Luma does not recognize. Check the return in ${store}.`;
+      return m.returns_next_unknown({ system });
   }
 }
 
@@ -214,11 +253,14 @@ export function nextStep(
 export function accessMessage(source: ReturnSource) {
   if (source.access === 'granted') return null;
   if (source.access === 'not_granted')
-    return `${source.label} has not granted access to returns. Reconnect it to allow reading returns and refunds.`;
+    return m.returns_access_not_granted({ connection: source.label });
 
   return source.system === 'shopify'
-    ? `${source.label} was connected before returns were available. Reconnect it to share returns and refunds with Luma.`
-    : `${source.label} does not share returns with Luma. Returns handled in ${systemName(source.system)} are not shown here.`;
+    ? m.returns_access_reconnect_shopify({ connection: source.label })
+    : m.returns_access_not_shared({
+        connection: source.label,
+        system: returnSystem(source.system),
+      });
 }
 
 export type StepState =
@@ -256,24 +298,26 @@ export function returnSteps(
       .filter((value): value is string => !!value)
       .sort()
       .at(-1) ?? null;
-  const refunded = refundMoney(item.refund.refunded, item.refund.currency);
-  const pending = refundMoney(item.refund.pending, item.refund.currency);
+  const money = amounts(
+    refundMoney(item.refund.refunded, item.refund.currency),
+    refundMoney(item.refund.pending, item.refund.currency),
+  );
 
   return [
     {
       key: 'requested',
-      label: 'Requested',
+      label: m.returns_step_requested(),
       state: 'done',
-      detail: `${plural(quantity, 'unit')} to return`,
+      detail: m.returns_step_units_to_return({ count: quantity }),
       at: timeline.requestedAt,
     },
     {
       key: 'approved',
       label: stopped
         ? status === 'declined'
-          ? 'Declined'
-          : 'Cancelled'
-        : 'Approved',
+          ? m.returns_step_declined()
+          : m.returns_step_cancelled()
+        : m.returns_step_approved(),
       state: stopped
         ? 'failed'
         : approved
@@ -283,21 +327,21 @@ export function returnSteps(
             : 'unreported',
       detail:
         status === 'declined'
-          ? `Declined because ${declineLabels[timeline.declineReason ?? 'other']}`
+          ? declineDetails[timeline.declineReason ?? 'other']()
           : status === 'cancelled'
-            ? 'The return was cancelled'
+            ? m.returns_step_cancelled_detail()
             : timeline.approvedAt
-              ? 'Approved at the source'
+              ? m.returns_step_approved_detail()
               : approved
-                ? 'Opened at the source'
+                ? m.returns_step_opened_detail()
                 : status === 'requested'
-                  ? 'Waiting for your decision'
-                  : 'Approval not reported',
+                  ? m.returns_step_waiting_decision()
+                  : m.returns_step_approval_unreported(),
       at: stopped ? timeline.closedAt : timeline.approvedAt,
     },
     {
       key: 'received',
-      label: 'Items received',
+      label: m.returns_step_received(),
       state: stopped
         ? 'skipped'
         : received === null
@@ -309,13 +353,13 @@ export function returnSteps(
               : 'upcoming',
       detail:
         received === null
-          ? 'The source does not report returned items'
-          : `${received.toLocaleString()} of ${plural(quantity, 'unit')} received`,
+          ? m.returns_step_received_unreported()
+          : m.returns_step_received_detail({ received, quantity }),
       at: received !== null && received > 0 ? timeline.receivedAt : null,
     },
     {
       key: 'refunded',
-      label: 'Refunded',
+      label: m.returns_step_refunded(),
       state: stopped
         ? 'skipped'
         : item.refund.state === 'refunded'
@@ -328,20 +372,15 @@ export function returnSteps(
               : 'upcoming',
       detail:
         item.refund.state === 'failed'
-          ? 'The refund payment failed'
+          ? m.returns_step_refund_failed()
           : item.refund.state === 'recorded'
-            ? 'Refund recorded without a payment'
-            : [
-                refunded && `${refunded} refunded`,
-                pending && `${pending} processing`,
-              ]
-                .filter(Boolean)
-                .join(' · ') || 'No refund yet',
+            ? m.returns_step_refund_recorded()
+            : (money ?? m.returns_step_no_refund()),
       at: refundedAt,
     },
     {
       key: 'closed',
-      label: 'Closed',
+      label: m.returns_step_closed(),
       state: stopped
         ? 'skipped'
         : status === 'closed'
@@ -349,23 +388,28 @@ export function returnSteps(
           : item.stage === 'ready_to_close'
             ? 'current'
             : 'upcoming',
-      detail: status === 'closed' ? 'Closed at the source' : 'Still open',
+      detail:
+        status === 'closed'
+          ? m.returns_step_closed_detail()
+          : m.returns_step_still_open(),
       at: status === 'closed' ? timeline.closedAt : null,
     },
   ];
 }
 
-export const transactionLabels = {
-  success: 'Refunded',
-  pending: 'Processing',
-  failed: 'Failed',
-  unknown: 'Outcome unknown',
-} as const;
+type RefundOutcome = 'success' | 'pending' | 'failed' | 'unknown';
+
+export const transactionLabels = localized({
+  success: m.returns_transaction_success,
+  pending: m.returns_transaction_pending,
+  failed: m.returns_transaction_failed,
+  unknown: m.returns_transaction_unknown,
+} satisfies Record<RefundOutcome, () => string>);
 
 /** The overall outcome of one refund's payment attempts; a pending attempt means not finished. */
 export function refundOutcome(
   transactions: ReturnDetail['refunds'][number]['transactions'],
-): keyof typeof transactionLabels {
+): RefundOutcome {
   if (transactions.some((t) => t.status === 'pending')) return 'pending';
   if (transactions.some((t) => t.status === 'success')) return 'success';
   if (transactions.some((t) => t.status === 'failed')) return 'failed';
@@ -380,9 +424,9 @@ export const transactionTones = {
   unknown: 'neutral',
 } as const;
 
-export const restockLabels = {
-  return: 'Restock from return',
-  cancel: 'Restock from cancellation',
-  no_restock: 'Not restocked',
-  unknown: 'Restock not reported',
-} as const;
+export const restockLabels = localized({
+  return: m.returns_restock_return,
+  cancel: m.returns_restock_cancel,
+  no_restock: m.returns_restock_no_restock,
+  unknown: m.returns_restock_unknown,
+});

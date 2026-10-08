@@ -3,6 +3,7 @@ import type {
   DraftValidation,
   WorkflowDraftContent,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { Card } from '@luma/ui/components/primitives/card';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { Input } from '@luma/ui/components/primitives/input';
@@ -51,9 +52,12 @@ export function WorkflowSettings({
       className="authoring-settings"
       aria-labelledby="authoring-settings-title"
     >
-      <h2 id="authoring-settings-title">About this workflow</h2>
+      <h2 id="authoring-settings-title">{m.authoring_settings_title()}</h2>
       <div className="authoring-settings-grid">
-        <Field label="Name" diagnostics={at('definition.name')}>
+        <Field
+          label={m.authoring_settings_name()}
+          diagnostics={at('definition.name')}
+        >
           {(props) => (
             <Input
               {...props}
@@ -63,7 +67,10 @@ export function WorkflowSettings({
             />
           )}
         </Field>
-        <Field label="Version" diagnostics={at('version')}>
+        <Field
+          label={m.authoring_settings_version()}
+          diagnostics={at('version')}
+        >
           {(props) => (
             <Input
               {...props}
@@ -75,7 +82,10 @@ export function WorkflowSettings({
             />
           )}
         </Field>
-        <Field label="What it’s for" diagnostics={at('definition.intent')}>
+        <Field
+          label={m.authoring_settings_intent()}
+          diagnostics={at('definition.intent')}
+        >
           {(props) => (
             <Textarea
               {...props}
@@ -88,7 +98,10 @@ export function WorkflowSettings({
             />
           )}
         </Field>
-        <Field label="Category" diagnostics={at('definition.category')}>
+        <Field
+          label={m.authoring_settings_category()}
+          diagnostics={at('definition.category')}
+        >
           {(props) => (
             <Input
               {...props}
@@ -101,13 +114,13 @@ export function WorkflowSettings({
           )}
         </Field>
         <Field
-          label="When it starts"
+          label={m.authoring_settings_trigger()}
           diagnostics={at('applicability.trigger')}
           hint={triggerEntry?.executable ? triggerEntry.description : undefined}
         >
           {(props) => (
             <Select
-              aria-label="When it starts"
+              aria-label={m.authoring_settings_trigger()}
               {...(props['aria-describedby']
                 ? { 'aria-describedby': props['aria-describedby'] }
                 : {})}
@@ -143,7 +156,9 @@ export function WorkflowSettings({
               }}
               options={vocabulary.triggers.map((item) => ({
                 value: item.kind,
-                label: `${item.label}${item.executable ? '' : ' · can’t run here'}`,
+                label: item.executable
+                  ? item.label
+                  : m.authoring_option_limited({ option: item.label }),
               }))}
             />
           )}
@@ -152,10 +167,10 @@ export function WorkflowSettings({
           <Field
             label={
               trigger.kind === 'event'
-                ? 'Event name'
+                ? m.authoring_settings_event()
                 : trigger.kind === 'schedule'
-                  ? 'Start time (UTC)'
-                  : 'Issue type'
+                  ? m.authoring_settings_schedule()
+                  : m.authoring_settings_issue_type()
             }
             diagnostics={at(
               `applicability.trigger.${triggerFields[trigger.kind]}`,
@@ -189,15 +204,15 @@ export function WorkflowSettings({
         {trigger.kind === 'condition' ? (
           <>
             <Field
-              label="Condition field"
+              label={m.authoring_settings_condition_field()}
               diagnostics={at('applicability.trigger.field')}
             >
               {() => (
                 <Select
-                  aria-label="Condition field"
+                  aria-label={m.authoring_settings_condition_field()}
                   disabled={readOnly}
                   value={trigger.field}
-                  placeholder="Choose an evidence field"
+                  placeholder={m.authoring_settings_condition_placeholder()}
                   onValueChange={(next) =>
                     next &&
                     onChange({
@@ -216,13 +231,13 @@ export function WorkflowSettings({
               )}
             </Field>
             <Field
-              label="Starts when it is"
+              label={m.authoring_settings_condition_equals()}
               diagnostics={at('applicability.trigger.equals')}
             >
               {(props) => (
                 <ScalarInput
                   {...props}
-                  aria-label="Starts when it is"
+                  aria-label={m.authoring_settings_condition_equals()}
                   disabled={readOnly}
                   type={conditionType ?? 'boolean'}
                   value={trigger.equals}
@@ -241,19 +256,19 @@ export function WorkflowSettings({
           </>
         ) : null}
         <Field
-          label="What it acts on"
-          hint="Each run is about one of these."
+          label={m.authoring_settings_subject()}
+          hint={m.authoring_settings_subject_hint()}
           diagnostics={at('applicability.subjectKind')}
         >
           {(props) => (
             <Select
-              aria-label="What it acts on"
+              aria-label={m.authoring_settings_subject()}
               {...(props['aria-describedby']
                 ? { 'aria-describedby': props['aria-describedby'] }
                 : {})}
               disabled={readOnly}
               value={content.applicability.subjectKind}
-              placeholder="Choose a subject"
+              placeholder={m.authoring_settings_subject_placeholder()}
               onValueChange={(next) =>
                 next &&
                 onChange({
@@ -276,7 +291,9 @@ export function WorkflowSettings({
                   ? [
                       {
                         value: content.applicability.subjectKind,
-                        label: `${content.applicability.subjectKind} (unknown)`,
+                        label: m.authoring_settings_subject_unknown({
+                          subject: content.applicability.subjectKind,
+                        }),
                       },
                     ]
                   : []),
@@ -286,17 +303,17 @@ export function WorkflowSettings({
         </Field>
       </div>
       <Disclosure variant="plain" className="authoring-advanced">
-        <summary>Inputs, evidence and ID</summary>
+        <summary>{m.authoring_settings_advanced()}</summary>
         <div className="authoring-settings-grid">
           <FieldListEditor
-            label="Inputs"
+            label={m.authoring_settings_inputs()}
             fields={content.inputs as Record<string, FieldType>}
             disabled={readOnly}
             diagnostics={at('inputs')}
             onChange={(inputs) => onChange({ ...content, inputs })}
           />
           <FieldListEditor
-            label="Evidence fields"
+            label={m.authoring_settings_evidence_fields()}
             fields={content.context.fields as Record<string, FieldType>}
             disabled={readOnly}
             diagnostics={at('context.fields')}
@@ -304,7 +321,10 @@ export function WorkflowSettings({
               onChange({ ...content, context: { ...content.context, fields } })
             }
           />
-          <Field label="Evidence type" diagnostics={at('context.kind')}>
+          <Field
+            label={m.authoring_settings_evidence_type()}
+            diagnostics={at('context.kind')}
+          >
             {(props) => (
               <Input
                 {...props}
@@ -320,7 +340,7 @@ export function WorkflowSettings({
             )}
           </Field>
           <Field
-            label="Evidence must be newer than (seconds)"
+            label={m.authoring_settings_evidence_age()}
             diagnostics={at('context.maxAgeSeconds')}
           >
             {(props) => (
@@ -344,8 +364,8 @@ export function WorkflowSettings({
             )}
           </Field>
           <Field
-            label="Workflow ID"
-            hint="Used in links. It can’t change after the first version is published."
+            label={m.authoring_settings_id()}
+            hint={m.authoring_settings_id_hint()}
             diagnostics={at('definition.id')}
           >
             {(props) => (

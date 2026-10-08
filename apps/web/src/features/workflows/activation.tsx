@@ -1,4 +1,6 @@
 import type { ActivateWorkflow, WorkflowDetail } from '@luma/api-contract';
+import { formatList } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
@@ -83,10 +85,10 @@ export function ActivationForm({
     >
       <div className="workflow-activation-summary">
         <strong>
-          {detail.summary.name} · v{version}
+          {m.workflows_name_version({ name: detail.summary.name, version })}
         </strong>
         <p>
-          <strong>Approval: </strong>
+          <strong>{m.workflows_approval_label()} </strong>
           {detail.summary.readiness.approval.summary}
         </p>
         <ul>
@@ -96,11 +98,11 @@ export function ActivationForm({
         </ul>
       </div>
       <fieldset disabled={pending || request !== null}>
-        <legend>Connection and order scope</legend>
+        <legend>{m.workflows_activation_scope_legend()}</legend>
         <label>
-          Connection
+          {m.workflows_activation_connection()}
           <Select
-            aria-label="Connection"
+            aria-label={m.workflows_activation_connection()}
             required
             value={connectionId}
             onValueChange={(value) => {
@@ -109,10 +111,17 @@ export function ActivationForm({
               setReviewedRevision(null);
             }}
             options={[
-              { value: '', label: 'Select an eligible connection' },
+              {
+                value: '',
+                label: m.workflows_activation_connection_placeholder(),
+              },
               ...detail.connections.map((c) => ({
                 value: c.id,
-                label: `${c.label}${c.blockers.length ? ' — prerequisites missing' : ''}`,
+                label: c.blockers.length
+                  ? m.workflows_activation_connection_blocked({
+                      connection: c.label,
+                    })
+                  : c.label,
                 disabled: c.blockers.length > 0,
               })),
             ]}
@@ -120,12 +129,9 @@ export function ActivationForm({
         </label>
         {connection ? (
           <fieldset className="workflow-targets">
-            <legend>Orders permitted to change</legend>
+            <legend>{m.workflows_activation_orders_legend()}</legend>
             {!connection.targets.length ? (
-              <p>
-                No eligible orders on this connection. Choose another connection
-                or sync orders before activating.
-              </p>
+              <p>{m.workflows_activation_no_orders()}</p>
             ) : null}
             {connection.targets.map((target) => (
               <label key={target.id}>
@@ -154,22 +160,23 @@ export function ActivationForm({
         ) : null}
         <div className="workflow-scope-summary" aria-live="polite">
           <strong>
-            {targetIds.length} {targetIds.length === 1 ? 'order' : 'orders'}{' '}
-            selected
+            {targetIds.length
+              ? m.workflows_activation_selected({ count: targetIds.length })
+              : m.workflows_activation_selected_none()}
           </strong>
-          {targetIds.length ? (
+          {targetIds.length && connection ? (
             <p>
-              {connection?.label} ·{' '}
-              {connection?.targets
-                .filter((target) => targetIds.includes(target.id))
-                .map((target) => target.label)
-                .join(', ')}
+              {m.workflows_activation_selected_detail({
+                connection: connection.label,
+                orders: formatList(
+                  connection.targets
+                    .filter((target) => targetIds.includes(target.id))
+                    .map((target) => target.label),
+                ),
+              })}
             </p>
           ) : null}
-          <p>
-            Select up to 100 orders. Other resources and future orders are not
-            included.
-          </p>
+          <p>{m.workflows_activation_limit()}</p>
         </div>
         <label className="workflow-review">
           <input
@@ -181,21 +188,21 @@ export function ActivationForm({
               setReviewedRevision(e.target.checked ? revision : null)
             }
           />{' '}
-          I reviewed this version, order scope and approval requirements.
+          {m.workflows_activation_confirm()}
         </label>
       </fieldset>
       <Disclosure>
-        <summary>Version and access details</summary>
+        <summary>{m.workflows_activation_details()}</summary>
         <p>
-          Policy {detail.policyVersion} · Principal {detail.principalId}
+          {m.workflows_activation_details_line({
+            policy: detail.policyVersion,
+            principal: detail.principalId,
+          })}
         </p>
         <code>{selected.digest}</code>
       </Disclosure>
       {reviewedRevision && !reviewed && !request ? (
-        <p role="status">
-          The activation requirements changed. Review them again before
-          activating.
-        </p>
+        <p role="status">{m.workflows_activation_changed()}</p>
       ) : null}
       {error ? (
         <Alert tone="danger" role="alert">
@@ -203,9 +210,7 @@ export function ActivationForm({
         </Alert>
       ) : null}
       {request && !pending ? (
-        <p role="status">
-          The request is retained. Retrying uses the same ID and scope.
-        </p>
+        <p role="status">{m.workflows_activation_kept()}</p>
       ) : null}
       <div className="workflow-dialog-actions">
         <Button
@@ -214,7 +219,7 @@ export function ActivationForm({
           disabled={pending}
           onClick={cancel}
         >
-          Cancel
+          {m.common_cancel()}
         </Button>
         <Button
           type="submit"
@@ -227,10 +232,10 @@ export function ActivationForm({
           }
         >
           {pending
-            ? 'Confirming activation…'
+            ? m.workflows_activation_pending()
             : request
-              ? 'Retry same activation'
-              : 'Activate reviewed version'}
+              ? m.workflows_activation_retry()
+              : m.workflows_activation_submit()}
         </Button>
       </div>
     </form>

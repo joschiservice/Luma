@@ -189,7 +189,7 @@ export const Default: Story = {
       canvas.getByRole('button', { name: 'Add Source filter' }),
     );
     await userEvent.type(
-      await body.findByRole('searchbox', { name: 'Find source' }),
+      await body.findByRole('searchbox', { name: 'Find an option' }),
       '10',
     );
     await userEvent.click(body.getByRole('button', { name: 'Store 10' }));
@@ -253,7 +253,7 @@ export const DateRange: Story = {
     await userEvent.click(body.getByRole('button', { name: 'Apply range' }));
     await expect(
       await canvas.findByRole('button', {
-        name: 'Edit Placed filter: Sep 1 – Oct 1, 2026',
+        name: /^Edit Placed filter: 1 Sept?\s–\s1 Oct 2026$/,
       }),
     ).toBeVisible();
   },

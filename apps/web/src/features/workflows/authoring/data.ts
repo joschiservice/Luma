@@ -27,6 +27,7 @@ import { queryOptions } from '@tanstack/react-query';
 import { createWebApiClient } from '../../../lib/api-client';
 import { privateQueryDefaults } from '../../../lib/private-query';
 import { workflowFailure, workflowsKey } from '../data';
+import { localizeVocabulary } from './vocabulary-text';
 
 const api = createWebApiClient();
 
@@ -66,7 +67,10 @@ export async function installTemplate(
   return workflowTemplateSchema.parse(result.body);
 }
 
-/** Reads what authors can use here, including entries that cannot run and why. */
+/**
+ * Reads what authors can use here, including entries that cannot run and why. Known triggers,
+ * step types and subjects are shown in the interface language.
+ */
 export const vocabularyOptions = (organizationId: string) =>
   queryOptions({
     queryKey: [...workflowsKey(organizationId), 'vocabulary'],
@@ -82,6 +86,7 @@ export const vocabularyOptions = (organizationId: string) =>
 
       return authoringVocabularySchema.parse(result.body);
     },
+    select: localizeVocabulary,
   });
 
 /** Lists open drafts, most recently changed first. */

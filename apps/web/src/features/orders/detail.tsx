@@ -1,6 +1,7 @@
 import './orders.css';
 
 import type { OrderDetail, OrderSourceFacts } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { WorkspaceTimezone } from '@luma/ui/components/primitives/workspace-date';
@@ -178,7 +179,8 @@ export function OrderDetailView({
     <main className="order-page">
       {returnPath ? (
         <a className="order-back" href={returnPath}>
-          <ArrowLeft size={16} aria-hidden="true" /> Back to context
+          <ArrowLeft size={16} aria-hidden="true" />{' '}
+          {m.orders_detail_back_context()}
         </a>
       ) : (
         <Link
@@ -187,51 +189,47 @@ export function OrderDetailView({
           params={{ organizationId }}
           search={listSearch}
         >
-          <ArrowLeft size={16} aria-hidden="true" /> Back to orders
+          <ArrowLeft size={16} aria-hidden="true" /> {m.orders_detail_back()}
         </Link>
       )}
       {offline ? (
-        <Alert role="status">
-          You are offline. The order below may be out of date.
-        </Alert>
+        <Alert role="status">{m.orders_detail_offline()}</Alert>
       ) : null}
       {error === 'missing' ? (
-        <Alert role="alert">
-          This order is not in this workspace or is no longer reported by any
-          source.
-        </Alert>
+        <Alert role="alert">{m.orders_detail_missing()}</Alert>
       ) : error === 'access' ? (
         <Alert tone="danger" role="alert">
-          You no longer have access to orders in this workspace.
+          {m.orders_access_lost()}
         </Alert>
       ) : error ? (
         <Alert tone="danger" role="alert">
-          The order could not be loaded.{' '}
+          {m.orders_detail_load_failed()}{' '}
           <Button variant="outline" onClick={refresh}>
-            Retry
+            {m.common_retry()}
           </Button>
         </Alert>
       ) : null}
       {!detail ? (
         loading && !error ? (
           <p role="status" className="order-note">
-            Loading order…
+            {m.orders_detail_loading()}
           </p>
         ) : null
       ) : (
         <>
           {detail.redirectedFrom || search.linkedFrom ? (
-            <Alert role="status">
-              This order was linked to another source. You’re viewing the
-              combined order; each source’s evidence is preserved.
-            </Alert>
+            <Alert role="status">{m.orders_detail_linked_notice()}</Alert>
           ) : null}
           <OrderHeader order={detail.order} />
           <div className="order-layout">
             <div className="order-main">
               <OrderSection
-                title="Current state"
-                description={`Based on ${shown?.label ?? 'the newest source'}, the source with the newest update. Other sources are compared below.`}
+                title={m.orders_detail_state_title()}
+                description={
+                  shown
+                    ? m.orders_detail_state_description({ source: shown.label })
+                    : m.orders_detail_state_description_generic()
+                }
               >
                 <ul className="order-summary">
                   {orderSummary(detail, (value) =>
@@ -265,8 +263,10 @@ export function OrderDetailView({
               {contexts.map(({ source, content }) => (
                 <OrderSection
                   key={source.connectionId}
-                  title={`${source.label} details`}
-                  description="Payments, customer, fulfillment holds, returns, refunds and source events, read live with this connection's permissions. Luma stores returns and refunds shown above, but not these live details."
+                  title={m.orders_detail_live_title({ source: source.label })}
+                  description={m.orders_detail_live_description({
+                    source: source.label,
+                  })}
                 >
                   {content}
                 </OrderSection>

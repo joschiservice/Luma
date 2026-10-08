@@ -4,6 +4,8 @@ import type {
   CaseSummary,
   Diagnosis,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import {
   Activity,
   ChevronRight,
@@ -25,19 +27,33 @@ import { DomainIcon } from '../primitives/domain-icon';
 import { StatePill } from '../primitives/state';
 import { WorkspaceDate } from '../primitives/workspace-date';
 import {
+  caseStateLabel,
   elapsed,
+  freshnessLabel,
   issueKind,
   issueStatus,
+  quantityLabel,
+  recordKindLabel,
+  severityFullLabel,
+  severityLabel,
   sourceLabel,
+  unitLabel,
 } from './case-presentation';
 import { IssueCollection } from './issue-collection';
 import { IssueContext } from './issue-context';
-import { IssueFindings } from './issue-findings';
+import {
+  EvidenceRecord,
+  evidenceSourceLabel,
+  IssueFindings,
+} from './issue-findings';
 import { IssueOverview } from './issue-overview';
 import { IssueRecordDetails } from './issue-record-details';
 import { IssueSection } from './issue-section';
 
-/** Converts underscore-separated case codes to readable labels. */
+/**
+ * Converts an underscore-separated code that has no translated label into readable text, such
+ * as `inventory_position` → “Inventory position”. Prefer a named label where one exists.
+ */
 export function caseLabel(value: string) {
   return value.replaceAll('_', ' ').replace(/^./, (c) => c.toUpperCase());
 }
@@ -49,27 +65,29 @@ export function CaseTime({ value }: { value: string }) {
 
 function issueStateLabel(item: CaseSummary): string | null {
   if (item.state === 'resolved')
-    return item.resolution === 'verified' ? 'Verified' : 'Closed';
-  const labels: Record<string, string> = {
-    diagnosed: 'Investigation ready',
-    proposed: 'Action proposed',
-    awaiting_approval: 'Needs approval',
-    allowed: 'Ready for action',
-    executing: 'Action in progress',
-    verifying: 'Verifying outcome',
-    failed: 'Action failed',
-    escalated: 'Needs review',
-  };
+    return item.resolution === 'verified'
+      ? m.issues_status_verified()
+      : m.issues_status_closed();
+  if (item.state === 'detected') return null;
 
-  return labels[item.state] ?? null;
+  return item.state === 'escalated'
+    ? m.issues_status_needs_review()
+    : caseStateLabel(item.state);
 }
+
+const diagnosisStatuses = {
+  pending: m.issues_diagnosis_pending,
+  ready: m.issues_diagnosis_ready,
+  insufficient_evidence: m.issues_status_needs_evidence,
+  failed: m.issues_diagnosis_failed,
+} satisfies Record<Diagnosis['status'], () => string>;
 
 /** Displays the recorded issue state and severity. */
 export function CaseStatus({ item }: { item: CaseSummary }) {
   return (
     <div className="case-badges">
       <Badge tone={item.severity === 'high' ? 'warning' : 'neutral'}>
-        {caseLabel(item.severity)} severity
+        {severityFullLabel(item.severity)}
       </Badge>
       {issueStateLabel(item) && <Badge>{issueStateLabel(item)}</Badge>}
     </div>
@@ -95,18 +113,18 @@ export function CaseRow({ item }: { item: CaseSummary }) {
         <span className="case-row-subject">
           <span>{kind.label}</span>
           <span>
-            {item.sources.map(sourceLabel).join(' · ') || 'Source unknown'}
+            {item.sources.map(sourceLabel).join(' · ') ||
+              m.issues_source_unknown()}
           </span>
           <span title={item.subject.id}>
-            {item.subject.kind === 'sku' ? 'SKU' : caseLabel(item.subject.kind)}{' '}
-            {subject}
+            {recordKindLabel(item.subject.kind)} {subject}
           </span>
         </span>
       </div>
       <div className="issue-row-meta">
         <span className="issue-severity" data-severity={item.severity}>
-          {item.severity === 'high' ? 'High' : 'Medium'}
-          <span className="sr-only"> severity</span>
+          <span aria-hidden="true">{severityLabel(item.severity)}</span>
+          <span className="sr-only">{severityFullLabel(item.severity)}</span>
         </span>
         <StatePill state={status.state}>{status.label}</StatePill>
         <span className="case-row-time" title={item.lastActivityAt}>
@@ -144,13 +162,32 @@ export function CaseNotice({
 /** Announces that a case investigation is loading. */
 export function CaseLoading() {
   return (
-    <div className="case-loading" role="status" aria-label="Loading issues">
+    <div
+      className="case-loading"
+      role="status"
+      aria-label={m.issues_loading_issues()}
+    >
       <span />
       <span />
       <span />
       <span />
-      <p>Loading issues…</p>
+      <p>{m.issues_loading_issues()}</p>
     </div>
+  );
+}
+
+function EvidenceReferences({ refs }: { refs: string[] }) {
+  return (
+    <Disclosure className="finding-sources">
+      <summary>{m.issues_evidence_references({ count: refs.length })}</summary>
+      <ul>
+        {refs.map((ref) => (
+          <li key={ref}>
+            <code>{ref}</code>
+          </li>
+        ))}
+      </ul>
+    </Disclosure>
   );
 }
 
@@ -161,22 +198,98 @@ function Findings({ items }: { items: Diagnosis['facts'] }) {
         <li key={item.code}>
           <p>{item.text}</p>
           {item.evidenceRefs.length ? (
-            <Disclosure className="finding-sources">
-              <summary>
-                Evidence references ({item.evidenceRefs.length})
-              </summary>
-              <ul>
-                {item.evidenceRefs.map((ref) => (
-                  <li key={ref}>
-                    <code>{ref}</code>
-                  </li>
-                ))}
-              </ul>
-            </Disclosure>
+            <EvidenceReferences refs={item.evidenceRefs} />
           ) : null}
         </li>
       ))}
     </ul>
+  );
+}
+
+function Exposure({ diagnosis, note }: { diagnosis: Diagnosis; note: string }) {
+  const quantity = diagnosis.impact.exposedQuantity!;
+
+  return (
+    <>
+      <div>
+        <span>{m.issues_exposure_label()}</span>
+        <p>{note}</p>
+      </div>
+      <strong>
+        {quantityLabel(quantity)}{' '}
+        {diagnosis.impact.unit ? (
+          <small>{unitLabel(diagnosis.impact.unit, quantity)}</small>
+        ) : null}
+      </strong>
+    </>
+  );
+}
+
+/** Explains why the current findings can’t be acted on yet: unconfirmed, out of date, pending or incomplete. */
+function InvestigationNotices({
+  item,
+  unconfirmed,
+}: {
+  item: CaseDetail;
+  unconfirmed: boolean;
+}) {
+  return (
+    <>
+      {unconfirmed ? (
+        <CaseNotice title={m.issues_notice_unconfirmed_title()}>
+          {m.issues_notice_unconfirmed_body()}
+        </CaseNotice>
+      ) : null}
+      {item.freshness === 'stale' ? (
+        <CaseNotice title={m.issues_notice_stale_title()}>
+          {m.issues_notice_stale_body()}
+        </CaseNotice>
+      ) : null}
+      {item.diagnosisStatus === 'pending' ? (
+        <CaseNotice title={m.issues_notice_pending_title()}>
+          {m.issues_notice_pending_body()}
+        </CaseNotice>
+      ) : null}
+      {item.diagnosisStatus === 'failed' ? (
+        <CaseNotice title={m.issues_notice_failed_title()}>
+          {m.issues_notice_failed_body()}
+        </CaseNotice>
+      ) : null}
+      {item.diagnosisStatus === 'insufficient_evidence' &&
+      item.freshness !== 'stale' ? (
+        <CaseNotice title={m.issues_notice_insufficient_title()}>
+          {m.issues_notice_insufficient_body()}
+        </CaseNotice>
+      ) : null}
+    </>
+  );
+}
+
+function FindingsSummary({ item }: { item: CaseDetail }) {
+  return (
+    <span>
+      {m.issues_findings_and_evidence()}
+      <small>
+        {m.issues_findings_and_evidence_count({
+          findings: item.diagnosis?.facts.length ?? 0,
+          evidence: item.diagnosis?.provenance.evidence.length ?? 0,
+        })}
+      </small>
+    </span>
+  );
+}
+
+function ActivitySummary({ item }: { item: CaseDetail }) {
+  return (
+    <span>
+      {m.issues_activity_and_history()}
+      <small>
+        {rich(m.issues_activity_summary, {
+          state: issueStateLabel(item) ?? m.issues_activity_open(),
+          time: <CaseTime value={item.lastActivityAt} />,
+        })}
+      </small>
+    </span>
   );
 }
 
@@ -212,19 +325,21 @@ function FailedInvestigation({
   expanded = false,
 }: InvestigationProps) {
   const diagnosis = item.diagnosis;
-  const evidenceCount = diagnosis?.provenance.evidence.length ?? 0;
   const historical =
     item.freshness === 'stale' ||
     diagnosis?.superseded ||
     item.state === 'resolved';
 
   return (
-    <article className="failed-investigation" aria-label="Issue investigation">
+    <article
+      className="failed-investigation"
+      aria-label={m.issues_investigation_label()}
+    >
       {!embedded && (
         <header className="failed-investigation-header">
           <div className="failed-investigation-context">
             <span className="failed-priority">
-              {caseLabel(item.severity)} severity
+              {severityFullLabel(item.severity)}
             </span>
           </div>
           <h2>{item.summary.replace(/\.+$/, '')}</h2>
@@ -234,14 +349,12 @@ function FailedInvestigation({
       <IssueSection section="overview" enabled={expanded}>
         <section
           className="investigation-failure"
-          aria-label="Investigation status"
+          aria-label={m.issues_investigation_status()}
         >
           <CircleAlert size={22} aria-hidden="true" />
           <div>
-            <h3>Investigation failed</h3>
-            <p>
-              The investigation could not finish. No recommendation is ready.
-            </p>
+            <h3>{m.issues_status_investigation_failed()}</h3>
+            <p>{m.issues_investigation_failed_body()}</p>
           </div>
         </section>
         {unconfirmed || historical ? (
@@ -249,18 +362,18 @@ function FailedInvestigation({
             <ShieldQuestion size={18} aria-hidden="true" />
             <p>
               {unconfirmed
-                ? 'Current state is unconfirmed. Reconnect or refresh before acting.'
-                : 'Recorded findings are historical. Fresh evidence is needed before acting.'}
+                ? m.issues_investigation_unconfirmed_warning()
+                : m.issues_investigation_historical_warning()}
             </p>
           </div>
         ) : null}
-        <section className="failed-next-step" aria-label="Next step">
+        <section className="failed-next-step" aria-label={m.issues_next_step()}>
           <h3>
             <RefreshCw size={16} aria-hidden="true" />
-            Next step
+            {m.issues_next_step()}
           </h3>
           <div className="failed-update-action">
-            <p>Check whether new findings are available.</p>
+            <p>{m.issues_investigation_check_updates_hint()}</p>
             {onRefresh ? (
               <Button
                 variant="outline"
@@ -268,20 +381,22 @@ function FailedInvestigation({
                 disabled={refreshing}
               >
                 <RefreshCw aria-hidden="true" />
-                {refreshing ? 'Checking…' : 'Check for updates'}
+                {refreshing
+                  ? m.issues_investigation_checking()
+                  : m.issues_investigation_check_updates()}
               </Button>
             ) : null}
           </div>
           <p className="failed-help">
             {onRefresh
-              ? 'Checks the latest status without restarting the investigation.'
-              : 'Refresh the issue to check the latest status.'}
+              ? m.issues_investigation_check_updates_help()
+              : m.issues_investigation_refresh_help()}
           </p>
           {item.attention.required && (
             <div className="failed-review-request">
               <CircleAlert size={16} aria-hidden="true" />
               <div>
-                <strong>Recorded review request</strong>
+                <strong>{m.issues_investigation_review_requested()}</strong>
                 <p>{item.attention.explanation}</p>
               </div>
             </div>
@@ -289,42 +404,35 @@ function FailedInvestigation({
         </section>
         <section
           className="failed-recorded-context"
-          aria-label="Recorded context"
+          aria-label={m.issues_investigation_recorded()}
         >
           <div className="failed-context-heading">
             <h3>
               <FileText size={16} aria-hidden="true" />
-              Recorded context
+              {m.issues_investigation_recorded()}
             </h3>
             <span className="failed-freshness">
               {unconfirmed
-                ? 'Unconfirmed'
+                ? m.issues_evidence_badge_unconfirmed()
                 : historical
-                  ? 'Historical evidence'
+                  ? m.issues_evidence_badge_historical()
                   : item.freshness === 'fresh'
-                    ? 'Fresh evidence'
-                    : 'Freshness unknown'}
+                    ? m.issues_evidence_badge_fresh()
+                    : m.issues_evidence_badge_unknown()}
             </span>
           </div>
           {diagnosis?.impact.exposedQuantity != null ? (
             <div className="failed-exposure">
-              <div>
-                <span>Potential exposure</span>
-                <p>
-                  Recorded before the investigation completed. Does not confirm
-                  lost sales or oversold orders.
-                </p>
-              </div>
-              <strong>
-                {diagnosis.impact.exposedQuantity}{' '}
-                <small>{diagnosis.impact.unit}</small>
-              </strong>
+              <Exposure
+                diagnosis={diagnosis}
+                note={m.issues_exposure_note_before_finish()}
+              />
             </div>
           ) : (
             <p className="failed-help">
               {diagnosis?.facts.length
-                ? 'Recorded findings are available below. Impact has not been established.'
-                : 'No findings are available yet. Impact remains unknown.'}
+                ? m.issues_investigation_impact_unknown()
+                : m.issues_investigation_no_findings()}
             </p>
           )}
         </section>
@@ -332,7 +440,11 @@ function FailedInvestigation({
       {expanded ? (
         <IssueSection
           section="findings"
-          preview={`${diagnosis?.facts.length ?? 0} recorded facts`}
+          preview={
+            diagnosis?.facts.length
+              ? m.issues_findings_fact_count({ count: diagnosis.facts.length })
+              : m.issues_findings_fact_count_none()
+          }
         >
           <IssueFindings item={item} unconfirmed={unconfirmed} />
         </IssueSection>
@@ -344,13 +456,7 @@ function FailedInvestigation({
         >
           <summary>
             <FileText size={18} aria-hidden="true" />
-            <span>
-              Findings & evidence
-              <small>
-                {diagnosis?.facts.length ?? 0} findings · {evidenceCount}{' '}
-                evidence records
-              </small>
-            </span>
+            <FindingsSummary item={item} />
             <ChevronRight size={16} aria-hidden="true" />
           </summary>
           <div className="failed-disclosure-content">
@@ -367,7 +473,7 @@ function FailedInvestigation({
       {expanded ? (
         (progress ?? (
           <IssueSection section="execution">
-            <p>No activity is available yet.</p>
+            <p>{m.issues_activity_none()}</p>
           </IssueSection>
         ))
       ) : (
@@ -378,13 +484,7 @@ function FailedInvestigation({
         >
           <summary>
             <Activity size={18} aria-hidden="true" />
-            <span>
-              Activity & history
-              <small>
-                {issueStateLabel(item) ?? 'Open issue'} · Updated{' '}
-                <CaseTime value={item.lastActivityAt} />
-              </small>
-            </span>
+            <ActivitySummary item={item} />
             <ChevronRight size={16} aria-hidden="true" />
           </summary>
           <div className="failed-disclosure-content">
@@ -392,14 +492,16 @@ function FailedInvestigation({
               <>
                 <p>
                   {item.resolution === 'verified'
-                    ? 'Resolved with fresh verification evidence.'
+                    ? m.issues_resolution_verified_body()
                     : item.resolution === 'human_disposition'
-                      ? 'Closed by human disposition. This does not establish a verified correction.'
-                      : 'The issue remains open.'}
+                      ? m.issues_resolution_human_body()
+                      : m.issues_resolution_open()}
                 </p>
                 <p className="failed-recorded-time">
                   <Clock3 size={16} aria-hidden="true" />
-                  Detected <CaseTime value={item.detectedAt} />
+                  {rich(m.issues_detected_at, {
+                    time: <CaseTime value={item.detectedAt} />,
+                  })}
                 </p>
               </>
             )}
@@ -439,7 +541,7 @@ function InvestigationReport({
   return (
     <article
       className="case-investigation recorded-findings"
-      aria-label="Issue investigation"
+      aria-label={m.issues_investigation_label()}
     >
       {!hideHeader && !embedded && (
         <header>
@@ -457,50 +559,46 @@ function InvestigationReport({
         <>
           <section>
             <h3>
-              <Activity size={16} aria-hidden="true" /> Why it matters
+              <Activity size={16} aria-hidden="true" />{' '}
+              {m.issues_impact_title()}
             </h3>
             {diagnosis?.impact.observed.length ? (
               <>
-                <h4>Observed impact</h4>
+                <h4>{m.issues_findings_confirmed_impact()}</h4>
                 <Findings items={diagnosis.impact.observed} />
               </>
             ) : null}
             {diagnosis?.impact.potential.length ? (
               <>
-                <h4>Potential exposure</h4>
+                <h4>{m.issues_findings_potential_impact()}</h4>
                 <Findings items={diagnosis.impact.potential} />
               </>
             ) : null}
             {!diagnosis?.impact.observed.length &&
             !diagnosis?.impact.potential.length ? (
-              <p>Impact is unknown until the evidence supports a conclusion.</p>
+              <p>{m.issues_impact_unknown()}</p>
             ) : null}
-            <p className="case-caption">
-              Revenue impact is unknown. Potential exposure does not establish
-              lost sales or oversold orders.
-            </p>
+            <p className="case-caption">{m.issues_impact_revenue_unknown()}</p>
           </section>
           <section>
             <h3>
-              <ListChecks size={16} aria-hidden="true" /> Investigation findings
+              <ListChecks size={16} aria-hidden="true" />{' '}
+              {m.issues_findings_title()}
             </h3>
             {historical ? (
-              <p className="case-caption">
-                These findings describe the recorded observations, not current
-                conditions.
-              </p>
+              <p className="case-caption">{m.issues_findings_historical()}</p>
             ) : null}
-            <h4>Established facts</h4>
+            <h4>{m.issues_findings_confirmed_facts()}</h4>
             {diagnosis?.facts.length ? (
               <Findings items={diagnosis.facts} />
             ) : (
-              <p>No established findings yet.</p>
+              <p>{m.issues_findings_none()}</p>
             )}
             {diagnosis?.constraints.length ? (
               <>
                 <h4 className="findings-uncertainty-heading">
-                  <ShieldQuestion size={14} aria-hidden="true" /> Uncertainty
-                  and constraints
+                  <ShieldQuestion size={14} aria-hidden="true" />{' '}
+                  {m.issues_findings_uncertain()}
                 </h4>
                 <ul className="findings-constraints">
                   {diagnosis.constraints.map((text) => (
@@ -513,7 +611,7 @@ function InvestigationReport({
               <Disclosure className="case-hypotheses">
                 <summary>
                   <ShieldQuestion size={16} aria-hidden="true" />
-                  <span>Hypotheses and missing checks</span>
+                  <span>{m.issues_findings_causes_and_checks()}</span>
                   <span className="hypothesis-count">
                     {diagnosis.hypotheses.length}
                   </span>
@@ -521,11 +619,13 @@ function InvestigationReport({
                 </summary>
                 {diagnosis.hypotheses.map((h) => (
                   <div className="hypothesis-item" key={h.code}>
-                    <span className="hypothesis-status">Unconfirmed</span>
+                    <span className="hypothesis-status">
+                      {m.issues_findings_unconfirmed_label()}
+                    </span>
                     <p className="hypothesis-text">{h.text}</p>
                     {h.missingChecks.length > 0 && (
                       <div className="hypothesis-checks">
-                        <h4>Checks needed</h4>
+                        <h4>{m.issues_findings_checks_needed()}</h4>
                         <ul>
                           {h.missingChecks.map((text) => (
                             <li key={text}>
@@ -537,18 +637,7 @@ function InvestigationReport({
                       </div>
                     )}
                     {h.evidenceRefs.length > 0 && (
-                      <Disclosure className="finding-sources">
-                        <summary>
-                          Evidence references ({h.evidenceRefs.length})
-                        </summary>
-                        <ul>
-                          {h.evidenceRefs.map((ref) => (
-                            <li key={ref}>
-                              <code>{ref}</code>
-                            </li>
-                          ))}
-                        </ul>
-                      </Disclosure>
+                      <EvidenceReferences refs={h.evidenceRefs} />
                     )}
                   </div>
                 ))}
@@ -557,86 +646,44 @@ function InvestigationReport({
           </section>
           <section>
             <h3>
-              <Database size={16} aria-hidden="true" /> Supporting evidence
+              <Database size={16} aria-hidden="true" />{' '}
+              {m.issues_evidence_supporting_title()}
             </h3>
             <p className="case-caption">
-              Freshness: {caseLabel(item.freshness)}. Source update time may be
-              unknown.
+              {m.issues_evidence_freshness({
+                freshness: freshnessLabel(item.freshness),
+              })}
             </p>
             <IssueCollection
-              title="Supporting evidence"
-              noun="supporting evidence records"
+              title={m.issues_evidence_supporting_title()}
+              noun="evidence"
               items={[...(diagnosis?.provenance.evidence ?? [])].sort((a, b) =>
                 b.observedAt.localeCompare(a.observedAt),
               )}
               filters={[
-                {
-                  label: 'Source',
-                  value: (entry) =>
-                    entry.source
-                      ? `${entry.source.provider} · ${entry.source.resource}`
-                      : 'Canonical evidence',
-                },
+                { label: m.common_source(), value: evidenceSourceLabel },
               ]}
               renderItems={(entries) =>
                 entries.length ? (
-                  entries.map((e) => (
-                    <Disclosure className="case-evidence" key={e.id}>
-                      <summary>
-                        {e.source
-                          ? `${e.source.provider} · ${e.source.resource}`
-                          : 'Canonical evidence'}{' '}
-                        <span>
-                          Observed <CaseTime value={e.observedAt} />
-                        </span>
-                      </summary>
-                      <dl>
-                        <dt>Evidence ID</dt>
-                        <dd>
-                          <code>{e.id}</code>
-                        </dd>
-                        <dt>Observed</dt>
-                        <dd>
-                          <CaseTime value={e.observedAt} />
-                        </dd>
-                        <dt>Source updated</dt>
-                        <dd>
-                          {e.sourceUpdatedAt ? (
-                            <CaseTime value={e.sourceUpdatedAt} />
-                          ) : (
-                            'Unknown'
-                          )}
-                        </dd>
-                        {e.source ? (
-                          <>
-                            <dt>Source object</dt>
-                            <dd>{e.source.externalId}</dd>
-                            <dt>Source scope</dt>
-                            <dd>{e.source.scopeKey || 'Not specified'}</dd>
-                          </>
-                        ) : null}
-                        <dt>Adapter</dt>
-                        <dd>{e.adapterVersion}</dd>
-                        <dt>Schema</dt>
-                        <dd>{e.schemaVersion}</dd>
-                      </dl>
-                    </Disclosure>
-                  ))
+                  entries.map((e) => <EvidenceRecord key={e.id} entry={e} />)
                 ) : (
-                  <p>No evidence references are available yet.</p>
+                  <p>{m.issues_evidence_none()}</p>
                 )
               }
             />
             {diagnosis?.provenance.mappingVersions.length ? (
               <p className="case-caption">
-                Mapping versions:{' '}
-                {diagnosis.provenance.mappingVersions.join(', ')}
+                {m.issues_findings_link_versions_value({
+                  versions: diagnosis.provenance.mappingVersions.join(', '),
+                })}
               </p>
             ) : null}
             {diagnosis ? (
               <p className="case-caption">
-                Configuration: {diagnosis.provenance.configVersion} · Rules:{' '}
-                {diagnosis.provenance.ruleVersion}
+                {m.issues_findings_configuration_value({
+                  configuration: diagnosis.provenance.configVersion,
+                  rules: diagnosis.provenance.ruleVersion,
+                })}
               </p>
             ) : null}
           </section>
@@ -655,7 +702,7 @@ function InvestigationReport({
               !['pending', 'failed'].includes(item.diagnosisStatus) &&
               !['pending', 'failed'].includes(diagnosis.status) &&
               item.attention.required ? (
-                <Badge tone="warning">Manual review required</Badge>
+                <Badge tone="warning">{m.issues_manual_review_needed()}</Badge>
               ) : null
             }
           >
@@ -665,83 +712,15 @@ function InvestigationReport({
                 unconfirmed={unconfirmed}
                 review={review}
               >
-                {!recordedOnly && (
-                  <>
-                    {unconfirmed ? (
-                      <CaseNotice title="Current investigation is unconfirmed">
-                        These are the last confirmed findings. Reconnect or
-                        refresh before choosing a correction.
-                      </CaseNotice>
-                    ) : null}
-                    {item.freshness === 'stale' ? (
-                      <CaseNotice title="Evidence is stale">
-                        Current conditions are unknown. Fresh observations are
-                        needed before choosing a correction.
-                      </CaseNotice>
-                    ) : null}
-                    {item.diagnosisStatus === 'pending' ? (
-                      <CaseNotice title="Investigation pending">
-                        The issue has been detected. Findings and next steps
-                        will appear when investigation completes.
-                      </CaseNotice>
-                    ) : null}
-                    {item.diagnosisStatus === 'failed' ? (
-                      <CaseNotice title="Investigation could not finish">
-                        Refresh to check for a completed investigation. No
-                        recommendation is ready.
-                      </CaseNotice>
-                    ) : null}
-                    {item.diagnosisStatus === 'insufficient_evidence' &&
-                    item.freshness !== 'stale' ? (
-                      <CaseNotice title="More evidence is needed">
-                        Mappings, authority or observations do not yet support a
-                        confident conclusion.
-                      </CaseNotice>
-                    ) : null}
-                  </>
-                )}
+                <InvestigationNotices item={item} unconfirmed={unconfirmed} />
               </IssueOverview>
             ) : (
               <>
-                {!recordedOnly && (
-                  <>
-                    {unconfirmed ? (
-                      <CaseNotice title="Current investigation is unconfirmed">
-                        These are the last confirmed findings. Reconnect or
-                        refresh before choosing a correction.
-                      </CaseNotice>
-                    ) : null}
-                    {item.freshness === 'stale' ? (
-                      <CaseNotice title="Evidence is stale">
-                        Current conditions are unknown. Fresh observations are
-                        needed before choosing a correction.
-                      </CaseNotice>
-                    ) : null}
-                    {item.diagnosisStatus === 'pending' ? (
-                      <CaseNotice title="Investigation pending">
-                        The issue has been detected. Findings and next steps
-                        will appear when investigation completes.
-                      </CaseNotice>
-                    ) : null}
-                    {item.diagnosisStatus === 'failed' ? (
-                      <CaseNotice title="Investigation could not finish">
-                        Refresh to check for a completed investigation. No
-                        recommendation is ready.
-                      </CaseNotice>
-                    ) : null}
-                    {item.diagnosisStatus === 'insufficient_evidence' &&
-                    item.freshness !== 'stale' ? (
-                      <CaseNotice title="More evidence is needed">
-                        Mappings, authority or observations do not yet support a
-                        confident conclusion.
-                      </CaseNotice>
-                    ) : null}
-                  </>
-                )}
+                <InvestigationNotices item={item} unconfirmed={unconfirmed} />
                 <section>
                   <h3>
-                    <ListChecks size={16} aria-hidden="true" /> Recommended next
-                    step
+                    <ListChecks size={16} aria-hidden="true" />{' '}
+                    {m.issues_recommendation_title()}
                   </h3>
                   {item.attention.required ? (
                     <p className="case-attention">
@@ -749,15 +728,9 @@ function InvestigationReport({
                     </p>
                   ) : null}
                   {unconfirmed ? (
-                    <p>
-                      Current recommendations will appear when the investigation
-                      is confirmed.
-                    </p>
+                    <p>{m.issues_recommendation_unconfirmed()}</p>
                   ) : historical ? (
-                    <p>
-                      This investigation is historical. Its recommendations are
-                      no longer current.
-                    </p>
+                    <p>{m.issues_recommendation_historical()}</p>
                   ) : item.diagnosisStatus !== 'failed' &&
                     diagnosis &&
                     !['pending', 'failed'].includes(diagnosis.status) &&
@@ -766,13 +739,13 @@ function InvestigationReport({
                       <div className="case-step" key={step.code}>
                         <h4>
                           {step.kind === 'manual_intervention'
-                            ? 'Operator review'
-                            : 'Investigate'}
+                            ? m.issues_step_manual()
+                            : m.issues_step_investigate()}
                         </h4>
                         <p>{step.text}</p>
                         {step.preconditions.length ? (
                           <>
-                            <h5>Before proceeding</h5>
+                            <h5>{m.issues_step_before()}</h5>
                             <ul>
                               {step.preconditions.map((text) => (
                                 <li key={text}>{text}</li>
@@ -780,7 +753,7 @@ function InvestigationReport({
                             </ul>
                           </>
                         ) : null}
-                        <h5>Expected result and verification</h5>
+                        <h5>{m.issues_step_expected()}</h5>
                         <ul>
                           {step.verificationCriteria.map((text) => (
                             <li key={text}>{text}</li>
@@ -794,26 +767,26 @@ function InvestigationReport({
                       </div>
                     ))
                   ) : (
-                    <p>No current recommendation is available.</p>
+                    <p>{m.issues_recommendation_none()}</p>
                   )}
                   {diagnosis ? (
                     <p className="case-caption">
-                      Investigation revision {diagnosis.revision} ·{' '}
-                      {historical ? 'Historical' : caseLabel(diagnosis.status)}
+                      {m.issues_recommendation_version({
+                        version: diagnosis.revision,
+                        status: historical
+                          ? m.issues_diagnosis_historical()
+                          : diagnosisStatuses[diagnosis.status](),
+                      })}
                     </p>
                   ) : null}
                 </section>
 
                 {diagnosis?.impact.exposedQuantity != null && (
                   <div className="report-exposure failed-exposure">
-                    <div>
-                      <span>Potential exposure</span>
-                      <p>Does not confirm lost sales or oversold orders.</p>
-                    </div>
-                    <strong>
-                      {diagnosis.impact.exposedQuantity}{' '}
-                      <small>{diagnosis.impact.unit}</small>
-                    </strong>
+                    <Exposure
+                      diagnosis={diagnosis}
+                      note={m.issues_exposure_note()}
+                    />
                   </div>
                 )}
               </>
@@ -822,7 +795,13 @@ function InvestigationReport({
           {expanded ? (
             <IssueSection
               section="findings"
-              preview={`${diagnosis?.facts.length ?? 0} recorded facts`}
+              preview={
+                diagnosis?.facts.length
+                  ? m.issues_findings_fact_count({
+                      count: diagnosis.facts.length,
+                    })
+                  : m.issues_findings_fact_count_none()
+              }
             >
               <IssueFindings item={item} unconfirmed={unconfirmed} />
             </IssueSection>
@@ -834,14 +813,7 @@ function InvestigationReport({
             >
               <summary>
                 <FileText size={18} aria-hidden="true" />
-                <span>
-                  Findings &amp; evidence
-                  <small>
-                    {diagnosis?.facts.length ?? 0} findings ·{' '}
-                    {diagnosis?.provenance.evidence.length ?? 0} evidence
-                    records
-                  </small>
-                </span>
+                <FindingsSummary item={item} />
                 <ChevronRight size={16} aria-hidden="true" />
               </summary>
               <div className="failed-disclosure-content">
@@ -858,7 +830,7 @@ function InvestigationReport({
           {expanded ? (
             (progress ?? (
               <IssueSection section="execution">
-                <p>No activity is available yet.</p>
+                <p>{m.issues_activity_none()}</p>
               </IssueSection>
             ))
           ) : (
@@ -869,13 +841,7 @@ function InvestigationReport({
             >
               <summary>
                 <Activity size={18} aria-hidden="true" />
-                <span>
-                  Activity &amp; history
-                  <small>
-                    {issueStateLabel(item) ?? 'Open issue'} · Updated{' '}
-                    <CaseTime value={item.lastActivityAt} />
-                  </small>
-                </span>
+                <ActivitySummary item={item} />
                 <ChevronRight size={16} aria-hidden="true" />
               </summary>
               <div className="failed-disclosure-content">
@@ -883,10 +849,10 @@ function InvestigationReport({
                   <div>
                     <p>
                       {item.resolution === 'verified'
-                        ? 'Resolved with fresh verification evidence.'
+                        ? m.issues_resolution_verified_body()
                         : item.resolution === 'human_disposition'
-                          ? 'Closed by human disposition. This does not establish a verified correction.'
-                          : 'This issue is open. Activity will appear here as work progresses.'}
+                          ? m.issues_resolution_human_body()
+                          : m.issues_activity_open_body()}
                     </p>
                   </div>
                 )}

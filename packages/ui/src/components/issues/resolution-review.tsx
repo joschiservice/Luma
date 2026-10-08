@@ -3,6 +3,8 @@ import type {
   CaseProgress,
   CaseReview,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import {
   Activity,
   ArrowRightLeft,
@@ -23,9 +25,44 @@ import { Button } from '../primitives/button';
 import { Card, CardHeader, CardTitle } from '../primitives/card';
 import { Disclosure } from '../primitives/disclosure';
 import { caseLabel, CaseNotice, CaseTime } from './case-investigation';
+import {
+  caseStateLabel,
+  executionStateLabel,
+  recordKindLabel,
+  verificationLabel,
+  workflowStatusLabel,
+} from './case-presentation';
 import { IssuePageNavigation } from './issue-section';
 
 type DecisionKind = CaseDecision['kind'];
+
+type Proposal = NonNullable<CaseReview['proposal']>;
+
+const risks = {
+  low: m.issues_review_risk_low,
+  medium: m.issues_review_risk_medium,
+  high: m.issues_review_risk_high,
+} satisfies Record<Proposal['risk'], () => string>;
+
+const decisionButtons = {
+  approve: m.issues_review_approve,
+  reject: m.issues_review_reject,
+  escalate: m.issues_decision_escalate,
+} satisfies Record<DecisionKind, () => string>;
+
+function policyTitle(review: CaseReview, proposal: Proposal) {
+  if (review.policyStale) return m.issues_review_policy_stale_title();
+  switch (proposal.policy?.outcome) {
+    case 'allowed':
+      return m.issues_review_policy_allowed_title();
+    case 'denied':
+      return m.issues_review_policy_denied_title();
+    case 'approval_required':
+      return m.issues_review_policy_approval_title();
+    default:
+      return m.issues_review_policy_missing_title();
+  }
+}
 
 function fieldLabel(value: string) {
   return caseLabel(
@@ -34,8 +71,8 @@ function fieldLabel(value: string) {
 }
 
 /**
- * Presents a proposal, policy result, and permitted decisions with caller-controlled
- * submission state.
+ * Presents a proposed change, what the workspace’s approval rules require, and the decisions the
+ * reader may make, with caller-controlled submission state.
  */
 export function ResolutionReview({
   review,
@@ -62,14 +99,12 @@ export function ResolutionReview({
   return (
     <article
       className="case-investigation recorded-findings resolution-review"
-      aria-label="Resolution review"
+      aria-label={m.issues_section_resolution()}
     >
       <section>
         <h3>
           <ClipboardCheck size={16} aria-hidden="true" />{' '}
-          {proposal
-            ? 'Review the proposed correction'
-            : 'No proposed correction'}
+          {proposal ? m.issues_review_title() : m.issues_review_none_title()}
         </h3>
         {proposal ? (
           <>
@@ -80,65 +115,72 @@ export function ResolutionReview({
                   {fieldLabel(proposal.capability)}
                 </h4>
                 <Badge tone={proposal.risk === 'low' ? 'neutral' : 'warning'}>
-                  {caseLabel(proposal.risk)} risk
+                  {risks[proposal.risk]()}
                 </Badge>
               </CardHeader>
               <p className="case-caption">
-                Proposal version {proposal.version} · Investigation revision{' '}
-                {proposal.diagnosisRevision}
+                {m.issues_review_versions({
+                  proposal: proposal.version,
+                  investigation: proposal.diagnosisRevision,
+                })}
               </p>
               <dl className="resolution-facts">
-                <dt>Target system</dt>
+                <dt>{m.issues_review_target_system()}</dt>
                 <dd>{connectionLabel ?? proposal.connectionId}</dd>
-                <dt>Target object</dt>
+                <dt>{m.issues_review_target_record()}</dt>
                 <dd>
-                  {caseLabel(proposal.target.kind)} · {proposal.target.id}
+                  {recordKindLabel(proposal.target.kind)} · {proposal.target.id}
                 </dd>
               </dl>
             </Card>
             <div className="resolution-change-group">
               <Card as="div" className="resolution-change-card">
                 <CardTitle as="h4">
-                  <ArrowRightLeft size={14} aria-hidden="true" /> Proposed
-                  changes
+                  <ArrowRightLeft size={14} aria-hidden="true" />{' '}
+                  {m.issues_review_changes()}
                 </CardTitle>
                 <Fields values={proposal.parameters} />
               </Card>
               <Card as="div" className="resolution-change-card">
                 <CardTitle as="h4">
-                  <Target size={14} aria-hidden="true" /> Expected result
+                  <Target size={14} aria-hidden="true" />{' '}
+                  {m.issues_criteria_expected()}
                 </CardTitle>
                 <Fields values={proposal.expectedPostcondition} />
               </Card>
             </div>
             <Alert tone="warning" className="resolution-recovery">
-              <AlertTitle>Recovery not specified</AlertTitle>
+              <AlertTitle>{m.issues_review_no_undo_title()}</AlertTitle>
               <AlertDescription>
-                No recovery action is specified for this proposal. Do not assume
-                the change can be undone.
+                {m.issues_review_no_undo_body()}
               </AlertDescription>
             </Alert>
             <div className="resolution-preconditions">
               <h4>
-                <ListChecks size={14} aria-hidden="true" /> Preconditions
+                <ListChecks size={14} aria-hidden="true" />{' '}
+                {m.issues_review_evidence_title()}
               </h4>
               {review.refreshable || proposal.approval ? (
                 <p>
                   {proposal.approval
-                    ? 'The evidence used for this decision is recorded below.'
-                    : 'We keep the evidence up to date while you review.'}
+                    ? m.issues_review_evidence_recorded()
+                    : m.issues_review_evidence_refreshed()}
                 </p>
               ) : (
                 <p>
-                  Evidence must remain current through{' '}
-                  <CaseTime value={proposal.preconditions.validUntil} />.
+                  {rich(m.issues_review_evidence_valid_until, {
+                    time: (
+                      <CaseTime value={proposal.preconditions.validUntil} />
+                    ),
+                  })}
                 </p>
               )}
               {proposal.preconditions.evidenceRefs.length > 0 && (
                 <Disclosure className="finding-sources">
                   <summary>
-                    Evidence references (
-                    {proposal.preconditions.evidenceRefs.length})
+                    {m.issues_evidence_references({
+                      count: proposal.preconditions.evidenceRefs.length,
+                    })}
                   </summary>
                   <ul>
                     {proposal.preconditions.evidenceRefs.map((ref) => (
@@ -151,55 +193,45 @@ export function ResolutionReview({
               )}
               {!review.refreshable && !proposal.approval ? (
                 <p className="case-caption">
-                  <Clock3 size={12} aria-hidden="true" /> Proposal expires{' '}
-                  <CaseTime value={proposal.expiresAt} />.
+                  <Clock3 size={12} aria-hidden="true" />{' '}
+                  {rich(m.issues_review_expires, {
+                    time: <CaseTime value={proposal.expiresAt} />,
+                  })}
                 </p>
               ) : null}
             </div>
-            <CaseNotice
-              title={
-                review.policyStale
-                  ? 'Approval settings changed'
-                  : proposal.policy?.outcome === 'allowed'
-                    ? 'Automatic execution allowed'
-                    : proposal.policy?.outcome === 'denied'
-                      ? 'Action prohibited by policy'
-                      : proposal.policy?.outcome === 'approval_required'
-                        ? 'Human approval required'
-                        : 'Policy result unavailable'
-              }
-            >
+            <CaseNotice title={policyTitle(review, proposal)}>
               {review.policyStale
-                ? 'Refresh this review before deciding. The previous policy result no longer authorizes execution.'
+                ? m.issues_review_policy_stale_body()
                 : proposal.policy?.reason === 'approval_required'
-                  ? 'Another authorized operator must approve this change.'
+                  ? m.issues_review_policy_approval_body()
                   : (proposal.policy?.reason ??
-                    'Execution is not authorized without a current policy result.')}
+                    m.issues_review_policy_missing_body())}
               {proposal.policy?.outcome === 'allowed'
-                ? ' No approval click is needed. Execution and verification are tracked separately.'
+                ? ` ${m.issues_review_policy_allowed_body()}`
                 : null}
             </CaseNotice>
             {!proposal.available ? (
-              <CaseNotice title="Action unavailable">
-                The target capability cannot currently execute this proposal.
+              <CaseNotice title={m.issues_review_unavailable_title()}>
+                {m.issues_review_unavailable_body()}
               </CaseNotice>
             ) : null}
             {proposal.diagnosisRevision !== review.diagnosisRevision ? (
-              <CaseNotice title="Proposal is out of date">
-                The investigation changed. Wait for a current proposal.
+              <CaseNotice title={m.issues_review_outdated_title()}>
+                {m.issues_review_outdated_body()}
               </CaseNotice>
             ) : null}
             {proposal.approval ? (
               <CaseNotice
                 title={
                   proposal.approval.outcome === 'approved'
-                    ? 'Approval recorded'
-                    : 'Proposal rejected'
+                    ? m.issues_review_approved_title()
+                    : m.issues_review_rejected_title()
                 }
               >
                 {proposal.approval.outcome === 'approved'
-                  ? 'The decision is recorded. Execution and verification are tracked separately.'
-                  : 'This proposal has not been approved for execution.'}
+                  ? m.issues_review_approved_body()
+                  : m.issues_review_rejected_body()}
               </CaseNotice>
             ) : null}
           </>
@@ -207,10 +239,10 @@ export function ResolutionReview({
           <>
             <p>
               {progress?.resolution
-                ? 'This issue is closed. No correction is available to review.'
+                ? m.issues_review_none_closed()
                 : review.permittedDecisions.includes('escalate')
-                  ? 'Follow the recommended manual steps or escalate this issue for further review.'
-                  : 'Review the investigation for the recommended next step.'}
+                  ? m.issues_review_none_escalate()
+                  : m.issues_review_none_investigation()}
             </p>
             {navigate ? (
               <Button
@@ -218,16 +250,13 @@ export function ResolutionReview({
                 variant="outline"
                 onClick={() => navigate('overview')}
               >
-                View recommended next step
+                {m.issues_review_view_next_step()}
               </Button>
             ) : null}
           </>
         )}
         {proposal && review.refreshable ? (
-          <p className="case-caption">
-            We’ll check current conditions before applying your approved change.
-            If the action changes, we’ll ask you to review it again.
-          </p>
+          <p className="case-caption">{m.issues_review_refresh_note()}</p>
         ) : null}
         {/* Fresh evidence preserves the draft; a changed action starts a new decision. */}
         <DecisionControls
@@ -261,71 +290,88 @@ export function ResolutionReview({
         progress?.resolution ||
         progress?.state === 'escalated' ? (
           <Button variant="ghost" onClick={() => navigate('execution')}>
-            View execution status
+            {m.issues_review_view_progress()}
           </Button>
         ) : null
       ) : (
-        <section aria-label="Execution and verification">
+        <section aria-label={m.issues_section_execution()}>
           <h3>
-            <Activity size={16} aria-hidden="true" /> Execution and verification
+            <Activity size={16} aria-hidden="true" />{' '}
+            {m.issues_section_execution()}
           </h3>
           {progress ? (
             <>
-              <p className="case-caption">Issue: {caseLabel(progress.state)}</p>
+              <p className="case-caption">
+                {m.issues_review_progress_issue({
+                  state: caseStateLabel(progress.state),
+                })}
+              </p>
               <div className="resolution-outcomes">
                 <p>
-                  Execution:{' '}
-                  {progress.execution
-                    ? caseLabel(progress.execution.state)
-                    : 'Not recorded'}
+                  {m.issues_review_progress_change({
+                    state: progress.execution
+                      ? executionStateLabel(progress.execution.state)
+                      : m.issues_change_not_sent(),
+                  })}
                 </p>
                 <p>
-                  Verification:{' '}
-                  {progress.execution?.verification
-                    ? caseLabel(progress.execution.verification.outcome)
-                    : 'Not recorded'}
+                  {m.issues_review_progress_check({
+                    outcome: progress.execution?.verification
+                      ? verificationLabel(
+                          progress.execution.verification.outcome,
+                        )
+                      : m.issues_check_none(),
+                  })}
                 </p>
               </div>
               {progress.execution?.verification ? (
                 <p className="case-caption">
-                  Observed{' '}
-                  <CaseTime
-                    value={progress.execution.verification.observedAt}
-                  />{' '}
-                  · Evidence:{' '}
-                  {progress.execution.verification.observationRefs.join(', ') ||
-                    'None recorded'}
+                  {rich(m.issues_review_progress_checked, {
+                    time: (
+                      <CaseTime
+                        value={progress.execution.verification.observedAt}
+                      />
+                    ),
+                    evidence:
+                      progress.execution.verification.observationRefs.join(
+                        ', ',
+                      ) || m.issues_review_progress_no_evidence(),
+                  })}
                 </p>
               ) : null}
               {progress.workflow.availability === 'unavailable' ? (
-                <CaseNotice title="Workflow progress unavailable">
-                  Execution status is uncertain. Refresh to check current
-                  progress.
+                <CaseNotice
+                  title={m.issues_review_workflow_unavailable_title()}
+                >
+                  {m.issues_review_workflow_unavailable_body()}
                 </CaseNotice>
               ) : progress.workflow.progress ? (
-                <p>Workflow: {caseLabel(progress.workflow.progress.phase)}</p>
+                <p>
+                  {m.issues_progress_workflow({
+                    status: workflowStatusLabel(progress.workflow),
+                  })}
+                </p>
               ) : null}
               {progress.resolution ? (
                 <CaseNotice
                   title={
                     progress.resolution.kind === 'verification'
-                      ? 'Resolution verified'
-                      : 'Closed by human disposition'
+                      ? m.issues_resolution_verified_title()
+                      : m.issues_resolution_human_title()
                   }
                 >
                   {progress.resolution.kind === 'verification'
-                    ? 'Fresh evidence confirms the correction.'
-                    : 'Closure does not establish a verified correction.'}
+                    ? m.issues_resolution_verified_note()
+                    : m.issues_resolution_human_note()}
                 </CaseNotice>
               ) : (
                 <p className="case-caption">
-                  A recorded decision does not establish a successful
-                  correction.
+                  {m.issues_review_decision_note()}
                 </p>
               )}
             </>
           ) : (
-            <p>Current execution and verification status is unavailable.</p>
+            <p>{m.issues_review_progress_unavailable()}</p>
           )}
         </section>
       )}
@@ -343,12 +389,12 @@ function Fields({
       {Object.entries(values).map(([key, value]) => (
         <div key={key}>
           <dt>{fieldLabel(key)}</dt>
-          <dd>{value === null ? 'Not specified' : String(value)}</dd>
+          <dd>{value === null ? m.issues_not_specified() : String(value)}</dd>
         </div>
       ))}
     </dl>
   ) : (
-    <p>No fields specified.</p>
+    <p>{m.issues_review_fields_none()}</p>
   );
 }
 
@@ -379,8 +425,7 @@ function DecisionControls({
   useEffect(() => {
     if (compact && escalating) textarea.current?.focus({ preventScroll: true });
   }, [compact, escalating]);
-  if (!decisions.length)
-    return <p>No decisions are currently available to you.</p>;
+  if (!decisions.length) return <p>{m.issues_review_decisions_none()}</p>;
 
   if (compact && !escalating)
     return (
@@ -392,7 +437,7 @@ function DecisionControls({
         onClick={() => setEscalating(true)}
       >
         <ArrowUpRight size={15} aria-hidden="true" />
-        Escalate issue
+        {m.issues_review_escalate()}
       </Button>
     );
 
@@ -405,12 +450,14 @@ function DecisionControls({
     >
       <CardTitle as="h4">
         <MessageSquare size={15} aria-hidden="true" />{' '}
-        {compact ? 'Escalate issue' : 'Your decision'}
+        {compact
+          ? m.issues_review_escalate()
+          : m.issues_review_decision_title()}
       </CardTitle>
       <label htmlFor={id}>
         {compact
-          ? 'Why does this need escalation?'
-          : 'Decision reason (required)'}
+          ? m.issues_review_escalate_reason()
+          : m.issues_review_decision_reason()}
       </label>
       <textarea
         id={id}
@@ -424,8 +471,8 @@ function DecisionControls({
       />
       <p className="case-caption">
         {compact
-          ? 'A reason is required. Escalation marks this issue for further review and records your reason. It does not apply a correction.'
-          : 'Your reason is recorded with the decision.'}
+          ? m.issues_review_escalate_help()
+          : m.issues_review_decision_help()}
       </p>
       <div className="resolution-actions">
         {decisions.map((kind) => (
@@ -442,7 +489,9 @@ function DecisionControls({
             ) : (
               <ArrowUpRight size={15} aria-hidden="true" />
             )}
-            {compact ? 'Confirm escalation' : caseLabel(kind)}
+            {compact
+              ? m.issues_review_escalate_confirm()
+              : decisionButtons[kind]()}
           </Button>
         ))}
         {compact ? (
@@ -454,13 +503,15 @@ function DecisionControls({
               requestAnimationFrame(() => trigger.current?.focus());
             }}
           >
-            Cancel
+            {m.common_cancel()}
           </Button>
         ) : null}
       </div>
       {pending ? (
         <p role="status">
-          {checking ? 'Checking current conditions…' : 'Recording decision…'}
+          {checking
+            ? m.issues_review_checking()
+            : m.issues_review_saving_decision()}
         </p>
       ) : null}
     </Card>

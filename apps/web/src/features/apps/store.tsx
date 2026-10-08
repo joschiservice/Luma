@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
 import {
   Card,
@@ -67,7 +68,7 @@ export function AppStore({
     }
   }
 
-  if (query.isPending) return <p role="status">Loading apps…</p>;
+  if (query.isPending) return <p role="status">{m.apps_store_loading()}</p>;
   if (query.error) return <p role="alert">{connectionError(query.error)}</p>;
   const installed = query.data.installations.filter(
     (app) => app.status === 'installed',
@@ -87,17 +88,12 @@ export function AppStore({
   return (
     <>
       {!canManage ? (
-        <p className="apps-note">
-          Installing apps requires permission to manage apps, which your role
-          doesn’t include.
-        </p>
+        <p className="apps-note">{m.apps_store_manage_denied()}</p>
       ) : null}
       <section className="connections-section" aria-labelledby="installed-apps">
-        <h2 id="installed-apps">Installed apps</h2>
+        <h2 id="installed-apps">{m.apps_store_installed_title()}</h2>
         {!installed.length ? (
-          <p className="apps-note">
-            No apps installed yet. Choose an app below to get started.
-          </p>
+          <p className="apps-note">{m.apps_store_installed_empty()}</p>
         ) : null}
         <div className="connection-providers">
           {installed.map((installation) => {
@@ -127,8 +123,7 @@ export function AppStore({
                   </CardTitle>
                 </CardHeader>
                 <p className="app-tile-description">
-                  {app?.description ??
-                    'App unavailable. Historical records remain accessible.'}
+                  {app?.description ?? m.apps_store_app_unavailable()}
                 </p>
                 {app?.connectionTypes.length ? (
                   <p className="app-tile-status">
@@ -144,12 +139,14 @@ export function AppStore({
                       }
                     />
                     {connections.isPending
-                      ? 'Loading connections…'
+                      ? m.apps_connections_loading()
                       : connections.error
-                        ? 'Connection status unavailable'
+                        ? m.apps_store_connections_unavailable()
                         : live.length
-                          ? `${live.length} ${live.length === 1 ? 'connection' : 'connections'}`
-                          : 'No connected accounts'}
+                          ? m.apps_store_connections_count({
+                              count: live.length,
+                            })
+                          : m.apps_store_connections_empty()}
                   </p>
                 ) : null}
                 {!connections.error && attention.length ? (
@@ -159,11 +156,9 @@ export function AppStore({
                     hash={`connection-${attention[0]!.id}`}
                     className="app-attention"
                   >
-                    {attention.length}{' '}
-                    {attention.length === 1
-                      ? 'connection needs'
-                      : 'connections need'}{' '}
-                    attention
+                    {m.apps_store_connections_attention({
+                      count: attention.length,
+                    })}
                   </Link>
                 ) : null}
                 <Link
@@ -171,7 +166,7 @@ export function AppStore({
                   to="/app/$organizationId/apps/$appId/settings"
                   params={params}
                 >
-                  Manage app
+                  {m.apps_store_manage()}
                 </Link>
               </Card>
             );
@@ -179,7 +174,7 @@ export function AppStore({
         </div>
       </section>
       <section className="connections-section" aria-labelledby="available-apps">
-        <h2 id="available-apps">Available apps</h2>
+        <h2 id="available-apps">{m.apps_store_available_title()}</h2>
         <div className="connection-providers">
           {available.map((app) => (
             <Card as="article" key={app.id} className="app-tile">
@@ -197,18 +192,19 @@ export function AppStore({
                   setReviewing(app.id);
                 }}
               >
-                Install {app.name}
+                {m.apps_store_install({ app: app.name })}
               </Button>
             </Card>
           ))}
         </div>
         {!available.length ? (
-          <p className="apps-note">No additional apps available.</p>
+          <p className="apps-note">{m.apps_store_available_empty()}</p>
         ) : null}
       </section>
       {historical.length ? (
-        <section className="connections-section">
-          <h2>Connection history</h2>
+        <section className="connections-section" aria-labelledby="past-apps">
+          <h2 id="past-apps">{m.apps_store_history_title()}</h2>
+          <p className="apps-note">{m.apps_store_history_description()}</p>
           <ul className="apps-history">
             {historical.map((appId) => (
               <li key={appId}>

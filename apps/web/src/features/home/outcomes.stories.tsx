@@ -81,7 +81,7 @@ export const UnknownAttribution: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getAllByText('Unavailable')).toHaveLength(2);
     await expect(
-      canvas.getByText('Partial measurement coverage.', { exact: false }),
+      canvas.getByText('Covers only some live issues.', { exact: false }),
     ).toBeVisible();
   },
 };
@@ -126,7 +126,7 @@ export const NoClassifiedCohort: Story = {
   },
   play: async ({ canvasElement }) => {
     await expect(
-      within(canvasElement).getByText('No classified live cohort.', {
+      within(canvasElement).getByText('No live issues are classified yet.', {
         exact: false,
       }),
     ).toBeVisible();

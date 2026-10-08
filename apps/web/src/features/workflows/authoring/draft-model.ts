@@ -6,6 +6,8 @@ import type {
   WorkflowDiagnostic,
   WorkflowDraftContent,
 } from '@luma/api-contract';
+import { formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 
 export type StepKind = DraftStep['kind'];
 
@@ -279,12 +281,44 @@ export function valueKey(value: StepValue | ValueOption) {
 /** Describes where a value comes from in plain words. */
 export function valueLabel(value: StepValue | ValueOption) {
   if (value.source === 'literal')
-    return 'value' in value ? JSON.stringify(value.value) : 'A fixed value';
-  if (value.source === 'input') return `Input: ${humanize(value.field)}`;
-  if (value.source === 'evidence') return `Evidence: ${humanize(value.field)}`;
+    return 'value' in value
+      ? JSON.stringify(value.value)
+      : m.authoring_value_fixed();
+  if (value.source === 'input')
+    return m.authoring_value_input({ field: humanize(value.field) });
+  if (value.source === 'evidence')
+    return m.authoring_value_evidence({ field: humanize(value.field) });
 
-  return `${value.stepId} → ${humanize(value.field)}`;
+  return m.authoring_value_step({
+    step: value.stepId ?? '',
+    field: humanize(value.field),
+  });
 }
+
+/** Formats a whole number of seconds in the largest unit that divides it, such as “2 hours”. */
+export function formatDuration(seconds: number) {
+  const [unit, size] =
+    (
+      [
+        ['day', 86_400],
+        ['hour', 3600],
+        ['minute', 60],
+      ] as const
+    ).find(([, size]) => seconds >= size && seconds % size === 0) ??
+    (['second', 1] as const);
+
+  return formatNumber(seconds / size, {
+    style: 'unit',
+    unit,
+    unitDisplay: 'long',
+  });
+}
+
+const riskFacts = {
+  low: m.authoring_fact_risk_low,
+  medium: m.authoring_fact_risk_medium,
+  high: m.authoring_fact_risk_high,
+} satisfies Record<'low' | 'medium' | 'high', () => string>;
 
 /** Returns diagnostics that belong to one step, or to the workflow when `index` is null. */
 export function diagnosticsAt(
@@ -420,40 +454,44 @@ export function stepFacts(
 ): string[] {
   const step = content.steps[index];
   if (!step) return [];
-  const duration = (seconds: number) =>
-    seconds % 86_400 === 0
-      ? `${seconds / 86_400} d`
-      : seconds % 3600 === 0
-        ? `${seconds / 3600} h`
-        : seconds % 60 === 0
-          ? `${seconds / 60} min`
-          : `${seconds} s`;
   switch (step.kind) {
     case 'read':
       return Object.keys(step.fields).map(humanize);
     case 'condition':
       return [
-        step.onFalse === 'end' ? 'Otherwise: finish' : 'Otherwise: escalate',
+        step.onFalse === 'end'
+          ? m.authoring_fact_otherwise_finish()
+          : m.authoring_fact_otherwise_escalate(),
       ];
     case 'capability':
       return [
-        `${step.minimumRisk.charAt(0).toUpperCase()}${step.minimumRisk.slice(1)} risk`,
-        ...(content.steps[index - 1]?.kind === 'approval'
-          ? ['Asks a person first']
-          : ['Policy decides approval']),
+        riskFacts[step.minimumRisk](),
+        content.steps[index - 1]?.kind === 'approval'
+          ? m.authoring_fact_asks_person()
+          : m.authoring_fact_rules_decide(),
       ];
     case 'approval':
-      return [`Decide within ${duration(step.expiresAfterSeconds)}`];
+      return [
+        m.authoring_fact_decide_within({
+          duration: formatDuration(step.expiresAfterSeconds),
+        }),
+      ];
     case 'wait':
-      return [duration(step.seconds)];
+      return [formatDuration(step.seconds)];
     case 'verification':
-      return [`Within ${duration(step.maxDurationSeconds)}`];
+      return [
+        m.authoring_fact_check_within({
+          duration: formatDuration(step.maxDurationSeconds),
+        }),
+      ];
     case 'code':
       return [
-        ...Object.keys(step.fields).map(
-          (field) => `Returns ${humanize(field)}`,
+        ...Object.keys(step.fields).map((field) =>
+          m.authoring_fact_returns({ field: humanize(field) }),
         ),
-        ...(step.grants.length ? [`Requests ${step.grants.length}`] : []),
+        ...(step.grants.length
+          ? [m.authoring_fact_requests({ count: step.grants.length })]
+          : []),
       ];
     default:
       return [];

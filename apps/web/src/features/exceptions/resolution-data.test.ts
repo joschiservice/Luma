@@ -153,6 +153,6 @@ it('treats a failed freshness read as retryable without implying an uncertain ap
   ).rejects.toMatchObject({
     status: 503,
     message:
-      'We couldn’t check the latest conditions. Nothing was approved. Try again shortly.',
+      'Luma couldn’t check the latest conditions. Nothing was approved. Try again shortly.',
   });
 });

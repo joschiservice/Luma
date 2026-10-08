@@ -208,7 +208,7 @@ test('keeps failures recoverable and hides inaccessible tenant content', async (
     .click();
   await page
     .getByText(
-      'Creation was not confirmed. Check your workspace list before trying again.',
+      'Luma couldn’t confirm that the workspace was created. Check your workspace list before you try again.',
     )
     .waitFor();
   expect(creations).toBe(1);
@@ -257,7 +257,7 @@ test('keeps failures recoverable and hides inaccessible tenant content', async (
     }),
   );
   await page.goto(`/app/${organizationId}/home`);
-  await heading(page, 'We couldn’t connect');
+  await heading(page, 'Luma couldn’t connect');
   expect(page.url()).toContain(`/app/${organizationId}/home`);
   await page.unroute('**/api/v1/organizations/*/context');
   await page.getByRole('button', { name: 'Try again' }).click();
@@ -273,9 +273,7 @@ test('keeps failures recoverable and hides inaccessible tenant content', async (
   await page.getByLabel('Password', { exact: true }).fill('wrong-password');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await page
-    .getByText(
-      'Sign-in failed. Check your email and password, or try again when the service is available.',
-    )
+    .getByText('The email or password isn’t correct. Check both and try again.')
     .waitFor();
   expect(await page.getByLabel('Email', { exact: true }).inputValue()).toBe(
     'ada@example.test',
@@ -305,7 +303,7 @@ test('handles missing sessions, uncertain registration, conflicts and permission
     .click();
   await page
     .getByText(
-      'Account creation was not confirmed. Check your connection. Try signing in before creating another account.',
+      'Luma couldn’t confirm that your account was created. Check your connection, then try signing in before you create another account.',
     )
     .waitFor();
   expect(registrations).toBe(1);
@@ -337,7 +335,7 @@ test('handles missing sessions, uncertain registration, conflicts and permission
     [
       409,
       'CONFLICT',
-      'That workspace address is taken. Try again to generate a new address.',
+      'That workspace address is already in use. Try again and Luma will choose another one.',
     ],
   ]) {
     await page.route('**/api/v1/organizations', (route) =>
@@ -378,7 +376,7 @@ test('handles missing sessions, uncertain registration, conflicts and permission
     }),
   );
   await page.reload();
-  await heading(page, 'Permission denied');
+  await heading(page, 'You don’t have access');
   expect(await page.locator('.desk').count()).toBe(0);
   await page.unroute('**/api/v1/organizations/*/context');
   await page.route('**/api/auth/get-session', (route) =>
@@ -389,7 +387,7 @@ test('handles missing sessions, uncertain registration, conflicts and permission
     }),
   );
   await page.goto(`/app/${id}/home`);
-  await heading(page, 'We couldn’t connect');
+  await heading(page, 'Luma couldn’t connect');
   expect(page.url()).toContain(`/app/${id}/home`);
   await page.unroute('**/api/auth/get-session');
   await page.getByRole('button', { name: 'Try again' }).click();

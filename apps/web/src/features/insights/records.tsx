@@ -6,6 +6,14 @@ import {
   orderStageSchema,
 } from '@luma/api-contract';
 import {
+  formatCalendarDate,
+  formatList,
+  formatNumber,
+  formatRelativeTime,
+} from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
+import {
   issueKind,
   issueStatus,
 } from '@luma/ui/components/issues/case-presentation';
@@ -20,6 +28,7 @@ import {
   DialogTitle,
 } from '@luma/ui/components/primitives/dialog';
 import { StatePill } from '@luma/ui/components/primitives/state';
+import { isPieceUnit } from '@luma/ui/lib/units';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { ArrowUpRight, RefreshCw } from 'lucide-react';
@@ -32,7 +41,6 @@ import {
   statusLabels,
 } from '../orders/presentation';
 import { stages } from '../procurement/presentation';
-import { ago, count } from '../sync/presentation';
 import type { Selection } from './chart-card';
 import {
   insightRecordsOptions,
@@ -50,13 +58,13 @@ import {
   selectionValue,
 } from './presentation';
 
-const unknownReasons: Record<string, string> = {
-  missing: 'No stock read from the rule’s source',
-  deleted: 'Removed at the source',
-  nonnumeric: 'Source quantity isn’t a number',
-  future: 'Read time is in the future',
-  expired: 'Last read is more than 5 minutes old',
-  invalid_time: 'Read time is invalid',
+const unknownReasons: Record<string, () => string> = {
+  missing: m.insights_unknown_reason_missing,
+  deleted: m.insights_unknown_reason_deleted,
+  nonnumeric: m.insights_unknown_reason_nonnumeric,
+  future: m.insights_unknown_reason_future,
+  expired: m.insights_unknown_reason_expired,
+  invalid_time: m.insights_unknown_reason_invalid_time,
 };
 
 const isOrderStatus = (value: string | undefined) =>
@@ -71,11 +79,24 @@ const stageOf = (value: string | undefined) =>
 const signalLabel = (signal: string) =>
   Object.entries(signalLabels).find(([key]) => key === signal)?.[1] ?? signal;
 
-const attentionLabels: Record<string, string> = {
-  approval: 'Waiting for an approval',
-  manual_intervention: 'Needs a manual step',
-  uncertainty: 'Needs review',
+const attentionLabels: Record<string, () => string> = {
+  approval: m.insights_attention_approval,
+  manual_intervention: m.insights_attention_manual_intervention,
+  uncertainty: m.insights_attention_uncertainty,
 };
+
+/** Shows a decimal quantity string with the active language's separators when it is numeric. */
+const quantity = (value: string) => {
+  const number = Number(value);
+
+  return value.trim() && Number.isFinite(number) ? formatNumber(number) : value;
+};
+
+const ago = (value: string, now: number) => formatRelativeTime(value, now);
+
+/** Formats an ISO calendar date such as `2026-10-08`; other values are shown as delivered. */
+const calendarDate = (value: string) =>
+  /^\d{4}-\d{2}-\d{2}$/.test(value) ? formatCalendarDate(value) : value;
 
 /**
  * Lists the exact records behind a chart point and series at the chart's evaluation time.
@@ -124,21 +145,27 @@ export function RecordsSheet({
     ? chartCategories(data, timeZone).find((c) => c.key === point.key)
     : undefined;
   const badge = coverageBadge(data);
-  const series = definition.series.filter((s) => data.series.includes(s.id));
+  const series = definition.series().filter((s) => data.series.includes(s.id));
+  const scopeText = data.window
+    ? point
+      ? m.insights_records_scope_point({
+          period: category?.label ?? point.key,
+          timeZone: data.window.timeZone,
+        })
+      : data.window.bucket === 'day'
+        ? m.insights_records_scope_days({ timeZone: data.window.timeZone })
+        : m.insights_records_scope_weeks({ timeZone: data.window.timeZone })
+    : m.insights_records_scope_now({ time: moment(data.asOf, timeZone) });
+  const counted = amount(data.chart, total ?? 0);
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent placement="sheet" className="insights-sheet">
         <DialogHeader>
-          <p className="insights-sheet-eyebrow">{definition.title}</p>
+          <p className="insights-sheet-eyebrow">{definition.title()}</p>
           <DialogTitle>{selectionTitle(data, selection, timeZone)}</DialogTitle>
           <DialogDescription>
-            {data.window
-              ? point
-                ? `${category?.label ?? point.key} in ${data.window.timeZone}.`
-                : `Every ${data.window.bucket} shown, in ${data.window.timeZone}.`
-              : `As classified at ${moment(data.asOf, timeZone)}.`}{' '}
-            {definition.description}
+            {scopeText} {definition.description()}
           </DialogDescription>
         </DialogHeader>
         <div className="insights-sheet-facts">
@@ -150,7 +177,7 @@ export function RecordsSheet({
           <div
             className="insights-sheet-series"
             role="group"
-            aria-label="Show records for"
+            aria-label={m.insights_records_series_group()}
           >
             <Button
               variant="ghost"
@@ -158,7 +185,8 @@ export function RecordsSheet({
               aria-pressed={!selection.series}
               onClick={() => onSelect({ ...selection, series: undefined })}
             >
-              All · {count(selectionValue(data, { point: selection.point }))}
+              {m.common_all()} ·{' '}
+              {formatNumber(selectionValue(data, { point: selection.point }))}
             </Button>
             {series.map((s) => (
               <Button
@@ -170,7 +198,7 @@ export function RecordsSheet({
               >
                 <span className="lu-chart-key" data-color={s.color} />
                 {s.label} ·{' '}
-                {count(
+                {formatNumber(
                   selectionValue(data, {
                     point: selection.point,
                     series: s.id,
@@ -184,13 +212,13 @@ export function RecordsSheet({
           <Alert tone="warning" role="alert">
             <AlertDescription>
               {error === 'outdated'
-                ? 'This chart was read more than 15 minutes ago. Refresh it to list the records it counted.'
+                ? m.insights_records_error_outdated()
                 : error === 'access'
-                  ? 'Your access to this workspace changed.'
-                  : 'Luma couldn’t list these records.'}
+                  ? m.insights_records_error_access()
+                  : m.insights_records_error_failed()}
               <Button variant="outline" size="sm" onClick={onRefreshChart}>
                 <RefreshCw size={14} />
-                Refresh chart
+                {m.insights_records_refresh_chart()}
               </Button>
             </AlertDescription>
           </Alert>
@@ -198,24 +226,27 @@ export function RecordsSheet({
           <div
             className="insights-sheet-loading lu-skeleton"
             role="status"
-            aria-label="Loading records"
+            aria-label={m.insights_records_loading()}
           />
         ) : (
           <>
             <p className="insights-sheet-count" aria-live="polite">
-              <strong>{amount(data.chart, total ?? 0)}</strong>
               {total === expected
-                ? ' · matches the chart'
-                : ` · the chart showed ${count(expected)}`}
+                ? rich(m.insights_records_count_matches, {
+                    amount: <strong>{counted}</strong>,
+                  })
+                : rich(m.insights_records_count_differs, {
+                    amount: <strong>{counted}</strong>,
+                    expected: formatNumber(expected),
+                  })}
             </p>
             {total !== expected && (
               <Alert tone="warning" role="status">
                 <AlertDescription>
-                  Records changed after the chart was read. Refresh the chart to
-                  count them again.
+                  {m.insights_records_changed()}
                   <Button variant="outline" size="sm" onClick={onRefreshChart}>
                     <RefreshCw size={14} />
-                    Refresh chart
+                    {m.insights_records_refresh_chart()}
                   </Button>
                 </AlertDescription>
               </Alert>
@@ -235,7 +266,7 @@ export function RecordsSheet({
               </ul>
             ) : (
               <p className="insights-sheet-empty">
-                No {definition.many} match this selection.
+                {m.insights_records_empty()}
               </p>
             )}
             {query.hasNextPage && (
@@ -246,8 +277,10 @@ export function RecordsSheet({
                 onClick={() => void query.fetchNextPage()}
               >
                 {query.isFetchingNextPage
-                  ? 'Loading…'
-                  : `Show more (${count((total ?? 0) - items.length)} left)`}
+                  ? m.common_loading()
+                  : m.insights_records_show_more({
+                      count: (total ?? 0) - items.length,
+                    })}
               </Button>
             )}
           </>
@@ -305,7 +338,7 @@ function WorkspaceLink({
             from: returnPath,
           }}
         >
-          Open these orders in Orders
+          {m.insights_link_orders()}
           <ArrowUpRight size={14} />
         </Link>
       );
@@ -323,8 +356,8 @@ function WorkspaceLink({
           }}
         >
           {selection.series === 'held'
-            ? 'All held work in Fulfillment'
-            : 'All open work in Fulfillment'}
+            ? m.insights_link_fulfillment_held()
+            : m.insights_link_fulfillment_open()}
           <ArrowUpRight size={14} />
         </Link>
       );
@@ -335,7 +368,7 @@ function WorkspaceLink({
           to="/app/$organizationId/workflows/$definitionId"
           params={{ organizationId, definitionId: 'inventory-replenishment' }}
         >
-          Replenishment rules and readiness
+          {m.insights_link_stock()}
           <ArrowUpRight size={14} />
         </Link>
       );
@@ -350,7 +383,9 @@ function WorkspaceLink({
             class: isCaseClass(selection.series),
           }}
         >
-          Active issues of this kind
+          {isCaseClass(selection.series)
+            ? m.insights_link_cases_kind()
+            : m.insights_link_cases_all()}
           <ArrowUpRight size={14} />
         </Link>
       );
@@ -369,7 +404,9 @@ function WorkspaceLink({
             ...(stage ? { stage } : {}),
           }}
         >
-          Open this stage in Procurement
+          {stage
+            ? m.insights_link_procurement_stage()
+            : m.insights_link_procurement_all()}
           <ArrowUpRight size={14} />
         </Link>
       );
@@ -401,7 +438,10 @@ function RecordRow({
             params={{ organizationId, orderId: item.id }}
             search={{ from: returnPath }}
           >
-            <strong>{item.number ?? `Order ${item.id.slice(0, 8)}`}</strong>
+            <strong>
+              {item.number ??
+                m.insights_record_order_fallback({ id: item.id.slice(0, 8) })}
+            </strong>
             <span>
               {statusLabels[item.status] ?? item.status} ·{' '}
               {fulfillmentLabels[item.fulfillment] ?? item.fulfillment}
@@ -409,9 +449,11 @@ function RecordRow({
             </span>
             <small>
               {item.placedAt
-                ? `Placed ${moment(item.placedAt, timeZone)}`
-                : 'No placed time'}{' '}
-              · {item.sources.map((s) => s.label).join(' + ')}
+                ? m.insights_record_placed({
+                    time: moment(item.placedAt, timeZone),
+                  })
+                : m.insights_record_no_placed_time()}{' '}
+              · {formatList(item.sources.map((s) => s.label))}
             </small>
           </Link>
           {item.attentionIssueIds.map((issueId) => (
@@ -433,19 +475,32 @@ function RecordRow({
             search={{ from: returnPath }}
           >
             <strong>
-              {item.order.number ?? `Order ${item.order.id.slice(0, 8)}`}
+              {item.order.number ??
+                m.insights_record_order_fallback({
+                  id: item.order.id.slice(0, 8),
+                })}
             </strong>
             <span>
               {item.signals.length
                 ? item.signals.map(signalLabel).join(' · ')
-                : 'No signal'}
-              {` · ${item.units}${item.unit && item.unit !== 'each' ? ` ${item.unit}` : ''} open`}
+                : m.insights_fulfillment_series_none()}
+              {' · '}
+              {item.unit && !isPieceUnit(item.unit)
+                ? m.insights_record_units_unit_open({
+                    units: quantity(item.units),
+                    unit: item.unit,
+                  })
+                : m.insights_record_units_open({ units: quantity(item.units) })}
             </span>
             <small>
-              Last progress {ago(item.progressAt, now)}
               {item.lastProgressAt
-                ? ''
-                : ' (from the last source update)'} · {item.source.label}
+                ? m.insights_record_last_progress({
+                    time: ago(item.progressAt, now),
+                  })
+                : m.insights_record_last_source_update({
+                    time: ago(item.progressAt, now),
+                  })}{' '}
+              · {item.source.label}
               {item.locationName ? ` · ${item.locationName}` : ''}
             </small>
           </Link>
@@ -463,14 +518,32 @@ function RecordRow({
             <strong className="insights-mono">{item.sku}</strong>
             <span>
               {item.unknownReason
-                ? (unknownReasons[item.unknownReason] ?? 'Stock unknown')
-                : `${item.available} available · minimum ${item.minimum}${item.unit && item.unit !== 'each' ? ` ${item.unit}` : ''}`}
+                ? (unknownReasons[item.unknownReason]?.() ??
+                  m.insights_stock_point_unknown())
+                : item.unit && !isPieceUnit(item.unit)
+                  ? m.insights_record_stock_level_unit({
+                      available:
+                        item.available === null
+                          ? m.common_unknown()
+                          : formatNumber(item.available),
+                      minimum: formatNumber(item.minimum),
+                      unit: item.unit,
+                    })
+                  : m.insights_record_stock_level({
+                      available:
+                        item.available === null
+                          ? m.common_unknown()
+                          : formatNumber(item.available),
+                      minimum: formatNumber(item.minimum),
+                    })}
             </span>
             <small>
               {item.source.label}
-              {item.observedAt ? ` · read ${ago(item.observedAt, now)}` : ''}
+              {item.observedAt
+                ? ` · ${m.insights_record_read({ time: ago(item.observedAt, now) })}`
+                : ''}
               {item.purchaseOrderIds.length
-                ? ` · ${item.purchaseOrderIds.length} purchase order${item.purchaseOrderIds.length === 1 ? '' : 's'} recorded`
+                ? ` · ${m.insights_record_purchase_orders({ count: item.purchaseOrderIds.length })}`
                 : ''}
             </small>
           </Link>
@@ -481,7 +554,7 @@ function RecordRow({
               to="/app/$organizationId/procurement/$purchaseOrderId"
               params={{ organizationId, purchaseOrderId: id }}
             >
-              Purchase order
+              {m.insights_record_purchase_order_link()}
               <ArrowUpRight size={13} />
             </Link>
           ))}
@@ -491,7 +564,7 @@ function RecordRow({
             params={{ organizationId, definitionId: 'inventory-replenishment' }}
             hash={`rule-${item.ruleId}`}
           >
-            Rule
+            {m.insights_record_rule_link()}
             <ArrowUpRight size={13} />
           </Link>
         </li>
@@ -522,11 +595,19 @@ function RecordRow({
               <StatePill state={status.state}>{status.label}</StatePill>
             </span>
             <small>
-              Detected {moment(item.detectedAt, timeZone)}
+              {m.insights_record_detected({
+                time: moment(item.detectedAt, timeZone),
+              })}
               {item.resolvedAt
-                ? ` · ${item.resolution === 'verified' ? 'verified' : 'closed'} ${moment(item.resolvedAt, timeZone)}`
+                ? ` · ${(item.resolution === 'verified'
+                    ? m.insights_record_verified
+                    : m.insights_record_closed)({
+                    time: moment(item.resolvedAt, timeZone),
+                  })}`
                 : ''}
-              {item.attention ? ` · ${attentionLabels[item.attention]}` : ''}
+              {item.attention && attentionLabels[item.attention]
+                ? ` · ${attentionLabels[item.attention]!()}`
+                : ''}
             </small>
           </Link>
           {item.attention && (
@@ -553,13 +634,19 @@ function RecordRow({
               <StatePill state={stage ? stages[stage].state : 'idle'}>
                 {stage ? stages[stage].label : item.stage}
               </StatePill>
-              {item.overdue && <Badge tone="warning">Overdue</Badge>}
+              {item.overdue && (
+                <Badge tone="warning">
+                  {m.insights_procurement_series_overdue()}
+                </Badge>
+              )}
             </span>
             <small>
               {item.supplierName}
-              {item.expectedDate ? ` · expected ${item.expectedDate}` : ''}
+              {item.expectedDate
+                ? ` · ${m.insights_record_expected({ date: calendarDate(item.expectedDate) })}`
+                : ''}
               {item.attention
-                ? ` · ${item.attention} item${item.attention === 1 ? '' : 's'} to answer`
+                ? ` · ${m.insights_record_items_to_answer({ count: item.attention })}`
                 : ''}
             </small>
           </Link>
@@ -570,7 +657,7 @@ function RecordRow({
               params={{ organizationId }}
               search={{ domain: 'procurement' }}
             >
-              Needs you
+              {m.insights_record_needs_you()}
               <ArrowUpRight size={13} />
             </Link>
           )}
@@ -595,7 +682,7 @@ function NeedsYou({
       params={{ organizationId }}
       search={{ item }}
     >
-      Decide in Needs you
+      {m.insights_record_decide()}
       <ArrowUpRight size={13} />
     </Link>
   );

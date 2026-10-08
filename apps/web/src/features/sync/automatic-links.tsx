@@ -3,6 +3,8 @@ import type {
   AutoLinkRule,
   SyncConnectionView,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import {
@@ -80,12 +82,7 @@ export function AutomaticLinks({
         connections={connections}
         rules={query.data}
         loading={query.isPending}
-        error={
-          error ??
-          (query.isError
-            ? 'Automatic linking rules could not be loaded.'
-            : null)
-        }
+        error={error ?? (query.isError ? m.sync_autolink_load_failed() : null)}
         canManage={canManage}
         busy={busy}
         retry={() => void query.refetch()}
@@ -145,19 +142,16 @@ export function AutomaticLinksView({
 }) {
   const label = (id: string) =>
     connections.find((connection) => connection.connectionId === id)?.label ??
-    'Unavailable connection';
+    m.sync_autolink_unavailable_connection();
 
   return (
     <Card as="section" aria-labelledby="automatic-links-title">
       <CardHeader>
         <div>
           <CardTitle as="h2" id="automatic-links-title">
-            Automatic linking
+            {m.sync_autolink_title()}
           </CardTitle>
-          <CardDescription>
-            Group matching SKUs and orders across selected connections. Each
-            source keeps its own facts.
-          </CardDescription>
+          <CardDescription>{m.sync_autolink_description()}</CardDescription>
         </div>
         {canManage ? (
           <Button
@@ -165,7 +159,7 @@ export function AutomaticLinksView({
             onClick={add}
             disabled={busy || loading || !rules || connections.length < 2}
           >
-            Add linking rule
+            {m.sync_autolink_add()}
           </Button>
         ) : null}
       </CardHeader>
@@ -174,12 +168,12 @@ export function AutomaticLinksView({
           <Alert tone="danger" role="alert">
             {error}{' '}
             <Button variant="outline" size="sm" onClick={retry}>
-              Retry
+              {m.common_retry()}
             </Button>
           </Alert>
         ) : null}
         {loading ? (
-          <p role="status">Loading linking rules…</p>
+          <p role="status">{m.sync_autolink_loading()}</p>
         ) : rules?.length ? (
           <ul className="auto-link-rules">
             {rules.map((rule) => (
@@ -187,20 +181,23 @@ export function AutomaticLinksView({
                 <div>
                   <strong>
                     {rule.kind === 'sku'
-                      ? 'Unique SKU code'
-                      : 'JTL order reference'}
+                      ? m.sync_autolink_kind_sku()
+                      : m.sync_autolink_kind_order()}
                   </strong>
                   <p>
-                    {label(rule.sourceConnectionId)} →{' '}
-                    {label(rule.targetConnectionId)}
+                    {m.sync_autolink_pair({
+                      source: label(rule.sourceConnectionId),
+                      target: label(rule.targetConnectionId),
+                    })}
                   </p>
                   <p>
-                    {rule.linked.toLocaleString()}{' '}
-                    {rule.linked === 1 ? 'link' : 'links'} applied
+                    {m.sync_autolink_applied({ count: rule.linked })}
                     {rule.lastCheckedAt ? (
                       <>
-                        {' '}
-                        · Checked <WorkspaceDate value={rule.lastCheckedAt} />
+                        {' · '}
+                        {rich(m.sync_autolink_checked, {
+                          date: <WorkspaceDate value={rule.lastCheckedAt} />,
+                        })}
                       </>
                     ) : null}
                   </p>
@@ -218,14 +215,14 @@ export function AutomaticLinksView({
                   }
                 >
                   {rule.state === 'active'
-                    ? 'Enabled'
+                    ? m.sync_autolink_state_active()
                     : rule.state === 'disabled'
-                      ? 'Disabled'
+                      ? m.sync_autolink_state_disabled()
                       : rule.state === 'blocked'
-                        ? 'Needs access'
+                        ? m.sync_autolink_state_blocked()
                         : rule.state === 'failed'
-                          ? 'Retrying'
-                          : 'Waiting for reads'}
+                          ? m.sync_autolink_state_failed()
+                          : m.sync_autolink_state_waiting()}
                 </StatePill>
                 {canManage ? (
                   <div className="auto-link-actions">
@@ -235,10 +232,9 @@ export function AutomaticLinksView({
                       disabled={busy}
                       onClick={() => edit(rule)}
                     >
-                      Preview
                       {!rule.enabled || rule.state === 'blocked'
-                        ? ' and enable'
-                        : ''}
+                        ? m.sync_autolink_preview_and_enable()
+                        : m.sync_autolink_preview()}
                     </Button>
                     {rule.enabled ? (
                       <Button
@@ -247,7 +243,7 @@ export function AutomaticLinksView({
                         disabled={busy}
                         onClick={() => disable(rule)}
                       >
-                        Disable
+                        {m.sync_autolink_disable()}
                       </Button>
                     ) : null}
                   </div>
@@ -256,20 +252,28 @@ export function AutomaticLinksView({
             ))}
           </ul>
         ) : rules ? (
-          <p>
-            No automatic linking rules. Matching records stay separate until you
-            link them or enable a rule.
-          </p>
+          <p>{m.sync_autolink_empty()}</p>
         ) : null}
         <p>
           <a href="/docs/data-sync#automatic-linking">
-            How automatic linking works
+            {m.sync_autolink_help_link()}
           </a>
         </p>
       </CardContent>
     </Card>
   );
 }
+
+const dispositions: Record<
+  AutoLinkPreview['candidates'][number]['disposition'],
+  () => string
+> = {
+  eligible: m.sync_autolink_disposition_eligible,
+  ambiguous: m.sync_autolink_disposition_ambiguous,
+  conflict: m.sync_autolink_disposition_conflict,
+  excluded: m.sync_autolink_disposition_excluded,
+  stale: m.sync_autolink_disposition_stale,
+};
 
 function RuleEditor({
   organizationId,
@@ -345,20 +349,19 @@ function RuleEditor({
   return (
     <DialogContent className="auto-link-editor">
       <DialogTitle>
-        {existing ? 'Review linking rule' : 'Add linking rule'}
+        {existing ? m.sync_autolink_review_title() : m.sync_autolink_add()}
       </DialogTitle>
       <DialogDescription>
-        Preview current matches, then enable ongoing linking with your access.
-        Disabling a rule keeps the links already applied.
+        {m.sync_autolink_editor_description()}
       </DialogDescription>
       <div className="auto-link-fields">
         <Select
-          aria-label="Record type"
+          aria-label={m.sync_autolink_record_type()}
           disabled={!!existing || busy}
           value={kind}
           options={[
-            { value: 'sku', label: 'SKUs: unique code' },
-            { value: 'order', label: 'Orders: JTL reference to Shopify' },
+            { value: 'sku', label: m.sync_autolink_option_sku() },
+            { value: 'order', label: m.sync_autolink_option_order() },
           ]}
           onValueChange={(value) => {
             if (value) {
@@ -370,12 +373,18 @@ function RuleEditor({
           }}
         />
         <Select
-          aria-label={kind === 'order' ? 'Shopify store' : 'Link to connection'}
+          aria-label={
+            kind === 'order'
+              ? m.sync_autolink_shopify_store()
+              : m.sync_autolink_target_connection()
+          }
           disabled={!!existing || busy}
           value={target || null}
           options={options('target')}
           placeholder={
-            kind === 'order' ? 'Shopify store' : 'Link to connection'
+            kind === 'order'
+              ? m.sync_autolink_shopify_store()
+              : m.sync_autolink_target_connection()
           }
           onValueChange={(value) => {
             form.setFieldValue('target', value ?? '');
@@ -383,11 +392,19 @@ function RuleEditor({
           }}
         />
         <Select
-          aria-label={kind === 'order' ? 'JTL connection' : 'Other connection'}
+          aria-label={
+            kind === 'order'
+              ? m.sync_autolink_jtl_connection()
+              : m.sync_autolink_source_connection()
+          }
           disabled={!!existing || busy}
           value={source || null}
           options={options('source')}
-          placeholder={kind === 'order' ? 'JTL connection' : 'Other connection'}
+          placeholder={
+            kind === 'order'
+              ? m.sync_autolink_jtl_connection()
+              : m.sync_autolink_source_connection()
+          }
           onValueChange={(value) => {
             form.setFieldValue('source', value ?? '');
             setPreview(null);
@@ -396,9 +413,8 @@ function RuleEditor({
       </div>
       <p>
         {kind === 'sku'
-          ? 'SKU matching ignores letter case and surrounding spaces. Codes must be unique in both connections, with matching units.'
-          : 'The JTL external order reference must uniquely match the order number in this Shopify store. Dates, totals and customer details do not establish identity.'}{' '}
-        Manually separated records are skipped.
+          ? m.sync_autolink_rule_sku()
+          : m.sync_autolink_rule_order()}
       </p>
       {error ? (
         <Alert tone="danger" role="alert">
@@ -406,7 +422,9 @@ function RuleEditor({
         </Alert>
       ) : null}
       {busy ? (
-        <p role="status">{preview ? 'Saving rule…' : 'Checking matches…'}</p>
+        <p role="status">
+          {preview ? m.sync_autolink_saving() : m.sync_autolink_checking()}
+        </p>
       ) : null}
       {preview ? (
         <div aria-live="polite">
@@ -414,29 +432,24 @@ function RuleEditor({
             <>
               <p>
                 <strong>
-                  {preview.counts.eligible.toLocaleString()}{' '}
-                  {preview.counts.eligible === 1 ? 'match can' : 'matches can'}{' '}
-                  be linked
+                  {m.sync_autolink_preview_eligible({
+                    count: preview.counts.eligible,
+                  })}
                 </strong>
               </p>
               <p>
-                {preview.counts.ambiguous} ambiguous · {preview.counts.conflict}{' '}
-                conflicting · {preview.counts.excluded} manually separated or
-                awaiting review · {preview.counts.stale} with stale or missing
-                evidence
+                {m.sync_autolink_preview_skipped({
+                  ambiguous: preview.counts.ambiguous,
+                  conflict: preview.counts.conflict,
+                  excluded: preview.counts.excluded,
+                  stale: preview.counts.stale,
+                })}
               </p>
               <ul className="auto-link-examples">
                 {preview.candidates.map((candidate) => (
                   <li key={candidate.key}>
                     <strong>{candidate.key}</strong> ·{' '}
-                    {candidate.disposition === 'eligible'
-                      ? 'Can link'
-                      : {
-                          ambiguous: 'Ambiguous match',
-                          conflict: 'Conflicting records',
-                          excluded: 'Manual review',
-                          stale: 'Stale evidence',
-                        }[candidate.disposition]}{' '}
+                    {dispositions[candidate.disposition]()}{' '}
                     <Link
                       to={
                         kind === 'sku'
@@ -449,7 +462,7 @@ function RuleEditor({
                           : { organizationId, orderId: candidate.targetId }
                       }
                     >
-                      First record
+                      {m.sync_autolink_first_record()}
                     </Link>
                     {' · '}
                     <Link
@@ -464,7 +477,7 @@ function RuleEditor({
                           : { organizationId, orderId: candidate.sourceId }
                       }
                     >
-                      Other record
+                      {m.sync_autolink_other_record()}
                     </Link>
                   </li>
                 ))}
@@ -473,26 +486,23 @@ function RuleEditor({
           ) : (
             <Alert tone="warning">{preview.message}</Alert>
           )}
-          <p>
-            Future matches are checked again before linking. Sources keep their
-            own quantities, prices and order states.
-          </p>
+          <p>{m.sync_autolink_preview_note()}</p>
         </div>
       ) : null}
       <div className="sync-dialog-actions">
         <Button variant="outline" onClick={close} disabled={busy}>
-          Cancel
+          {m.common_cancel()}
         </Button>
         <Button
           variant="outline"
           onClick={() => void submit(false)}
           disabled={busy || !target || !source || target === source}
         >
-          Preview matches
+          {m.sync_autolink_preview_matches()}
         </Button>
         {preview ? (
           <Button onClick={() => void submit(true)} disabled={busy}>
-            Enable automatic linking
+            {m.sync_autolink_enable()}
           </Button>
         ) : null}
       </div>
@@ -502,9 +512,9 @@ function RuleEditor({
 
 function saveError(error: unknown) {
   if (error instanceof IdentityError && error.status === 403)
-    return 'Your role no longer includes Manage imports.';
+    return m.sync_autolink_error_role();
   if (error instanceof IdentityError && error.status === 409)
-    return 'This rule changed or already exists. Close this dialog and refresh before trying again.';
+    return m.sync_autolink_error_conflict();
 
-  return 'Luma could not update automatic linking. Try again.';
+  return m.sync_autolink_error_save();
 }

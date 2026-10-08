@@ -33,7 +33,7 @@ describe('coverageStatement', () => {
         }),
       ),
     ).toEqual({
-      text: '12 orders so far. Coverage is complete when the history import finishes.',
+      text: '12 orders imported so far. The list is complete when the history import finishes.',
       limited: false,
     });
   });
@@ -41,7 +41,7 @@ describe('coverageStatement', () => {
   it('states the creation dates covered and any source history limit', () => {
     const shopifyOrders = current.connections[0]!.recordTypes[0]!.stream!;
     expect(coverageStatement('orders', shopifyOrders)).toEqual({
-      text: '3,100 orders placed Jul 31, 2026 – Sep 29, 2026. The source didn’t share orders placed before Jul 31, 2026.',
+      text: '3,100 orders placed 31 Jul 2026 – 29 Sept 2026. The source didn’t share orders placed before 31 Jul 2026.',
       limited: true,
     });
     expect(
@@ -51,7 +51,7 @@ describe('coverageStatement', () => {
           records: { total: 1, current: 1, pending: 0, failed: 0, missing: 0 },
         }),
       ).text,
-    ).toBe('All 1 product the source shares.');
+    ).toBe('1 product, everything the source shares.');
     expect(coverageStatement('inventory', stream()).text).toBe(
       'The source has no stock levels to share.',
     );
@@ -89,15 +89,15 @@ describe('sync states', () => {
     expect(overallState(current)).toMatchObject({
       state: 'verified',
       title: 'Up to date',
-      detail: 'Changes last read 2m ago.',
+      detail: 'Last checked for changes 2 minutes ago.',
     });
   });
 
   it('formats relative times in both directions', () => {
     const now = Date.parse('2026-09-29T09:00:00.000Z');
     expect(ago('2026-09-29T08:59:55.000Z', now)).toBe('just now');
-    expect(ago('2026-09-29T06:00:00.000Z', now)).toBe('3h ago');
-    expect(soon('2026-09-29T09:04:00.000Z', now)).toBe('in 4m');
+    expect(ago('2026-09-29T06:00:00.000Z', now)).toBe('3 hours ago');
+    expect(soon('2026-09-29T09:04:00.000Z', now)).toBe('in 4 minutes');
     expect(soon('2026-09-29T08:59:00.000Z', now)).toBe('now');
   });
 });
@@ -111,25 +111,25 @@ describe('recent history coverage', () => {
       text: 'The source is preparing an export',
     });
     expect(coverageStatement('orders', orders).text).toBe(
-      'Orders since Aug 30, 2026 imported. Older history continues in the background.',
+      'Orders since 30 Aug 2026 are imported. Older history continues to import in the background.',
     );
   });
   it('keeps coverage qualified when imports are paused, incomplete or source limited', () => {
     expect(
       coverageStatement('orders', { ...orders, paused: true }).text,
-    ).toContain('Older history paused.');
+    ).toContain('Importing older history is paused.');
     expect(
       coverageStatement('orders', {
         ...orders,
         records: { ...orders.records, failed: 1 },
       }).text,
-    ).toContain('read; some records need attention');
+    ).toContain('are read, and some need attention');
     expect(
       coverageStatement('orders', {
         ...orders,
         coverage: { ...orders.coverage, historyFrom: '2026-09-01T00:00:00Z' },
       }).text,
-    ).toContain('since Sep 1, 2026');
+    ).toContain('since 1 Sept 2026');
   });
 });
 

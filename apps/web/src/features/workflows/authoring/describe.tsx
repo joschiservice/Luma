@@ -4,6 +4,8 @@ import type {
   GeneratedDraft,
   WorkflowDraft,
 } from '@luma/api-contract';
+import { formatList } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -42,7 +44,7 @@ const recent = new Map<string, Generation>();
 function Unavailable({ reason }: { reason: string | null }) {
   return (
     <Alert tone="neutral" role="status">
-      {reason ?? 'Describing workflows is unavailable in this workspace.'}
+      {reason ?? m.authoring_describe_unavailable()}
     </Alert>
   );
 }
@@ -116,34 +118,28 @@ export function DescribeDialog({
       }}
     >
       <DialogContent className="workflow-dialog">
-        <DialogTitle>Describe a workflow</DialogTitle>
+        <DialogTitle>{m.authoring_describe_title()}</DialogTitle>
         <DialogDescription>
-          Say what should happen. Luma drafts the steps using only what this
-          workspace has installed, and lists its assumptions and questions for
-          you to review. Nothing runs until you publish and activate it.
+          {m.authoring_describe_description()}
         </DialogDescription>
         {availability.data && !availability.data.available ? (
           <Unavailable reason={availability.data.reason} />
         ) : null}
         <label className="authoring-field">
-          What should happen?
+          {m.authoring_describe_prompt_label()}
           <Textarea
             rows={5}
             maxLength={4000}
             disabled={pending || !!request || !availability.data?.available}
             value={request?.prompt ?? prompt}
-            placeholder="When a SKU drops below 20 units, draft a purchase order for the usual supplier and ask me to approve it."
+            placeholder={m.authoring_describe_prompt_placeholder()}
             onChange={(event) => setPrompt(event.target.value)}
           />
         </label>
-        {pending ? (
-          <p role="status">
-            Drafting and checking the workflow. This can take up to a minute…
-          </p>
-        ) : null}
+        {pending ? <p role="status">{m.authoring_describe_pending()}</p> : null}
         {error ? (
           <Alert tone="danger" role="alert">
-            {error} Your description is kept so you can try again.
+            {m.authoring_describe_failed({ error })}
           </Alert>
         ) : null}
         <div className="workflow-dialog-actions">
@@ -154,7 +150,7 @@ export function DescribeDialog({
               close();
             }}
           >
-            Cancel
+            {m.common_cancel()}
           </Button>
           <Button
             disabled={
@@ -164,7 +160,11 @@ export function DescribeDialog({
             }
             onClick={() => void submit()}
           >
-            {pending ? 'Drafting…' : request ? 'Try again' : 'Draft workflow'}
+            {pending
+              ? m.authoring_describe_drafting()
+              : request
+                ? m.common_try_again()
+                : m.authoring_describe_submit()}
           </Button>
         </div>
       </DialogContent>
@@ -173,11 +173,11 @@ export function DescribeDialog({
 }
 
 const changeLabels = {
-  added: 'Added',
-  removed: 'Removed',
-  changed: 'Changed',
-  moved: 'Moved',
-} as const;
+  added: m.authoring_change_added,
+  removed: m.authoring_change_removed,
+  changed: m.authoring_change_changed,
+  moved: m.authoring_change_moved,
+} satisfies Record<DraftProposal['changes'][number]['change'], () => string>;
 
 /**
  * Shows what a description produced and proposes changes from follow-up instructions. A
@@ -268,26 +268,27 @@ export function GenerationAssistant({
       aria-labelledby="assistant-title"
     >
       <h2 id="assistant-title">
-        {generation ? 'From your description' : 'Ask for a change'}
+        {generation
+          ? m.authoring_assistant_generated_title()
+          : m.authoring_assistant_refine_title()}
       </h2>
       {generation ? (
         <>
           {generation.outcome === 'partial' ? (
-            <Alert tone="warning">
-              Luma couldn’t fix every problem in the draft. The remaining
-              problems are listed above.
-            </Alert>
+            <Alert tone="warning">{m.authoring_assistant_partial()}</Alert>
           ) : null}
           {generation.questions.length ? (
             <div>
-              <h3>Questions for you</h3>
+              <h3>{m.authoring_assistant_questions()}</h3>
               <ul>
                 {generation.questions.map((item) => (
                   <li key={`${item.stepId}:${item.field}:${item.question}`}>
                     {item.question}{' '}
                     <span className="authoring-hint">
-                      ({item.stepId ?? 'Workflow settings'} ·{' '}
-                      {humanize(item.field)})
+                      {m.authoring_assistant_question_where({
+                        place: item.stepId ?? m.authoring_workflow_settings(),
+                        field: humanize(item.field),
+                      })}
                     </span>
                   </li>
                 ))}
@@ -296,7 +297,7 @@ export function GenerationAssistant({
           ) : null}
           {generation.assumptions.length ? (
             <div>
-              <h3>Assumptions</h3>
+              <h3>{m.authoring_assistant_assumptions()}</h3>
               <ul>
                 {generation.assumptions.map((item) => (
                   <li key={item}>{item}</li>
@@ -306,7 +307,7 @@ export function GenerationAssistant({
           ) : null}
           {generation.explanations.length ? (
             <Disclosure variant="plain" className="authoring-advanced">
-              <summary>Why each step is there</summary>
+              <summary>{m.authoring_assistant_explanations()}</summary>
               <dl className="authoring-code-summary">
                 {generation.explanations.map((item) => (
                   <div key={item.stepId}>
@@ -323,8 +324,11 @@ export function GenerationAssistant({
         availability.data && !availability.data.available ? (
           <Unavailable reason={availability.data.reason} />
         ) : proposal ? (
-          <div className="authoring-proposal" aria-label="Proposed change">
-            <h3>Proposed change</h3>
+          <div
+            className="authoring-proposal"
+            aria-label={m.authoring_proposal_title()}
+          >
+            <h3>{m.authoring_proposal_title()}</h3>
             {proposal.changes.length ? (
               <ul>
                 {proposal.changes.map((item, index) => (
@@ -338,30 +342,31 @@ export function GenerationAssistant({
                             : 'info'
                       }
                     >
-                      {changeLabels[item.change]}
+                      {changeLabels[item.change]()}
                     </Badge>{' '}
                     {item.summary}
                   </li>
                 ))}
               </ul>
             ) : (
-              <p>The instruction didn’t change the draft.</p>
+              <p>{m.authoring_proposal_no_changes()}</p>
             )}
             {proposal.questions.length ? (
               <p className="authoring-hint">
-                Open questions:{' '}
-                {proposal.questions.map((item) => item.question).join(' ')}
+                {m.authoring_proposal_questions({
+                  questions: proposal.questions
+                    .map((item) => item.question)
+                    .join(' '),
+                })}
               </p>
             ) : null}
             {proposal.diagnostics.some((item) => item.severity === 'error') ? (
               <Alert tone="warning">
-                The proposed draft still has{' '}
-                {
-                  proposal.diagnostics.filter(
+                {m.authoring_proposal_problems({
+                  count: proposal.diagnostics.filter(
                     (item) => item.severity === 'error',
-                  ).length
-                }{' '}
-                problem(s) to fix after you accept it.
+                  ).length,
+                })}
               </Alert>
             ) : null}
             <div className="workflow-dialog-actions">
@@ -370,7 +375,7 @@ export function GenerationAssistant({
                 disabled={pending}
                 onClick={() => void decide(false)}
               >
-                Reject
+                {m.authoring_proposal_reject()}
               </Button>
               <Button
                 disabled={
@@ -378,13 +383,11 @@ export function GenerationAssistant({
                 }
                 onClick={() => void decide(true)}
               >
-                Accept change
+                {m.authoring_proposal_accept()}
               </Button>
             </div>
             {proposal.baseRevision !== draft.revision ? (
-              <p className="authoring-hint">
-                The draft changed after this proposal. Reject it and ask again.
-              </p>
+              <p className="authoring-hint">{m.authoring_proposal_stale()}</p>
             ) : null}
           </div>
         ) : (
@@ -396,13 +399,13 @@ export function GenerationAssistant({
             }}
           >
             <label className="authoring-field">
-              What should change?
+              {m.authoring_refine_label()}
               <Textarea
                 rows={2}
                 maxLength={4000}
                 disabled={pending || !saved}
                 value={instruction}
-                placeholder="Also wait an hour before checking the result."
+                placeholder={m.authoring_refine_placeholder()}
                 onChange={(event) => setInstruction(event.target.value)}
               />
             </label>
@@ -416,19 +419,19 @@ export function GenerationAssistant({
                 !availability.data?.available
               }
             >
-              {pending ? 'Proposing…' : 'Propose change'}
+              {pending
+                ? m.authoring_refine_pending()
+                : m.authoring_refine_submit()}
             </Button>
             {!saved ? (
-              <p className="authoring-hint">
-                Wait until your changes are saved.
-              </p>
+              <p className="authoring-hint">{m.authoring_wait_for_save()}</p>
             ) : null}
           </form>
         )
       ) : null}
       {error ? (
         <Alert tone="danger" role="alert">
-          {error} The draft is unchanged.
+          {m.authoring_assistant_failed({ error })}
         </Alert>
       ) : null}
     </Card>
@@ -457,15 +460,15 @@ export function CodeStepSuggester({
 
   return (
     <Disclosure variant="plain" className="authoring-advanced">
-      <summary>Generate from a description</summary>
+      <summary>{m.authoring_suggest_title()}</summary>
       <div className="authoring-step-form">
         <label className="authoring-field">
-          Describe the calculation
+          {m.authoring_suggest_label()}
           <Textarea
             rows={2}
             maxLength={4000}
             value={description}
-            placeholder="Order enough to reach the target, rounded up to whole boxes of 12."
+            placeholder={m.authoring_suggest_placeholder()}
             onChange={(event) => setDescription(event.target.value)}
           />
         </label>
@@ -491,11 +494,13 @@ export function CodeStepSuggester({
             }
           }}
         >
-          {pending ? 'Generating…' : 'Suggest code'}
+          {pending
+            ? m.authoring_suggest_pending()
+            : m.authoring_suggest_submit()}
         </Button>
         {error ? (
           <Alert tone="danger" role="alert">
-            {error} Your code is unchanged.
+            {m.authoring_suggest_failed({ error })}
           </Alert>
         ) : null}
         {suggestion ? (
@@ -506,12 +511,16 @@ export function CodeStepSuggester({
             </pre>
             {suggestion.examples.length ? (
               <p className="authoring-hint">
-                Examples to test with:{' '}
-                {suggestion.examples
-                  .map(
-                    (item) => `${item.name} → ${JSON.stringify(item.expected)}`,
-                  )
-                  .join('; ')}
+                {m.authoring_suggest_examples({
+                  examples: formatList(
+                    suggestion.examples.map((item) =>
+                      m.authoring_suggest_example({
+                        name: item.name,
+                        expected: JSON.stringify(item.expected),
+                      }),
+                    ),
+                  ),
+                })}
               </p>
             ) : null}
             {suggestion.diagnostics.length ? (
@@ -528,7 +537,7 @@ export function CodeStepSuggester({
                 })
               }
             >
-              Use this code
+              {m.authoring_suggest_apply()}
             </Button>
           </div>
         ) : null}

@@ -30,18 +30,20 @@ type Story = StoryObj<typeof meta>;
 export const ApprovalRequired: Story = {
   play: async ({ canvasElement, args }) => {
     const c = within(canvasElement);
-    await expect(c.getByText('Human approval required')).toBeVisible();
-    await expect(c.getByRole('button', { name: 'Approve' })).toBeDisabled();
+    await expect(c.getByText('Approval needed')).toBeVisible();
+    await expect(
+      c.getByRole('button', { name: 'Approve change' }),
+    ).toBeDisabled();
     await userEvent.type(
-      c.getByLabelText('Decision reason (required)'),
+      c.getByLabelText('Reason for your decision (required)'),
       'Evidence checked',
     );
-    await userEvent.click(c.getByRole('button', { name: 'Approve' }));
+    await userEvent.click(c.getByRole('button', { name: 'Approve change' }));
     await expect(args.onDecision).toHaveBeenCalledWith(
       'approve',
       'Evidence checked',
     );
-    await expect(c.getByText('Verification: Not recorded')).toBeVisible();
+    await expect(c.getByText('Outcome check: Not checked yet')).toBeVisible();
   },
 };
 
@@ -62,9 +64,9 @@ export const Automatic: Story = {
   },
   play: async ({ canvasElement }) => {
     const c = within(canvasElement);
-    await expect(c.getByText('Automatic execution allowed')).toBeVisible();
+    await expect(c.getByText('No approval needed')).toBeVisible();
     await expect(
-      c.queryByRole('button', { name: 'Approve' }),
+      c.queryByRole('button', { name: 'Approve change' }),
     ).not.toBeInTheDocument();
   },
 };
@@ -86,9 +88,9 @@ export const Denied: Story = {
   },
   play: async ({ canvasElement }) => {
     const c = within(canvasElement);
-    await expect(c.getByText('Action prohibited by policy')).toBeVisible();
+    await expect(c.getByText('Not allowed by workspace rules')).toBeVisible();
     await expect(
-      c.queryByRole('button', { name: 'Approve' }),
+      c.queryByRole('button', { name: 'Approve change' }),
     ).not.toBeInTheDocument();
   },
 };
@@ -185,14 +187,14 @@ export const PageEscalation: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     await expect(
-      canvas.getByRole('heading', { name: 'No proposed correction' }),
+      canvas.getByRole('heading', { name: 'No change proposed' }),
     ).toBeVisible();
     await expect(canvas.queryByRole('textbox')).not.toBeInTheDocument();
     await expect(
-      canvas.queryByRole('region', { name: 'Execution and verification' }),
+      canvas.queryByRole('region', { name: 'Change and outcome check' }),
     ).not.toBeInTheDocument();
     await expect(
-      canvas.queryByText(/We’ll check current conditions/),
+      canvas.queryByText(/Luma checks current conditions/),
     ).not.toBeInTheDocument();
     const trigger = canvas.getByRole('button', { name: 'Escalate issue' });
     await userEvent.click(trigger);

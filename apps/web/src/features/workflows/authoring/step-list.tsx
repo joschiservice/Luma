@@ -7,6 +7,8 @@ import type {
   WorkflowDiagnostic,
   WorkflowDraftContent,
 } from '@luma/api-contract';
+import { formatDateTime } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
@@ -35,6 +37,18 @@ import { humanize, stepFacts } from './draft-model';
 import { Field, FieldProblems, StepForm } from './step-forms';
 import { StepKindIcon, stepKinds } from './step-kinds';
 
+/** Shows a scheduled start in the reader's language, or the raw text while it isn't a valid time. */
+function scheduledAt(value: string) {
+  return Number.isNaN(Date.parse(value))
+    ? value
+    : formatDateTime(value, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone: 'UTC',
+        timeZoneName: 'short',
+      });
+}
+
 /** Shows how and for what the workflow starts, at the top of the step list. */
 export function StartNode({
   content,
@@ -49,35 +63,42 @@ export function StartNode({
     humanize(trigger.kind);
   const detail =
     trigger.kind === 'condition'
-      ? `${humanize(trigger.field) || 'a field'} is ${JSON.stringify(trigger.equals)}`
+      ? trigger.field
+        ? m.authoring_start_condition({
+            field: humanize(trigger.field),
+            value: JSON.stringify(trigger.equals),
+          })
+        : m.authoring_start_condition_unset()
       : trigger.kind === 'event'
-        ? humanize(trigger.eventType) || 'an event'
+        ? humanize(trigger.eventType) || m.authoring_start_event_unset()
         : trigger.kind === 'exception'
-          ? humanize(trigger.issueType) || 'an issue'
+          ? humanize(trigger.issueType) || m.authoring_start_issue_unset()
           : trigger.kind === 'schedule'
-            ? trigger.at
+            ? scheduledAt(trigger.at)
             : null;
   const subject =
     vocabulary.subjects.find(
       (item) => item.kind === content.applicability.subjectKind,
-    )?.label ??
-    (humanize(content.applicability.subjectKind) || 'something');
+    )?.label ?? humanize(content.applicability.subjectKind);
 
   return (
-    <div className="authoring-start" aria-label="How the workflow starts">
+    <div className="authoring-start" aria-label={m.authoring_start_label()}>
       <span className="authoring-kind-icon" data-kind="start">
         <Play aria-hidden="true" size={16} />
       </span>
       <div>
         <span className="authoring-step-kind" data-kind="start">
-          Starts
+          {m.authoring_start_kind()}
         </span>
         <strong>
-          {label}
-          {detail ? `: ${detail}` : ''}
+          {detail
+            ? m.authoring_start_trigger({ trigger: label, detail })
+            : label}
         </strong>
         <span className="authoring-hint">
-          Each run is about one {subject.toLowerCase()}.
+          {subject
+            ? m.authoring_start_subject({ subject })
+            : m.authoring_start_subject_unset()}
         </span>
       </div>
     </div>
@@ -108,7 +129,9 @@ export function InsertSlot({
     disabled: !receiving,
   });
   const label =
-    index === 0 ? 'Add a step at the start' : `Add a step after step ${index}`;
+    index === 0
+      ? m.authoring_slot_add_start()
+      : m.authoring_slot_add_after({ step: index });
 
   return (
     <div
@@ -121,7 +144,7 @@ export function InsertSlot({
     >
       {receiving ? (
         <span className="authoring-slot-drop" aria-hidden="true">
-          {active ? 'Release to add here' : 'Drop here'}
+          {active ? m.authoring_slot_release() : m.authoring_slot_drop()}
         </span>
       ) : count === 0 ? (
         <button
@@ -131,8 +154,8 @@ export function InsertSlot({
           onClick={() => onSelect(index)}
         >
           <Plus aria-hidden="true" size={18} />
-          <strong>Add the first step</strong>
-          <span>Drag a step here from the panel, or select one.</span>
+          <strong>{m.authoring_slot_first_title()}</strong>
+          <span>{m.authoring_slot_first_hint()}</span>
         </button>
       ) : (
         <Button
@@ -234,7 +257,7 @@ export function StepCard({
               className="authoring-step-handle"
               {...attributes}
               {...listeners}
-              aria-label={`Reorder step ${index + 1}`}
+              aria-label={m.authoring_step_reorder({ step: index + 1 })}
             >
               <GripVertical aria-hidden="true" size={16} />
             </button>
@@ -248,8 +271,10 @@ export function StepCard({
             onClick={onToggle}
           >
             <span className="authoring-step-kind" data-kind={step.kind}>
-              <span className="sr-only">Step {index + 1}: </span>
-              {described?.title ?? stepKinds[step.kind].name}
+              <span className="sr-only">
+                {m.authoring_step_position({ step: index + 1 })}{' '}
+              </span>
+              {described?.title ?? stepKinds[step.kind].name()}
             </span>
             <strong className="authoring-step-description">
               {described?.description ?? step.id}
@@ -265,11 +290,15 @@ export function StepCard({
           <div className="authoring-step-badges">
             {errors.length ? (
               <Badge tone="danger">
-                {errors.length} problem{errors.length === 1 ? '' : 's'}
+                {m.authoring_step_problems({ count: errors.length })}
               </Badge>
             ) : null}
-            {questions.length ? <Badge tone="info">Question</Badge> : null}
-            {limited ? <Badge tone="warning">Can’t run here</Badge> : null}
+            {questions.length ? (
+              <Badge tone="info">{m.authoring_step_question()}</Badge>
+            ) : null}
+            {limited ? (
+              <Badge tone="warning">{m.authoring_limited_badge()}</Badge>
+            ) : null}
           </div>
           <ChevronDown
             className="authoring-step-chevron"
@@ -283,7 +312,7 @@ export function StepCard({
                   <Button
                     variant="ghost"
                     size="icon"
-                    aria-label={`Actions for step ${index + 1}`}
+                    aria-label={m.authoring_step_actions({ step: index + 1 })}
                   />
                 }
               >
@@ -294,20 +323,21 @@ export function StepCard({
                   disabled={index === 0}
                   onClick={() => onMove(index - 1)}
                 >
-                  <ArrowUp aria-hidden="true" /> Move up
+                  <ArrowUp aria-hidden="true" /> {m.authoring_step_move_up()}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   disabled={last}
                   onClick={() => onMove(index + 1)}
                 >
-                  <ArrowDown aria-hidden="true" /> Move down
+                  <ArrowDown aria-hidden="true" />{' '}
+                  {m.authoring_step_move_down()}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={onDuplicate}>
-                  <Copy aria-hidden="true" /> Duplicate
+                  <Copy aria-hidden="true" /> {m.authoring_step_duplicate()}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem variant="destructive" onClick={onRemove}>
-                  <Trash2 aria-hidden="true" /> Delete
+                  <Trash2 aria-hidden="true" /> {m.common_delete()}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -340,10 +370,10 @@ export function StepCard({
               openCode={openCode}
             />
             <Disclosure variant="plain" className="authoring-advanced">
-              <summary>Step ID</summary>
+              <summary>{m.authoring_step_id_label()}</summary>
               <Field
-                label="Step ID"
-                hint="Other steps refer to this ID. Renaming updates them."
+                label={m.authoring_step_id_label()}
+                hint={m.authoring_step_id_hint()}
                 diagnostics={problems.filter((item) => item.field === 'id')}
               >
                 {(props) => (

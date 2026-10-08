@@ -46,7 +46,7 @@ test('reviews stock in Inventory, obtains approval, then verifies Shopify in bot
     ),
   ).toBeVisible();
   await expect(
-    panel.getByRole('button', { name: 'Apply to Shopify' }),
+    panel.getByRole('button', { name: 'Send to Shopify' }),
   ).toHaveCount(0);
   await page.reload();
   const inspection = await call(admin, 'inspect', target);
@@ -56,11 +56,13 @@ test('reviews stock in Inventory, obtains approval, then verifies Shopify in bot
   });
   await panel.getByRole('button', { name: 'Check approval' }).click();
   delayVerification(true);
-  await panel.getByRole('button', { name: 'Apply to Shopify' }).click();
+  await panel.getByRole('button', { name: 'Send to Shopify' }).click();
   await expect(
     panel.getByText('Shopify accepted', { exact: true }),
   ).toBeVisible();
-  await expect(panel.getByText('Not verified', { exact: true })).toBeVisible();
+  await expect(
+    panel.getByText('Quantity not verified', { exact: true }),
+  ).toBeVisible();
   expect(mutations).toHaveLength(1);
   await page.screenshot({
     path: '/tmp/luma-106-stock-light.png',
@@ -84,7 +86,7 @@ test('reviews stock in Inventory, obtains approval, then verifies Shopify in bot
   await panel.getByRole('button', { name: 'Review a new correction' }).click();
   await expect(
     panel.getByText(
-      'Shopify already matches the ERP quantity. No correction is needed.',
+      'Shopify already shows the same quantity as your inventory system. No correction is needed.',
       { exact: true },
     ),
   ).toBeVisible();

@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
 
 import { SectionNavigation } from '../primitives/section-navigation';
@@ -102,7 +103,7 @@ export function SectionWorkspace({
         onValueChange={jump}
       />
       <div className="section-workspace-mobile" ref={mobile}>
-        <span>On this page</span>
+        <span>{m.ui_section_navigation_title()}</span>
         <SectionSelect
           label={label}
           value={current}

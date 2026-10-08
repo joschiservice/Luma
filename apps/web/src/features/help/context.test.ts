@@ -17,6 +17,21 @@ describe('contextual help', () => {
     ).toBe('workflows/create');
   });
 
+  it('chooses a topic from the route parameters when a route serves several pages', () => {
+    const settings = {
+      staticData: {
+        help: ({ section }: Record<string, string | undefined>) =>
+          section === 'roles' ? 'roles-and-permissions' : 'workspace-settings',
+      },
+    } as const;
+    expect(
+      contextualTopic([{ ...settings, params: { section: 'roles' } }]),
+    ).toBe('roles-and-permissions');
+    expect(
+      contextualTopic([{ ...settings, params: { section: 'team' } }]),
+    ).toBe('workspace-settings');
+  });
+
   it('preserves article anchors without treating external or app links as documentation', () => {
     expect(docLocation('/docs/issues/resolve#confirm-the-outcome')).toEqual({
       slug: 'issues/resolve',

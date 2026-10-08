@@ -1,24 +1,25 @@
+import { m } from '@luma/i18n/messages';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { ArrowRight } from 'lucide-react';
 
 const steps = [
   {
     state: 'error',
-    label: 'Problem',
-    title: 'Order stuck',
-    detail: 'The shop shows an order that fulfillment hasn’t picked up.',
+    label: m.identity_story_problem_label,
+    title: m.identity_story_problem_title,
+    detail: m.identity_story_problem_detail,
   },
   {
     state: 'running',
-    label: 'Action',
-    title: 'Retry approved',
-    detail: 'The agreed fix is sent to the fulfillment system.',
+    label: m.identity_story_action_label,
+    title: m.identity_story_action_title,
+    detail: m.identity_story_action_detail,
   },
   {
     state: 'verified',
-    label: 'Check',
-    title: 'Order moving',
-    detail: 'The system confirms that fulfillment has resumed.',
+    label: m.identity_story_check_label,
+    title: m.identity_story_check_title,
+    detail: m.identity_story_check_detail,
   },
 ] as const;
 
@@ -31,10 +32,10 @@ export function ResolutionStory() {
     <figure className="resolution-story">
       <ol>
         {steps.map((step, index) => (
-          <li key={step.title} style={{ animationDelay: `${index * 140}ms` }}>
-            <StatePill state={step.state}>{step.label}</StatePill>
-            <strong>{step.title}</strong>
-            <span>{step.detail}</span>
+          <li key={step.state} style={{ animationDelay: `${index * 140}ms` }}>
+            <StatePill state={step.state}>{step.label()}</StatePill>
+            <strong>{step.title()}</strong>
+            <span>{step.detail()}</span>
             {index < steps.length - 1 ? (
               <ArrowRight
                 className="resolution-story-arrow"
@@ -45,9 +46,7 @@ export function ResolutionStory() {
           </li>
         ))}
       </ol>
-      <figcaption>
-        Example: how Luma handles an order stuck between systems.
-      </figcaption>
+      <figcaption>{m.identity_story_caption()}</figcaption>
     </figure>
   );
 }

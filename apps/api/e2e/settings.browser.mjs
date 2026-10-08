@@ -43,7 +43,7 @@ test('manages workspace preferences and the complete invitation journey on deskt
   const nameHeight = await page
     .getByLabel('Workspace name')
     .evaluate((input) => input.getBoundingClientRect().height);
-  const timezone = page.getByRole('combobox', { name: 'Display timezone' });
+  const timezone = page.getByRole('combobox', { name: 'Time zone' });
   const timezoneHeight = await timezone.evaluate(
     (input) => input.getBoundingClientRect().height,
   );
@@ -81,8 +81,10 @@ test('manages workspace preferences and the complete invitation journey on deskt
   });
   const overview = await context.newPage();
   await overview.goto(`/app/${f.org.id}/home`);
+  // Workspace dates show the zone's short name, such as "8 Oct 2026, 15:39 GMT+9".
   await overview
-    .getByText(/Asia\/Tokyo/)
+    .locator('time')
+    .filter({ hasText: /GMT\+9|JST/ })
     .first()
     .waitFor();
   await overview.close();
@@ -110,7 +112,9 @@ test('manages workspace preferences and the complete invitation journey on deskt
   await page.keyboard.press('Space');
   await page.getByRole('button', { name: 'Save changes', exact: true }).click();
   await page
-    .getByText('Approval preference saved. Older reviews must be refreshed.')
+    .getByText(
+      'Approval setting saved. Open reviews must be refreshed before their changes run.',
+    )
     .waitFor();
   await page.reload();
   expect(
@@ -136,11 +140,11 @@ test('manages workspace preferences and the complete invitation journey on deskt
     .getByRole('button', { name: 'Send invitation', exact: true })
     .click();
   await page
-    .getByText('Invitation queued. Access starts when it is accepted.')
+    .getByText('Invitation queued. Access starts when they accept.')
     .waitFor();
   await f.drain();
   await page
-    .getByText('Email sent · Pending acceptance', { exact: false })
+    .getByText('Email sent. Waiting for them to accept.', { exact: false })
     .waitFor();
   const proof = invitationProof(
     [...f.messages.values()].find((message) => message.to === f.outsider.email),
@@ -169,7 +173,7 @@ test('manages workspace preferences and the complete invitation journey on deskt
   await page.getByRole('radio', { name: /^Admin/ }).check();
   await page.getByRole('button', { name: 'Save role' }).click();
   await page
-    .getByText('Role updated. It applies on their next request.')
+    .getByText('Role changed. It applies from their next action in Luma.')
     .waitFor();
   await page.getByRole('button', { name: 'Manage Outsider' }).click();
   await page.getByRole('button', { name: 'Remove access' }).click();

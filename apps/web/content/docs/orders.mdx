@@ -1,72 +1,74 @@
 ---
-title: Work with orders
-description: Find an order, see what still needs work, and check the source facts behind it.
+title: Find and read orders
+description: Find an order, see what still needs work, compare what each connected system reports, and link a Shopify order with its JTL-Wawi order.
 ---
 
-Orders lists every current order Luma has read from your connected stores and ERPs. Orders imported from different systems start as separate records. After you link them as the same order, Luma shows one order and keeps each system’s facts separate.
+Orders lists every current order your connected stores and ERPs report. Use it to find orders that still need work, see where systems disagree about an order, and follow an order to its issues, fulfillments and returns. Open **Orders** in the sidebar or press **G**, then **O**.
 
 ## Find an order
 
-Search by order number, the order's ID in its source system, SKU text on an order line or a source SKU ID. Combine search with filters for status, payment, source and placed date, and sort by last update, placed date, order number or due date. Each filter is always shown next to the search: choose one, such as **Status**, to pick a value. An applied filter shows its value, which you can change or remove. The placed date offers today, the last 7 or 30 days, or a custom range. On a phone, choose **Filters** to see every filter at once.
+Choose a view above the list:
 
-The views narrow the list to work that matters:
-
+- **All orders** shows every current order from your connected systems.
 - **Outstanding** shows open orders with units still to fulfill.
-- **Overdue** shows outstanding orders past the deadline their source reported.
-- **Needs you** shows orders linked to an issue that needs a decision or review.
-- **Differs by source** shows orders whose status, payment, total or ordered items disagree between systems.
+- **Overdue** shows outstanding orders past the deadline set in their source.
+- **Needs you** shows orders linked to an issue that needs your decision or review.
+- **Differs by source** shows orders whose status, payment, total or ordered items differ between sources.
 
-Outstanding, overdue and needs you count the same orders as the order metrics on Insights. Choosing a metric there opens the matching view here.
+Search by order number, the order’s ID in its source or a SKU on an order line. Narrow the list with **Status**, **Payment**, **Source**, **Placed** and **Updated**, and sort by **Last updated**, **Date placed**, **Order number** or **Due date**. On a narrow screen, choose **Filters** to see every filter at once.
 
-Every filter, sort and page is part of the address, so you can share it or pin it to the sidebar.
+The view, filters, sort and page are part of the page address, so you can share the list or pin it to the sidebar. Outstanding, Overdue and Needs you count the same orders as the order counts on Home and in [Insights](/docs/insights). Choosing a count there opens the matching view here.
+
+**Coverage** above the list says whether the list is complete, for example while older history is still importing or when a source shares only recent orders. See [Data sync](/docs/data-sync).
+
+**No orders match** means the search, view or filters exclude every order. **No orders yet** means no connected store or ERP has reported an order. If a page link no longer matches its filters, choose **Go to first page**.
 
 ## Read an order
 
-**Current state** explains the order in a few sentences: its status and payment, how many units are still to fulfill, whether it is overdue, and which issues need you. Luma bases it on the source with the newest update and names any system that disagrees.
+The top of the order shows when it was placed, its total, its due date and when Luma last read it. Below that:
 
-**Lines** shows ordered, cancelled, fulfilled and remaining quantities per item. When a source does not report cancelled quantities, remaining work is shown as unknown instead of guessed.
+- **Current state** sums up the order: its status and payment, how many units are still to fulfill, whether it’s past its deadline, and which issues need you. It’s based on the source updated most recently.
+- **Order lines** shows the ordered, canceled, fulfilled and remaining quantities for each item. If the order comes from more than one source, choose the source under **Show lines from**. When a source doesn’t report canceled quantities, Luma says it can’t tell how much remains instead of guessing. **Product and stock** opens the item’s product.
+- **Fulfillments** lists the fulfillment work each source reports. Work mirrored in two systems is never added together.
+- **Returns and refunds** lists the returns and refunds imported for the order. See [Returns](/docs/returns).
+- **Source readings** lists each state Luma read from a source, newest first. It shows what the source reported at that time, not every change the source made.
+- **Luma activity** lists the decisions, actions and results Luma recorded for the order, its issues and its workflow runs.
 
-**Source comparison** lines up each system's facts side by side. Order numbers and dates are shown but not compared, because each system assigns its own.
+The side panel lists the order’s **Issues**, its **Workflow runs** and its **Sources**, with when each source last updated the order and when Luma last read it. Choose **Copy link** to share the order with a colleague, or **Open in Records** to see the records behind it.
 
-**Observed history** lists each state Luma read from a source. It shows what the source reported at that time, not every change the source made.
+## When sources disagree
 
-For Shopify orders, the Shopify details section reads payments, customer, fulfillment holds, returns, refunds and source events live from your store. Customer details appear only when your Shopify app is approved for protected customer data.
+If an order exists in more than one system, **Source comparison** lines up what each source reports, and **Differs** marks the fields that disagree. Order numbers and dates are shown but not compared, because each system assigns its own.
 
-## Link source orders
+**Current state** names each difference, for example: Payment differs between sources: “Paid” in Shopify and “Payment pending” in JTL-Wawi. Luma doesn’t treat either system as correct. Systems often update at different times, so compare when each source last updated the order before you decide which one is wrong. Correct the order in that system; Luma shows the change after its next read.
 
-Open an order’s **Linked sources** panel. If your role includes **Manage imports**, you can
-link an imported Shopify order to its JTL sales order. Suggestions use JTL’s external order number; they are never
-applied automatically. Dates and totals help you review a match. If several orders share
-that reference, check each source record before choosing.
+## See live Shopify details
 
-Choose **Link**, compare the source IDs, dates and totals, then explain why they represent
-the same order. Without a suggestion, use **Find another order** and **Review link**.
-Luma shows progress while it applies the request. Once complete, both source versions appear
-on this order, with separate lines and shipments. Old order links open the combined order;
-existing issues, activity and observed history remain reachable.
+For an order from Shopify, a live details section reads payments, the customer, fulfillment holds, returns, refunds and events directly from your store, with the connection’s permissions. Luma doesn’t store these details. Choose **Refresh** to read them again, or **Open in Shopify admin** to open the order in Shopify.
 
-To separate them again, choose **Unlink** beside a source and give a reason. That source
-becomes its own order with its lines and shipments. Every link and unlink records who
-requested it and why. Linking does not change either provider’s records.
+**Open customer in Luma →** opens the order’s customer in [Customers](/docs/customers). Customer details appear only after Shopify approves Luma’s access to customer data and your store grants it. If an order has no Shopify order ID, Luma can’t read live details for it.
 
-## Act on an order
+## Link a Shopify order with its JTL-Wawi order
 
-Open a linked issue to review it, open a workflow run to see its steps, or follow an item to its stock and product. **Copy link** copies the order's address for a colleague.
+When Shopify passes an order to JTL-Wawi, Luma imports both as separate orders. Link them so Luma shows one order, while each system keeps its own lines, shipments and evidence.
 
-## Recover a held fulfillment
+1. Open the order and go to **Linked sources**.
+2. Under **Possibly the same order**, Luma suggests orders whose JTL-Wawi external order number matches. Compare the external order number, placed date and total. If more than one order shares the reference, check each source record before you choose.
+3. Choose **Link** beside the right order. If Luma didn’t suggest it, search by order number under **Find another order** and choose **Review link**.
+4. Under **Why is this correct?**, say why both records are the same order, then choose **Link records**.
 
-In an order’s **Shopify details**, open a **Fulfillment order**. If your role
-includes **Recover Shopify fulfillments**, you can release one hold, reopen fulfillment or move all remaining items to an
-eligible location. The recovery panel explains when Shopify does not allow an
-action or the connection needs fulfillment write access.
+Luma shows its progress while it links the records. Afterward, both source versions appear on one order. Links to either order open the combined order, and earlier issues, activity and readings stay available. Luma links suggestions automatically only when your workspace has an [automatic linking](/docs/data-sync#automatic-linking) rule for orders, and linking doesn’t change the orders in Shopify or JTL-Wawi.
 
-Choose the exact hold or destination and select **Preview recovery**. Someone else
-who can approve changes must open the same fulfillment and approve it. The
-requester can then select **Run approved action**. Previews expire after ten
-minutes; changes in Shopify require a new review.
+To separate them again, choose **Unlink** beside a source, give a reason and choose **Unlink source**. That source becomes a separate order again, with its own lines and shipments. Every link and unlink is recorded with who made it and why.
 
-**Shopify accepted** confirms the request was accepted. **Progress verified**
-means a later Shopify read showed fewer unfulfilled items. Select **Check
-fulfillment progress** to read again. If acceptance is uncertain, Luma will not
-resend the action. Review the order in Shopify and reconcile the existing
-recovery before starting another.
+Linking and unlinking need **Manage imports**. Without it, you see the linked sources and suggestions but not **Link** or **Unlink**.
+
+## Fix a held or delayed fulfillment
+
+To release a Shopify hold, reopen fulfillment or move the work to another location, open the fulfillment from **Fulfillments** on the order. See [Recover a Shopify fulfillment](/docs/fulfillment#recover-a-shopify-fulfillment).
+
+## When an order is unavailable
+
+- **This order isn’t in this workspace, or no connected system reports it anymore** means the link is wrong or every source removed the order.
+- **You’re offline. This order may be out of date.** Reconnect to see current data.
+- **You don’t have access to orders in this workspace.** Viewing orders needs **View orders**. Ask a workspace admin for access.

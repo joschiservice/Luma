@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { Button } from '@luma/ui/components/primitives/button';
 import {
   Field,
@@ -40,14 +41,14 @@ export function readFields(rows: ActionField[]) {
   for (const row of rows) {
     const name = row.name.trim();
     if (!name || Object.hasOwn(result, name))
-      throw new Error('Use a unique name for each action field.');
+      throw new Error(m.shadow_fields_error_unique());
     if (
       row.kind === 'number' &&
       (!row.value.trim() || !Number.isFinite(Number(row.value)))
     )
-      throw new Error(`Enter a valid number for ${name}.`);
+      throw new Error(m.shadow_fields_error_number({ field: name }));
     if (row.kind === 'boolean' && !['true', 'false'].includes(row.value))
-      throw new Error(`Choose true or false for ${name}.`);
+      throw new Error(m.shadow_fields_error_boolean({ field: name }));
     Object.defineProperty(result, name, {
       value:
         row.kind === 'none'
@@ -64,17 +65,29 @@ export function readFields(rows: ActionField[]) {
   return result;
 }
 
+const groups = {
+  parameters: {
+    title: m.shadow_fields_parameters,
+    add: m.shadow_fields_add_parameters,
+  },
+  expected: {
+    title: m.shadow_fields_expected,
+    add: m.shadow_fields_add_expected,
+  },
+} satisfies Record<string, { title: () => string; add: () => string }>;
+
 /** Edits parameters or expected results without requiring JSON input. */
 export function ActionFieldsEditor({
-  title,
+  group,
   rows,
   change,
 }: {
-  title: string;
+  group: keyof typeof groups;
   rows: ActionField[];
   change: (rows: ActionField[]) => void;
 }) {
   const id = useId();
+  const title = groups[group].title();
   const update = (rowId: string, patch: Partial<ActionField>) =>
     change(rows.map((row) => (row.id === rowId ? { ...row, ...patch } : row)));
 
@@ -85,7 +98,9 @@ export function ActionFieldsEditor({
         {rows.map((row, i) => (
           <div className="shadow-field-row" key={row.id}>
             <Field>
-              <FieldLabel htmlFor={`${id}-${i}-name`}>Field name</FieldLabel>
+              <FieldLabel htmlFor={`${id}-${i}-name`}>
+                {m.shadow_fields_name()}
+              </FieldLabel>
               <Input
                 id={`${id}-${i}-name`}
                 value={row.name}
@@ -94,10 +109,15 @@ export function ActionFieldsEditor({
               />
             </Field>
             <Field>
-              <FieldLabel htmlFor={`${id}-${i}-type`}>Value type</FieldLabel>
+              <FieldLabel htmlFor={`${id}-${i}-type`}>
+                {m.shadow_fields_type()}
+              </FieldLabel>
               <Select
                 id={`${id}-${i}-type`}
-                aria-label={`${title} value type ${i + 1}`}
+                aria-label={m.shadow_fields_type_row({
+                  group: title,
+                  row: i + 1,
+                })}
                 value={row.kind}
                 onValueChange={(value) =>
                   value &&
@@ -107,24 +127,29 @@ export function ActionFieldsEditor({
                   })
                 }
                 options={[
-                  { value: 'text', label: 'Text' },
-                  { value: 'number', label: 'Number' },
-                  { value: 'boolean', label: 'True / false' },
-                  { value: 'none', label: 'None' },
+                  { value: 'text', label: m.shadow_fields_kind_text() },
+                  { value: 'number', label: m.shadow_fields_kind_number() },
+                  { value: 'boolean', label: m.shadow_fields_kind_boolean() },
+                  { value: 'none', label: m.shadow_fields_kind_none() },
                 ]}
               />
             </Field>
             <Field>
-              <FieldLabel htmlFor={`${id}-${i}-value`}>Value</FieldLabel>
+              <FieldLabel htmlFor={`${id}-${i}-value`}>
+                {m.shadow_fields_value()}
+              </FieldLabel>
               {row.kind === 'boolean' ? (
                 <Select
                   id={`${id}-${i}-value`}
-                  aria-label={`${title} value ${i + 1}`}
+                  aria-label={m.shadow_fields_value_row({
+                    group: title,
+                    row: i + 1,
+                  })}
                   value={row.value}
                   onValueChange={(value) => value && update(row.id, { value })}
                   options={[
-                    { value: 'true', label: 'True' },
-                    { value: 'false', label: 'False' },
+                    { value: 'true', label: m.common_yes() },
+                    { value: 'false', label: m.common_no() },
                   ]}
                 />
               ) : (
@@ -141,10 +166,13 @@ export function ActionFieldsEditor({
             <Button
               type="button"
               variant="ghost"
-              aria-label={`Remove ${title.toLowerCase()} field ${i + 1}`}
+              aria-label={m.shadow_fields_remove_row({
+                group: title,
+                row: i + 1,
+              })}
               onClick={() => change(rows.filter((r) => r.id !== row.id))}
             >
-              Remove
+              {m.common_remove()}
             </Button>
           </div>
         ))}
@@ -159,7 +187,7 @@ export function ActionFieldsEditor({
           ])
         }
       >
-        Add {title.toLowerCase()} field
+        {groups[group].add()}
       </Button>
     </fieldset>
   );

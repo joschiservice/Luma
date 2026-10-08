@@ -1,0 +1,49 @@
+---
+title: Search records across your systems
+description: Find any order, fulfillment, stock position, SKU, product or issue in one search, and see what each connected system reports about it.
+---
+
+**Records** is one search across everything Luma has read from your connected systems, plus the issues Luma created. Use it when you have a number, name or ID and don’t know which page it belongs to, or when you want to compare what each system says about one record. Open it from the sidebar, or press **G** then **R**.
+
+## Find a record
+
+1. Choose a record type above the list: **All records**, **Orders**, **Fulfillments**, **Stock**, **SKUs**, **Products** or **Issues**.
+2. Type a number, name or source ID into **Search records**.
+3. To look in one system only, pick it under **Source**.
+
+Results show each record’s type, name, status and source, 50 per page, most recently read first. A record that several sources report shows how many. The record type, search and source are part of the address, so you can share a link to the same results.
+
+Customers and returns aren’t searchable here. Find them in [Customers](/docs/customers) and [Returns](/docs/returns).
+
+**No records match this search** can also mean a source isn’t fully imported yet. Check its progress in [Data sync](/docs/data-sync).
+
+## Read a record page
+
+Select a record to open its page. The header shows the record type, its ID and its status. A record page has these parts:
+
+- **Data from sources**: what each connected system reported, shown separately for each source. Records that are linked across systems can still differ in individual fields; Luma doesn’t merge them into one value.
+- **Lines**: the record’s lines, such as an order’s SKUs and quantities, including canceled quantities.
+- **Sources**: each system that knows the record, with its ID there, how it was linked, when it last changed in that system and when Luma last read it.
+- **Related records**: linked orders, fulfillments, stock positions, SKUs or issues.
+
+Links at the end take you to the page where you work with the record: **Open in Orders**, **Open in Fulfillment**, **Open in Inventory**, **Open in Products**, **Show stock for this SKU** or, for an issue, **Investigate issue**. If you came from another page, **Back to context** returns you there.
+
+## When only the ID is known
+
+A record marked **Only the ID in Shopify is known**, or the same for another source, is one Luma has seen referenced, for example on an order line, but hasn’t read data for yet. Its page has no source data. This usually changes once the import finishes. If it stays, check that the connection may read that record type in [Data sync](/docs/data-sync#what-luma-imports).
+
+An issue Luma created shows **Luma created this issue. It isn’t linked to a source system.** under **Sources**.
+
+## How records are linked
+
+Under **Sources**, **Linked by** says how a source record was matched to the others, for example on import or by a person. **Linked through matching IDs in other sources** means the link follows from IDs the sources share. Luma never links suggested matches on its own. To link or unlink the same SKU across sources, see [Inventory](/docs/inventory).
+
+## Look up a record directly in Shopify
+
+The Shopify app adds a page that reads records live from your store, without waiting for the next sync. Open **Shopify** in the sidebar’s **Apps** section, or choose **Open Shopify** on the app’s page under [Apps](/docs/apps-and-connections). You need **View orders**.
+
+1. If you have several stores, choose one under **Store**.
+2. Choose **Browse orders** or **Browse products**, or open **Find by Shopify ID**.
+3. To find one record, choose its **Record type**, such as **Order**, **Product variant** or **Refund**, and enter its **Shopify record ID**: the number at the end of the record’s address in Shopify admin. Then choose **Load record**.
+
+Luma shows when it read the record, and you can follow its linked orders, variants, inventory, returns and refunds. If Luma can’t find the record, check the ID and the record type. Orders older than 60 days need access to older orders. If the connection doesn’t have access to that record type, check its permissions in Apps.

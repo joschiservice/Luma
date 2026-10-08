@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { useId } from 'react';
 
 import { cn } from '../../lib/utils';
@@ -108,7 +109,9 @@ export function LumaLockup({
     <span className={cn('lu-lockup', className)} data-size={size}>
       <LumaMark />
       <span className="lu-lockup-name">Luma</span>
-      {byAuren ? <span className="lu-lockup-by">by Auren</span> : null}
+      {byAuren ? (
+        <span className="lu-lockup-by">{m.ui_brand_by_auren()}</span>
+      ) : null}
     </span>
   );
 }

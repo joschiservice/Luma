@@ -4,6 +4,9 @@ import type {
   CaseReview,
   CaseTimelinePage,
 } from '@luma/api-contract';
+import { formatList } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import {
   Activity,
   CircleAlert,
@@ -25,11 +28,21 @@ import { Disclosure } from '../primitives/disclosure';
 import { WorkspaceDate } from '../primitives/workspace-date';
 import { caseLabel, CaseNotice, CaseTime } from './case-investigation';
 import {
+  caseStateLabel,
+  decisionLabel,
+  eventOutcomeLabel,
+  executionStateLabel,
+  recordKindLabel,
+  verificationLabel,
+  workflowStatusLabel,
+} from './case-presentation';
+import {
   ExecutionMetadata,
   executionStatus,
   ExecutionSummary,
 } from './execution-summary';
 import { IssueCollection } from './issue-collection';
+import { EvidenceRecord, evidenceSourceLabel } from './issue-findings';
 import { IssueSection } from './issue-section';
 
 export type LiveConnection =
@@ -37,16 +50,38 @@ export type LiveConnection =
 
 type Event = CaseTimelinePage['items'][number];
 
-const eventNames: Record<string, string> = {
-  'exception.detected': 'Issue detected',
-  'execution.prepared': 'Execution reserved',
-  'execution.completed': 'Execution attempt finished',
-  'execution.withheld': 'Execution withheld',
-  'execution.reconciled': 'Recovery confirmed by observation',
-  'case.approve': 'Operator approved',
-  'case.reject': 'Operator rejected',
-  'case.escalate': 'Operator escalated',
+type Execution = NonNullable<CaseProgress['execution']>;
+
+const eventNames: Record<string, () => string> = {
+  'exception.detected': m.issues_event_detected,
+  'execution.prepared': m.issues_event_change_queued,
+  'execution.completed': m.issues_event_change_finished,
+  'execution.withheld': m.issues_event_change_withheld,
+  'execution.reconciled': m.issues_event_change_reconciled,
+  'case.approve': m.issues_event_approved,
+  'case.reject': m.issues_event_rejected,
+  'case.escalate': m.issues_event_escalated,
 };
+
+const executors = {
+  service: m.issues_executor_service,
+  agent: m.issues_executor_agent,
+  connector: m.issues_executor_connector,
+  user: m.issues_executor_user,
+} satisfies Record<Execution['executor']['kind'], () => string>;
+
+const policyOutcomes = {
+  allowed: m.issues_policy_allowed,
+  denied: m.issues_policy_denied,
+  approval_required: m.issues_policy_approval_required,
+} satisfies Record<
+  NonNullable<NonNullable<CaseReview['proposal']>['policy']>['outcome'],
+  () => string
+>;
+
+function eventName(type: string) {
+  return eventNames[type]?.() ?? caseLabel(type.replaceAll('.', ' '));
+}
 
 function References({ refs }: { refs: string[] }) {
   return refs.length ? (
@@ -56,13 +91,29 @@ function References({ refs }: { refs: string[] }) {
       ))}
     </ul>
   ) : (
-    <p>No evidence references recorded.</p>
+    <p>{m.issues_references_none()}</p>
   );
 }
 
+function countLabel(
+  count: number,
+  more: boolean,
+  messages: {
+    none: () => string;
+    count: (inputs: { count: number }) => string;
+    more: (inputs: { count: number }) => string;
+  },
+) {
+  return more
+    ? messages.more({ count })
+    : count
+      ? messages.count({ count })
+      : messages.none();
+}
+
 /**
- * Displays execution progress, audit events, and evidence with optional controls for loading
- * more history.
+ * Displays the change, its outcome check, history events and evidence, with optional controls
+ * for loading more history.
  */
 export function CaseTimeline({
   expanded = false,
@@ -106,7 +157,6 @@ export function CaseTimeline({
       ? proposal
       : null;
   const current = confirmed;
-  const workflow = progress.workflow;
 
   const liveStatus = (
     <span
@@ -116,27 +166,79 @@ export function CaseTimeline({
     >
       {connection === 'live'
         ? expanded
-          ? 'Live updates'
-          : 'Live'
+          ? m.issues_live_updates()
+          : m.issues_live_short()
         : connection === 'syncing'
-          ? 'Refreshing'
+          ? m.common_refreshing()
           : connection === 'connecting'
-            ? 'Connecting'
+            ? m.issues_live_connecting()
             : connection === 'interrupted'
-              ? 'Live updates interrupted'
-              : 'Connection lost'}
+              ? m.issues_live_interrupted()
+              : m.issues_live_disconnected()}
     </span>
   );
+
+  const stages = [
+    {
+      stage: 'investigation',
+      states: ['detected', 'diagnosed'],
+      label: m.issues_stage_investigation(),
+      icon: Search,
+      tone: 'investigation',
+    },
+    {
+      stage: 'approval',
+      states: ['proposed', 'awaiting_approval', 'allowed'],
+      label: m.issues_stage_approval(),
+      icon: ClipboardCheck,
+      tone: 'review',
+    },
+    {
+      stage: 'change',
+      states: ['executing'],
+      label: m.issues_stage_change(),
+      icon: Play,
+      tone: 'execution',
+    },
+    {
+      stage: 'check',
+      states: ['verifying'],
+      label: m.issues_stage_check(),
+      icon: ShieldCheck,
+      tone: 'verification',
+    },
+    {
+      stage: 'result',
+      states: ['resolved', 'escalated', 'failed'],
+      label: m.issues_stage_result(),
+      icon:
+        progress.state === 'failed' || progress.state === 'escalated'
+          ? CircleAlert
+          : progress.resolution?.kind === 'verification'
+            ? CircleCheck
+            : Flag,
+      tone:
+        progress.state === 'failed'
+          ? 'failed'
+          : progress.state === 'escalated'
+            ? 'review'
+            : progress.resolution?.kind === 'verification'
+              ? 'resolved'
+              : 'outcome',
+    },
+  ];
 
   return (
     <section
       className="case-progress recorded-findings"
-      aria-label="Execution and audit timeline"
+      aria-label={m.issues_timeline_label()}
     >
       <IssueSection
         section="execution"
         preview={
-          confirmed ? executionStatus(progress) : 'Current state unconfirmed'
+          confirmed
+            ? executionStatus(progress)
+            : m.issues_state_unconfirmed_preview()
         }
         enabled={expanded}
         status={expanded ? liveStatus : undefined}
@@ -145,73 +247,28 @@ export function CaseTimeline({
           <header className="case-progress-heading">
             {!expanded && (
               <h3>
-                <Activity size={16} aria-hidden="true" /> Execution &
-                verification
+                <Activity size={16} aria-hidden="true" />{' '}
+                {m.issues_section_execution()}
               </h3>
             )}
             {liveStatus}
           </header>
         )}
         {!current ? (
-          <CaseNotice title="Current state is unconfirmed">
+          <CaseNotice title={m.issues_state_unconfirmed()}>
             {connection === 'disconnected'
-              ? 'Reconnecting automatically. '
-              : 'Reading authoritative progress. '}
-            The records below show the last confirmed state.
+              ? m.issues_state_unconfirmed_reconnecting()
+              : m.issues_state_unconfirmed_loading()}
           </CaseNotice>
         ) : null}
         {expanded ? (
           <ExecutionSummary progress={progress} confirmed={current} />
         ) : (
           <>
-            <ol className="case-lifecycle" aria-label="Case lifecycle">
-              {[
-                {
-                  states: ['detected', 'diagnosed'],
-                  label: 'Investigation',
-                  icon: Search,
-                  tone: 'investigation',
-                },
-                {
-                  states: ['proposed', 'awaiting_approval', 'allowed'],
-                  label: 'Review',
-                  icon: ClipboardCheck,
-                  tone: 'review',
-                },
-                {
-                  states: ['executing'],
-                  label: 'Execution',
-                  icon: Play,
-                  tone: 'execution',
-                },
-                {
-                  states: ['verifying'],
-                  label: 'Verification',
-                  icon: ShieldCheck,
-                  tone: 'verification',
-                },
-                {
-                  states: ['resolved', 'escalated', 'failed'],
-                  label: 'Outcome',
-                  icon:
-                    progress.state === 'failed' ||
-                    progress.state === 'escalated'
-                      ? CircleAlert
-                      : progress.resolution?.kind === 'verification'
-                        ? CircleCheck
-                        : Flag,
-                  tone:
-                    progress.state === 'failed'
-                      ? 'failed'
-                      : progress.state === 'escalated'
-                        ? 'review'
-                        : progress.resolution?.kind === 'verification'
-                          ? 'resolved'
-                          : 'outcome',
-                },
-              ].map(({ states, label, icon: Icon, tone }) => (
+            <ol className="case-lifecycle" aria-label={m.issues_stage_list()}>
+              {stages.map(({ stage, states, label, icon: Icon, tone }) => (
                 <li
-                  key={label}
+                  key={stage}
                   data-stage={tone}
                   aria-current={
                     states.includes(progress.state) ? 'step' : undefined
@@ -226,25 +283,26 @@ export function CaseTimeline({
             </ol>
             <div className="execution-state-card">
               <p className="case-progress-state">
-                {current ? 'Case state' : 'Last confirmed case state'}:{' '}
-                <strong>{caseLabel(progress.state)}</strong>
+                {rich(
+                  current
+                    ? m.issues_progress_state
+                    : m.issues_progress_state_last_confirmed,
+                  { state: <strong>{caseStateLabel(progress.state)}</strong> },
+                )}
               </p>
               <p className="case-caption">
-                Case revision {progress.caseRevision} · Investigation revision{' '}
-                {progress.diagnosisRevision}
+                {m.issues_progress_versions({
+                  issue: progress.caseRevision,
+                  investigation: progress.diagnosisRevision,
+                })}
               </p>
               <p>
-                Workflow:{' '}
-                {workflow.availability === 'unavailable'
-                  ? 'Unavailable. Current activity is unknown.'
-                  : workflow.availability === 'not_started'
-                    ? 'Not started'
-                    : workflow.progress
-                      ? caseLabel(workflow.progress.phase)
-                      : 'Current phase unknown'}
+                {m.issues_progress_workflow({
+                  status: workflowStatusLabel(progress.workflow),
+                })}
               </p>
-              {workflow.progress?.reason ? (
-                <p>{caseLabel(workflow.progress.reason)}</p>
+              {progress.workflow.progress?.reason ? (
+                <p>{caseLabel(progress.workflow.progress.reason)}</p>
               ) : null}
             </div>
             <div className="case-outcomes">
@@ -258,19 +316,15 @@ export function CaseTimeline({
                 }
               >
                 <Subheading>
-                  <Play size={15} aria-hidden="true" /> Execution result
+                  <Play size={15} aria-hidden="true" />{' '}
+                  {m.issues_execution_change_label()}
                 </Subheading>
                 <strong>
                   {execution
-                    ? {
-                        prepared: 'Reserved; result pending',
-                        unknown: 'Effect unknown',
-                        succeeded: 'Succeeded',
-                        failed: 'Failed',
-                      }[execution.state]
-                    : 'No attempt recorded'}
+                    ? executionStateLabel(execution.state)
+                    : m.issues_change_not_sent()}
                 </strong>
-                <p>A successful action alone does not establish resolution.</p>
+                <p>{m.issues_change_accepted_note()}</p>
               </div>
               <div
                 data-tone={
@@ -282,20 +336,20 @@ export function CaseTimeline({
                 }
               >
                 <Subheading>
-                  <ShieldCheck size={15} aria-hidden="true" /> Verification
-                  result
+                  <ShieldCheck size={15} aria-hidden="true" />{' '}
+                  {m.issues_check_label()}
                 </Subheading>
                 <strong>
                   {verification
-                    ? caseLabel(verification.outcome)
-                    : 'Not recorded'}
+                    ? verificationLabel(verification.outcome)
+                    : m.issues_check_none()}
                 </strong>
                 <p>
                   {verification?.outcome === 'passed'
-                    ? 'The recorded verification criteria passed.'
+                    ? m.issues_check_confirmed_note()
                     : verification?.outcome === 'failed'
-                      ? 'The intended outcome was not confirmed.'
-                      : 'The intended outcome remains uncertain.'}
+                      ? m.issues_check_not_confirmed_note()
+                      : m.issues_check_pending_note()}
                 </p>
               </div>
             </div>
@@ -303,121 +357,139 @@ export function CaseTimeline({
         )}
         {boundProposal ? (
           <Disclosure className="case-evidence">
-            <summary>Action and verification criteria</summary>
+            <summary>{m.issues_criteria_title()}</summary>
             <dl>
-              <dt>Proposal</dt>
+              <dt>{m.issues_criteria_proposal()}</dt>
               <dd>
-                {boundProposal.id} · Version {boundProposal.version}
+                {m.issues_criteria_proposal_value({
+                  id: boundProposal.id,
+                  version: boundProposal.version,
+                })}
               </dd>
-              <dt>Action</dt>
+              <dt>{m.issues_execution_change_label()}</dt>
               <dd>
-                {boundProposal.capability} · {boundProposal.capabilityVersion}
+                {caseLabel(
+                  boundProposal.capability
+                    .replaceAll('.', ' ')
+                    .replace(/([a-z])([A-Z])/g, '$1 $2'),
+                )}
               </dd>
-              <dt>Connection</dt>
+              <dt>{m.issues_criteria_connection()}</dt>
               <dd>{boundProposal.connectionId}</dd>
-              <dt>Target</dt>
+              <dt>{m.issues_criteria_target()}</dt>
               <dd>
-                {boundProposal.target.kind} · {boundProposal.target.id}
+                {recordKindLabel(boundProposal.target.kind)} ·{' '}
+                {boundProposal.target.id}
               </dd>
-              <dt>Requested by</dt>
+              <dt>{m.issues_criteria_requested_by()}</dt>
               <dd>{boundProposal.requestedBy}</dd>
             </dl>
-            <Subheading>Expected outcome</Subheading>
+            <Subheading>{m.issues_criteria_expected()}</Subheading>
             {Object.keys(boundProposal.expectedPostcondition).length ? (
               <dl className="execution-criteria">
                 {Object.entries(boundProposal.expectedPostcondition).map(
                   ([key, value]) => (
                     <div key={key}>
                       <dt>{caseLabel(key)}</dt>
-                      <dd>{value === null ? 'Unknown' : String(value)}</dd>
+                      <dd>
+                        {value === null ? m.common_unknown() : String(value)}
+                      </dd>
                     </div>
                   ),
                 )}
               </dl>
             ) : (
-              <p>No structured criteria recorded.</p>
+              <p>{m.issues_criteria_expected_none()}</p>
             )}
             {boundProposal.policy ? (
               <p>
-                Policy: {caseLabel(boundProposal.policy.outcome)} ·{' '}
-                {boundProposal.policy.policyVersion}
+                {m.issues_criteria_rules({
+                  outcome: policyOutcomes[boundProposal.policy.outcome](),
+                })}
               </p>
             ) : null}
             {boundProposal.approval ? (
               <p>
-                {caseLabel(boundProposal.approval.outcome)} by{' '}
-                {boundProposal.approval.actorId} ·{' '}
-                <CaseTime value={boundProposal.approval.createdAt} />
+                {rich(
+                  boundProposal.approval.outcome === 'approved'
+                    ? m.issues_criteria_approved_by
+                    : m.issues_criteria_rejected_by,
+                  {
+                    actor: boundProposal.approval.actorId,
+                    time: <CaseTime value={boundProposal.approval.createdAt} />,
+                  },
+                )}
               </p>
             ) : null}
           </Disclosure>
         ) : execution || !expanded ? (
-          <p>Verification criteria are not available for this attempt.</p>
+          <p>{m.issues_criteria_unavailable()}</p>
         ) : null}
         {execution ? (
           <Disclosure className="case-evidence">
             <summary>
               {expanded
-                ? 'Execution details'
-                : `Attempt ${execution.attempt} · ${caseLabel(execution.state)}`}
+                ? m.issues_execution_details()
+                : m.issues_execution_attempt_summary({
+                    attempt: execution.attempt,
+                    state: executionStateLabel(execution.state),
+                  })}
             </summary>
             {expanded ? <ExecutionMetadata progress={progress} /> : null}
             <dl>
-              <dt>Attempt</dt>
+              <dt>{m.issues_execution_attempt()}</dt>
               <dd>{execution.attempt}</dd>
-              <dt>Attempt ID</dt>
+              <dt>{m.issues_execution_attempt_id()}</dt>
               <dd>{execution.attemptId}</dd>
-              <dt>Execution</dt>
+              <dt>{m.issues_execution_change_id()}</dt>
               <dd>{execution.id}</dd>
-              <dt>Proposal</dt>
+              <dt>{m.issues_criteria_proposal()}</dt>
               <dd>{execution.proposalId}</dd>
-              <dt>Requested by</dt>
+              <dt>{m.issues_criteria_requested_by()}</dt>
               <dd>{execution.requestedBy}</dd>
-              <dt>Executor</dt>
+              <dt>{m.issues_execution_sent_by()}</dt>
               <dd>
-                {execution.executor.kind} · {execution.executor.id}
+                {executors[execution.executor.kind]()} · {execution.executor.id}
               </dd>
-              <dt>Started</dt>
+              <dt>{m.issues_execution_started()}</dt>
               <dd>
                 <CaseTime value={execution.startedAt} />
               </dd>
-              <dt>Finished</dt>
+              <dt>{m.issues_execution_finished()}</dt>
               <dd>
                 {execution.finishedAt ? (
                   <CaseTime value={execution.finishedAt} />
                 ) : (
-                  'Not recorded'
+                  m.issues_not_recorded()
                 )}
               </dd>
             </dl>
             {execution.state === 'unknown' ? (
-              <p>
-                The action may have taken effect. Inspect fresh observations
-                before any further action.
-              </p>
+              <p>{m.issues_execution_unclear_help()}</p>
             ) : null}
-            <Subheading>Effect evidence</Subheading>
+            <Subheading>{m.issues_execution_effect_evidence()}</Subheading>
             <References refs={execution.effectEvidenceRefs} />
             {verification ? (
               <>
                 <Subheading>
-                  Observed result: {caseLabel(verification.outcome)}
+                  {m.issues_check_result({
+                    outcome: verificationLabel(verification.outcome),
+                  })}
                 </Subheading>
                 <p>
-                  <CaseTime value={verification.observedAt} /> · Evaluator{' '}
-                  {verification.evaluatorVersion}
+                  {rich(m.issues_check_result_meta, {
+                    time: <CaseTime value={verification.observedAt} />,
+                    version: verification.evaluatorVersion,
+                  })}
                 </p>
                 <References refs={verification.observationRefs} />
-                <p>
-                  Observation values are not included in this result. Inspect
-                  the evidence provenance below.
-                </p>
+                <p>{m.issues_check_values_hidden()}</p>
               </>
             ) : null}
           </Disclosure>
         ) : expanded ? (
           <Disclosure className="case-evidence">
-            <summary>Execution details</summary>
+            <summary>{m.issues_execution_details()}</summary>
             <ExecutionMetadata progress={progress} />
           </Disclosure>
         ) : null}
@@ -425,33 +497,34 @@ export function CaseTimeline({
           <div className="case-resolution">
             <Subheading>
               {progress.resolution.kind === 'verification'
-                ? 'Recorded verified resolution'
-                : 'Closed by human disposition'}
+                ? m.issues_resolution_verified_heading()
+                : m.issues_resolution_human_title()}
             </Subheading>
             <p>
-              {progress.resolution.kind === 'human_disposition'
-                ? 'Human closure does not establish a verified correction. '
-                : ''}
-              <CaseTime value={progress.resolution.at} /> ·{' '}
-              {progress.resolution.actorId}
+              {rich(
+                progress.resolution.kind === 'human_disposition'
+                  ? m.issues_resolution_human_meta
+                  : m.issues_resolution_meta,
+                {
+                  time: <CaseTime value={progress.resolution.at} />,
+                  actor: progress.resolution.actorId,
+                },
+              )}
             </p>
             <References refs={progress.resolution.evidenceRefs} />
           </div>
         ) : !expanded ? (
-          <p className="case-caption">
-            This issue is still open. No resolution has been recorded.
-          </p>
+          <p className="case-caption">{m.issues_resolution_open()}</p>
         ) : null}
         {['failed', 'escalated'].includes(progress.state) ? (
-          <CaseNotice title="Next steps">
-            <span>
-              Inspect the attempt and evidence, then follow the current
-              investigation recommendation.{' '}
-            </span>
+          <CaseNotice title={m.issues_next_steps_title()}>
             {current && review.permittedDecisions.length
-              ? `Permitted decisions: ${review.permittedDecisions.map(caseLabel).join(', ')}. `
-              : 'No decision is confirmed as available. '}
-            Automatic retries are not available from this view.
+              ? m.issues_next_steps_with_decisions({
+                  decisions: formatList(
+                    review.permittedDecisions.map(decisionLabel),
+                  ),
+                })
+              : m.issues_next_steps_without_decisions()}
           </CaseNotice>
         ) : null}
       </IssueSection>
@@ -460,9 +533,13 @@ export function CaseTimeline({
         preview={
           historyUnavailable
             ? loadingHistory
-              ? 'Loading history'
-              : 'History unavailable'
-            : `${timeline.length}${hasMoreTimeline ? '+' : ''} recorded ${timeline.length === 1 && !hasMoreTimeline ? 'event' : 'events'}`
+              ? m.issues_history_loading()
+              : m.issues_history_unavailable_short()
+            : countLabel(timeline.length, hasMoreTimeline, {
+                none: m.issues_history_count_none,
+                count: m.issues_history_count,
+                more: m.issues_history_count_more,
+              })
         }
         enabled={expanded}
         status={
@@ -473,7 +550,8 @@ export function CaseTimeline({
               onClick={onRefresh}
               disabled={loadingHistory}
             >
-              <RefreshCw size={14} aria-hidden="true" /> Refresh history
+              <RefreshCw size={14} aria-hidden="true" />{' '}
+              {m.issues_history_refresh()}
             </Button>
           ) : undefined
         }
@@ -485,22 +563,26 @@ export function CaseTimeline({
         >
           {!expanded && (
             <Subheading>
-              <History size={16} aria-hidden="true" /> Audit history
+              <History size={16} aria-hidden="true" />{' '}
+              {m.issues_section_history()}
             </Subheading>
           )}
           {!expanded && onRefresh ? (
             <Button variant="outline" onClick={onRefresh}>
-              <RefreshCw size={14} aria-hidden="true" /> Refresh progress
+              <RefreshCw size={14} aria-hidden="true" />{' '}
+              {m.issues_progress_refresh()}
             </Button>
           ) : null}
         </div>
-        {timeline.length ? <p className="case-caption">Newest first</p> : null}
+        {timeline.length ? (
+          <p className="case-caption">{m.issues_newest_first()}</p>
+        ) : null}
         <IssueCollection
-          title="Audit history"
+          title={m.issues_section_history()}
           triggerLabel={
             hasMoreTimeline
-              ? 'View full history'
-              : `View full history (${timeline.length})`
+              ? m.issues_history_view_full()
+              : m.issues_history_view_full_count({ count: timeline.length })
           }
           noun="events"
           items={[...timeline].sort((a, b) =>
@@ -512,15 +594,15 @@ export function CaseTimeline({
           notice={children}
           filters={[
             {
-              label: 'Event type',
-              value: (event) =>
-                eventNames[event.type] ??
-                caseLabel(event.type.replaceAll('.', ' ')),
+              label: m.issues_history_filter_type(),
+              value: (event) => eventName(event.type),
             },
             {
-              label: 'Outcome',
+              label: m.issues_history_filter_outcome(),
               value: (event) =>
-                event.outcome ? caseLabel(event.outcome) : 'Not recorded',
+                event.outcome
+                  ? eventOutcomeLabel(event.outcome)
+                  : m.issues_not_recorded(),
             },
           ]}
           renderItems={(events) =>
@@ -540,10 +622,7 @@ export function CaseTimeline({
                       )}
                     </span>
                     <div className="audit-event-heading">
-                      <strong>
-                        {eventNames[event.type] ??
-                          caseLabel(event.type.replaceAll('.', ' '))}
-                      </strong>
+                      <strong>{eventName(event.type)}</strong>
                       <WorkspaceDate value={event.occurredAt} />
                     </div>
                     {event.outcome ? (
@@ -557,32 +636,32 @@ export function CaseTimeline({
                               : 'neutral'
                         }
                       >
-                        {caseLabel(event.outcome)}
+                        {eventOutcomeLabel(event.outcome)}
                       </p>
                     ) : null}
                     {event.actorId ? (
                       <p className="case-caption audit-actor">
-                        By {event.actorId}
+                        {m.issues_history_by({ actor: event.actorId })}
                       </p>
                     ) : null}
                     <Disclosure className="audit-event-details">
-                      <summary>Event details</summary>
+                      <summary>{m.issues_history_event_details()}</summary>
                       <dl>
-                        <dt>Event</dt>
+                        <dt>{m.issues_history_event_id()}</dt>
                         <dd>{event.id}</dd>
-                        <dt>Event type</dt>
+                        <dt>{m.issues_history_filter_type()}</dt>
                         <dd>{event.type}</dd>
-                        <dt>Recorded at</dt>
+                        <dt>{m.issues_history_recorded_at()}</dt>
                         <dd>
                           <time dateTime={event.occurredAt}>
                             {event.occurredAt}
                           </time>
                         </dd>
-                        <dt>Actor</dt>
-                        <dd>{event.actorId ?? 'Not recorded'}</dd>
+                        <dt>{m.issues_history_actor()}</dt>
+                        <dd>{event.actorId ?? m.issues_not_recorded()}</dd>
                         {event.proposalId ? (
                           <>
-                            <dt>Proposal</dt>
+                            <dt>{m.issues_criteria_proposal()}</dt>
                             <dd>{event.proposalId}</dd>
                           </>
                         ) : null}
@@ -595,8 +674,8 @@ export function CaseTimeline({
             ) : (
               <p>
                 {historyUnavailable
-                  ? 'Audit history is unavailable.'
-                  : 'No audit events recorded yet.'}
+                  ? m.issues_history_unavailable()
+                  : m.issues_history_empty()}
               </p>
             )
           }
@@ -607,8 +686,12 @@ export function CaseTimeline({
         enabled={expanded}
         preview={
           historyUnavailable
-            ? 'Evidence unavailable'
-            : `${evidence.length}${hasMoreEvidence ? '+' : ''} ${evidence.length === 1 && !hasMoreEvidence ? 'record' : 'records'}`
+            ? m.issues_evidence_unavailable_short()
+            : countLabel(evidence.length, hasMoreEvidence, {
+                none: m.issues_evidence_count_none,
+                count: m.issues_evidence_count,
+                more: m.issues_evidence_count_more,
+              })
         }
       >
         {!expanded && (
@@ -617,12 +700,13 @@ export function CaseTimeline({
             data-issue-section={expanded ? undefined : 'evidence'}
             tabIndex={-1}
           >
-            <Database size={16} aria-hidden="true" /> Evidence provenance
+            <Database size={16} aria-hidden="true" />{' '}
+            {m.issues_section_evidence()}
           </Subheading>
         )}
         <IssueCollection
-          title="Evidence provenance"
-          noun="evidence records"
+          title={m.issues_section_evidence()}
+          noun="evidence"
           items={[...evidence].sort((a, b) =>
             b.observedAt.localeCompare(a.observedAt),
           )}
@@ -630,64 +714,17 @@ export function CaseTimeline({
           loading={loadingHistory}
           onLoadMore={onLoadMore}
           notice={children}
-          filters={[
-            {
-              label: 'Source',
-              value: (entry) =>
-                entry.source
-                  ? `${entry.source.provider} · ${entry.source.resource}`
-                  : 'Canonical evidence',
-            },
-          ]}
+          filters={[{ label: m.common_source(), value: evidenceSourceLabel }]}
           renderItems={(entries) =>
             entries.length ? (
               entries.map((entry) => (
-                <Disclosure className="case-evidence" key={entry.id}>
-                  <summary>
-                    {entry.source
-                      ? `${entry.source.provider} · ${entry.source.resource}`
-                      : 'Canonical evidence'}{' '}
-                    <span>
-                      Observed <CaseTime value={entry.observedAt} />
-                    </span>
-                  </summary>
-                  <dl>
-                    <dt>Evidence ID</dt>
-                    <dd>{entry.id}</dd>
-                    <dt>Observed</dt>
-                    <dd>
-                      <CaseTime value={entry.observedAt} />
-                    </dd>
-                    <dt>Source updated</dt>
-                    <dd>
-                      {entry.sourceUpdatedAt ? (
-                        <CaseTime value={entry.sourceUpdatedAt} />
-                      ) : (
-                        'Unknown'
-                      )}
-                    </dd>
-                    <dt>Completeness</dt>
-                    <dd>{caseLabel(entry.completeness)}</dd>
-                    <dt>Adapter / schema</dt>
-                    <dd>
-                      {entry.adapterVersion} / {entry.schemaVersion}
-                    </dd>
-                    {entry.source ? (
-                      <>
-                        <dt>Source object</dt>
-                        <dd>{entry.source.externalId}</dd>
-                        <dt>Source scope</dt>
-                        <dd>{entry.source.scopeKey || 'Not specified'}</dd>
-                      </>
-                    ) : null}
-                  </dl>
-                </Disclosure>
+                <EvidenceRecord key={entry.id} entry={entry} />
               ))
             ) : (
               <p>
                 {historyUnavailable
-                  ? 'Evidence history is unavailable.'
-                  : 'No authorized observation references are available in this page. Audit references may describe other evidence types.'}
+                  ? m.issues_evidence_unavailable()
+                  : m.issues_evidence_empty_page()}
               </p>
             )
           }

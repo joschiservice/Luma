@@ -1,51 +1,89 @@
 ---
 title: Track purchase orders from draft to goods received
-description: Send approved purchase orders through your ERP, follow supplier confirmations and receipts, and answer changes and missed deadlines.
+description: Create purchase orders, send them to suppliers through JTL-Wawi, follow confirmations and receipts, and answer changes and missed deadlines.
 ---
 
-Procurement shows your suppliers and purchase orders and where each order stands. Every order moves through four separate milestones, so a draft is never mistaken for goods on the way:
+**Procurement** shows your suppliers and purchase orders, where each order stands and who acts next. Open it from the sidebar, or press **G** then **P**. **View procurement** lets you see everything. Creating, sending and changing orders needs **Manage procurement**.
 
-- **Drafted**: the order exists in Luma. Replenishment drafts say whether Luma verified them.
-- **Sent to supplier**: the order was placed in your purchasing system (JTL-Wawi) and found there again by a separate read. Your purchasing system sends it to the supplier.
-- **Supplier confirmed**: the supplier confirmed quantities and dates, read from your purchasing system or recorded from a supplier message.
-- **Goods received**: units were booked as received in your purchasing system. Only that booking counts. A supplier saying goods were shipped, or closing the order in Luma, does not.
+## How an order progresses
 
-## Find an order
+Every purchase order moves through four milestones, so a draft is never mistaken for goods on the way:
 
-The list shows each order's stage, its next expected delivery and who acts next. Use the tiles to see orders that **need a response**, orders **waiting on the supplier** and **drafts not sent**, or filter by stage. Search by reference, supplier or SKU. You can also find suppliers and orders from search with ⌘K.
+- **Drafted**: the order exists in Luma. Nothing has gone to the supplier.
+- **Sent**: Luma placed the order in your purchasing system, such as JTL-Wawi, and a separate read found it there. Your purchasing system passes it on to the supplier.
+- **Confirmed by supplier**: the supplier confirmed quantities and dates, read from your purchasing system or recorded from a supplier message.
+- **Goods received**: units were booked as received in your purchasing system. Only that booking counts. A supplier saying goods were shipped, or closing the order in Luma, doesn’t.
+
+The order’s stage sums this up, from **Draft, not sent** through **Waiting for approval**, **Sending**, **Sent, waiting on supplier**, **Confirmed by supplier** or **Confirmed with changes**, to **Partly received** and **Received**. **Sending failed**, **Closed** and **Canceled** end or interrupt the path.
+
+## Find an order or supplier
+
+Switch between **Purchase orders** and **Suppliers** at the top. For orders, the tiles show those that **Need a response**, are **Waiting on supplier** or are **Drafts not sent**. You can also filter by **Stage** and search by reference, supplier or SKU. Each row shows the stage, the next expected delivery and **Who’s next**: the buyer, an approver, the supplier, the warehouse, Luma or no one.
+
+You can also find suppliers and purchase orders from search with ⌘ K or Ctrl K.
+
+## Create a draft
+
+1. Choose **Add supplier** and enter the **Supplier name**. If the supplier exists in another system, add its ID as an external reference.
+2. Choose **New purchase order**, enter an **Order reference**, pick the supplier and add lines with SKU, description, quantity and unit.
+3. Choose **Create draft**. Nothing goes to the supplier until you send it.
+
+**Mark as open** records that the order is in progress without sending it. **Close order** marks it complete in Luma and doesn’t cancel it in your purchasing system. **Cancel order** ends it. Each status change needs a reason, and closed or canceled orders keep their history. Orders marked **Managed outside Luma** belong to another system and can’t be changed here.
+
+Replenishment Workflows can draft orders too. Such an order shows **Why it was ordered**: the stock that fell below the rule’s minimum, the proposed quantity, who approved it and whether Luma checked the draft.
 
 ## Link a supplier
 
-To send orders from Luma, link the supplier to the same supplier in your purchasing system. Open the supplier and choose **Link to purchasing system**, then pick the connection and the supplier. The connection needs supplier and purchase-order access; reconnect it in Apps if it doesn't have them.
+To send orders from Luma, link the supplier to the same supplier in your purchasing system. On the supplier’s page, choose **Link to purchasing system**, or **Link supplier** on an order. Pick the **Purchasing system** and the **Supplier in that system**, set **Expect confirmation within (hours)**, and choose **Save link**. After that time, an unconfirmed order appears in [Needs you](/docs/needs-you).
 
-Set how many hours the supplier has to confirm a sent order. After that, an unconfirmed order appears in [Needs you](/docs/needs-you).
+The connection must allow sending purchase orders. If none of your connections can list suppliers, connect JTL-Wawi in Apps with **Allow sending approved purchase orders** turned on; see [Install apps and connect your systems](/docs/apps-and-connections#choose-what-luma-may-change-in-jtl).
 
-Every item on the order must also be linked to an item in the purchasing system. If one isn't, the order page names the SKU to link first. Prices and tax come from your purchasing system's supplier terms; Luma doesn't set them.
+Every item on the order must also exist as an item in the purchasing system. If something blocks sending, the order lists it under **Before sending**. Prices and tax come from the supplier terms in your purchasing system; Luma doesn’t set them.
 
 ## Send an order
 
-On a draft or open order, choose **Send to supplier**, check the lines and pick a requested delivery date. Sending is an external commitment, so someone else who can approve changes approves it. They see the request in Needs you and on the order. After approval, Luma places the order once and checks with a separate read that it exists with the right supplier and lines.
+1. On a draft or open order, choose **Send to supplier**.
+2. Check **What will be sent** and pick a **Requested delivery date**.
+3. Choose **Request approval**.
 
-If the purchasing system doesn't confirm the request, the order shows **Sending** and Luma checks whether it was created. It never sends the same order twice. Approval requests expire after 24 hours.
+Sending is a commitment to the supplier, so another person who can approve changes has to approve it. They see the request in Needs you and on the order, with **Approve and send** and **Reject**. The request expires after 24 hours; the order shows when. After approval, Luma places the order in your purchasing system once and then checks that it arrived. If sending hasn’t started, the requester can choose **Send now**.
+
+To approve, a person needs **Manage procurement**, **Approve or reject changes** and the JTL app permission **Send purchase orders to JTL**, and can’t be the person who requested it.
+
+## Check that it arrived
+
+- **Sending**: Luma is placing the order. If your purchasing system doesn’t confirm the request, Luma checks whether the order was created and never sends it a second time. Choose the **Check** button with your connection’s name to read your purchasing system now.
+- **Sent, waiting on supplier**: a separate read found the order in your purchasing system.
+- **Sending failed**: your purchasing system didn’t create the order. The message says why. Fix the cause, then send again.
+- If sending was rejected or the approval request expired, nothing was sent. You can send it again.
+
+The order’s **Purchasing system checks** list each read Luma made.
 
 ## Follow the supplier
 
-Luma reads the order in your purchasing system regularly and records each new confirmation and goods receipt. Choose **Check for updates** to read it now. Each line shows what was ordered, confirmed and received, when it's expected and the current stock for the item.
+Luma reads the order in your purchasing system regularly and records each confirmation and goods receipt. Choose **Check for updates** to read it now. **Lines and stock** shows for each line what was ordered, confirmed and received, what’s still open, the requested and promised dates, and the current stock for the item.
 
-When a supplier confirms fewer units or a later date, the order asks you to **accept the change** or **follow up** with the supplier. A follow-up records what you did and when Luma should check again. Missed confirmations and overdue deliveries come back the same way until they are resolved.
+When a supplier confirms fewer units or a later date, the order needs a response. Choose **Accept or follow up**, then:
+
+- **Accept the change**: Luma expects the changed quantity or date from now on.
+- **Follow up with the supplier**: note what you did, such as emailing the supplier, and when Luma should **Check again on**. If nothing changes by then, the order returns to Needs you.
+
+For a missed confirmation or an overdue delivery, choose **Record follow-up** the same way. These come back until they’re resolved.
 
 ## Record supplier messages
 
-Choose **Add message** to paste a supplier's email, portal note or phone notes. The same message is recorded once, even if you add it again.
+Choose **Add message** and paste the supplier’s email, portal note or phone notes. Adding the same email twice keeps one copy.
 
-If your workspace reads messages automatically, Luma lists what the supplier states, such as confirmed quantities, delivery dates, shipments and conditions. Each fact is highlighted in the message. Facts that change the order, conditions and anything unclear wait for your review: confirm or reject them on the order or in Needs you.
+If your workspace reads messages automatically, choose **Add and read**. Luma lists each commitment the supplier states, such as confirmed quantities, delivery dates, shipments and conditions, and highlights the words it came from. Changes, conditions and unclear wording wait for your review: **Confirm**, **Confirm and accept** or **Reject** them on the order or in Needs you.
 
-You can always record facts yourself: select the words in the message that state them and choose **Record what this says**. To fix a recorded fact, choose **Correct** and give a reason. Corrections are added to the history; nothing is overwritten.
+You can always record commitments yourself: select the words that state them and choose **Record what this says**. To fix a recorded commitment, choose **Correct** and give a reason. Corrections are added to the **Commitment history**; nothing is overwritten.
 
-Message text is removed after one year. People whose role includes **Manage procurement** can remove it sooner from **Message details**. The recorded facts stay.
+Luma removes message text after a retention period; **Message details** shows the date. People with **Manage procurement** can choose **Remove message text now**. Recorded commitments stay.
 
-## Supplier records
+## Supplier pages
 
-A supplier's page shows its open commitments, what's awaiting confirmation or overdue, every order with its stage, and the items you buy from it with current stock and units still on order. Units on order are not confirmed incoming stock.
+A supplier’s page shows the counts **Open orders**, **Waiting on supplier**, **Need a response** and **Overdue**, every purchase order with its stage, recent messages and related issues. **Items and stock** lists what you buy from the supplier with **Available now** and **On order**. On order counts draft and open purchase orders; it isn’t confirmed incoming stock.
 
-People whose role includes **Manage procurement** can link suppliers, send orders and record messages. Approving an order also needs **Approve or reject changes**. **View procurement** is enough to see everything.
+## Replenishment
+
+The **Replenishment** panel on Procurement shows how many stock positions your replenishment rules watch and what to fix next. **Manage stock rules** opens the replenishment Workflow; see [Workflows](/docs/workflows).

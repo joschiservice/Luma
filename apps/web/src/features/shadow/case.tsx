@@ -1,5 +1,6 @@
 import './shadow.css';
 
+import { m } from '@luma/i18n/messages';
 import { CaseNotice } from '@luma/ui/components/issues/case-investigation';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Card, CardTitle } from '@luma/ui/components/primitives/card';
@@ -45,20 +46,15 @@ export function CaseShadow({
       className="shadow-panel"
       variant={embedded ? 'plain' : 'default'}
       id="shadow"
-      aria-label="Shadow evaluation"
+      aria-label={m.shadow_case_title()}
     >
-      <CardTitle as="h3">Shadow evaluation</CardTitle>
-      <p>
-        Preview a Workflow against the retained case evidence. No action is
-        executed.
-      </p>
+      <CardTitle as="h3">{m.shadow_case_title()}</CardTitle>
+      <p>{m.shadow_case_description()}</p>
       {context.isPending ? (
-        <p role="status">Checking access…</p>
+        <p role="status">{m.shadow_case_checking_access()}</p>
       ) : !canManage ? (
         <p>
-          {context.error
-            ? shadowError(context.error)
-            : 'Your role doesn’t include Activate playbooks, so you can’t evaluate or review Shadow predictions.'}
+          {context.error ? shadowError(context.error) : m.shadow_error_role()}
         </p>
       ) : (
         <ShadowCaseControls
@@ -126,29 +122,31 @@ function ShadowCaseControls({
 
   if (denied)
     return (
-      <CaseNotice error title="Shadow access unavailable">
+      <CaseNotice error title={m.shadow_case_denied_title()}>
         {shadowError(denied)}
       </CaseNotice>
     );
-  if (books.isPending) return <p role="status">Loading Workflows…</p>;
+  if (books.isPending)
+    return <p role="status">{m.shadow_case_workflows_loading()}</p>;
   if (books.error)
     return (
-      <CaseNotice error title="Workflows unavailable">
+      <CaseNotice error title={m.shadow_case_workflows_failed()}>
         <Button variant="outline" onClick={() => void books.refetch()}>
-          Retry Workflows
+          {m.common_retry()}
         </Button>
       </CaseNotice>
     );
-  if (!books.data?.length)
-    return <p>Publish a Workflow before evaluating this case.</p>;
+  if (!books.data?.length) return <p>{m.shadow_case_workflows_empty()}</p>;
 
   return (
     <>
       <Field>
-        <FieldLabel htmlFor={`${id}-workflow`}>Workflow to evaluate</FieldLabel>
+        <FieldLabel htmlFor={`${id}-workflow`}>
+          {m.shadow_case_workflow_label()}
+        </FieldLabel>
         <Select
           id={`${id}-workflow`}
-          aria-label="Workflow to evaluate"
+          aria-label={m.shadow_case_workflow_label()}
           value={workflow}
           disabled={pending || !!request}
           onValueChange={(value) => {
@@ -161,43 +159,40 @@ function ShadowCaseControls({
           }))}
         />
       </Field>
-      <p className="shadow-meta">
-        Uses the current diagnosis and bound candidate. Missing or stale
-        candidates are recorded without a passing prediction.
-      </p>
+      <p className="shadow-meta">{m.shadow_case_inputs_hint()}</p>
       <div className="shadow-actions">
         <Button
           disabled={pending || disabled || latest.isPending || latest.isError}
           onClick={() => void evaluate()}
         >
           {pending
-            ? 'Evaluating…'
+            ? m.shadow_case_running()
             : request
-              ? 'Retry evaluation'
-              : 'Run Shadow evaluation'}
+              ? m.shadow_case_retry()
+              : m.shadow_case_run()}
         </Button>
         <Button
           variant="outline"
           disabled={pending || latest.isFetching}
           onClick={() => void refresh()}
         >
-          Refresh results
+          {m.shadow_case_refresh()}
         </Button>
         <Link
           to="/app/$organizationId/workflows/$definitionId"
           params={{ organizationId, definitionId: workflow }}
           hash="shadow-report"
         >
-          Compare cases
+          {m.shadow_case_compare_link()}
         </Link>
       </div>
       {error ? <p role="alert">{shadowError(error)}</p> : null}
       {latest.error ? (
-        <CaseNotice error title="Shadow results unavailable">
+        <CaseNotice error title={m.shadow_case_results_failed()}>
           {shadowError(latest.error)}
         </CaseNotice>
       ) : latest.isPending ? (
-        <p role="status">Loading the latest evaluation…</p>
+        <p role="status">{m.shadow_case_results_loading()}</p>
       ) : latest.data ? (
         <>
           <ShadowResult item={latest.data} />
@@ -212,9 +207,7 @@ function ShadowCaseControls({
           ) : null}
         </>
       ) : (
-        <p>
-          No Shadow evaluation has been recorded for this case and Workflow.
-        </p>
+        <p>{m.shadow_case_results_empty()}</p>
       )}
     </>
   );

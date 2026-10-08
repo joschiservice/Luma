@@ -1,0 +1,111 @@
+---
+title: Install apps and connect your systems
+description: Install the Shopify and JTL apps, connect your stores and ERP, and keep each connection working.
+---
+
+Apps connect Luma to the systems you already use. Each app, such as Shopify or JTL, adds its own connections, permissions and pages to your workspace. A connection is one store or ERP installation that Luma reads from and, where you allow it, changes. Open **Apps** from the sidebar, or press **G** then **C**.
+
+## Find your apps
+
+The **Apps** page has up to three lists:
+
+- **Installed apps**: each app shows how many connections it has and links to any connection that needs attention. Choose **Manage app** to open the app’s page with its connections and access.
+- **Available apps**: apps you can install in this workspace.
+- **Previously used apps**: apps that aren’t installed anymore but still have earlier connections. Open one to see them. Records those connections imported stay in Luma.
+
+Everyone in the workspace can see apps and connections. Installing, uninstalling and approving app access needs **Manage apps**. Adding, validating and disconnecting connections needs **Manage connections**. Without these, the page says what your role can’t do.
+
+## Install an app
+
+1. Under **Available apps**, choose **Install Shopify** or **Install JTL**.
+2. Review what the app gets:
+   - **Data and actions the app can use**, such as orders, stock or proposing actions. Items marked **Sensitive** can change data in your systems, move money, change access or approval rules, or read personal data.
+   - **New permissions for roles**: the app’s own permissions. Shopify adds **Recover Shopify fulfillments** and **Correct Shopify inventory**. JTL adds **Send purchase orders to JTL** and **Change JTL shipping methods**. Owners and admins get them automatically. To give them to another role, edit the role in [Settings → Roles](/docs/roles-and-permissions).
+3. Choose **Install Shopify** or **Install JTL** in the dialog. Luma opens the app’s page so you can add a connection.
+
+An app works for the person using it and never does more than that person’s role allows. You can only grant access your own role includes. If yours doesn’t include all of it, the dialog says so and a workspace owner has to install the app.
+
+## Approve new access after an update
+
+When an app update asks for more access, its page says so and offers **Review new access**. The dialog lists the new data and actions the app asks for. Choose **Approve new access** to grant them. Until someone with **Manage apps** approves, the app keeps working with the access it already has.
+
+## Connect Shopify
+
+1. On the Shopify app’s page, choose **Add connection**.
+2. Enter a **Connection name** your team will recognize, and the **Shop hostname**: the store’s `.myshopify.com` address, such as `your-store.myshopify.com`. Shopify lists it under **Settings → Domains**.
+3. Choose **Continue to Shopify** and approve the access there. You can cancel before approving.
+
+Shopify then returns you to Luma, which checks the access it received. **Connection added. Luma confirmed it can read the data it needs.** means you’re done. If Luma couldn’t confirm every permission, check the connection’s card. If you declined in Shopify, no connection is added; add it again to retry.
+
+Luma asks for access to read orders, products, inventory, returns and fulfillment, and to change inventory and fulfillment. Luma changes them only for the stock corrections and fulfillment recoveries people approve. Before you continue, the form also says:
+
+- How much order history Luma can read. Shopify shares orders from the last 60 days unless access to older orders is approved for Luma and the store authorizes it.
+- Whether customer details are available. They are imported only after Shopify approves access to customer data and the store grants it.
+- Which access the store hasn’t granted. Reconnect the store to request it.
+
+## Connect JTL Cloud
+
+1. On the JTL app’s page, choose **Add connection** and set **Connection type** to **JTL Cloud**.
+2. Enter a **Connection name**, the **JTL Cloud tenant ID** and an **Access token** from your JTL Cloud installation. Grant that installation access to orders, products, inventory and fulfillment.
+3. Choose any [write access](#choose-what-luma-may-change-in-jtl) you want, then **Save connection**.
+4. Choose **Validate access** on the new connection to see what JTL granted.
+
+## Connect JTL-Wawi on-premise
+
+1. Register Luma as an app in JTL-Wawi. JTL-Wawi gives you an access token and a challenge code.
+2. On the JTL app’s page, choose **Add connection** and set **Connection type** to **JTL-Wawi on-premise**.
+3. Enter:
+   - **Connection name**.
+   - **HTTPS API URL**: the address of your JTL-Wawi API. It must start with `https://` and end with `/`, for example `https://erp.example.com/api/eazybusiness/`.
+   - **App ID** and **App version** of the app you registered.
+   - **Access token** and **Challenge code** from JTL-Wawi.
+4. Choose any write access, then **Save connection** and **Validate access**.
+
+Luma only connects to on-premise addresses that your Luma administrator has allowed for your workspace. Send them the HTTPS API URL before you validate. Until the address is allowed, validation can’t succeed.
+
+## Choose what Luma may change in JTL
+
+A JTL connection always asks for read access to orders, products, inventory and fulfillment. When you add it, you can also allow:
+
+- **Allow shipping method corrections**: needs read and write access to sales orders in JTL.
+- **Allow sending approved purchase orders**: needs access to suppliers, purchase orders and items in JTL. Procurement uses it to [send purchase orders](/docs/procurement#send-an-order).
+
+Luma uses a write action only after it confirms that JTL granted it. People still need the matching app permission, and every change waits for approval.
+
+## Check a connection
+
+Each connection’s card shows its state, what Luma may do through it, and a sync summary with **View Data sync**.
+
+| State                   | What it means                                                                                                                 | What to do                                                                                                                            |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| **Awaiting validation** | Luma hasn’t confirmed the credentials yet.                                                                                    | Choose **Validate access**.                                                                                                           |
+| **Validated**           | Luma confirmed the credentials and the requested permissions.                                                                 | Nothing.                                                                                                                              |
+| **Needs attention**     | Luma couldn’t confirm the credentials or every requested permission.                                                          | Check the access granted in the connected system, then **Validate access**, or open **Connection settings** to enter new credentials. |
+| **Access revoked**      | The connected system stopped accepting Luma’s access, for example because the token was revoked or the app was removed there. | Choose **Reconnect** and enter new access.                                                                                            |
+| **Disconnected**        | Someone disconnected it. Luma no longer reads or changes anything through it.                                                 | Add a new connection to use the system again.                                                                                         |
+
+The heading above the permission list says **Read-only access**, **Read and write access** or **No access enabled**. Each permission is marked **Permitted**, **Not enabled**, or **Granted · not enabled** when the system granted it but Luma isn’t using it yet, for example before validation.
+
+If a form says Luma couldn’t confirm whether your change was saved, close it and choose **Refresh list** before you try again.
+
+## Change or reconnect a connection
+
+**Connection settings** updates a connection’s access. For Shopify, **Continue to Shopify** authorizes the same store again, which also requests access that was added since. For JTL, enter the new access token, and the challenge code for on-premise, then choose **Confirm replacement** and validate again. The account or address a connection points to can’t be changed; add a new connection for a different one.
+
+When a connection shows **Access revoked**, Luma also opens an issue. Choose **Reconnect** on the connection’s card, or the reconnect button on the issue, and enter new access. The connection keeps its records and links, and sync resumes. See [Data sync](/docs/data-sync#when-a-sync-needs-you).
+
+## Disconnect a connection
+
+Choose **Disconnect**, then **Confirm disconnect**. Luma deletes the stored credentials and stops new reads and changes. Requests already sent may still finish. Records the connection imported stay in Luma.
+
+Disconnecting doesn’t revoke the access token in Shopify or JTL. To remove Luma’s access there too, uninstall the Luma app from the Shopify store, or remove Luma’s app registration or token in JTL.
+
+## Uninstall an app
+
+On the app’s page, choose **Uninstall app**, then **Uninstall and disconnect**. Uninstalling:
+
+- Disconnects every connection of the app and deletes their stored credentials.
+- Removes the app’s permissions from all roles. Reinstalling doesn’t restore them; the dialog names the roles you’ll need to grant them to again.
+- Keeps the records the app imported and its history. The app then appears under **Previously used apps**.
+
+Requests already sent to your systems may still finish. As with disconnecting, revoke Luma’s access in Shopify or JTL as well.

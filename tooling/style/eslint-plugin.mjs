@@ -5,6 +5,48 @@ const appearanceClass =
 
 export default {
   rules: {
+    'module-scope-message': {
+      meta: {
+        type: 'problem',
+        schema: [],
+        messages: {
+          moduleScope:
+            'Call message and formatting functions while rendering. At module scope the text is fixed in the language the module first loaded in; store the function instead.',
+        },
+      },
+      create(context) {
+        const localized = new Set();
+        const sources = new Set([
+          '@luma/i18n/messages',
+          '@luma/i18n/format',
+          '@luma/i18n/rich',
+        ]);
+        const functions = new Set([
+          'FunctionDeclaration',
+          'FunctionExpression',
+          'ArrowFunctionExpression',
+        ]);
+
+        return {
+          ImportDeclaration(node) {
+            if (!sources.has(node.source.value)) return;
+            for (const specifier of node.specifiers)
+              localized.add(specifier.local.name);
+          },
+          CallExpression(node) {
+            const callee =
+              node.callee.type === 'MemberExpression'
+                ? node.callee.object
+                : node.callee;
+            if (callee.type !== 'Identifier' || !localized.has(callee.name))
+              return;
+            const ancestors = context.sourceCode.getAncestors(node);
+            if (!ancestors.some((ancestor) => functions.has(ancestor.type)))
+              context.report({ node, messageId: 'moduleScope' });
+          },
+        };
+      },
+    },
     'primitive-appearance': {
       meta: {
         type: 'problem',

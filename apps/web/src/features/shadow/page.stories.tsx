@@ -85,11 +85,13 @@ export const Case: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(
-      await canvas.findByText('Shadow — not executed'),
+      await canvas.findByText('Preview only. Nothing was changed.'),
     ).toBeVisible();
-    await expect(canvas.getByText('Pass, if assumptions hold')).toBeVisible();
     await expect(
-      canvas.getByText('Not observed', { selector: 'dd' }),
+      canvas.getByText('Should succeed if the assumptions hold'),
+    ).toBeVisible();
+    await expect(
+      canvas.getByText('Not checked yet', { selector: 'dd' }),
     ).toBeVisible();
   },
 };
@@ -99,10 +101,10 @@ export const Evaluate: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(
-      await canvas.findByRole('button', { name: 'Run Shadow evaluation' }),
+      await canvas.findByRole('button', { name: 'Run test' }),
     );
     await expect(
-      await canvas.findByText('Shadow — not executed'),
+      await canvas.findByText('Preview only. Nothing was changed.'),
     ).toBeVisible();
     await expect(requests.filter((r) => r.method === 'POST')).toHaveLength(1);
   },
@@ -113,13 +115,13 @@ export const RetryEvaluation: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(
-      await canvas.findByRole('button', { name: 'Run Shadow evaluation' }),
+      await canvas.findByRole('button', { name: 'Run test' }),
     );
     await userEvent.click(
-      await canvas.findByRole('button', { name: 'Retry evaluation' }),
+      await canvas.findByRole('button', { name: 'Retry test' }),
     );
     await expect(
-      await canvas.findByText('Shadow — not executed'),
+      await canvas.findByText('Preview only. Nothing was changed.'),
     ).toBeVisible();
     const writes = requests.filter((r) => r.method === 'POST');
     await expect(writes).toHaveLength(2);
@@ -131,36 +133,36 @@ export const RecordReview: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(
-      await canvas.findByRole('combobox', { name: 'Was an action needed?' }),
+      await canvas.findByRole('combobox', { name: 'Was a change needed?' }),
     );
     await userEvent.click(
       await within(document.body).findByRole('option', { name: 'Yes' }),
     );
     await userEvent.click(
-      canvas.getByRole('combobox', { name: 'Was this case eligible?' }),
+      canvas.getByRole('combobox', {
+        name: 'Should this Workflow handle this issue?',
+      }),
     );
     await userEvent.click(
       await within(document.body).findByRole('option', { name: 'Yes' }),
     );
     await userEvent.click(
-      canvas.getByRole('combobox', { name: 'Observed operator action' }),
+      canvas.getByRole('combobox', { name: 'What did your team do?' }),
     );
     await userEvent.click(
       await within(document.body).findByRole('option', {
-        name: 'Same as the proposed action',
+        name: 'Made the proposed change',
       }),
     );
     await userEvent.click(await canvas.findByRole('checkbox'));
-    await userEvent.click(
-      canvas.getByRole('button', { name: 'Save operator comparison' }),
-    );
+    await userEvent.click(canvas.getByRole('button', { name: 'Save review' }));
     await expect(
       await canvas.findByRole('heading', {
-        name: 'Operator comparison recorded',
+        name: 'Review saved',
       }),
     ).toBeVisible();
     await expect(
-      canvas.queryByRole('button', { name: 'Save operator comparison' }),
+      canvas.queryByRole('button', { name: 'Save review' }),
     ).not.toBeInTheDocument();
   },
 };
@@ -173,11 +175,11 @@ export const Member: Story = {
     const canvas = within(canvasElement);
     await expect(
       await canvas.findByText(
-        'Your role doesn’t include Activate playbooks, so you can’t evaluate or review Shadow predictions.',
+        'Your role doesn’t allow testing Workflows. Ask a workspace owner or admin for access.',
       ),
     ).toBeVisible();
     await expect(
-      canvas.queryByRole('button', { name: 'Run Shadow evaluation' }),
+      canvas.queryByRole('button', { name: 'Run test' }),
     ).not.toBeInTheDocument();
   },
 };
@@ -190,19 +192,19 @@ export const Comparisons: Story = {
   args: { state: 'report' },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(await canvas.findByText('1 case evaluated')).toBeVisible();
+    await expect(await canvas.findByText('1 issue tested')).toBeVisible();
+    await expect(canvas.getAllByText('Not enough data').length).toBeGreaterThan(
+      0,
+    );
+    await userEvent.click(canvas.getByText('Show test details'));
     await expect(
-      canvas.getAllByText('Not enough evidence').length,
-    ).toBeGreaterThan(0);
-    await userEvent.click(canvas.getByText('View prediction and evidence'));
-    await expect(
-      await canvas.findByText('Passed', { selector: 'dd' }),
+      await canvas.findByText('Confirmed', { selector: 'dd' }),
     ).toBeVisible();
     await userEvent.clear(canvas.getByLabelText('From (UTC)'));
     await userEvent.type(canvas.getByLabelText('From (UTC)'), '2026-01-01');
     await userEvent.click(canvas.getByRole('button', { name: 'Apply dates' }));
     await expect(
-      await canvas.findByText(/Showing 2026-01-01 through/),
+      await canvas.findByText(/Showing 1 Jan 2026 through/),
     ).toBeVisible();
   },
 };
@@ -217,7 +219,10 @@ export const AlternativeAction: Story = {
   args: { state: 'no_candidate' },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    for (const label of ['Was an action needed?', 'Was this case eligible?']) {
+    for (const label of [
+      'Was a change needed?',
+      'Should this Workflow handle this issue?',
+    ]) {
       await userEvent.click(
         await canvas.findByRole('combobox', { name: label }),
       );
@@ -226,23 +231,23 @@ export const AlternativeAction: Story = {
       );
     }
     await userEvent.click(
-      canvas.getByRole('combobox', { name: 'Observed operator action' }),
+      canvas.getByRole('combobox', { name: 'What did your team do?' }),
     );
     await userEvent.click(
       await within(document.body).findByRole('option', {
-        name: 'Record another action',
+        name: 'Made a different change',
       }),
     );
     await userEvent.type(
-      canvas.getByLabelText('Action capability'),
+      canvas.getByLabelText('Change type'),
       'orders.shipping-method.write',
     );
     await userEvent.type(
-      canvas.getByLabelText('Target ID'),
+      canvas.getByLabelText('Record ID'),
       '55555555-5555-4555-8555-555555555555',
     );
     await userEvent.click(
-      canvas.getByRole('button', { name: 'Add expected result field' }),
+      canvas.getByRole('button', { name: 'Add expected result' }),
     );
     await userEvent.type(
       canvas.getByLabelText('Field name'),
@@ -253,12 +258,10 @@ export const AlternativeAction: Story = {
       'STANDARD',
     );
     await userEvent.click(await canvas.findByRole('checkbox'));
-    await userEvent.click(
-      canvas.getByRole('button', { name: 'Save operator comparison' }),
-    );
+    await userEvent.click(canvas.getByRole('button', { name: 'Save review' }));
     await expect(
       await canvas.findByRole('heading', {
-        name: 'Operator comparison recorded',
+        name: 'Review saved',
       }),
     ).toBeVisible();
     await expect(
@@ -274,7 +277,10 @@ export const RetryReview: Story = {
   args: { state: 'review_uncertain' },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    for (const label of ['Was an action needed?', 'Was this case eligible?']) {
+    for (const label of [
+      'Was a change needed?',
+      'Should this Workflow handle this issue?',
+    ]) {
       await userEvent.click(
         await canvas.findByRole('combobox', { name: label }),
       );
@@ -283,15 +289,13 @@ export const RetryReview: Story = {
       );
     }
     await userEvent.click(await canvas.findByRole('checkbox'));
+    await userEvent.click(canvas.getByRole('button', { name: 'Save review' }));
     await userEvent.click(
-      canvas.getByRole('button', { name: 'Save operator comparison' }),
-    );
-    await userEvent.click(
-      await canvas.findByRole('button', { name: 'Retry saving comparison' }),
+      await canvas.findByRole('button', { name: 'Retry saving review' }),
     );
     await expect(
       await canvas.findByRole('heading', {
-        name: 'Operator comparison recorded',
+        name: 'Review saved',
       }),
     ).toBeVisible();
     const writes = requests.filter((r) => r.path.endsWith('/review'));
@@ -307,22 +311,25 @@ export const EvidenceSelection: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await canvas.findByRole('button', {
-      name: 'View all 45 incident evidence records',
+      name: 'View all 45 evidence records',
     });
     await expect(canvas.getAllByRole('checkbox')).toHaveLength(3);
     await userEvent.click(canvas.getAllByRole('checkbox')[0]!);
-    for (const label of ['Was an action needed?', 'Was this case eligible?']) {
+    for (const label of [
+      'Was a change needed?',
+      'Should this Workflow handle this issue?',
+    ]) {
       await userEvent.click(canvas.getByRole('combobox', { name: label }));
       await userEvent.click(
         await within(document.body).findByRole('option', { name: 'Yes' }),
       );
     }
     const trigger = canvas.getByRole('button', {
-      name: 'View all 45 incident evidence records',
+      name: 'View all 45 evidence records',
     });
     await userEvent.click(trigger);
     await expect(
-      canvas.getByRole('heading', { name: 'Supporting incident evidence' }),
+      canvas.getByRole('heading', { name: 'Supporting evidence' }),
     ).toBeVisible();
     await expect(canvas.getAllByRole('checkbox')).toHaveLength(20);
     await userEvent.click(canvas.getByRole('button', { name: 'Next' }));
@@ -342,12 +349,10 @@ export const EvidenceSelection: Story = {
     await expect(trigger).toHaveFocus();
     await expect(canvas.getByText('2 evidence records selected')).toBeVisible();
     await expect(canvas.getAllByRole('checkbox')[0]!).toBeChecked();
-    await userEvent.click(
-      canvas.getByRole('button', { name: 'Save operator comparison' }),
-    );
+    await userEvent.click(canvas.getByRole('button', { name: 'Save review' }));
     await expect(
       await canvas.findByRole('heading', {
-        name: 'Operator comparison recorded',
+        name: 'Review saved',
       }),
     ).toBeVisible();
     await expect(

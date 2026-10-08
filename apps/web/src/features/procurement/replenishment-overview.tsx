@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { ArrowUpRight, Workflow } from 'lucide-react';
@@ -41,7 +42,7 @@ export function ReplenishmentOverview({
         <Workflow size={17} aria-hidden="true" />
         <div>
           <h2 id="procurement-replenishment-title">
-            Replenishment
+            {m.procurement_replenishment_title()}
             {readiness ? (
               <span className="procurement-replenishment-state">
                 {' · '}
@@ -51,11 +52,21 @@ export function ReplenishmentOverview({
           </h2>
           <p>
             {query.isPending
-              ? 'Checking stock rules…'
+              ? m.procurement_replenishment_checking()
               : query.error
-                ? `Readiness is unavailable. ${workflowError(query.error)}`
-                : readiness
-                  ? `${coverageLabel(readiness.coverage)} watched. ${next?.repair ? `Next: ${next.label}.` : next?.description}`
+                ? m.procurement_replenishment_failed({
+                    detail: workflowError(query.error),
+                  })
+                : readiness && next
+                  ? next.repair
+                    ? m.procurement_replenishment_next_repair({
+                        coverage: coverageLabel(readiness.coverage),
+                        action: next.label,
+                      })
+                    : m.procurement_replenishment_next_detail({
+                        coverage: coverageLabel(readiness.coverage),
+                        detail: next.description,
+                      })
                   : ''}
           </p>
         </div>
@@ -78,7 +89,8 @@ export function ReplenishmentOverview({
             search={{}}
             hash="rules"
           >
-            Manage stock rules <ArrowUpRight size={13} aria-hidden="true" />
+            {m.procurement_replenishment_manage()}{' '}
+            <ArrowUpRight size={13} aria-hidden="true" />
           </Link>
         </div>
       ) : null}

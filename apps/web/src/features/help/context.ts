@@ -1,31 +1,58 @@
-export type HelpTopic =
-  | 'needs-you'
-  | 'issues'
-  | 'issues/investigate'
-  | 'issues/resolve'
-  | 'orders'
-  | 'customers'
-  | 'products'
-  | 'fulfillment'
-  | 'returns'
-  | 'procurement'
-  | 'data-sync'
-  | 'insights'
-  | 'workflows'
-  | 'workflows/create';
+/**
+ * Guides that workspace routes can open from Help, as slugs under `/docs`. Each must be an
+ * existing English guide.
+ */
+export const helpTopics = [
+  'needs-you',
+  'issues',
+  'issues/investigate',
+  'issues/resolve',
+  'orders',
+  'customers',
+  'products',
+  'inventory',
+  'fulfillment',
+  'returns',
+  'procurement',
+  'apps-and-connections',
+  'data-sync',
+  'activity',
+  'records',
+  'insights',
+  'workflows',
+  'workflows/create',
+  'home',
+  'workspace-settings',
+  'roles-and-permissions',
+  'account-security',
+] as const;
+
+export type HelpTopic = (typeof helpTopics)[number];
+
+/**
+ * A route's guide: a fixed topic, or one chosen from the route's path parameters when a single
+ * route serves several pages, such as the settings sections.
+ */
+export type RouteHelp =
+  HelpTopic | ((params: Record<string, string | undefined>) => HelpTopic);
 
 declare module '@tanstack/react-router' {
   interface StaticDataRouteOption {
-    help?: HelpTopic;
+    help?: RouteHelp;
   }
 }
 
 /** Finds the most specific help topic among the active route matches. */
 export function contextualTopic(
-  matches: { staticData: { help?: HelpTopic } }[],
+  matches: {
+    staticData: { help?: RouteHelp };
+    params?: Record<string, string | undefined>;
+  }[],
 ) {
   for (let index = matches.length - 1; index >= 0; index--) {
-    const topic = matches[index]?.staticData.help;
+    const match = matches[index];
+    const help = match?.staticData.help;
+    const topic = typeof help === 'function' ? help(match?.params ?? {}) : help;
     if (topic) return topic;
   }
 

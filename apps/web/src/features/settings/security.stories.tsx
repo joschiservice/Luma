@@ -3,7 +3,7 @@ import './settings.css';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
-import { expect, userEvent, waitFor, within } from 'storybook/test';
+import { expect, userEvent, within } from 'storybook/test';
 
 import appStyles from '../../styles.css?inline';
 import { SecuritySettings } from './security';
@@ -128,7 +128,9 @@ export const NotSetUp: Story = {
     ).toBeVisible();
     await userEvent.type(page.getByLabelText('Authentication code'), '123456');
     await userEvent.click(page.getByRole('button', { name: 'Turn on' }));
-    await waitFor(() => expect(canvas.getByText('On')).toBeVisible());
+    await expect(
+      await canvas.findByText('On', {}, { timeout: 5000 }),
+    ).toBeVisible();
   },
 };
 
@@ -155,7 +157,7 @@ export const PasskeysUnavailable: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(
-      await canvas.findByText(/Passkeys could not be loaded/),
+      await canvas.findByText(/Passkeys couldn’t be loaded/),
     ).toBeVisible();
   },
 };

@@ -1,0 +1,72 @@
+---
+title: Problem untersuchen
+description: Lesen Sie, was Luma gefunden hat, prüfen Sie, wie aktuell die Nachweise sind, und verfolgen Sie ein Problem von der Untersuchung bis zum bestätigten Ergebnis.
+---
+
+Ein Problem enthält, was Luma gefunden hat, die Daten dahinter, eine eventuell vorgeschlagene Änderung und alles, was seitdem passiert ist. Lesen Sie es, bevor Sie entscheiden. Öffnen Sie ein Problem unter [Probleme](/docs/issues) oder wählen Sie **Als ganze Seite öffnen**, um mehr Platz zu haben.
+
+## Übersicht lesen [#read-the-overview]
+
+Oben im Problem stehen Zusammenfassung, Schweregrad und Status. Die **Übersicht** zeigt dann:
+
+- Was betroffen ist, etwa eine SKU, eine Bestellung oder eine Verbindung.
+- **Warum es wichtig ist**: das mögliche Risiko, etwa Einheiten, die überverkauft werden könnten. Ein mögliches Risiko bestätigt weder entgangene Umsätze noch überverkaufte Bestellungen. Kann Luma die Auswirkung noch nicht feststellen, steht dort, dass sie unbekannt ist.
+- **Nächste Aktion**: was jetzt zu tun ist. Hat Luma eine Änderung vorgeschlagen, wählen Sie **Vorgeschlagene Änderung prüfen**. Kann Luma das Problem nicht selbst beheben, steht das dort zusammen mit den manuellen Schritten.
+- **Schritte und Prüfungen**: was Sie prüfen sollten, **Bevor Sie fortfahren**, und **Erwartetes Ergebnis und Prüfung**.
+
+Auf der ganzen Seite führt die Abschnittsliste an der Seite durch **Übersicht**, **Befunde**, **Änderung und Ergebnisprüfung**, **Verlauf**, **Nachweise**, **Vorgeschlagene Änderung** und **Problemdetails**. Auf schmalen Bildschirmen wählen Sie einen Abschnitt unter **Auf dieser Seite**.
+
+## Befunde und Nachweise prüfen [#check-findings-and-evidence]
+
+**Befunde** trennt, was Luma weiß, von dem, was Luma vermutet:
+
+- **Bestätigte Fakten** sind durch gelesene Daten belegt.
+- **Was noch unsicher ist** und **Mögliche Ursachen und nötige Prüfungen** nennen Erklärungen, die Luma nicht bestätigt hat, und was sie bestätigen würde.
+- **Widersprechende Nachweise** zeigt Daten, die nicht zur Schlussfolgerung passen.
+
+Jeder Befund verweist auf seine Nachweise. **Nachweise** listet die Lesevorgänge hinter dem Problem: aus welchem System und Datensatz sie stammen, wann Luma sie gelesen hat, wann sich der Datensatz in der Quelle zuletzt geändert hat und ob der Lesevorgang vollständig war. Das Problem zeigt die letzten drei. Die Schaltfläche darunter, etwa **Alle 12 Nachweise anzeigen**, öffnet die ganze Liste.
+
+## Wenn Nachweise veraltet sind oder der Stand nicht bestätigt ist [#when-evidence-is-out-of-date-or-the-state-isnt-confirmed]
+
+Luma kennzeichnet Befunde, deren Daten Ihre Systeme möglicherweise nicht mehr widerspiegeln:
+
+- **Nachweise sind veraltet**: Die Daten sind zu alt, um danach zu handeln. Luma braucht neue Daten, bevor Sie eine Korrektur wählen. Die Empfehlungen gelten möglicherweise nicht mehr.
+- **Untersuchung läuft**: Luma liest noch Daten. Befunde und nächste Schritte erscheinen, sobald die Untersuchung fertig ist.
+- **Weitere Nachweise nötig**: Verknüpfte Datensätze, das führende System oder die gelesenen Daten reichen noch nicht für eine sichere Schlussfolgerung.
+- **Untersuchung konnte nicht abgeschlossen werden**: Es gibt noch keine Empfehlung. Wählen Sie später **Auf Aktualisierungen prüfen**.
+- **Untersuchung nicht bestätigt** oder **Aktueller Stand nicht bestätigt**: Luma hat die Live-Verbindung zum Problem verloren, zum Beispiel weil Sie offline sind. Sie sehen den zuletzt bestätigten Stand. Verbinden Sie sich neu oder aktualisieren Sie, bevor Sie handeln.
+
+Neben **Änderung und Ergebnisprüfung** bedeutet **Live**, dass sich das Problem von selbst aktualisiert. **Live-Aktualisierung unterbrochen** oder **Verbindung unterbrochen** bedeutet, dass Sie möglicherweise einen älteren Stand sehen.
+
+## Ein Problem bis zum Ergebnis verfolgen [#follow-an-issue-to-its-result]
+
+Ein Problem durchläuft fünf Phasen: **Untersuchung**, **Genehmigung**, **Änderung**, **Prüfung** und **Ergebnis**. Sein Status zeigt, wo es steht, zum Beispiel **Genehmigung nötig**, **Änderung wird gesendet** oder **Ergebnis wird geprüft**.
+
+**Änderung und Ergebnisprüfung** hält drei Dinge auseinander:
+
+1. Ob eine Änderung gesendet wurde, zum Beispiel **Wartet auf Genehmigung**, **Änderung eingeplant** oder **Keine Änderung gesendet**.
+2. Ob das verbundene System sie angenommen hat: **Änderung angenommen**, **Änderung fehlgeschlagen** oder **Ergebnis unklar**.
+3. Ob ein neuer Lesevorgang das Ergebnis bestätigt hat: **Ergebnis bestätigt** oder **Ergebnis nicht bestätigt**.
+
+Eine angenommene Änderung beweist nicht, dass das Problem behoben ist. Nur **Gelöst und bestätigt** bedeutet, dass eine neue Prüfung die Korrektur bestätigt hat. Siehe [Ergebnis bestätigen](/docs/issues/resolve#confirm-the-outcome).
+
+## Zugehörige Datensätze und Verbindungen ansehen [#look-at-related-records-and-connections]
+
+Auf der ganzen Seite öffnen die Links neben **Probleme** oben die Datensätze hinter dem Problem:
+
+- **Bestand ansehen** und **Produkt ansehen** für eine SKU.
+- **Fulfillment ansehen** für ein verzögertes Fulfillment.
+- **Verbindung öffnen** für ein Verbindungsproblem. Hat die Verbindung den Zugriff verloren, steht dort stattdessen ihr Name mit „neu verbinden“, etwa **Mein Shop neu verbinden**.
+- **Datensätze suchen** sucht unter [Datensätze](/docs/records) nach dem betroffenen Datensatz.
+
+**Problemdetails** nennt die Quellsysteme, die Aktualität der Daten, den betroffenen Datensatz, wann Luma das Problem zuerst erkannt hat und die letzte Aktivität. Mit **Problem-ID kopieren** teilen Sie die ID mit Ihrem Team.
+
+## Verlauf lesen [#read-the-history]
+
+**Verlauf** listet alles, was passiert ist, das Neueste zuerst: wann das Problem erkannt wurde, Genehmigungen, Ablehnungen, Eskalationen, gesendete Änderungen und Prüfungen. Bei jedem Eintrag steht, wer ihn ausgelöst hat. Wählen Sie **Gesamten Verlauf anzeigen**, um alle Einträge zu sehen und nach **Ereignistyp** oder **Ergebnis** zu filtern.
+
+Lässt sich der Verlauf nicht laden, funktioniert der Rest des Problems weiter. Wählen Sie **Verlauf erneut laden**.
+
+## Nächste Schritte [#next-steps]
+
+Wie Sie eine vorgeschlagene Änderung genehmigen, ablehnen oder eskalieren, lesen Sie unter [Problem lösen](/docs/issues/resolve). Um zu sehen, was ein Workflow mit diesem Problem tun würde, ohne etwas zu ändern, öffnen Sie **Workflow an diesem Problem testen**. Siehe [Workflow gefahrlos testen](/docs/shadow-mode).

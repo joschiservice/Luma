@@ -1,6 +1,7 @@
 import './records.css';
 
 import type { AppUiProps } from '@luma/app-host/web';
+import { m } from '@luma/i18n/messages';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Input } from '@luma/ui/components/primitives/input';
 import { useForm } from '@tanstack/react-form';
@@ -84,11 +85,10 @@ function ShopifyToken({ connection, services, done }: AppUiProps) {
       }}
     >
       <p className="field-help">
-        Enter a new Admin API access token for {connection.target.shop}. Then
-        validate access to resume reads.
+        {m.shopify_token_help({ shop: connection.target.shop ?? '' })}
       </p>
       <div className="form-field">
-        <label htmlFor="shopify-token">Access token</label>
+        <label htmlFor="shopify-token">{m.shopify_token_label()}</label>
         <Input
           id="shopify-token"
           type="password"
@@ -101,7 +101,7 @@ function ShopifyToken({ connection, services, done }: AppUiProps) {
       </div>
       <p role="alert">{message}</p>
       <Button type="submit" disabled={pending || !token.trim()}>
-        {pending ? 'Saving…' : 'Save access token'}
+        {pending ? m.common_saving() : m.shopify_token_save()}
       </Button>
     </form>
   );
@@ -154,17 +154,16 @@ function ShopifyAuthorization(props: AppUiProps) {
         }}
         aria-busy={pending}
       >
-        <p className="field-help">
-          Approve read access to orders, products, inventory, returns and
-          fulfillment in Shopify. You can cancel before approving.
-        </p>
+        <p className="field-help">{m.shopify_authorize_help()}</p>
         <ShopifyAccess services={services} connectionId={connection?.id} />
         {(['label', 'shop'] as const).map((name) => (
           <form.Field key={name} name={name}>
             {(field) => (
               <div className="form-field">
                 <label htmlFor={`shopify-${name}`}>
-                  {name === 'shop' ? 'Shop hostname' : 'Connection name'}
+                  {name === 'shop'
+                    ? m.shopify_authorize_label_shop()
+                    : m.shopify_authorize_label_name()}
                 </label>
                 <Input
                   id={`shopify-${name}`}
@@ -175,7 +174,9 @@ function ShopifyAuthorization(props: AppUiProps) {
                   maxLength={name === 'shop' ? 253 : 120}
                   disabled={pending || (name === 'shop' && !!shop)}
                   placeholder={
-                    name === 'shop' ? 'your-store.myshopify.com' : undefined
+                    name === 'shop'
+                      ? m.shopify_authorize_shop_placeholder()
+                      : undefined
                   }
                 />
               </div>
@@ -184,7 +185,9 @@ function ShopifyAuthorization(props: AppUiProps) {
         ))}
         <p role="alert">{message}</p>
         <Button type="submit" disabled={pending}>
-          {pending ? 'Opening Shopify…' : 'Continue to Shopify'}
+          {pending
+            ? m.shopify_authorize_opening()
+            : m.shopify_authorize_continue()}
         </Button>
       </form>
       {connection?.status === 'active' ? (

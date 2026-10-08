@@ -5,6 +5,8 @@ import {
   evaluateCodeSchema,
   type WorkflowVersionView,
 } from '@luma/api-contract';
+import { formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -53,16 +55,13 @@ const sample = (fields: Record<string, string>) =>
     ]),
   );
 const print = (value: unknown) => JSON.stringify(value, null, 2);
-const reasons: Record<string, string> = {
-  code_error:
-    'The code could not complete. Check the source and example inputs.',
-  resource_limit: 'The step reached its execution limit.',
-  invalid_output: 'The returned values do not match the declared outputs.',
-  capability_denied:
-    'A capability was not granted or its example reply is missing.',
-  unavailable:
-    'The code runtime is unavailable on this Luma server. Whoever runs the server needs to check its configuration.',
-  cancelled: 'Evaluation cancelled.',
+const reasons: Record<string, () => string> = {
+  code_error: m.workflows_code_reason_code_error,
+  resource_limit: m.workflows_code_reason_resource_limit,
+  invalid_output: m.workflows_code_reason_invalid_output,
+  capability_denied: m.workflows_code_reason_capability_denied,
+  unavailable: m.workflows_code_reason_unavailable,
+  cancelled: m.workflows_code_reason_cancelled,
 };
 
 /** Reviews immutable code and evaluates examples without calling connected systems. */
@@ -151,9 +150,7 @@ function CodeStepPanel({
     } else {
       if (error instanceof CodeEvaluationRejected) setRequest(null);
       setError(
-        error instanceof Error
-          ? error.message
-          : 'The evaluation could not complete. Try again.',
+        error instanceof Error ? error.message : m.workflows_code_test_failed(),
       );
     }
   }
@@ -175,9 +172,7 @@ function CodeStepPanel({
           replies: JSON.parse(replies),
         });
     } catch {
-      setError(
-        'Enter valid JSON objects with scalar values for inputs, expected outputs and capability replies.',
-      );
+      setError(m.workflows_code_invalid_json());
 
       return;
     }
@@ -230,63 +225,83 @@ function CodeStepPanel({
           <Braces size={19} aria-hidden="true" />
           <div>
             <h2 id={`${id}-title`}>{step.id.replaceAll('-', ' ')}</h2>
-            <p>TypeScript · Version {version.version}</p>
+            <p>
+              {m.workflows_code_language_version({ version: version.version })}
+            </p>
           </div>
         </div>
         <Badge tone="neutral">
-          <ShieldCheck size={12} aria-hidden="true" /> Sandboxed
+          <ShieldCheck size={12} aria-hidden="true" />{' '}
+          {m.workflows_code_isolated()}
         </Badge>
       </CardHeader>
       <dl className="code-step-limits">
         <div>
-          <dt>Time limit</dt>
-          <dd>{step.limits.wallTimeMs / 1000}s</dd>
-        </div>
-        <div>
-          <dt>Guest memory</dt>
-          <dd>{step.limits.memoryBytes / 1048576} MB</dd>
-        </div>
-        <div>
-          <dt>Capability access</dt>
+          <dt>{m.workflows_code_time_limit()}</dt>
           <dd>
-            {step.grants.length ? `${step.grants.length} granted` : 'None'}
+            {m.workflows_code_seconds({
+              seconds: formatNumber(step.limits.wallTimeMs / 1000),
+            })}
+          </dd>
+        </div>
+        <div>
+          <dt>{m.workflows_code_memory_limit()}</dt>
+          <dd>
+            {m.workflows_code_megabytes({
+              size: formatNumber(step.limits.memoryBytes / 1048576, {
+                maximumFractionDigits: 1,
+              }),
+            })}
+          </dd>
+        </div>
+        <div>
+          <dt>{m.workflows_code_allowed_actions()}</dt>
+          <dd>
+            {step.grants.length
+              ? m.workflows_code_actions_count({ count: step.grants.length })
+              : m.common_none()}
           </dd>
         </div>
       </dl>
       <Tabs defaultValue="source" className="code-step-tabs">
-        <TabsList variant="line" aria-label={`${step.id} views`}>
-          <TabsTrigger value="source">Source & access</TabsTrigger>
-          <TabsTrigger value="evaluate">Test example</TabsTrigger>
+        <TabsList
+          variant="line"
+          aria-label={m.workflows_code_tabs_label({ step: step.id })}
+        >
+          <TabsTrigger value="source">
+            {m.workflows_code_tab_source()}
+          </TabsTrigger>
+          <TabsTrigger value="evaluate">
+            {m.workflows_code_tab_test()}
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="source" className="code-step-content">
           <div className="code-source-toolbar">
             <span>main.ts</span>
             <Button
               variant="ghost"
-              aria-label="Copy TypeScript source"
+              aria-label={m.workflows_code_copy_label()}
               onClick={() => {
                 void navigator.clipboard
                   .writeText(step.source)
                   .then(() => setCopied(true))
-                  .catch(() =>
-                    setError('Copy failed. Select the source to copy it.'),
-                  );
+                  .catch(() => setError(m.workflows_code_copy_failed()));
               }}
             >
               {copied ? <Check size={14} /> : <Copy size={14} />}
-              {copied ? 'Copied' : 'Copy'}
+              {copied ? m.common_copied() : m.common_copy()}
             </Button>
           </div>
           <pre
             className="code-step-source"
             tabIndex={0}
-            aria-label="TypeScript source"
+            aria-label={m.workflows_code_source_label()}
           >
             <code>{step.source}</code>
           </pre>
           <div className="code-step-contract">
             <div>
-              <h3>Returns</h3>
+              <h3>{m.workflows_code_returns()}</h3>
               <dl>
                 {Object.entries(step.fields).map(([name, type]) => (
                   <div key={name}>
@@ -297,7 +312,7 @@ function CodeStepPanel({
               </dl>
             </div>
             <div>
-              <h3>Allowed capabilities</h3>
+              <h3>{m.workflows_code_allowed_actions()}</h3>
               {step.grants.length ? (
                 <ul>
                   {step.grants.map((grant) => (
@@ -307,40 +322,32 @@ function CodeStepPanel({
                   ))}
                 </ul>
               ) : (
-                <p>This step only computes values from its inputs.</p>
+                <p>{m.workflows_code_compute_only()}</p>
               )}
             </div>
           </div>
           <Disclosure>
-            <summary>Runtime and artifact</summary>
+            <summary>{m.workflows_code_runtime_details()}</summary>
             <p>{step.runtime}</p>
-            <p>Instruction budget: {step.limits.fuel.toLocaleString()}</p>
+            <p>{m.workflows_code_fuel({ fuel: step.limits.fuel })}</p>
             <code className="code-step-digest">{step.artifactDigest}</code>
           </Disclosure>
         </TabsContent>
         <TabsContent value="evaluate" className="code-step-content">
-          <p className="code-step-help">
-            Try an example and compare the returned values with your expected
-            result. Connected systems are never called.
-          </p>
+          <p className="code-step-help">{m.workflows_code_test_help()}</p>
           {!canManage ? (
-            <Alert>
-              Running evaluations requires Author workflows, which your role
-              doesn’t include.
-            </Alert>
+            <Alert>{m.workflows_code_cannot_test()}</Alert>
           ) : lost ? (
-            <Alert tone="danger">
-              Access changed. Refresh the workflow to continue.
-            </Alert>
+            <Alert tone="danger">{m.workflows_code_access_changed()}</Alert>
           ) : (
             <>
               <div className="code-step-editor-grid">
                 <Field>
                   <FieldLabel htmlFor={`${id}-input`}>
-                    Example inputs
+                    {m.workflows_code_inputs()}
                   </FieldLabel>
                   <FieldDescription id={`${id}-input-help`}>
-                    Inputs, evidence, and outputs from earlier steps.
+                    {m.workflows_code_inputs_help()}
                   </FieldDescription>
                   <Textarea
                     id={`${id}-input`}
@@ -354,10 +361,10 @@ function CodeStepPanel({
                 </Field>
                 <Field>
                   <FieldLabel htmlFor={`${id}-expected`}>
-                    Expected outputs
+                    {m.workflows_code_expected()}
                   </FieldLabel>
                   <FieldDescription>
-                    Use the names and types declared in Returns.
+                    {m.workflows_code_expected_help()}
                   </FieldDescription>
                   <Textarea
                     id={`${id}-expected`}
@@ -372,11 +379,10 @@ function CodeStepPanel({
               {step.grants.length ? (
                 <Field>
                   <FieldLabel htmlFor={`${id}-replies`}>
-                    Example capability replies
+                    {m.workflows_code_replies()}
                   </FieldLabel>
                   <FieldDescription>
-                    Provide one reply object for each capability the code
-                    requests.
+                    {m.workflows_code_replies_help()}
                   </FieldDescription>
                   <Textarea
                     id={`${id}-replies`}
@@ -396,7 +402,7 @@ function CodeStepPanel({
                     onClick={() => void cancel()}
                   >
                     <Square size={14} />
-                    Cancel evaluation
+                    {m.workflows_code_cancel_test()}
                   </Button>
                 ) : evaluationId ? (
                   <Button
@@ -407,19 +413,19 @@ function CodeStepPanel({
                       setError('');
                     }}
                   >
-                    Edit example
+                    {m.workflows_code_edit_example()}
                   </Button>
                 ) : (
                   <Button disabled={busy} onClick={() => void start()}>
                     <Play size={14} />
                     {busy
-                      ? 'Starting…'
+                      ? m.workflows_code_starting()
                       : request
-                        ? 'Retry evaluation'
-                        : 'Run evaluation'}
+                        ? m.workflows_code_retry_test()
+                        : m.workflows_code_run_test()}
                   </Button>
                 )}
-                <span>Fixed version · No production writes</span>
+                <span>{m.workflows_code_test_note()}</span>
               </div>
               {evaluation ? (
                 <div
@@ -430,49 +436,51 @@ function CodeStepPanel({
                   <div className="code-step-heading">
                     <strong>
                       {running
-                        ? 'Evaluating example…'
+                        ? m.workflows_code_testing()
                         : evaluation.state === 'passed'
-                          ? 'Example passed'
+                          ? m.workflows_code_passed()
                           : evaluation.state === 'cancelled'
-                            ? 'Evaluation cancelled'
-                            : 'Example did not pass'}
+                            ? m.workflows_code_canceled()
+                            : m.workflows_code_not_passed()}
                     </strong>
                     {output ? (
                       <span>
-                        {output.telemetry.wallTimeMs} ms ·{' '}
-                        {output.telemetry.requests} requests
+                        {m.workflows_code_test_telemetry({
+                          duration: formatNumber(output.telemetry.wallTimeMs),
+                          requests: output.telemetry.requests,
+                        })}
                       </span>
                     ) : null}
                   </div>
                   {running ? (
-                    <p>The code runs within its published resource limits.</p>
+                    <p>{m.workflows_code_running_help()}</p>
                   ) : output?.telemetry.outcome === 'completed' ? (
                     <>
                       <p>
                         {evaluation.state === 'passed'
-                          ? 'Returned values match the expected outputs.'
-                          : 'Returned values differ from the expected outputs.'}
+                          ? m.workflows_code_values_match()
+                          : m.workflows_code_values_differ()}
                       </p>
-                      <pre aria-label="Returned values">
+                      <pre aria-label={m.workflows_code_returned_values()}>
                         {print(output.values)}
                       </pre>
                     </>
                   ) : (
                     <p>
                       {output
-                        ? reasons[output.telemetry.outcome]
+                        ? reasons[output.telemetry.outcome]?.()
                         : evaluation.state === 'failed'
-                          ? 'The evaluator stopped before returning a result. Run the example again.'
-                          : 'The evaluation has stopped.'}
+                          ? m.workflows_code_stopped_early()
+                          : m.workflows_code_stopped()}
                     </p>
                   )}
                 </div>
               ) : null}
               {query.error && !lost ? (
                 <Alert tone="danger">
-                  Results are temporarily unavailable.{' '}
+                  {m.workflows_code_result_unavailable()}{' '}
                   <Button variant="ghost" onClick={() => void query.refetch()}>
-                    Retry results
+                    {m.workflows_code_reload_result()}
                   </Button>
                 </Alert>
               ) : null}

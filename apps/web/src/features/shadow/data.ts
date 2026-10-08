@@ -5,6 +5,7 @@ import {
   shadowReviewSchema,
   shadowWindowSchema,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { nextCalendarDay, workspaceInstant } from '@luma/ui/lib/timezone';
 import { queryOptions } from '@tanstack/react-query';
 
@@ -39,7 +40,7 @@ function failure(result: { status: number; body: unknown }): never {
       'message' in body &&
       typeof body.message === 'string'
       ? body.message
-      : 'Shadow data is unavailable. Try again.',
+      : m.shadow_error_unavailable(),
   );
 }
 
@@ -84,7 +85,7 @@ export function shadowWindow(
     Number.isFinite(Date.parse(day)) &&
     new Date(day).toISOString().slice(0, 10) === day;
   if (!valid(from) || !valid(to) || from > to)
-    throw new Error('Choose valid dates with the end on or after the start.');
+    throw new Error(m.shadow_error_dates());
 
   return shadowWindowSchema.parse({
     workflow,
@@ -162,15 +163,13 @@ export function candidateAction(
 /** Explains access loss, conflicts and uncertain writes without implying success. */
 export function shadowError(error: unknown) {
   if (error instanceof IdentityError) {
-    if (error.status === 401) return 'Your session expired. Sign in again.';
-    if (error.status === 403)
-      return 'Your role doesn’t include Activate playbooks, which Shadow evaluations require.';
-    if (error.status === 404)
-      return 'This case or evaluation is no longer available.';
+    if (error.status === 401) return m.shadow_error_session();
+    if (error.status === 403) return m.shadow_error_role();
+    if (error.status === 404) return m.shadow_error_not_found();
     if (error instanceof ShadowError) return error.feedback;
   }
 
-  return 'The result could not be confirmed. Retry the same request to check it.';
+  return m.shadow_error_unconfirmed();
 }
 
 /** Hides retained private data when access can no longer be confirmed. */

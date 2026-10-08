@@ -1,4 +1,7 @@
 import type { ActivityEvent, OrderDetail } from '@luma/api-contract';
+import { formatList } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { StateDot } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
@@ -10,6 +13,7 @@ import { OrderSection } from './order-section';
 import {
   formatQuantity,
   paymentLabels,
+  returnLabels,
   shipmentLabels,
   statusLabels,
 } from './presentation';
@@ -17,8 +21,33 @@ import {
 function sourceLabel(detail: OrderDetail, connectionId: string) {
   return (
     detail.sources.find((source) => source.connectionId === connectionId)
-      ?.label ?? 'Connected source'
+      ?.label ?? m.orders_source_fallback()
   );
+}
+
+type HistoryEntry = OrderDetail['history']['entries'][number];
+
+function historyLabel(entry: HistoryEntry) {
+  if (entry.entityKind === 'order') {
+    const status = statusLabels[entry.status] ?? entry.status;
+
+    return entry.paymentStatus
+      ? m.orders_history_order_payment({
+          status,
+          payment: paymentLabels[entry.paymentStatus] ?? entry.paymentStatus,
+        })
+      : m.orders_history_order({ status });
+  }
+  if (entry.entityKind === 'fulfillment')
+    return m.orders_history_fulfillment({
+      status: shipmentLabels[entry.status] ?? entry.status,
+    });
+  if (entry.entityKind === 'return')
+    return m.orders_history_return({
+      status: returnLabels[entry.status] ?? entry.status,
+    });
+
+  return m.orders_history_refund();
 }
 
 /** Lists fulfillment work each source reports, linking each to its record; `from` is the order path. */
@@ -33,54 +62,67 @@ export function OrderFulfillments({
 }) {
   return (
     <OrderSection
-      title="Fulfillments"
-      description="Fulfillment work reported by each source. Mirrored work in different systems is not added together."
+      title={m.orders_fulfillments_title()}
+      description={m.orders_fulfillments_description()}
     >
       {detail.fulfillments.length ? (
         <ul className="order-list">
-          {detail.fulfillments.map((item) => (
-            <li key={`${item.id}:${item.connectionId}`}>
-              <span className="orders-cell-stack">
-                <strong>
-                  {shipmentLabels[item.status] ?? item.status}
-                  {item.deleted ? ' · removed at source' : ''}
-                </strong>
-                <small>
-                  {sourceLabel(detail, item.connectionId)}
-                  {' · '}
-                  {item.lines
-                    .map((line) => formatQuantity(line.quantity, line.unit))
-                    .join(' + ')}{' '}
-                  units
-                  {item.failureCode ? ` · Failure ${item.failureCode}` : ''}
-                </small>
-                <small>
-                  {item.lastProgressAt ? (
-                    <>
-                      Last progress{' '}
-                      <WorkspaceDate value={item.lastProgressAt} />
-                    </>
-                  ) : (
-                    'No progress time reported'
-                  )}
-                  {item.externalId ? ` · Source ID ${item.externalId}` : ''}
-                </small>
-              </span>
-              <Link
-                to="/app/$organizationId/fulfillment/$fulfillmentId"
-                params={{ organizationId, fulfillmentId: item.id }}
-                search={{ from }}
-                aria-label={`Open ${shipmentLabels[item.status] ?? item.status} fulfillment`}
-              >
-                Open <ArrowRight size={13} aria-hidden="true" />
-              </Link>
-            </li>
-          ))}
+          {detail.fulfillments.map((item) => {
+            const status = shipmentLabels[item.status] ?? item.status;
+
+            return (
+              <li key={`${item.id}:${item.connectionId}`}>
+                <span className="orders-cell-stack">
+                  <strong>
+                    {item.deleted
+                      ? m.orders_fulfillments_removed({ status })
+                      : status}
+                  </strong>
+                  <small>
+                    {[
+                      sourceLabel(detail, item.connectionId),
+                      m.orders_fulfillments_quantities({
+                        quantities: formatList(
+                          item.lines.map((line) =>
+                            formatQuantity(line.quantity, line.unit),
+                          ),
+                          { type: 'unit' },
+                        ),
+                      }),
+                      item.failureCode
+                        ? m.orders_fulfillments_failure_code({
+                            code: item.failureCode,
+                          })
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </small>
+                  <small>
+                    {item.lastProgressAt
+                      ? rich(m.orders_fulfillments_progress, {
+                          date: <WorkspaceDate value={item.lastProgressAt} />,
+                        })
+                      : m.orders_fulfillments_no_progress()}
+                    {item.externalId
+                      ? ` · ${m.orders_fulfillments_source_id({ id: item.externalId })}`
+                      : ''}
+                  </small>
+                </span>
+                <Link
+                  to="/app/$organizationId/fulfillment/$fulfillmentId"
+                  params={{ organizationId, fulfillmentId: item.id }}
+                  search={{ from }}
+                  aria-label={m.orders_fulfillments_open({ status })}
+                >
+                  {m.common_open()} <ArrowRight size={13} aria-hidden="true" />
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       ) : (
-        <p className="order-note">
-          No source has reported fulfillment work for this order.
-        </p>
+        <p className="order-note">{m.orders_fulfillments_empty()}</p>
       )}
     </OrderSection>
   );
@@ -90,41 +132,39 @@ export function OrderFulfillments({
 export function ObservedHistory({ detail }: { detail: OrderDetail }) {
   return (
     <OrderSection
-      title="Observed history"
-      description="Each entry is a state Luma read from a source, newest first. It shows what the source reported at that time, not every change the source made."
+      title={m.orders_history_title()}
+      description={m.orders_history_description()}
     >
       <ol className="order-history">
         {detail.history.entries.map((entry) => (
           <li key={entry.snapshotId}>
             <span className="orders-cell-stack">
               <strong>
-                {entry.entityKind === 'order'
-                  ? `Order ${(statusLabels[entry.status] ?? entry.status).toLowerCase()}${entry.paymentStatus ? ` · ${(paymentLabels[entry.paymentStatus] ?? entry.paymentStatus).toLowerCase()}` : ''}`
-                  : entry.entityKind === 'fulfillment'
-                    ? `Fulfillment ${(shipmentLabels[entry.status] ?? entry.status).toLowerCase()}`
-                    : entry.entityKind === 'return'
-                      ? `Return ${entry.status}`
-                      : 'Refund recorded'}
-                {entry.deleted ? ' · removed' : ''}
+                {entry.deleted
+                  ? m.orders_history_removed({ entry: historyLabel(entry) })
+                  : historyLabel(entry)}
               </strong>
               <small>
-                {sourceLabel(detail, entry.connectionId)}
-                {' · Source time '}
-                {entry.sourceUpdatedAt ? (
-                  <WorkspaceDate value={entry.sourceUpdatedAt} />
-                ) : (
-                  'not reported'
-                )}
-                {' · Read '}
-                <WorkspaceDate value={entry.observedAt} />
+                {entry.sourceUpdatedAt
+                  ? rich(m.orders_history_times, {
+                      source: sourceLabel(detail, entry.connectionId),
+                      updated: <WorkspaceDate value={entry.sourceUpdatedAt} />,
+                      read: <WorkspaceDate value={entry.observedAt} />,
+                    })
+                  : rich(m.orders_history_times_unreported, {
+                      source: sourceLabel(detail, entry.connectionId),
+                      read: <WorkspaceDate value={entry.observedAt} />,
+                    })}
               </small>
             </span>
-            {entry.current ? <Badge>Current</Badge> : null}
+            {entry.current ? <Badge>{m.orders_history_current()}</Badge> : null}
           </li>
         ))}
       </ol>
       {detail.history.truncated ? (
-        <p className="order-note">Showing the latest 100 entries.</p>
+        <p className="order-note">
+          {m.orders_history_truncated({ count: 100 })}
+        </p>
       ) : null}
     </OrderSection>
   );
@@ -140,8 +180,8 @@ export function LumaActivity({
 }) {
   return (
     <OrderSection
-      title="Luma activity"
-      description="Decisions, actions and results Luma recorded for this order, its issues and workflow runs."
+      title={m.orders_activity_title()}
+      description={m.orders_activity_description()}
     >
       {detail.activity.entries.length ? (
         <ol className="order-activity">
@@ -163,19 +203,19 @@ export function LumaActivity({
                   params={{ organizationId, exceptionId: entry.exceptionId }}
                   search={{ view: 'active' }}
                 >
-                  Issue
+                  {m.orders_activity_open_issue()}
                 </Link>
               ) : null}
             </li>
           ))}
         </ol>
       ) : (
-        <p className="order-note">
-          No Luma activity is recorded for this order in the last year.
-        </p>
+        <p className="order-note">{m.orders_activity_empty()}</p>
       )}
       {detail.activity.truncated ? (
-        <p className="order-note">Showing the latest 25 events.</p>
+        <p className="order-note">
+          {m.orders_activity_truncated({ count: 25 })}
+        </p>
       ) : null}
     </OrderSection>
   );

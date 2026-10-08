@@ -49,15 +49,12 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
   await page.getByRole('option', { name: 'Northstar Supply' }).click();
   await dialog.getByLabel('Filter stock positions').fill(f.position.sku);
   // A SKU can come from several sources; pick the configured connection's position.
-  const sku = new RegExp(f.position.sku.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  const choices = dialog.getByRole('checkbox', { name: sku });
-  await (
-    (await choices.count()) > 1
-      ? dialog.getByRole('checkbox', {
-          name: new RegExp(f.position.connectionId.slice(0, 8)),
-        })
-      : choices
-  ).check();
+  const sku = f.position.sku.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  await dialog
+    .getByRole('checkbox', {
+      name: new RegExp(`${sku}.*source ${f.position.connectionId.slice(0, 8)}`),
+    })
+    .check();
   await dialog
     .getByLabel('Minimum stock', { exact: true })
     .fill(String(f.position.available + 10));
@@ -132,7 +129,7 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
     .getByText('The expected result was verified.', { exact: true })
     .waitFor();
   await review.getByText('Draft verified', { exact: true }).waitFor();
-  await review.getByText('approved', { exact: true }).waitFor();
+  await review.getByText('Approved', { exact: true }).waitFor();
   await review.getByLabel('Recorded stock context').waitFor();
   await review.screenshot({
     path: '/tmp/luma74-run-desktop.png',
@@ -159,7 +156,7 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
     .first()
     .waitFor();
   await review.goBack();
-  await review.getByRole('link', { name: 'Inspect purchase order' }).click();
+  await review.getByRole('link', { name: 'Open purchase order' }).click();
   await review.getByText('Northstar Supply', { exact: true }).first().waitFor();
   // The stock record shows the same readiness and returns to the original context.
   await page.getByRole('link', { name: 'Stock record' }).first().click();

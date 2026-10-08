@@ -1,20 +1,26 @@
 import { Combobox } from '@base-ui/react/combobox';
+import { m } from '@luma/i18n/messages';
 import { Check, Search } from 'lucide-react';
 
 import type { SelectOption } from './select';
 
-/** Chooses one option from a long list by typing part of its label. */
+/**
+ * Chooses one option from a long list by typing part of its label. `emptyLabel` replaces the
+ * generic text shown when nothing matches, such as "No matching timezones".
+ */
 export function SearchableSelect({
   options,
   value,
   disabled,
   onValueChange,
+  emptyLabel,
   'aria-labelledby': ariaLabelledBy,
 }: {
   options: readonly SelectOption[];
   value: string;
   disabled?: boolean;
   onValueChange: (value: string | null) => void;
+  emptyLabel?: string | undefined;
   'aria-labelledby': string;
 }) {
   return (
@@ -41,7 +47,7 @@ export function SearchableSelect({
         >
           <Combobox.Popup className="searchable-select-popup">
             <Combobox.Empty className="searchable-select-empty">
-              No matching timezones
+              {emptyLabel ?? m.ui_select_no_matches()}
             </Combobox.Empty>
             <Combobox.List className="searchable-select-list">
               {(option: SelectOption) => (

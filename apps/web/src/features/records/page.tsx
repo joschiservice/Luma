@@ -5,6 +5,9 @@ import {
   recordKindSchema,
   type RecordSummary,
 } from '@luma/api-contract';
+import { formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -20,6 +23,7 @@ import {
 import { Pagination } from '@luma/ui/components/primitives/pagination';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { PageTitle } from '@luma/ui/components/workspace/page-header';
+import { quantityUnit } from '@luma/ui/lib/units';
 import { useQuery } from '@tanstack/react-query';
 import {
   Link,
@@ -40,16 +44,37 @@ import {
   recordsOptions,
 } from './data';
 
-const kinds: { value: string; kind: RecordKind | undefined; label: string }[] =
-  [
-    { value: 'all', kind: undefined, label: 'All records' },
-    { value: 'order', kind: 'order', label: 'Orders' },
-    { value: 'fulfillment', kind: 'fulfillment', label: 'Fulfillments' },
-    { value: 'position', kind: 'position', label: 'Stock' },
-    { value: 'sku', kind: 'sku', label: 'SKUs' },
-    { value: 'product', kind: 'product', label: 'Products' },
-    { value: 'issue', kind: 'issue', label: 'Issues' },
-  ];
+const kinds = (): {
+  value: string;
+  kind: RecordKind | undefined;
+  label: string;
+}[] => [
+  { value: 'all', kind: undefined, label: m.records_kind_all() },
+  { value: 'order', kind: 'order', label: m.records_kind_order_plural() },
+  {
+    value: 'fulfillment',
+    kind: 'fulfillment',
+    label: m.records_kind_fulfillment_plural(),
+  },
+  {
+    value: 'position',
+    kind: 'position',
+    label: m.records_kind_position_plural(),
+  },
+  { value: 'sku', kind: 'sku', label: m.records_kind_sku_plural() },
+  { value: 'product', kind: 'product', label: m.records_kind_product_plural() },
+  { value: 'issue', kind: 'issue', label: m.records_kind_issue_plural() },
+];
+
+/** Singular name of each record type, as shown beside a record. */
+const kindLabels = {
+  order: m.records_kind_order,
+  fulfillment: m.records_kind_fulfillment,
+  position: m.records_kind_position,
+  sku: m.records_kind_sku,
+  product: m.records_kind_product,
+  issue: m.records_kind_issue,
+} satisfies Record<RecordKind, () => string>;
 
 /**
  * Offers connected sources when there is more than one to choose from. An applied source always
@@ -63,7 +88,10 @@ function sourceOptions(
     connections && (connections.length > 1 || applied) ? connections : []
   ).map((item) => ({ value: item.id, label: item.label }));
   if (applied && !options.some((option) => option.value === applied))
-    options.push({ value: applied, label: `Source ${applied.slice(0, 8)}` });
+    options.push({
+      value: applied,
+      label: m.records_source_unknown({ id: applied.slice(0, 8) }),
+    });
 
   return options;
 }
@@ -98,14 +126,14 @@ function recordColumns(
   return [
     {
       key: 'kind',
-      header: 'Type',
+      header: m.records_column_type(),
       cell: (record) => (
-        <span className="record-row-kind">{record.kind.replace('_', ' ')}</span>
+        <span className="record-row-kind">{kindLabels[record.kind]()}</span>
       ),
     },
     {
       key: 'record',
-      header: 'Record',
+      header: m.records_column_record(),
       cell: (record) => (
         <span className="record-row-main">
           <DataTableRowLink href={href(record)}>
@@ -117,7 +145,7 @@ function recordColumns(
     },
     {
       key: 'status',
-      header: 'Status',
+      header: m.common_status(),
       hideOnNarrow: true,
       cell: (record) => (
         <span className="record-row-status">{record.status}</span>
@@ -125,7 +153,7 @@ function recordColumns(
     },
     {
       key: 'source',
-      header: 'Source',
+      header: m.common_source(),
       hideOnNarrow: true,
       cell: (record) => (
         <span className="record-row-source">
@@ -139,12 +167,14 @@ function recordColumns(
             {record.sources.length
               ? record.sources.length === 1
                 ? record.sources[0]?.label
-                : `${record.sources.length} sources`
+                : m.records_source_count({ count: record.sources.length })
               : 'Luma'}
           </Badge>
           {record.observedAt ? (
             <small>
-              Observed <WorkspaceDate value={record.observedAt} />
+              {rich(m.records_last_read, {
+                date: <WorkspaceDate value={record.observedAt} />,
+              })}
             </small>
           ) : null}
         </span>
@@ -182,21 +212,22 @@ export function RecordsPage() {
   const goTo = (cursor: string | undefined, page: number | undefined) =>
     void navigate({ search: { ...listSearch, cursor, page } });
   const nextCursor = query.data?.nextCursor;
+  const views = kinds();
 
   return (
     <main className="records-page records-list">
-      <PageTitle title="Records" />
+      <PageTitle title={m.records_title()} />
       <CollectionToolbar
         views={
           <CollectionViews
-            label="Record types"
+            label={m.records_views()}
             value={search.kind ?? 'all'}
-            views={kinds}
+            views={views}
             onChange={(value) =>
               void navigate({
                 search: {
                   ...listSearch,
-                  kind: kinds.find((item) => item.value === value)?.kind,
+                  kind: views.find((item) => item.value === value)?.kind,
                 },
               })
             }
@@ -208,15 +239,15 @@ export function RecordsPage() {
             void navigate({
               search: { ...listSearch, q: q?.trim() ?? '' },
             }),
-          label: 'Search records',
-          placeholder: 'Search number, source ID or record…',
+          label: m.records_search(),
+          placeholder: m.records_search_placeholder(),
           maxLength: 120,
         }}
         filters={[
           {
             kind: 'choice',
             key: 'connectionId',
-            label: 'Source',
+            label: m.common_source(),
             icon: Plug,
             value: search.connectionId,
             options: sourceOptions(connections.data, search.connectionId),
@@ -231,52 +262,45 @@ export function RecordsPage() {
         }
         onRefresh={() => void query.refetch()}
         refreshing={query.isFetching}
-        refreshLabel="Refresh records"
+        refreshLabel={m.records_refresh()}
       />
       <p className="record-coverage">
-        Customer and return records appear once connected sources share them.{' '}
-        {recordPageSize} records per page, most recently observed first.
+        {m.records_coverage({ count: recordPageSize })}
       </p>
       {query.isPending ? (
         <p className="record-notice" role="status">
-          Loading records…
+          {m.records_loading()}
         </p>
       ) : query.isPaused ? (
         <p className="record-notice" role="status">
-          Disconnected. Reconnect to load records.
+          {m.records_offline()}
         </p>
       ) : error?.kind === 'access' ? (
         <p className="record-notice" role="alert">
-          You no longer have access to this workspace.
+          {m.records_no_access()}
         </p>
       ) : error?.kind === 'page' ? (
         <Alert role="alert">
-          {error.message ??
-            'This page link no longer matches the record search.'}{' '}
+          {error.message ?? m.records_page_link_stale()}{' '}
           <Button variant="outline" onClick={() => goTo(undefined, undefined)}>
-            Go to the first page
+            {m.records_first_page()}
           </Button>
         </Alert>
       ) : query.isError ? (
         <p className="record-notice" role="alert">
-          Records are unavailable. Try refreshing.
+          {m.records_failed()}
         </p>
       ) : (
         <>
           <DataTable
-            caption="Matching records"
+            caption={m.records_table_caption()}
             columns={recordColumns((record) =>
               recordHref(organizationId, record.kind, record.id, search),
             )}
             rows={query.data.items}
             rowKey={(record) => `${record.kind}:${record.id}`}
             rowHeader="record"
-            empty={
-              <p className="record-notice">
-                No records match this search. Source coverage may still be
-                incomplete.
-              </p>
-            }
+            empty={<p className="record-notice">{m.records_empty()}</p>}
           />
           {query.data.items.length || search.cursor ? (
             <Pagination
@@ -303,13 +327,13 @@ export function RecordsPage() {
                 goTo(nextCursor, (search.page ?? 1) + 1);
               }}
               disabled={query.isFetching}
-              itemLabel="records"
-              label="Record pages"
+              emptyLabel={m.records_pagination_empty()}
+              label={m.records_pagination_label()}
             />
           ) : null}
           {search.cursor && position < 0 ? (
             <Button variant="ghost" onClick={() => goTo(undefined, undefined)}>
-              Return to first page
+              {m.records_return_first_page()}
             </Button>
           ) : null}
         </>
@@ -322,6 +346,13 @@ function formatField(key: string) {
   return key
     .replace(/([A-Z])/g, ' $1')
     .replace(/^./, (letter) => letter.toUpperCase());
+}
+
+function lineQuantity(value: unknown) {
+  if (typeof value === 'number') return formatNumber(value);
+  if (typeof value === 'string' && value) return value;
+
+  return null;
 }
 
 function RecordLines({
@@ -342,7 +373,7 @@ function RecordLines({
 
   return (
     <div className="record-lines">
-      <h3>Lines</h3>
+      <h3>{m.records_lines_title()}</h3>
       <ul>
         {lines.map((value, index) => {
           if (!value || typeof value !== 'object') return null;
@@ -360,17 +391,26 @@ function RecordLines({
               <span>
                 {skuId ? (
                   <a href={recordHref(organizationId, 'sku', skuId, search)}>
-                    SKU {skuId.slice(0, 8)}{' '}
+                    {m.records_line_sku({ id: skuId.slice(0, 8) })}{' '}
                     <ArrowRight size={12} aria-hidden="true" />
                   </a>
                 ) : (
-                  `Line ${lineId?.slice(0, 8) ?? index + 1}`
+                  m.records_line({
+                    line: lineId?.slice(0, 8) ?? formatNumber(index + 1),
+                  })
                 )}
               </span>
               <span>
-                {String(line.quantity ?? 'Unknown')} {String(line.unit ?? '')}
+                {lineQuantity(line.quantity) ?? m.common_unknown()}{' '}
+                {typeof line.unit === 'string'
+                  ? quantityUnit(line.unit, String(line.quantity ?? ''))
+                  : String(line.unit ?? '')}
                 {line.cancelledQuantity
-                  ? ` · ${line.cancelledQuantity} cancelled`
+                  ? ` · ${m.records_line_canceled({
+                      quantity:
+                        lineQuantity(line.cancelledQuantity) ??
+                        String(line.cancelledQuantity),
+                    })}`
                   : ''}
               </span>
             </li>
@@ -423,32 +463,30 @@ export function RecordDetailPage() {
     <main className="records-page record-detail-page">
       <a className="record-back" href={back}>
         <ArrowLeft size={16} />{' '}
-        {returnPath ? 'Back to context' : 'Back to records'}
+        {returnPath ? m.records_back_context() : m.records_back_list()}
       </a>
       {!parsed.success ? (
-        <p className="record-notice">Record type unavailable.</p>
+        <p className="record-notice">{m.records_detail_kind_unknown()}</p>
       ) : query.isPending ? (
         <p className="record-notice" role="status">
-          Loading record…
+          {m.records_detail_loading()}
         </p>
       ) : query.isPaused ? (
-        <p className="record-notice">
-          Disconnected. Reconnect to inspect this record.
-        </p>
+        <p className="record-notice">{m.records_detail_offline()}</p>
       ) : denied ? (
         <p className="record-notice" role="alert">
-          You no longer have access to this workspace.
+          {m.records_no_access()}
         </p>
       ) : query.isError ? (
         <p className="record-notice" role="alert">
-          Record unavailable or removed.
+          {m.records_detail_failed()}
         </p>
       ) : record ? (
         <>
           <header className="record-detail-head">
             <div>
               <p className="record-eyebrow">
-                {record.kind.replace('_', ' ')} / {record.id}
+                {kindLabels[record.kind]()} / {record.id}
               </p>
               <h1>{record.label}</h1>
               <p>{record.description}</p>
@@ -458,16 +496,17 @@ export function RecordDetailPage() {
             >
               {record.coverage === 'projected'
                 ? record.status
-                : 'Source identity only'}
+                : record.sources.length === 1 && record.sources[0]
+                  ? m.records_detail_id_only_source({
+                      source: record.sources[0].label,
+                    })
+                  : m.records_detail_id_only()}
             </Badge>
           </header>
           <div className="record-detail-grid">
             <section className="record-card">
-              <h2>Source facts</h2>
-              <p className="record-note">
-                Records from different sources stay separate when their details
-                differ. A shared identity does not confirm every field matches.
-              </p>
+              <h2>{m.records_detail_data_title()}</h2>
+              <p className="record-note">{m.records_detail_data_note()}</p>
               {query.data.snapshots.length ? (
                 query.data.snapshots.map((snapshot, index) => (
                   <div
@@ -479,10 +518,12 @@ export function RecordDetailPage() {
                         {record.sources.find(
                           (source) =>
                             source.connectionId === snapshot.connectionId,
-                        )?.label ?? 'Connected source'}
+                        )?.label ?? m.records_detail_source_fallback()}
                       </strong>
                       <span>
-                        Observed <WorkspaceDate value={snapshot.observedAt} />
+                        {rich(m.records_last_read, {
+                          date: <WorkspaceDate value={snapshot.observedAt} />,
+                        })}
                       </span>
                     </div>
                     <dl>
@@ -497,7 +538,7 @@ export function RecordDetailPage() {
                             <dt>{formatField(key)}</dt>
                             <dd>
                               {value === null ? (
-                                'Unknown'
+                                m.common_unknown()
                               ) : typeof value === 'string' &&
                                 key.endsWith('At') &&
                                 !Number.isNaN(Date.parse(value)) ? (
@@ -517,15 +558,12 @@ export function RecordDetailPage() {
                   </div>
                 ))
               ) : (
-                <p className="record-note">
-                  Source identity is known. No current projected facts are
-                  available.
-                </p>
+                <p className="record-note">{m.records_detail_data_empty()}</p>
               )}
             </section>
             <aside className="record-detail-side">
               <section className="record-card">
-                <h2>Sources</h2>
+                <h2>{m.common_sources()}</h2>
                 {record.sources.length ? (
                   record.sources.map((source, index) => (
                     <div
@@ -541,39 +579,43 @@ export function RecordDetailPage() {
                         {source.status}
                       </Badge>
                       {source.externalId ? (
-                        <small>Source ID {source.externalId}</small>
+                        <small>
+                          {m.records_detail_source_id({
+                            id: source.externalId,
+                          })}
+                        </small>
                       ) : null}
                       <small>
                         {source.mappingMethod
-                          ? `Mapping: ${source.mappingMethod}`
-                          : 'Mapping: derived from linked source identities'}
+                          ? m.records_detail_link_method({
+                              method: source.mappingMethod,
+                            })
+                          : m.records_detail_link_derived()}
                       </small>
                       <small>
-                        Source updated{' '}
-                        {source.sourceUpdatedAt ? (
-                          <WorkspaceDate value={source.sourceUpdatedAt} />
-                        ) : (
-                          'unknown'
-                        )}
+                        {source.sourceUpdatedAt
+                          ? rich(m.records_detail_source_updated, {
+                              date: (
+                                <WorkspaceDate value={source.sourceUpdatedAt} />
+                              ),
+                            })
+                          : m.records_detail_source_updated_unknown()}
                       </small>
                       <small>
-                        Observed{' '}
-                        {source.observedAt ? (
-                          <WorkspaceDate value={source.observedAt} />
-                        ) : (
-                          'unknown'
-                        )}
+                        {source.observedAt
+                          ? rich(m.records_last_read, {
+                              date: <WorkspaceDate value={source.observedAt} />,
+                            })
+                          : m.records_detail_last_read_unknown()}
                       </small>
                     </div>
                   ))
                 ) : (
-                  <p className="record-note">
-                    Luma issue record. No commerce source mapping.
-                  </p>
+                  <p className="record-note">{m.records_detail_luma_issue()}</p>
                 )}
               </section>
               <section className="record-card">
-                <h2>Related records</h2>
+                <h2>{m.records_detail_related_title()}</h2>
                 {query.data.links.length ? (
                   <ul className="record-related">
                     {query.data.links.map((link) => (
@@ -599,7 +641,7 @@ export function RecordDetailPage() {
                   </ul>
                 ) : (
                   <p className="record-note">
-                    No confirmed related records yet.
+                    {m.records_detail_related_empty()}
                   </p>
                 )}
                 {record.kind === 'issue' ? (
@@ -609,7 +651,8 @@ export function RecordDetailPage() {
                     search={{ view: 'needs_you' }}
                     className="record-action"
                   >
-                    Investigate issue <ArrowRight size={14} />
+                    {m.records_detail_investigate_issue()}{' '}
+                    <ArrowRight size={14} />
                   </Link>
                 ) : record.kind === 'position' ? (
                   <Link
@@ -617,7 +660,7 @@ export function RecordDetailPage() {
                     params={{ organizationId, positionId: record.id }}
                     className="record-action"
                   >
-                    Inspect stock <ArrowRight size={14} />
+                    {m.records_detail_open_inventory()} <ArrowRight size={14} />
                   </Link>
                 ) : record.kind === 'sku' ? (
                   <>
@@ -626,7 +669,8 @@ export function RecordDetailPage() {
                       params={{ organizationId, skuId: record.id }}
                       className="record-action"
                     >
-                      Open in Products <ArrowRight size={14} />
+                      {m.records_detail_open_products()}{' '}
+                      <ArrowRight size={14} />
                     </Link>
                     <Link
                       to="/app/$organizationId/inventory"
@@ -634,7 +678,7 @@ export function RecordDetailPage() {
                       search={{ skuId: record.id }}
                       className="record-action"
                     >
-                      View inventory <ArrowRight size={14} />
+                      {m.records_detail_sku_stock()} <ArrowRight size={14} />
                     </Link>
                   </>
                 ) : record.kind === 'order' ? (
@@ -643,7 +687,7 @@ export function RecordDetailPage() {
                     params={{ organizationId, orderId: record.id }}
                     className="record-action"
                   >
-                    Open in Orders <ArrowRight size={14} />
+                    {m.records_detail_open_orders()} <ArrowRight size={14} />
                   </Link>
                 ) : record.kind === 'fulfillment' ? (
                   <Link
@@ -651,7 +695,8 @@ export function RecordDetailPage() {
                     params={{ organizationId, fulfillmentId: record.id }}
                     className="record-action"
                   >
-                    Open in Fulfillment <ArrowRight size={14} />
+                    {m.records_detail_open_fulfillment()}{' '}
+                    <ArrowRight size={14} />
                   </Link>
                 ) : null}
               </section>

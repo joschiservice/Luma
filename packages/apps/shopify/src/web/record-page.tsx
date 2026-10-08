@@ -1,4 +1,5 @@
 import type { AppUiProps } from '@luma/app-host/web';
+import { m } from '@luma/i18n/messages';
 import { Button } from '@luma/ui/components/primitives/button';
 import { useEffect, useState } from 'react';
 import { z } from 'zod';
@@ -46,12 +47,9 @@ export function ShopifyRecordPage({ services, organizationId }: AppUiProps) {
   return (
     <main className="shopify-record-page">
       <h1>Shopify</h1>
-      <p className="field-help">
-        Explore orders, payments, fulfillment and stock directly from your
-        stores.
-      </p>
+      <p className="field-help">{m.shopify_page_description()}</p>
       {pending ? (
-        <p role="status">Loading stores…</p>
+        <p role="status">{m.shopify_page_loading()}</p>
       ) : message ? (
         <>
           <p role="alert">{message}</p>
@@ -61,18 +59,17 @@ export function ShopifyRecordPage({ services, organizationId }: AppUiProps) {
               setAttempt((value) => value + 1);
             }}
           >
-            Try again
+            {m.common_try_again()}
           </Button>
         </>
       ) : stores.length === 0 ? (
-        <p>
-          Connect and authorize a Shopify store in Apps &amp; connections to
-          browse its records.
-        </p>
+        <p>{m.shopify_page_empty()}</p>
       ) : (
         <>
           <div className="form-field">
-            <label htmlFor="shopify-store">Store</label>
+            <label htmlFor="shopify-store">
+              {m.shopify_page_store_label()}
+            </label>
             <select
               id="shopify-store"
               value={selected}

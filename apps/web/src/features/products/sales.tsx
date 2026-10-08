@@ -1,5 +1,10 @@
 import type { ProductDetail } from '@luma/api-contract';
+import { formatCalendarDate, formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
+import { quantityUnit } from '@luma/ui/lib/units';
+
+import { formatSourceNumber } from '../orders/presentation';
 
 type Sales = ProductDetail['sales']['sources'][number];
 
@@ -34,7 +39,13 @@ export function SalesBars({
 }) {
   const series = dailySeries(sales, since);
   const max = Math.max(...series.map((day) => day.quantity), 0);
-  const summary = `${sales.quantity} ${sales.unit} in ${sales.orders} ${sales.orders === 1 ? 'order' : 'orders'}`;
+  const summary = m.products_sales_summary({
+    quantity: formatSourceNumber(sales.quantity),
+    unit: quantityUnit(sales.unit, sales.quantity),
+    orders: sales.orders,
+  });
+  const shortDay = (date: string) =>
+    formatCalendarDate(date, { day: 'numeric', month: 'short' });
 
   return (
     <figure className="products-sales">
@@ -45,7 +56,12 @@ export function SalesBars({
       <div
         className="products-sales-bars"
         role="img"
-        aria-label={`${label}: ${summary} in the last 30 days, peaking at ${max} ${sales.unit} on one day.`}
+        aria-label={m.products_sales_chart_label({
+          source: label,
+          summary,
+          peak: formatNumber(max),
+          unit: quantityUnit(sales.unit, max),
+        })}
       >
         {series.map((day) => (
           <span
@@ -55,22 +71,28 @@ export function SalesBars({
             style={{
               height: `${day.quantity && max ? Math.max(8, (day.quantity / max) * 100) : 0}%`,
             }}
-            title={`${day.date}: ${day.quantity} ${sales.unit}`}
+            title={m.products_sales_day({
+              date: formatCalendarDate(day.date),
+              quantity: formatNumber(day.quantity),
+              unit: quantityUnit(sales.unit, day.quantity),
+            })}
           />
         ))}
       </div>
       <div className="products-sales-axis" aria-hidden="true">
-        <span>{series[0]?.date.slice(5)}</span>
-        <span>Today</span>
+        <span>{series[0] ? shortDay(series[0].date) : null}</span>
+        <span>{m.products_sales_today()}</span>
       </div>
       <Disclosure variant="plain" className="products-sales-days">
-        <summary>Daily units</summary>
+        <summary>{m.products_sales_daily()}</summary>
         <table>
-          <caption className="sr-only">{`${label} units ordered by day`}</caption>
+          <caption className="sr-only">
+            {m.products_sales_daily_caption({ source: label })}
+          </caption>
           <thead>
             <tr>
-              <th scope="col">Day (UTC)</th>
-              <th scope="col">Units</th>
+              <th scope="col">{m.products_sales_day_column()}</th>
+              <th scope="col">{m.products_sales_units_column()}</th>
             </tr>
           </thead>
           <tbody>
@@ -78,8 +100,8 @@ export function SalesBars({
               .filter((day) => day.quantity)
               .map((day) => (
                 <tr key={day.date}>
-                  <td>{day.date}</td>
-                  <td>{day.quantity}</td>
+                  <td>{formatCalendarDate(day.date)}</td>
+                  <td>{formatNumber(day.quantity)}</td>
                 </tr>
               ))}
           </tbody>

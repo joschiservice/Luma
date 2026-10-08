@@ -64,7 +64,7 @@ test('keeps cross-domain cohorts live, recovers races and measures committed cha
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(`/app/${f.org.id}/insights`);
-  const section = page.getByRole('region', { name: 'Your operational pulse' });
+  const section = page.getByRole('region', { name: 'Where work is waiting' });
   const value = (id) =>
     section.locator(`[data-metric="${id}"] .operational-value`);
   const count = async (id, n) =>
@@ -77,7 +77,7 @@ test('keeps cross-domain cohorts live, recovers races and measures committed cha
   await section.getByText('Live updates', { exact: true }).waitFor();
   await section.locator('[data-metric="cases.attention"]').click();
   const dialog = page.getByRole('dialog');
-  await dialog.getByText('Uncertainty · 200').waitFor();
+  await dialog.getByText('Outcome unclear · 200').waitFor();
   await dialog.getByRole('button', { name: 'Next', exact: true }).click();
   await dialog.getByText('21–40 of 200', { exact: false }).waitFor();
   await page.keyboard.press('Escape');
@@ -125,9 +125,9 @@ test('keeps cross-domain cohorts live, recovers races and measures committed cha
     durations.push(performance.now() - committed);
     if (i === 0) {
       await section.locator('[data-metric="inventory.below_minimum"]').click();
-      await dialog.getByText('Existing commitment · 41').waitFor();
+      await dialog.getByText('Already ordered · 41').waitFor();
       await dialog
-        .getByRole('link', { name: /Commitment/ })
+        .getByRole('link', { name: /Purchase order/ })
         .first()
         .waitFor();
       await page.keyboard.press('Escape');
@@ -186,7 +186,7 @@ test('keeps cross-domain cohorts live, recovers races and measures committed cha
   await section
     .locator('[data-metric="inventory.replenishment_unknown"]')
     .click();
-  await dialog.getByText('Missing stock · 1').waitFor();
+  await dialog.getByText('Stock not reported · 1').waitFor();
   await expect
     .poll(() => dialog.evaluate((el) => window.getComputedStyle(el).opacity))
     .toBe('1');

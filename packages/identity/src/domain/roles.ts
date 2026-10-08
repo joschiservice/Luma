@@ -61,7 +61,7 @@ export const builtInRoles: Readonly<Record<BuiltInRoleKey, BuiltInRole>> = {
     key: 'admin',
     name: 'Admin',
     description:
-      'Runs the workspace: settings, team, connections, workflows and every action. Cannot change owners.',
+      'Runs the workspace: settings, team, connections, workflows, and every change. Can’t change owners.',
     permissions: allCore,
     appPermissions: true,
   },
@@ -69,7 +69,7 @@ export const builtInRoles: Readonly<Record<BuiltInRoleKey, BuiltInRole>> = {
     key: 'member',
     name: 'Member',
     description:
-      'Sees operations, records and workflows, takes decisions and asks Luma. Cannot change data or settings.',
+      'Sees operations, records, and workflows, takes decisions, and asks Luma. Can’t change data or settings.',
     permissions: memberPermissions,
     appPermissions: false,
   },

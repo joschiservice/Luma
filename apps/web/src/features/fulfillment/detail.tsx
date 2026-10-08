@@ -1,6 +1,9 @@
 import './fulfillment.css';
 
 import type { ActivityEvent, FulfillmentDetail } from '@luma/api-contract';
+import { formatRelativeTime } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
@@ -27,7 +30,6 @@ import {
   statusLabels as orderStatusLabels,
 } from '../orders/presentation';
 import { recordReturnPath } from '../records/data';
-import { ago } from '../sync/presentation';
 import {
   fulfillmentFilters,
   fulfillmentOptions,
@@ -44,6 +46,7 @@ import {
   nextStep,
   orderLabel,
   otherSignals,
+  quantity,
   signalLabels,
   statusLabels,
   timelineGroups,
@@ -138,8 +141,17 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function Missing({ children = 'Not reported' }: { children?: ReactNode }) {
-  return <span className="fulfillment-muted">{children}</span>;
+function Missing({ children }: { children?: ReactNode }) {
+  return (
+    <span className="fulfillment-muted">
+      {children ?? m.common_not_reported()}
+    </span>
+  );
+}
+
+/** Screen-reader note for links that open outside Luma. */
+function NewTab() {
+  return <span className="sr-only"> {m.fulfillment_opens_new_tab()}</span>;
 }
 
 /** The facts a source reports about the fulfillment, including what it does not report. */
@@ -148,64 +160,68 @@ function Facts({ detail }: { detail: FulfillmentDetail }) {
 
   return (
     <Card className="fulfillment-section">
-      <h2>Source facts</h2>
+      <h2>{m.fulfillment_facts_title()}</h2>
       <dl className="fulfillment-facts">
-        <Fact label="Type">{kindLabels[item.kind]}</Fact>
-        <Fact label="Status">{statusLabels[item.status] ?? item.status}</Fact>
-        <Fact label="Holds">
+        <Fact label={m.fulfillment_fact_type()}>{kindLabels[item.kind]}</Fact>
+        <Fact label={m.fulfillment_fact_status()}>
+          {statusLabels[item.status] ?? item.status}
+        </Fact>
+        <Fact label={m.fulfillment_fact_holds()}>
           {item.holds === null ? (
-            <Missing>Not reported by this source</Missing>
+            <Missing>{m.fulfillment_fact_holds_unreported()}</Missing>
           ) : item.holds.length ? (
             holdText(item.holds)
           ) : (
-            'None'
+            m.common_none()
           )}
         </Fact>
-        <Fact label="Location">
+        <Fact label={m.fulfillment_fact_location()}>
           {item.location?.name ?? <Missing />}
           {item.location && !item.location.id ? (
-            <small>Not linked to a Luma location</small>
+            <small>{m.fulfillment_fact_location_unlinked()}</small>
           ) : null}
         </Fact>
-        <Fact label="Delivery method">
+        <Fact label={m.fulfillment_fact_method()}>
           {item.method ? (
-            (item.method.name ?? methodLabels[item.method.type] ?? 'Delivery')
+            (item.method.name ??
+            methodLabels[item.method.type] ??
+            m.fulfillment_method_unknown())
           ) : (
             <Missing />
           )}
         </Fact>
         {item.kind !== 'shipment' ? (
           <>
-            <Fact label="Fulfill by">
+            <Fact label={m.fulfillment_fact_fulfill_by()}>
               {item.fulfillBy ? (
                 <WorkspaceDate value={item.fulfillBy} />
               ) : (
-                <Missing>No deadline reported</Missing>
+                <Missing>{m.fulfillment_fact_no_deadline()}</Missing>
               )}
             </Fact>
             {item.fulfillAt ? (
-              <Fact label="Scheduled for">
+              <Fact label={m.fulfillment_fact_scheduled()}>
                 <WorkspaceDate value={item.fulfillAt} />
               </Fact>
             ) : null}
           </>
         ) : (
           <>
-            <Fact label="Carrier status">
+            <Fact label={m.fulfillment_fact_carrier_status()}>
               {item.delivery ? (
                 (deliveryLabels[item.delivery] ?? item.delivery)
               ) : (
                 <Missing />
               )}
             </Fact>
-            <Fact label="Estimated delivery">
+            <Fact label={m.fulfillment_fact_estimated_delivery()}>
               {item.estimatedDeliveryAt ? (
                 <WorkspaceDate value={item.estimatedDeliveryAt} />
               ) : (
                 <Missing />
               )}
             </Fact>
-            <Fact label="Tracking">
+            <Fact label={m.fulfillment_fact_tracking()}>
               {item.tracking.length ? (
                 <ul className="fulfillment-tracking">
                   {item.tracking.map((entry, index) => (
@@ -214,9 +230,9 @@ function Facts({ detail }: { detail: FulfillmentDetail }) {
                         <a href={entry.url} target="_blank" rel="noreferrer">
                           {[entry.carrier, entry.number]
                             .filter(Boolean)
-                            .join(' ') || 'Tracking page'}
+                            .join(' ') || m.fulfillment_fact_tracking_page()}
                           <ExternalLink size={12} aria-hidden="true" />
-                          <span className="sr-only"> (opens in a new tab)</span>
+                          <NewTab />
                         </a>
                       ) : (
                         [entry.carrier, entry.number].filter(Boolean).join(' ')
@@ -225,24 +241,23 @@ function Facts({ detail }: { detail: FulfillmentDetail }) {
                   ))}
                 </ul>
               ) : (
-                <Missing>No tracking reported</Missing>
+                <Missing>{m.fulfillment_fact_no_tracking()}</Missing>
               )}
             </Fact>
           </>
         )}
-        <Fact label="Source">
+        <Fact label={m.fulfillment_fact_source()}>
           {source.label}
           {item.externalId ? <small>{item.externalId}</small> : null}
         </Fact>
-        <Fact label="Read">
+        <Fact label={m.fulfillment_fact_read()}>
           <WorkspaceDate value={item.observedAt} />
           <small>
-            Source updated{' '}
-            {item.sourceUpdatedAt ? (
-              <WorkspaceDate value={item.sourceUpdatedAt} />
-            ) : (
-              'time not reported'
-            )}
+            {item.sourceUpdatedAt
+              ? rich(m.fulfillment_fact_source_updated, {
+                  date: <WorkspaceDate value={item.sourceUpdatedAt} />,
+                })
+              : m.fulfillment_fact_source_updated_unreported()}
           </small>
         </Fact>
       </dl>
@@ -266,24 +281,20 @@ function ProgressEvidence({
 
   return (
     <Card className="fulfillment-section">
-      <h2>Progress evidence</h2>
-      <p className="fulfillment-note">
-        Luma counts progress only from what a source reports in a fresh read. A
-        request the source accepted, or a corrected shipping method, is not
-        progress until a later read shows work completed or shipped.
-      </p>
+      <h2>{m.fulfillment_evidence_title()}</h2>
+      <p className="fulfillment-note">{m.fulfillment_evidence_note()}</p>
       <dl className="fulfillment-facts fulfillment-facts-inline">
-        <Fact label="Last progress reported">
+        <Fact label={m.fulfillment_evidence_last_progress()}>
           {item.lastProgressAt ? (
             <>
               <WorkspaceDate value={item.lastProgressAt} />
-              <small>{ago(item.lastProgressAt, now)}</small>
+              <small>{formatRelativeTime(item.lastProgressAt, now)}</small>
             </>
           ) : (
-            <Missing>The source does not report progress times</Missing>
+            <Missing>{m.fulfillment_evidence_no_progress_times()}</Missing>
           )}
         </Fact>
-        <Fact label="Last change Luma saw">
+        <Fact label={m.fulfillment_evidence_last_change()}>
           {change ? (
             <>
               {change.changes.join(' · ')}
@@ -292,17 +303,17 @@ function ProgressEvidence({
               </small>
             </>
           ) : (
-            <Missing>No change observed yet</Missing>
+            <Missing>{m.fulfillment_evidence_no_change()}</Missing>
           )}
         </Fact>
-        <Fact label="Luma last read">
+        <Fact label={m.fulfillment_evidence_last_read()}>
           <WorkspaceDate value={item.observedAt} />
-          <small>{ago(item.observedAt, now)}</small>
+          <small>{formatRelativeTime(item.observedAt, now)}</small>
         </Fact>
       </dl>
       {detail.workflows.length ? (
         <>
-          <h3>Workflow runs for this order</h3>
+          <h3>{m.fulfillment_workflows_title()}</h3>
           <ul className="fulfillment-related">
             {detail.workflows.map((run) => (
               <li key={run.id}>
@@ -314,27 +325,27 @@ function ProgressEvidence({
                     {run.name ?? run.definitionId}
                   </Link>
                   <small>
-                    {run.state.replaceAll('_', ' ')}
-                    {run.createdAt ? (
-                      <>
-                        {' · started '}
-                        <WorkspaceDate value={run.createdAt} />
-                      </>
-                    ) : null}
+                    {run.createdAt
+                      ? rich(m.fulfillment_workflow_started, {
+                          state: run.state.replaceAll('_', ' '),
+                          date: <WorkspaceDate value={run.createdAt} />,
+                        })
+                      : run.state.replaceAll('_', ' ')}
                   </small>
                   {run.purpose === 'method_correction' ? (
-                    <small>
-                      Changes the shipping method. It does not ship the order.
-                    </small>
+                    <small>{m.fulfillment_workflow_method_note()}</small>
                   ) : null}
                 </span>
                 {run.progressObservedAt ? (
                   <StatePill state="verified">
-                    Progress seen{' '}
-                    <WorkspaceDate value={run.progressObservedAt} />
+                    {rich(m.fulfillment_workflow_progress_seen, {
+                      date: <WorkspaceDate value={run.progressObservedAt} />,
+                    })}
                   </StatePill>
                 ) : (
-                  <StatePill state="waiting">No progress seen since</StatePill>
+                  <StatePill state="waiting">
+                    {m.fulfillment_workflow_no_progress()}
+                  </StatePill>
                 )}
               </li>
             ))}
@@ -357,10 +368,9 @@ function Timeline({ detail }: { detail: FulfillmentDetail }) {
       className="fulfillment-section"
       aria-labelledby="fulfillment-timeline"
     >
-      <h2 id="fulfillment-timeline">Source timeline</h2>
+      <h2 id="fulfillment-timeline">{m.fulfillment_timeline_title()}</h2>
       <p className="fulfillment-note">
-        States Luma read from {detail.source.label}, newest first, with what
-        changed since the read before.
+        {m.fulfillment_timeline_note({ source: detail.source.label })}
       </p>
       <ol className="fulfillment-timeline">
         {groups.map(({ entry, changes, repeats }) => {
@@ -386,25 +396,29 @@ function Timeline({ detail }: { detail: FulfillmentDetail }) {
                   {changes.length
                     ? changes.join(' · ')
                     : repeats.length > 1
-                      ? `Read ${repeats.length} times, no change`
-                      : 'Read again, no change'}
+                      ? m.fulfillment_timeline_repeated({
+                          count: repeats.length,
+                        })
+                      : m.fulfillment_timeline_read_again()}
                 </strong>
                 <small>
-                  {entry.current ? 'Current · ' : ''}
-                  Source time{' '}
-                  {entry.sourceUpdatedAt ? (
-                    <WorkspaceDate value={entry.sourceUpdatedAt} />
-                  ) : (
-                    'not reported'
-                  )}
-                  {' · Read '}
-                  {repeats.length > 1 ? (
-                    <>
-                      <WorkspaceDate value={oldest.observedAt} />
-                      {' to '}
-                    </>
-                  ) : null}
-                  <WorkspaceDate value={entry.observedAt} />
+                  {entry.current
+                    ? `${m.fulfillment_timeline_current()} · `
+                    : ''}
+                  {entry.sourceUpdatedAt
+                    ? rich(m.fulfillment_timeline_source_time, {
+                        date: <WorkspaceDate value={entry.sourceUpdatedAt} />,
+                      })
+                    : m.fulfillment_timeline_source_time_unreported()}
+                  {' · '}
+                  {repeats.length > 1
+                    ? rich(m.fulfillment_timeline_read_range, {
+                        from: <WorkspaceDate value={oldest.observedAt} />,
+                        to: <WorkspaceDate value={entry.observedAt} />,
+                      })
+                    : rich(m.fulfillment_timeline_read, {
+                        date: <WorkspaceDate value={entry.observedAt} />,
+                      })}
                 </small>
               </span>
             </li>
@@ -412,7 +426,7 @@ function Timeline({ detail }: { detail: FulfillmentDetail }) {
         })}
       </ol>
       {detail.timeline.truncated ? (
-        <p className="fulfillment-note">Showing the 50 most recent reads.</p>
+        <p className="fulfillment-note">{m.fulfillment_timeline_truncated()}</p>
       ) : null}
     </section>
   );
@@ -456,7 +470,7 @@ export function FulfillmentDetailView({
       {from ? (
         <Link className="fulfillment-back" to={from}>
           <ArrowLeft size={14} aria-hidden="true" />
-          Back to context
+          {m.fulfillment_back_to_context()}
         </Link>
       ) : (
         <Link
@@ -466,16 +480,25 @@ export function FulfillmentDetailView({
           search={fulfillmentFilters(search)}
         >
           <ArrowLeft size={14} aria-hidden="true" />
-          Back to fulfillment
+          {m.fulfillment_back_to_list()}
         </Link>
       )}
       <PageHeader
-        title={item ? orderLabel(item) : 'Fulfillment'}
+        title={item ? orderLabel(item) : m.fulfillment_detail_title_fallback()}
         icon={<DomainIcon domain="fulfillment" size="md" />}
         description={
           detail && item
-            ? `${kindLabels[item.kind]} from ${detail.source.label}${item.units !== '0' ? ` · ${item.units} ${item.unit ?? 'units'}` : ''}`
-            : 'Where this fulfillment stands, what blocks it and the next safe step.'
+            ? item.units !== '0'
+              ? m.fulfillment_detail_description_units({
+                  kind: kindLabels[item.kind],
+                  source: detail.source.label,
+                  units: quantity(item.units, item.unit),
+                })
+              : m.fulfillment_detail_description({
+                  kind: kindLabels[item.kind],
+                  source: detail.source.label,
+                })
+            : m.fulfillment_detail_description_fallback()
         }
       />
       <div className="fulfillment-detail-toolbar">
@@ -493,46 +516,41 @@ export function FulfillmentDetailView({
         </span>
         <Button variant="outline" disabled={refreshing} onClick={refresh}>
           <RefreshCw size={14} aria-hidden="true" />
-          Refresh
+          {m.fulfillment_detail_refresh()}
         </Button>
       </div>
       {offline ? (
-        <Alert role="status">
-          You are offline. Reconnect to refresh this fulfillment.
-        </Alert>
+        <Alert role="status">{m.fulfillment_detail_offline()}</Alert>
       ) : null}
       {error === 'missing' ? (
         <Empty>
           <PackageX size={30} aria-hidden="true" />
-          <h2>Fulfillment not found</h2>
-          <p>
-            This fulfillment is not in this workspace, or no source reports it
-            anymore.
-          </p>
+          <h2>{m.fulfillment_detail_missing_title()}</h2>
+          <p>{m.fulfillment_detail_missing_body()}</p>
           <Link
             to="/app/$organizationId/fulfillment"
             params={{ organizationId }}
           >
-            Browse fulfillment
+            {m.fulfillment_detail_browse()}
           </Link>
         </Empty>
       ) : error === 'access' ? (
         <Alert tone="danger" role="alert">
-          You no longer have access to fulfillment in this workspace.
+          {m.fulfillment_detail_no_access()}
         </Alert>
       ) : error ? (
         <Alert tone="danger" role="alert">
           {detail
-            ? 'This fulfillment could not be refreshed. The details below may be out of date.'
-            : 'This fulfillment could not be loaded.'}{' '}
+            ? m.fulfillment_detail_refresh_failed()
+            : m.fulfillment_detail_load_failed()}{' '}
           <Button variant="outline" onClick={refresh}>
-            Retry
+            {m.common_retry()}
           </Button>
         </Alert>
       ) : null}
       {!detail && loading && !error ? (
         <div className="fulfillment-loading" role="status">
-          <span className="sr-only">Loading fulfillment…</span>
+          <span className="sr-only">{m.fulfillment_detail_loading()}</span>
           {Array.from({ length: 3 }, (_, i) => (
             <span className="lu-skeleton" key={i} />
           ))}
@@ -550,7 +568,9 @@ export function FulfillmentDetailView({
               <p>{summary.body}</p>
             </section>
             <Card className="fulfillment-section fulfillment-step">
-              <p className="fulfillment-eyebrow">Next safe step</p>
+              <p className="fulfillment-eyebrow">
+                {m.fulfillment_step_eyebrow()}
+              </p>
               <h2>{step.title}</h2>
               <p className="fulfillment-note">{step.body}</p>
               {step.action === 'carrier' && carrier?.url ? (
@@ -560,9 +580,9 @@ export function FulfillmentDetailView({
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Open carrier tracking
+                  {m.fulfillment_open_carrier_tracking()}
                   <ExternalLink size={14} aria-hidden="true" />
-                  <span className="sr-only"> (opens in a new tab)</span>
+                  <NewTab />
                 </a>
               ) : null}
               {actions ? (
@@ -574,16 +594,16 @@ export function FulfillmentDetailView({
               className="fulfillment-section"
               aria-labelledby="fulfillment-items"
             >
-              <h2 id="fulfillment-items">Items</h2>
+              <h2 id="fulfillment-items">{m.fulfillment_items_title()}</h2>
               <DataTable
-                caption="Items in this fulfillment"
+                caption={m.fulfillment_items_caption()}
                 density="compact"
                 rows={detail.lines}
                 rowKey={(line) => line.orderLineId}
                 columns={[
                   {
                     key: 'item',
-                    header: 'Item',
+                    header: m.fulfillment_items_column_item(),
                     cell: (line) => (
                       <span className="fulfillment-cell">
                         {line.skuId ? (
@@ -592,11 +612,15 @@ export function FulfillmentDetailView({
                             params={{ organizationId, skuId: line.skuId }}
                             search={{ from: here }}
                           >
-                            {line.skuCode ?? line.title ?? 'Mapped SKU'}
+                            {line.skuCode ??
+                              line.title ??
+                              m.fulfillment_items_linked_sku()}
                           </Link>
                         ) : (
                           <span>
-                            {line.skuCode ?? line.title ?? 'Unmapped item'}
+                            {line.skuCode ??
+                              line.title ??
+                              m.fulfillment_items_unlinked()}
                           </span>
                         )}
                         {line.skuCode && line.title ? (
@@ -607,20 +631,26 @@ export function FulfillmentDetailView({
                   },
                   {
                     key: 'quantity',
-                    header: 'In this fulfillment',
+                    header: m.fulfillment_items_column_quantity(),
                     numeric: true,
-                    cell: (line) => `${line.quantity} ${line.unit}`,
+                    cell: (line) => quantity(line.quantity, line.unit),
                   },
                   {
                     key: 'ordered',
-                    header: 'Ordered',
+                    header: m.fulfillment_items_column_ordered(),
                     numeric: true,
                     hideOnNarrow: true,
                     cell: (line) =>
-                      line.ordered ? `${line.ordered} ${line.unit}` : '—',
+                      line.ordered
+                        ? quantity(line.ordered, line.unit)
+                        : m.common_empty_value(),
                   },
                 ]}
-                empty={<p className="fulfillment-note">No lines reported.</p>}
+                empty={
+                  <p className="fulfillment-note">
+                    {m.fulfillment_items_empty()}
+                  </p>
+                }
               />
             </section>
             <Timeline detail={detail} />
@@ -628,7 +658,9 @@ export function FulfillmentDetailView({
               className="fulfillment-section"
               aria-labelledby="fulfillment-activity"
             >
-              <h2 id="fulfillment-activity">Luma activity</h2>
+              <h2 id="fulfillment-activity">
+                {m.fulfillment_activity_title()}
+              </h2>
               {detail.activity.entries.length ? (
                 <ol className="fulfillment-related">
                   {detail.activity.entries.map((entry) => (
@@ -654,7 +686,7 @@ export function FulfillmentDetailView({
                           }}
                           search={{ view: 'active' }}
                         >
-                          Issue
+                          {m.fulfillment_activity_issue()}
                         </Link>
                       ) : null}
                     </li>
@@ -662,15 +694,18 @@ export function FulfillmentDetailView({
                 </ol>
               ) : (
                 <p className="fulfillment-note">
-                  Luma has not acted on this order or its issues yet.
+                  {m.fulfillment_activity_empty()}
                 </p>
               )}
             </section>
           </div>
-          <aside className="fulfillment-aside" aria-label="Related records">
+          <aside
+            className="fulfillment-aside"
+            aria-label={m.fulfillment_related_label()}
+          >
             <Facts detail={detail} />
             <Card className="fulfillment-section">
-              <h2>Order</h2>
+              <h2>{m.fulfillment_order_title()}</h2>
               <Link
                 to="/app/$organizationId/orders/$orderId"
                 params={{ organizationId, orderId: detail.order.id }}
@@ -679,15 +714,15 @@ export function FulfillmentDetailView({
                 {detail.order.number ?? orderLabel(item)}
               </Link>
               <dl className="fulfillment-facts">
-                <Fact label="Status">
+                <Fact label={m.fulfillment_order_status()}>
                   {detail.order.status ? (
                     (orderStatusLabels[detail.order.status] ??
                     detail.order.status)
                   ) : (
-                    <Missing>Order not read from this source</Missing>
+                    <Missing>{m.fulfillment_order_not_read()}</Missing>
                   )}
                 </Fact>
-                <Fact label="Payment">
+                <Fact label={m.fulfillment_order_payment()}>
                   {detail.order.paymentStatus ? (
                     (paymentLabels[detail.order.paymentStatus] ??
                     detail.order.paymentStatus)
@@ -695,7 +730,7 @@ export function FulfillmentDetailView({
                     <Missing />
                   )}
                 </Fact>
-                <Fact label="Fulfillment">
+                <Fact label={m.fulfillment_order_fulfillment()}>
                   {detail.order.fulfillment ? (
                     (orderFulfillmentLabels[detail.order.fulfillment] ??
                     detail.order.fulfillment)
@@ -704,18 +739,17 @@ export function FulfillmentDetailView({
                   )}
                 </Fact>
                 {detail.order.placedAt ? (
-                  <Fact label="Placed">
+                  <Fact label={m.fulfillment_order_placed()}>
                     <WorkspaceDate value={detail.order.placedAt} />
                   </Fact>
                 ) : null}
               </dl>
               <p className="fulfillment-note">
-                Customer, payment and address details are on the order, read
-                live from {detail.source.label}.
+                {m.fulfillment_order_note({ source: detail.source.label })}
               </p>
             </Card>
             <Card className="fulfillment-section">
-              <h2>Other fulfillments of this order</h2>
+              <h2>{m.fulfillment_others_title()}</h2>
               {detail.related.length ? (
                 <ul className="fulfillment-related">
                   {detail.related.map((other) => {
@@ -735,11 +769,13 @@ export function FulfillmentDetailView({
                             {kindLabels[other.kind]}
                           </Link>
                           <small>
-                            {other.connectionId === item.connectionId
-                              ? detail.source.label
-                              : 'Another source'}
-                            {' · '}
-                            {other.units} {other.unit ?? 'units'}
+                            {m.fulfillment_others_context({
+                              source:
+                                other.connectionId === item.connectionId
+                                  ? detail.source.label
+                                  : m.fulfillment_others_another_source(),
+                              units: quantity(other.units, other.unit),
+                            })}
                           </small>
                         </span>
                         <StatePill state={otherState.state}>
@@ -751,13 +787,12 @@ export function FulfillmentDetailView({
                 </ul>
               ) : (
                 <p className="fulfillment-note">
-                  No other fulfillment work or shipments are reported for this
-                  order.
+                  {m.fulfillment_others_empty()}
                 </p>
               )}
             </Card>
             <Card className="fulfillment-section">
-              <h2>Issues</h2>
+              <h2>{m.fulfillment_issues_title()}</h2>
               {detail.issues.length ? (
                 <ul className="fulfillment-related">
                   {detail.issues.map((issue) => (
@@ -771,16 +806,24 @@ export function FulfillmentDetailView({
                           {issue.class.replaceAll('_', ' ')}
                         </Link>
                         <small>
-                          {issue.relationship === 'fulfillment'
-                            ? 'On this fulfillment'
-                            : 'On the order'}
                           {issue.lastDetectedAt
-                            ? ` · detected ${ago(issue.lastDetectedAt, Date.parse(detail.asOf))}`
-                            : ''}
+                            ? (issue.relationship === 'fulfillment'
+                                ? m.fulfillment_issue_on_fulfillment_detected
+                                : m.fulfillment_issue_on_order_detected)({
+                                time: formatRelativeTime(
+                                  issue.lastDetectedAt,
+                                  detail.asOf,
+                                ),
+                              })
+                            : issue.relationship === 'fulfillment'
+                              ? m.fulfillment_issue_on_fulfillment()
+                              : m.fulfillment_issue_on_order()}
                         </small>
                       </span>
                       {issue.needsYou ? (
-                        <StatePill state="approval">Needs you</StatePill>
+                        <StatePill state="approval">
+                          {m.fulfillment_issue_needs_you()}
+                        </StatePill>
                       ) : (
                         <Badge>{issue.state}</Badge>
                       )}
@@ -789,7 +832,7 @@ export function FulfillmentDetailView({
                 </ul>
               ) : (
                 <p className="fulfillment-note">
-                  No recorded issues for this fulfillment or its order.
+                  {m.fulfillment_issues_empty()}
                 </p>
               )}
             </Card>

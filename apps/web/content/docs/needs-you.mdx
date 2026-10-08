@@ -1,49 +1,80 @@
 ---
 title: Decide what needs you
-description: Find every approval, manual step and outcome check waiting on a person, understand what your response does, and respond once.
+description: Find every approval, manual step and outcome check waiting for a person, take ownership, and respond once.
 ---
 
-**Needs you** collects the decisions Luma can't make on its own, from issues, workflows and apps, in one queue. You don't need to know which workflow or app raised a decision to find it. Press G then N to open it. The sidebar shows how many decisions are waiting.
+**Needs you** collects the decisions Luma can’t make on its own, from issues, Workflows, Procurement and apps, in one queue. You don’t need to know which Workflow or app raised a decision to find it. Open it from the sidebar, or press **G** then **N**. The sidebar shows how many decisions are waiting.
 
 ## What appears here
 
-- **Approvals**: a proposed change that needs approval from someone other than the requester, such as an issue fix, a purchase-order draft from replenishment, sending a purchase order to a supplier, a Shopify stock correction or a fulfillment recovery. A supplier's changed quantity or date waits here too, to be accepted or followed up.
-- **Ready to run**: an approved Shopify change that only its requester can run before it expires.
-- **Outcome checks**: a change the source system accepted, or whose outcome is unknown, that no fresh read has confirmed yet. An accepted change is not a verified one.
-- **Manual steps**: work Luma can't do itself, such as a correction in your ERP or chasing a supplier whose confirmation or delivery is overdue. See [Procurement](/docs/procurement). A [follow-up workflow](/docs/workflows#workflows-that-follow-up) also hands you a return still waiting for its refund or a payment that stays pending; it leaves once Luma sees it's done.
-- **Reviews**: evidence that is incomplete or conflicting, an issue someone escalated, or a fact Luma read from a supplier message that needs checking.
+- **Approvals**: a proposed change that needs approval from someone other than the person who requested it, such as an issue fix, a purchase order drafted by replenishment, sending a purchase order, a Shopify stock correction or a fulfillment recovery. A supplier’s changed quantity or date waits here too, to be accepted or followed up.
+- **Ready to run**: an approved Shopify change that only its requester can send, before it expires.
+- **Outcome checks**: a change the connected system accepted, or whose outcome is unclear, that no separate check has confirmed yet. Accepted isn’t the same as verified.
+- **Manual steps**: work Luma can’t do itself, such as a correction in your ERP, chasing a supplier whose confirmation or delivery is overdue, or a follow-up a [Workflow](/docs/workflows) handed to a person, like a return still waiting for its refund.
+- **Unclear evidence**: incomplete or conflicting evidence, an issue someone escalated, or a fact Luma read from a supplier message that needs checking.
 
-Decisions leave the queue as soon as they're answered, expire or no longer apply. An empty queue means nothing is waiting on a person. It doesn't mean every connection is healthy; Home shows connection health.
+Decisions leave the queue as soon as they’re answered, expire or no longer apply. An empty queue means no decision is waiting for a person. It doesn’t mean every connection is healthy; Home shows connection health.
+
+## Choose a view
+
+- **All**: every decision you can see.
+- **Assigned to me**: decisions you took or someone assigned to you.
+- **Unassigned**: decisions nobody is looking after yet.
+
+Filter by **Area** (Orders, Fulfillment, Inventory, Procurement or Other operations) or by **Reason**. Each option shows how many decisions match. The view, filters and selected decision are part of the address, so you can share a link or pin the view.
 
 ## How the queue is ordered
 
-1. Proposals that expire within 30 minutes. Approval doesn't extend a proposal's deadline.
-2. High-impact decisions.
+1. Decisions that expire within 30 minutes. Approving doesn’t extend a deadline.
+2. **High impact** decisions.
 3. Everything else, earliest deadline first, then oldest request.
 
-Unknown impact is labeled **Impact not assessed** instead of being ranked as low.
+Impact Luma hasn’t assessed is labeled **Impact not assessed** instead of being ranked as low.
 
-Filter by area (orders, fulfillment, inventory, procurement) or by reason. **Group by cause** puts decisions with the same cause together, such as all stock corrections awaiting approval. Each still needs its own response; nothing is approved in bulk. Every filter and the selected decision are part of the address, so you can share a link or pin the view.
+**Group by cause** puts decisions with the same cause together, such as all stock corrections waiting for approval. Groups cover the current page only. Each decision still needs its own response; nothing is approved in bulk.
+
+## What each status means
+
+| Status                           | What it means                                                                                   |
+| -------------------------------- | ----------------------------------------------------------------------------------------------- |
+| **Needs your approval**          | You can approve or reject this change.                                                          |
+| **Ready for you to run**         | You requested this change and it’s approved. Send it before it expires.                         |
+| **Check the outcome**            | The change was sent, but no check has confirmed its result.                                     |
+| **Needs a manual step**          | Someone has to act outside Luma or on the record.                                               |
+| **Needs review**                 | The evidence is unclear, or someone escalated the issue.                                        |
+| **Proposal expired**             | The approval window closed before anyone answered. Open the issue or record to review it again. |
+| **Waiting for another approver** | You requested this change, so someone else has to approve it. You can follow it here.           |
+| **Waiting for the requester**    | It’s approved, and only the person who requested it can run it.                                 |
+| **Waiting for an approver**      | Your role can see this decision but can’t respond to it.                                        |
+| **Outcome not confirmed**        | The result isn’t confirmed yet, and your role can’t act on it.                                  |
 
 ## Respond to a decision
 
 Select a decision to see:
 
-- **Why you're needed** and, if you can't respond yourself, who can.
-- **Proposed change**: the exact source, record, location and quantities.
-- **What your response does** for each available response.
-- **Evidence and ownership**: when the evidence was observed, whether it's still current, the deadline, who requested it and who's looking after it.
+- **Why you’re needed** and, if you can’t respond yourself, why not.
+- **Proposed change**: the exact system, record, location and quantities.
+- **What your response does** for each response you can give.
+- **Evidence and owner**: when the evidence was last read and whether it’s still current, the deadline, who requested it and who’s looking after it. **Outdated evidence** or **Evidence age unknown** tells you to check the record before you rely on it.
 
-**Review and respond** shows the same controls as the issue, workflow run or record the decision belongs to. Responding here is the one decision; the issue, run and record update without a second one. Before anything changes, the owner checks again that the proposal, its revision and its expiry are unchanged. If someone else already answered, or the proposal changed or expired, your response is refused and the current state is shown.
+**Review and respond** shows the same controls as the issue, Workflow run or record the decision belongs to. Responding here is the decision; the issue, run or record updates without a second one. Before anything changes, Luma checks again that the proposal and its deadline are unchanged. If someone else already answered, or the proposal changed or expired, your response is refused and **This decision has left the queue** shows the current state.
 
-The person who requested a change can't approve it. Responding to an approval needs **Approve or reject changes**. Some approvals need more, such as **Manage procurement** for purchase orders.
+Responding to an approval needs **Approve or reject changes**, and the person who requested a change can’t approve it. Some approvals need more: purchase orders also need **Manage procurement** and **Send purchase orders to JTL**, and Shopify changes need **Recover Shopify fulfillments** or **Correct Shopify inventory**.
 
-Use J and K to move through the list, and Esc to close a decision.
+## Take or assign a decision
 
-## Assign decisions
+Choose **Take it** to show your team you’re looking after a decision, or **Unassign me** to hand it back. People with **Assign decisions** can also **Take over** a decision someone else holds, or assign it to another member. Owning a decision doesn’t change who may approve it.
 
-Take a decision to show your team you're looking after it. People whose role includes **Assign decisions** can also hand a decision to another member. **Assigned to me** and **Unassigned** list the matching decisions. Assigning a decision doesn't change who may approve it.
+Members can take decisions and follow them, but their role doesn’t include **Approve or reject changes**. They see approvals as **Waiting for an approver**, with a note that their role can’t respond.
 
-## When a decision is missing
+## Move through the queue
 
-If Luma can't read one area's decisions, the page names it. Those decisions are missing from the list, not resolved; refresh to try again. The queue updates live and checks again every 30 seconds while live updates are interrupted.
+Use **J** and **K** to move to the next and previous decision, and **Esc** to close the selected decision.
+
+## When the queue is incomplete or offline
+
+- **Some decisions couldn’t be loaded** names the area that didn’t answer. Its decisions are missing from the list, not resolved. Choose **Refresh Needs you** to try again.
+- **Needs you couldn’t be refreshed** means the list below may be out of date.
+- **You’re offline**: the list shows the decisions Luma last loaded, and responses are paused until you reconnect.
+
+The queue updates live. While live updates are interrupted, it shows **Checking every 30 seconds**.

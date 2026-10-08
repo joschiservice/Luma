@@ -1,4 +1,5 @@
 import type { OrderListItem, OrderSort } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import {
   DataTable,
@@ -28,7 +29,7 @@ function orderColumns(
   return [
     {
       key: 'order',
-      header: 'Order',
+      header: m.orders_column_order(),
       sortKey: 'number',
       cell: (order) => (
         <>
@@ -45,11 +46,15 @@ function orderColumns(
           </DataTableRowLink>
           <span className="orders-row-flags">
             {order.issueIds.length ? (
-              <StatePill state="attention">Needs you</StatePill>
+              <StatePill state="attention">
+                {m.orders_flag_needs_you()}
+              </StatePill>
             ) : null}
-            {order.overdue ? <Badge tone="danger">Overdue</Badge> : null}
+            {order.overdue ? (
+              <Badge tone="danger">{m.orders_flag_overdue()}</Badge>
+            ) : null}
             {order.differs ? (
-              <Badge tone="warning">Differs by source</Badge>
+              <Badge tone="warning">{m.orders_flag_differs()}</Badge>
             ) : null}
           </span>
         </>
@@ -57,15 +62,19 @@ function orderColumns(
     },
     {
       key: 'placed',
-      header: 'Placed',
+      header: m.orders_column_placed(),
       sortKey: 'placed',
       hideOnNarrow: true,
       cell: (order) =>
-        order.placedAt ? <WorkspaceDate value={order.placedAt} /> : '—',
+        order.placedAt ? (
+          <WorkspaceDate value={order.placedAt} />
+        ) : (
+          m.common_empty_value()
+        ),
     },
     {
       key: 'status',
-      header: 'Status',
+      header: m.orders_column_status(),
       cell: (order) => (
         <span className="orders-cell-stack">
           <span>{statusLabels[order.status] ?? order.status}</span>
@@ -77,18 +86,18 @@ function orderColumns(
     },
     {
       key: 'fulfillment',
-      header: 'Fulfillment',
+      header: m.orders_column_fulfillment(),
       cell: (order) => fulfillmentLabel(order),
     },
     {
       key: 'total',
-      header: 'Total',
+      header: m.orders_column_total(),
       numeric: true,
-      cell: (order) => formatMoney(order.total) ?? '—',
+      cell: (order) => formatMoney(order.total) ?? m.common_empty_value(),
     },
     {
       key: 'sources',
-      header: 'Sources',
+      header: m.orders_column_sources(),
       hideOnNarrow: true,
       cell: (order) => (
         <span className="orders-sources">
@@ -102,8 +111,9 @@ function orderColumns(
               }
               title={source.externalId ?? undefined}
             >
-              {source.label}
-              {source.deleted ? ' · removed' : ''}
+              {source.deleted
+                ? m.orders_source_removed({ source: source.label })
+                : source.label}
             </Badge>
           ))}
         </span>
@@ -111,7 +121,7 @@ function orderColumns(
     },
     {
       key: 'updated',
-      header: 'Updated',
+      header: m.orders_column_updated(),
       sortKey: 'updated',
       hideOnNarrow: true,
       cell: (order) => (
@@ -142,7 +152,10 @@ export function OrdersTable({
 
   return (
     <DataTable
-      caption={`${viewLabels[search.view ?? 'all']}, sorted by ${sortLabels[sort].toLowerCase()}`}
+      caption={m.orders_list_caption({
+        view: viewLabels[search.view ?? 'all'],
+        sort: sortLabels[sort],
+      })}
       columns={orderColumns(organizationId, search)}
       rows={items}
       rowKey={(order) => order.id}

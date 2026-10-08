@@ -1,73 +1,100 @@
 ---
-title: Understand workflows
-description: See what each workflow does, whether it can run here, what it covers and what to do next.
+title: Manage workflows
+description: See what each workflow does and whether it can run, turn it on or off, and follow its runs to a confirmed result.
 ---
 
-A workflow reacts to something — a person starting it, an event, a condition such as low stock, or a detected issue — and runs a fixed list of steps. Every action it takes passes workspace policy and approval before it runs, and a separate check confirms the result.
+A workflow reacts to something, such as a person starting it, a schedule, low stock or an issue Luma detects, and runs a fixed list of steps. Every change it proposes follows your workspace’s approval rules, and a separate check confirms the result. Open **Workflows** from the sidebar, or press **G** then **W**.
 
-## Read the library
+## Find a workflow
 
-Each workflow shows two separate labels:
+Each workflow in the list shows two labels:
 
-- **Enabled**, **Paused** or **Not set up** says whether someone turned it on. Paused means every activation or stock rule was revoked.
-- **Ready**, **Partly blocked** or **Blocked** says whether it can run now. An enabled workflow can still be blocked, for example when a connection lost access or stock stopped updating.
+- **Enabled**, **Paused** or **Not set up**: whether someone turned it on. **Paused** means every activation or stock rule was revoked.
+- **Ready**, **Partly blocked** or **Blocked**: whether it can run now. An enabled workflow can still be blocked, for example when a connection lost access or stock stopped updating.
 
-Below the purpose, **Next** names the one thing to do, with a link to the place that fixes it. Use the views to find what needs you:
+**Next** names the one thing to do, with a link to the place that fixes it. **Covers** shows what the workflow watches, such as a number of stock positions. If Luma can’t tell, it says **Coverage unknown**, never zero.
 
-- **Needs attention** shows blocked or partly blocked workflows, workflows with decisions waiting and workflows whose latest run ended unresolved.
-- **Enabled** and **Not enabled** filter by whether a workflow is turned on.
+Use the views to find what needs you:
 
-**Drafts** are workflows being written. Drafts never run.
+- **Needs attention**: blocked or partly blocked workflows, workflows with decisions waiting, and workflows whose latest run ended unresolved.
+- **Enabled** and **Not enabled**: whether a workflow is turned on.
+
+Search by name, or filter by **System**. **Drafts** lists workflows that are still being written. Drafts never run.
 
 ## Open a workflow
 
-A workflow has four parts:
+The top of a workflow says whether it’s **Running**, **Running with gaps**, **Paused**, **Ready to set up** or **Can’t run right now**. Choose a version to see what it does. Published versions don’t change; choosing another version only changes what the page shows.
 
-- **Overview** shows when it starts, what success means and its readiness: the next action, anything blocking it, what it covers, who approves its actions, what waits for a person and what recent runs verified. **How it works** lists the steps in plain language.
-- **Activity** shows every run with its decisions, actions and result checks. An accepted action isn't success on its own; only a passed result check confirms it.
-- **Rules** is where you turn the workflow on, if your role allows it: stock rules for replenishment (**Manage procurement**), an activation that names the exact orders a correction may change (**Activate playbooks**), or **Turn on** for a workflow that starts from detected issues (**Publish and enable workflows**).
-- **Technical details** keeps capability identifiers, permissions, inputs, version history and digests for inspection.
+- **Overview** shows when the workflow starts, what success means and its readiness: the next action, anything blocking it, what it covers, how approval applies, what’s waiting for a person and recent results. **How it works** lists the steps in plain language.
+- **Activity** lists **Recent runs**. Each run shows what Luma found, the decision, the proposed change, the **Change status** and the **Check status**. For workflows that fix issues, **Test results** compares workflow tests with what your team did; see [Test a workflow safely](/docs/shadow-mode).
+- **Rules** is where you turn the workflow on or off and start runs, if your role allows it.
+- **Technical details** lists steps and actions, requirements and permissions, inputs and version history. You don’t need them to use the workflow.
 
-Coverage that Luma can't establish shows as **Unknown**, never as zero.
+## Follow a run
 
-## Approval
+A run’s status tells you where it stands:
 
-**Approval** in the overview states how approval actually applies under current workspace policy. A replenishment rule's high-risk quantity only marks larger drafts as high risk. It never lets a draft skip approval.
+- **Running**, **Waiting** or **Waiting for approval**: the run is in progress. Changes that need approval wait in [Needs you](/docs/needs-you).
+- **Verified**: Luma checked the result independently and it matched.
+- **Ended without changes**: the conditions weren’t met, so nothing changed.
+- **Rejected**: a person rejected the change.
+- **Verification failed** or **Couldn’t verify**: the change didn’t produce the expected result, or Luma couldn’t confirm it. Check the record before trying again.
+- **Handed to a person**: the run needs someone to take over.
+
+An accepted change isn’t success on its own. Only a passed check confirms it. Runs labeled **Pilot data**, **Simulated data** or **Shadow mode** never count as confirmed fixes.
+
+## Turn a workflow on or off
+
+How you turn a workflow on depends on what it does. Look under **Rules**:
+
+- Workflows that start from issues: select **Turn on**, review what starts a run and who approves its changes, and confirm. Runs use the permissions of the person who turned it on. **Turn off** stops new runs; a waiting run won’t send new changes, and changes already made aren’t undone. You need **Publish and enable workflows**.
+- **Stock rules** for replenishment: see [Set up replenishment](#set-up-replenishment). You need **Manage procurement**.
+- Workflows that change specific orders: select **Review activation**, choose the connection and up to 100 orders, confirm that you reviewed them, and select **Activate reviewed version**. Other orders and future orders aren’t included. **Revoke activation** stops new runs; changes already sent may still finish. You need **Test and turn on issue workflows**.
+- Workflows you start yourself: under **Trigger**, select **Start workflow**, **Schedule start**, **Record event**, **Check condition** or **Record detected issue**, depending on how the workflow starts. A trigger only starts a run; it never approves a change. You can cancel a scheduled start from **Recent runs** before it begins. You need **Manage workflow triggers**.
+
+If you can’t make a change, the page says which part your role doesn’t allow.
 
 ## Set up replenishment
 
-Open **Replenish low stock** and choose **Add stock rules**, or start from **Procurement** or a stock position. You can set up to 25 stock positions at once:
+Open **Replenish low stock** and select **Add stock rules** under **Rules**, or start from **Procurement** or a stock position. You can set up 25 stock positions at a time:
 
-1. Choose the supplier and the stock positions. Search by SKU or use the page controls. Your selections stay selected across pages and searches. Positions that already have an active rule can't be selected.
-2. Review each position. Luma shows current stock, whether the first check would propose an order, and who approves it. You can adjust the minimum and target for each position.
-3. Activate. Each position gets its own rule and its own result. A rule that couldn't be confirmed can be retried; retrying never creates a second rule.
+1. Choose the supplier and the stock positions. Search by SKU or use the page controls; your selections stay selected across pages and searches. Positions that already have an active rule can’t be selected.
+2. Set the **Minimum stock**, **Target stock** and **High-risk quantity threshold**, then select **Preview rules**.
+3. Review each position. Luma shows current stock, whether the first check would propose an order and who approves it. You can adjust each position’s quantities; select **Update preview** after a change.
+4. Select **Activate**, which shows how many rules it creates, such as **Activate 3 rules**. Each position gets its own rule and its own result.
 
-A stock position's page shows the same readiness as the workflow, including a waiting decision and the latest purchase order.
+When available stock falls below the minimum, Luma drafts a purchase order that brings stock up to the target and waits for approval. Every draft needs approval; the high-risk quantity only marks larger drafts as high risk. Luma doesn’t draft a new order while a draft or open purchase order for the same SKU exists. If a result shows **Unconfirmed**, select **Retry 1 unconfirmed**; retrying never creates a second rule.
+
+A stock position’s page shows the same readiness, including a waiting decision and the latest purchase order.
 
 ## Workflows that start from issues
 
 Some workflows start on their own when Luma detects an issue:
 
-- **Correct Shopify stock from the ERP** starts when Shopify and your ERP disagree on linked stock. It proposes setting Shopify to the ERP quantity and confirms it with a fresh Shopify read. It never changes ERP stock.
-- **Release an overdue fulfillment hold** starts when a Shopify order stays on a fraud-review or manual hold for too long. It proposes releasing that hold and confirms in Shopify that it's gone. Payment, address and stock holds go to a person, because their cause has to be fixed first.
-- **Check a failing connection** starts when a connection's reads keep failing or a provider stopped accepting Luma. Lost access goes to a person straight away, with **Reconnect** on the issue. Otherwise it waits 15 minutes, checks again, and hands the issue over only if reads still fail. It changes nothing.
+- **Correct Shopify stock from the ERP** starts when Shopify and your ERP disagree on linked stock. It proposes setting Shopify to the ERP quantity and confirms it with a fresh read from Shopify. It never changes ERP stock.
+- **Release an overdue fulfillment hold** starts when a Shopify order stays on a fraud-review or manual hold for too long. It proposes releasing the hold and confirms in Shopify that it’s gone. Payment, address and stock holds go to a person, because their cause has to be fixed first.
+- **Check a failing connection** starts when reads from a connection keep failing or a system stopped accepting Luma. Lost access goes to a person straight away, and the issue offers to reconnect. Otherwise it waits 15 minutes, checks again, and hands the issue over only if reads still fail. It changes nothing.
 
-Someone whose role includes **Publish and enable workflows** turns each one on under **Rules**. Runs act as that person, but every change still waits in [Needs you](/docs/needs-you) for someone else who can approve changes to approve. A proposal stays open for four hours. Right before acting, Luma reads stock again: if the change is still the same, it runs; if it would differ, Luma prepares one new proposal in the same Needs you item. A rejected change, a change Luma can't make safely, or an unclear result hands the issue to a person; nothing is retried behind your back.
+Every change waits in [Needs you](/docs/needs-you) for approval from another person who can approve changes. A proposal stays open for four hours. Right before acting, Luma reads stock again: if the change is still the same, it goes ahead; if it would differ, Luma prepares one new proposal in the same Needs you item. A rejected change, a change Luma can’t make safely or an unclear result hands the issue to a person. Nothing is retried without you.
 
 ## Workflows that follow up
 
-Others start when something stays undone too long. They never change anything in your store or with your suppliers:
+Other workflows start when something stays undone too long. They never change anything in your store or with your suppliers:
 
-- **Follow up on an overdue supplier order** starts when a supplier hasn't confirmed a sent order in time, or a delivery is past its expected date. Luma notes the follow-up on the order, so nobody is asked yet, waits, and checks again. If the supplier is still silent, the order comes back to a buyer in Needs you.
-- **Chase a refund after a return arrives** starts when returned items arrived but no refund is recorded within the waiting window. It hands the return to a person in Needs you. Luma never refunds by itself.
-- **Follow up on a payment that stays pending** starts when an order's payment is still pending well after it was placed. It hands the order to a person in Needs you. Luma never holds or cancels it.
+- **Follow up on an overdue supplier order** starts when a supplier hasn’t confirmed a sent order in time, or a delivery is past its expected date. Luma notes the follow-up on the order, waits and checks again. If the supplier is still silent, the order comes back to a buyer in Needs you.
+- **Chase a refund after a return arrives** starts when returned items arrived but no refund is recorded in time. It hands the return to a person in Needs you. Luma never refunds by itself.
+- **Follow up on a payment that stays pending** starts when an order’s payment is still pending well after it was placed. It hands the order to a person in Needs you. Luma never holds or cancels it.
 
-A follow-up leaves Needs you on its own once Luma sees it's done, for example when the refund is recorded or the payment settles. If a workflow can't run in your workspace, its template says what's missing, such as returns access or a supplier linked to your purchasing system, and links to where to fix it.
+A follow-up leaves Needs you on its own once Luma sees it’s done, for example when the refund is recorded or the payment settles. If a workflow can’t run in your workspace, its template says what’s missing, such as access to returns or a supplier linked to your purchasing system, and links to where to fix it.
 
-A workflow never closes an issue. Luma closes it only after its own check confirms the problem is gone. Releasing a hold, for example, doesn't ship the order, so the issue stays open until the warehouse makes progress.
+A workflow never closes an issue on its own. Luma closes it only after its own check confirms the problem is gone. Releasing a hold, for example, doesn’t ship the order, so the issue stays open until the warehouse makes progress.
 
-Turning a workflow off stops new runs. A change that's waiting for approval is then never sent.
+## Who can do what
 
-## Start something new
+- **View workflows**: open the list, a workflow and its runs.
+- **Publish and enable workflows**: publish versions, set up templates, and turn workflows that start from issues on or off.
+- **Manage workflow triggers**: start runs, schedule them and cancel scheduled starts.
+- **Manage procurement**: add and revoke stock rules.
+- **Test and turn on issue workflows**: activate workflows that change specific orders, and test workflows on issues.
 
-Choose **New workflow** to start from a template or build your own. See [Create a workflow](/docs/workflows/create).
+To build a new workflow, select **New workflow**. See [Create a workflow](/docs/workflows/create).

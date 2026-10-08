@@ -5,6 +5,9 @@ import type {
   FulfillmentList,
   FulfillmentView,
 } from '@luma/api-contract';
+import { formatRelativeTime } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -36,7 +39,6 @@ import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
 import { recordReturnPath } from '../records/data';
 import { SyncCoverage } from '../sync/coverage';
-import { ago } from '../sync/presentation';
 import {
   fulfillmentFilters,
   type FulfillmentSearch,
@@ -49,6 +51,7 @@ import {
   methodLabels,
   orderLabel,
   otherSignals,
+  quantity,
   signalLabels,
   sortLabels,
   viewDescriptions,
@@ -73,9 +76,18 @@ const warningViews = new Set<FulfillmentView>(['attention', 'held', 'delayed']);
 
 const kinds = ['fulfillment_order', 'shipment'] as const;
 
-const kindFilterLabels: Record<(typeof kinds)[number], string> = {
-  fulfillment_order: 'Fulfillment orders',
-  shipment: 'Shipments',
+const kindFilterLabels: Record<(typeof kinds)[number], () => string> = {
+  fulfillment_order: m.fulfillment_filter_kind_fulfillment_order,
+  shipment: m.fulfillment_filter_kind_shipment,
+};
+
+const emptyViewTitles: Record<FulfillmentView, () => string> = {
+  attention: m.fulfillment_empty_attention_title,
+  held: m.fulfillment_empty_held_title,
+  delayed: m.fulfillment_empty_delayed_title,
+  open: m.fulfillment_empty_open_title,
+  in_transit: m.fulfillment_empty_in_transit_title,
+  all: m.fulfillment_empty_all_title,
 };
 
 const sorts = ['waiting', 'recent', 'deadline'] as const;
@@ -157,16 +169,23 @@ function ProgressCell({ item, asOf }: { item: FulfillmentItem; asOf: string }) {
   return (
     <span className="fulfillment-cell">
       <span>
-        {item.lastProgressAt ? 'Progress' : 'Updated'}{' '}
-        {ago(item.progressAt, now)}
+        {(item.lastProgressAt
+          ? m.fulfillment_progress_last
+          : m.fulfillment_progress_updated)({
+          time: formatRelativeTime(item.progressAt, now),
+        })}
       </span>
       {item.open && item.fulfillBy ? (
         <small>
-          Fulfill by <WorkspaceDate value={item.fulfillBy} />
+          {rich(m.fulfillment_progress_fulfill_by, {
+            date: <WorkspaceDate value={item.fulfillBy} />,
+          })}
         </small>
       ) : item.status === 'shipped' && item.estimatedDeliveryAt ? (
         <small>
-          Expected <WorkspaceDate value={item.estimatedDeliveryAt} />
+          {rich(m.fulfillment_progress_expected, {
+            date: <WorkspaceDate value={item.estimatedDeliveryAt} />,
+          })}
         </small>
       ) : null}
     </span>
@@ -180,12 +199,12 @@ function listColumns(
 ): DataTableColumn<FulfillmentItem>[] {
   const sourceLabel = (connectionId: string) =>
     list.sources.find((source) => source.connectionId === connectionId)
-      ?.label ?? 'Connected source';
+      ?.label ?? m.fulfillment_source_fallback();
 
   return [
     {
       key: 'fulfillment',
-      header: 'Order / fulfillment',
+      header: m.fulfillment_column_fulfillment(),
       cell: (item) => (
         <span className="fulfillment-cell">
           <DataTableRowLink
@@ -200,17 +219,18 @@ function listColumns(
             {orderLabel(item)}
           </DataTableRowLink>
           <small>
-            {kindLabels[item.kind]} · {sourceLabel(item.connectionId)}
+            {m.fulfillment_row_context({
+              kind: kindLabels[item.kind],
+              source: sourceLabel(item.connectionId),
+            })}
           </small>
-          <small>
-            {item.units} {item.unit ?? 'units'}
-          </small>
+          <small>{quantity(item.units, item.unit)}</small>
         </span>
       ),
     },
     {
       key: 'state',
-      header: 'State',
+      header: m.fulfillment_column_state(),
       cell: (item) => {
         const state = fulfillmentState(item);
 
@@ -228,7 +248,7 @@ function listColumns(
     },
     {
       key: 'reason',
-      header: 'What’s happening',
+      header: m.fulfillment_column_reason(),
       hideOnNarrow: true,
       cell: (item) => (
         <span className="fulfillment-reason">
@@ -238,14 +258,16 @@ function listColumns(
     },
     {
       key: 'location',
-      header: 'Location',
+      header: m.fulfillment_column_location(),
       hideOnNarrow: true,
       cell: (item) => (
         <span className="fulfillment-cell">
-          <span>{item.location?.name ?? 'Not reported'}</span>
+          <span>{item.location?.name ?? m.common_not_reported()}</span>
           {item.method ? (
             <small>
-              {item.method.name ?? methodLabels[item.method.type] ?? 'Delivery'}
+              {item.method.name ??
+                methodLabels[item.method.type] ??
+                m.fulfillment_method_unknown()}
             </small>
           ) : null}
         </span>
@@ -253,7 +275,7 @@ function listColumns(
     },
     {
       key: 'progress',
-      header: 'Progress',
+      header: m.fulfillment_column_progress(),
       hideOnNarrow: true,
       cell: (item) => <ProgressCell item={item} asOf={list.asOf} />,
     },
@@ -284,30 +306,26 @@ function EmptyList({
         <Truck size={30} aria-hidden="true" />
       )}
       <h2>
-        {calm
-          ? 'Nothing is stuck right now'
-          : filtered
-            ? 'No fulfillments match'
-            : view === 'all'
-              ? 'No fulfillments yet'
-              : `Nothing ${viewLabels[view].toLowerCase()}`}
+        {filtered
+          ? m.fulfillment_empty_filtered_title()
+          : emptyViewTitles[view]()}
       </h2>
       <p>
         {calm
-          ? 'Held, delayed and failed fulfillments appear here as soon as a source reports them.'
+          ? m.fulfillment_empty_problems_body()
           : filtered
-            ? 'Try another order number, tracking number, location or source.'
+            ? m.fulfillment_empty_filtered_body()
             : view === 'all'
-              ? 'Fulfillment orders and shipments appear once a connected store or ERP reports them. Check Data sync for progress.'
+              ? m.fulfillment_empty_all_body()
               : viewDescriptions[view]}
       </p>
       {filtered ? (
         <Button onClick={clear} variant="outline">
-          Clear filters
+          {m.common_clear_filters()}
         </Button>
       ) : view === 'all' ? (
         <Link to="/app/$organizationId/sync" params={{ organizationId }}>
-          Open Data sync
+          {m.fulfillment_open_data_sync()}
         </Link>
       ) : null}
     </Empty>
@@ -363,15 +381,15 @@ export function FulfillmentView({
 
   return (
     <main className="fulfillment-page">
-      {from ? <Link to={from}>← Back to context</Link> : null}
-      <PageTitle title="Fulfillment" />
+      {from ? <Link to={from}>← {m.fulfillment_back_to_context()}</Link> : null}
+      <PageTitle title={m.fulfillment_page_title()} />
       <CollectionToolbar
-        refreshLabel="Refresh fulfillment"
+        refreshLabel={m.fulfillment_list_refresh()}
         refreshing={refreshing}
         onRefresh={refresh}
         views={
           <CollectionViews
-            label="Fulfillment views"
+            label={m.fulfillment_list_views_label()}
             value={view}
             views={views.map((option) => ({
               value: option,
@@ -386,14 +404,14 @@ export function FulfillmentView({
         search={{
           value: search.q,
           onChange: (q) => update({ q }),
-          label: 'Search fulfillment',
-          placeholder: 'Order, tracking number, location or source ID…',
+          label: m.fulfillment_list_search_label(),
+          placeholder: m.fulfillment_list_search_placeholder(),
         }}
         filters={[
           {
             kind: 'choice',
             key: 'connectionId',
-            label: 'Source',
+            label: m.fulfillment_filter_source(),
             icon: Plug,
             value: search.connectionId,
             options: withSelected(
@@ -404,35 +422,38 @@ export function FulfillmentView({
                   }))
                 : [],
               search.connectionId,
-              'Selected source',
+              m.fulfillment_filter_selected_source(),
             ),
             onChange: (connectionId) => update({ connectionId }),
           },
           {
             kind: 'choice',
             key: 'locationId',
-            label: 'Location',
+            label: m.fulfillment_filter_location(),
             icon: MapPin,
             value: search.locationId,
             options: withSelected(
               locations.map((location) => ({
                 value: location.id,
-                label: `${location.name ?? 'Unnamed location'} · ${location.open} open`,
+                label: m.fulfillment_filter_location_option({
+                  location: location.name ?? m.fulfillment_unnamed_location(),
+                  count: location.open,
+                }),
               })),
               search.locationId,
-              'Selected location',
+              m.fulfillment_filter_selected_location(),
             ),
             onChange: (locationId) => update({ locationId }),
           },
           {
             kind: 'choice',
             key: 'kind',
-            label: 'Type',
+            label: m.fulfillment_filter_type(),
             icon: Shapes,
             value: search.kind,
             options: kinds.map((value) => ({
               value,
-              label: kindFilterLabels[value],
+              label: kindFilterLabels[value](),
             })),
             onChange: (value) =>
               update({ kind: kinds.find((item) => item === value) }),
@@ -450,25 +471,22 @@ export function FulfillmentView({
       />
       {coverage}
       <p className="fulfillment-note">
-        Work without progress for {shownList?.stalledAfterHours ?? 48} hours
-        counts as delayed. Each source’s work is listed separately.
+        {m.fulfillment_list_note({ hours: shownList?.stalledAfterHours ?? 48 })}
       </p>
       {offline ? (
-        <Alert role="status">
-          You are offline. Reconnect to refresh fulfillment.
-        </Alert>
+        <Alert role="status">{m.fulfillment_list_offline()}</Alert>
       ) : null}
       {error ? (
         <Alert tone="danger" role="alert">
           {stale
-            ? 'Fulfillment could not be refreshed. The list below may be out of date.'
-            : error}{' '}
+            ? m.fulfillment_list_refresh_failed()
+            : `${m.fulfillment_list_load_failed()} ${error}`}{' '}
           <Button variant="outline" onClick={refresh}>
-            Retry
+            {m.common_retry()}
           </Button>
           {search.cursor ? (
             <Button variant="ghost" onClick={() => update({})}>
-              Go to first page
+              {m.fulfillment_go_first_page()}
             </Button>
           ) : null}
         </Alert>
@@ -477,7 +495,7 @@ export function FulfillmentView({
         <>
           <DataTable
             className="fulfillment-list-table"
-            caption={`${viewLabels[view]}: fulfillment orders and shipments with their state and next deadline`}
+            caption={m.fulfillment_list_caption({ view: viewLabels[view] })}
             columns={listColumns(organizationId, search, shownList)}
             rows={shownList.items}
             rowKey={(item) => `${item.id}:${item.connectionId}`}
@@ -493,9 +511,12 @@ export function FulfillmentView({
           {shownList.items.length ? (
             <div className="fulfillment-pagination">
               <span>
-                {shownList.items.length} of {shownList.counts[view]}{' '}
-                {shownList.counts[view] === 1 ? 'fulfillment' : 'fulfillments'}
-                {search.cursor ? ' on this page' : ''}
+                {(search.cursor
+                  ? m.fulfillment_list_page_count_paged
+                  : m.fulfillment_list_page_count)({
+                  shown: shownList.items.length,
+                  total: shownList.counts[view] ?? 0,
+                })}
               </span>
               <div>
                 {previous ? (
@@ -504,12 +525,12 @@ export function FulfillmentView({
                     disabled={refreshing}
                     onClick={previous}
                   >
-                    Previous page
+                    {m.fulfillment_previous_page()}
                   </Button>
                 ) : null}
                 {search.cursor ? (
                   <Button variant="ghost" onClick={() => update({})}>
-                    First page
+                    {m.fulfillment_first_page()}
                   </Button>
                 ) : null}
                 <Button
@@ -517,7 +538,7 @@ export function FulfillmentView({
                   disabled={!next || refreshing}
                   onClick={next}
                 >
-                  Next page
+                  {m.fulfillment_next_page()}
                 </Button>
               </div>
             </div>
@@ -525,7 +546,7 @@ export function FulfillmentView({
         </>
       ) : loading && !error ? (
         <div className="fulfillment-loading" role="status">
-          <span className="sr-only">Loading fulfillment…</span>
+          <span className="sr-only">{m.fulfillment_list_loading()}</span>
           {Array.from({ length: 5 }, (_, i) => (
             <span className="lu-skeleton" key={i} />
           ))}

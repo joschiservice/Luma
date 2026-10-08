@@ -92,7 +92,9 @@ describe('API errors', () => {
       expect(error.status).toBe(502);
       expect(error.code).toBeUndefined();
       expect(error.requestId).toBeUndefined();
-      expect(error.message).toBe('The request could not be completed.');
+      expect(error.message).toBe(
+        'Luma couldn’t complete this request. Try again in a moment.',
+      );
     }
   });
 

@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
 import { Input } from '@luma/ui/components/primitives/input';
 import { useForm } from '@tanstack/react-form';
@@ -35,10 +36,10 @@ export function WorkspaceList({ entry = false }: { entry?: boolean }) {
     );
 
   return (
-    <EntryFrame actions={<a href="/sign-out">Sign out</a>}>
+    <EntryFrame actions={<a href="/sign-out">{m.identity_sign_out_link()}</a>}>
       <section className="entry-panel" aria-labelledby="workspaces-title">
-        <h1 id="workspaces-title">Choose a workspace</h1>
-        <p>Open a workspace to pick up where you left off.</p>
+        <h1 id="workspaces-title">{m.identity_workspaces_title()}</h1>
+        <p>{m.identity_workspaces_lead()}</p>
         {query.data.length ? (
           <ul className="workspace-list">
             {query.data.map((org) => (
@@ -57,14 +58,14 @@ export function WorkspaceList({ entry = false }: { entry?: boolean }) {
             ))}
           </ul>
         ) : (
-          <p className="entry-empty">You don’t have a workspace yet.</p>
+          <p className="entry-empty">{m.identity_workspaces_empty()}</p>
         )}
         <Link
           className={buttonVariants({ variant: 'outline' })}
           to="/app/workspaces/new"
         >
           <Plus aria-hidden="true" />
-          Create workspace
+          {m.identity_workspaces_create()}
         </Link>
       </section>
     </EntryFrame>
@@ -87,7 +88,7 @@ export function NewWorkspace() {
   const formElement = useRef<HTMLFormElement>(null);
   const form = useForm({
     onSubmitInvalid: () => {
-      setMessage('Check the highlighted fields.');
+      setMessage(m.identity_auth_check_fields());
       requestAnimationFrame(() =>
         formElement.current
           ?.querySelector<HTMLInputElement>('input[aria-invalid="true"]')
@@ -124,14 +125,12 @@ export function NewWorkspace() {
         ) {
           setMessage(
             error.status === 409
-              ? 'That workspace address is taken. Try again to generate a new address.'
-              : 'Check the workspace name and try again.',
+              ? m.identity_new_workspace_taken()
+              : m.identity_new_workspace_invalid(),
           );
         } else {
           setUncertain(true);
-          setMessage(
-            'Creation was not confirmed. Check your workspace list before trying again.',
-          );
+          setMessage(m.identity_new_workspace_unconfirmed());
           await client
             .fetchQuery(organizationsOptions())
             .catch(() => undefined);
@@ -154,13 +153,10 @@ export function NewWorkspace() {
     );
 
   return (
-    <EntryFrame actions={<a href="/sign-out">Sign out</a>}>
+    <EntryFrame actions={<a href="/sign-out">{m.identity_sign_out_link()}</a>}>
       <section className="entry-panel" aria-labelledby="new-workspace-title">
-        <h1 id="new-workspace-title">Create a workspace</h1>
-        <p>
-          A workspace holds one business’s connected systems, issues and
-          workflows. Its data is hosted in the European Union.
-        </p>
+        <h1 id="new-workspace-title">{m.identity_new_workspace_title()}</h1>
+        <p>{m.identity_new_workspace_lead()}</p>
         <form
           ref={formElement}
           noValidate
@@ -173,7 +169,9 @@ export function NewWorkspace() {
           <form.Field name="name" validators={{ onChange: workspaceName }}>
             {(field) => (
               <div className="form-field">
-                <label htmlFor="workspace-name">Workspace name</label>
+                <label htmlFor="workspace-name">
+                  {m.identity_new_workspace_name_label()}
+                </label>
                 <Input
                   id="workspace-name"
                   autoComplete="organization"
@@ -193,14 +191,18 @@ export function NewWorkspace() {
             )}
           </form.Field>
           <p role="status" ref={result} tabIndex={-1} className="form-message">
-            {pending ? 'Creating your workspace…' : message}
+            {pending ? m.identity_new_workspace_creating_status() : message}
           </p>
           <Button size="lg" type="submit" disabled={pending || uncertain}>
-            {pending ? 'Creating…' : 'Create workspace'}
+            {pending
+              ? m.identity_new_workspace_creating()
+              : m.identity_new_workspace_submit()}
           </Button>
         </form>
         <Link className="entry-back" to="/app/workspaces">
-          {uncertain ? 'Check workspace list' : 'Back to workspaces'}
+          {uncertain
+            ? m.identity_new_workspace_check_list()
+            : m.identity_new_workspace_back()}
         </Link>
       </section>
     </EntryFrame>

@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import {
   ChevronDown,
   CircleCheck,
@@ -16,14 +17,57 @@ import { Disclosure } from '../primitives/disclosure';
 /** Enables compact, collapsible supporting sections inside an issue inspector. */
 export const IssuePanelSections = createContext(false);
 
+/** Issue page sections in reading order. Labels are getters so they follow the active language. */
 export const issueSections = [
-  { value: 'overview', label: 'Overview', icon: <LayoutList /> },
-  { value: 'findings', label: 'Findings', icon: <Search /> },
-  { value: 'execution', label: 'Execution', icon: <Play /> },
-  { value: 'history', label: 'Audit history', icon: <History /> },
-  { value: 'evidence', label: 'Evidence', icon: <Files /> },
-  { value: 'resolution', label: 'Resolution', icon: <CircleCheck /> },
-  { value: 'details', label: 'Issue details', icon: <Info /> },
+  {
+    value: 'overview',
+    get label() {
+      return m.issues_section_overview();
+    },
+    icon: <LayoutList />,
+  },
+  {
+    value: 'findings',
+    get label() {
+      return m.issues_section_findings();
+    },
+    icon: <Search />,
+  },
+  {
+    value: 'execution',
+    get label() {
+      return m.issues_section_execution();
+    },
+    icon: <Play />,
+  },
+  {
+    value: 'history',
+    get label() {
+      return m.issues_section_history();
+    },
+    icon: <History />,
+  },
+  {
+    value: 'evidence',
+    get label() {
+      return m.issues_section_evidence();
+    },
+    icon: <Files />,
+  },
+  {
+    value: 'resolution',
+    get label() {
+      return m.issues_section_resolution();
+    },
+    icon: <CircleCheck />,
+  },
+  {
+    value: 'details',
+    get label() {
+      return m.issues_section_details();
+    },
+    icon: <Info />,
+  },
 ] as const;
 
 /** Groups issue content in labeled cards; inspector sections collapse while full-page sections stay open. */

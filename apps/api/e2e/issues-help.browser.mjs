@@ -129,18 +129,18 @@ test('opens contextual issue guides and preserves the investigation across help 
     .waitFor();
   await help
     .getByRole('navigation', { name: 'On this page' })
-    .getByRole('link', { name: 'Narrow the list' })
+    .getByRole('link', { name: 'Filter the list' })
     .click();
   await expect
     .poll(() =>
       help
-        .locator('#help-narrow-the-list')
+        .locator('#help-filter-the-list')
         .evaluate((element) => element === document.activeElement),
     )
     .toBe(true);
   expect(page.url()).toBe(inboxUrl);
   await help
-    .getByRole('navigation', { name: 'Issue guides' })
+    .getByRole('navigation', { name: 'Guides' })
     .getByRole('link', { name: 'Investigate an issue' })
     .click();
   await help
@@ -152,16 +152,16 @@ test('opens contextual issue guides and preserves the investigation across help 
     .waitFor();
   await help
     .getByRole('searchbox', { name: 'Search documentation' })
-    .fill('preconditions');
+    .fill('reverse');
   await help.locator('.docs-search-results a').first().click();
   await help
-    .getByRole('heading', { name: 'Review a resolution', exact: true })
+    .getByRole('heading', { name: 'Resolve an issue', exact: true })
     .waitFor();
   const popupPromise = page.waitForEvent('popup');
   await help.getByRole('link', { name: /Open full documentation/ }).click();
   const docsTab = await popupPromise;
   await docsTab
-    .getByRole('heading', { name: 'Review a resolution', exact: true })
+    .getByRole('heading', { name: 'Resolve an issue', exact: true })
     .waitFor();
   await docsTab.close();
   expect(page.url()).toBe(inboxUrl);
@@ -246,7 +246,12 @@ test('opens contextual issue guides and preserves the investigation across help 
   expect(page.url()).toBe(selectedUrl);
   await page.goto(`/app/${organizationId}/home`);
   await page.getByRole('heading', { name: 'Needs your attention' }).waitFor();
-  expect(await helpButton.count()).toBe(0);
+  await helpButton.click();
+  await help
+    .getByRole('heading', { name: 'Start your day on Home', exact: true })
+    .waitFor();
+  await page.keyboard.press('Escape');
+  await help.waitFor({ state: 'hidden' });
   expect(await page.locator('vite-error-overlay').count()).toBe(0);
   expect(errors).toEqual([]);
 });

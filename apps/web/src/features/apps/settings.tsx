@@ -1,5 +1,7 @@
 import './apps.css';
 
+import { formatList } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
 import {
@@ -17,11 +19,24 @@ import { useRef, useState } from 'react';
 
 import { ConnectionCard } from '../connections/connection-card';
 import { connectionError, connectionsOptions } from '../connections/data';
+import { roleName } from '../identity/permission-text';
 import { usePermissions } from '../identity/permissions';
 import { syncOptions } from '../sync/data';
 import { AppAccessDialog, ScopeList } from './access';
-import { approveAppScopes, appsOptions, changeApp } from './data';
+import {
+  type AppResult,
+  approveAppScopes,
+  appsOptions,
+  changeApp,
+} from './data';
 import { AppExtension } from './extension';
+
+const appResults = {
+  connected: m.apps_settings_result_connected,
+  permissions: m.apps_settings_result_permissions,
+  denied: m.apps_settings_result_denied,
+  failed: m.apps_settings_result_failed,
+} satisfies Record<AppResult, () => string>;
 
 /** Lists an app's connections and hosts its setup and workspace settings contributions. */
 export function AppSettings({
@@ -31,7 +46,7 @@ export function AppSettings({
 }: {
   organizationId: string;
   appId: string;
-  appResult?: string | undefined;
+  appResult?: AppResult | undefined;
 }) {
   const apps = useQuery(appsOptions(organizationId));
   const connections = useQuery(connectionsOptions(organizationId));
@@ -60,6 +75,7 @@ export function AppSettings({
   const installed = installation?.status === 'installed';
   const available = installed && !!app;
   const items = connections.data?.filter((item) => item.appId === appId) ?? [];
+  const name = app?.name ?? appId;
 
   async function approve() {
     if (lock.current || !installation) return;
@@ -114,10 +130,10 @@ export function AppSettings({
     <div className="connections-page apps-page">
       <WorkspaceBreadcrumb>
         <Link to="/app/$organizationId/apps" params={{ organizationId }}>
-          Apps
+          {m.apps_title()}
         </Link>
         <ChevronRight size={14} aria-hidden="true" />
-        <span aria-current="page">{app?.name ?? appId}</span>
+        <span aria-current="page">{name}</span>
       </WorkspaceBreadcrumb>
       <Link
         to="/app/$organizationId/apps"
@@ -125,10 +141,10 @@ export function AppSettings({
         className="app-back"
       >
         <ArrowLeft size={15} aria-hidden="true" />
-        All apps
+        {m.apps_settings_back()}
       </Link>
       {apps.isPending ? (
-        <p role="status">Loading app…</p>
+        <p role="status">{m.apps_loading_app()}</p>
       ) : apps.error ? (
         <p role="alert">{connectionError(apps.error)}</p>
       ) : (
@@ -136,13 +152,12 @@ export function AppSettings({
           <PageHeader
             icon={
               <span className="app-tile-icon" data-size="lg" aria-hidden="true">
-                {(app?.name ?? appId).slice(0, 1)}
+                {name.slice(0, 1)}
               </span>
             }
-            title={app?.name ?? appId}
+            title={name}
             description={
-              app?.description ??
-              'This app is unavailable. Historical connections remain accessible.'
+              app?.description ?? m.apps_settings_unavailable_description()
             }
             actions={
               installed && canManageApp ? (
@@ -150,15 +165,14 @@ export function AppSettings({
                   variant="outline"
                   onClick={() => setDialog('uninstall')}
                 >
-                  Uninstall
+                  {m.apps_settings_uninstall()}
                 </Button>
               ) : null
             }
           />
           {!installed ? (
             <p className="apps-note">
-              This app is not installed. Install it from Apps to connect an
-              account.
+              {m.apps_settings_not_installed({ app: name })}
             </p>
           ) : null}
           {appResult ? (
@@ -166,17 +180,14 @@ export function AppSettings({
               role="status"
               tone={appResult === 'connected' ? 'success' : 'warning'}
             >
-              {appResult === 'connected'
-                ? 'Connection ready.'
-                : 'Authorization needs attention. Add a connection to try again.'}
+              {appResults[appResult]()}
             </Alert>
           ) : null}
           {installation?.status === 'installed' &&
           installation.pendingScopes.length > 0 &&
           app ? (
             <Alert tone="warning">
-              {app.name} was updated and asks for more access. It keeps working
-              with its current access until someone approves.{' '}
+              {m.apps_settings_pending_access({ app: app.name })}{' '}
               {canManageApp ? (
                 <Button
                   variant="outline"
@@ -185,16 +196,13 @@ export function AppSettings({
                     setDialog('approve');
                   }}
                 >
-                  Review access
+                  {m.apps_settings_review_access()}
                 </Button>
               ) : null}
             </Alert>
           ) : null}
           {!canManage ? (
-            <p className="apps-note">
-              Adding connections and changing app settings requires permission
-              to manage connections, which your role doesn’t include.
-            </p>
+            <p className="apps-note">{m.apps_settings_manage_denied()}</p>
           ) : null}
           {app?.connectionTypes.length || items.length || !app ? (
             <section
@@ -202,18 +210,22 @@ export function AppSettings({
               aria-labelledby="app-connections"
             >
               <div className="connections-heading">
-                <h2 id="app-connections">Connections</h2>
+                <h2 id="app-connections">
+                  {m.apps_settings_connections_title()}
+                </h2>
                 <div className="connection-actions">
                   <Button
                     variant="outline"
                     disabled={connections.isFetching}
                     onClick={() => void refresh()}
                   >
-                    {connections.isFetching ? 'Refreshing…' : 'Refresh list'}
+                    {connections.isFetching
+                      ? m.common_refreshing()
+                      : m.apps_settings_refresh()}
                   </Button>
                   {available && canManage && app.ui.includes('connections') ? (
                     <Button onClick={() => setDialog('add')}>
-                      Add connection
+                      {m.apps_settings_add_connection()}
                     </Button>
                   ) : null}
                 </div>
@@ -221,7 +233,7 @@ export function AppSettings({
               {connections.error ? (
                 <p role="alert">{connectionError(connections.error)}</p>
               ) : connections.isPending ? (
-                <p role="status">Loading connections…</p>
+                <p role="status">{m.apps_connections_loading()}</p>
               ) : items.length ? (
                 <div className="connection-list">
                   {items.map((connection) => (
@@ -242,11 +254,11 @@ export function AppSettings({
               ) : (
                 <div className="connection-empty">
                   <Plug size={18} aria-hidden="true" />
-                  <h3>No connections yet</h3>
+                  <h3>{m.apps_settings_connections_empty_title()}</h3>
                   <p>
                     {canManage && available
-                      ? 'Add your first connection to enable this app’s capabilities.'
-                      : 'Connected accounts will appear here.'}
+                      ? m.apps_settings_connections_empty_manage({ app: name })
+                      : m.apps_settings_connections_empty_read()}
                   </p>
                 </div>
               )}
@@ -257,10 +269,9 @@ export function AppSettings({
               className="connections-section"
               aria-labelledby="app-access"
             >
-              <h2 id="app-access">Access</h2>
+              <h2 id="app-access">{m.apps_settings_access_title()}</h2>
               <p className="apps-note">
-                What {app?.name ?? appId} may use in this workspace. When it
-                acts for someone, it can never do more than their role allows.
+                {m.apps_settings_access_description({ app: name })}
               </p>
               {installation.grantedScopes.length ? (
                 <ScopeList
@@ -268,13 +279,15 @@ export function AppSettings({
                   scopes={installation.grantedScopes}
                 />
               ) : (
-                <p className="apps-note">No workspace data granted.</p>
+                <p className="apps-note">
+                  {m.apps_settings_access_empty({ app: name })}
+                </p>
               )}
             </section>
           ) : null}
           {available && canManageApp && app.ui.includes('app-settings') ? (
             <section className="connections-section">
-              <h2>App settings</h2>
+              <h2>{m.apps_settings_app_settings_title()}</h2>
               <AppExtension
                 appId={appId}
                 organizationId={organizationId}
@@ -290,7 +303,7 @@ export function AppSettings({
                 to="/app/$organizationId/apps/$appId"
                 params={{ organizationId, appId }}
               >
-                Open {app.name}
+                {m.apps_settings_open_app({ app: app.name })}
                 <ArrowRight aria-hidden="true" />
               </Link>
             </section>
@@ -302,9 +315,11 @@ export function AppSettings({
             }}
           >
             <DialogContent className="connection-dialog">
-              <DialogTitle>Add {app?.name} connection</DialogTitle>
+              <DialogTitle>
+                {m.apps_settings_add_title({ app: name })}
+              </DialogTitle>
               <DialogDescription>
-                Connect an account to enable the app’s capabilities.
+                {m.apps_settings_add_description({ app: name })}
               </DialogDescription>
               {dialog === 'add' ? (
                 <AppExtension
@@ -326,17 +341,16 @@ export function AppSettings({
             }}
           >
             <DialogContent>
-              <DialogTitle>Uninstall {app?.name ?? appId}?</DialogTitle>
+              <DialogTitle>{m.apps_uninstall_title({ app: name })}</DialogTitle>
               <DialogDescription>
-                This stops new app operations and deletes credentials for all
-                its connections. Historical records remain. Requests already
-                sent may finish.
+                {m.apps_uninstall_description({ app: name })}
               </DialogDescription>
               {installation?.roles.length ? (
                 <Alert tone="warning">
-                  These roles lose {app?.name ?? appId} permissions:{' '}
-                  {installation.roles.map((role) => role.name).join(', ')}.
-                  Reinstalling doesn’t restore them.
+                  {m.apps_uninstall_roles({
+                    count: installation.roles.length,
+                    roles: formatList(installation.roles.map(roleName)),
+                  })}
                 </Alert>
               ) : null}
               <div className="connection-actions">
@@ -345,10 +359,12 @@ export function AppSettings({
                   disabled={pending}
                   onClick={() => setDialog(null)}
                 >
-                  Cancel
+                  {m.common_cancel()}
                 </Button>
                 <Button disabled={pending} onClick={() => void uninstall()}>
-                  {pending ? 'Uninstalling…' : 'Confirm uninstall'}
+                  {pending
+                    ? m.apps_uninstall_pending()
+                    : m.apps_uninstall_confirm()}
                 </Button>
               </div>
               <p role="alert">{message}</p>

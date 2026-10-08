@@ -1,5 +1,6 @@
 import '../apps/apps.css';
 
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { PageTitle } from '@luma/ui/components/workspace/page-header';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -60,15 +61,15 @@ export function Connections({
 
   return (
     <div className="connections-page apps-page">
-      <PageTitle title="Apps" />
+      <PageTitle title={m.connections_page_title()} />
       {appResult ? (
         <Alert
           role="status"
           tone={appResult === 'connected' ? 'success' : 'warning'}
         >
           {appResult === 'connected'
-            ? 'Connection ready.'
-            : 'Authorization needs attention. Open the app to try again.'}
+            ? m.connections_result_connected()
+            : m.connections_result_failed()}
         </Alert>
       ) : null}
       <AppStore

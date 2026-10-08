@@ -185,7 +185,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
       id: 'shopify',
       name: 'Shopify',
       description:
-        'Connect stores to read orders, products, inventory and fulfillment.',
+        'Connect Shopify stores to read orders, products, inventory, and fulfillment.',
       version: '1.0.0',
       category: 'storefront',
       ui: [
@@ -203,14 +203,14 @@ export function createApp(context: AppFactoryContext): AppDefinition {
           key: 'shopify:fulfillment_recovery.run',
           label: 'Recover Shopify fulfillments',
           description:
-            'Preview, request approval for and run fulfillment recovery for stuck Shopify orders.',
+            'Preview, request approval for, and run recovery of stuck Shopify fulfillments.',
           consequential: true,
         },
         {
           key: 'shopify:inventory_corrections.apply',
           label: 'Correct Shopify inventory',
           description:
-            'Preview, request approval for and apply stock corrections at Shopify locations.',
+            'Preview, request approval for, and apply stock corrections at Shopify locations.',
           consequential: true,
         },
       ],

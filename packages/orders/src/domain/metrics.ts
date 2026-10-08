@@ -13,27 +13,28 @@ export const orderMetricDefinitions = (
       id: 'orders.open',
       title: 'Open orders',
       description:
-        'Orders with remaining fulfillment work. Partially fulfilled orders count once; completed, cancelled and deleted orders do not count.',
+        'Orders with fulfillment work remaining. Partially fulfilled orders count once. Completed, canceled, and deleted orders don’t count.',
       predicate: 'open_remaining_quantity',
-      timeSemantics: 'Current accepted source state at the read snapshot.',
+      timeSemantics:
+        'Order data from your connected systems at the time shown.',
     },
     {
       id: 'orders.overdue',
       title: 'Overdue orders',
       description:
-        'Open orders whose source-provided fulfillment deadline is before the evaluation time. Orders without a deadline are unknown.',
+        'Open orders whose fulfillment deadline from the source system has passed. Orders without a deadline count as unknown.',
       predicate: 'open_and_due_before_as_of',
       timeSemantics:
-        'dueAt < asOf. Time passing can change this count without a source update.',
+        'Deadlines before the time shown. The count can change as time passes, even without new data.',
     },
     {
       id: 'orders.attention',
       title: 'Orders needing you',
       description:
-        'Orders linked to an unresolved issue that requests approval, manual intervention or uncertainty review. Each order counts once.',
+        'Orders linked to an unresolved issue that waits for an approval, a manual fix, or a review of an unclear outcome. Each order counts once.',
       predicate: 'persisted_case_attention',
       timeSemantics:
-        'Inbox attention evaluated at the same read snapshot and evaluation time.',
+        'Issues and order data from the same moment, at the time shown.',
     },
   ] as const
 ).map((definition) => ({

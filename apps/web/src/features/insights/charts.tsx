@@ -1,6 +1,7 @@
 import './insights.css';
 
 import type { InsightChart } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Select } from '@luma/ui/components/primitives/select';
 import { WorkspaceTimezone } from '@luma/ui/components/primitives/workspace-date';
@@ -97,21 +98,18 @@ export function OperationalCharts({
     <section className="insights-trends" aria-labelledby={headingId}>
       <header className="insights-trends-header">
         <div>
-          <p className="order-metrics-eyebrow">Over time</p>
-          <h2 id={headingId}>Operational trends</h2>
-          <p>
-            Counted from source timestamps and Luma’s records. Select a bar or
-            table value to see the exact records behind it.
-          </p>
+          <p className="order-metrics-eyebrow">{m.insights_trends_eyebrow()}</p>
+          <h2 id={headingId}>{m.insights_trends_title()}</h2>
+          <p>{m.insights_trends_description()}</p>
         </div>
         <div className="insights-filters">
           <Select
             className="insights-filter"
-            aria-label="Time range"
+            aria-label={m.insights_filter_range()}
             value={scope.range}
             options={insightRanges.map((range) => ({
               value: range,
-              label: rangeLabels[range],
+              label: rangeLabels[range](),
             }))}
             onValueChange={(range) =>
               onSearch({
@@ -124,10 +122,10 @@ export function OperationalCharts({
           />
           <Select
             className="insights-filter"
-            aria-label="Source"
+            aria-label={m.common_source()}
             value={search.source ?? 'all'}
             options={[
-              { value: 'all', label: 'All sources' },
+              { value: 'all', label: m.insights_filter_source_all() },
               ...sources.map((connection) => ({
                 value: connection.id,
                 label: connection.label,
@@ -153,7 +151,7 @@ export function OperationalCharts({
             }
           >
             <RefreshCw size={14} />
-            Refresh charts
+            {m.insights_refresh_charts()}
           </Button>
         </div>
       </header>

@@ -1,4 +1,6 @@
 import type { IdentityDetail } from '@luma/api-contract';
+import { formatList } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Input } from '@luma/ui/components/primitives/input';
@@ -9,6 +11,7 @@ import { useCallback, useDeferredValue, useState } from 'react';
 import { identityOptions } from '../sync/data';
 import { IdentityLinks, type IdentitySuggestion } from '../sync/identity-links';
 import { ordersOptions } from './data';
+import { formatMoney, orderLabel } from './presentation';
 
 /** Links order sources and refreshes orders, Home and Insights after the worker completes. */
 export function OrderIdentityLinks({
@@ -71,7 +74,7 @@ function OrderLinkSearch({
         sources: candidate.sources,
       });
     } catch {
-      setReviewError('This order could not be loaded. Try reviewing it again.');
+      setReviewError(m.orders_link_review_failed());
     } finally {
       setReviewing(null);
     }
@@ -96,11 +99,11 @@ function OrderLinkSearch({
   return (
     <div className="sync-order-search">
       <label>
-        <span>Find another order</span>
+        <span>{m.orders_link_search_label()}</span>
         <Input
           value={text}
           maxLength={120}
-          placeholder="Search by order number"
+          placeholder={m.orders_link_search_placeholder()}
           onChange={(event) => setText(event.target.value)}
         />
       </label>
@@ -110,21 +113,19 @@ function OrderLinkSearch({
         </Alert>
       ) : null}
       {search.length < 2 ? (
-        <p className="sync-identity-note">
-          Use the order number to find a source record without a suggestion.
-        </p>
+        <p className="sync-identity-note">{m.orders_link_search_hint()}</p>
       ) : query.isPending || search !== text.trim() ? (
-        <p role="status">Searching orders…</p>
+        <p role="status">{m.orders_link_searching()}</p>
       ) : query.error ? (
         <Alert tone="danger" role="alert">
-          Orders could not be searched.{' '}
+          {m.orders_link_search_failed()}{' '}
           <Button variant="outline" onClick={() => void query.refetch()}>
-            Retry
+            {m.common_retry()}
           </Button>
         </Alert>
       ) : !candidates.length ? (
         <p role="status" className="sync-identity-note">
-          No orders from another connection match this search.
+          {m.orders_link_search_empty()}
         </p>
       ) : (
         <ul className="sync-identity-sources">
@@ -135,13 +136,11 @@ function OrderLinkSearch({
                   to="/app/$organizationId/orders/$orderId"
                   params={{ organizationId, orderId: item.id }}
                 >
-                  {item.displayNumber ?? 'Order'}
+                  {orderLabel(item)}
                 </Link>
                 <small>
-                  {item.sources.map((source) => source.label).join(', ')} ·{' '}
-                  {item.total
-                    ? `${item.total.amount} ${item.total.currency}`
-                    : 'Total unknown'}
+                  {formatList(item.sources.map((source) => source.label))} ·{' '}
+                  {formatMoney(item.total) ?? m.orders_link_total_unknown()}
                 </small>
               </span>
               <Button
@@ -150,7 +149,9 @@ function OrderLinkSearch({
                 disabled={busy || reviewing !== null}
                 onClick={() => void review(item.id)}
               >
-                {reviewing === item.id ? 'Loading…' : 'Review link'}
+                {reviewing === item.id
+                  ? m.common_loading()
+                  : m.orders_link_review()}
               </Button>
             </li>
           ))}

@@ -254,6 +254,7 @@
 .case-row-time {
   min-width: 26px;
   color: var(--foreground-subtle);
+  white-space: nowrap;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   text-align: right;
@@ -304,7 +305,9 @@
 
   .issue-row-meta {
     grid-column: 2;
+    flex-wrap: wrap;
     justify-content: flex-start;
+    row-gap: 6px;
   }
 
   .case-row-time {

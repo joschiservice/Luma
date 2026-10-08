@@ -9,6 +9,7 @@ import {
   lastChange,
   nextStep,
   otherSignals,
+  quantity,
   timelineChanges,
 } from './presentation';
 
@@ -132,7 +133,7 @@ it('offers a release only for held work the source app can act on', () => {
   // A method correction is explicitly not progress.
   expect(
     nextStep({ ...detail, item: item({ signals: ['stalled'] }) }, false).body,
-  ).toContain('does not prove that it shipped');
+  ).toContain('doesn’t prove that it shipped');
   expect(
     nextStep(
       {
@@ -194,4 +195,12 @@ it('opens on the attention view with the longest wait first', () => {
     sort: 'waiting',
     cursor: undefined,
   });
+});
+
+it('names piece units in the interface language and keeps other units', () => {
+  expect(quantity('1', 'each')).toBe('1 unit');
+  expect(quantity('12', 'EACH')).toBe('12 units');
+  expect(quantity('3', 'Stk')).toBe('3 units');
+  expect(quantity('1.5', 'kg')).toBe('1.5 kg');
+  expect(quantity('2', null)).toBe('2 units');
 });

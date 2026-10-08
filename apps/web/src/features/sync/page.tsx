@@ -7,6 +7,8 @@ import type {
   SyncRecordType,
   SyncStreamView,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import {
   Alert,
   AlertDescription,
@@ -101,14 +103,14 @@ export function SyncPage() {
     setMessage(null);
     try {
       await sendSyncCommand(organizationId, stream.id, action);
-      setMessage({ tone: 'success', text: commandMessages[action] });
+      setMessage({ tone: 'success', text: commandMessages[action]() });
     } catch (error) {
       setMessage({
         tone: 'danger',
         text:
           error instanceof IdentityError && error.status === 403
-            ? 'Your role doesn’t include Manage imports, so you can’t control syncs.'
-            : 'Luma could not update this sync. Refresh and try again.',
+            ? m.sync_command_forbidden()
+            : m.sync_command_failed(),
       });
     } finally {
       await client.invalidateQueries({ queryKey: syncKey(organizationId) });
@@ -122,7 +124,7 @@ export function SyncPage() {
       organizationId={organizationId}
       overview={query.isError ? undefined : query.data}
       loading={query.isPending}
-      error={query.error ? 'Sync status could not be loaded.' : undefined}
+      error={query.error ? m.sync_load_failed() : undefined}
       offline={query.isPaused}
       refreshing={query.isFetching}
       canManage={can('sync.manage')}
@@ -143,13 +145,12 @@ export function SyncPage() {
   );
 }
 
-const commandMessages: Record<SyncCommand, string> = {
-  pause: 'Sync paused. Records already imported stay available.',
-  resume: 'Sync resumed with your access.',
-  retry: 'Luma will try again now.',
-  reconcile: 'Full check requested. Luma rereads every record from the source.',
-  reimport:
-    'History import restarted. Unchanged records are recognized and not duplicated.',
+const commandMessages: Record<SyncCommand, () => string> = {
+  pause: m.sync_command_paused,
+  resume: m.sync_command_resumed,
+  retry: m.sync_command_retry,
+  reconcile: m.sync_command_reconcile,
+  reimport: m.sync_command_reimport,
 };
 
 /** Presents import progress, sync health and record coverage for every connection. */
@@ -185,31 +186,29 @@ export function SyncView({
   return (
     <main className="sync-page">
       <PageTitle
-        title="Data sync"
+        title={m.sync_page_title()}
         actions={
           <Button
             variant="outline"
             onClick={refresh}
             disabled={refreshing}
-            aria-label="Refresh sync status"
+            aria-label={m.sync_refresh_label()}
           >
             <RefreshCw
               size={14}
               aria-hidden="true"
               className={refreshing ? 'sync-spin' : undefined}
             />
-            Refresh
+            {m.common_refresh()}
           </Button>
         }
       />
-      {offline ? (
-        <Alert role="status">You are offline. Reconnect to refresh.</Alert>
-      ) : null}
+      {offline ? <Alert role="status">{m.common_offline()}</Alert> : null}
       {error ? (
         <Alert tone="danger" role="alert">
           {error}{' '}
           <Button variant="outline" size="sm" onClick={refresh}>
-            Retry
+            {m.common_retry()}
           </Button>
         </Alert>
       ) : null}
@@ -220,7 +219,7 @@ export function SyncView({
       ) : null}
       {loading && !overview ? (
         <div className="sync-loading" role="status">
-          Loading sync status…
+          {m.sync_loading()}
         </div>
       ) : null}
       {overview ? (
@@ -241,29 +240,22 @@ export function SyncView({
           ) : (
             <Empty>
               <Plug size={28} aria-hidden="true" />
-              <h2>Connect a system to import its history</h2>
-              <p>
-                When you connect Shopify or JTL, Luma imports orders,
-                fulfillments, products, stock and permitted customers, then
-                keeps them in sync.
-              </p>
+              <h2>{m.sync_empty_title()}</h2>
+              <p>{m.sync_empty_description()}</p>
               <Link
                 className={buttonVariants({ variant: 'outline' })}
                 to="/app/$organizationId/apps"
                 params={{ organizationId }}
               >
-                Connect a system
+                {m.sync_empty_action()}
               </Link>
             </Empty>
           )}
           {automaticLinks}
           <RecentRuns overview={overview} />
           <p className="sync-footnote">
-            Luma never changes records in your systems while syncing. Change
-            notifications queue a read within seconds; source limits can delay
-            it. Without them, Luma checks for changes every few minutes and
-            rereads everything once a day.{' '}
-            <a href="/docs/data-sync">How data sync works</a>
+            {m.sync_footnote()}{' '}
+            <a href="/docs/data-sync">{m.sync_footnote_link()}</a>
           </p>
         </>
       ) : null}
@@ -293,22 +285,22 @@ function SyncSummary({ overview }: { overview: SyncOverview }) {
       </div>
       <dl className="sync-summary-stats">
         <div>
-          <dt>Records in Luma</dt>
+          <dt>{m.sync_summary_records()}</dt>
           <dd>{count(imported)}</dd>
         </div>
         <div>
-          <dt>Connections</dt>
+          <dt>{m.sync_summary_connections()}</dt>
           <dd>{count(overview.connections.length)}</dd>
         </div>
         <div>
-          <dt>Oldest full check</dt>
+          <dt>{m.sync_summary_oldest_check()}</dt>
           <dd>
             {lastCheck ? (
               <span title={lastCheck}>
                 {ago(lastCheck, Date.parse(overview.asOf))}
               </span>
             ) : (
-              'Not yet'
+              m.sync_summary_not_yet()
             )}
           </dd>
         </div>
@@ -365,20 +357,19 @@ function ConnectionSync({
               params={{ organizationId, appId: connection.appId }}
               hash={`connection-${connection.connectionId}`}
             >
-              Manage connection
+              {m.sync_connection_manage()}
             </Link>
           ) : null}
         </div>
       </CardHeader>
       {connection.status !== 'active' ? (
-        <CardDescription>
-          Syncing pauses while the connection is not active. Records already
-          imported stay in Luma.
-        </CardDescription>
+        <CardDescription>{m.sync_connection_inactive()}</CardDescription>
       ) : null}
       <ul
         className="sync-streams"
-        aria-label={`${connection.label} record types`}
+        aria-label={m.sync_connection_record_types({
+          connection: connection.label,
+        })}
       >
         {connection.recordTypes.map((item) => (
           <li key={item.recordType}>
@@ -440,7 +431,13 @@ function StreamRow({
     : null;
   const coverage = coverageStatement(type, stream);
   const noun = recordTypes[type].noun;
-  const label = `${recordTypes[type].title} ${state.label.toLowerCase()}`;
+  const label = m.sync_stream_label({
+    type: recordTypes[type].title,
+    state: state.label,
+  });
+  const startsNow = stream.nextRunAt
+    ? Date.parse(stream.nextRunAt) - now < 10_000
+    : false;
 
   return (
     <div className="sync-stream" aria-label={label} role="group">
@@ -451,7 +448,15 @@ function StreamRow({
           <div className="sync-stream-progress">
             <Progress
               value={progress.value}
-              label={`${recordTypes[type].title} ${stream.scan?.kind === 'backfill' ? 'history import' : 'sync'}`}
+              label={
+                stream.scan?.kind === 'backfill'
+                  ? m.sync_stream_progress_backfill({
+                      type: recordTypes[type].title,
+                    })
+                  : m.sync_stream_progress_sync({
+                      type: recordTypes[type].title,
+                    })
+              }
               valueText={progress.text}
             />
             <small>{progress.text}</small>
@@ -464,10 +469,9 @@ function StreamRow({
         stream.phase === 'backfill' ? (
           <span className="sync-recent-coverage">
             <CircleCheck size={14} aria-hidden="true" />
-            Recent history{' '}
             {stream.records.failed || stream.records.pending
-              ? 'read'
-              : 'imported'}
+              ? m.sync_stream_recent_read()
+              : m.sync_stream_recent_imported()}
           </span>
         ) : null}
         <p>{coverage.text}</p>
@@ -475,18 +479,24 @@ function StreamRow({
       <div className="sync-stream-time">
         {stream.lastSuccessAt ? (
           <span title={stream.lastSuccessAt}>
-            Synced {ago(stream.lastSuccessAt, now)}
+            {m.sync_stream_synced({ time: ago(stream.lastSuccessAt, now) })}
           </span>
         ) : (
-          <span>Not synced yet</span>
+          <span>{m.sync_stream_not_synced()}</span>
         )}
         {stream.status === 'waiting' ? (
-          <small>Starts after orders</small>
+          <small>{m.sync_stream_starts_after_orders()}</small>
         ) : stream.nextRunAt && !stream.scan ? (
           <small title={stream.nextRunAt}>
-            {soon(stream.nextRunAt, now) === 'now'
-              ? 'Starting now'
-              : `${stream.error ? 'Retry' : 'Next check'} ${soon(stream.nextRunAt, now)}`}
+            {startsNow
+              ? m.sync_stream_starting_now()
+              : stream.error
+                ? m.sync_stream_next_retry({
+                    time: soon(stream.nextRunAt, now),
+                  })
+                : m.sync_stream_next_check({
+                    time: soon(stream.nextRunAt, now),
+                  })}
           </small>
         ) : null}
       </div>
@@ -499,7 +509,9 @@ function StreamRow({
                   variant="ghost"
                   size="icon"
                   disabled={pending}
-                  aria-label={`${recordTypes[type].title} sync actions`}
+                  aria-label={m.sync_stream_actions({
+                    type: recordTypes[type].title,
+                  })}
                 />
               }
             >
@@ -508,26 +520,29 @@ function StreamRow({
             <DropdownMenuContent align="end">
               {stream.paused ? (
                 <DropdownMenuItem onClick={() => command(stream, 'resume')}>
-                  <Play aria-hidden="true" /> Resume
+                  <Play aria-hidden="true" /> {m.sync_action_resume()}
                 </DropdownMenuItem>
               ) : (
                 <>
                   <DropdownMenuItem onClick={() => command(stream, 'retry')}>
                     <RefreshCw aria-hidden="true" />
-                    {stream.error ? 'Retry now' : 'Sync now'}
+                    {stream.error
+                      ? m.sync_action_retry_now()
+                      : m.sync_action_sync_now()}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     disabled={stream.phase === 'backfill'}
                     onClick={() => command(stream, 'reconcile')}
                   >
-                    <ScanSearch aria-hidden="true" /> Check all records
+                    <ScanSearch aria-hidden="true" />{' '}
+                    {m.sync_action_check_all()}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setConfirm(true)}>
-                    <History aria-hidden="true" /> Re-import history
+                    <History aria-hidden="true" /> {m.sync_action_reimport()}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => command(stream, 'pause')}>
-                    <Pause aria-hidden="true" /> Pause
+                    <Pause aria-hidden="true" /> {m.sync_action_pause()}
                   </DropdownMenuItem>
                 </>
               )}
@@ -546,15 +561,13 @@ function StreamRow({
       />
       <Dialog open={confirm} onOpenChange={setConfirm}>
         <DialogContent>
-          <DialogTitle>Re-import {noun} history?</DialogTitle>
+          <DialogTitle>{m.sync_reimport_title({ records: noun })}</DialogTitle>
           <DialogDescription>
-            Luma rereads every {recordTypes[type].one} the source shares.
-            Records already in Luma stay available and unchanged records are not
-            duplicated. Large histories can take a while.
+            {m.sync_reimport_description({ records: noun })}
           </DialogDescription>
           <div className="sync-dialog-actions">
             <Button variant="outline" onClick={() => setConfirm(false)}>
-              Cancel
+              {m.common_cancel()}
             </Button>
             <Button
               onClick={() => {
@@ -562,7 +575,7 @@ function StreamRow({
                 command(stream, 'reimport');
               }}
             >
-              <RotateCcw aria-hidden="true" /> Re-import history
+              <RotateCcw aria-hidden="true" /> {m.sync_reimport_confirm()}
             </Button>
           </div>
         </DialogContent>
@@ -593,10 +606,11 @@ function StreamNotices({
   if (stream.blocked === 'principal_unavailable')
     notices.push(
       <Alert key="principal" tone="warning">
-        <AlertTitle>This sync is waiting for someone to resume it</AlertTitle>
+        <AlertTitle>{m.sync_notice_principal_title()}</AlertTitle>
         <AlertDescription>
-          The person it ran as no longer manages this workspace.
-          {canManage ? ' Resume it to continue with your access.' : ''}
+          {canManage
+            ? m.sync_notice_principal_manage()
+            : m.sync_notice_principal_view()}
         </AlertDescription>
         {canManage ? (
           <Button
@@ -604,7 +618,7 @@ function StreamNotices({
             disabled={pending}
             onClick={() => command(stream, 'resume')}
           >
-            <Play aria-hidden="true" /> Resume with my access
+            <Play aria-hidden="true" /> {m.sync_notice_principal_resume()}
           </Button>
         ) : null}
       </Alert>,
@@ -617,15 +631,17 @@ function StreamNotices({
       >
         <AlertTitle>
           {stream.status === 'failing'
-            ? `Failed ${count(stream.error.attempts)} times in a row`
-            : 'The last read failed'}
+            ? m.sync_notice_failing_title({ count: stream.error.attempts })
+            : m.sync_notice_failed_title()}
         </AlertTitle>
         <AlertDescription>
           {stream.error.message}{' '}
           {stream.nextRunAt
-            ? `Next attempt ${soon(stream.nextRunAt, now)}.`
+            ? m.sync_notice_next_attempt({ time: soon(stream.nextRunAt, now) })
             : ''}{' '}
-          Last failure <WorkspaceDate value={stream.error.at} />.
+          {rich(m.sync_notice_last_failure, {
+            date: <WorkspaceDate value={stream.error.at} />,
+          })}
         </AlertDescription>
         {canManage ? (
           <Button
@@ -634,7 +650,7 @@ function StreamNotices({
             disabled={pending}
             onClick={() => command(stream, 'retry')}
           >
-            <RefreshCw aria-hidden="true" /> Retry now
+            <RefreshCw aria-hidden="true" /> {m.sync_action_retry_now()}
           </Button>
         ) : null}
       </Alert>,
@@ -642,15 +658,19 @@ function StreamNotices({
   if (stream.coverage.olderHistoryAvailable)
     notices.push(
       <Alert key="older" tone="success">
-        <AlertTitle>Older {noun} are now available</AlertTitle>
+        <AlertTitle>{m.sync_notice_older_title({ records: noun })}</AlertTitle>
         <AlertDescription>
-          The source no longer limits history. Re-import to add {noun} from
-          before{' '}
-          {stream.coverage.historyFrom ? coverageDay(stream) : 'the import'}.
+          {stream.coverage.historyFrom
+            ? m.sync_notice_older_description({
+                records: noun,
+                date: coverageDay(stream),
+              })
+            : m.sync_notice_older_description_undated({ records: noun })}
         </AlertDescription>
         {canManage ? (
           <Button size="sm" disabled={pending} onClick={onReimport}>
-            <History aria-hidden="true" /> Import older {noun}
+            <History aria-hidden="true" />{' '}
+            {m.sync_notice_older_action({ records: noun })}
           </Button>
         ) : null}
       </Alert>,
@@ -658,14 +678,19 @@ function StreamNotices({
   else if (stream.coverage.historyFrom && stream.phase === 'incremental')
     notices.push(
       <Alert key="limited" tone="info">
-        <AlertTitle>Only recent {noun} were shared</AlertTitle>
+        <AlertTitle>
+          {m.sync_notice_limited_title({ records: noun })}
+        </AlertTitle>
         <AlertDescription>
-          The source shared {noun} from {coverageDay(stream)} onward
           {stream.coverage.historyRequirement
-            ? `. Older ${noun} need the ${stream.coverage.historyRequirement} permission`
-            : ''}
-          . Luma keeps every {recordTypes[type].one} it has imported, so
-          coverage grows from here.
+            ? m.sync_notice_limited_access({
+                records: noun,
+                date: coverageDay(stream),
+              })
+            : m.sync_notice_limited_description({
+                records: noun,
+                date: coverageDay(stream),
+              })}
         </AlertDescription>
       </Alert>,
     );
@@ -674,23 +699,26 @@ function StreamNotices({
   if (waiting)
     notices.push(
       <p key="waiting" className="sync-stream-note">
-        {records(type, waiting)} waiting for related records to arrive. Luma
-        imports them on a later pass.
+        {m.sync_note_waiting({ records: records(type, waiting) })}
       </p>,
     );
   if (failed)
     notices.push(
       <p key="failed" className="sync-stream-note">
-        {records(type, failed)} could not be imported
-        {stream.problems.length ? `: ${stream.problems.join('; ')}` : ''}.
+        {stream.problems.length
+          ? m.sync_note_failed_reasons({
+              records: records(type, failed),
+              reasons: stream.problems.join('; '),
+            })
+          : m.sync_note_failed({ records: records(type, failed) })}
       </p>,
     );
   if (stream.records.missing)
     notices.push(
       <p key="missing" className="sync-stream-note">
-        {records(type, stream.records.missing)} no longer found at the source in
-        the last full check. Luma keeps them; check whether they were deleted
-        there.
+        {m.sync_note_missing({
+          records: records(type, stream.records.missing),
+        })}
       </p>,
     );
 
@@ -713,7 +741,7 @@ function RecentRuns({ overview }: { overview: SyncOverview }) {
 
   return (
     <Disclosure className="sync-runs">
-      <summary>Recent sync runs</summary>
+      <summary>{m.sync_runs_title()}</summary>
       <ol>
         {overview.runs.map((run) => (
           <li key={run.id}>
@@ -727,19 +755,19 @@ function RecentRuns({ overview }: { overview: SyncOverview }) {
             <span className="sync-run-main">
               <strong>
                 {run.createdSince
-                  ? 'Recent history import'
-                  : scanKinds[run.kind]}{' '}
+                  ? m.sync_run_kind_recent()
+                  : scanKinds[run.kind]()}{' '}
                 · {recordTypes[run.recordType].title}
               </strong>
               <small>
-                {labels.get(run.connectionId) ?? 'Connection'} ·{' '}
-                {triggers[run.trigger]}
-                {run.outcome === 'cancelled'
-                  ? ' · Replaced by a newer run'
-                  : ''}
-                {run.errors
-                  ? ` · ${count(run.errors)} failed ${run.errors === 1 ? 'read' : 'reads'} retried`
-                  : ''}
+                {[
+                  labels.get(run.connectionId) ?? m.sync_run_connection(),
+                  triggers[run.trigger](),
+                  run.outcome === 'cancelled' ? m.sync_run_replaced() : '',
+                  run.errors ? m.sync_run_retried({ count: run.errors }) : '',
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               </small>
             </span>
             <span className="sync-run-summary">{runSummary(run)}</span>

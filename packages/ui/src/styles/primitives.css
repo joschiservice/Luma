@@ -990,20 +990,25 @@
   min-width: 0;
 }
 
-/* Many views scroll sideways in narrow layouts instead of wrapping the segmented control. */
-.collection-views {
+/* Many views scroll sideways in narrow layouts instead of wrapping the segmented control.
+   Link-based tab views in the toolbar follow the same rule, since longer translations can
+   make any set of views wider than a phone. */
+.collection-views,
+.collection-toolbar-views > [data-slot='tabs'] {
   min-width: 0;
   max-width: 100%;
 }
 
-.collection-views [data-slot='tabs-list'] {
+.collection-views [data-slot='tabs-list'],
+.collection-toolbar-views > [data-slot='tabs'] > [data-slot='tabs-list'] {
   max-width: 100%;
   overflow-x: auto;
   scrollbar-width: none;
 }
 
 /* The scrolling list clips outside outlines, so focus is drawn inside the trigger. */
-.collection-views [data-slot='tabs-trigger']:focus-visible {
+.collection-views [data-slot='tabs-trigger']:focus-visible,
+.collection-toolbar-views [data-slot='tabs-trigger']:focus-visible {
   outline-offset: -2px;
 }
 

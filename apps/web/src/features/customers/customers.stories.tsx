@@ -337,7 +337,7 @@ export const Detail: Story = {
       await canvas.findByRole('button', { name: '#2001' }, { timeout: 10000 }),
     );
     await expect(
-      await canvas.findByText(/has not been mapped/, undefined, {
+      await canvas.findByText(/isn’t linked to an order in Luma/, undefined, {
         timeout: 10000,
       }),
     ).toBeVisible();

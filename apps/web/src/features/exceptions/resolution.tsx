@@ -1,4 +1,5 @@
 import type { CaseDecision, DecisionReceipt } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import {
   CaseLoading,
   CaseNotice,
@@ -86,7 +87,7 @@ export function CaseResolution({
           const current = await refreshResolution(organizationId, exceptionId);
           if (!sameResolution(review, current)) {
             setCheckError(
-              'The proposed action changed. Review the updated details before approving.',
+              m.exceptions_resolution_changed(),
               current.proposal?.id,
             );
 
@@ -97,7 +98,7 @@ export function CaseResolution({
           setCheckError(
             error instanceof Error
               ? error.message
-              : 'Current conditions could not be checked. Try again.',
+              : m.exceptions_resolution_check_failed(),
           );
 
           return;
@@ -120,7 +121,7 @@ export function CaseResolution({
         const current = await refreshResolution(organizationId, exceptionId);
         if (!sameResolution(review, current)) {
           setCheckError(
-            'The proposed action changed. Review the updated details before approving.',
+            m.exceptions_resolution_changed(),
             current.proposal?.id,
           );
 
@@ -190,7 +191,7 @@ export function CaseResolution({
         setUncertain(undefined);
       setMessage(
         !retry && error instanceof IdentityError && error.status === 404
-          ? 'No receipt is available yet. The request may still be processing. Check again before taking another action.'
+          ? m.exceptions_resolution_no_receipt()
           : decisionError(error),
       );
     } finally {
@@ -236,7 +237,7 @@ export function CaseResolution({
       setCheckError(
         error instanceof Error
           ? error.message
-          : 'Current conditions could not be checked. Try again.',
+          : m.exceptions_resolution_check_failed(),
       );
     } finally {
       await refresh();
@@ -263,20 +264,20 @@ export function CaseResolution({
   return (
     <>
       {offline ? (
-        <CaseNotice title="You’re offline">
-          Decisions are paused until the current case can be confirmed.
+        <CaseNotice title={m.exceptions_resolution_offline_title()}>
+          {m.exceptions_resolution_offline_text()}
         </CaseNotice>
       ) : null}
       {query.isPending ? <CaseLoading /> : null}
       {query.isError ? (
-        <CaseNotice error title="Resolution review unavailable">
+        <CaseNotice error title={m.exceptions_resolution_unavailable_title()}>
           {denied
             ? decisionError(query.error)
-            : 'Current policy and progress could not be confirmed. Refresh before making a decision.'}
+            : m.exceptions_resolution_unavailable_text()}
         </CaseNotice>
       ) : null}
       {message ? (
-        <CaseNotice error title="Decision needs attention">
+        <CaseNotice error title={m.exceptions_resolution_message_title()}>
           {message}
         </CaseNotice>
       ) : null}
@@ -284,17 +285,17 @@ export function CaseResolution({
         <CaseNotice
           title={
             receipt.kind === 'approve'
-              ? 'Approval recorded'
+              ? m.exceptions_receipt_approve_title()
               : receipt.kind === 'reject'
-                ? 'Rejection recorded'
-                : 'Escalation recorded'
+                ? m.exceptions_receipt_reject_title()
+                : m.exceptions_receipt_escalate_title()
           }
         >
           {receipt.kind === 'approve'
-            ? 'This acknowledges your decision. Execution and verification are tracked separately.'
+            ? m.exceptions_receipt_approve_text()
             : receipt.kind === 'reject'
-              ? 'The proposal was rejected. The case remains open for follow-up.'
-              : 'The case was escalated for further review.'}
+              ? m.exceptions_receipt_reject_text()
+              : m.exceptions_receipt_escalate_text()}
         </CaseNotice>
       ) : null}
       {uncertain ? (
@@ -304,25 +305,25 @@ export function CaseResolution({
             disabled={pending || offline}
             onClick={() => void recover()}
           >
-            Check recorded decision
+            {m.exceptions_resolution_recover()}
           </Button>
           <Button
             variant="outline"
             disabled={pending || offline}
             onClick={() => void recover(true)}
           >
-            Retry same decision
+            {m.exceptions_resolution_resend()}
           </Button>
         </div>
       ) : null}
       {checking ? (
-        <CaseNotice title="Checking current conditions">
-          We’re checking the latest facts before you continue.
+        <CaseNotice title={m.exceptions_resolution_checking_title()}>
+          {m.exceptions_resolution_checking_text()}
         </CaseNotice>
       ) : null}
       {checkError ? (
         <>
-          <CaseNotice error title="Review needs attention">
+          <CaseNotice error title={m.exceptions_resolution_check_error_title()}>
             {checkError}
           </CaseNotice>
           <div className="resolution-actions">
@@ -331,16 +332,14 @@ export function CaseResolution({
               disabled={checking || pending || offline}
               onClick={() => void checkCurrent()}
             >
-              Retry checks
+              {m.exceptions_resolution_check_again()}
             </Button>
           </div>
         </>
       ) : null}
       {expired && !data?.review.refreshable ? (
-        <CaseNotice title="Approval window expired">
-          The proposal or its supporting evidence has expired. Approval requires
-          a new proposal based on fresh evidence. Refreshing this page does not
-          extend the approval window.
+        <CaseNotice title={m.exceptions_resolution_expired_title()}>
+          {m.exceptions_resolution_expired_text()}
         </CaseNotice>
       ) : null}
       {data ? (

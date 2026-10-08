@@ -1,33 +1,41 @@
+import { m } from '@luma/i18n/messages';
+import { getLocale } from '@luma/i18n/runtime';
 import { Input } from '@luma/ui/components/primitives/input';
 import { Link, useHydrated } from '@tanstack/react-router';
 import { useDocsSearch } from 'fumadocs-core/search/client';
 import { fetchClient } from 'fumadocs-core/search/client/fetch';
 import { Search } from 'lucide-react';
-import { useId } from 'react';
+import { useId, useMemo } from 'react';
 
 import { docLocation } from './context';
 
-const client = fetchClient({ api: '/docs-search' });
-
-/** Searches article text and opens results in the portal or the enclosing help drawer. */
+/**
+ * Searches article text in the reader's language and opens results in the portal or the
+ * enclosing help drawer.
+ */
 export function DocsSearch({
   onNavigate,
 }: {
   onNavigate?: (href: string) => void;
 }) {
+  const locale = getLocale();
+  const client = useMemo(
+    () => fetchClient({ api: '/docs-search', locale }),
+    [locale],
+  );
   const { search, setSearch, query } = useDocsSearch({ client });
   const id = useId();
   const hydrated = useHydrated();
   const results = Array.isArray(query.data) ? query.data.slice(0, 8) : [];
 
   return (
-    <div className="docs-search" role="search" aria-label="Documentation">
+    <div className="docs-search" role="search" aria-label={m.docs_title()}>
       <div className="docs-search-input">
         <Search size={16} aria-hidden="true" />
         <Input
-          aria-label="Search documentation"
+          aria-label={m.docs_search_label()}
           type="search"
-          placeholder="Search documentation…"
+          placeholder={m.docs_search_placeholder()}
           disabled={!hydrated}
           value={search}
           onChange={(event) => setSearch(event.target.value)}
@@ -38,12 +46,12 @@ export function DocsSearch({
         <div id={id} className="docs-search-results">
           <p role="status">
             {query.error
-              ? 'Search is unavailable. Browse the guides below.'
+              ? m.docs_search_unavailable()
               : query.isLoading
-                ? 'Searching…'
+                ? m.docs_search_searching()
                 : results.length
-                  ? `${results.length} results`
-                  : 'No results. Try another word, or browse the guides below.'}
+                  ? m.docs_search_results({ count: results.length })
+                  : m.docs_search_empty()}
           </p>
           {!query.isLoading && !query.error ? (
             <ul>

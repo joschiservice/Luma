@@ -6,6 +6,9 @@ import type {
   CatalogSource,
   ProductDetail,
 } from '@luma/api-contract';
+import { formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -16,6 +19,7 @@ import { Empty } from '@luma/ui/components/primitives/empty';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { quantityUnit } from '@luma/ui/lib/units';
 import { onlineManager, useQuery } from '@tanstack/react-query';
 import { Link, useParams, useSearch } from '@tanstack/react-router';
 import { ArrowLeft, PackageX, RefreshCw } from 'lucide-react';
@@ -24,6 +28,12 @@ import { type ReactNode, useSyncExternalStore } from 'react';
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
 import { stockQuantity, StockState } from '../inventory/presentation';
+import {
+  formatSourceNumber,
+  issueStateLabel,
+  purchaseOrderLabels,
+  statusLabels as orderStatusLabels,
+} from '../orders/presentation';
 import { recordReturnPath } from '../records/data';
 import { IdentityLinks } from '../sync/identity-links';
 import { productFilters, productOptions, type ProductsSearch } from './data';
@@ -92,7 +102,7 @@ export function ProductPage() {
 
 type FieldRow = {
   key: string;
-  label: string;
+  label: () => string;
   field?: CatalogField;
   value: (listing: CatalogListing, source: CatalogSource) => ReactNode;
 };
@@ -100,69 +110,78 @@ type FieldRow = {
 const fieldRows: FieldRow[] = [
   {
     key: 'title',
-    label: 'Product',
+    label: m.products_detail_field_product,
     field: 'title',
     value: (listing) => listingTitle(listing),
   },
   {
     key: 'code',
-    label: 'SKU code',
-    value: (listing) => listing.code?.trim() || 'Not reported',
+    label: m.products_detail_field_code,
+    value: (listing) => listing.code?.trim() || m.common_not_reported(),
   },
   {
     key: 'status',
-    label: 'Status',
+    label: m.products_field_status,
     field: 'status',
     value: (listing) => statusLabels[listing.status],
   },
   {
     key: 'published',
-    label: 'Sales channel',
+    label: m.products_field_published,
     field: 'published',
     value: (listing, source) => listingLabel(listing.published, source.system),
   },
   {
     key: 'price',
-    label: 'Price',
+    label: m.products_field_price,
     field: 'price',
-    value: (listing) => formatPrice(listing.price) ?? 'Not reported',
+    value: (listing) => formatPrice(listing.price) ?? m.common_not_reported(),
   },
   {
     key: 'barcode',
-    label: 'Barcode',
+    label: m.products_field_barcode,
     field: 'barcode',
-    value: (listing) => listing.barcode ?? 'Not reported',
+    value: (listing) => listing.barcode ?? m.common_not_reported(),
   },
   {
     key: 'vendor',
-    label: 'Vendor',
-    value: (listing) => listing.vendor ?? 'Not reported',
+    label: m.products_detail_field_vendor,
+    value: (listing) => listing.vendor ?? m.common_not_reported(),
   },
   {
     key: 'ids',
-    label: 'Source IDs',
+    label: m.products_detail_field_ids,
     value: (listing) => (
       <span className="products-cell">
-        <span>Product {listing.externalProduct ?? 'unknown'}</span>
-        <small>SKU {listing.externalSku ?? 'unknown'}</small>
+        <span>
+          {listing.externalProduct
+            ? m.products_detail_product_id({ id: listing.externalProduct })
+            : m.products_detail_product_id_missing()}
+        </span>
+        <small>
+          {listing.externalSku
+            ? m.products_detail_sku_id({ id: listing.externalSku })
+            : m.products_detail_sku_id_missing()}
+        </small>
       </span>
     ),
   },
   {
     key: 'read',
-    label: 'Freshness',
+    label: m.products_detail_field_freshness,
     value: (listing) => (
       <span className="products-cell">
         <span>
-          Read <WorkspaceDate value={listing.observedAt} />
+          {rich(m.products_detail_last_read, {
+            date: <WorkspaceDate value={listing.observedAt} />,
+          })}
         </span>
         <small>
-          Source updated{' '}
-          {listing.sourceUpdatedAt ? (
-            <WorkspaceDate value={listing.sourceUpdatedAt} />
-          ) : (
-            'unknown'
-          )}
+          {listing.sourceUpdatedAt
+            ? rich(m.products_detail_source_updated, {
+                date: <WorkspaceDate value={listing.sourceUpdatedAt} />,
+              })
+            : m.products_detail_source_updated_missing()}
         </small>
       </span>
     ),
@@ -181,18 +200,18 @@ function ListingComparison({ detail }: { detail: ProductDetail }) {
   return (
     <DataTable
       className="products-comparison"
-      caption="Listing comparison by source"
+      caption={m.products_detail_comparison_caption()}
       rows={fieldRows}
       rowKey={(row) => row.key}
       columns={[
         {
           key: 'field',
-          header: 'Field',
+          header: m.products_detail_field(),
           cell: (row) => (
             <span className="products-field">
-              {row.label}
+              {row.label()}
               {row.field && item.differences.includes(row.field) ? (
-                <Badge tone="warning">Differs</Badge>
+                <Badge tone="warning">{m.products_detail_differs()}</Badge>
               ) : null}
             </span>
           ),
@@ -206,10 +225,15 @@ function ListingComparison({ detail }: { detail: ProductDetail }) {
             );
             if (!listing)
               return row.key === 'title' ? (
-                <span className="products-muted">Not in catalog</span>
+                <span className="products-muted">
+                  {m.products_listing_not_in_catalog()}
+                </span>
               ) : (
-                <span className="products-muted" aria-label="Not listed">
-                  —
+                <span
+                  className="products-muted"
+                  aria-label={m.products_detail_not_listed()}
+                >
+                  {m.common_empty_value()}
                 </span>
               );
 
@@ -245,7 +269,7 @@ function Gaps({
 
   return (
     <section className="products-gaps" aria-labelledby="product-gaps">
-      <h2 id="product-gaps">Not in every source</h2>
+      <h2 id="product-gaps">{m.products_gaps_title()}</h2>
       {detail.item.gaps.map((gap) => {
         const source = detail.sources.find(
           (entry) => entry.connectionId === gap.connectionId,
@@ -261,14 +285,15 @@ function Gaps({
                   params={{ organizationId, skuId: gap.match.skuId }}
                   search={search}
                 >
-                  Compare {gap.match.sku.trim()}
+                  {m.products_gaps_compare({ sku: gap.match.sku.trim() })}
                 </Link>
-                <a href="#sku-sources">Review the link below</a>
+                <a href="#sku-sources">{m.products_gaps_review_link()}</a>
               </p>
             ) : (
               <p className="products-muted">
-                If it should be sold or managed there, add it in{' '}
-                {source?.label ?? 'that source'}. Luma does not create listings.
+                {source
+                  ? m.products_gaps_add({ source: source.label })
+                  : m.products_gaps_add_generic()}
               </p>
             )}
           </Alert>
@@ -310,7 +335,7 @@ export function ProductDetailView({
     detail?.stock
       .flatMap((position) => position.sources)
       .find((source) => source.connectionId === connectionId)?.label ??
-    'Connected source';
+    m.orders_source_fallback();
   const orderSearch = item?.listings.find((l) => l.code)?.code?.trim();
 
   return (
@@ -318,7 +343,7 @@ export function ProductDetailView({
       {from ? (
         <Link className="products-back" to={from}>
           <ArrowLeft size={14} />
-          Back to context
+          {m.products_back_context()}
         </Link>
       ) : (
         <Link
@@ -328,16 +353,16 @@ export function ProductDetailView({
           search={productFilters(search)}
         >
           <ArrowLeft size={14} />
-          Back to products
+          {m.products_detail_back()}
         </Link>
       )}
       <PageHeader
-        title={item?.sku.trim() ?? 'Product'}
+        title={item?.sku.trim() ?? m.products_detail_title_fallback()}
         icon={<DomainIcon domain="products" size="md" />}
         description={
           item
-            ? (item.title ?? 'No source reports a title for this SKU.')
-            : 'Compare listings by source and see what depends on this SKU.'
+            ? (item.title ?? m.products_detail_no_title())
+            : m.products_detail_description_fallback()
         }
       />
       <div className="products-detail-toolbar">
@@ -353,39 +378,34 @@ export function ProductDetailView({
         </span>
         <Button variant="outline" disabled={refreshing} onClick={refresh}>
           <RefreshCw size={14} />
-          Refresh product
+          {m.products_detail_refresh()}
         </Button>
       </div>
       {offline ? (
-        <Alert role="status">
-          You are offline. Reconnect to refresh this product.
-        </Alert>
+        <Alert role="status">{m.products_detail_offline()}</Alert>
       ) : null}
       {error === 'missing' ? (
         <Empty>
           <PackageX size={30} aria-hidden="true" />
-          <h2>SKU not found</h2>
-          <p>
-            This SKU does not exist in this workspace, or it was linked into
-            another SKU.
-          </p>
+          <h2>{m.products_detail_missing_title()}</h2>
+          <p>{m.products_detail_missing_body()}</p>
           <Link to="/app/$organizationId/products" params={{ organizationId }}>
-            Browse products
+            {m.products_detail_browse()}
           </Link>
         </Empty>
       ) : error ? (
         <Alert tone="danger" role="alert">
           {detail
-            ? 'This product could not be refreshed. The details below may be out of date.'
-            : 'This product could not be loaded.'}{' '}
+            ? m.products_detail_refresh_failed()
+            : m.products_detail_load_failed()}{' '}
           <Button variant="outline" onClick={refresh}>
-            Retry
+            {m.common_retry()}
           </Button>
         </Alert>
       ) : null}
       {loading && !error ? (
         <div className="products-loading" role="status">
-          <span className="sr-only">Loading product…</span>
+          <span className="sr-only">{m.products_detail_loading()}</span>
           {Array.from({ length: 3 }, (_, i) => (
             <span className="lu-skeleton" key={i} />
           ))}
@@ -399,20 +419,19 @@ export function ProductDetailView({
           >
             <h2 id="product-explanation">
               {item.differences.length
-                ? 'Same SKU. Different listings.'
+                ? m.products_explanation_differs()
                 : !item.listings.length
-                  ? 'No catalog lists this SKU'
+                  ? m.products_explanation_no_catalog()
                   : item.gaps.length
-                    ? 'Listed in some sources only'
-                    : 'How each source lists this SKU'}
+                    ? m.products_explanation_some_sources()
+                    : m.products_explanation_agree()}
             </h2>
             <p>
               {differenceSentence(item.differences) ??
                 (item.listings.length
-                  ? 'Known values agree where sources report them. Agreement does not establish which source is authoritative.'
-                  : 'Luma knows this SKU from stock or order lines, but no connected catalog lists it.')}{' '}
-              Titles are compared ignoring case, spacing and punctuation; prices
-              only within the same currency.
+                  ? m.products_explanation_agree_body()
+                  : m.products_explanation_no_catalog_body())}{' '}
+              {m.products_explanation_method()}
             </p>
           </section>
           {item.listings.length ? <ListingComparison detail={detail} /> : null}
@@ -423,10 +442,8 @@ export function ProductDetailView({
           />
           <div className="products-context-grid">
             <Card className="products-section">
-              <h2>Stock by location</h2>
-              <p className="products-note">
-                Available quantity per source. Sources are never added together.
-              </p>
+              <h2>{m.products_stock_title()}</h2>
+              <p className="products-note">{m.products_stock_note()}</p>
               <ul className="products-related">
                 {detail.stock.map((position) => (
                   <li key={position.id}>
@@ -439,9 +456,19 @@ export function ProductDetailView({
                     <StockState position={position} />
                     <small>
                       {position.sources
-                        .map(
-                          (source) =>
-                            `${source.label}: ${source.deleted ? 'removed' : stockQuantity(source.available)} ${position.unit}`,
+                        .map((source) =>
+                          source.deleted
+                            ? m.products_stock_source_removed({
+                                source: source.label,
+                              })
+                            : m.products_stock_source({
+                                source: source.label,
+                                quantity: stockQuantity(source.available),
+                                unit: quantityUnit(
+                                  position.unit,
+                                  source.available ?? '',
+                                ),
+                              }),
                         )
                         .join(' · ')}
                     </small>
@@ -449,22 +476,19 @@ export function ProductDetailView({
                 ))}
               </ul>
               {!detail.stock.length ? (
-                <p className="products-note">No stock observed for this SKU.</p>
+                <p className="products-note">{m.products_stock_empty()}</p>
               ) : null}
               <Link
                 to="/app/$organizationId/inventory"
                 params={{ organizationId }}
                 search={{ skuId: item.skuId }}
               >
-                Open in Inventory
+                {m.products_stock_open()}
               </Link>
             </Card>
             <Card className="products-section">
-              <h2>Sales in the last 30 days</h2>
-              <p className="products-note">
-                Units ordered by placed date, net of reported cancellations.
-                Shown per source, because systems can hold the same order.
-              </p>
+              <h2>{m.products_sales_title()}</h2>
+              <p className="products-note">{m.products_sales_note()}</p>
               {detail.sales.sources.map((sales) => (
                 <SalesBars
                   key={`${sales.connectionId}:${sales.unit}`}
@@ -474,14 +498,12 @@ export function ProductDetailView({
                 />
               ))}
               {!detail.sales.sources.length ? (
-                <p className="products-note">
-                  No orders with a placed date in the last 30 days.
-                </p>
+                <p className="products-note">{m.products_sales_empty()}</p>
               ) : null}
             </Card>
             <Card className="products-section">
-              <h2>Orders with this SKU</h2>
-              <p className="products-note">Open orders first.</p>
+              <h2>{m.products_orders_title()}</h2>
+              <p className="products-note">{m.products_orders_note()}</p>
               <ul className="products-related">
                 {detail.orders.map((order) => (
                   <li key={`${order.id}:${order.connectionId}:${order.unit}`}>
@@ -492,14 +514,20 @@ export function ProductDetailView({
                       {order.label}
                     </Link>
                     <span>
-                      {order.quantity} {order.unit} · {order.status}
+                      {m.products_orders_line({
+                        quantity: formatSourceNumber(order.quantity),
+                        unit: quantityUnit(order.unit, order.quantity),
+                        status: orderStatusLabels[order.status] ?? order.status,
+                      })}
                     </span>
                     <small>
                       {sourceLabel(order.connectionId)}
                       {order.placedAt ? (
                         <>
-                          {' · placed '}
-                          <WorkspaceDate value={order.placedAt} />
+                          {' · '}
+                          {rich(m.products_orders_placed, {
+                            date: <WorkspaceDate value={order.placedAt} />,
+                          })}
                         </>
                       ) : null}
                     </small>
@@ -507,9 +535,7 @@ export function ProductDetailView({
                 ))}
               </ul>
               {!detail.orders.length ? (
-                <p className="products-note">
-                  No observed orders include this SKU.
-                </p>
+                <p className="products-note">{m.products_orders_empty()}</p>
               ) : null}
               {orderSearch ? (
                 <Link
@@ -517,15 +543,13 @@ export function ProductDetailView({
                   params={{ organizationId }}
                   search={{ q: orderSearch }}
                 >
-                  Search Orders for {orderSearch}
+                  {m.products_orders_search({ sku: orderSearch })}
                 </Link>
               ) : null}
             </Card>
             <Card className="products-section">
-              <h2>Supply commitments</h2>
-              <p className="products-note">
-                Purchase order quantities are not confirmed incoming stock.
-              </p>
+              <h2>{m.products_supply_title()}</h2>
+              <p className="products-note">{m.products_supply_note()}</p>
               <ul className="products-related">
                 {detail.purchaseOrders.map((order) => (
                   <li key={`${order.id}:${order.unit}`}>
@@ -536,19 +560,22 @@ export function ProductDetailView({
                       {order.label}
                     </Link>
                     <span>
-                      {order.quantity} {order.unit} · {order.status}
+                      {m.products_orders_line({
+                        quantity: formatNumber(order.quantity),
+                        unit: quantityUnit(order.unit, order.quantity),
+                        status:
+                          purchaseOrderLabels[order.status] ?? order.status,
+                      })}
                     </span>
                   </li>
                 ))}
               </ul>
               {!detail.purchaseOrders.length ? (
-                <p className="products-note">
-                  No purchase orders for this SKU.
-                </p>
+                <p className="products-note">{m.products_supply_empty()}</p>
               ) : null}
             </Card>
             <Card className="products-section">
-              <h2>Issues</h2>
+              <h2>{m.products_issues_title()}</h2>
               <ul className="products-related">
                 {detail.issues.map((issue) => (
                   <li key={issue.id}>
@@ -559,19 +586,17 @@ export function ProductDetailView({
                     >
                       {issue.label}
                     </Link>
-                    <span>{issue.state}</span>
+                    <span>{issueStateLabel(issue.state)}</span>
                   </li>
                 ))}
               </ul>
               {!detail.issues.length ? (
-                <p className="products-note">
-                  No recorded issues for this SKU or its stock.
-                </p>
+                <p className="products-note">{m.products_issues_empty()}</p>
               ) : null}
             </Card>
             <Card className="products-section">
-              <h2>Other variants</h2>
-              <p className="products-note">SKUs in the same source products.</p>
+              <h2>{m.products_variants_title()}</h2>
+              <p className="products-note">{m.products_variants_note()}</p>
               <ul className="products-related">
                 {detail.variants.map((variant) => (
                   <li key={`${variant.skuId}:${variant.connectionId}`}>
@@ -592,64 +617,58 @@ export function ProductDetailView({
                 ))}
               </ul>
               {!detail.variants.length ? (
-                <p className="products-note">
-                  This SKU is the only variant of its products.
-                </p>
+                <p className="products-note">{m.products_variants_empty()}</p>
               ) : null}
             </Card>
           </div>
           {detail.relatedTruncated ? (
-            <Alert>
-              Showing the first 50 entries per related record type. Open Orders,
-              Inventory or Procurement to continue.
-            </Alert>
+            <Alert>{m.products_related_truncated()}</Alert>
           ) : null}
           <div id="sku-sources">{identity}</div>
           <section className="products-section">
-            <h2>Listing history</h2>
-            <p className="products-note">
-              Catalog snapshots Luma read, newest first. A snapshot is evidence
-              of a read, not necessarily a change at the source.
-            </p>
+            <h2>{m.products_history_title()}</h2>
+            <p className="products-note">{m.products_history_note()}</p>
             <DataTable
-              caption="Listing observation history"
+              caption={m.products_history_caption()}
               rows={detail.history.entries}
               rowKey={(entry) => entry.id}
               columns={[
                 {
                   key: 'time',
-                  header: 'Read',
+                  header: m.products_history_read(),
                   cell: (entry) => <WorkspaceDate value={entry.observedAt} />,
                 },
                 {
                   key: 'source',
-                  header: 'Source',
+                  header: m.products_history_source(),
                   cell: (entry) => (
                     <span className="products-cell">
                       <span>{sourceLabel(entry.connectionId)}</span>
                       <small>
                         {entry.deleted
-                          ? 'Removed at source'
+                          ? m.products_history_removed()
                           : entry.current
-                            ? 'Current'
-                            : 'Earlier read'}
+                            ? m.products_history_current()
+                            : m.products_history_earlier()}
                       </small>
                     </span>
                   ),
                 },
                 {
                   key: 'status',
-                  header: 'Status',
+                  header: m.products_history_status(),
                   cell: (entry) =>
-                    entry.status ? statusLabels[entry.status] : '—',
+                    entry.status
+                      ? statusLabels[entry.status]
+                      : m.common_empty_value(),
                 },
                 {
                   key: 'published',
-                  header: 'Sales channel',
+                  header: m.products_history_published(),
                   hideOnNarrow: true,
                   cell: (entry) =>
                     entry.deleted
-                      ? '—'
+                      ? m.common_empty_value()
                       : listingLabel(
                           entry.published,
                           detail.sources.find(
@@ -659,14 +678,17 @@ export function ProductDetailView({
                 },
                 {
                   key: 'price',
-                  header: 'Price',
+                  header: m.products_history_price(),
                   numeric: true,
-                  cell: (entry) => formatPrice(entry.price) ?? '—',
+                  cell: (entry) =>
+                    formatPrice(entry.price) ?? m.common_empty_value(),
                 },
               ]}
             />
             {detail.history.truncated ? (
-              <p className="products-note">Showing the 50 most recent reads.</p>
+              <p className="products-note">
+                {m.products_history_truncated({ count: 50 })}
+              </p>
             ) : null}
           </section>
         </>

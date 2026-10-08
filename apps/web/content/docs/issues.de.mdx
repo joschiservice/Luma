@@ -1,0 +1,68 @@
+---
+title: Probleme finden und priorisieren
+description: Sehen Sie, welche Probleme Luma in Ihren verbundenen Systemen gefunden hat, filtern Sie die Liste und öffnen Sie jedes Problem, um über den nächsten Schritt zu entscheiden.
+---
+
+Luma liest die Daten, die Ihre verbundenen Systeme senden, und legt ein Problem an, wenn etwas nicht stimmt: zum Beispiel ein Bestand, der zwischen Shopify und Ihrem ERP abweicht, ein Fulfillment, das nicht vorankommt, oder eine Verbindung, die Luma nicht lesen kann. **Probleme** listet sie mit ihren Nachweisen und dem nächsten Schritt auf. Öffnen Sie die Seite über die Seitenleiste oder mit **G**, dann **I**.
+
+## Woher Probleme kommen [#where-issues-come-from]
+
+Jedes Problem hat einen Typ:
+
+- **Bestandsabweichung**: Verknüpfter Bestand weicht zwischen Ihren Systemen ab.
+- **Fulfillment-Verzögerung**: Eine Bestellung kommt im Fulfillment nicht wie erwartet voran.
+- **Verbindungsproblem**: Luma kann ein verbundenes System nicht lesen, zum Beispiel weil der Zugriff widerrufen wurde.
+- **Workflow-Problem**: Eine Workflow-Ausführung konnte nicht abgeschlossen werden.
+
+Probleme decken nur Daten ab, die Luma lesen kann. Ist ein System nicht verbunden oder hat es noch keine Daten gesendet, kann Luma dort keine Probleme erkennen.
+
+## Ansicht wählen [#choose-a-view]
+
+- **Zu prüfen** zeigt Probleme, die eine Person brauchen, etwa um eine Änderung zu genehmigen, einen manuellen Schritt zu erledigen oder ein Ergebnis zu prüfen, das Luma nicht bestätigen konnte.
+- **Alle offenen** zeigt alle ungelösten Probleme, auch solche, die Luma noch untersucht oder behebt.
+- **Verlauf** zeigt abgeschlossene Probleme. Bei jedem steht, ob eine neue Prüfung die Korrektur bestätigt oder eine Person es geschlossen hat.
+
+Die Zahlen über der Liste zeigen, wie viele Probleme zu prüfen sind, wie viele offen sind und wie viele in den letzten 24 Stunden bestätigt wurden. Sie gelten für den ganzen Workspace und ändern sich nicht mit Ihren Filtern.
+
+## Liste filtern [#filter-the-list]
+
+Wählen Sie **Filter** oder einen Filternamen über der Liste, um nach **Schweregrad**, **Problemtyp** oder **Status** einzugrenzen. Ein Problem erscheint nur, wenn es zu allen gesetzten Filtern passt. Jeder gesetzte Filter steht über der Liste: Wählen Sie ihn, um den Wert zu ändern, sein **×**, um ihn zu entfernen, oder **Leeren**, um alle zu entfernen.
+
+Ansicht und Filter sind Teil der Seitenadresse. Sie können sie also als Lesezeichen speichern oder in der oberen Leiste **Diese Seite an die Seitenleiste anheften** wählen. Wirkt die Liste veraltet, wählen Sie **Probleme aktualisieren**. Danach sehen Sie wieder die erste Seite.
+
+## Problem öffnen [#open-an-issue]
+
+Wählen Sie ein Problem, um es neben der Liste zu lesen. Auf schmalen Bildschirmen ersetzt das Problem die Liste.
+
+- **Nächstes Problem**, der Pfeil oben im Problem, öffnet das nächste Problem der Liste.
+- **Als ganze Seite öffnen** gibt dem Problem mehr Platz und einen Link, den Sie mit Personen in Ihrem Workspace teilen können.
+- **Bereich schließen** oder Esc führt zurück zur Liste. Ansicht und Filter bleiben erhalten.
+
+Ändert sich ein Problem, während Sie es lesen, etwa weil jemand seine Änderung genehmigt hat, kann es aus Ihrer Ansicht verschwinden. Luma weist darauf hin und lässt es geöffnet, bis Sie fertig sind.
+
+Wie Sie ein Problem lesen, erfahren Sie unter [Problem untersuchen](/docs/issues/investigate).
+
+## Wenn die Liste leer ist [#when-the-list-is-empty]
+
+- **Keine Probleme warten auf Ihre Prüfung**: In dieser Ansicht braucht gerade nichts eine Person. Probleme, an denen Luma noch arbeitet, finden Sie unter **Alle offenen**.
+- **Keine passenden Probleme**: Ihre Filter schließen alle Probleme aus. Ändern oder entfernen Sie sie.
+- **Keine offenen Probleme in dieser Ansicht** oder **Noch keine abgeschlossenen Probleme**: Diese Ansicht hat nichts anzuzeigen.
+- **Noch keine Daten empfangen**: Luma hat noch keine Daten aus einem verbundenen System gelesen und kann daher noch keine Probleme gefunden haben.
+- **Keine aktiven Verbindungen**: Verbinden Sie unter [Apps](/docs/apps-and-connections) ein System, damit Luma mit der Prüfung beginnen kann.
+
+Eine leere Liste heißt nicht, dass in Ihrem Betrieb alles in Ordnung ist. Sie heißt nur, dass Luma in den lesbaren Daten nichts gefunden hat.
+
+## Wenn etwas nicht geladen werden konnte [#when-something-couldnt-load]
+
+- **Probleme konnten nicht aktualisiert werden**: Luma konnte die aktuelle Liste nicht laden. Die angezeigten Probleme sind möglicherweise veraltet. Wählen Sie **Probleme aktualisieren**, um es erneut zu versuchen.
+- **Übersicht nicht verfügbar**: Die Zahlen über der Liste konnten nicht geladen werden. Die Liste selbst funktioniert weiter.
+- **Verbindungen konnten nicht geprüft werden**: Luma konnte Ihre Verbindungen nicht prüfen. Ihre Probleme werden trotzdem angezeigt.
+- **Problem nicht verfügbar**: Das Problem existiert nicht mehr, oder Sie haben keinen Zugriff mehr darauf.
+
+## Hilfe zu dieser Seite [#get-help-for-this-page]
+
+Wählen Sie **Hilfe zu dieser Seite**, das Fragezeichen in der oberen Leiste, um diese Anleitung neben Ihrer Arbeit zu lesen. Suchen in den Anleitungen oder Folgen eines Links ändert weder Ihre Auswahl noch Ihre Filter. **Vollständige Dokumentation öffnen** öffnet die Anleitung in einem neuen Tab.
+
+## Wer Probleme sehen kann [#who-can-see-issues]
+
+Ihre Rolle braucht **Probleme ansehen**, um diese Seite zu öffnen. Genehmigen, Ablehnen und Eskalieren erfordern weitere Berechtigungen, siehe [Problem lösen](/docs/issues/resolve).

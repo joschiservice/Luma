@@ -1,4 +1,7 @@
 import type { DecisionItem } from '@luma/api-contract';
+import { formatDateTime } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
+import { rich } from '@luma/i18n/rich';
 import { CaseNotice } from '@luma/ui/components/issues/case-investigation';
 import { IssuePanelClose } from '@luma/ui/components/issues/issue-panel-close';
 import { Badge } from '@luma/ui/components/primitives/badge';
@@ -6,10 +9,13 @@ import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
 import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Select } from '@luma/ui/components/primitives/select';
 import { StatePill } from '@luma/ui/components/primitives/state';
-import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
+import {
+  WorkspaceDate,
+  WorkspaceTimezone,
+} from '@luma/ui/components/primitives/workspace-date';
 import { Link } from '@tanstack/react-router';
 import { ArrowUpRight, Clock } from 'lucide-react';
-import { type ReactNode, useId } from 'react';
+import { type ReactNode, useContext, useId } from 'react';
 
 import {
   decisionStatus,
@@ -42,6 +48,7 @@ export function DecisionDeadline({
   deadline: string | null;
   now: number;
 }) {
+  const timeZone = useContext(WorkspaceTimezone);
   if (!deadline) return null;
   const left = Date.parse(deadline) - now;
 
@@ -51,10 +58,16 @@ export function DecisionDeadline({
       data-urgency={
         left <= 0 ? 'expired' : left <= 30 * 60_000 ? 'soon' : undefined
       }
-      title={`Expires ${deadline}`}
+      title={m.decisions_deadline_title({
+        time: formatDateTime(deadline, {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+          timeZone,
+        }),
+      })}
     >
       <Clock size={13} aria-hidden="true" />
-      <span className="sr-only">Deadline: </span>
+      <span className="sr-only">{m.decisions_deadline_prefix()} </span>
       {timeLeft(deadline, now)}
     </span>
   );
@@ -79,7 +92,7 @@ function RecordLinks({
           to="/app/$organizationId/orders/$orderId"
           params={{ organizationId, orderId: record.id }}
         >
-          Open order <ArrowUpRight aria-hidden="true" />
+          {m.decisions_open_order()} <ArrowUpRight aria-hidden="true" />
         </Link>
       ) : record?.kind === 'fulfillment' ? (
         <Link
@@ -87,7 +100,7 @@ function RecordLinks({
           to="/app/$organizationId/fulfillment/$fulfillmentId"
           params={{ organizationId, fulfillmentId: record.id }}
         >
-          Open fulfillment <ArrowUpRight aria-hidden="true" />
+          {m.decisions_open_fulfillment()} <ArrowUpRight aria-hidden="true" />
         </Link>
       ) : record?.kind === 'position' ? (
         <Link
@@ -95,7 +108,7 @@ function RecordLinks({
           to="/app/$organizationId/inventory/$positionId"
           params={{ organizationId, positionId: record.id }}
         >
-          Open stock position <ArrowUpRight aria-hidden="true" />
+          {m.decisions_open_position()} <ArrowUpRight aria-hidden="true" />
         </Link>
       ) : record ? (
         <Link
@@ -103,7 +116,7 @@ function RecordLinks({
           to="/app/$organizationId/records/$kind/$recordId"
           params={{ organizationId, kind: record.kind, recordId: record.id }}
         >
-          Open record <ArrowUpRight aria-hidden="true" />
+          {m.decisions_open_record()} <ArrowUpRight aria-hidden="true" />
         </Link>
       ) : null}
       {owner.kind === 'case' ? (
@@ -113,7 +126,7 @@ function RecordLinks({
           params={{ organizationId, exceptionId: owner.exceptionId }}
           search={{ view: 'needs_you' }}
         >
-          Open issue <ArrowUpRight aria-hidden="true" />
+          {m.decisions_open_issue()} <ArrowUpRight aria-hidden="true" />
         </Link>
       ) : owner.kind === 'workflow_run' ? (
         <Link
@@ -121,7 +134,7 @@ function RecordLinks({
           to="/app/$organizationId/workflows/$definitionId"
           params={{ organizationId, definitionId: owner.definitionId }}
         >
-          Open workflow run <ArrowUpRight aria-hidden="true" />
+          {m.decisions_open_run()} <ArrowUpRight aria-hidden="true" />
         </Link>
       ) : null}
     </div>
@@ -150,7 +163,7 @@ function Assignment({
   const holder = item.assignment?.assigneeId ?? null;
   const staff = access === 'anyone';
   const selfService = access !== 'none';
-  const label = memberName(holder, members, self) ?? 'Unassigned';
+  const label = memberName(holder, members, self) ?? m.decisions_owner_none();
 
   return (
     <div className="decision-assignment">
@@ -162,7 +175,7 @@ function Assignment({
           disabled={pending}
           onClick={() => onAssign(null)}
         >
-          Release
+          {m.decisions_release()}
         </Button>
       ) : self && selfService && (holder === null || staff) ? (
         <Button
@@ -171,14 +184,14 @@ function Assignment({
           disabled={pending}
           onClick={() => onAssign(self)}
         >
-          {holder === null ? 'Take it' : 'Take over'}
+          {holder === null ? m.decisions_take() : m.decisions_take_over()}
         </Button>
       ) : null}
       {staff && members.length > 1 ? (
         <Select<string>
-          aria-label="Assign to a member"
+          aria-label={m.decisions_assign_label()}
           className="decision-assignee"
-          placeholder="Assign to…"
+          placeholder={m.decisions_assign_placeholder()}
           value={null}
           disabled={pending}
           options={members
@@ -187,8 +200,10 @@ function Assignment({
               value: member.userId,
               label:
                 member.userId === self
-                  ? 'You'
-                  : member.name || member.email || 'Member',
+                  ? m.decisions_member_you()
+                  : member.name ||
+                    member.email ||
+                    m.decisions_member_fallback(),
             }))}
           onValueChange={(value) => {
             if (value) onAssign(value);
@@ -245,7 +260,7 @@ export function DecisionInspector({
           <div className="issue-panel-identity">
             <span className="decision-eyebrow">
               <DomainIcon domain={domainIcons[item.domain]} size="xs" />
-              {kindLabels[item.kind]} · {domainLabels[item.domain]}
+              {kindLabels[item.kind]()} · {domainLabels[item.domain]()}
             </span>
             <div className="issue-panel-heading">
               <h2 id={`${id}-title`} title={item.title}>
@@ -261,7 +276,7 @@ export function DecisionInspector({
                   item.impact.level === 'high' ? 'high' : undefined
                 }
               >
-                {impactLabels[item.impact.level]}
+                {impactLabels[item.impact.level]()}
               </span>
             </div>
           </div>
@@ -272,31 +287,29 @@ export function DecisionInspector({
         </header>
       </div>
       {departed ? (
-        <CaseNotice title="This decision has left the queue">
-          It was answered, expired or changed, possibly on another surface. The
-          owner’s current state is shown below.
+        <CaseNotice title={m.decisions_departed_title()}>
+          {m.decisions_departed_text()}
         </CaseNotice>
       ) : null}
       <div className="decision-brief">
         <section className="decision-section" aria-labelledby={`${id}-why`}>
-          <h3 id={`${id}-why`}>Why you’re needed</h3>
+          <h3 id={`${id}-why`}>{m.decisions_why_title()}</h3>
           <p>{item.why}</p>
           {item.response === 'awaiting_other' ? (
-            <p className="decision-note">
-              You requested this, so someone else who can approve changes has to
-              approve it. You can still follow it here.
-            </p>
+            <p className="decision-note">{m.decisions_note_awaiting_other()}</p>
           ) : item.response === 'view_only' ? (
             <p className="decision-note">
               {item.reason === 'run'
-                ? 'Only the person who requested it can run it.'
-                : 'Your role can follow this decision but not respond to it.'}
+                ? m.decisions_note_requester_runs()
+                : m.decisions_note_view_only()}
             </p>
           ) : null}
         </section>
         <section className="decision-section" aria-labelledby={`${id}-change`}>
           <h3 id={`${id}-change`}>
-            {approval ? 'Proposed change' : 'What it affects'}
+            {approval
+              ? m.decisions_change_title()
+              : m.decisions_affects_title()}
           </h3>
           <dl className="decision-facts">
             {item.change.map((fact) => (
@@ -308,7 +321,7 @@ export function DecisionInspector({
           </dl>
         </section>
         <section className="decision-section" aria-labelledby={`${id}-effect`}>
-          <h3 id={`${id}-effect`}>What your response does</h3>
+          <h3 id={`${id}-effect`}>{m.decisions_effect_title()}</h3>
           <dl className="decision-consequences">
             {item.consequences.map((consequence) => (
               <div key={consequence.response}>
@@ -322,10 +335,10 @@ export function DecisionInspector({
           className="decision-section"
           aria-labelledby={`${id}-evidence`}
         >
-          <h3 id={`${id}-evidence`}>Evidence and ownership</h3>
+          <h3 id={`${id}-evidence`}>{m.decisions_evidence_title()}</h3>
           <dl className="decision-facts">
             <div>
-              <dt>Evidence</dt>
+              <dt>{m.decisions_evidence_label()}</dt>
               <dd>
                 <Badge
                   tone={
@@ -336,42 +349,48 @@ export function DecisionInspector({
                         : 'neutral'
                   }
                 >
-                  {evidenceLabels[item.evidence.state]}
+                  {evidenceLabels[item.evidence.state]()}
                 </Badge>
                 {item.evidence.observedAt ? (
                   <span>
-                    Observed <WorkspaceDate value={item.evidence.observedAt} />
+                    {rich(m.decisions_evidence_read, {
+                      time: <WorkspaceDate value={item.evidence.observedAt} />,
+                    })}
                   </span>
                 ) : (
-                  <span>Observation time unknown</span>
+                  <span>{m.decisions_evidence_read_unknown()}</span>
                 )}
               </dd>
             </div>
             {item.deadline ? (
               <div>
-                <dt>Deadline</dt>
+                <dt>{m.decisions_deadline_label()}</dt>
                 <dd>
                   <WorkspaceDate value={item.deadline} />
-                  <span>Approval doesn’t extend it.</span>
+                  <span>{m.decisions_deadline_note()}</span>
                 </dd>
               </div>
             ) : null}
             <div>
-              <dt>Impact</dt>
+              <dt>{m.decisions_impact_label()}</dt>
               <dd>
-                {impactLabels[item.impact.level]}
-                {item.impact.text ? ` · ${item.impact.text}` : ''}
+                {item.impact.text
+                  ? m.decisions_impact_detail({
+                      impact: impactLabels[item.impact.level](),
+                      detail: item.impact.text,
+                    })
+                  : impactLabels[item.impact.level]()}
               </dd>
             </div>
             <div>
-              <dt>Requested</dt>
+              <dt>{m.decisions_requested_label()}</dt>
               <dd>
                 {requester ? <span>{requester}</span> : null}
                 <WorkspaceDate value={item.requestedAt} />
               </dd>
             </div>
             <div>
-              <dt>Owner</dt>
+              <dt>{m.decisions_owner_label()}</dt>
               <dd>
                 <Assignment
                   item={item}
@@ -393,16 +412,13 @@ export function DecisionInspector({
         </section>
       </div>
       <section className="decision-review" aria-labelledby={`${id}-review`}>
-        <h3 id={`${id}-review`}>Review and respond</h3>
+        <h3 id={`${id}-review`}>{m.decisions_review_title()}</h3>
         <p className="decision-note">
-          These are the same controls shown on the{' '}
           {item.owner.kind === 'case'
-            ? 'issue'
+            ? m.decisions_review_note_case()
             : item.owner.kind === 'workflow_run'
-              ? 'workflow run'
-              : 'record'}
-          . They check the exact proposal, its revision and its expiry again
-          before anything changes.
+              ? m.decisions_review_note_run()
+              : m.decisions_review_note_record()}
         </p>
         {review}
       </section>

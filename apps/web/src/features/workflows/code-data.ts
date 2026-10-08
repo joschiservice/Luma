@@ -3,6 +3,7 @@ import {
   codeEvaluationSchema,
   type EvaluateCode,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { queryOptions } from '@tanstack/react-query';
 
 import { createWebApiClient } from '../../lib/api-client';
@@ -24,7 +25,7 @@ function failure(result: { status: number; body: unknown }): never {
   throw new Failure(
     typeof result.body === 'object' && result.body && 'message' in result.body
       ? String(result.body.message)
-      : 'The evaluator could not respond. Retry the same evaluation.',
+      : m.workflows_code_no_response(),
   );
 }
 

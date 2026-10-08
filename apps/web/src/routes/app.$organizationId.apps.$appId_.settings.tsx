@@ -7,6 +7,7 @@ export const Route = createFileRoute(
   '/app/$organizationId/apps/$appId_/settings',
 )({
   validateSearch: appResultSearch,
+  staticData: { help: 'apps-and-connections' },
   component: AppSettingsPage,
 });
 

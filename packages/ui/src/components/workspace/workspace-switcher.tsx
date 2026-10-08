@@ -1,4 +1,5 @@
 import { Menu } from '@base-ui/react/menu';
+import { m } from '@luma/i18n/messages';
 import { Check, ChevronsUpDown, Plus } from 'lucide-react';
 import type { ReactElement } from 'react';
 
@@ -36,7 +37,7 @@ export function WorkspaceSwitcher({
     <Menu.Root>
       <Menu.Trigger
         className="workspace-switcher"
-        aria-label={`${workspace}. Switch workspace`}
+        aria-label={m.ui_workspace_switcher_open({ workspace })}
       >
         <span className="workspace-avatar" aria-hidden="true">
           {initialsOf(workspace).slice(0, 1)}
@@ -55,7 +56,7 @@ export function WorkspaceSwitcher({
           <Menu.Popup className="lu-popover workspace-menu">
             <Menu.Group>
               <Menu.GroupLabel className="workspace-menu-label">
-                Workspaces
+                {m.ui_workspace_switcher_heading()}
               </Menu.GroupLabel>
               <div className="workspace-menu-list">
                 {workspaces.map((choice) => (
@@ -85,7 +86,7 @@ export function WorkspaceSwitcher({
             <Menu.Separator className="workspace-menu-separator" />
             <Menu.Item render={createLink} className="lu-menu-item">
               <Plus size={15} aria-hidden="true" />
-              Create workspace
+              {m.ui_workspace_create()}
             </Menu.Item>
           </Menu.Popup>
         </Menu.Positioner>

@@ -8,6 +8,14 @@ import {
 } from '../features/settings/page';
 
 export const Route = createFileRoute('/app/$organizationId/settings/$section')({
+  staticData: {
+    help: ({ section }) =>
+      section === 'roles'
+        ? 'roles-and-permissions'
+        : section === 'security'
+          ? 'account-security'
+          : 'workspace-settings',
+  },
   validateSearch: z.object({ role: z.string().max(100).optional() }),
   beforeLoad: ({ params }) => {
     if (!settingsSections.some((item) => item.id === params.section))

@@ -4,6 +4,7 @@ import type {
   PurchaseOrderRecord,
   Supplier,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import {
@@ -16,6 +17,7 @@ import {
 import { Input } from '@luma/ui/components/primitives/input';
 import { Select } from '@luma/ui/components/primitives/select';
 import { Textarea } from '@luma/ui/components/primitives/textarea';
+import { quantityWithUnit } from '@luma/ui/lib/units';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -70,10 +72,14 @@ function Footer({
           disabled={command.locked}
           onClick={close}
         >
-          Cancel
+          {m.common_cancel()}
         </Button>
         <Button type="submit" disabled={command.isPending || disabled}>
-          {command.isPending ? pending : command.uncertain ? 'Retry' : label}
+          {command.isPending
+            ? pending
+            : command.uncertain
+              ? m.common_retry()
+              : label}
         </Button>
       </DialogFooter>
     </>
@@ -135,14 +141,17 @@ export function SubmitDialog({
       requestSubmission(organizationId, record.order.id, body),
     close,
   );
-  const connection =
-    record.readiness.connection?.label ?? 'the purchasing system';
+  const system = record.readiness.connection?.label;
   const supplier = record.supplier?.link?.name ?? record.order.supplierName;
 
   return (
     <Frame
-      title="Send to supplier"
-      description={`Luma places this order in ${connection} for ${supplier} once someone else who can approve changes approves it. ${connection} then sends it to the supplier.`}
+      title={m.procurement_submit_title()}
+      description={
+        system
+          ? m.procurement_submit_description({ system, supplier })
+          : m.procurement_submit_description_generic({ supplier })
+      }
       locked={command.locked}
       close={close}
       wide
@@ -156,7 +165,7 @@ export function SubmitDialog({
       >
         <fieldset disabled={command.locked}>
           <label>
-            Requested delivery date
+            {m.procurement_submit_delivery_date()}
             <Input
               type="date"
               required
@@ -166,13 +175,17 @@ export function SubmitDialog({
             />
           </label>
           <div className="procurement-send-summary">
-            <h3>What will be sent</h3>
+            <h3>{m.procurement_submit_summary()}</h3>
             <ul>
               {record.order.lines.map((line) => (
                 <li key={line.id}>
                   <span>
                     <strong>
-                      {quantity(line.quantity)} {line.unit}
+                      {quantityWithUnit(
+                        quantity(line.quantity),
+                        line.unit,
+                        line.quantity,
+                      )}
                     </strong>{' '}
                     {line.description}
                   </span>
@@ -181,27 +194,28 @@ export function SubmitDialog({
               ))}
             </ul>
             <p>
-              Prices and tax come from {connection}’s supplier terms. Luma
-              doesn’t set them.
+              {system
+                ? m.procurement_submit_prices({ system })
+                : m.procurement_submit_prices_generic()}
             </p>
           </div>
         </fieldset>
         <Footer
           command={command}
           close={close}
-          label="Request approval"
-          pending="Requesting…"
+          label={m.procurement_submit_request()}
+          pending={m.procurement_submit_requesting()}
         />
       </form>
     </Frame>
   );
 }
 
-const channelOptions = [
-  { value: 'email', label: 'Email' },
-  { value: 'portal', label: 'Supplier portal' },
-  { value: 'phone', label: 'Phone call notes' },
-  { value: 'other', label: 'Other' },
+const channelOptions = () => [
+  { value: 'email', label: m.procurement_channel_email() },
+  { value: 'portal', label: m.procurement_channel_portal() },
+  { value: 'phone', label: m.procurement_channel_phone() },
+  { value: 'other', label: m.procurement_channel_other() },
 ];
 
 const localNow = () => {
@@ -240,11 +254,11 @@ export function MessageDialog({
 
   return (
     <Frame
-      title="Add supplier message"
+      title={m.procurement_message_dialog_title()}
       description={
         record.extraction.available
-          ? 'Paste what the supplier wrote. Luma lists the commitments it states, each with the exact words it came from. Changes and unclear wording wait for your review.'
-          : 'Paste what the supplier wrote, then select the words that state a commitment to record it. Automatic reading isn’t set up on this server.'
+          ? m.procurement_message_dialog_description_read()
+          : m.procurement_message_dialog_description_manual()
       }
       locked={command.locked}
       close={close}
@@ -268,7 +282,7 @@ export function MessageDialog({
         <fieldset disabled={command.locked}>
           <div className="procurement-form-pair">
             <label>
-              From
+              {m.procurement_message_dialog_from()}
               <Input
                 autoFocus
                 required
@@ -279,7 +293,7 @@ export function MessageDialog({
               />
             </label>
             <label>
-              Received
+              {m.procurement_message_dialog_received()}
               <Input
                 type="datetime-local"
                 required
@@ -290,47 +304,47 @@ export function MessageDialog({
           </div>
           <div className="procurement-form-pair">
             <label>
-              Channel
+              {m.procurement_message_dialog_channel()}
               <Select
-                aria-label="Channel"
+                aria-label={m.procurement_message_dialog_channel()}
                 value={channel}
-                options={channelOptions}
+                options={channelOptions()}
                 onValueChange={(value) =>
                   setChannel((value as typeof channel) ?? 'email')
                 }
               />
             </label>
             <label>
-              Subject
+              {m.procurement_message_dialog_subject()}
               <Input
                 maxLength={500}
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                placeholder={`Re: ${record.order.reference}`}
+                placeholder={m.procurement_message_dialog_subject_placeholder({
+                  order: record.order.reference,
+                })}
               />
             </label>
           </div>
           <label>
-            Message
+            {m.procurement_message_dialog_message()}
             <Textarea
               required
               rows={8}
               maxLength={20_000}
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              placeholder="Paste the supplier’s reply"
+              placeholder={m.procurement_message_dialog_message_placeholder()}
             />
           </label>
           <details className="procurement-external-fields">
             <summary>
-              Message ID <span>Optional</span>
+              {m.procurement_message_dialog_id()}{' '}
+              <span>{m.common_optional()}</span>
             </summary>
-            <p>
-              The email’s Message-ID. The same message is recorded only once,
-              even if it’s added again.
-            </p>
+            <p>{m.procurement_message_dialog_id_description()}</p>
             <Input
-              aria-label="Message ID"
+              aria-label={m.procurement_message_dialog_id()}
               maxLength={250}
               value={messageId}
               onChange={(e) => setMessageId(e.target.value)}
@@ -341,8 +355,12 @@ export function MessageDialog({
         <Footer
           command={command}
           close={close}
-          label={record.extraction.available ? 'Add and read' : 'Add message'}
-          pending="Adding…"
+          label={
+            record.extraction.available
+              ? m.procurement_message_dialog_add_read()
+              : m.procurement_messages_add()
+          }
+          pending={m.procurement_message_dialog_adding()}
         />
       </form>
     </Frame>
@@ -397,11 +415,15 @@ export function CommitmentDialog({
 
   return (
     <Frame
-      title={prior ? 'Correct commitment' : 'Record what the supplier said'}
+      title={
+        prior
+          ? m.procurement_commitment_dialog_correct_title()
+          : m.procurement_commitment_dialog_record_title()
+      }
       description={
         prior
-          ? 'Corrections are added to the history; the original stays visible.'
-          : 'This counts as the supplier’s commitment and cites the words you selected.'
+          ? m.procurement_commitment_dialog_correct_description()
+          : m.procurement_commitment_dialog_record_description()
       }
       locked={command.locked}
       close={close}
@@ -429,14 +451,16 @@ export function CommitmentDialog({
         }}
       >
         {draft.mode === 'message' ? (
-          <blockquote className="procurement-quote">“{draft.quote}”</blockquote>
+          <blockquote className="procurement-quote">
+            {m.procurement_quote({ quote: draft.quote })}
+          </blockquote>
         ) : null}
         <fieldset disabled={command.locked}>
           <div className="procurement-form-pair">
             <label>
-              What it states
+              {m.procurement_commitment_dialog_kind()}
               <Select
-                aria-label="What it states"
+                aria-label={m.procurement_commitment_dialog_kind()}
                 value={kind}
                 disabled={!!prior}
                 options={(
@@ -446,20 +470,22 @@ export function CommitmentDialog({
                     'shipped',
                     'condition',
                   ] as const
-                ).map((value) => ({ value, label: commitmentKinds[value] }))}
+                ).map((value) => ({ value, label: commitmentKinds[value]() }))}
                 onValueChange={(value) =>
                   setKind((value as typeof kind) ?? 'confirmed_quantity')
                 }
               />
             </label>
             <label>
-              Line
+              {m.procurement_commitment_dialog_line()}
               <Select
-                aria-label="Line"
+                aria-label={m.procurement_commitment_dialog_line()}
                 value={lineId}
                 disabled={!!prior}
                 options={[
-                  ...(needsLine ? [] : [{ value: '', label: 'Whole order' }]),
+                  ...(needsLine
+                    ? []
+                    : [{ value: '', label: m.procurement_whole_order() }]),
                   ...record.order.lines.map((line) => ({
                     value: line.id,
                     label: `${line.sku} · ${line.description}`,
@@ -471,7 +497,7 @@ export function CommitmentDialog({
           </div>
           {kind === 'confirmed_quantity' ? (
             <label>
-              Confirmed quantity
+              {m.procurement_commitment_kind_confirmed_quantity()}
               <Input
                 type="number"
                 min="0"
@@ -483,18 +509,20 @@ export function CommitmentDialog({
             </label>
           ) : kind === 'condition' ? (
             <label>
-              Condition
+              {m.procurement_commitment_kind_condition()}
               <Input
                 required
                 maxLength={300}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder="e.g. Freight surcharge of 40 EUR"
+                placeholder={m.procurement_commitment_dialog_condition_placeholder()}
               />
             </label>
           ) : (
             <label>
-              {kind === 'shipped' ? 'Shipped on' : 'Delivery date'}
+              {kind === 'shipped'
+                ? m.procurement_commitment_dialog_shipped_on()
+                : m.procurement_commitment_dialog_delivery_date()}
               <Input
                 type="date"
                 required={kind === 'promised_date'}
@@ -505,13 +533,13 @@ export function CommitmentDialog({
           )}
           {prior ? (
             <label>
-              Reason for the correction
+              {m.procurement_commitment_dialog_reason()}
               <Input
                 required
                 maxLength={500}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                placeholder="e.g. The supplier corrected the date by phone"
+                placeholder={m.procurement_commitment_dialog_reason_placeholder()}
               />
             </label>
           ) : null}
@@ -519,8 +547,12 @@ export function CommitmentDialog({
         <Footer
           command={command}
           close={close}
-          label={prior ? 'Add correction' : 'Record commitment'}
-          pending="Saving…"
+          label={
+            prior
+              ? m.procurement_commitment_dialog_add_correction()
+              : m.procurement_commitment_dialog_record()
+          }
+          pending={m.common_saving()}
         />
       </form>
     </Frame>
@@ -555,7 +587,11 @@ export function RespondDialog({
 
   return (
     <Frame
-      title={change ? 'Accept or follow up' : 'Record a follow-up'}
+      title={
+        change
+          ? m.procurement_respond_change_title()
+          : m.procurement_respond_follow_up_title()
+      }
       description={attention.summary}
       locked={command.locked}
       close={close}
@@ -581,19 +617,19 @@ export function RespondDialog({
             <div
               className="procurement-choice"
               role="radiogroup"
-              aria-label="Response"
+              aria-label={m.procurement_respond_response()}
             >
               {(
                 [
                   [
                     'accepted',
-                    'Accept the change',
-                    'It becomes what Luma expects.',
+                    m.procurement_respond_accept,
+                    m.procurement_respond_accept_hint,
                   ],
                   [
                     'following_up',
-                    'Follow up with the supplier',
-                    'Luma checks again on the date you choose.',
+                    m.procurement_respond_follow_up,
+                    m.procurement_respond_follow_up_hint,
                   ],
                 ] as const
               ).map(([value, label, hint]) => (
@@ -606,15 +642,17 @@ export function RespondDialog({
                     onChange={() => setResponse(value)}
                   />
                   <span>
-                    <strong>{label}</strong>
-                    <small>{hint}</small>
+                    <strong>{label()}</strong>
+                    <small>{hint()}</small>
                   </span>
                 </label>
               ))}
             </div>
           ) : null}
           <label>
-            {response === 'accepted' ? 'Note' : 'What did you do?'}
+            {response === 'accepted'
+              ? m.procurement_respond_note()
+              : m.procurement_respond_action()}
             <Input
               autoFocus
               required
@@ -623,14 +661,14 @@ export function RespondDialog({
               onChange={(e) => setNote(e.target.value)}
               placeholder={
                 response === 'accepted'
-                  ? 'e.g. Partial delivery is fine for this week'
-                  : 'e.g. Emailed the supplier for a new date'
+                  ? m.procurement_respond_note_placeholder()
+                  : m.procurement_respond_action_placeholder()
               }
             />
           </label>
           {response === 'following_up' ? (
             <label>
-              Check again on
+              {m.procurement_respond_check_again()}
               <Input
                 type="date"
                 required
@@ -640,8 +678,9 @@ export function RespondDialog({
                 onChange={(e) => setNext(e.target.value)}
               />
               <small className="procurement-hint">
-                If nothing changes by {calendarDate(next)}, it returns to Needs
-                you.
+                {m.procurement_respond_check_again_hint({
+                  date: calendarDate(next),
+                })}
               </small>
             </label>
           ) : null}
@@ -649,8 +688,12 @@ export function RespondDialog({
         <Footer
           command={command}
           close={close}
-          label={response === 'accepted' ? 'Accept change' : 'Record follow-up'}
-          pending="Saving…"
+          label={
+            response === 'accepted'
+              ? m.procurement_respond_accept_change()
+              : m.procurement_respond_record_follow_up()
+          }
+          pending={m.common_saving()}
         />
       </form>
     </Frame>
@@ -691,8 +734,8 @@ export function LinkSupplierDialog({
 
   return (
     <Frame
-      title="Purchasing link"
-      description="Link this supplier to the same supplier in your purchasing system so Luma can place approved orders and read confirmations and goods receipts."
+      title={m.procurement_link_title()}
+      description={m.procurement_link_description()}
       locked={command.locked}
       close={close}
     >
@@ -716,18 +759,15 @@ export function LinkSupplierDialog({
       >
         <fieldset disabled={command.locked}>
           {connections.isPending ? (
-            <p role="status">Loading connections…</p>
+            <p role="status">{m.procurement_link_loading()}</p>
           ) : !usable.length ? (
-            <Alert tone="info">
-              No connection can list suppliers yet. Connect your ERP with
-              supplier and purchase-order access in Apps.
-            </Alert>
+            <Alert tone="info">{m.procurement_link_no_connection()}</Alert>
           ) : (
             <>
               <label>
-                Purchasing system
+                {m.procurement_link_system()}
                 <Select
-                  aria-label="Purchasing system"
+                  aria-label={m.procurement_link_system()}
                   value={selected}
                   options={usable.map((c) => ({ value: c.id, label: c.label }))}
                   onValueChange={(value) => {
@@ -737,19 +777,25 @@ export function LinkSupplierDialog({
                 />
               </label>
               <label>
-                Supplier in that system
+                {m.procurement_link_supplier()}
                 <Select
-                  aria-label="Supplier in that system"
+                  aria-label={m.procurement_link_supplier()}
                   value={externalId}
                   disabled={suppliers.isPending || !!suppliers.error}
                   options={[
                     {
                       value: '',
-                      label: suppliers.isPending ? 'Loading…' : 'Not linked',
+                      label: suppliers.isPending
+                        ? m.common_loading()
+                        : m.procurement_not_linked(),
                     },
                     ...(suppliers.data?.items ?? []).map((s) => ({
                       value: s.externalId,
-                      label: [s.name ?? `Supplier ${s.externalId}`, s.number]
+                      label: [
+                        s.name ??
+                          m.procurement_supplier_external({ id: s.externalId }),
+                        s.number,
+                      ]
                         .filter(Boolean)
                         .join(' · '),
                     })),
@@ -764,14 +810,13 @@ export function LinkSupplierDialog({
               ) : null}
               {match?.email ? (
                 <small className="procurement-hint">
-                  Orders go to {match.email} through your purchasing system’s
-                  own workflow.
+                  {m.procurement_link_email({ email: match.email })}
                 </small>
               ) : null}
             </>
           )}
           <label>
-            Expect a confirmation within (hours)
+            {m.procurement_link_hours()}
             <Input
               type="number"
               min="1"
@@ -782,15 +827,15 @@ export function LinkSupplierDialog({
               onChange={(e) => setHours(e.target.value)}
             />
             <small className="procurement-hint">
-              After this, an unconfirmed order appears in Needs you.
+              {m.procurement_link_hours_hint()}
             </small>
           </label>
         </fieldset>
         <Footer
           command={command}
           close={close}
-          label="Save link"
-          pending="Saving…"
+          label={m.procurement_link_save()}
+          pending={m.common_saving()}
         />
       </form>
     </Frame>

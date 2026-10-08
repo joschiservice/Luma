@@ -1,4 +1,5 @@
 import { Select as SelectPrimitive } from '@base-ui/react/select';
+import { m } from '@luma/i18n/messages';
 import { cn } from '@luma/ui/lib/utils';
 import { Check, ChevronDown } from 'lucide-react';
 import { useId } from 'react';
@@ -30,7 +31,7 @@ export type SelectProps<Value extends string = string> = Omit<
  */
 export function Select<Value extends string>({
   options,
-  placeholder = 'Select an option',
+  placeholder,
   className,
   'aria-label': ariaLabel,
   'aria-labelledby': ariaLabelledBy,
@@ -58,7 +59,8 @@ export function Select<Value extends string>({
         <SelectPrimitive.Value className="truncate">
           {(value: Value | null) =>
             options.find((option) => option.value === value)?.label ??
-            placeholder
+            placeholder ??
+            m.ui_select_placeholder()
           }
         </SelectPrimitive.Value>
         <SelectPrimitive.Icon className="shrink-0 text-fg-subtle transition-transform duration-150 group-data-[popup-open]:rotate-180 motion-reduce:transition-none">

@@ -20,9 +20,9 @@ export const connectionMetricDefinitions: OperationalMetricDefinition[] = [
     filters: ['connectionId'],
     permissions: 'workspace_member',
     description:
-      'Installed connections that are pending, degraded, revoked, or active with stale or unobserved permitted reads. Disconnected installations are excluded. Each connection counts once.',
+      'Connections that are pending, degraded, or revoked, or whose allowed reads are out of date or haven’t run yet. Disconnected connections don’t count. Each connection counts once.',
     timeSemantics:
-      'Current installation health and permitted granted reads at asOf. Exactly 24 hours old remains fresh.',
+      'Connection health and allowed reads at the time shown. Data exactly 24 hours old still counts as current.',
   },
 ];
 

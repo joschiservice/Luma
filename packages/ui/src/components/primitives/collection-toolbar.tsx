@@ -1,3 +1,5 @@
+import { formatNumber } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import {
   ArrowDownUp,
   ListFilter,
@@ -108,7 +110,7 @@ export function CollectionViews<Value extends string>({
               <Badge
                 tone={view.attention && view.count ? 'warning' : 'neutral'}
               >
-                {view.count}
+                {formatNumber(view.count)}
               </Badge>
             ) : null}
           </TabsTrigger>
@@ -147,7 +149,7 @@ export function CollectionToolbar({
   onClear,
   onRefresh,
   refreshing = false,
-  refreshLabel = 'Refresh',
+  refreshLabel,
 }: {
   className?: string;
   views?: ReactNode;
@@ -174,13 +176,14 @@ export function CollectionToolbar({
   const clearable = !!search?.value || appliedCount > 0;
   const openChange = (key: string) => (next: boolean) =>
     setOpen(next ? key : null);
+  const refreshName = refreshLabel ?? m.common_refresh();
 
   const refresh = (
     <Button
       variant="ghost"
       className="collection-toolbar-refresh"
-      aria-label={refreshLabel}
-      title={refreshLabel}
+      aria-label={refreshName}
+      title={refreshName}
       disabled={refreshing}
       onClick={onRefresh}
     >
@@ -188,7 +191,7 @@ export function CollectionToolbar({
         aria-hidden="true"
         className={refreshing ? 'animate-spin motion-reduce:animate-none' : ''}
       />
-      Refresh
+      {m.common_refresh()}
     </Button>
   );
 
@@ -228,7 +231,7 @@ export function CollectionToolbar({
           <div
             className="collection-toolbar-filters"
             role="group"
-            aria-label="Filters"
+            aria-label={m.common_filters()}
           >
             {shown.map((filter) =>
               chipped(filter) ? (
@@ -257,7 +260,7 @@ export function CollectionToolbar({
             )}
             {offered.length ? (
               <ResponsivePopover
-                title="Filters"
+                title={m.common_filters()}
                 open={open === 'sheet'}
                 onOpenChange={openChange('sheet')}
                 trigger={
@@ -266,13 +269,15 @@ export function CollectionToolbar({
                     className="collection-filter-sheet-trigger"
                     aria-label={
                       appliedCount
-                        ? `Filters, ${appliedCount} applied`
-                        : 'Filters'
+                        ? m.ui_filters_applied({ count: appliedCount })
+                        : m.common_filters()
                     }
                   >
                     <ListFilter aria-hidden="true" />
-                    Filters
-                    {appliedCount ? <Badge>{appliedCount}</Badge> : null}
+                    {m.common_filters()}
+                    {appliedCount ? (
+                      <Badge>{formatNumber(appliedCount)}</Badge>
+                    ) : null}
                   </Button>
                 }
               >
@@ -283,7 +288,7 @@ export function CollectionToolbar({
                   className="collection-filter-sheet-done"
                   onClick={() => setOpen(null)}
                 >
-                  Done
+                  {m.common_done()}
                 </Button>
               </ResponsivePopover>
             ) : null}
@@ -296,7 +301,7 @@ export function CollectionToolbar({
                   restoreFocus();
                 }}
               >
-                Clear
+                {m.common_clear()}
               </Button>
             ) : null}
           </div>
@@ -394,7 +399,10 @@ function FilterPill({
         open={open}
         onOpenChange={onOpenChange}
         trigger={
-          <Button variant="ghost" aria-label={`Add ${filter.label} filter`}>
+          <Button
+            variant="ghost"
+            aria-label={m.ui_filter_add({ filter: filter.label })}
+          >
             <Plus aria-hidden="true" />
             {filter.label}
           </Button>
@@ -443,7 +451,7 @@ function FilterChip({
           trigger={
             <Button
               variant="ghost"
-              aria-label={`Edit ${filter.label} filter: ${value}`}
+              aria-label={m.ui_filter_edit({ filter: filter.label, value })}
             >
               {content}
             </Button>
@@ -458,7 +466,7 @@ function FilterChip({
         <Button
           variant="ghost"
           size="icon"
-          aria-label={`Remove ${filter.label} filter: ${value}`}
+          aria-label={m.ui_filter_remove({ filter: filter.label, value })}
           onClick={onRemove}
         >
           <X aria-hidden="true" />
@@ -481,7 +489,13 @@ function SortMenu({ sort }: { sort: CollectionSort }) {
           <Button
             variant="ghost"
             className="collection-toolbar-sort"
-            aria-label={`Sort: ${label}${sort.onDirectionChange ? `, ${direction === 'desc' ? 'descending' : 'ascending'}` : ''}`}
+            aria-label={
+              !sort.onDirectionChange
+                ? m.ui_sort_label({ sort: label })
+                : direction === 'desc'
+                  ? m.ui_sort_label_descending({ sort: label })
+                  : m.ui_sort_label_ascending({ sort: label })
+            }
           />
         }
       >
@@ -490,7 +504,7 @@ function SortMenu({ sort }: { sort: CollectionSort }) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-48">
         <DropdownMenuGroup>
-          <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+          <DropdownMenuLabel>{m.ui_sort_by()}</DropdownMenuLabel>
           <DropdownMenuRadioGroup
             value={sort.value}
             onValueChange={(value: string) => sort.onChange(value)}
@@ -510,7 +524,7 @@ function SortMenu({ sort }: { sort: CollectionSort }) {
           <>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuLabel>Order</DropdownMenuLabel>
+              <DropdownMenuLabel>{m.ui_sort_order()}</DropdownMenuLabel>
               <DropdownMenuRadioGroup
                 value={direction}
                 onValueChange={(value: 'asc' | 'desc') =>
@@ -518,10 +532,10 @@ function SortMenu({ sort }: { sort: CollectionSort }) {
                 }
               >
                 <DropdownMenuRadioItem value="desc" closeOnClick>
-                  Newest or highest first
+                  {m.ui_sort_descending()}
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="asc" closeOnClick>
-                  Oldest or lowest first
+                  {m.ui_sort_ascending()}
                 </DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
             </DropdownMenuGroup>

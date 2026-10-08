@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { useForm } from '@tanstack/react-form';
 import { useMutation } from '@tanstack/react-query';
 import { useId, useRef } from 'react';
@@ -56,11 +57,11 @@ export function ContactFormExample({ saveContact }: ContactFormExampleProps) {
     ? match(save.data)
         .with({ kind: 'saved' }, () => ({
           role: 'status' as const,
-          message: 'Contact saved.',
+          message: m.ui_example_contact_saved(),
         }))
         .with({ kind: 'email-conflict' }, () => ({
           role: 'alert' as const,
-          message: 'This email is already in use. Choose another address.',
+          message: m.ui_example_contact_email_conflict(),
         }))
         .exhaustive()
     : null;
@@ -77,10 +78,10 @@ export function ContactFormExample({ saveContact }: ContactFormExampleProps) {
     >
       <header className="flex flex-col gap-2">
         <h2 id={`${id}-heading`} className="font-heading text-3xl">
-          Contact details
+          {m.ui_example_contact_title()}
         </h2>
         <p className="text-sm text-muted-foreground">
-          A small form with room for clear feedback.
+          {m.ui_example_contact_description()}
         </p>
       </header>
       <FieldGroup>
@@ -91,7 +92,9 @@ export function ContactFormExample({ saveContact }: ContactFormExampleProps) {
 
             return (
               <Field data-invalid={invalid} data-disabled={save.isPending}>
-                <FieldLabel htmlFor={`${id}-name`}>Name</FieldLabel>
+                <FieldLabel htmlFor={`${id}-name`}>
+                  {m.ui_example_contact_name()}
+                </FieldLabel>
                 <Input
                   ref={nameRef}
                   id={`${id}-name`}
@@ -122,7 +125,9 @@ export function ContactFormExample({ saveContact }: ContactFormExampleProps) {
 
             return (
               <Field data-invalid={invalid} data-disabled={save.isPending}>
-                <FieldLabel htmlFor={`${id}-email`}>Email</FieldLabel>
+                <FieldLabel htmlFor={`${id}-email`}>
+                  {m.ui_example_contact_email()}
+                </FieldLabel>
                 <Input
                   ref={emailRef}
                   id={`${id}-email`}
@@ -142,7 +147,7 @@ export function ContactFormExample({ saveContact }: ContactFormExampleProps) {
                   }
                 />
                 <FieldDescription id={`${id}-email-hint`}>
-                  Use an address where you can be reached.
+                  {m.ui_example_contact_email_hint()}
                 </FieldDescription>
                 {invalid ? (
                   <FieldError
@@ -157,7 +162,7 @@ export function ContactFormExample({ saveContact }: ContactFormExampleProps) {
       </FieldGroup>
       {save.isError ? (
         <p role="alert" className="text-sm text-destructive">
-          We couldn’t save your changes. Try again.
+          {m.common_save_failed()}
         </p>
       ) : null}
       {outcome ? (
@@ -175,7 +180,7 @@ export function ContactFormExample({ saveContact }: ContactFormExampleProps) {
             {isSubmitting ? (
               <Spinner aria-hidden="true" data-icon="inline-start" />
             ) : null}
-            {isSubmitting ? 'Saving…' : 'Save contact'}
+            {isSubmitting ? m.common_saving() : m.ui_example_contact_save()}
           </Button>
         )}
       </form.Subscribe>

@@ -1,4 +1,5 @@
 import type { ActivityEvent } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import type { CollectionFilterOption } from '@luma/ui/components/primitives/collection-toolbar';
 import type { OperationalState } from '@luma/ui/components/primitives/state';
 
@@ -12,46 +13,141 @@ export interface ActivitySource {
   system: string;
 }
 
-/** Readable names for activity codes that don't read well when title-cased. */
-export const activityLabels: Record<string, string> = {
-  provider_accepted: 'Provider accepted',
-  manually_disposed: 'Manually disposed',
-  uncertain: 'Uncertain',
-  'purchase_order.created': 'Purchase order created',
-  'purchase_order.status_changed': 'Purchase order status changed',
-};
-
-const verbs: Record<string, string> = {
-  write: 'updated',
-  update: 'updated',
-  create: 'created',
-  delete: 'deleted',
-  read: 'read',
-  cancel: 'cancelled',
-  retry: 'retried',
-};
-
-const capitalize = (value: string) =>
-  value.charAt(0).toUpperCase() + value.slice(1);
+type Label = () => string;
 
 /**
- * Turns an activity code into a readable label: `provider_accepted` becomes
- * "Provider accepted" and `orders.shipping-method.write` becomes
- * "Order shipping method updated".
+ * Readable names for activity codes: outcomes, event types, modes and the recorded actions
+ * Luma knows. Values are message functions so each render reads the active language.
  */
-export function activityLabel(value: string) {
-  if (activityLabels[value]) return activityLabels[value];
-  const parts = value.split('.');
-  if (parts.length === 3) {
-    const [resource, field, verb] = parts as [string, string, string];
-    const subject = resource.replace(/s$/, '').replaceAll(/[-_]/g, ' ');
+export const activityLabels: Record<string, Label> = {
+  approved: m.activity_outcome_approved,
+  rejected: m.activity_outcome_rejected,
+  escalated: m.activity_outcome_escalated,
+  attempted: m.activity_outcome_attempted,
+  provider_accepted: m.activity_outcome_provider_accepted,
+  verified: m.activity_outcome_verified,
+  failed: m.activity_outcome_failed,
+  uncertain: m.activity_outcome_uncertain,
+  manually_disposed: m.activity_outcome_manually_disposed,
+  recorded: m.activity_outcome_recorded,
 
-    return capitalize(
-      `${subject} ${field.replaceAll(/[-_]/g, ' ')} ${verbs[verb] ?? verb}`,
-    );
-  }
+  issue: m.activity_type_issue,
+  decision: m.activity_type_decision,
+  execution: m.activity_type_execution,
+  verification: m.activity_type_verification,
+  resolution: m.activity_type_resolution,
+  connection: m.activity_type_connection,
+  procurement: m.activity_type_procurement,
+  access: m.activity_type_access,
 
-  return capitalize(value.replaceAll(/[._-]/g, ' '));
+  simulation: m.activity_mode_simulation,
+  shadow: m.activity_mode_shadow,
+  pilot: m.activity_mode_pilot,
+
+  'exception.detected': m.activity_action_issue_detected,
+  'exception.resolved': m.activity_action_issue_resolved,
+  'exception.escalated': m.activity_action_issue_escalated,
+  'case.escalated': m.activity_action_issue_escalated,
+  'case.escalate': m.activity_action_issue_escalated,
+  'case.updated': m.activity_action_issue_updated,
+  'exception.review_required': m.activity_action_issue_review_required,
+  'exception.reevaluated': m.activity_action_issue_reevaluated,
+  'exception.verification_attempt': m.activity_action_issue_check_attempt,
+  'exception.verification_inconclusive':
+    m.activity_action_issue_check_inconclusive,
+  'case.approve': m.activity_action_change_approved,
+  'case.reject': m.activity_action_change_rejected,
+  'execution.prepared': m.activity_action_change_prepared,
+  'execution.dispatched': m.activity_action_change_sent,
+  'execution.completed': m.activity_action_change_finished,
+  'execution.withheld': m.activity_action_change_withheld,
+  'execution.reconciled': m.activity_action_change_confirmed,
+  'policy.evaluated': m.activity_action_rules_checked,
+  'policy.approved': m.activity_action_rules_approved,
+  'policy.updated': m.activity_action_rules_changed,
+  'approval.responded': m.activity_action_approval_answered,
+  'connection.connected': m.activity_action_connection_connected,
+  'connection.disconnected': m.activity_action_connection_disconnected,
+  'connection.reconnected': m.activity_action_connection_reconnected,
+  'connection.revoked': m.activity_action_connection_revoked,
+  'purchase_order.created': m.activity_action_po_created,
+  'purchase_order.status_changed': m.activity_action_po_status_changed,
+  'purchase_order.submitted': m.activity_action_po_submitted,
+  'purchase_order.submission_requested':
+    m.activity_action_po_submission_requested,
+  'purchase_order.submission_approved':
+    m.activity_action_po_submission_approved,
+  'purchase_order.submission_rejected':
+    m.activity_action_po_submission_rejected,
+  'purchase_order.follow_up': m.activity_action_po_follow_up,
+  'purchase_order.commitment_recorded':
+    m.activity_action_po_commitment_recorded,
+  'purchase_order.commitment_reviewed':
+    m.activity_action_po_commitment_reviewed,
+  'purchase_order.message_recorded': m.activity_action_po_message_recorded,
+  'purchase_order.message_read': m.activity_action_po_message_read,
+  'purchase_order.message_removed': m.activity_action_po_message_removed,
+  'workflow.activated': m.activity_action_workflow_enabled,
+  'workflow.activation_revoked': m.activity_action_workflow_disabled,
+  'workflow.published': m.activity_action_workflow_published,
+  'workflow.draft_created': m.activity_action_workflow_draft_created,
+  'workflow.draft_discarded': m.activity_action_workflow_draft_discarded,
+  'workflow.step_recorded': m.activity_action_workflow_step_recorded,
+  'workflow.run': m.activity_action_workflow_run,
+  'role.created': m.activity_action_role_created,
+  'role.updated': m.activity_action_role_changed,
+  'role.archived': m.activity_action_role_archived,
+  'role.app_permissions_removed':
+    m.activity_action_role_app_permissions_removed,
+  'member.add': m.activity_action_member_added,
+  'member.update': m.activity_action_member_changed,
+  'member.remove': m.activity_action_member_removed,
+  'invitation.created': m.activity_action_invitation_created,
+  'invitation.accepted': m.activity_action_invitation_accepted,
+  'invitation.revoked': m.activity_action_invitation_revoked,
+  'workspace.updated': m.activity_action_workspace_changed,
+};
+
+/** Readable names for the changes Luma can propose, keyed by their recorded change code. */
+const changeLabels: Record<string, Label> = {
+  'orders.shipping-method.write': m.activity_change_shipping_method,
+  'inventory.write': m.activity_change_inventory,
+  'orders.write': m.activity_change_order,
+  'orders.cancel': m.activity_change_order_cancel,
+  'procurement.purchase-order.create': m.activity_change_purchase_order,
+  'payments.refund.create': m.activity_change_refund,
+  'fulfillment.retry': m.activity_change_fulfillment_retry,
+};
+
+const humanize = (value: string) => {
+  const text = value.replaceAll(/[._-]/g, ' ');
+
+  return text.charAt(0).toUpperCase() + text.slice(1);
+};
+
+/**
+ * Turns an activity code into a readable label in the active language: `execution.completed`
+ * becomes "Change attempt finished". A `provider_accepted` outcome names the connected system
+ * when `system` is given. Codes Luma doesn't know are shown with separators replaced by spaces.
+ */
+export function activityLabel(value: string, system?: string | null) {
+  if (value === 'provider_accepted' && system)
+    return m.activity_outcome_provider_accepted_by({
+      system: providerName(system),
+    });
+  const known = activityLabels[value];
+
+  return known ? known() : humanize(value);
+}
+
+/**
+ * Names a proposed change by its recorded change code, such as "Change the order’s shipping
+ * method". Unknown codes are shown with separators replaced by spaces.
+ */
+export function activityChangeLabel(value: string) {
+  const known = changeLabels[value];
+
+  return known ? known() : humanize(value);
 }
 
 /**
@@ -95,7 +191,7 @@ export function activityConnectionOptions(
   if (applied && !options.some((option) => option.value === applied))
     options.push({
       value: applied,
-      label: `Connection ${applied.slice(0, 8)}`,
+      label: m.activity_filter_connection_unlisted({ id: applied.slice(0, 8) }),
     });
 
   return options;

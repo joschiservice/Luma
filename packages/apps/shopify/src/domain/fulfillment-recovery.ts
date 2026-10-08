@@ -72,30 +72,54 @@ export const recoverySnapshot = z.object({
 
 export type RecoverySnapshot = z.infer<typeof recoverySnapshot>;
 
-/** Explains why a reviewed recovery is unsafe using Shopify's current permissions and state. */
-export function recoveryBlocker(
+/** Why a reviewed recovery is unsafe now. Interfaces translate these codes. */
+export type RecoveryBlockerReason =
+  | 'write_access'
+  | 'incomplete'
+  | 'closed'
+  | 'not_allowed'
+  | 'hold_gone'
+  | 'cancellation_pending'
+  | 'same_location'
+  | 'location_unavailable';
+
+const recoveryBlockerText: Record<RecoveryBlockerReason, string> = {
+  write_access: 'Reconnect Shopify with fulfillment write access.',
+  incomplete:
+    'Shopify returned incomplete fulfillment details. Refresh before continuing.',
+  closed: 'This fulfillment order is closed or cancelled.',
+  not_allowed: 'Shopify does not allow this action in the current state.',
+  hold_gone: 'The selected hold is no longer present.',
+  cancellation_pending:
+    'The fulfillment service must accept cancellation before this order can move.',
+  same_location: 'Choose a different fulfillment location.',
+  location_unavailable:
+    'Shopify cannot move all remaining items to this location.',
+};
+
+/**
+ * Finds why a reviewed recovery is unsafe using Shopify's current permissions and state, or
+ * returns null when it may proceed.
+ */
+export function recoveryBlockerReason(
   snapshot: RecoverySnapshot,
   choice: RecoveryChoice,
   granted: readonly string[],
-): string | null {
-  if (!granted.includes(choice.capability))
-    return 'Reconnect Shopify with fulfillment write access.';
-  if (!snapshot.complete)
-    return 'Shopify returned incomplete fulfillment details. Refresh before continuing.';
-  if (['CLOSED', 'CANCELLED'].includes(snapshot.status))
-    return 'This fulfillment order is closed or cancelled.';
+): RecoveryBlockerReason | null {
+  if (!granted.includes(choice.capability)) return 'write_access';
+  if (!snapshot.complete) return 'incomplete';
+  if (['CLOSED', 'CANCELLED'].includes(snapshot.status)) return 'closed';
   const action = {
     'fulfillment.hold.release': 'RELEASE_HOLD',
     'fulfillment.open': 'MARK_AS_OPEN',
     'fulfillment.move': 'MOVE',
   }[choice.capability];
-  if (!snapshot.actions.includes(action))
-    return 'Shopify does not allow this action in the current state.';
+  if (!snapshot.actions.includes(action)) return 'not_allowed';
   if (
     choice.capability === 'fulfillment.hold.release' &&
     !snapshot.holds.some((hold) => hold.id === choice.holdId)
   )
-    return 'The selected hold is no longer present.';
+    return 'hold_gone';
   if (choice.capability === 'fulfillment.move') {
     if (
       [
@@ -105,18 +129,28 @@ export function recoveryBlocker(
         'CANCELLATION_REJECTED',
       ].includes(snapshot.requestStatus)
     )
-      return 'The fulfillment service must accept cancellation before this order can move.';
-    if (snapshot.locationId === choice.locationId)
-      return 'Choose a different fulfillment location.';
+      return 'cancellation_pending';
+    if (snapshot.locationId === choice.locationId) return 'same_location';
     if (
       !snapshot.locations.some(
         (location) => location.id === choice.locationId && location.movable,
       )
     )
-      return 'Shopify cannot move all remaining items to this location.';
+      return 'location_unavailable';
   }
 
   return null;
+}
+
+/** Explains in English why a reviewed recovery is unsafe, for API responses and logs. */
+export function recoveryBlocker(
+  snapshot: RecoverySnapshot,
+  choice: RecoveryChoice,
+  granted: readonly string[],
+): string | null {
+  const reason = recoveryBlockerReason(snapshot, choice, granted);
+
+  return reason ? recoveryBlockerText[reason] : null;
 }
 
 /** Requires an independent, complete read with fewer unfulfilled units on the reviewed lines. */

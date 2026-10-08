@@ -42,15 +42,14 @@ export interface PurchaseOrderMetricItem {
 export const procurementMetricDefinitions: OperationalMetricDefinition[] = [
   {
     id: 'procurement.purchase_orders.draft',
-    title: 'Purchase-order drafts',
-    description:
-      'Distinct purchase orders currently in draft, recorded in Luma.',
+    title: 'Purchase order drafts',
+    description: 'Purchase orders in Luma that are still drafts.',
   },
   {
     id: 'procurement.purchase_orders.open',
     title: 'Open purchase orders',
     description:
-      'Open operational commitments recorded in Luma. Open does not establish supplier submission or acceptance.',
+      'Open purchase orders recorded in Luma. Open doesn’t mean the supplier received or accepted the order.',
   },
 ].map((d) => ({
   ...d,
@@ -59,7 +58,7 @@ export const procurementMetricDefinitions: OperationalMetricDefinition[] = [
   unit: 'purchase_order',
   filters: ['supplierId', 'authority'],
   permissions: 'workspace_member',
-  timeSemantics: 'Exact current status at the read snapshot.',
+  timeSemantics: 'Purchase order status at the time shown.',
 }));
 
 export const stockMetricDefinitions: OperationalMetricDefinition[] = [
@@ -67,13 +66,13 @@ export const stockMetricDefinitions: OperationalMetricDefinition[] = [
     id: 'inventory.below_minimum',
     title: 'Stock positions below minimum',
     description:
-      'Active-rule positions with valid stock below the configured minimum. Existing commitments are draft or open orders for the same SKU across suppliers and sources; they do not establish sufficient incoming stock.',
+      'Stock positions with an active replenishment rule whose stock is below the minimum. Draft or open purchase orders for the same SKU, from any supplier, are shown, but don’t prove that enough stock is on its way.',
   },
   {
     id: 'inventory.replenishment_unknown',
     title: 'Stock data needing review',
     description:
-      'Active-rule positions with missing, deleted, nonnumeric, future-dated or expired stock from the configured connection.',
+      'Stock positions with an active replenishment rule whose stock from the chosen connection is missing, deleted, not a number, dated in the future, or out of date.',
   },
 ].map((d) => ({
   ...d,
@@ -83,7 +82,7 @@ export const stockMetricDefinitions: OperationalMetricDefinition[] = [
   filters: ['connectionId'],
   permissions: 'workspace_member',
   timeSemantics:
-    'Accepted configured-source stock must be less than five minutes old at asOf. Equality to minimum is not below minimum.',
+    'Stock from the chosen connection must be less than 5 minutes old at the time shown. Stock equal to the minimum isn’t below it.',
 }));
 
 /** Finds draft/open commitments for the exact SKU, across suppliers and sources. */

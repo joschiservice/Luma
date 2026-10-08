@@ -1,6 +1,7 @@
 import './inventory.css';
 
 import type { InventoryList, StockPosition } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import {
@@ -10,6 +11,7 @@ import {
 import { DataTable } from '@luma/ui/components/primitives/data-table';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { PageTitle } from '@luma/ui/components/workspace/page-header';
+import { unitOfMeasure } from '@luma/ui/lib/units';
 import { useQuery } from '@tanstack/react-query';
 import {
   Link,
@@ -23,10 +25,16 @@ import { type ReactNode, useState } from 'react';
 import { connectionsOptions } from '../connections/data';
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
+import { connectionStatusLabel } from '../orders/presentation';
 import { recordReturnPath } from '../records/data';
 import { SyncCoverage } from '../sync/coverage';
 import { inventoryOptions, type InventorySearch } from './data';
-import { stockFreshness, stockQuantity, StockState } from './presentation';
+import {
+  quantityLabels,
+  stockFreshness,
+  stockQuantity,
+  StockState,
+} from './presentation';
 
 /** Connects the inventory list to workspace-scoped queries and shareable search state. */
 export function InventoryPage() {
@@ -121,7 +129,7 @@ export function InventoryView({
   const columns = [
     {
       key: 'sku',
-      header: 'SKU / location',
+      header: m.inventory_column_position(),
       cell: (item: StockPosition) => (
         <div className="inventory-cell">
           <Link
@@ -132,7 +140,7 @@ export function InventoryView({
             {item.sku}
           </Link>
           <small>
-            {item.location} · {item.unit}
+            {item.location} · {unitOfMeasure(item.unit)}
           </small>
           <StockState position={item} />
         </div>
@@ -140,14 +148,15 @@ export function InventoryView({
     },
     {
       key: 'source',
-      header: 'Source',
+      header: m.inventory_column_source(),
       cell: (item: StockPosition) => (
         <div className="inventory-source-stack">
           {item.sources.map((source) => (
             <div key={source.connectionId}>
               <strong>{source.label}</strong>
               <small>
-                {stockFreshness(source, list!.asOf)} · {source.status}
+                {stockFreshness(source, list!.asOf)} ·{' '}
+                {connectionStatusLabel(source.status)}
               </small>
             </div>
           ))}
@@ -157,12 +166,7 @@ export function InventoryView({
     ...(['onHand', 'reserved', 'available', 'incoming'] as const).map(
       (field) => ({
         key: field,
-        header: {
-          onHand: 'On hand',
-          reserved: 'Reserved',
-          available: 'Available',
-          incoming: 'Incoming',
-        }[field],
+        header: quantityLabels[field](),
         numeric: true,
         cell: (item: StockPosition) => (
           <div className="inventory-source-stack">
@@ -176,15 +180,17 @@ export function InventoryView({
                 }
               >
                 <span>
-                  {source.deleted ? '—' : stockQuantity(source[field])}
+                  {source.deleted
+                    ? m.common_empty_value()
+                    : stockQuantity(source[field])}
                 </span>
                 <small>
                   {field === 'available'
                     ? source.availabilityBasis === 'derived'
-                      ? 'Derived'
+                      ? m.inventory_basis_derived()
                       : source.availabilityBasis === 'provider_reported'
-                        ? 'Reported'
-                        : 'Not reported'
+                        ? m.inventory_basis_reported()
+                        : m.common_not_reported()
                     : '\u00a0'}
                 </small>
               </div>
@@ -197,20 +203,20 @@ export function InventoryView({
 
   return (
     <main className="inventory-page">
-      {from ? <Link to={from}>← Back to context</Link> : null}
-      <PageTitle title="Inventory" />
+      {from ? <Link to={from}>← {m.inventory_back_context()}</Link> : null}
+      <PageTitle title={m.inventory_page_title()} />
       <CollectionToolbar
-        refreshLabel="Refresh inventory"
+        refreshLabel={m.inventory_list_refresh()}
         refreshing={refreshing}
         onRefresh={refresh}
         views={
           <CollectionViews
-            label="Inventory views"
+            label={m.inventory_list_views_label()}
             value={search.view ?? 'all'}
             views={[
-              { value: 'all', label: 'All stock' },
-              { value: 'differs', label: 'Source differences' },
-              { value: 'unknown', label: 'Incomplete stock' },
+              { value: 'all', label: m.inventory_view_all() },
+              { value: 'differs', label: m.inventory_view_differs() },
+              { value: 'unknown', label: m.inventory_view_unknown() },
             ]}
             onChange={(view) =>
               update({ view: view === 'all' ? undefined : view })
@@ -220,21 +226,26 @@ export function InventoryView({
         search={{
           value: search.q,
           onChange: (q) => update({ q }),
-          label: 'Search inventory',
-          placeholder: 'Search SKU or location…',
+          label: m.inventory_list_search_label(),
+          placeholder: m.inventory_list_search_placeholder(),
         }}
         filters={[
           {
             kind: 'choice',
             key: 'connectionId',
-            label: 'Source',
+            label: m.inventory_filter_source(),
             icon: Plug,
             value: search.connectionId,
             options: [
               ...sources.map((s) => ({ value: s.id, label: s.label })),
               ...(search.connectionId &&
               !sources.some((s) => s.id === search.connectionId)
-                ? [{ value: search.connectionId, label: 'Selected source' }]
+                ? [
+                    {
+                      value: search.connectionId,
+                      label: m.inventory_selected_source(),
+                    },
+                  ]
                 : []),
             ],
             onChange: (connectionId) => update({ connectionId }),
@@ -242,21 +253,21 @@ export function InventoryView({
           {
             kind: 'applied',
             key: 'skuId',
-            label: 'SKU',
+            label: m.inventory_filter_sku(),
             value: search.skuId
               ? (list?.items.find((item) => item.skuId === search.skuId)?.sku ??
-                'Selected SKU')
+                m.inventory_selected_sku())
               : undefined,
             onRemove: () => update({ skuId: undefined }),
           },
           {
             kind: 'applied',
             key: 'locationId',
-            label: 'Location',
+            label: m.inventory_filter_location(),
             value: search.locationId
               ? (list?.items.find(
                   (item) => item.locationId === search.locationId,
-                )?.location ?? 'Selected location')
+                )?.location ?? m.inventory_selected_location())
               : undefined,
             onRemove: () => update({ locationId: undefined }),
           },
@@ -264,24 +275,17 @@ export function InventoryView({
         onClear={() => change({ view: search.view, from: search.from })}
       />
       {coverage}
-      <p className="inventory-note">
-        One position per SKU, location and unit. Source quantities stay
-        separate. Unknown means the source has not reported a value.
-      </p>
-      {offline ? (
-        <Alert role="status">
-          You are offline. Reconnect to refresh stock.
-        </Alert>
-      ) : null}
+      <p className="inventory-note">{m.inventory_list_note()}</p>
+      {offline ? <Alert role="status">{m.inventory_offline()}</Alert> : null}
       {error ? (
         <Alert tone="danger" role="alert">
-          {error}{' '}
+          {m.inventory_list_load_failed()} {error}{' '}
           <Button variant="outline" onClick={refresh}>
-            Retry
+            {m.common_retry()}
           </Button>
           {search.cursor ? (
             <Button variant="ghost" onClick={() => update({})}>
-              Go to first page
+              {m.inventory_list_first_page_button()}
             </Button>
           ) : null}
         </Alert>
@@ -290,7 +294,7 @@ export function InventoryView({
         <>
           <DataTable
             className="inventory-list-table"
-            caption="Stock by SKU, location and source"
+            caption={m.inventory_list_caption()}
             columns={columns}
             rows={list.items}
             rowKey={(row) => row.id}
@@ -298,33 +302,32 @@ export function InventoryView({
               <Empty>
                 <Boxes size={30} aria-hidden="true" />
                 <h2>
-                  {filtered ? 'No stock matches' : 'No stock observed yet'}
+                  {filtered
+                    ? m.inventory_list_unmatched_title()
+                    : m.inventory_list_empty_title()}
                 </h2>
                 <p>
                   {filtered
-                    ? 'Try another SKU, location or source.'
-                    : 'Stock appears here once a connected store or ERP is imported. Check Data sync for progress.'}
+                    ? m.inventory_list_unmatched_body()
+                    : m.inventory_list_empty_body()}
                 </p>
                 {filtered ? (
                   <Button onClick={() => change({})} variant="outline">
-                    Clear filters
+                    {m.common_clear_filters()}
                   </Button>
                 ) : (
                   <Link
                     to="/app/$organizationId/apps"
                     params={{ organizationId }}
                   >
-                    Connect a store or ERP
+                    {m.inventory_list_connect()}
                   </Link>
                 )}
               </Empty>
             }
           />
           <div className="inventory-pagination">
-            <span>
-              {list.items.length}{' '}
-              {list.items.length === 1 ? 'position' : 'positions'} on this page
-            </span>
+            <span>{m.inventory_list_count({ count: list.items.length })}</span>
             <div>
               {previous ? (
                 <Button
@@ -332,12 +335,12 @@ export function InventoryView({
                   disabled={refreshing}
                   onClick={previous}
                 >
-                  Previous page
+                  {m.inventory_list_previous()}
                 </Button>
               ) : null}
               {search.cursor ? (
                 <Button variant="ghost" onClick={() => update({})}>
-                  First page
+                  {m.inventory_list_first_page()}
                 </Button>
               ) : null}
               <Button
@@ -347,14 +350,14 @@ export function InventoryView({
                   change({ ...search, cursor: list.nextCursor ?? undefined })
                 }
               >
-                Next page
+                {m.inventory_list_next()}
               </Button>
             </div>
           </div>
         </>
       ) : loading && !error ? (
         <div className="inventory-loading" role="status">
-          <span className="sr-only">Loading inventory…</span>
+          <span className="sr-only">{m.inventory_list_loading()}</span>
           {Array.from({ length: 5 }, (_, i) => (
             <span className="lu-skeleton" key={i} />
           ))}

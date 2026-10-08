@@ -1,6 +1,8 @@
 import './sync.css';
 
 import type { SyncOverview, SyncRecordType } from '@luma/api-contract';
+import { formatNumber, formatPercent } from '@luma/i18n/format';
+import { m } from '@luma/i18n/messages';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import {
   type OperationalState,
@@ -22,7 +24,7 @@ export interface CoverageItem {
   id: string;
   label: string;
   state: OperationalState;
-  /** What Luma holds, such as "importing orders (8%)" or "orders since Jul 31, 2026". */
+  /** What Luma holds, such as "importing orders (8%)" or "orders since 31 Jul 2026". */
   text: string;
   /** Why the sync is not progressing, such as "Paused" or "Failing". */
   problem: string | null;
@@ -53,13 +55,29 @@ export function coverageItems(
       importing && recentCompletedAt && recentFrom ? recentFrom : null;
     const progress =
       importing && !recent ? (scanProgress(type, stream)?.value ?? null) : null;
-    const text = recent
-      ? `${noun} since ${day(historyFrom && historyFrom > recent ? historyFrom : recent)} ${stream.records.failed || stream.records.pending ? 'read' : 'imported'} · older history incomplete`
+    const since = recent
+      ? {
+          records: noun,
+          date: day(historyFrom && historyFrom > recent ? historyFrom : recent),
+        }
+      : null;
+    const text = since
+      ? stream.records.failed || stream.records.pending
+        ? m.sync_coverage_item_recent_read(since)
+        : m.sync_coverage_item_recent_imported(since)
       : importing
-        ? `importing ${noun}${progress != null ? ` (${Math.floor(progress)}%)` : ''}`
+        ? progress != null
+          ? m.sync_coverage_item_importing_progress({
+              records: noun,
+              progress: formatPercent(Math.floor(progress) / 100),
+            })
+          : m.sync_coverage_item_importing({ records: noun })
         : stream.coverage.historyFrom
-          ? `${noun} since ${day(stream.coverage.historyFrom)}`
-          : `all ${noun}`;
+          ? m.sync_coverage_item_since({
+              records: noun,
+              date: day(stream.coverage.historyFrom),
+            })
+          : m.sync_coverage_item_all({ records: noun });
 
     return [
       {
@@ -89,8 +107,6 @@ const severity: Record<OperationalState, number> = {
   verified: 0,
 };
 
-const sources = (count: number) => (count === 1 ? 'source' : 'sources');
-
 /**
  * Condenses per-source coverage into one line, leading with sources that need attention, then
  * unfinished imports and history limits, and ending with the stalest successful sync. It never
@@ -107,16 +123,17 @@ export function coverageSummary(
   const parts: string[] = [];
 
   if (problems.length === 1)
-    parts.push(`${problems[0]!.label}: ${problems[0]!.problem!.toLowerCase()}`);
+    parts.push(
+      m.sync_coverage_source_problem({
+        source: problems[0]!.label,
+        problem: problems[0]!.problem!,
+      }),
+    );
   else if (problems.length)
-    parts.push(`${problems.length} of ${total} sources need attention`);
+    parts.push(
+      m.sync_coverage_sources_attention({ count: problems.length, total }),
+    );
 
-  const who = (count: number) =>
-    count === total
-      ? total === 1
-        ? 'the source'
-        : `all ${total} sources`
-      : `${count} of ${total} sources`;
   const older = importing.filter((item) => item.olderOnly);
   const full = importing.filter((item) => !item.olderOnly);
 
@@ -128,32 +145,58 @@ export function coverageSummary(
     const high = Math.max(...values);
     const progress = values.length
       ? low === high
-        ? ` (${low}%)`
-        : ` (${low}–${high}%)`
-      : '';
-    parts.push(`importing from ${who(full.length)}${progress}`);
+        ? formatPercent(low / 100)
+        : m.sync_coverage_percent_range({
+            low: formatNumber(low),
+            high: formatPercent(high / 100),
+          })
+      : null;
+    const count = full.length;
+    parts.push(
+      count < total
+        ? progress
+          ? m.sync_coverage_importing_some_progress({ count, total, progress })
+          : m.sync_coverage_importing_some({ count, total })
+        : total > 1
+          ? progress
+            ? m.sync_coverage_importing_all_progress({ total, progress })
+            : m.sync_coverage_importing_all({ total })
+          : progress
+            ? m.sync_coverage_importing_one_progress({ progress })
+            : m.sync_coverage_importing_one(),
+    );
   }
   if (older.length)
-    parts.push(`older history importing from ${who(older.length)}`);
-  if (importing.length) parts.push('list is incomplete');
+    parts.push(
+      older.length < total
+        ? m.sync_coverage_older_some({ count: older.length, total })
+        : total > 1
+          ? m.sync_coverage_older_all({ total })
+          : m.sync_coverage_older_one(),
+    );
+  if (importing.length) parts.push(m.sync_coverage_incomplete());
   else if (!problems.length)
     parts.push(
-      total === 1 ? '1 source imported' : `all ${total} sources imported`,
+      total === 1
+        ? m.sync_coverage_imported_one()
+        : m.sync_coverage_imported_all({ total }),
     );
 
   if (!importing.length && limited.length) {
     const dates = new Set(limited.map((item) => item.historyFrom));
     parts.push(
       limited.length === total && dates.size === 1
-        ? `history since ${day(limited[0]!.historyFrom!)}`
-        : `history limited on ${limited.length} ${sources(limited.length)}`,
+        ? m.sync_coverage_history_since({
+            date: day(limited[0]!.historyFrom!),
+          })
+        : m.sync_coverage_history_limited({ count: limited.length }),
     );
   }
 
   const synced = items
     .flatMap((item) => (item.lastSuccessAt ? [item.lastSuccessAt] : []))
     .sort()[0];
-  if (synced) parts.push(`synced ${ago(synced, now)}`);
+  if (synced) parts.push(m.sync_coverage_synced({ time: ago(synced, now) }));
 
   const text = parts.join(' · ');
   const state = items.reduce<OperationalState>(
@@ -186,7 +229,7 @@ export function SyncCoverage({
     <Disclosure variant="plain" className="sync-coverage">
       <summary>
         <StateDot state={summary.state} />
-        <span className="sync-coverage-label">Coverage</span>
+        <span className="sync-coverage-label">{m.sync_coverage_label()}</span>
         <span className="sync-coverage-summary">{summary.text}</span>
       </summary>
       <ul className="sync-coverage-items">
@@ -195,17 +238,23 @@ export function SyncCoverage({
             <StateDot state={item.state} />
             <span>
               <strong>{item.label}</strong>{' '}
-              {item.problem ? `${item.problem} · ` : ''}
-              {item.text}
-              {item.lastSuccessAt
-                ? ` · synced ${ago(item.lastSuccessAt, now)}`
-                : ''}
+              {[
+                item.problem,
+                item.text,
+                item.lastSuccessAt
+                  ? m.sync_coverage_synced({
+                      time: ago(item.lastSuccessAt, now),
+                    })
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </span>
           </li>
         ))}
       </ul>
       <Link to="/app/$organizationId/sync" params={{ organizationId }}>
-        Open Data sync
+        {m.sync_coverage_open()}
       </Link>
     </Disclosure>
   );
