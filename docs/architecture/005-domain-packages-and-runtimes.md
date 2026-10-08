@@ -20,6 +20,8 @@ Luma remains a modular monolith with one PostgreSQL schema history. Domain packa
 | `packages/platform`                                                        | Tenant database abstraction and technical observability/model infrastructure                    |
 | `tooling/pilot`                                                            | Synthetic provider behavior, fixture provisioning and scenario orchestration                    |
 
+The staff frontend and API run separately from the customer applications. Staff owns its sessions, grants and support evidence; the identity owner exposes only the controlled account operation. The shared identity-provider package verifies external identities without granting application access.
+
 The existing connector SDKs and simulator packages retain their independent provider boundaries. Simulated transport continues to exercise installed connectors and the real policy/execution path.
 
 ## Public interfaces and transport boundaries

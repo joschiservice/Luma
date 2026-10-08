@@ -59,7 +59,8 @@
     "knip": "knip",
     "knip:check": "knip --include files,dependencies --no-config-hints && knip --workspace packages/connectors/core --exports --include-entry-exports --no-config-hints",
     "typecheck:tooling": "tsc -p tooling/tsconfig.json",
-    "lint:ui": "node tooling/style/check-ui.mjs"
+    "lint:ui": "node tooling/style/check-ui.mjs",
+    "dev:staff": "node tooling/dev/cli.mjs staff"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -103,6 +104,7 @@
     "typescript": "catalog:typescript-compatible-5-9-3",
     "typescript-eslint": "^8.46.0",
     "vitest": "catalog:",
-    "yaml": "2.9.0"
+    "yaml": "2.9.0",
+    "@luma/staff": "workspace:*"
   }
 }

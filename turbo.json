@@ -71,7 +71,20 @@
         "LUMA_LOCAL_OTLP_ENDPOINT",
         "LUMA_LOCAL_PROFILES_ENDPOINT",
         "LUMA_CODE_RUNTIME_DIR",
-        "LUMA_SIMULATOR_ORIGIN"
+        "LUMA_SIMULATOR_ORIGIN",
+        "STAFF_DATABASE_URL",
+        "STAFF_AUTH_SECRET",
+        "STAFF_PUBLIC_ORIGIN",
+        "STAFF_AUTH_MODE",
+        "STAFF_API_HOST",
+        "STAFF_API_PORT",
+        "STAFF_API_PROXY_TARGET",
+        "STAFF_WEB_PORT",
+        "STAFF_COOKIE_PREFIX",
+        "STAFF_GOOGLE_CLIENT_ID",
+        "STAFF_GOOGLE_CLIENT_SECRET",
+        "STAFF_GOOGLE_HOSTED_DOMAIN",
+        "STAFF_TRUSTED_PROXY"
       ]
     },
     "build:storybook": {

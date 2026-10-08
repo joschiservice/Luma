@@ -7,34 +7,36 @@ conventions only; it does not list files.
 
 ## Owners
 
-| Area                                                           | Owner                                                                                    |
-| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Sign-in, workspaces, memberships, roles, settings              | `@luma/identity`                                                                         |
-| Action policy and approval requirements                        | `@luma/policies`                                                                         |
-| Action admission, effects, idempotency                         | `@luma/execution`                                                                        |
-| Append-only audit log                                          | `@luma/audit`                                                                            |
-| Installed connections, credentials, capabilities, observations | `@luma/connections`                                                                      |
-| Provider apps (setup, adapters, OAuth, webhooks, app UI)       | `packages/apps/<id>`, contracts in `@luma/app-host`, registration in `@luma/app-catalog` |
-| Provider protocol clients                                      | `packages/connectors/*`                                                                  |
-| Canonical orders, fulfillment, returns, refunds                | `@luma/orders`                                                                           |
-| Canonical SKUs, locations, stock, product catalog rows         | `@luma/inventory`                                                                        |
-| Customer profiles                                              | `@luma/customers`                                                                        |
-| Observation → canonical projection                             | `@luma/commerce-ingestion`                                                               |
-| History import, incremental sync, reconciliation               | `@luma/commerce-sync`                                                                    |
-| Detection rules, cases, evidence, diagnosis, verification      | `@luma/exceptions`                                                                       |
-| Case desk, proposals, learning, measurement, activity          | `@luma/resolution`                                                                       |
-| Workflow definitions, versions, activations, runs, authoring   | `@luma/workflows`; durable execution in `@luma/workflow-temporal`                        |
-| Suppliers, purchase orders, replenishment, commitments         | `@luma/procurement`                                                                      |
-| Cross-owner read-only views (workspaces, metrics, Needs you)   | `@luma/read-models`                                                                      |
-| Ask Luma                                                       | `@luma/assistant`                                                                        |
-| Service composition, process runtimes, migrations              | `@luma/application-runtime`                                                              |
-| HTTP schemas, typed client, OpenAPI                            | `@luma/api-contract`                                                                     |
-| Shared technical infrastructure, model gateway                 | `@luma/platform`; validated settings in `@luma/config`                                   |
-| Shared components and design tokens                            | `@luma/ui`                                                                               |
+| Area                                                             | Owner                                                                                    |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Sign-in, workspaces, memberships, roles, settings                | `@luma/identity`                                                                         |
+| Reviewed Google Workspace/OIDC federation adapters               | `@luma/identity-provider`                                                                |
+| Staff identities, support access, inspection and account actions | `@luma/staff`                                                                            |
+| Action policy and approval requirements                          | `@luma/policies`                                                                         |
+| Action admission, effects, idempotency                           | `@luma/execution`                                                                        |
+| Append-only audit log                                            | `@luma/audit`                                                                            |
+| Installed connections, credentials, capabilities, observations   | `@luma/connections`                                                                      |
+| Provider apps (setup, adapters, OAuth, webhooks, app UI)         | `packages/apps/<id>`, contracts in `@luma/app-host`, registration in `@luma/app-catalog` |
+| Provider protocol clients                                        | `packages/connectors/*`                                                                  |
+| Canonical orders, fulfillment, returns, refunds                  | `@luma/orders`                                                                           |
+| Canonical SKUs, locations, stock, product catalog rows           | `@luma/inventory`                                                                        |
+| Customer profiles                                                | `@luma/customers`                                                                        |
+| Observation → canonical projection                               | `@luma/commerce-ingestion`                                                               |
+| History import, incremental sync, reconciliation                 | `@luma/commerce-sync`                                                                    |
+| Detection rules, cases, evidence, diagnosis, verification        | `@luma/exceptions`                                                                       |
+| Case desk, proposals, learning, measurement, activity            | `@luma/resolution`                                                                       |
+| Workflow definitions, versions, activations, runs, authoring     | `@luma/workflows`; durable execution in `@luma/workflow-temporal`                        |
+| Suppliers, purchase orders, replenishment, commitments           | `@luma/procurement`                                                                      |
+| Cross-owner read-only views (workspaces, metrics, Needs you)     | `@luma/read-models`                                                                      |
+| Ask Luma                                                         | `@luma/assistant`                                                                        |
+| Service composition, process runtimes, migrations                | `@luma/application-runtime`                                                              |
+| HTTP schemas, typed client, OpenAPI                              | `@luma/api-contract`                                                                     |
+| Shared technical infrastructure, model gateway                   | `@luma/platform`; validated settings in `@luma/config`                                   |
+| Shared components and design tokens                              | `@luma/ui`                                                                               |
 
 Processes: `apps/api` (HTTP), `apps/worker` (Temporal worker and the commerce sync process
 with scheduled detection), `apps/web` (product UI), `apps/simulator` and
-`apps/simulator-web` (synthetic providers). Local environments live in `tooling/pilot` and
+`apps/simulator-web` (synthetic providers), and `apps/staff-api` / `apps/staff` (isolated staff API and web application). Local environments live in `tooling/pilot` and
 `tooling/simulator`.
 
 ## Conventions

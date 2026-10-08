@@ -1,0 +1,24 @@
+{
+  "name": "@luma/staff-api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "dev": "tsx watch --conditions=luma-source --env-file-if-exists=.env src/index.ts",
+    "start": "node --env-file-if-exists=.env dist/index.js",
+    "staff:provision": "node scripts/provision.mjs"
+  },
+  "dependencies": {
+    "@luma/staff": "workspace:*",
+    "fastify": "catalog:"
+  },
+  "devDependencies": {
+    "@luma/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "vitest": "catalog:"
+  }
+}

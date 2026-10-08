@@ -342,6 +342,9 @@ importers:
       '@luma/simulator-shopify':
         specifier: workspace:*
         version: link:packages/simulator/shopify
+      '@luma/staff':
+        specifier: workspace:*
+        version: link:packages/staff
       '@luma/workflow-temporal':
         specifier: workspace:*
         version: link:packages/workflow-temporal
@@ -421,6 +424,9 @@ importers:
       '@luma/simulator-shopify':
         specifier: workspace:*
         version: link:../../packages/simulator/shopify
+      '@luma/staff':
+        specifier: workspace:*
+        version: link:../../packages/staff
       '@luma/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
@@ -522,6 +528,74 @@ importers:
       vite:
         specifier: 'catalog:'
         version: 8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0)
+
+  apps/staff:
+    dependencies:
+      '@luma/api-contract':
+        specifier: workspace:*
+        version: link:../../packages/api-contract
+      '@luma/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      '@tanstack/react-form':
+        specifier: 'catalog:'
+        version: 1.33.5(@tanstack/react-start@1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.8)))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@tanstack/react-query':
+        specifier: 'catalog:'
+        version: 5.103.0(react@19.3.0)
+      '@tanstack/react-router':
+        specifier: ^1.168.0
+        version: 1.170.36(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      react:
+        specifier: 'catalog:'
+        version: 19.3.0
+      react-dom:
+        specifier: 'catalog:'
+        version: 19.3.0(react@19.3.0)
+      zod:
+        specifier: catalog:zod4
+        version: 4.6.5
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@tailwindcss/vite':
+        specifier: 'catalog:'
+        version: 4.3.3(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.3.0(@types/react@19.3.0)
+      '@vitejs/plugin-react':
+        specifier: ^6.0.0
+        version: 6.1.1(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
+      vite:
+        specifier: 'catalog:'
+        version: 8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0)
+
+  apps/staff-api:
+    dependencies:
+      '@luma/staff':
+        specifier: workspace:*
+        version: link:../../packages/staff
+      fastify:
+        specifier: 'catalog:'
+        version: 5.12.5
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.5
+      tsx:
+        specifier: 'catalog:'
+        version: 4.23.13
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
 
   apps/web:
     dependencies:
@@ -810,6 +884,9 @@ importers:
       '@luma/app-shopify':
         specifier: workspace:*
         version: link:../apps/shopify
+      '@luma/staff':
+        specifier: workspace:*
+        version: link:../staff
       '@luma/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
@@ -1257,6 +1334,25 @@ importers:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
 
+  packages/identity-provider:
+    dependencies:
+      better-auth:
+        specifier: 'catalog:'
+        version: 1.7.5(@opentelemetry/api@1.9.1)(@tanstack/react-start@1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.8)))(drizzle-kit@0.31.11)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(kysely@0.29.6)(pg@8.23.0))(pg@8.23.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@4.1.11)
+      jose:
+        specifier: 6.2.12
+        version: 6.2.12
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.5
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
+
   packages/inventory:
     dependencies:
       '@luma/identity':
@@ -1579,6 +1675,49 @@ importers:
       '@luma/typescript-config':
         specifier: workspace:*
         version: link:../../typescript-config
+
+  packages/staff:
+    dependencies:
+      '@luma/api-contract':
+        specifier: workspace:*
+        version: link:../api-contract
+      '@luma/identity':
+        specifier: workspace:*
+        version: link:../identity
+      '@luma/identity-provider':
+        specifier: workspace:*
+        version: link:../identity-provider
+      '@ts-rest/fastify':
+        specifier: 'catalog:'
+        version: 3.52.1(@ts-rest/core@3.52.1(@types/node@24.13.5)(zod@3.25.76))(fastify@5.12.5)(zod@3.25.76)
+      better-auth:
+        specifier: 'catalog:'
+        version: 1.7.5(@opentelemetry/api@1.9.1)(@tanstack/react-start@1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.8)))(drizzle-kit@0.31.11)(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(kysely@0.29.6)(pg@8.20.0))(pg@8.20.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@4.1.11)
+      drizzle-orm:
+        specifier: 0.45.2
+        version: 0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(kysely@0.29.6)(pg@8.20.0)
+      fastify:
+        specifier: 'catalog:'
+        version: 5.12.5
+      pg:
+        specifier: catalog:pg-8-20-0
+        version: 8.20.0
+      zod:
+        specifier: catalog:zod3
+        version: 3.25.76
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.5
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.20.0
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/typescript-config: {}
 

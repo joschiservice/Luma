@@ -1,0 +1,32 @@
+{
+  "name": "@luma/identity-provider",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "luma-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./composition": {
+      "luma-source": "./src/composition.ts",
+      "types": "./dist/composition.d.ts",
+      "default": "./dist/composition.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "better-auth": "catalog:",
+    "jose": "6.2.12"
+  },
+  "devDependencies": {
+    "@luma/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
+    "vitest": "catalog:"
+  }
+}
