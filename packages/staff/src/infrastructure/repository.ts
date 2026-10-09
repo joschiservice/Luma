@@ -1,9 +1,13 @@
 import { randomUUID } from 'node:crypto';
 
-import { revokeCustomerSessionsForSupport } from '@luma/identity';
+import {
+  describeUserAgent,
+  revokeCustomerSessionsForSupport,
+} from '@luma/identity';
 import type { Pool, PoolClient } from 'pg';
 
 import type {
+  AccountDetail,
   DirectoryUser,
   DirectoryWorkspace,
   StaffRepository,
@@ -87,6 +91,18 @@ export function createStaffRepository(pool: Pool): StaffRepository {
       throw new StaffError(
         403,
         'Workspace support access has expired or is unavailable.',
+      );
+  }
+
+  async function validateAccountGrant(tx: PoolClient, userId: string) {
+    const result = await tx.query<{ allowed: boolean }>(
+      'SELECT staff_has_account_access($1) AS allowed',
+      [userId],
+    );
+    if (!result.rows[0]?.allowed)
+      throw new StaffError(
+        403,
+        'Account support access has expired or is unavailable.',
       );
   }
 
@@ -221,6 +237,123 @@ export function createStaffRepository(pool: Pool): StaffRepository {
             ...input,
             requestId: context.requestId,
           });
+        },
+      );
+    },
+    accountGrant(context, userId, reason) {
+      return transaction(
+        context,
+        null,
+        'staff.accounts.inspect',
+        async (tx) => {
+          const account = await tx.query('SELECT id FROM users WHERE id=$1', [
+            userId,
+          ]);
+          if (!account.rowCount)
+            throw new StaffError(404, 'Customer account unavailable.');
+          const id = randomUUID();
+          const result = await tx.query<{ expiresAt: Date }>(
+            'INSERT INTO staff_account_grants(id,staff_user_id,staff_session_id,user_id,reason,expires_at) VALUES($1,$2,$3,$4,$5,now()+interval \'30 minutes\') RETURNING expires_at AS "expiresAt"',
+            [id, context.userId, context.sessionId, userId, reason],
+          );
+          await audit(tx, context, 'account.access.opened', null, reason, {
+            grantId: id,
+            userId,
+          });
+
+          return {
+            id,
+            userId,
+            reason,
+            expiresAt: result.rows[0]!.expiresAt.toISOString(),
+          };
+        },
+      );
+    },
+    account(context, userId, grantId) {
+      return transaction(
+        context,
+        grantId,
+        'staff.accounts.inspect',
+        async (tx): Promise<AccountDetail> => {
+          await validateAccountGrant(tx, userId);
+          const profile = await tx.query<{
+            id: string;
+            name: string;
+            email: string;
+            created_at: Date;
+            two_factor_enabled: boolean;
+            passkey_count: number;
+          }>(
+            'SELECT id,name,email,created_at,two_factor_enabled,passkey_count FROM staff_account_profile WHERE id=$1',
+            [userId],
+          );
+          const account = profile.rows[0];
+          if (!account)
+            throw new StaffError(404, 'Customer account unavailable.');
+          const workspaces = await tx.query<{
+            id: string;
+            name: string;
+            slug: string;
+            status: string;
+            data_region: string;
+            role: string;
+            custom_role_name: string | null;
+            joined_at: Date;
+          }>(
+            'SELECT id,name,slug,status,data_region,role,custom_role_name,joined_at FROM staff_account_workspaces WHERE user_id=$1 ORDER BY lower(name),id LIMIT 101',
+            [userId],
+          );
+          const sessions = await tx.query<{
+            id: string;
+            created_at: Date;
+            expires_at: Date;
+            last_active_at: Date | null;
+            ip_address: string | null;
+            user_agent: string | null;
+          }>(
+            'SELECT id,created_at,expires_at,last_active_at,ip_address,user_agent FROM staff_account_sessions WHERE user_id=$1 ORDER BY coalesce(last_active_at,created_at) DESC,id LIMIT 101',
+            [userId],
+          );
+          await audit(tx, context, 'account.inspected', null, null, {
+            grantId,
+            userId,
+          });
+
+          return {
+            account: {
+              id: account.id,
+              name: account.name,
+              email: account.email,
+              createdAt: account.created_at.toISOString(),
+            },
+            security: {
+              twoFactorEnabled: account.two_factor_enabled,
+              passkeys: account.passkey_count,
+            },
+            workspacesTruncated: workspaces.rows.length > 100,
+            workspaces: workspaces.rows.slice(0, 100).map((row) => ({
+              id: row.id,
+              name: row.name,
+              slug: row.slug,
+              status: row.status,
+              dataRegion: row.data_region,
+              role: row.role,
+              customRoleName: row.custom_role_name,
+              // Memberships have no suspension state yet; every stored membership is active.
+              membershipStatus: 'active' as const,
+              joinedAt: row.joined_at.toISOString(),
+            })),
+            sessionsTruncated: sessions.rows.length > 100,
+            sessions: sessions.rows.slice(0, 100).map((row) => ({
+              id: row.id,
+              createdAt: row.created_at.toISOString(),
+              expiresAt: row.expires_at.toISOString(),
+              lastActiveAt: row.last_active_at?.toISOString() ?? null,
+              ipAddress: row.ip_address,
+              ...describeUserAgent(row.user_agent),
+            })),
+          };
         },
       );
     },

@@ -67,6 +67,11 @@ RLS prevents omitted filters; it does not protect against a compromised backend 
 
 ## Browser sessions
 
+Sessions record when they were last used. Resolving a session for a protected API request
+advances `last_active_at` at most once per five minutes per session, so ordinary requests
+don't write; Better Auth's own session reads through the auth bridge don't advance it. Use it
+to show recent activity, not to enforce idle timeouts.
+
 Protected web routes use TanStack Start's `ssr: false`: session and membership reads run in the browser through the same-origin proxy. The server renders no private content and forwards no session cookies. Do not add server-side identity reads without forwarding only the current request's cookies to a configured, trusted API origin. Each router owns its own QueryClient; never share a server cache between users.
 
 Workspace URLs use organization UUIDs, and each tab selects its own workspace. Private queries use the `['private', 'organization', organizationId, ...]` prefix. Switching workspaces cancels and removes the previous workspace's queries, and session loss removes all private queries. Session and access reads refetch on focus and navigation. There is no query persistence or offline mutation queue.

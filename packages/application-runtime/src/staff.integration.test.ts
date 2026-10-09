@@ -88,6 +88,7 @@ describe.skipIf(!databaseUrl)(
             'staff.directory.read',
             'staff.workspace.inspect',
             'staff.sessions.revoke',
+            'staff.accounts.inspect',
           ],
         },
         adminUrl,
@@ -105,8 +106,13 @@ describe.skipIf(!databaseUrl)(
         [randomUUID(), tenantA, customer],
       );
       await owner.query(
-        "INSERT INTO sessions(id,token,user_id,expires_at,created_at,updated_at) VALUES($1,$2,$3,now()+interval '1 day',now(),now())",
-        [randomUUID(), randomUUID(), customer],
+        "INSERT INTO sessions(id,token,user_id,expires_at,created_at,updated_at,ip_address,user_agent,last_active_at) VALUES($1,$2,$3,now()+interval '1 day',now(),now(),'192.0.2.40',$4,now())",
+        [
+          randomUUID(),
+          randomUUID(),
+          customer,
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36',
+        ],
       );
       runtime = new Pool({ connectionString: url.toString() });
       staff = createStaff(settings);
@@ -283,7 +289,7 @@ describe.skipIf(!databaseUrl)(
         ).rejects.toMatchObject({ status: 403 });
       } finally {
         await owner.query(
-          "UPDATE staff_access SET permissions=ARRAY['staff.directory.read','staff.workspace.inspect','staff.sessions.revoke'] WHERE email='support@example.test'",
+          "UPDATE staff_access SET permissions=ARRAY['staff.directory.read','staff.workspace.inspect','staff.sessions.revoke','staff.accounts.inspect'] WHERE email='support@example.test'",
         );
       }
     });
@@ -310,6 +316,210 @@ describe.skipIf(!databaseUrl)(
       });
       expect(detail.statusCode, detail.body).toBe(200);
       expect(detail.json().members[0].userId).toBe(customer);
+    });
+    it('restricts account data to the listed columns behind an account grant', async () => {
+      for (const statement of [
+        'SELECT created_at FROM users',
+        'SELECT user_agent FROM sessions',
+        'SELECT secret FROM two_factors',
+        'SELECT credential_id FROM passkeys',
+        'SELECT custom_role_id FROM memberships',
+      ])
+        await expect(runtime.query(statement)).rejects.toMatchObject({
+          code: '42501',
+        });
+      const columns = async (view: string) =>
+        (await runtime.query(`SELECT * FROM ${view} LIMIT 0`)).fields
+          .map((field) => field.name)
+          .sort();
+      expect(await columns('staff_account_profile')).toEqual([
+        'created_at',
+        'email',
+        'id',
+        'name',
+        'passkey_count',
+        'two_factor_enabled',
+      ]);
+      expect(await columns('staff_account_sessions')).toEqual([
+        'created_at',
+        'expires_at',
+        'id',
+        'ip_address',
+        'last_active_at',
+        'user_agent',
+        'user_id',
+      ]);
+      expect(await columns('staff_account_workspaces')).toEqual([
+        'custom_role_name',
+        'data_region',
+        'id',
+        'joined_at',
+        'name',
+        'role',
+        'slug',
+        'status',
+        'user_id',
+      ]);
+      for (const view of [
+        'staff_account_profile',
+        'staff_account_sessions',
+        'staff_account_workspaces',
+      ])
+        expect((await runtime.query(`SELECT FROM ${view}`)).rowCount).toBe(0);
+    });
+    it('opens audited account access and shows workspaces, factors and sessions', async () => {
+      const tenantC = randomUUID();
+      const roleId = randomUUID();
+      await owner.query(
+        "INSERT INTO organizations(id,name,slug,status,data_region,created_at) VALUES($1,'Workspace Gamma','gamma','active','EU',now())",
+        [tenantC],
+      );
+      await owner.query(
+        "INSERT INTO workspace_roles(tenant_id,id,name,created_by) VALUES($1,$2,'Buyer',$3)",
+        [tenantC, roleId, customer],
+      );
+      await owner.query(
+        "INSERT INTO memberships(id,tenant_id,user_id,role,custom_role_id,created_at) VALUES($1,$2,$3,'custom',$4,now())",
+        [randomUUID(), tenantC, customer, roleId],
+      );
+      await owner.query(
+        "INSERT INTO passkeys(id,user_id,name,credential_id,public_key,counter,device_type,backed_up) VALUES($1,$2,'Laptop','secret-credential-id','secret-public-key',0,'singleDevice',false)",
+        [randomUUID(), customer],
+      );
+      await owner.query(
+        'UPDATE users SET two_factor_enabled=true WHERE id=$1',
+        [customer],
+      );
+      const foreign = await owner.query<{ id: string }>(
+        "SELECT id FROM users WHERE email='bob@example.test'",
+      );
+      const bob = foreign.rows[0]!.id;
+      const url = `/v1/staff/accounts/${customer}`;
+      expect(
+        (
+          await app.inject({
+            url: `${url}?grantId=${randomUUID()}`,
+            headers: { cookie },
+          })
+        ).statusCode,
+      ).toBe(403);
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url: `${url}/access`,
+            headers: { cookie, origin },
+            payload: { reason: 'short' },
+          })
+        ).statusCode,
+      ).toBe(400);
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url: `/v1/staff/accounts/${randomUUID()}/access`,
+            headers: { cookie, origin },
+            payload: { reason: 'Investigating a missing customer account' },
+          })
+        ).statusCode,
+      ).toBe(404);
+      const opened = await app.inject({
+        method: 'POST',
+        url: `${url}/access`,
+        headers: { cookie, origin },
+        payload: { reason: 'Investigating a customer sign-in ticket' },
+      });
+      expect(opened.statusCode, opened.body).toBe(201);
+      const accountGrant = opened.json().id as string;
+      const detail = await app.inject({
+        url: `${url}?grantId=${accountGrant}`,
+        headers: { cookie },
+      });
+      expect(detail.statusCode, detail.body).toBe(200);
+      expect(detail.json()).toMatchObject({
+        account: { id: customer, email: 'alice@example.test' },
+        security: { twoFactorEnabled: true, passkeys: 1 },
+        workspacesTruncated: false,
+        workspaces: [
+          {
+            id: tenantA,
+            role: 'owner',
+            customRoleName: null,
+            membershipStatus: 'active',
+          },
+          {
+            id: tenantC,
+            role: 'custom',
+            customRoleName: 'Buyer',
+            membershipStatus: 'active',
+          },
+        ],
+        sessions: [
+          {
+            ipAddress: '192.0.2.40',
+            browser: 'Chrome 141',
+            os: 'macOS',
+            lastActiveAt: expect.any(String),
+          },
+        ],
+      });
+      expect(detail.body).not.toContain('secret-credential-id');
+      expect(detail.body).not.toContain('token');
+      for (const denied of [
+        `/v1/staff/accounts/${bob}?grantId=${accountGrant}`,
+        `/v1/staff/workspaces/${tenantA}?grantId=${accountGrant}`,
+      ])
+        expect(
+          (await app.inject({ url: denied, headers: { cookie } })).statusCode,
+        ).toBe(403);
+      const evidence = await owner.query<{
+        event: string;
+        reason: string | null;
+        details: { grantId: string; userId: string };
+      }>(
+        "SELECT event,reason,details FROM staff_audit WHERE event IN ('account.access.opened','account.inspected') ORDER BY sequence",
+      );
+      expect(evidence.rows).toEqual([
+        {
+          event: 'account.access.opened',
+          reason: 'Investigating a customer sign-in ticket',
+          details: { grantId: accountGrant, userId: customer },
+        },
+        {
+          event: 'account.inspected',
+          reason: null,
+          details: { grantId: accountGrant, userId: customer },
+        },
+      ]);
+      await owner.query(
+        "UPDATE staff_access SET permissions=ARRAY['staff.directory.read','staff.workspace.inspect'] WHERE email='support@example.test'",
+      );
+      try {
+        expect(
+          (
+            await app.inject({
+              url: `${url}?grantId=${accountGrant}`,
+              headers: { cookie },
+            })
+          ).statusCode,
+        ).toBe(403);
+      } finally {
+        await owner.query(
+          "UPDATE staff_access SET permissions=ARRAY['staff.directory.read','staff.workspace.inspect','staff.sessions.revoke','staff.accounts.inspect'] WHERE email='support@example.test'",
+        );
+      }
+      await owner.query(
+        "UPDATE staff_account_grants SET expires_at=now()-interval '1 second' WHERE id=$1",
+        [accountGrant],
+      );
+      expect(
+        (
+          await app.inject({
+            url: `${url}?grantId=${accountGrant}`,
+            headers: { cookie },
+          })
+        ).statusCode,
+      ).toBe(403);
     });
     it('rolls back session deletion and the command receipt if audit insertion fails', async () => {
       const commandId = randomUUID();

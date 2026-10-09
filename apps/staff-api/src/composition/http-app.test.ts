@@ -23,6 +23,8 @@ function fixture(trustedProxy: string[] = []) {
       grant: unused,
       workspace: unused,
       revoke: unused,
+      accountGrant: unused,
+      account: unused,
     },
   };
 

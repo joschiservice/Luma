@@ -1,5 +1,7 @@
 import {
   staffAccessGrantSchema,
+  staffAccountAccessSchema,
+  staffAccountDetailSchema,
   staffConfigSchema,
   staffDirectorySchema,
   staffRevokeSessionsResultSchema,
@@ -104,6 +106,7 @@ export function createStaffApi(
   }
 
   const workspace = (id: string) => `workspaces/${encodeURIComponent(id)}`;
+  const account = (id: string) => `accounts/${encodeURIComponent(id)}`;
 
   return {
     config: async (signal?: AbortSignal) =>
@@ -148,6 +151,18 @@ export function createStaffApi(
         await request(
           `${workspace(workspaceId)}/users/${encodeURIComponent(userId)}/revoke-sessions`,
           body,
+        ),
+      ),
+    grantAccount: async (userId: string, reason: string) =>
+      staffAccountAccessSchema.parse(
+        await request(`${account(userId)}/access`, { reason }),
+      ),
+    account: async (userId: string, grantId: string, signal?: AbortSignal) =>
+      staffAccountDetailSchema.parse(
+        await request(
+          `${account(userId)}?${new URLSearchParams({ grantId })}`,
+          undefined,
+          signal,
         ),
       ),
     signIn: (email: string, password: string) =>

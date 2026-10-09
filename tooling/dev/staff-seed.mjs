@@ -23,6 +23,7 @@ export async function seedStaff(
         'staff.directory.read',
         'staff.workspace.inspect',
         'staff.sessions.revoke',
+        'staff.accounts.inspect',
       ],
     },
     migrationUrl,

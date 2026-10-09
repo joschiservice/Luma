@@ -31,6 +31,15 @@ export const workspaceOptions = (workspaceId: string, grantId: string) =>
     retry: false,
   });
 
+/** Reads one customer account under its account grant; failed grants are never retried. */
+export const accountOptions = (userId: string, grantId: string) =>
+  queryOptions({
+    queryKey: ['staff', 'account', userId, grantId],
+    queryFn: ({ signal }) => staffApi.account(userId, grantId, signal),
+    enabled: grantId.length > 0,
+    retry: false,
+  });
+
 /** Cancels in-flight reads and erases all private data before changing staff identity. */
 export async function clearPrivate(client: QueryClient) {
   await client.cancelQueries();

@@ -71,6 +71,7 @@ async function fixture(t) {
         'staff.directory.read',
         'staff.workspace.inspect',
         'staff.sessions.revoke',
+        'staff.accounts.inspect',
       ],
     },
     db.ownerUrl,
@@ -209,6 +210,77 @@ test('staff investigates a workspace and retries an uncertain global revocation 
   await expect(
     page.getByRole('table', { name: 'Workspace members' }),
   ).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('staff opens a customer account and follows a workspace into its own support access', async ({
+  resources: t,
+}) => {
+  const { page, db, customer, workspace, errors } = await fixture(t);
+  await signIn(page);
+  await page.getByLabel('Name, email or workspace').fill('customer@example');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page
+    .getByRole('link', { name: 'Open account customer@example.test' })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'Account support access' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('table', { name: 'Account workspaces' }),
+  ).toHaveCount(0);
+  await page
+    .getByRole('button', { name: 'Open account access', exact: true })
+    .click();
+  const dialog = page.getByRole('dialog');
+  await dialog
+    .getByLabel('Support reason or ticket reference')
+    .fill('Investigating a customer sign-in ticket');
+  await dialog
+    .getByRole('button', { name: 'Open account access', exact: true })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'customer', exact: true, level: 1 }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('table', { name: 'Account workspaces' }),
+  ).toContainText(workspace.name);
+  await expect(
+    page.getByRole('table', { name: 'Account workspaces' }),
+  ).toContainText('Owner');
+  // The header row and the session created at sign-up.
+  await expect(
+    page
+      .getByRole('table', { name: 'Active customer sessions' })
+      .getByRole('row'),
+  ).toHaveCount(2);
+  const audit = await db.owner.query(
+    "SELECT event,details->>'userId' AS \"userId\" FROM staff_audit WHERE event LIKE 'account.%' ORDER BY sequence",
+  );
+  expect(audit.rows).toEqual([
+    { event: 'account.access.opened', userId: customer.userId },
+    { event: 'account.inspected', userId: customer.userId },
+  ]);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expect
+    .poll(() =>
+      page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    )
+    .toBe(true);
+  await page.screenshot({
+    path: test.info().outputPath('account-dark-narrow.png'),
+    fullPage: true,
+    animations: 'disabled',
+  });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.getByRole('link', { name: workspace.name, exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Workspace support access' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Open support access', exact: true }),
+  ).toBeVisible();
   expect(errors).toEqual([]);
 });
 

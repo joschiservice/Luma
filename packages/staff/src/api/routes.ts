@@ -21,6 +21,8 @@ const protectedRoutes = new Set([
   'POST /v1/staff/workspaces/:workspaceId/access',
   'GET /v1/staff/workspaces/:workspaceId',
   'POST /v1/staff/workspaces/:workspaceId/users/:userId/revoke-sessions',
+  'POST /v1/staff/accounts/:userId/access',
+  'GET /v1/staff/accounts/:userId',
 ]);
 const routePermissions: Record<string, StaffPermission[]> = {
   'GET /v1/staff/session': [],
@@ -34,6 +36,11 @@ const routePermissions: Record<string, StaffPermission[]> = {
     'staff.workspace.inspect',
     'staff.sessions.revoke',
   ],
+  'POST /v1/staff/accounts/:userId/access': [
+    'staff.accounts.inspect',
+    'staff.directory.read',
+  ],
+  'GET /v1/staff/accounts/:userId': ['staff.accounts.inspect'],
 };
 const publicRoutes = new Set([
   'GET /health',
@@ -291,6 +298,22 @@ export function registerStaffHttp(app: FastifyInstance, staff: StaffRuntime) {
           ...params,
           ...body,
         }),
+    ),
+    grantAccountAccess: os.grantAccountAccess.handler(
+      async ({ context: { request }, input: { params, body } }) =>
+        await staff.service.accountGrant(
+          context(request.staffContext),
+          params.userId,
+          body.reason,
+        ),
+    ),
+    account: os.account.handler(
+      async ({ context: { request }, input: { params, query } }) =>
+        await staff.service.account(
+          context(request.staffContext),
+          params.userId,
+          query.grantId,
+        ),
     ),
   });
   registerContractRoutes(app, staffContract, router);

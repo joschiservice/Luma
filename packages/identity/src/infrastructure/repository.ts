@@ -13,6 +13,10 @@ import {
   isBuiltInRole,
   PermissionSet,
 } from '../domain/roles.js';
+import {
+  sessionActivityDue,
+  sessionActivityIntervalMs,
+} from '../domain/sessions.js';
 import type { MembershipRow } from './access.js';
 import { membershipFromRow, membershipSelect, storedRole } from './access.js';
 import type { AuthSettings } from './auth.js';
@@ -82,9 +86,15 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
         query: { disableCookieCache: true },
       });
 
-      return session
-        ? { userId: session.user.id, sessionId: session.session.id }
-        : null;
+      if (!session) return null;
+      if (sessionActivityDue(session.session.lastActiveAt, new Date()))
+        // The SQL condition keeps concurrent requests from writing more than once per interval.
+        await pool.query(
+          `UPDATE sessions SET last_active_at=now() WHERE id=$1 AND (last_active_at IS NULL OR last_active_at<=now()-make_interval(secs=>$2))`,
+          [session.session.id, sessionActivityIntervalMs / 1000],
+        );
+
+      return { userId: session.user.id, sessionId: session.session.id };
     },
     async withUser(userId, operation) {
       try {

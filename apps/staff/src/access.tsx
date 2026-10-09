@@ -23,7 +23,7 @@ import { z } from 'zod';
 import { staffApi } from './api';
 import { Failure } from './feedback';
 
-const reasonSchema = z
+export const reasonSchema = z
   .string()
   .trim()
   .min(10, 'Explain the support reason in at least 10 characters.')

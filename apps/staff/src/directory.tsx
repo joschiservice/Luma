@@ -1,6 +1,6 @@
 import { Alert, AlertDescription } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
-import { Button } from '@luma/ui/components/primitives/button';
+import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
 import { DataTable } from '@luma/ui/components/primitives/data-table';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { Field, FieldLabel } from '@luma/ui/components/primitives/field';
@@ -8,6 +8,7 @@ import { Input } from '@luma/ui/components/primitives/input';
 import { PageHeader } from '@luma/ui/components/workspace/page-header';
 import { useForm } from '@tanstack/react-form';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 
 import { AccessDialog } from './access';
@@ -27,6 +28,8 @@ export function DirectoryPage() {
     session.data?.permissions.includes('staff.directory.read') ?? false;
   const canInspect =
     session.data?.permissions.includes('staff.workspace.inspect') ?? false;
+  const canInspectAccounts =
+    session.data?.permissions.includes('staff.accounts.inspect') ?? false;
   const directory = useQuery({
     ...directoryOptions(query),
     enabled: canRead && query.length >= 3,
@@ -153,6 +156,26 @@ export function DirectoryPage() {
               columns={[
                 { key: 'name', header: 'Name', cell: (row) => row.name },
                 { key: 'email', header: 'Email', cell: (row) => row.email },
+                {
+                  key: 'account',
+                  header: 'Account',
+                  cell: (row) =>
+                    canInspectAccounts ? (
+                      <Link
+                        to="/accounts/$userId"
+                        params={{ userId: row.id }}
+                        className={buttonVariants({
+                          variant: 'outline',
+                          size: 'sm',
+                        })}
+                        aria-label={`Open account ${row.email}`}
+                      >
+                        Open account
+                      </Link>
+                    ) : (
+                      'No account permission'
+                    ),
+                },
               ]}
               empty={
                 <Empty>

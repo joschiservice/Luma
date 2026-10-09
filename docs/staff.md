@@ -1,7 +1,7 @@
 # Staff access
 
-The staff console provides customer account lookup, workspace inspection and controlled
-session revocation. Its identities, sessions and permissions are separate from customer
+The staff console provides customer account lookup, account and workspace inspection and
+controlled session revocation. Its identities, sessions and permissions are separate from customer
 workspace access. Customer Owners and Admins cannot grant staff privileges.
 
 ## Authentication and provisioning
@@ -56,8 +56,9 @@ Google sessions retain the verified subject from their sign-in. A session withou
 matching subject is rejected, including an old callback that finishes after rebinding.
 Sessions also recheck admission on every request. The administrator operation records
 its operator, reason and resulting grant atomically; the running
-staff credentials cannot perform it. Opening support grants
-requires both `staff.directory.read` and `staff.workspace.inspect`. Global customer
+staff credentials cannot perform it. Opening workspace support grants
+requires both `staff.directory.read` and `staff.workspace.inspect`; opening account grants
+requires `staff.directory.read` and `staff.accounts.inspect`. Global customer
 session revocation additionally requires `staff.sessions.revoke`.
 
 Configure Google's OAuth client as an internal Workspace application and register
@@ -79,13 +80,26 @@ Use `pnpm dev:staff` to run the staff surface against this checkout's database.
 ## Authority and evidence
 
 Staff permission keys belong to a separate catalog. Never add them to the customer catalog:
-its built-in Owner and Admin roles automatically receive every core permission.
+its built-in Owner and Admin roles automatically receive every core permission. The
+`staff_access` permission check lists the same keys, so a new key needs a migration that
+redefines it with the complete list.
 
 Directory access exposes bounded user/workspace metadata. Customer detail requires a
 workspace support grant with a reason, bound to the current staff identity and session,
 and valid for thirty minutes. Grants are checked again on every read and command. Database
 policies preserve workspace boundaries without inserting artificial customer memberships.
 Inspection can support suspended workspaces; it grants no commerce execution authority.
+
+Account detail requires an account support grant for one customer account, with the same
+reason, staff session binding and thirty-minute limit. It shows the person's workspaces and
+roles, whether two-factor authentication is on, how many passkeys are registered, and active
+sessions with their IP address, approximate browser and operating system, and last activity.
+It never returns credentials, factor secrets or passkey credential IDs. An account grant opens
+no workspace: workspace detail and session revocation still need a workspace grant. Restricted
+views expose only the listed columns, and only under a current account grant. Opening a grant
+is audited as `account.access.opened` and each read as `account.inspected`. IP addresses and
+user agents come from the customer's requests; treat them as hints, not proof of device or
+location.
 
 Staff sessions have an eight-hour absolute lifetime and a thirty-minute idle limit.
 Passive polling does not extend the idle deadline. Only browser interaction reported on

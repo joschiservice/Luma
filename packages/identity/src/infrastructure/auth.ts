@@ -66,7 +66,18 @@ export function createAuth(
     database: drizzleAdapter(db, { provider: 'pg', schema, transaction: true }),
     emailAndPassword: { enabled: true, minPasswordLength: 12 },
     account: { accountLinking: { enabled: false } },
-    session: { cookieCache: { enabled: false } },
+    session: {
+      cookieCache: { enabled: false },
+      // Session resolution advances this at a bounded rate; see sessionActivityDue.
+      additionalFields: {
+        lastActiveAt: {
+          type: 'date',
+          required: false,
+          input: false,
+          defaultValue: () => new Date(),
+        },
+      },
+    },
     hooks: { before: rejectedFactorOptions },
     advanced: {
       ...(settings.cookiePrefix ? { cookiePrefix: settings.cookiePrefix } : {}),

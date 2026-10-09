@@ -15,6 +15,12 @@ function fixture(mode: 'local' | 'google' = 'local') {
     users: [],
     workspaces: [],
   }));
+  const accountGrant = vi.fn(async () => {
+    throw new Error('Unused');
+  });
+  const account = vi.fn(async () => {
+    throw new Error('Unused');
+  });
   const staff: StaffRuntime = {
     settings: { publicOrigin: origin, mode },
     service: {
@@ -28,6 +34,8 @@ function fixture(mode: 'local' | 'google' = 'local') {
       revoke: async () => {
         throw new Error('Unused');
       },
+      accountGrant,
+      account,
     },
     authHandler: vi.fn(
       async () =>
@@ -67,7 +75,7 @@ function fixture(mode: 'local' | 'google' = 'local') {
   const app = Fastify();
   registerStaffHttp(app, staff);
 
-  return { app, staff, directory };
+  return { app, staff, directory, accountGrant, account };
 }
 
 describe('staff HTTP security boundary', () => {
@@ -144,6 +152,34 @@ describe('staff HTTP security boundary', () => {
         ).statusCode,
       ).toBe(403);
       expect(directory).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+    }
+  });
+  it('requires account inspection permission before account access or reads', async () => {
+    const { app, accountGrant, account } = fixture();
+    const userId = '6f1f8f5e-6b8a-4c1b-9d55-2f0f6a1b7c3d';
+    try {
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url: `/v1/staff/accounts/${userId}/access`,
+            headers: { cookie: 'staff', origin },
+            payload: { reason: 'Investigating a sign-in ticket' },
+          })
+        ).statusCode,
+      ).toBe(403);
+      expect(
+        (
+          await app.inject({
+            url: `/v1/staff/accounts/${userId}?grantId=${userId}`,
+            headers: { cookie: 'staff' },
+          })
+        ).statusCode,
+      ).toBe(403);
+      expect(accountGrant).not.toHaveBeenCalled();
+      expect(account).not.toHaveBeenCalled();
     } finally {
       await app.close();
     }

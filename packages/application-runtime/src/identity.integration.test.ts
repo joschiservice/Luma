@@ -1,5 +1,5 @@
 import { createHmac, randomUUID } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 
 import { buildRuntimeApp } from '@luma/application-runtime';
 import { Pool } from 'pg';
@@ -109,41 +109,23 @@ describe.skipIf(!databaseUrl)(
         await roleSetup.query(
           "SELECT pg_advisory_lock(hashtext('luma_test_role_setup'))",
         );
-        for (const migration of [
-          '0001_identity.sql',
-          '0004_connector_installations.sql',
-        ])
-          await owner.query(
-            await readFile(
-              new URL(`../migrations/${migration}`, import.meta.url),
-              'utf8',
-            ),
-          );
+        // Session and security tables depend on later migrations, so apply the full history.
+        for (const migration of (
+          await readdir(new URL('../migrations/', import.meta.url))
+        ).sort())
+          if (migration.endsWith('.sql'))
+            await owner.query(
+              await readFile(
+                new URL(`../migrations/${migration}`, import.meta.url),
+                'utf8',
+              ),
+            );
       } finally {
         await roleSetup.query(
           "SELECT pg_advisory_unlock(hashtext('luma_test_role_setup'))",
         );
         roleSetup.release();
       }
-      await owner.query(
-        await readFile(
-          new URL('../migrations/0023_workspace_settings.sql', import.meta.url),
-          'utf8',
-        ),
-      );
-      // Roles list app permissions, so app installations are part of identity's schema here.
-      for (const migration of [
-        '0024_workspace_apps.sql',
-        '0052_authentication_factors.sql',
-        '0054_workspace_roles.sql',
-        '0055_workspace_app_scopes.sql',
-      ])
-        await owner.query(
-          await readFile(
-            new URL(`../migrations/${migration}`, import.meta.url),
-            'utf8',
-          ),
-        );
       await admin.query(
         `CREATE ROLE "${login}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
       );
@@ -275,6 +257,49 @@ describe.skipIf(!databaseUrl)(
           })
         ).statusCode,
       ).toBe(404);
+    });
+    it('records session activity at most once per five minutes', async () => {
+      // The signed cookie value is "<token>.<signature>".
+      const token = decodeURIComponent(
+        bob.cookie.match(/session_token=([^;]+)/)![1]!,
+      ).split('.')[0];
+      const session = await owner.query<{ id: string; last_active_at: Date }>(
+        'SELECT id,last_active_at FROM sessions WHERE token=$1',
+        [token],
+      );
+      const { id, last_active_at: created } = session.rows[0]!;
+      expect(created).toBeInstanceOf(Date);
+      const lastActive = async () =>
+        (
+          await owner.query<{ last_active_at: Date }>(
+            'SELECT last_active_at FROM sessions WHERE id=$1',
+            [id],
+          )
+        ).rows[0]!.last_active_at.getTime();
+      const read = async () =>
+        expect(
+          (
+            await app.inject({
+              url: '/v1/organizations',
+              headers: headers(bob.cookie),
+            })
+          ).statusCode,
+        ).toBe(200);
+      const recent = new Date(Date.now() - 4 * 60_000);
+      await owner.query('UPDATE sessions SET last_active_at=$1 WHERE id=$2', [
+        recent,
+        id,
+      ]);
+      await read();
+      await read();
+      expect(await lastActive()).toBe(recent.getTime());
+      const stale = new Date(Date.now() - 6 * 60_000);
+      await owner.query('UPDATE sessions SET last_active_at=$1 WHERE id=$2', [
+        stale,
+        id,
+      ]);
+      await read();
+      expect(await lastActive()).toBeGreaterThan(Date.now() - 60_000);
     });
     it('rejects missing, forged and foreign sessions without exposing tenant existence', async () => {
       for (const cookie of ['', 'better-auth.session_token=forged']) {
