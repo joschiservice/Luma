@@ -51,7 +51,7 @@ const text = (value: string | null | undefined, max = 512) => {
   return trimmed && trimmed.length <= max ? trimmed : null;
 };
 
-const record = z.record(z.unknown());
+const record = z.record(z.string(), z.unknown());
 
 const statusFrom = <T extends string>(
   mapping: Record<string, T>,
@@ -331,10 +331,7 @@ export function createShopifyConnector(
         }
         const payloads: unknown[] = [];
         // Parse before capture so unexpected fields, customer details and provider errors cannot enter evidence.
-        const capture = <T>(
-          schema: z.ZodType<T, z.ZodTypeDef, unknown>,
-          value: unknown,
-        ): T => {
+        const capture = <T>(schema: z.ZodType<T>, value: unknown): T => {
           const parsed = parse(schema, value);
           if (options.rawRetentionMs !== undefined) payloads.push(parsed);
 
@@ -386,7 +383,7 @@ export function createShopifyConnector(
           externalId: string,
           type: string,
           fields: string,
-          schema: z.ZodType<T, z.ZodTypeDef, unknown>,
+          schema: z.ZodType<T>,
         ): Promise<T> {
           const cached = nested.get(externalId);
           // Overflow pages may cache an ID-only reference; fetch its full selection.
@@ -406,7 +403,7 @@ export function createShopifyConnector(
           type: string,
           field: string,
           fields: string,
-          schema: z.ZodType<T, z.ZodTypeDef, unknown>,
+          schema: z.ZodType<T>,
         ): Promise<T[]> {
           const result: T[] = [];
           let cursor: string | null = null;

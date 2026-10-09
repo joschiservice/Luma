@@ -10,6 +10,7 @@ const refs = z.array(z.string().uuid()).min(1).max(100);
 
 const fields = z
   .record(
+    z.string(),
     z.union([z.string().max(1000), z.number().finite(), z.boolean(), z.null()]),
   )
   .refine((value) => Object.keys(value).length <= 50);

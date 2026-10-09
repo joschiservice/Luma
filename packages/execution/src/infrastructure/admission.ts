@@ -43,6 +43,7 @@ const artifactSchema = z
       .strict(),
     steps: z
       .record(
+        z.string(),
         z
           .object({
             capability: text,

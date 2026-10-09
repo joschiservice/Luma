@@ -72,7 +72,7 @@ export function createSimulationTransport(input: unknown): SimulationTransport {
         b.tenantId === connection.tenantId && b.connectionId === connection.id,
     );
     if (!binding) return undefined;
-    const target = z.record(z.unknown()).parse(binding.target);
+    const target = z.record(z.string(), z.unknown()).parse(binding.target);
     if (
       JSON.stringify(Object.entries(target).sort()) !==
         JSON.stringify(Object.entries(connection.target).sort()) ||
@@ -109,7 +109,7 @@ export function createSimulationTransport(input: unknown): SimulationTransport {
       const result = z
         .object({
           status: z.number().int().min(200).max(599),
-          headers: z.record(z.string()),
+          headers: z.record(z.string(), z.string()),
           body: z.unknown(),
           // Raw bytes for simulated malformed responses.
           bodyText: z.string().optional(),

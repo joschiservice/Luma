@@ -40,7 +40,10 @@ const link = z.object({
 export const recordRow = z.object({
   id: z.string(),
   sourceUpdatedAt: z.string().datetime({ offset: true }).nullable(),
-  fields: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])),
+  fields: z.record(
+    z.string(),
+    z.union([z.string(), z.number(), z.boolean(), z.null()]),
+  ),
   links: z.array(link),
 });
 

@@ -7,7 +7,7 @@ import { Button } from '@luma/ui/components/primitives/button';
 import { Select } from '@luma/ui/components/primitives/select';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { useEffect, useRef, useState } from 'react';
-import { z } from 'zod/v3';
+import { z } from 'zod';
 
 import {
   type RecoveryBlockerReason,

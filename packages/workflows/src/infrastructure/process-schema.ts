@@ -1,4 +1,4 @@
-import { z, type ZodIssue } from 'zod';
+import { z } from 'zod';
 
 import { codeOwnedSteps } from '../domain/code-grants.js';
 import { codeRuntime, type CodeStep } from '../domain/code-step.js';
@@ -340,8 +340,22 @@ const labels: Record<string, string> = {
   steps: 'Steps',
 };
 
+/** Returns the raw input value at a schema issue path, or undefined when the path is absent. */
+function valueAt(input: unknown, path: readonly PropertyKey[]): unknown {
+  let current = input;
+  for (const part of path) {
+    if (current === null || typeof current !== 'object') return undefined;
+    current = (current as Record<PropertyKey, unknown>)[part];
+  }
+
+  return current;
+}
+
 /** Converts a schema issue into a plain-language diagnostic on the step and field it names. */
-function issueDiagnostic(issue: ZodIssue, input: unknown): WorkflowDiagnostic {
+function issueDiagnostic(
+  issue: z.core.$ZodIssue,
+  input: unknown,
+): WorkflowDiagnostic {
   const path = issue.path.map(String);
   const stepIndex =
     path[0] === 'steps' && path.length > 1 ? Number(path[1]) : null;
@@ -360,38 +374,38 @@ function issueDiagnostic(issue: ZodIssue, input: unknown): WorkflowDiagnostic {
   const label = name ? labels[name]! : 'This value';
   const last = path.at(-1) ?? '';
   let message: string;
-  if (issue.code === 'invalid_type' && issue.received === 'undefined')
+  if (issue.code === 'invalid_type' && valueAt(input, issue.path) === undefined)
     message = `${label} is required.`;
-  else if (issue.code === 'invalid_union_discriminator')
+  else if (issue.code === 'invalid_union' && issue.discriminator !== undefined)
     message =
       last === 'kind'
         ? 'Choose a supported step type.'
         : `Choose a ${label.toLowerCase()}.`;
-  else if (issue.code === 'invalid_enum_value')
-    message = `Choose one of: ${issue.options.join(', ')}.`;
+  else if (issue.code === 'invalid_value')
+    message = `Choose one of: ${issue.values.join(', ')}.`;
   else if (issue.code === 'unrecognized_keys')
     message = `Remove unsupported settings: ${issue.keys.join(', ')}.`;
   else if (issue.code === 'too_small')
     message =
-      issue.type === 'string'
+      issue.origin === 'string'
         ? `${label} can't be empty.`
-        : issue.type === 'array'
+        : issue.origin === 'array'
           ? last === 'steps' || path.length === 1
             ? `Add at least ${issue.minimum} steps.`
             : `${label} needs at least ${issue.minimum} entries.`
           : `${label} must be at least ${issue.minimum}.`;
   else if (issue.code === 'too_big')
     message =
-      issue.type === 'string'
+      issue.origin === 'string'
         ? `${label} is too long.`
-        : issue.type === 'array'
+        : issue.origin === 'array'
           ? `${label} can have at most ${issue.maximum} entries.`
           : `${label} must be at most ${issue.maximum}.`;
-  else if (issue.code === 'invalid_string' && last === 'version')
+  else if (issue.code === 'invalid_format' && last === 'version')
     message = 'Use a version such as 1.0.0.';
-  else if (issue.code === 'invalid_string' && issue.validation === 'datetime')
+  else if (issue.code === 'invalid_format' && issue.format === 'datetime')
     message = 'Enter a valid date and time.';
-  else if (issue.code === 'invalid_string')
+  else if (issue.code === 'invalid_format')
     message =
       'Start with a lowercase letter and use only letters, numbers, - or _.';
   else if (issue.code === 'custom') message = issue.message;

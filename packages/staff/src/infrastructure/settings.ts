@@ -87,7 +87,7 @@ const settingsSchema = z
     publicOrigin: z.string().url(),
     mode: z.enum(['local', 'google']),
     host: z.string(),
-    port: z.coerce.number().int().min(1).max(65535),
+    port: z.coerce.number<number>().int().min(1).max(65535),
     cookiePrefix: z
       .string()
       .min(1)

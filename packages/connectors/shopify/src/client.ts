@@ -123,7 +123,7 @@ export function createClient(options: ShopifyTransportOptions): {
     }
     const envelope = parse(
       z.object({
-        data: z.record(z.unknown()).nullable().optional(),
+        data: z.record(z.string(), z.unknown()).nullable().optional(),
         errors: z
           .array(
             z.object({

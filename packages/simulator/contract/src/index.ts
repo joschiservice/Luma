@@ -33,7 +33,7 @@ export const chaosProfileSchema = z.object({
   preset: z.string().max(64),
   transport: z.object({
     errorRate: rate,
-    mix: z.record(transportFaultSchema, z.number().min(0).max(1000)),
+    mix: z.partialRecord(transportFaultSchema, z.number().min(0).max(1000)),
     latency,
     responseLossRate: rate,
     indexLagMs: z.number().int().min(0).max(3_600_000),
@@ -47,7 +47,7 @@ export const chaosProfileSchema = z.object({
         operation: z.string().max(80).optional(),
         errorRate: rate.optional(),
         mix: z
-          .record(transportFaultSchema, z.number().min(0).max(1000))
+          .partialRecord(transportFaultSchema, z.number().min(0).max(1000))
           .optional(),
         latency: latency.optional(),
       }),
@@ -83,7 +83,7 @@ export const chaosProfileSchema = z.object({
     reorderRate: rate,
     delay: latency,
   }),
-  incidents: z.record(incidentKindSchema, z.number().min(0).max(10_000)),
+  incidents: z.partialRecord(incidentKindSchema, z.number().min(0).max(10_000)),
 });
 
 export type ChaosProfileInput = z.infer<typeof chaosProfileSchema>;
@@ -146,7 +146,7 @@ export const controlSchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('command'),
     instance: name,
-    command: z.record(z.unknown()),
+    command: z.record(z.string(), z.unknown()),
   }),
   orderActionSchema,
   z.object({ action: z.literal('fault'), rule: faultRuleSchema }),

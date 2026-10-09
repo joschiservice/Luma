@@ -228,7 +228,7 @@ export async function readBulkHistory(options: {
     } catch {
       fail('invalid_response');
     }
-    const item = parse(z.record(z.unknown()), decoded);
+    const item = parse(z.record(z.string(), z.unknown()), decoded);
     const parent = item.__parentId;
     delete item.__parentId;
     if (parent === undefined) {

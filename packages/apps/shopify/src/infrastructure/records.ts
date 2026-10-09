@@ -159,7 +159,7 @@ export function createShopifyRecordReader(
     async function node<T>(
       type: string,
       fields: string,
-      schema: z.ZodType<T, z.ZodTypeDef, unknown>,
+      schema: z.ZodType<T>,
     ): Promise<T> {
       const data = await request(
         `query LumaRecord($id: ID!) { node(id: $id) { ... on ${type} { ${fields} } } }`,
@@ -222,7 +222,7 @@ export function createShopifyRecordReader(
     async function children<T>(
       field: string,
       fields: string,
-      schema: z.ZodType<T, z.ZodTypeDef, unknown>,
+      schema: z.ZodType<T>,
     ): Promise<T[]> {
       const values: T[] = [];
       let after: string | null = null;

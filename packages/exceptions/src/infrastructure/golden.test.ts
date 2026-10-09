@@ -56,7 +56,7 @@ const corpusSchema = z
           .object({
             id: z.string().min(1),
             exceptionClass: className,
-            input: z.record(z.unknown()),
+            input: z.record(z.string(), z.unknown()),
             expected: decision,
           })
           .strict(),

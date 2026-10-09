@@ -70,7 +70,7 @@ import { createWebhookDelivery } from './runtime/webhooks.js';
 const requestSchema = z.object({
   url: z.string().url(),
   method: z.enum(['GET', 'POST', 'PATCH', 'PUT', 'DELETE']),
-  headers: z.record(z.string()),
+  headers: z.record(z.string(), z.string()),
   body: z.string().nullable(),
 });
 
