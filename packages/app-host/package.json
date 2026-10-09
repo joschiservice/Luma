@@ -25,14 +25,13 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@luma/api-contract": "workspace:*",
     "@luma/connections": "workspace:*",
     "@luma/identity": "workspace:*",
-    "@luma/workflows": "workspace:*",
     "@luma/platform": "workspace:*",
-    "zod": "catalog:zod3",
-    "@luma/api-contract": "workspace:*",
-    "fastify": "catalog:",
-    "@ts-rest/fastify": "catalog:"
+    "@luma/workflows": "workspace:*",
+    "@orpc/server": "catalog:",
+    "fastify": "catalog:"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

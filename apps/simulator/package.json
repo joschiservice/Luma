@@ -22,6 +22,6 @@
     "@luma/simulator-shopify": "workspace:*",
     "fastify": "catalog:",
     "pg": "catalog:pg-8-20-0",
-    "zod": "catalog:zod3"
+    "zod": "catalog:"
   }
 }

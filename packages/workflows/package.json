@@ -32,10 +32,10 @@
     "@luma/identity": "workspace:*",
     "@luma/platform": "workspace:*",
     "@luma/policies": "workspace:*",
-    "@ts-rest/fastify": "catalog:",
+    "@orpc/server": "catalog:",
     "fastify": "catalog:",
-    "zod": "catalog:zod3",
-    "typescript": "catalog:typescript-5-9-3"
+    "typescript": "catalog:typescript-5-9-3",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

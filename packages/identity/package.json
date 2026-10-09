@@ -28,7 +28,10 @@
   "dependencies": {
     "@better-auth/passkey": "catalog:",
     "@luma/api-contract": "workspace:*",
-    "@ts-rest/fastify": "catalog:",
+    "@orpc/contract": "catalog:",
+    "@orpc/openapi": "catalog:",
+    "@orpc/server": "catalog:",
+    "@orpc/standard-server-fastify": "catalog:",
     "better-auth": "catalog:",
     "drizzle-orm": "0.45.2",
     "fastify": "catalog:",

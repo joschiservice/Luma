@@ -33,10 +33,10 @@
     "@luma/orders": "workspace:*",
     "@luma/platform": "workspace:*",
     "@luma/procurement": "workspace:*",
-    "@ts-rest/fastify": "catalog:",
+    "@luma/resolution": "workspace:*",
+    "@orpc/server": "catalog:",
     "fastify": "catalog:",
-    "zod": "catalog:zod3",
-    "@luma/resolution": "workspace:*"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

@@ -11,9 +11,12 @@
     "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput"
   },
   "dependencies": {
-    "@ts-rest/core": "3.52.1",
-    "@ts-rest/open-api": "3.52.1",
-    "zod": "catalog:zod3"
+    "@orpc/client": "catalog:",
+    "@orpc/contract": "catalog:",
+    "@orpc/openapi": "catalog:",
+    "@orpc/openapi-client": "catalog:",
+    "@orpc/zod": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*"

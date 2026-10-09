@@ -29,12 +29,12 @@
     "@luma/api-contract": "workspace:*",
     "@luma/identity": "workspace:*",
     "@luma/identity-provider": "workspace:*",
-    "@ts-rest/fastify": "catalog:",
+    "@orpc/server": "catalog:",
     "better-auth": "catalog:",
     "drizzle-orm": "0.45.2",
     "fastify": "catalog:",
     "pg": "catalog:pg-8-20-0",
-    "zod": "catalog:zod3"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

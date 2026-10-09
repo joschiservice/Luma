@@ -17,7 +17,7 @@
     "@tanstack/react-router": "^1.168.0",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "zod": "catalog:zod4"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

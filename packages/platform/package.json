@@ -41,7 +41,7 @@
     "@sentry/opentelemetry": "10.75.0",
     "pg": "catalog:pg-8-20-0",
     "posthog-node": "5.52.4",
-    "zod": "catalog:zod3"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",
