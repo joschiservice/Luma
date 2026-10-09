@@ -1,9 +1,10 @@
 import { apiContract } from '@luma/api-contract';
-import { initServer } from '@ts-rest/fastify';
+import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
 import type { RolesService } from '../application/roles.js';
 import { IdentityError } from '../domain/context.js';
+import type { HttpContext } from './contract-routes.js';
 
 /** Routes role reads and command-identified role changes through the roles service. */
 export function rolesRoutes(service?: RolesService) {
@@ -24,36 +25,38 @@ export function rolesRoutes(service?: RolesService) {
     return request.tenantContext;
   };
 
-  return initServer().router(apiContract.roles, {
-    list: async ({ request }) => ({
-      status: 200,
-      body: await use().list(context(request)),
-    }),
-    create: async ({ request, headers, body }) => ({
-      status: 201,
-      body: await use().create(context(request), headers['x-command-id'], body),
-    }),
-    update: async ({ request, params, headers, body }) => ({
-      status: 200,
-      body: await use().update(
-        context(request),
-        params.roleId,
-        headers['x-command-id'],
-        body,
-      ),
-    }),
-    archive: async ({ request, params, headers, body }) => ({
-      status: 200,
-      body: await use().archive(
-        context(request),
-        params.roleId,
-        headers['x-command-id'],
-        body,
-      ),
-    }),
-    history: async ({ request, params }) => ({
-      status: 200,
-      body: { items: await use().history(context(request), params.roleId) },
-    }),
+  const os = implement(apiContract.roles).$context<HttpContext>();
+
+  return os.router({
+    list: os.list.handler(async ({ context: { request } }) =>
+      use().list(context(request)),
+    ),
+    create: os.create.handler(
+      async ({ context: { request }, input: { headers, body } }) =>
+        use().create(context(request), headers['x-command-id'], body),
+    ),
+    update: os.update.handler(
+      async ({ context: { request }, input: { params, headers, body } }) =>
+        use().update(
+          context(request),
+          params.roleId,
+          headers['x-command-id'],
+          body,
+        ),
+    ),
+    archive: os.archive.handler(
+      async ({ context: { request }, input: { params, headers, body } }) =>
+        use().archive(
+          context(request),
+          params.roleId,
+          headers['x-command-id'],
+          body,
+        ),
+    ),
+    history: os.history.handler(
+      async ({ context: { request }, input: { params } }) => ({
+        items: await use().history(context(request), params.roleId),
+      }),
+    ),
   });
 }

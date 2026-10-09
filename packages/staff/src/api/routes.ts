@@ -1,5 +1,7 @@
 import { staffContract } from '@luma/api-contract/staff';
-import { initServer } from '@ts-rest/fastify';
+import type { HttpContext } from '@luma/identity/http';
+import { registerContractRoutes } from '@luma/identity/http';
+import { implement } from '@orpc/server';
 import { APIError } from 'better-auth/api';
 import type { FastifyInstance } from 'fastify';
 
@@ -13,7 +15,6 @@ declare module 'fastify' {
     staffUser?: { id: string; name: string; email: string };
   }
 }
-const server = initServer();
 const protectedRoutes = new Set([
   'GET /v1/staff/session',
   'GET /v1/staff/directory',
@@ -245,58 +246,52 @@ export function registerStaffHttp(app: FastifyInstance, staff: StaffRuntime) {
       return reply.send('');
     },
   });
-  const router = server.router(staffContract, {
-    config: async () => ({
-      status: 200 as const,
-      body: {
-        mode: staff.settings.mode,
-        providerId:
-          staff.settings.mode === 'google' ? ('google' as const) : null,
-      },
-    }),
-    session: async ({ request }) => {
+  const os = implement(staffContract).$context<HttpContext>();
+  const router = os.router({
+    config: os.config.handler(async () => ({
+      mode: staff.settings.mode,
+      providerId: staff.settings.mode === 'google' ? ('google' as const) : null,
+    })),
+    session: os.session.handler(async ({ context: { request } }) => {
       const staffContext = context(request.staffContext);
       if (!request.staffUser)
         throw new StaffError(401, 'Staff sign-in required.');
 
       return {
-        status: 200 as const,
-        body: {
-          user: request.staffUser,
-          permissions: staffContext.permissions,
-        },
+        user: request.staffUser,
+        permissions: staffContext.permissions,
       };
-    },
-    directory: async ({ request, query }) => ({
-      status: 200 as const,
-      body: await staff.service.directory(
-        context(request.staffContext),
-        query.query,
-      ),
     }),
-    grantAccess: async ({ request, params, body }) => ({
-      status: 201 as const,
-      body: await staff.service.grant(
-        context(request.staffContext),
-        params.workspaceId,
-        body.reason,
-      ),
-    }),
-    workspace: async ({ request, params, query }) => ({
-      status: 200 as const,
-      body: await staff.service.workspace(
-        context(request.staffContext),
-        params.workspaceId,
-        query.grantId,
-      ),
-    }),
-    revokeSessions: async ({ request, params, body }) => ({
-      status: 200 as const,
-      body: await staff.service.revoke(context(request.staffContext), {
-        ...params,
-        ...body,
-      }),
-    }),
+    directory: os.directory.handler(
+      async ({ context: { request }, input: { query } }) =>
+        await staff.service.directory(
+          context(request.staffContext),
+          query.query,
+        ),
+    ),
+    grantAccess: os.grantAccess.handler(
+      async ({ context: { request }, input: { params, body } }) =>
+        await staff.service.grant(
+          context(request.staffContext),
+          params.workspaceId,
+          body.reason,
+        ),
+    ),
+    workspace: os.workspace.handler(
+      async ({ context: { request }, input: { params, query } }) =>
+        await staff.service.workspace(
+          context(request.staffContext),
+          params.workspaceId,
+          query.grantId,
+        ),
+    ),
+    revokeSessions: os.revokeSessions.handler(
+      async ({ context: { request }, input: { params, body } }) =>
+        await staff.service.revoke(context(request.staffContext), {
+          ...params,
+          ...body,
+        }),
+    ),
   });
-  app.register(server.plugin(router), { responseValidation: true });
+  registerContractRoutes(app, staffContract, router);
 }

@@ -11,7 +11,8 @@ import {
   syncStreamSchema,
 } from '@luma/api-contract';
 import { IdentityError } from '@luma/identity';
-import { initServer } from '@ts-rest/fastify';
+import type { HttpContext } from '@luma/identity/http';
+import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
 import type { SyncService } from '../application/service.js';
@@ -31,84 +32,76 @@ export function syncRoutes(service?: SyncService) {
     return { context: request.tenantContext, service };
   }
 
-  return initServer().router(apiContract.sync, {
-    autoLinkRules: async ({ request }) => {
-      const s = use(request);
+  const os = implement(apiContract.sync).$context<HttpContext>();
 
-      return {
-        status: 200,
-        body: autoLinkRulesSchema.parse(
+  return os.router({
+    autoLinkRules: os.autoLinkRules.handler(
+      async ({ context: { request } }) => {
+        const s = use(request);
+
+        return autoLinkRulesSchema.parse(
           await s.service.autoLinkRules(s.context),
-        ),
-      };
-    },
-    previewAutoLinks: async ({ request, body }) => {
-      const s = use(request);
+        );
+      },
+    ),
+    previewAutoLinks: os.previewAutoLinks.handler(
+      async ({ context: { request }, input: { body } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: autoLinkPreviewSchema.parse(
+        return autoLinkPreviewSchema.parse(
           await s.service.previewAutoLinks(s.context, body),
-        ),
-      };
-    },
-    saveAutoLinkRule: async ({ request, body }) => {
-      const s = use(request);
+        );
+      },
+    ),
+    saveAutoLinkRule: os.saveAutoLinkRule.handler(
+      async ({ context: { request }, input: { body } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: autoLinkRuleSchema.parse(
+        return autoLinkRuleSchema.parse(
           await s.service.saveAutoLinkRule(s.context, body),
-        ),
-      };
-    },
-    overview: async ({ request }) => {
+        );
+      },
+    ),
+    overview: os.overview.handler(async ({ context: { request } }) => {
       const s = use(request);
 
-      return {
-        status: 200,
-        body: syncOverviewSchema.parse(await s.service.overview(s.context)),
-      };
-    },
-    command: async ({ request, params, body }) => {
-      const s = use(request);
+      return syncOverviewSchema.parse(await s.service.overview(s.context));
+    }),
+    command: os.command.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: syncStreamSchema.parse(
+        return syncStreamSchema.parse(
           await s.service.command(s.context, params.streamId, body.command),
-        ),
-      };
-    },
-    identity: async ({ request, params }) => {
-      const s = use(request);
+        );
+      },
+    ),
+    identity: os.identity.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: identityDetailSchema.parse(
+        return identityDetailSchema.parse(
           await s.service.identity(s.context, params.kind, params.entityId),
-        ),
-      };
-    },
-    requestLink: async ({ request, body }) => {
-      const s = use(request);
+        );
+      },
+    ),
+    requestLink: os.requestLink.handler(
+      async ({ context: { request }, input: { body } }) => {
+        const s = use(request);
 
-      return {
-        status: 202,
-        body: linkRequestSchema.parse(
+        return linkRequestSchema.parse(
           await s.service.requestLink(s.context, body),
-        ),
-      };
-    },
-    linkRequest: async ({ request, params }) => {
-      const s = use(request);
+        );
+      },
+    ),
+    linkRequest: os.linkRequest.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: linkRequestSchema.parse(
+        return linkRequestSchema.parse(
           await s.service.linkRequest(s.context, params.requestId),
-        ),
-      };
-    },
+        );
+      },
+    ),
   });
 }

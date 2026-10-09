@@ -6,31 +6,37 @@ import {
   returnListSchema,
 } from '@luma/api-contract';
 import { IdentityError } from '@luma/identity';
-import { initServer } from '@ts-rest/fastify';
+import type { HttpContext } from '@luma/identity/http';
+import { implement } from '@orpc/server';
 
 import type { ReturnWorkspace } from '../application/returns.js';
 
 /** Exposes the tenant's returns and refunds to readers with `returns.read`. */
 export function returnRoutes(service?: ReturnWorkspace) {
-  return initServer().router(apiContract.returns, {
-    list: async ({ request, query }) => {
-      if (!request.tenantContext)
-        throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
-      if (!service)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Returns are unavailable',
-        );
+  const os = implement(apiContract.returns).$context<HttpContext>();
 
-      return {
-        status: 200,
-        body: returnListSchema.parse(
+  return os.router({
+    list: os.list.handler(
+      async ({ context: { request }, input: { query } }) => {
+        if (!request.tenantContext)
+          throw new IdentityError(
+            401,
+            'UNAUTHENTICATED',
+            'Sign in to continue',
+          );
+        if (!service)
+          throw new IdentityError(
+            503,
+            'SERVICE_UNAVAILABLE',
+            'Returns are unavailable',
+          );
+
+        return returnListSchema.parse(
           await service.list(request.tenantContext, query),
-        ),
-      };
-    },
-    get: async ({ request, params }) => {
+        );
+      },
+    ),
+    get: os.get.handler(async ({ context: { request }, input: { params } }) => {
       if (!request.tenantContext)
         throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
       if (!service)
@@ -43,7 +49,7 @@ export function returnRoutes(service?: ReturnWorkspace) {
       if (!detail)
         throw new IdentityError(404, 'NOT_FOUND', 'Return not found');
 
-      return { status: 200, body: returnDetailSchema.parse(detail) };
-    },
+      return returnDetailSchema.parse(detail);
+    }),
   });
 }

@@ -7,7 +7,8 @@ import {
   caseListSchema,
 } from '@luma/api-contract';
 import { IdentityError } from '@luma/identity';
-import { initServer } from '@ts-rest/fastify';
+import type { HttpContext } from '@luma/identity/http';
+import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
 import type { CaseService } from '../application/cases.js';
@@ -27,28 +28,31 @@ export function caseRoutes(service?: CaseService) {
     return { context: request.tenantContext, service };
   }
 
-  return initServer().router(apiContract.exceptions, {
-    list: async ({ request, query }) => {
-      const { context, service } = use(request);
+  const os = implement(apiContract.exceptions).$context<HttpContext>();
 
-      return {
-        status: 200,
-        body: caseListSchema.parse(await service.list(context, query)),
-      };
-    },
-    evidence: async ({ request, params, query }) => {
-      const { context, service } = use(request);
-      const body = await service.evidence(context, params.exceptionId, query);
-      if (!body) throw new IdentityError(404, 'NOT_FOUND', 'Case not found');
+  return os.router({
+    list: os.list.handler(
+      async ({ context: { request }, input: { query } }) => {
+        const { context, service } = use(request);
 
-      return { status: 200, body: caseEvidencePageSchema.parse(body) };
-    },
-    get: async ({ request, params }) => {
+        return caseListSchema.parse(await service.list(context, query));
+      },
+    ),
+    evidence: os.evidence.handler(
+      async ({ context: { request }, input: { params, query } }) => {
+        const { context, service } = use(request);
+        const body = await service.evidence(context, params.exceptionId, query);
+        if (!body) throw new IdentityError(404, 'NOT_FOUND', 'Case not found');
+
+        return caseEvidencePageSchema.parse(body);
+      },
+    ),
+    get: os.get.handler(async ({ context: { request }, input: { params } }) => {
       const { context, service } = use(request);
       const body = await service.get(context, params.exceptionId);
       if (!body) throw new IdentityError(404, 'NOT_FOUND', 'Case not found');
 
-      return { status: 200, body: caseDetailSchema.parse(body) };
-    },
+      return caseDetailSchema.parse(body);
+    }),
   });
 }

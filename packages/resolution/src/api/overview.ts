@@ -7,7 +7,8 @@ import {
   operationsOverviewSchema,
 } from '@luma/api-contract';
 import { IdentityError } from '@luma/identity';
-import { initServer } from '@ts-rest/fastify';
+import type { HttpContext } from '@luma/identity/http';
+import { implement } from '@orpc/server';
 
 import type { OperationsOverviewService } from '../application/overview.js';
 
@@ -16,65 +17,76 @@ export function operationsRoutes(
   service?: OperationsOverviewService,
   measurements?: import('../application/measurement.js').MeasurementService,
 ) {
-  return initServer().router(apiContract.operations, {
-    recordMeasurement: async ({ request, params, body }) => {
-      if (!request.tenantContext)
-        throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
-      if (!measurements)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Measurements are unavailable',
-        );
+  const os = implement(apiContract.operations).$context<HttpContext>();
 
-      return {
-        status: 200,
-        body: measurementEventSchema.parse(
+  return os.router({
+    recordMeasurement: os.recordMeasurement.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        if (!request.tenantContext)
+          throw new IdentityError(
+            401,
+            'UNAUTHENTICATED',
+            'Sign in to continue',
+          );
+        if (!measurements)
+          throw new IdentityError(
+            503,
+            'SERVICE_UNAVAILABLE',
+            'Measurements are unavailable',
+          );
+
+        return measurementEventSchema.parse(
           await measurements.append(
             request.tenantContext,
             params.exceptionId,
             body,
           ),
-        ),
-      };
-    },
-    measurementHistory: async ({ request, params, query }) => {
-      if (!request.tenantContext)
-        throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
-      if (!measurements)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Measurements are unavailable',
         );
+      },
+    ),
+    measurementHistory: os.measurementHistory.handler(
+      async ({ context: { request }, input: { params, query } }) => {
+        if (!request.tenantContext)
+          throw new IdentityError(
+            401,
+            'UNAUTHENTICATED',
+            'Sign in to continue',
+          );
+        if (!measurements)
+          throw new IdentityError(
+            503,
+            'SERVICE_UNAVAILABLE',
+            'Measurements are unavailable',
+          );
 
-      return {
-        status: 200,
-        body: measurementHistorySchema.parse(
+        return measurementHistorySchema.parse(
           await measurements.history(
             request.tenantContext,
             params.exceptionId,
             query.after,
           ),
-        ),
-      };
-    },
-    overview: async ({ request, query }) => {
-      if (!request.tenantContext)
-        throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
-      if (!service)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Operations overview is unavailable',
         );
+      },
+    ),
+    overview: os.overview.handler(
+      async ({ context: { request }, input: { query } }) => {
+        if (!request.tenantContext)
+          throw new IdentityError(
+            401,
+            'UNAUTHENTICATED',
+            'Sign in to continue',
+          );
+        if (!service)
+          throw new IdentityError(
+            503,
+            'SERVICE_UNAVAILABLE',
+            'Operations overview is unavailable',
+          );
 
-      return {
-        status: 200,
-        body: operationsOverviewSchema.parse(
+        return operationsOverviewSchema.parse(
           await service(request.tenantContext, query.window),
-        ),
-      };
-    },
+        );
+      },
+    ),
   });
 }

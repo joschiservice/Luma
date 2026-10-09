@@ -1,5 +1,4 @@
 import { apiContract } from '@luma/api-contract';
-import { initServer } from '@ts-rest/fastify';
 import type { FastifyInstance } from 'fastify';
 import Fastify from 'fastify';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -13,6 +12,7 @@ import type { Membership, Organization } from '../domain/context.js';
 import { IdentityError } from '../domain/context.js';
 import type { BuiltInRoleKey } from '../domain/roles.js';
 import { builtInReference, PermissionSet } from '../domain/roles.js';
+import { registerContractRoutes } from './contract-routes.js';
 import { identityRoutes, registerIdentityGuards } from './routes.js';
 
 const organization: Organization = {
@@ -121,13 +121,7 @@ function fixture() {
       return reply.status(error.statusCode).send({ code: error.code });
     throw error;
   });
-  app.register(async (router) => {
-    initServer().registerRouter(
-      apiContract.identity,
-      identityRoutes(service),
-      router,
-    );
-  });
+  registerContractRoutes(app, apiContract.identity, identityRoutes(service));
 
   return { app, tx, getSession, service };
 }

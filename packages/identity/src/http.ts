@@ -3,6 +3,10 @@ import type { FastifyInstance } from 'fastify';
 import { registerAuthHandler } from './api/auth-handler.js';
 import type { createIdentity } from './composition.js';
 
+export { registerContractRoutes } from './api/contract-routes.js';
+
+export type { HttpContext } from './api/contract-routes.js';
+
 export { identityRoutes, registerIdentityGuards } from './api/routes.js';
 
 /** Registers authentication endpoints on the owning HTTP server. */

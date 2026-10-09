@@ -45,6 +45,9 @@ describe('HTTP foundation', () => {
       expect(response.statusCode).toBe(200);
       expect(response.json()).toEqual(body);
     }
+    const head = await app.inject({ method: 'HEAD', url: '/health' });
+    expect(head.statusCode).toBe(200);
+    expect(head.body).toBe('');
   });
 
   it('consumes a real HTTP server through the typed client', async () => {
@@ -59,27 +62,20 @@ describe('HTTP foundation', () => {
     );
     const baseUrl = await app.listen({ host: '127.0.0.1', port: 0 });
     const client = createApiClient({ baseUrl });
-    const response = await client.connectorProviders.get({
-      params: { providerId: 'shopify' },
+    expect(
+      await client.connectorProviders.get({
+        params: { providerId: 'shopify' },
+      }),
+    ).toEqual({ id: 'shopify', name: 'Shopify', category: 'storefront' });
+    expect(
+      await client.connectorProviders.list({ query: { category: 'erp' } }),
+    ).toEqual({ items: [{ id: 'jtl', name: 'JTL', category: 'erp' }] });
+    await expect(
+      client.connectorProviders.get({ params: { providerId: 'missing' } }),
+    ).rejects.toMatchObject({
+      status: 404,
+      body: { code: 'NOT_FOUND', message: 'Provider not found' },
     });
-    expect(response.status).toBe(200);
-    if (response.status !== 200) throw new Error('Expected provider');
-    expect(response.body).toEqual({
-      id: 'shopify',
-      name: 'Shopify',
-      category: 'storefront',
-    });
-    const list = await client.connectorProviders.list({
-      query: { category: 'erp' },
-    });
-    expect(list.body).toEqual({
-      items: [{ id: 'jtl', name: 'JTL', category: 'erp' }],
-    });
-    const missing = await client.connectorProviders.get({
-      params: { providerId: 'missing' },
-    });
-    expect(missing.status).toBe(404);
-    expect(apiErrorSchema.parse(missing.body).code).toBe('NOT_FOUND');
   });
 
   it.each([
@@ -542,13 +538,10 @@ describe('observability baseline', () => {
     try {
       const baseUrl = await app.listen({ host: '127.0.0.1', port: 0 });
       const actionId = randomUUID();
-      const response = await createApiClient({
-        baseUrl,
-      }).connectorProviders.get({
-        params: { providerId: 'shopify' },
-        extraHeaders: { 'x-luma-action-id': actionId },
-      });
-      expect(response.status).toBe(200);
+      await createApiClient({ baseUrl }).connectorProviders.get(
+        { params: { providerId: 'shopify' } },
+        { context: { headers: { 'x-luma-action-id': actionId } } },
+      );
       expect(posthog.capture).toHaveBeenCalledWith(
         expect.objectContaining({
           event: 'connector_provider_viewed',

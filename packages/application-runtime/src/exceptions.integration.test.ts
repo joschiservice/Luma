@@ -1,11 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 
-import {
-  caseDetailSchema,
-  caseEvidencePageSchema,
-  caseQuerySchema,
-} from '@luma/api-contract';
+import { caseDetailSchema, caseQuerySchema } from '@luma/api-contract';
 import { createApiClient } from '@luma/api-contract/client';
 import {
   buildApp,
@@ -1286,29 +1282,25 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       const client = createApiClient({ baseUrl });
       const params = { organizationId: tenantId, exceptionId: id };
       const first = await client.exceptions.evidence({ params, query: {} });
-      expect(first.status).toBe(200);
-      if (first.status !== 200) throw new Error('Expected evidence');
-      expect(first.body.items).toHaveLength(25);
-      expect(first.body.items.slice(0, 3).map((e) => e.completeness)).toEqual([
+      expect(first.items).toHaveLength(25);
+      expect(first.items.slice(0, 3).map((e) => e.completeness)).toEqual([
         'complete',
         'incomplete',
         'unknown',
       ]);
-      expect(first.body.items[0]).toMatchObject({
+      expect(first.items[0]).toMatchObject({
         id: 'evidence-000',
         sourceUpdatedAt: null,
         observedAt: corpus.now,
       });
-      expect(JSON.stringify(first.body)).not.toContain('not-public');
-      const items = [...first.body.items];
-      let cursor = first.body.nextCursor;
+      expect(JSON.stringify(first)).not.toContain('not-public');
+      const items = [...first.items];
+      let cursor = first.nextCursor;
       while (cursor) {
-        const response = await client.exceptions.evidence({
+        const page = await client.exceptions.evidence({
           params,
           query: { cursor },
         });
-        expect(response.status).toBe(200);
-        const page = caseEvidencePageSchema.parse(response.body);
         items.push(...page.items);
         cursor = page.nextCursor;
       }
@@ -1322,25 +1314,22 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         'later-observation',
       ]);
       expect(run).not.toHaveBeenCalled();
-      expect(
-        (await client.exceptions.evidence({ params, query: { limit: 100 } }))
-          .status,
-      ).toBe(200);
+      await client.exceptions.evidence({ params, query: { limit: 100 } });
       for (const query of [
         { limit: 101 },
         { limit: 0 },
         { cursor: 'bad' },
-        { cursor: first.body.nextCursor!, limit: 24 },
-        { cursor: first.body.nextCursor! + '=' },
+        { cursor: first.nextCursor!, limit: 24 },
+        { cursor: first.nextCursor! + '=' },
         {
           cursor: Buffer.from(
             JSON.stringify({ context: 'wrong', id: 'evidence-000' }),
           ).toString('base64url'),
         },
       ])
-        expect(
-          (await client.exceptions.evidence({ params, query })).status,
-        ).toBe(400);
+        await expect(
+          client.exceptions.evidence({ params, query }),
+        ).rejects.toMatchObject({ status: 400 });
       const other = request('other-case');
       if (other.input.exceptionClass !== 'sync_failure')
         throw new Error('Fixture');
@@ -1350,14 +1339,12 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       other.evidence[0]!.connectionId = otherConnection;
       const otherId = (await services.exceptions.ingest(context(), other))
         .incident!.id;
-      expect(
-        (
-          await client.exceptions.evidence({
-            params: { ...params, exceptionId: otherId },
-            query: { cursor: first.body.nextCursor! },
-          })
-        ).status,
-      ).toBe(400);
+      await expect(
+        client.exceptions.evidence({
+          params: { ...params, exceptionId: otherId },
+          query: { cursor: first.nextCursor! },
+        }),
+      ).rejects.toMatchObject({ status: 400 });
       const listCursor = (
         await services.cases.list(
           context(),
@@ -1365,14 +1352,9 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         )
       ).nextCursor;
       expect(listCursor).not.toBeNull();
-      expect(
-        (
-          await client.exceptions.evidence({
-            params,
-            query: { cursor: listCursor! },
-          })
-        ).status,
-      ).toBe(400);
+      await expect(
+        client.exceptions.evidence({ params, query: { cursor: listCursor! } }),
+      ).rejects.toMatchObject({ status: 400 });
 
       expect(
         await services.cases.evidence(context(otherTenant), id, { limit: 25 }),
@@ -1383,50 +1365,44 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
           request('foreign-evidence', otherTenant),
         )
       ).incident!.id;
-      const missing = await client.exceptions.evidence({
-        params: { ...params, exceptionId: randomUUID() },
-        query: {},
-      });
-      const foreign = await client.exceptions.evidence({
-        params: { ...params, exceptionId: foreignId },
-        query: {},
-      });
-      expect(missing.status).toBe(404);
-      expect(foreign.status).toBe(404);
-      expect(foreign.body).toMatchObject({
-        code: 'NOT_FOUND',
-        message: 'Case not found',
-      });
+      const notFound = {
+        status: 404,
+        body: { code: 'NOT_FOUND', message: 'Case not found' },
+      };
+      await expect(
+        client.exceptions.evidence({
+          params: { ...params, exceptionId: randomUUID() },
+          query: {},
+        }),
+      ).rejects.toMatchObject(notFound);
+      await expect(
+        client.exceptions.evidence({
+          params: { ...params, exceptionId: foreignId },
+          query: {},
+        }),
+      ).rejects.toMatchObject(notFound);
       resolveTenant.mockResolvedValueOnce(context(otherTenant));
-      expect(
-        (
-          await client.exceptions.evidence({
-            params: { organizationId: otherTenant, exceptionId: foreignId },
-            query: { cursor: first.body.nextCursor! },
-          })
-        ).status,
-      ).toBe(400);
+      await expect(
+        client.exceptions.evidence({
+          params: { organizationId: otherTenant, exceptionId: foreignId },
+          query: { cursor: first.nextCursor! },
+        }),
+      ).rejects.toMatchObject({ status: 400 });
       resolveTenant.mockRejectedValueOnce(
         new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue'),
       );
-      expect(
-        (
-          await client.exceptions.evidence({
-            params,
-            query: { cursor: first.body.nextCursor! },
-          })
-        ).status,
-      ).toBe(401);
+      await expect(
+        client.exceptions.evidence({
+          params,
+          query: { cursor: first.nextCursor! },
+        }),
+      ).rejects.toMatchObject({ status: 401 });
       resolveTenant.mockRejectedValueOnce(
         new IdentityError(404, 'NOT_FOUND', 'Organization not found'),
       );
-      const denied = await client.exceptions.evidence({ params, query: {} });
-      expect(denied.status).toBe(404);
-      for (const response of [missing, foreign, denied])
-        expect(response.body).toMatchObject({
-          code: 'NOT_FOUND',
-          message: 'Case not found',
-        });
+      await expect(
+        client.exceptions.evidence({ params, query: {} }),
+      ).rejects.toMatchObject(notFound);
     } finally {
       run.mockRestore();
       await app.close();
@@ -2081,25 +2057,16 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       const base = await app.listen({ host: '127.0.0.1', port: 0 });
       const client = createApiClient({
         baseUrl: base,
-        baseHeaders: { cookie: 'fixture=valid', origin: 'http://fixture.test' },
+        headers: { cookie: 'fixture=valid', origin: 'http://fixture.test' },
       });
       const params = { organizationId: tenantId, exceptionId: f.incident.id };
-      expect((await client.caseDesk.review({ params })).status).toBe(200);
-      expect(
-        (await client.caseDesk.decide({ params, body: f.command })).status,
-      ).toBe(200);
-      expect(
-        (
-          await client.caseDesk.receipt({
-            params: { ...params, commandId: f.command.commandId },
-          })
-        ).status,
-      ).toBe(200);
-      expect((await client.caseDesk.progress({ params })).status).toBe(200);
-      expect(
-        (await client.caseDesk.timeline({ params, query: { limit: 2 } }))
-          .status,
-      ).toBe(200);
+      await client.caseDesk.review({ params });
+      await client.caseDesk.decide({ params, body: f.command });
+      await client.caseDesk.receipt({
+        params: { ...params, commandId: f.command.commandId },
+      });
+      await client.caseDesk.progress({ params });
+      await client.caseDesk.timeline({ params, query: { limit: 2 } });
       const path = `${base}/v1/organizations/${tenantId}/exceptions/${f.incident.id}/events`;
       expect((await fetch(path)).status).toBe(401);
       expect(

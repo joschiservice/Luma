@@ -13,7 +13,8 @@ import {
 } from '@luma/api-contract';
 import type { IdentityService } from '@luma/identity';
 import { IdentityError } from '@luma/identity';
-import { initServer } from '@ts-rest/fastify';
+import type { HttpContext } from '@luma/identity/http';
+import { implement } from '@orpc/server';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 import type { DeskService } from '../application/desk.js';
@@ -36,72 +37,68 @@ function use(request: FastifyRequest, service?: DeskService) {
  * operator desk.
  */
 export function deskRoutes(service?: DeskService) {
-  return initServer().router(apiContract.caseDesk, {
-    review: async ({ request, params }) => {
-      const s = use(request, service);
+  const os = implement(apiContract.caseDesk).$context<HttpContext>();
 
-      return {
-        status: 200,
-        body: caseReviewSchema.parse(
+  return os.router({
+    review: os.review.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = use(request, service);
+
+        return caseReviewSchema.parse(
           await s.service.review(s.context, params.exceptionId),
-        ),
-      };
-    },
-    refresh: async ({ request, params }) => {
-      const s = use(request, service);
-      await s.service.refresh(s.context, params.exceptionId);
+        );
+      },
+    ),
+    refresh: os.refresh.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = use(request, service);
+        await s.service.refresh(s.context, params.exceptionId);
 
-      return {
-        status: 200,
-        body: caseReviewSchema.parse(
+        return caseReviewSchema.parse(
           await s.service.review(s.context, params.exceptionId),
-        ),
-      };
-    },
-    decide: async ({ request, params, body }) => {
-      const s = use(request, service);
+        );
+      },
+    ),
+    decide: os.decide.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = use(request, service);
 
-      return {
-        status: 200,
-        body: decisionReceiptSchema.parse(
+        return decisionReceiptSchema.parse(
           await s.service.decide(s.context, params.exceptionId, body),
-        ),
-      };
-    },
-    receipt: async ({ request, params }) => {
-      const s = use(request, service);
+        );
+      },
+    ),
+    receipt: os.receipt.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = use(request, service);
 
-      return {
-        status: 200,
-        body: decisionReceiptSchema.parse(
+        return decisionReceiptSchema.parse(
           await s.service.receipt(
             s.context,
             params.exceptionId,
             params.commandId,
           ),
-        ),
-      };
-    },
-    progress: async ({ request, params }) => {
-      const s = use(request, service);
+        );
+      },
+    ),
+    progress: os.progress.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = use(request, service);
 
-      return {
-        status: 200,
-        body: caseProgressSchema.parse(
+        return caseProgressSchema.parse(
           await s.service.progress(s.context, params.exceptionId),
-        ),
-      };
-    },
-    timeline: async ({ request, params, query }) => {
-      const s = use(request, service);
+        );
+      },
+    ),
+    timeline: os.timeline.handler(
+      async ({ context: { request }, input: { params, query } }) => {
+        const s = use(request, service);
 
-      return {
-        status: 200,
-        body: caseTimelineSchema.parse(
+        return caseTimelineSchema.parse(
           await s.service.timeline(s.context, params.exceptionId, query),
-        ),
-      };
-    },
+        );
+      },
+    ),
   });
 }
 
