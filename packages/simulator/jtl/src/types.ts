@@ -89,6 +89,8 @@ export type JtlCommand =
     }
   | { kind: 'paid'; id: string }
   | { kind: 'cancel'; id: string }
+  /** Deletes a customer; their sales orders keep the customer ID. */
+  | { kind: 'delete-customer'; id: string }
   | {
       kind: 'ship';
       id: string;
@@ -135,7 +137,8 @@ export interface SupplierEvent {
 export interface JtlCommandResult {
   /**
    * The record the command created or changed: the sales order, the delivery note for `ship`,
-   * the purchase order, the item for `stock`, the supplier, or `catalog` for `seed-catalog`.
+   * the purchase order, the item for `stock`, the supplier, the deleted customer, or `catalog`
+   * for `seed-catalog`.
    */
   id: string;
   /**

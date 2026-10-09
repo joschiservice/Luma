@@ -112,6 +112,7 @@ export const shopifyCommandSchema = z.discriminatedUnion('kind', [
 export const jtlCommandSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('paid'), id }),
   z.object({ kind: z.literal('cancel'), id }),
+  z.object({ kind: z.literal('delete-customer'), id }),
   z.object({
     kind: z.literal('ship'),
     id,

@@ -290,6 +290,14 @@ describe('JTL ERP API', () => {
     expect(
       (await call(context, 'customers?lastChangedAfter=yesterday')).status,
     ).toBe(400);
+    // A deleted customer leaves customer reads; their orders keep the customer ID.
+    await jtl.command(context, { kind: 'delete-customer', id: '1' });
+    const remaining = (await call(context, 'customers')).body as Page;
+    expect(remaining.items.map((item) => item.id)).toEqual([2]);
+    expect(await customerOf(first.id)).toBe(1);
+    await expect(
+      jtl.command(context, { kind: 'delete-customer', id: '1' }),
+    ).rejects.toMatchObject({ status: 404 });
   });
 
   it('names operations and resources for fault targeting', () => {

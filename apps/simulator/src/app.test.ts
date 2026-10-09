@@ -322,13 +322,13 @@ describe.skipIf(!adminUrl)('simulator host', () => {
         action: 'order',
         lines: [{ sku: 'LUMA-001', quantity: 1 }],
       });
-      for (let attempt = 0; attempt < 60 && deliveries.length < 4; attempt++)
+      // The order's new customer is delivered too, under its own topic.
+      const created = () =>
+        deliveries.filter((delivery) => delivery.topic === 'orders/create');
+      for (let attempt = 0; attempt < 60 && created().length < 2; attempt++)
         await delay(100);
-      const created = deliveries.filter(
-        (delivery) => delivery.topic === 'orders/create',
-      );
-      expect(created).toHaveLength(2);
-      expect(created[0]!.event).toBe(created[1]!.event);
+      expect(created()).toHaveLength(2);
+      expect(created()[0]!.event).toBe(created()[1]!.event);
       expect(deliveries.every((delivery) => delivery.valid)).toBe(true);
     } finally {
       server.close();

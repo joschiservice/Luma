@@ -247,8 +247,7 @@ export async function placeOrder(
     incidents.includes('fraud-hold') || fraudCheck
       ? ['HIGH_RISK_OF_FRAUD' as const]
       : [];
-  const buyer =
-    profile.name === 'test' ? null : await customerFor(world, shopName, random);
+  const buyer = await customerFor(world, shopName, random);
   const result = await shop(world, shopName, {
     kind: 'order',
     ...(options.id ? { id: options.id } : {}),

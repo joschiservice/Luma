@@ -69,6 +69,19 @@ export async function customerFor(
   return id;
 }
 
+/**
+ * Deletes a customer as a merchant does in JTL-Wawi; the customer disappears from customer reads.
+ * Sales orders keep their customer ID, and a later order with the same email address creates a
+ * new customer.
+ */
+export async function deleteCustomer(context: JtlContext, id: string) {
+  if (!(await context.store.get<CustomerRecord>(kinds.customer, id)))
+    refuse('Customer not found', 404);
+  await context.store.delete(kinds.customer, id);
+
+  return { id };
+}
+
 /** Serializes a customer overview row in ERP API 2.2 field names. */
 export function customerJson(customer: CustomerRecord) {
   return {

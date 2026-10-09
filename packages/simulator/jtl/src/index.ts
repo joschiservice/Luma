@@ -1,6 +1,7 @@
 import type { ProviderSimulator } from '@luma/simulator-core';
 
 import { seedCatalog } from './catalog.js';
+import { deleteCustomer } from './customers.js';
 import { drift, handle, identify, rateLimit, unauthorized } from './http.js';
 import {
   cancelOrder,
@@ -51,6 +52,8 @@ async function command(
       return markPaid(context, value.id);
     case 'cancel':
       return cancelOrder(context, value.id);
+    case 'delete-customer':
+      return deleteCustomer(context, value.id);
     case 'ship':
       return shipOrder(context, value);
     case 'stock':
