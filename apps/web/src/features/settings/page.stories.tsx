@@ -262,7 +262,9 @@ export const LargeTeam: Story = {
     await expect(pages).toHaveTextContent('Page 1 of 3');
     await userEvent.click(within(pages).getByRole('button', { name: 'Next' }));
     await waitFor(() => expect(pages).toHaveTextContent('26–50 of 60 people'));
-    await expect(canvas.getByText('Teammate 22')).toBeVisible();
+    // Rows fade in, so check which people the page holds rather than their visibility.
+    await expect(canvas.getByText('Teammate 22')).toBeInTheDocument();
+    await expect(canvas.queryByText('Teammate 21')).toBeNull();
 
     await userEvent.type(
       canvas.getByRole('textbox', { name: 'Search team' }),

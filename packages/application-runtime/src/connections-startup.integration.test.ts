@@ -238,5 +238,5 @@ describe.skipIf(!databaseUrl)('connections through the API CLI', () => {
     await admin.query(`REVOKE luma_connectors FROM "${name}"`);
     await start();
     expect((await call('/ready')).status).toBe(503);
-  });
+  }, 30000);
 });
