@@ -1,49 +1,49 @@
 ---
 title: Datensätze in allen Systemen durchsuchen
-description: Finden Sie jede Bestellung, jedes Fulfillment, jede Bestandsposition, SKU, jedes Produkt und Problem mit einer Suche und sehen Sie, was jedes verbundene System dazu meldet.
+description: Finde jede Bestellung, jedes Fulfillment, jede Bestandsposition, SKU, jedes Produkt und Problem mit einer Suche und sieh dir an, was jedes verbundene System dazu meldet.
 ---
 
-**Datensätze** ist eine Suche über alles, was Luma aus Ihren verbundenen Systemen gelesen hat, und über die Probleme, die Luma erstellt hat. Nutzen Sie sie, wenn Sie eine Nummer, einen Namen oder eine ID haben und nicht wissen, auf welche Seite sie gehört, oder wenn Sie vergleichen möchten, was jedes System zu einem Datensatz sagt. Öffnen Sie sie in der Seitenleiste oder drücken Sie **G** und dann **R**.
+**Datensätze** ist eine Suche über alles, was Luma aus deinen verbundenen Systemen gelesen hat, und über die Probleme, die Luma erstellt hat. Nutze sie, wenn du eine Nummer, einen Namen oder eine ID hast und nicht weißt, auf welche Seite sie gehört, oder wenn du vergleichen möchtest, was jedes System zu einem Datensatz sagt. Öffne sie in der Seitenleiste oder drücke **G** und dann **R**.
 
 ## Einen Datensatz finden [#find-a-record]
 
-1. Wählen Sie über der Liste einen Datensatztyp: **Alle Datensätze**, **Bestellungen**, **Fulfillments**, **Bestand**, **SKUs**, **Produkte** oder **Probleme**.
-2. Geben Sie in **Datensätze durchsuchen** eine Nummer, einen Namen oder eine Quell-ID ein.
-3. Um nur in einem System zu suchen, wählen Sie es unter **Quelle**.
+1. Wähle über der Liste einen Datensatztyp: **Alle Datensätze**, **Bestellungen**, **Fulfillments**, **Bestand**, **SKUs**, **Produkte** oder **Probleme**.
+2. Gib in **Datensätze durchsuchen** eine Nummer, einen Namen oder eine Quell-ID ein.
+3. Um nur in einem System zu suchen, wähle es unter **Quelle**.
 
-Die Ergebnisse zeigen Typ, Name, Status und Quelle jedes Datensatzes, 50 pro Seite, zuletzt abgerufene zuerst. Meldet mehr als eine Quelle einen Datensatz, steht dort, wie viele. Datensatztyp, Suche und Quelle sind Teil der Adresse, sodass Sie einen Link auf dieselben Ergebnisse teilen können.
+Die Ergebnisse zeigen Typ, Name, Status und Quelle jedes Datensatzes, 50 pro Seite, zuletzt abgerufene zuerst. Meldet mehr als eine Quelle einen Datensatz, steht dort, wie viele. Datensatztyp, Suche und Quelle sind Teil der Adresse, sodass du einen Link auf dieselben Ergebnisse teilen kannst.
 
-Kunden und Retouren sind hier nicht durchsuchbar. Sie finden sie unter [Kunden](/docs/customers) und [Retouren](/docs/returns).
+Kunden und Retouren sind hier nicht durchsuchbar. Du findest sie unter [Kunden](/docs/customers) und [Retouren](/docs/returns).
 
-**Keine Datensätze passen zu dieser Suche** kann auch heißen, dass eine Quelle noch nicht vollständig importiert ist. Prüfen Sie den Fortschritt im [Datenabgleich](/docs/data-sync).
+**Keine Datensätze passen zu dieser Suche** kann auch heißen, dass eine Quelle noch nicht vollständig importiert ist. Prüfe den Fortschritt im [Datenabgleich](/docs/data-sync).
 
 ## Eine Datensatzseite lesen [#read-a-record-page]
 
-Wählen Sie einen Datensatz, um seine Seite zu öffnen. Sein Name steht in der Leiste oben, nach **Datensätze**; darunter folgen Status, Typ und eine kurze Beschreibung. Eine Datensatzseite hat diese Teile:
+Wähle einen Datensatz, um seine Seite zu öffnen. Sein Name steht in der Leiste oben, nach **Datensätze**; darunter folgen Status, Typ und eine kurze Beschreibung. Eine Datensatzseite hat diese Teile:
 
 - **Daten aus den Quellen**: was jedes verbundene System gemeldet hat, getrennt nach Quelle. Datensätze, die über Systeme hinweg verknüpft sind, können sich in einzelnen Feldern trotzdem unterscheiden; Luma führt sie nicht zu einem Wert zusammen.
 - **Positionen**: die Positionen des Datensatzes, etwa SKUs und Mengen einer Bestellung, einschließlich stornierter Mengen.
 - **Quellen**: jedes System, das den Datensatz kennt, mit seiner ID dort, der Art der Verknüpfung, der letzten Änderung in diesem System und dem letzten Abruf durch Luma.
 - **Verknüpfte Datensätze**: verknüpfte Bestellungen, Fulfillments, Bestandspositionen, SKUs oder Probleme.
 
-Links am Ende führen zur Seite, auf der Sie mit dem Datensatz arbeiten: **In Bestellungen öffnen**, **Im Fulfillment öffnen**, **Im Bestand öffnen**, **In Produkten öffnen**, **Bestand dieser SKU anzeigen** oder bei einem Problem **Problem untersuchen**. Kamen Sie von einer anderen Seite, bringt Sie der Zurück-Pfeil vor **Datensätze** in der Leiste dorthin zurück.
+Links am Ende führen zur Seite, auf der du mit dem Datensatz arbeitest: **In Bestellungen öffnen**, **Im Fulfillment öffnen**, **Im Bestand öffnen**, **In Produkten öffnen**, **Bestand dieser SKU anzeigen** oder bei einem Problem **Problem untersuchen**. Kamst du von einer anderen Seite, bringt dich der Zurück-Pfeil vor **Datensätze** in der Leiste dorthin zurück.
 
 ## Wenn nur die ID bekannt ist [#when-only-the-id-is-known]
 
-Ein Datensatz mit **Nur die ID in Shopify ist bekannt** oder derselben Angabe für eine andere Quelle ist einer, auf den Luma einen Verweis gesehen hat, etwa in einer Bestellposition, für den Luma aber noch keine Daten gelesen hat. Seine Seite hat keine Daten aus der Quelle. Das ändert sich meist, sobald der Import fertig ist. Bleibt es so, prüfen Sie im [Datenabgleich](/docs/data-sync#what-luma-imports), ob die Verbindung diesen Datensatztyp lesen darf.
+Ein Datensatz mit **Nur die ID in Shopify ist bekannt** oder derselben Angabe für eine andere Quelle ist einer, auf den Luma einen Verweis gesehen hat, etwa in einer Bestellposition, für den Luma aber noch keine Daten gelesen hat. Seine Seite hat keine Daten aus der Quelle. Das ändert sich meist, sobald der Import fertig ist. Bleibt es so, prüfe im [Datenabgleich](/docs/data-sync#what-luma-imports), ob die Verbindung diesen Datensatztyp lesen darf.
 
 Ein von Luma erstelltes Problem zeigt unter **Quellen** den Hinweis **Luma hat dieses Problem erstellt. Es ist mit keinem Quellsystem verknüpft.**
 
 ## Wie Datensätze verknüpft sind [#how-records-are-linked]
 
-Unter **Quellen** zeigt **Verknüpft über**, wie ein Quelldatensatz den anderen zugeordnet wurde, etwa beim Import oder durch eine Person. **Über übereinstimmende IDs in anderen Quellen verknüpft** heißt, die Verknüpfung ergibt sich aus IDs, die die Quellen gemeinsam haben. Luma verknüpft vorgeschlagene Treffer nie selbstständig. Wie Sie dieselbe SKU über Quellen hinweg verknüpfen oder trennen, lesen Sie unter [Bestand](/docs/inventory).
+Unter **Quellen** zeigt **Verknüpft über**, wie ein Quelldatensatz den anderen zugeordnet wurde, etwa beim Import oder durch eine Person. **Über übereinstimmende IDs in anderen Quellen verknüpft** heißt, die Verknüpfung ergibt sich aus IDs, die die Quellen gemeinsam haben. Luma verknüpft vorgeschlagene Treffer nie selbstständig. Wie du dieselbe SKU über Quellen hinweg verknüpfst oder trennst, liest du unter [Bestand](/docs/inventory).
 
 ## Einen Datensatz direkt in Shopify nachschlagen [#look-up-a-record-directly-in-shopify]
 
-Die Shopify-App bringt eine Seite mit, die Datensätze live aus Ihrem Shop liest, ohne auf den nächsten Abgleich zu warten. Öffnen Sie **Shopify** im Bereich **Apps** der Seitenleiste oder wählen Sie **Shopify öffnen** auf der Seite der App unter [Apps](/docs/apps-and-connections). Sie brauchen **Bestellungen ansehen**.
+Die Shopify-App bringt eine Seite mit, die Datensätze live aus deinem Shop liest, ohne auf den nächsten Abgleich zu warten. Öffne **Shopify** im Bereich **Apps** der Seitenleiste oder wähle **Shopify öffnen** auf der Seite der App unter [Apps](/docs/apps-and-connections). Du brauchst **Bestellungen ansehen**.
 
-1. Haben Sie mehrere Shops, wählen Sie einen unter **Shop**.
-2. Wählen Sie **Bestellungen ansehen** oder **Produkte ansehen**, oder öffnen Sie **Nach Shopify-ID suchen**.
-3. Um einen bestimmten Datensatz zu finden, wählen Sie seinen **Datensatztyp**, etwa **Bestellung**, **Produktvariante** oder **Erstattung**, und geben Sie seine **Shopify-Datensatz-ID** ein: die Nummer am Ende der Adresse des Datensatzes im Shopify-Admin. Wählen Sie dann **Datensatz laden**.
+1. Hast du mehrere Shops, wähle einen unter **Shop**.
+2. Wähle **Bestellungen ansehen** oder **Produkte ansehen**, oder öffne **Nach Shopify-ID suchen**.
+3. Um einen bestimmten Datensatz zu finden, wähle seinen **Datensatztyp**, etwa **Bestellung**, **Produktvariante** oder **Erstattung**, und gib seine **Shopify-Datensatz-ID** ein: die Nummer am Ende der Adresse des Datensatzes im Shopify-Admin. Wähle dann **Datensatz laden**.
 
-Luma zeigt, wann es den Datensatz gelesen hat, und Sie können den verknüpften Bestellungen, Varianten, Beständen, Retouren und Erstattungen folgen. Findet Luma den Datensatz nicht, prüfen Sie ID und Datensatztyp. Für Bestellungen, die älter als 60 Tage sind, ist Zugriff auf ältere Bestellungen nötig. Hat die Verbindung keinen Zugriff auf diesen Datensatztyp, prüfen Sie ihre Berechtigungen unter Apps.
+Luma zeigt, wann es den Datensatz gelesen hat, und du kannst den verknüpften Bestellungen, Varianten, Beständen, Retouren und Erstattungen folgen. Findet Luma den Datensatz nicht, prüfe ID und Datensatztyp. Für Bestellungen, die älter als 60 Tage sind, ist Zugriff auf ältere Bestellungen nötig. Hat die Verbindung keinen Zugriff auf diesen Datensatztyp, prüfe ihre Berechtigungen unter Apps.

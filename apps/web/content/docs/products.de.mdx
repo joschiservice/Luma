@@ -1,22 +1,22 @@
 ---
 title: Produkte systemübergreifend vergleichen
-description: Finden Sie eine SKU, sehen Sie, wie Shop und ERP sie führen, und erkennen Sie Listings, die fehlen, abweichen oder verknüpft werden sollten.
+description: Finde eine SKU, sieh dir an, wie Shop und ERP sie führen, und erkenne Listings, die fehlen, abweichen oder verknüpft werden sollten.
 ---
 
-Produkte zeigt jede SKU, die ein verbundener Shop oder ein ERP in seinem Katalog führt. Jede SKU hat eine Zeile mit allen Quellen nebeneinander. So sehen Sie, wie Shopify und Ihr ERP denselben Artikel beschreiben. Luma liest Kataloge; es ändert oder erstellt keine Listings. Öffnen Sie **Produkte** in der Seitenleiste oder drücken Sie **G**, dann **K**.
+Produkte zeigt jede SKU, die ein verbundener Shop oder ein ERP in seinem Katalog führt. Jede SKU hat eine Zeile mit allen Quellen nebeneinander. So siehst du, wie Shopify und dein ERP denselben Artikel beschreiben. Luma liest Kataloge; es ändert oder erstellt keine Listings. Öffne **Produkte** in der Seitenleiste oder drücke **G**, dann **K**.
 
 ## SKU finden [#find-a-sku]
 
-Suchen Sie nach SKU-Code, Produkt- oder Variantentitel, Barcode, Hersteller oder der Produkt- oder SKU-ID in einer Quelle. Wählen Sie eine Ansicht:
+Suche nach SKU-Code, Produkt- oder Variantentitel, Barcode, Hersteller oder der Produkt- oder SKU-ID in einer Quelle. Wähle eine Ansicht:
 
 - **Alle SKUs** zeigt jede SKU aus einem verbundenen Katalog.
 - **Quellen weichen ab** zeigt SKUs, bei denen die Quellen bei Titel, Status, Vertriebskanal, Preis oder Barcode voneinander abweichen.
 - **Nicht in allen Quellen** zeigt SKUs, die mindestens ein Katalog nicht führt. Manche Artikel werden absichtlich nur in einem System verkauft oder verwaltet, etwa Verpackungsmaterial, das nur im ERP geführt wird.
 - **Mögliche Treffer** zeigt SKUs, zu denen es in einer anderen Quelle eine SKU mit demselben Code gibt, die noch nicht verknüpft ist.
 
-Mit **Gelistet in** und **Fehlt in** beantworten Sie Fragen wie „Was ist im ERP, aber nicht im Shop?“. Ansichten und Filter sind Teil der Seitenadresse. So können Sie sie teilen oder an die Seitenleiste anheften.
+Mit **Gelistet in** und **Fehlt in** beantwortest du Fragen wie „Was ist im ERP, aber nicht im Shop?“. Ansichten und Filter sind Teil der Seitenadresse. So kannst du sie teilen oder an die Seitenleiste anheften.
 
-**Abdeckung** über der Liste zeigt, wie viel von jedem Katalog Luma importiert hat. **Noch keine Produkte importiert** bedeutet, dass noch kein verbundener Shop und kein ERP seinen Katalog geteilt hat. Den Fortschritt sehen Sie unter [Datenabgleich](/docs/data-sync).
+**Abdeckung** über der Liste zeigt, wie viel von jedem Katalog Luma importiert hat. **Noch keine Produkte importiert** bedeutet, dass noch kein verbundener Shop und kein ERP seinen Katalog geteilt hat. Den Fortschritt siehst du unter [Datenabgleich](/docs/data-sync).
 
 ## Wie Quellen verglichen werden [#how-sources-are-compared]
 
@@ -31,9 +31,9 @@ Ob eine Quelle eine SKU führt, steht erst fest, wenn Luma den vollständigen Ka
 
 ## Produkt lesen [#read-a-product]
 
-Die Vergleichstabelle stellt für jede Quelle Produkt, SKU-Code, Status, Vertriebskanal, Preis, Barcode, Hersteller, Quell-IDs und Aktualität nebeneinander. **Abweichend** markiert die Felder, die nicht übereinstimmen. **Nicht in allen Quellen** nennt jede Quelle, die die SKU nicht führt. Soll sie dort verkauft oder verwaltet werden, legen Sie sie in diesem System an.
+Die Vergleichstabelle stellt für jede Quelle Produkt, SKU-Code, Status, Vertriebskanal, Preis, Barcode, Hersteller, Quell-IDs und Aktualität nebeneinander. **Abweichend** markiert die Felder, die nicht übereinstimmen. **Nicht in allen Quellen** nennt jede Quelle, die die SKU nicht führt. Soll sie dort verkauft oder verwaltet werden, legst du sie in diesem System an.
 
-Unter dem Vergleich sehen Sie, was von der SKU abhängt:
+Unter dem Vergleich siehst du, was von der SKU abhängt:
 
 - **Bestand nach Lagerort** mit der verfügbaren Menge jeder Quelle. **Im Bestand öffnen** vergleicht den Bestand an einem Lagerort. Siehe [Bestand](/docs/inventory).
 - **Verkäufe der letzten 30 Tage** je Quelle, als bestellte Einheiten nach Bestelldatum abzüglich gemeldeter Stornierungen. Verkäufe werden nicht über Quellen hinweg addiert, weil dieselbe Bestellung in mehreren Systemen vorkommen kann.
@@ -41,20 +41,20 @@ Unter dem Vergleich sehen Sie, was von der SKU abhängt:
 - **Lieferzusagen** aus Lieferantenbestellungen. Sie sind kein bestätigter Zulauf.
 - **Probleme** zur SKU oder ihrem Bestand und **Weitere Varianten** desselben Produkts.
 - **Verknüpfte Quellen**: die Quelldatensätze, die Luma als diese SKU behandelt.
-- **Listing-Verlauf**: jeder Katalogabruf, den Luma erfasst hat. So sehen Sie, wann sich ein Preis oder Status geändert hat.
+- **Listing-Verlauf**: jeder Katalogabruf, den Luma erfasst hat. So siehst du, wann sich ein Preis oder Status geändert hat.
 
-Sie erreichen ein Produkt auch über eine Bestellposition, eine Bestandsposition, ein Problem zu einer SKU, **Datensätze** und die Suche.
+Du erreichst ein Produkt auch über eine Bestellposition, eine Bestandsposition, ein Problem zu einer SKU, **Datensätze** und die Suche.
 
 ## Dieselbe SKU über Quellen hinweg verknüpfen [#link-the-same-sku-across-sources]
 
 Luma behandelt Datensätze aus verschiedenen Quellen erst dann als dieselbe SKU, wenn sie verknüpft sind – von einer Person oder durch eine Regel für [automatisches Verknüpfen](/docs/data-sync#automatic-linking). Verwenden ein Shop und ein ERP denselben Code für einen Artikel, zeigt die Zeile **Möglicher Treffer zum Verknüpfen**.
 
-1. Gehen Sie auf der Produktseite zu **Verknüpfte Quellen**. **Möglicherweise dieselbe SKU** listet SKUs mit demselben Code aus anderen Quellen.
-2. Wählen Sie **Verknüpfen** neben dem Treffer.
-3. Prüfen Sie die Begründung unter **Warum ist das richtig?**, ändern Sie sie bei Bedarf und wählen Sie **Datensätze verknüpfen**.
+1. Gehe auf der Produktseite zu **Verknüpfte Quellen**. **Möglicherweise dieselbe SKU** listet SKUs mit demselben Code aus anderen Quellen.
+2. Wähle **Verknüpfen** neben dem Treffer.
+3. Prüfe die Begründung unter **Warum ist das richtig?**, ändere sie bei Bedarf und wähle **Datensätze verknüpfen**.
 
-Ist die Verknüpfung abgeschlossen, erscheinen beide Listings in einer Zeile, und Bestand, Produkte und Bestellpositionen aus beiden Quellen gehören zur selben SKU. Jede Quelle behält ihre eigenen Mengen. Um eine Quelle wieder zu trennen, wählen Sie **Trennen** daneben und dann **Quelle trennen**. Jede Verknüpfung und Trennung wird mit Person und Grund erfasst. Mehr zum Verknüpfen von Bestand finden Sie unter [Dieselbe SKU systemübergreifend verknüpfen](/docs/inventory#link-the-same-sku-across-systems).
+Ist die Verknüpfung abgeschlossen, erscheinen beide Listings in einer Zeile, und Bestand, Produkte und Bestellpositionen aus beiden Quellen gehören zur selben SKU. Jede Quelle behält ihre eigenen Mengen. Um eine Quelle wieder zu trennen, wähle **Trennen** daneben und dann **Quelle trennen**. Jede Verknüpfung und Trennung wird mit Person und Grund erfasst. Mehr zum Verknüpfen von Bestand findest du unter [Dieselbe SKU systemübergreifend verknüpfen](/docs/inventory#link-the-same-sku-across-systems).
 
 ## Wer Produkte sehen und verknüpfen kann [#who-can-see-and-link-products]
 
-Zum Ansehen von Produkten brauchen Sie **Produkte ansehen**. Zum Verknüpfen und Trennen von SKUs brauchen Sie **Importe verwalten**. Ohne diese Berechtigung sehen Sie die verknüpften Quellen und möglichen Treffer, aber nicht **Verknüpfen** oder **Trennen**.
+Zum Ansehen von Produkten brauchst du **Produkte ansehen**. Zum Verknüpfen und Trennen von SKUs brauchst du **Importe verwalten**. Ohne diese Berechtigung siehst du die verknüpften Quellen und möglichen Treffer, aber nicht **Verknüpfen** oder **Trennen**.

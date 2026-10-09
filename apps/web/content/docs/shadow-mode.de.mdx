@@ -1,25 +1,25 @@
 ---
 title: Workflow gefahrlos testen
-description: Sehen Sie, was ein Workflow mit einem echten Problem tun würde, ohne etwas zu ändern, erfassen Sie, was Ihr Team getan hat, und vergleichen Sie die Ergebnisse, bevor Sie sich auf den Workflow verlassen.
+description: Sieh dir an, was ein Workflow mit einem echten Problem tun würde, ohne etwas zu ändern, erfasse, was dein Team getan hat, und vergleiche die Ergebnisse, bevor du dich auf den Workflow verlässt.
 ---
 
-Ein Workflow-Test zeigt, was ein Workflow, der Probleme behebt, für ein echtes Problem vorschlagen würde, ohne etwas an Ihre Systeme zu senden. So entscheiden Sie, ob Sie einem Workflow vertrauen, bevor Sie ihn einschalten. Ergebnisse sind Vorschauen und zählen nie als bestätigte Korrekturen.
+Ein Workflow-Test zeigt, was ein Workflow, der Probleme behebt, für ein echtes Problem vorschlagen würde, ohne etwas an deine Systeme zu senden. So entscheidest du, ob du einem Workflow vertraust, bevor du ihn einschaltest. Ergebnisse sind Vorschauen und zählen nie als bestätigte Korrekturen.
 
 ## Wer Workflows testen kann [#who-can-test-workflows]
 
-Workflows testen und Testergebnisse lesen erfordert **Problem-Workflows testen und einschalten**. Ohne diese Berechtigung zeigt der Testbereich, dass Ihre Rolle keine Workflow-Tests erlaubt.
+Workflows testen und Testergebnisse lesen erfordert **Problem-Workflows testen und einschalten**. Ohne diese Berechtigung zeigt der Testbereich, dass deine Rolle keine Workflow-Tests erlaubt.
 
-Sie können nur veröffentlichte Workflows testen, die Probleme beheben. Gibt es keinen, zeigt der Testbereich „Veröffentlichen Sie einen Workflow, um ihn an diesem Problem zu testen.“
+Du kannst nur veröffentlichte Workflows testen, die Probleme beheben. Gibt es keinen, zeigt der Testbereich „Veröffentliche einen Workflow, um ihn an diesem Problem zu testen.“
 
 ## Test an einem Problem ausführen [#run-a-test-on-an-issue]
 
-1. Öffnen Sie ein Problem und wählen Sie **Workflow an diesem Problem testen**, gekennzeichnet mit **Nur Vorschau. Es wird nichts geändert.**
-2. Wählen Sie unter **Zu testender Workflow** einen Workflow.
-3. Wählen Sie **Test starten**.
+1. Öffne ein Problem und wähle **Workflow an diesem Problem testen**, gekennzeichnet mit **Nur Vorschau. Es wird nichts geändert.**
+2. Wähle unter **Zu testender Workflow** einen Workflow.
+3. Wähle **Test starten**.
 
-Luma verwendet die aktuelle Untersuchung des Problems und die Änderung, die der Workflow dafür vorbereitet hat. Fehlt diese Änderung oder ist sie veraltet, kann der Test keinen Erfolg vorhersagen. Solange Sie offline sind oder das Problem nicht bestätigt ist, können Sie keinen Test starten.
+Luma verwendet die aktuelle Untersuchung des Problems und die Änderung, die der Workflow dafür vorbereitet hat. Fehlt diese Änderung oder ist sie veraltet, kann der Test keinen Erfolg vorhersagen. Solange du offline bist oder das Problem nicht bestätigt ist, kannst du keinen Test starten.
 
-Kann Luma das Ergebnis nicht bestätigen, wählen Sie **Test wiederholen**. Dabei wird dieselbe Anfrage gesendet, der Test läuft also nicht doppelt.
+Kann Luma das Ergebnis nicht bestätigen, wähle **Test wiederholen**. Dabei wird dieselbe Anfrage gesendet, der Test läuft also nicht doppelt.
 
 ## Ergebnis lesen [#read-the-result]
 
@@ -27,40 +27,40 @@ Jedes Ergebnis ist mit **Nur Vorschau. Es wurde nichts geändert.** gekennzeichn
 
 - **Vorgeschlagene Änderung**: was der Workflow tun würde, oder dass er keine Änderung vorbereitet hat.
 - **Workflow passt**: **Ja**, **Nein**, **Problemdaten sind veraltet** oder **Keine Änderung vorbereitet**.
-- **Genehmigungsregeln**: ob Ihre Genehmigungsregeln die Änderung als **Erlaubt**, **Genehmigung nötig** oder **Blockiert** einstufen würden, und warum.
+- **Genehmigungsregeln**: ob deine Genehmigungsregeln die Änderung als **Erlaubt**, **Genehmigung nötig** oder **Blockiert** einstufen würden, und warum.
 - **Vorhergesagtes Ergebnis**: **Sollte gelingen, wenn die Annahmen zutreffen**, mit den Annahmen unter **Diese Vorhersage setzt voraus**, oder **Keine Vorhersage möglich**.
 - **Tatsächliches Ergebnis**: was Luma später für das Problem bestätigt hat: **Bestätigt**, **Nicht bestätigt** oder **Noch nicht geprüft**.
 
 Eine Vorhersage gibt es derzeit nur für Änderungen der Versandart einer Bestellung. Bei allen anderen Änderungen zeigt das vorhergesagte Ergebnis **Keine Vorhersage möglich**.
 
-## Erfassen, was Ihr Team getan hat [#record-what-your-team-did]
+## Erfassen, was dein Team getan hat [#record-what-your-team-did]
 
-Wenn das Problem bearbeitet ist, erfassen Sie unter **Erfassen, was Ihr Team getan hat**, was tatsächlich passiert ist:
+Wenn das Problem bearbeitet ist, erfasst du unter **Erfassen, was dein Team getan hat**, was tatsächlich passiert ist:
 
-1. Beantworten Sie **War eine Änderung nötig?** und **Sollte dieser Workflow dieses Problem übernehmen?**
-2. Wählen Sie unter **Was hat Ihr Team getan?** **Vorgeschlagene Änderung vorgenommen**, **Andere Änderung vorgenommen** oder **Nicht bekannt**. Bei einer anderen Änderung geben Sie an, was sich wann geändert hat.
-3. Wählen Sie die Nachweise, die Ihre Antworten stützen.
-4. Beantworten Sie **Würden Sie diesem Workflow zutrauen, diese Änderung selbstständig vorzunehmen?**
-5. Wählen Sie **Bewertung speichern**.
+1. Beantworte **War eine Änderung nötig?** und **Sollte dieser Workflow dieses Problem übernehmen?**
+2. Wähle unter **Was hat dein Team getan?** **Vorgeschlagene Änderung vorgenommen**, **Andere Änderung vorgenommen** oder **Nicht bekannt**. Bei einer anderen Änderung gibst du an, was sich wann geändert hat.
+3. Wähle die Nachweise, die deine Antworten stützen.
+4. Beantworte **Würdest du diesem Workflow zutrauen, diese Änderung selbstständig vorzunehmen?**
+5. Wähle **Bewertung speichern**.
 
-Nach dem Speichern können Sie eine Bewertung nicht mehr bearbeiten. Konnte Luma nicht bestätigen, dass Ihre Bewertung gespeichert wurde, wählen Sie **Erneut speichern**. Dabei wird dieselbe Bewertung noch einmal gesendet.
+Nach dem Speichern kannst du eine Bewertung nicht mehr bearbeiten. Konnte Luma nicht bestätigen, dass deine Bewertung gespeichert wurde, wähle **Erneut speichern**. Dabei wird dieselbe Bewertung noch einmal gesendet.
 
 ## Ergebnisse aller Probleme vergleichen [#compare-results-across-issues]
 
-Öffnen Sie den Workflow und wechseln Sie zu **Aktivität**, oder wählen Sie in einem Test **Ergebnisse aller Probleme vergleichen**. **Testergebnisse** vergleicht den letzten Test je Problem mit dem, was Ihr Team getan und Luma danach bestätigt hat.
+Öffne den Workflow und wechsle zu **Aktivität**, oder wähle in einem Test **Ergebnisse aller Probleme vergleichen**. **Testergebnisse** vergleicht den letzten Test je Problem mit dem, was dein Team getan und Luma danach bestätigt hat.
 
-Zu Beginn sehen Sie die letzten 30 Tage. Wählen Sie unter **Von** und **Bis** einen anderen Zeitraum und dann **Zeitraum anwenden**. Die Daten richten sich nach der Zeitzone Ihres Workspace. Ein Zeitraum zeigt bis zu 500 Probleme. Wählen Sie weniger Tage, um mehr zu sehen.
+Zu Beginn siehst du die letzten 30 Tage. Wähle unter **Von** und **Bis** einen anderen Zeitraum und dann **Zeitraum anwenden**. Die Daten richten sich nach der Zeitzone deines Workspace. Ein Zeitraum zeigt bis zu 500 Probleme. Wähle weniger Tage, um mehr zu sehen.
 
-- **Übereinstimmung mit Ihrem Team**: vorgeschlagene Änderungen, die dem Vorgehen Ihres Teams entsprechen.
-- **Unnötige Vorschläge**: Vorschläge, die Ihr Team als nicht nötig markiert hat.
+- **Übereinstimmung mit deinem Team**: vorgeschlagene Änderungen, die dem Vorgehen deines Teams entsprechen.
+- **Unnötige Vorschläge**: Vorschläge, die dein Team als nicht nötig markiert hat.
 - **Übersehene Probleme**: Probleme, die eine Änderung brauchten, aber keinen erlaubten Vorschlag hatten.
 - **Zutreffende Vorhersagen**: Vorhersagen, die dem bestätigten Ergebnis entsprechen.
 - **Selbstständig lösbar (Schätzung)**: erlaubte Vorschläge, die voraussichtlich gelingen.
-- **Vermeidbare Handarbeit (Schätzung)**: Vorschläge, die der Workflow selbstständig machen könnte und die Änderungen entsprechen, die Ihr Team von Hand vorgenommen hat.
+- **Vermeidbare Handarbeit (Schätzung)**: Vorschläge, die der Workflow selbstständig machen könnte und die Änderungen entsprechen, die dein Team von Hand vorgenommen hat.
 - **Vertrauen des Teams**: Bewertungen mit Vertrauen in den Workflow, gemessen an allen Ja- oder Nein-Antworten.
 
-Jede Zahl zeigt, auf wie vielen Problemen sie beruht. **Zu wenige Daten** bedeutet, dass es noch nichts zu zählen gibt. Unter den Zahlen zeigt jedes getestete Problem seine Vorhersage, sein Ergebnis und ob es bewertet wurde. Wählen Sie **Erfassen, was Ihr Team getan hat**, um eines zu bewerten.
+Jede Zahl zeigt, auf wie vielen Problemen sie beruht. **Zu wenige Daten** bedeutet, dass es noch nichts zu zählen gibt. Unter den Zahlen zeigt jedes getestete Problem seine Vorhersage, sein Ergebnis und ob es bewertet wurde. Wähle **Erfassen, was dein Team getan hat**, um eines zu bewerten.
 
 ## Was Testergebnisse nicht sagen [#what-test-results-dont-tell-you]
 
-Schätzungen zeigen, was der Workflow leisten könnte. Sie sind keine abgeschlossenen Korrekturen und zählen nie zu den bestätigten Ergebnissen unter [Auswertungen](/docs/insights). Die echten Ergebnisse eines Workflows stammen aus seinen Ausführungen, nachdem Sie ihn eingeschaltet haben. Siehe [Workflows verwalten](/docs/workflows).
+Schätzungen zeigen, was der Workflow leisten könnte. Sie sind keine abgeschlossenen Korrekturen und zählen nie zu den bestätigten Ergebnissen unter [Auswertungen](/docs/insights). Die echten Ergebnisse eines Workflows stammen aus seinen Ausführungen, nachdem du ihn eingeschaltet hast. Siehe [Workflows verwalten](/docs/workflows).

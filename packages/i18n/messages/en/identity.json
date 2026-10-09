@@ -113,7 +113,7 @@
   "identity_landing_diagnose_detail": "Check the systems to find out why.",
   "identity_landing_decide": "Decide",
   "identity_landing_decide_detail": "Choose a fix within the rules you agreed on.",
-  "identity_landing_act": "Act",
+  "identity_landing_act": "Execute",
   "identity_landing_act_detail": "Make the change, with approval if needed.",
   "identity_landing_verify": "Verify",
   "identity_landing_verify_detail": "Confirm the intended outcome happened.",

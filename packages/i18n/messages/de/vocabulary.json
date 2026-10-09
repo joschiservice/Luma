@@ -14,7 +14,7 @@
   "vocabulary_step_condition_label": "Bedingung prüfen",
   "vocabulary_step_condition_description": "Nur fortfahren, wenn ein Feld einen bestimmten Wert hat.",
   "vocabulary_step_capability_label": "Aktion ausführen",
-  "vocabulary_step_capability_description": "Ein verbundenes System um eine Änderung bitten. Luma prüft vorher Ihre Genehmigungsregeln.",
+  "vocabulary_step_capability_description": "Ein verbundenes System um eine Änderung bitten. Luma prüft vorher deine Genehmigungsregeln.",
   "vocabulary_step_approval_label": "Genehmigung anfordern",
   "vocabulary_step_approval_description": "Warten, bis eine Person, die Änderungen genehmigen darf, über die nächste Aktion entscheidet.",
   "vocabulary_step_wait_label": "Warten",

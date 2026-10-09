@@ -3,11 +3,11 @@
   "docs_meta_description": "Anleitungen für die Arbeit mit Luma: erkennen, was Aufmerksamkeit braucht, Handelsdaten prüfen, Änderungen genehmigen und das Ergebnis bestätigen.",
   "docs_portal_skip_link": "Zur Dokumentation springen",
   "docs_portal_open_app": "Luma öffnen",
-  "docs_portal_endnote": "In Luma öffnen Sie über „Hilfe“ die Anleitung zur aktuellen Seite direkt neben Ihrer Arbeit.",
+  "docs_portal_endnote": "In Luma öffnest du über „Hilfe“ die Anleitung zur aktuellen Seite direkt neben deiner Arbeit.",
   "docs_nav_label": "Anleitungen",
   "docs_nav_overview": "Übersicht",
   "docs_home_title": "Luma-Dokumentation",
-  "docs_home_intro": "Erkennen Sie, was Aufmerksamkeit braucht, prüfen Sie Ihre Handelsdaten, genehmigen Sie Änderungen und bestätigen Sie das Ergebnis. Jede Anleitung behandelt einen Bereich von Luma und die Schritte, die Sie dort ausführen.",
+  "docs_home_intro": "Erkenne, was Aufmerksamkeit braucht, prüfe deine Handelsdaten, genehmige Änderungen und bestätige das Ergebnis. Jede Anleitung behandelt einen Bereich von Luma und die Schritte, die du dort ausführst.",
   "docs_article_loading": "Anleitung wird geladen…",
   "docs_article_missing": "Diese Anleitung wurde nicht gefunden.",
   "docs_article_toc": "Auf dieser Seite",
@@ -19,6 +19,6 @@
   "docs_search_placeholder": "Dokumentation durchsuchen…",
   "docs_search_searching": "Suche läuft…",
   "docs_search_results": "{count, plural, one {{count, number} Ergebnis} other {{count, number} Ergebnisse}}",
-  "docs_search_empty": "Keine Ergebnisse. Versuchen Sie ein anderes Wort oder nutzen Sie die Anleitungen unten.",
-  "docs_search_unavailable": "Die Suche ist nicht verfügbar. Nutzen Sie die Anleitungen unten."
+  "docs_search_empty": "Keine Ergebnisse. Versuch ein anderes Wort oder nutze die Anleitungen unten.",
+  "docs_search_unavailable": "Die Suche ist nicht verfügbar. Nutze die Anleitungen unten."
 }
