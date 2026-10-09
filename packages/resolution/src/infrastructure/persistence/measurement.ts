@@ -12,6 +12,7 @@ import type {
   MeasurementSource,
 } from '../../domain/measurement.js';
 import { summarizeResolutionMetrics } from '../../domain/measurement.js';
+import { readPeople } from './actors.js';
 
 const missing = () =>
   new IdentityError(404, 'NOT_FOUND', 'Incident or evidence not found');
@@ -151,6 +152,11 @@ export function createMeasurementStore(
 
         return {
           items,
+          people: await readPeople(
+            tx,
+            context.tenantId,
+            items.map((item) => item.actorId),
+          ),
           revision: result.revision,
           nextRevision:
             result.items.length > 100 ? items.at(-1)!.revision : null,

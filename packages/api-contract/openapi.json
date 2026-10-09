@@ -10326,6 +10326,87 @@
                     "presentation": {
                       "type": "string",
                       "minLength": 1
+                    },
+                    "people": {
+                      "type": "array",
+                      "maxItems": 100,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "member",
+                              "former_member",
+                              "luma",
+                              "service",
+                              "unrecorded"
+                            ],
+                            "type": "string"
+                          },
+                          "id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 300
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "name": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 200
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "email": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 320
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "workflow": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "maxLength": 200
+                                  },
+                                  "name": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 200
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": ["id", "name"]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": ["kind", "id", "name", "email", "workflow"]
+                      }
                     }
                   },
                   "required": [
@@ -10336,7 +10417,8 @@
                     "policyVersion",
                     "principalId",
                     "canManage",
-                    "evaluationEvidence"
+                    "evaluationEvidence",
+                    "people"
                   ]
                 }
               }
@@ -10439,7 +10521,7 @@
       "get": {
         "operationId": "workflows.runs",
         "summary": "Read recent workflow runs",
-        "description": "Returns the 50 most recent runs with subject, actor, trigger and step evidence. Process runs show their current state and recorded outputs. Execution and verification results are separate.",
+        "description": "Returns the 50 most recent runs with subject, actor, trigger and step evidence, and the names of the people who started them. Process runs show their current state and recorded outputs. Execution and verification results are separate.",
         "tags": ["workflows"],
         "parameters": [
           {
@@ -10955,9 +11037,90 @@
                           "steps"
                         ]
                       }
+                    },
+                    "people": {
+                      "type": "array",
+                      "maxItems": 100,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "member",
+                              "former_member",
+                              "luma",
+                              "service",
+                              "unrecorded"
+                            ],
+                            "type": "string"
+                          },
+                          "id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 300
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "name": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 200
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "email": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 320
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "workflow": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "maxLength": 200
+                                  },
+                                  "name": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 200
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": ["id", "name"]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": ["kind", "id", "name", "email", "workflow"]
+                      }
                     }
                   },
-                  "required": ["items"]
+                  "required": ["items", "people"]
                 }
               }
             }
@@ -51283,6 +51446,87 @@
                         ]
                       }
                     },
+                    "people": {
+                      "type": "array",
+                      "maxItems": 100,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "member",
+                              "former_member",
+                              "luma",
+                              "service",
+                              "unrecorded"
+                            ],
+                            "type": "string"
+                          },
+                          "id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 300
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "name": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 200
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "email": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 320
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "workflow": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "maxLength": 200
+                                  },
+                                  "name": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 200
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": ["id", "name"]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": ["kind", "id", "name", "email", "workflow"]
+                      }
+                    },
                     "nextRevision": {
                       "anyOf": [
                         {
@@ -51301,7 +51545,7 @@
                       "maximum": 9007199254740991
                     }
                   },
-                  "required": ["items", "nextRevision", "revision"]
+                  "required": ["items", "people", "nextRevision", "revision"]
                 }
               }
             }

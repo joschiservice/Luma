@@ -140,7 +140,7 @@ function RunReview({
     ...workflowRunsOptions(organizationId, definitionId),
     refetchInterval: 5000,
   });
-  const run = runs.data?.find((item) => item.id === runId);
+  const run = runs.data?.items.find((item) => item.id === runId);
 
   if (runs.isPending) return <p role="status">{m.decisions_run_loading()}</p>;
   if (!run)

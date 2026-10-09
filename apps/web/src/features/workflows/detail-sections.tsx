@@ -11,6 +11,7 @@ import { Card, CardTitle } from '@luma/ui/components/primitives/card';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
+import { authorLabel, personLabel } from '@luma/ui/lib/actor';
 import { Link } from '@tanstack/react-router';
 import { ArrowRight, ShieldCheck, Zap } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -367,7 +368,11 @@ export function WorkflowActivations({
               </p>
               <p>
                 {m.workflows_activations_people({
-                  people: a.grants.principalIds.join(', '),
+                  people: formatList(
+                    a.grants.principalIds.map((id) =>
+                      personLabel(detail.people, id),
+                    ),
+                  ),
                 })}
               </p>
               <p>{m.workflows_activations_id({ id: a.id })}</p>
@@ -379,7 +384,7 @@ export function WorkflowActivations({
               <p>
                 {a.reviewedBy
                   ? m.workflows_activations_reviewed_by({
-                      person: a.reviewedBy,
+                      person: personLabel(detail.people, a.reviewedBy),
                     })
                   : m.workflows_activations_reviewed_outside()}
               </p>
@@ -420,7 +425,9 @@ export function WorkflowVersions({ detail }: { detail: WorkflowDetail }) {
             })}
           </summary>
           <p>
-            {m.workflows_versions_author({ author: v.provenance.authoredBy })}{' '}
+            {m.workflows_versions_author({
+              author: authorLabel(detail.people, v.provenance.authoredBy),
+            })}{' '}
             {v.provenance.reference}
           </p>
           <p>

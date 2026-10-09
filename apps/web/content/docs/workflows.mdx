@@ -47,7 +47,7 @@ An accepted change isn’t success on its own. Only a passed check confirms it. 
 
 How you turn a workflow on depends on what it does. Look under **Rules**:
 
-- Workflows that start from issues: select **Turn on**, review what starts a run and who approves its changes, and confirm. Runs use the permissions of the person who turned it on. **Turn off** stops new runs; a waiting run won’t send new changes, and changes already made aren’t undone. You need **Publish and enable workflows**.
+- Workflows that start from issues: select **Turn on**, review what starts a run and who approves its changes, and confirm. Runs use the permissions of the person who turned it on, and the workflow shows their name. **Turn off** stops new runs; a waiting run won’t send new changes, and changes already made aren’t undone. You need **Publish and enable workflows**.
 - **Stock rules** for replenishment: see [Set up replenishment](#set-up-replenishment). You need **Manage procurement**.
 - Workflows that change specific orders: select **Review activation**, choose the connection and up to 100 orders, confirm that you reviewed them, and select **Activate reviewed version**. Other orders and future orders aren’t included. **Revoke activation** stops new runs; changes already sent may still finish. You need **Test and turn on issue workflows**.
 - Workflows you start yourself: under **Trigger**, select **Start workflow**, **Schedule start**, **Record event**, **Check condition** or **Record detected issue**, depending on how the workflow starts. A trigger only starts a run; it never approves a change. You can cancel a scheduled start from **Recent runs** before it begins. You need **Manage workflow triggers**.

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { activityActorSchema } from '../activity.js';
 import { codeEvaluationSchema, evaluateCodeSchema } from '../code-steps.js';
 import { endpoint, organizationParamsSchema, requires } from '../common.js';
 import {
@@ -271,14 +272,20 @@ export const workflowsContract = {
       path: `${path}/{definitionId}/runs`,
       summary: 'Read recent workflow runs',
       description:
-        'Returns the 50 most recent runs with subject, actor, trigger and step evidence. Process runs show their current state and recorded outputs. Execution and verification results are separate.',
+        'Returns the 50 most recent runs with subject, actor, trigger and step evidence, and the names of the people who started them. Process runs show their current state and recorded outputs. Execution and verification results are separate.',
     })
     .meta({
       access: requires('workflows.read'),
       errors: [401, 403, 404, 409, 503],
     })
     .input(z.object({ params: params }))
-    .output(z.object({ items: z.array(workflowRunViewSchema) })),
+    .output(
+      z.object({
+        items: z.array(workflowRunViewSchema),
+        /** The people who started the runs, or who an agent started them for. */
+        people: z.array(activityActorSchema).max(100),
+      }),
+    ),
   fire: endpoint
     .route({
       method: 'POST',

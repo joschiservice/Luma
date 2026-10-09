@@ -55,3 +55,13 @@ export function personLabel(people: readonly ActivityActor[], id: string) {
     },
   );
 }
+
+/**
+ * Names a recorded author: the listed person for a user ID, or the value itself when it is a
+ * name already, such as "Luma". Responses list every user ID they reference.
+ */
+export function authorLabel(people: readonly ActivityActor[], author: string) {
+  const person = people.find((item) => item.id === author);
+
+  return person ? actorLabel(person) : author;
+}

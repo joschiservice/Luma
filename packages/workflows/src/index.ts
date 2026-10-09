@@ -18,7 +18,11 @@ export { runProcess } from './application/process-runtime.js';
 
 export { resolutionWorkflow } from './domain/workflow.js';
 
-export type { WorkflowCatalog } from './application/catalog.js';
+export type {
+  WorkflowCatalog,
+  WorkflowPeople,
+  WorkflowPerson,
+} from './application/catalog.js';
 
 export type {
   ReplenishmentBatchResult,

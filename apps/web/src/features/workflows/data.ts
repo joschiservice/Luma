@@ -67,7 +67,10 @@ export const workflowOptions = (organizationId: string, definitionId: string) =>
       ),
   });
 
-/** Reads recent runs separately so unavailable history does not hide the workflow. */
+/**
+ * Reads recent runs and the people who started them separately, so unavailable history does not
+ * hide the workflow.
+ */
 export const workflowRunsOptions = (
   organizationId: string,
   definitionId: string,
@@ -75,13 +78,11 @@ export const workflowRunsOptions = (
   queryOptions({
     queryKey: [...workflowsKey(organizationId), definitionId, 'runs'],
     ...privateQueryDefaults,
-    queryFn: async ({ signal }) =>
-      (
-        await api.workflows.runs(
-          { params: { organizationId, definitionId } },
-          { signal },
-        )
-      ).items,
+    queryFn: ({ signal }) =>
+      api.workflows.runs(
+        { params: { organizationId, definitionId } },
+        { signal },
+      ),
   });
 
 /** Submits a reviewed scope. Keep the same request ID and body when retrying an uncertain response. */

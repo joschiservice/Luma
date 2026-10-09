@@ -127,6 +127,7 @@ const detail: WorkflowDetail = {
   canManage: false,
   principalId: 'ada',
   policyVersion: 'v0.1',
+  people: [],
   evaluationEvidence: 'unavailable',
   activations: [],
   connections: [],

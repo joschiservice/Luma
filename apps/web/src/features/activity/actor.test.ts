@@ -1,4 +1,4 @@
-import { actorLabel, personLabel } from '@luma/ui/lib/actor';
+import { actorLabel, authorLabel, personLabel } from '@luma/ui/lib/actor';
 import { expect, it } from 'vitest';
 
 const ada = {
@@ -36,4 +36,9 @@ it('names people, former members, Luma and services instead of IDs', () => {
 it('treats a person missing from the listed people as a former member', () => {
   expect(personLabel([ada], 'user-1')).toBe('Ada Lovelace');
   expect(personLabel([ada], 'user-2')).toBe('Former member');
+});
+
+it('names authors that are people and keeps authors that are names already', () => {
+  expect(authorLabel([ada], 'user-1')).toBe('Ada Lovelace');
+  expect(authorLabel([ada], 'Luma')).toBe('Luma');
 });

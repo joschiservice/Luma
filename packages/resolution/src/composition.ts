@@ -11,6 +11,7 @@ import { createShadowService } from './application/shadow.js';
 import { learningBoundary } from './infrastructure/learning-validation.js';
 import { measurementCommandSchema } from './infrastructure/measurement-validation.js';
 import { createActivityStore } from './infrastructure/persistence/activity.js';
+import { readPeople } from './infrastructure/persistence/actors.js';
 import { createDecisionAssignmentStore } from './infrastructure/persistence/decision-assignments.js';
 import { createLearningStore } from './infrastructure/persistence/learning.js';
 import { createMeasurementStore } from './infrastructure/persistence/measurement.js';
@@ -64,6 +65,20 @@ export function createLearningCommands(
   ) => Promise<import('@luma/identity').TenantContext>,
 ): LearningService {
   return createLearningService({ store, refreshContext, ...learningBoundary });
+}
+
+/**
+ * Names the people behind recorded user IDs in the caller's workspace, as Activity names them,
+ * in one query. Callers authorize the read that referenced the IDs.
+ */
+export function createWorkspacePeople(db: TenantDatabase) {
+  return (
+    context: TenantContext,
+    ids: readonly (string | null | undefined)[],
+  ) =>
+    db.transaction(context.tenantId, (tx) =>
+      readPeople(tx, context.tenantId, ids),
+    );
 }
 
 /** Composes the workspace activity reader with refreshed membership. */

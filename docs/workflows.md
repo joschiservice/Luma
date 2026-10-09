@@ -26,6 +26,12 @@ start or continuation, and enter the same activation, policy, approval, admissio
 reservation, verification and audit path. An actor object never substitutes for an
 authenticated tenant context.
 
+Detail and run responses keep user IDs and list the people they reference in `people`, named
+as in [Activity](workspace-activity.md#attribution) with one read per response. Version
+authors that are not user IDs, such as `Luma`, are names already and are shown as recorded.
+The catalog names people through a port that the runtime composition supplies; without it,
+`people` is empty and screens show former members.
+
 Run history separates dispatch from verification; an accepted provider write or a
 completed activity never establishes verified business success. A run's readable `story`
 falls back to the linked diagnosis revision when findings are missing.

@@ -79,6 +79,24 @@ export interface WorkflowCatalogStore {
   ): Promise<Map<string, ProcessStepOutput[]>>;
 }
 
+/** A person named by a recorded user ID, as Activity names them. */
+export interface WorkflowPerson {
+  kind: 'member' | 'former_member' | 'luma' | 'service' | 'unrecorded';
+  id: string | null;
+  name: string | null;
+  email: string | null;
+  workflow: { id: string; name: string | null } | null;
+}
+
+/**
+ * Names the people behind recorded user IDs in one read. Values that are not user IDs are
+ * skipped, because they are names already.
+ */
+export type WorkflowPeople = (
+  context: TenantContext,
+  ids: readonly (string | null)[],
+) => Promise<WorkflowPerson[]>;
+
 /** Combines native definitions and existing resolution definitions under one authorized catalog. */
 export function createWorkflowCatalog(deps: {
   codeProcesses?: {
@@ -96,6 +114,8 @@ export function createWorkflowCatalog(deps: {
   refreshContext(context: TenantContext): Promise<TenantContext>;
   /** Reads the workspace approval setting for versions with actions. */
   approvalPolicy: Pick<PolicyService, 'approvalRequirement'>;
+  /** Without it, responses list nobody. */
+  people?: WorkflowPeople;
   /** Explains why no installed adapter can run a version. */
   explain?(
     context: TenantContext,
@@ -357,6 +377,88 @@ export function createWorkflowCatalog(deps: {
     return deps.replenishment;
   }
 
+  /** Reads a workflow from the definition's owner. */
+  async function view(context: TenantContext, id: string) {
+    if (id === deps.replenishment?.definitionId)
+      return deps.replenishment.detail(context);
+    if (deps.caseWorkflows?.owns(id))
+      return deps.caseWorkflows.detail(context, id);
+    const native = await deps.store.versions(context, id);
+    if (native.length)
+      return withReadiness(context, native, await explain(context, native));
+    const detail = await deps.legacy.detail(context, id);
+    // Versions are append-only; read after the view to include any concurrently published version.
+    const versions = await deps.store.resolutionVersions(context, id);
+
+    return {
+      ...detail,
+      summary: { ...detail.summary, category: 'resolution' },
+      versions: detail.versions.map((v) => {
+        const source = versions.find((item) => item.version === v.version);
+        if (!source) throw new Error('Published version is unavailable');
+        const workflow = resolutionWorkflow(source);
+
+        return {
+          ...v,
+          ...metadata(workflow),
+          policy: workflow.policy,
+          outcome: workflow.outcome,
+          format: 'resolution-playbook/0' as const,
+        };
+      }),
+    };
+  }
+
+  /** Reads up to 50 recent runs, newest first. */
+  async function runs(context: TenantContext, id: string) {
+    const starts = await deps.triggers.list(context, id);
+    const evidence = await deps.store.processSteps(
+      context,
+      starts.map((run) => run.id),
+    );
+    const triggered = starts.map((run) =>
+      presentTriggerRun(run, evidence.get(run.id)),
+    );
+    if (
+      id === deps.replenishment?.definitionId ||
+      deps.caseWorkflows?.owns(id) ||
+      (await deps.store.versions(context, id)).length
+    )
+      return triggered;
+    if (!(await deps.store.resolutionVersions(context, id)).length)
+      throw new IdentityError(404, 'NOT_FOUND', 'Workflow not found');
+    const records = await deps.store.runs(context, id);
+
+    const resolution = records.map(({ run, version, outcomes }) => {
+      const projection = resolutionWorkflowRun(run, version);
+      const presented = presentResolutionRun(run, version, outcomes.at(-1));
+
+      return {
+        ...presented,
+        story: presentResolutionStory(run, version, outcomes.at(-1)),
+        trigger: projection.trigger,
+        subject: projection.subject,
+        actor: projection.actor,
+        resolution: projection.resolution,
+        contextDigest: projection.contextDigest,
+        steps: outcomes.map((o) => ({
+          stepId: o.stepId,
+          state: o.state,
+          reason: o.reason,
+          proposalId: o.proposalId,
+          decisionId: o.decisionId ?? null,
+        })),
+      };
+    });
+
+    return [...triggered, ...resolution]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, 50);
+  }
+
+  const people = async (context: TenantContext, ids: (string | null)[]) =>
+    deps.people ? deps.people(context, ids) : [];
+
   return {
     /** Runs a fixture evaluation without access to production capabilities. */
     async evaluateCode(
@@ -548,82 +650,36 @@ export function createWorkflowCatalog(deps: {
         )),
       ];
     },
+    /** Reads a workflow with the people its activations, reviews and versions name. */
     async detail(context: TenantContext, id: string) {
       context = await authorize(context, 'workflows.read');
-      if (id === deps.replenishment?.definitionId)
-        return deps.replenishment.detail(context);
-      if (deps.caseWorkflows?.owns(id))
-        return deps.caseWorkflows.detail(context, id);
-      const native = await deps.store.versions(context, id);
-      if (native.length)
-        return withReadiness(context, native, await explain(context, native));
-      const detail = await deps.legacy.detail(context, id);
-      // Versions are append-only; read after the view to include any concurrently published version.
-      const versions = await deps.store.resolutionVersions(context, id);
+      const detail = await view(context, id);
 
       return {
         ...detail,
-        summary: { ...detail.summary, category: 'resolution' },
-        versions: detail.versions.map((v) => {
-          const source = versions.find((item) => item.version === v.version);
-          if (!source) throw new Error('Published version is unavailable');
-          const workflow = resolutionWorkflow(source);
-
-          return {
-            ...v,
-            ...metadata(workflow),
-            policy: workflow.policy,
-            outcome: workflow.outcome,
-            format: 'resolution-playbook/0' as const,
-          };
-        }),
+        people: await people(context, [
+          detail.principalId,
+          ...detail.activations.flatMap((a) => [
+            ...a.grants.principalIds,
+            a.reviewedBy,
+          ]),
+          ...detail.versions.map((v) => v.provenance.authoredBy),
+        ]),
       };
     },
     async runs(context: TenantContext, id: string) {
       context = await authorize(context, 'workflows.read');
-      const starts = await deps.triggers.list(context, id);
-      const evidence = await deps.store.processSteps(
-        context,
-        starts.map((run) => run.id),
-      );
-      const triggered = starts.map((run) =>
-        presentTriggerRun(run, evidence.get(run.id)),
-      );
-      if (
-        id === deps.replenishment?.definitionId ||
-        deps.caseWorkflows?.owns(id) ||
-        (await deps.store.versions(context, id)).length
-      )
-        return triggered;
-      if (!(await deps.store.resolutionVersions(context, id)).length)
-        throw new IdentityError(404, 'NOT_FOUND', 'Workflow not found');
-      const records = await deps.store.runs(context, id);
+      const items = await runs(context, id);
 
-      const resolution = records.map(({ run, version, outcomes }) => {
-        const projection = resolutionWorkflowRun(run, version);
-        const view = presentResolutionRun(run, version, outcomes.at(-1));
-
-        return {
-          ...view,
-          story: presentResolutionStory(run, version, outcomes.at(-1)),
-          trigger: projection.trigger,
-          subject: projection.subject,
-          actor: projection.actor,
-          resolution: projection.resolution,
-          contextDigest: projection.contextDigest,
-          steps: outcomes.map((o) => ({
-            stepId: o.stepId,
-            state: o.state,
-            reason: o.reason,
-            proposalId: o.proposalId,
-            decisionId: o.decisionId ?? null,
-          })),
-        };
-      });
-
-      return [...triggered, ...resolution]
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-        .slice(0, 50);
+      return {
+        items,
+        people: await people(
+          context,
+          items.map((run) =>
+            run.actor.kind === 'agent' ? run.actor.operatorId : run.actor.id,
+          ),
+        ),
+      };
     },
     async activate(...args: Parameters<PlaybookLibrary['activate']>) {
       const [context, id, request] = args;

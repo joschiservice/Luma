@@ -36,9 +36,13 @@ export const personSql = (alias: string, tenant: string, id: string) =>
     FROM workspace_people WHERE tenant_id=${tenant}
     AND user_id=CASE WHEN ${id} ~ ${uuidPattern} THEN (${id})::uuid END) ${alias} ON true`;
 
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
 /**
  * Reads the people behind recorded user IDs in one query, in first-seen order without
- * duplicates. An ID that names nobody in this workspace reads as a former member without a name.
+ * duplicates and at most 100. A user ID that names nobody in this workspace reads as a former
+ * member without a name. Values that are not user IDs, such as an author named "Luma", are
+ * skipped because they are names already.
  */
 export async function readPeople(
   tx: SqlTransaction,
@@ -46,7 +50,7 @@ export async function readPeople(
   ids: readonly (string | null | undefined)[],
 ): Promise<ActivityActor[]> {
   const unique = [
-    ...new Set(ids.filter((id): id is string => Boolean(id))),
+    ...new Set(ids.filter((id): id is string => uuid.test(id ?? ''))),
   ].slice(0, 100);
   if (!unique.length) return [];
   const result = await tx.query<{ actor: ActivityActor }>(

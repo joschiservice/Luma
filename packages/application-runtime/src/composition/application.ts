@@ -67,6 +67,7 @@ import {
   createResolutionMetricReader,
   createShadowEvaluations,
   createWorkspaceActivity,
+  createWorkspacePeople,
 } from '@luma/resolution/composition';
 import type { CaseWorkflowAdapter } from '@luma/workflows';
 import {
@@ -390,6 +391,7 @@ export function createApplicationServices(
     codeProcesses,
     drafts.blockers,
     caseWorkflows,
+    createWorkspacePeople(database),
   );
   const decisions = createDecisionQueue(database, {
     cases: caseDecisionQuery,

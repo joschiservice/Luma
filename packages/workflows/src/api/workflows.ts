@@ -179,7 +179,7 @@ export function workflowRoutes(service?: WorkflowCatalog) {
       async ({ context: { request }, input: { params } }) => {
         const s = use(request);
 
-        return { items: await s.service.runs(s.context, params.definitionId) };
+        return await s.service.runs(s.context, params.definitionId);
       },
     ),
     fire: os.fire.handler(

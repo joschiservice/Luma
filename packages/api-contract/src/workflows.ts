@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { activityActorSchema } from './activity.js';
 import { codeStepViewSchema, codeTelemetrySchema } from './code-steps.js';
 import {
   playbookActivationSchema,
@@ -156,6 +157,11 @@ export const workflowDetailSchema = playbookDetailSchema.extend({
   summary: workflowSummarySchema,
   versions: z.array(workflowVersionViewSchema),
   policyVersion: z.string(),
+  /**
+   * The people behind `principalId`, activation grants and reviewers, and version authors that
+   * are user IDs. Other authors, such as Luma, are names already.
+   */
+  people: z.array(activityActorSchema).max(100),
 });
 
 export const workflowRunViewSchema = playbookRunViewSchema

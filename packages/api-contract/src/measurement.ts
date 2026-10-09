@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { activityActorSchema } from './activity.js';
+
 export const measurementEnvironmentSchema = z.enum([
   'live',
   'pilot',
@@ -114,6 +116,8 @@ export const measurementEventSchema = z.object({
 
 export const measurementHistorySchema = z.object({
   items: z.array(measurementEventSchema),
+  /** The people who recorded the listed facts. */
+  people: z.array(activityActorSchema).max(100),
   nextRevision: z.number().int().nullable(),
   revision: z.number().int().nonnegative(),
 });

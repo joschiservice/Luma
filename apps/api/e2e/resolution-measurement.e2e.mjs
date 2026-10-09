@@ -191,6 +191,15 @@ it('serializes concurrent assessments, preserves retries and rejects foreign evi
   const history = await f.request(f.member, a.path);
   expect(history.items).toHaveLength(5);
   expect(history.revision).toBe(5);
+  expect(history.people).toEqual([
+    {
+      kind: 'member',
+      id: f.owner.id,
+      name: 'Owner',
+      email: 'owner@example.test',
+      workflow: null,
+    },
+  ]);
   const endpoint = `/v2/organizations/${f.org.id}/metrics/query`;
   const result = await f.request(f.member, endpoint, 'POST', request);
   expect(result.metrics[2]).toMatchObject({ value: 1, total: 1 });

@@ -94,6 +94,18 @@ test('corrects Shopify stock from the ERP after a different admin approves, and 
   await f.tick();
   const [run, ...others] = await f.runs(stock);
   expect(others).toEqual([]);
+  // The workflow and its runs name the person who turned it on, not their ID.
+  const operator = {
+    kind: 'member',
+    id: run.actor.id,
+    name: 'Synthetic pilot operator',
+    email: 'pilot-operator@example.test',
+    workflow: null,
+  };
+  expect((await f.request(`/workflows/${stock}/runs`)).people).toEqual([
+    operator,
+  ]);
+  expect((await f.request(`/workflows/${stock}`)).people).toEqual([operator]);
   expect(run).toMatchObject({
     triggerEvidence: { sourceId: opened.id },
     subject: { kind: 'inventory_position' },

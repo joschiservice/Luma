@@ -1,4 +1,8 @@
-import type { WorkflowDetail, WorkflowRunView } from '@luma/api-contract';
+import type {
+  ActivityActor,
+  WorkflowDetail,
+  WorkflowRunView,
+} from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
@@ -10,6 +14,7 @@ import {
   StatePill,
 } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
+import { personLabel } from '@luma/ui/lib/actor';
 import { Link, useLocation } from '@tanstack/react-router';
 import type { ComponentType } from 'react';
 
@@ -112,6 +117,7 @@ export function WorkflowRuns({
   detail,
   organizationId,
   runs,
+  people,
   loading,
   error,
   refreshing,
@@ -122,6 +128,8 @@ export function WorkflowRuns({
   detail: WorkflowDetail;
   organizationId: string;
   runs?: WorkflowRunView[] | undefined;
+  /** The people who started the runs, or who an agent started them for. */
+  people: readonly ActivityActor[];
   loading: boolean;
   error?: string | undefined;
   refreshing: boolean;
@@ -328,10 +336,14 @@ export function WorkflowRuns({
                     </p>
                   ) : null}
                   <p>
-                    {m.workflows_runs_started_by({
-                      kind: run.actor.kind,
-                      id: run.actor.id,
-                    })}
+                    {run.actor.kind === 'agent'
+                      ? m.workflows_runs_started_by_agent({
+                          agent: run.actor.id,
+                          person: personLabel(people, run.actor.operatorId),
+                        })
+                      : m.workflows_runs_started_by({
+                          actor: personLabel(people, run.actor.id),
+                        })}
                   </p>
                   <p>
                     {m.workflows_runs_record({

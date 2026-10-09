@@ -59,9 +59,11 @@ const active: WorkflowActivationView = {
   reviewedAt: '2026-10-06T09:00:00.000Z',
 };
 
-const detail = (
-  state: 'off' | 'on' | 'blocked' | 'member',
-): WorkflowDetail => ({
+type State = 'off' | 'on' | 'other' | 'blocked' | 'member';
+
+const on = (state: State) => state === 'on' || state === 'other';
+
+const detail = (state: State): WorkflowDetail => ({
   presentation: 'workflows.case',
   summary: {
     id: 'shopify-stock-correction',
@@ -72,39 +74,38 @@ const detail = (
     capability: 'inventory.available.reconcile',
     systems: [],
     availableVersion: '1.0.0',
-    status: state === 'on' ? 'active' : 'inactive',
+    status: on(state) ? 'active' : 'inactive',
     blockers: [],
-    activeVersions: state === 'on' ? ['1.0.0'] : [],
-    readiness:
-      state === 'on'
+    activeVersions: on(state) ? ['1.0.0'] : [],
+    readiness: on(state)
+      ? readiness({
+          enablement: 'enabled',
+          coverage: {
+            unit: 'open inventory mismatch case',
+            covered: 2,
+            ready: null,
+            explanation:
+              'Luma starts one run for each inventory mismatch case that detection confirms. 2 open now.',
+          },
+        })
+      : state === 'blocked'
         ? readiness({
-            enablement: 'enabled',
-            coverage: {
-              unit: 'open inventory mismatch case',
-              covered: 2,
-              ready: null,
-              explanation:
-                'Luma starts one run for each inventory mismatch case that detection confirms. 2 open now.',
-            },
-          })
-        : state === 'blocked'
-          ? readiness({
-              state: 'blocked',
-              issues: [
-                {
-                  code: 'requirement',
-                  severity: 'blocking',
-                  message:
-                    'Reconnect a Shopify store and allow inventory changes.',
-                  scope: null,
-                  repair: {
-                    label: 'Open Connections',
-                    destination: 'connections',
-                  },
+            state: 'blocked',
+            issues: [
+              {
+                code: 'requirement',
+                severity: 'blocking',
+                message:
+                  'Reconnect a Shopify store and allow inventory changes.',
+                scope: null,
+                repair: {
+                  label: 'Open Connections',
+                  destination: 'connections',
                 },
-              ],
-            })
-          : readiness(),
+              },
+            ],
+          })
+        : readiness(),
   },
   versions: [
     {
@@ -142,15 +143,31 @@ const detail = (
       steps: [],
     },
   ],
-  activations: state === 'on' ? [active] : [],
+  activations: on(state) ? [active] : [],
   connections: [],
   policyVersion: 'v1',
-  principalId: 'ada',
+  principalId: state === 'other' ? 'grace' : 'ada',
   canManage: state !== 'member',
   evaluationEvidence: 'unavailable',
+  people: [
+    {
+      kind: 'member',
+      id: 'ada',
+      name: 'Ada Lovelace',
+      email: 'ada@example.test',
+      workflow: null,
+    },
+    {
+      kind: 'member',
+      id: 'grace',
+      name: 'Grace Hopper',
+      email: 'grace@example.test',
+      workflow: null,
+    },
+  ],
 });
 
-function Preview({ state }: { state: 'off' | 'on' | 'blocked' | 'member' }) {
+function Preview({ state }: { state: State }) {
   const [client] = useState(
     () => new QueryClient({ defaultOptions: { queries: { retry: false } } }),
   );
@@ -214,6 +231,17 @@ export const On: Story = {
     ).toBeVisible();
     await expect(
       canvas.getByRole('button', { name: 'Turn off' }),
+    ).toBeVisible();
+  },
+};
+
+/** Someone else turned it on, so runs use that person's permissions. */
+export const OnBySomeoneElse: Story = {
+  args: { state: 'other' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByText(/Turned on by Ada Lovelace/),
     ).toBeVisible();
   },
 };

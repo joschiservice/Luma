@@ -69,7 +69,9 @@ Writes serialize on event and incident locks; `expectedRevision` rejects lost up
 Identical ID, request and actor replays return the original event without revalidating
 changed sources, and conflicting identity or payload returns 409. Every reference must
 resolve to retained evidence of this tenant and incident; foreign and missing IDs both
-return 404. Reads need `issues.read` and page 100 facts at a time by revision.
+return 404. Reads need `issues.read` and page 100 facts at a time by revision. Each page lists
+the people who recorded its facts in `people`, named as in
+[Activity](workspace-activity.md#attribution).
 
 ## Human work and autonomy
 

@@ -8,6 +8,7 @@ import { rich } from '@luma/i18n/rich';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
+import { personLabel } from '@luma/ui/lib/actor';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -139,7 +140,7 @@ export function ResolutionEvidence({
                 <small>
                   {m.overview_evidence_entry({
                     id: event.id,
-                    actor: event.actorId,
+                    actor: personLabel(query.data.people, event.actorId),
                   })}
                 </small>
               </li>

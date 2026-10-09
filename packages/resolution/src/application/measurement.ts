@@ -6,6 +6,7 @@ import {
 } from '@luma/identity';
 import type { OperationalMetricRead } from '@luma/platform';
 
+import type { ActivityActor } from '../domain/activity.js';
 import type {
   MeasurementEvent,
   MeasurementFact,
@@ -21,6 +22,8 @@ export interface MeasurementCommand {
 
 export interface MeasurementHistory {
   items: MeasurementEvent[];
+  /** The people who recorded the listed facts. */
+  people: ActivityActor[];
   nextRevision: number | null;
   revision: number;
 }
@@ -32,7 +35,7 @@ export interface MeasurementStore {
     incidentId: string,
     input: MeasurementCommand,
   ): Promise<MeasurementEvent>;
-  /** Reads up to 100 facts after a revision and the current head in one tenant snapshot. */
+  /** Reads up to 100 facts after a revision, the people who recorded them and the current head in one tenant snapshot. */
   history(
     context: TenantContext,
     incidentId: string,

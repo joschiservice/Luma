@@ -16,7 +16,10 @@ import {
   type CaseWorkflows,
   createCaseWorkflows,
 } from './application/case-workflows.js';
-import { createWorkflowCatalog } from './application/catalog.js';
+import {
+  createWorkflowCatalog,
+  type WorkflowPeople,
+} from './application/catalog.js';
 import { createCodeEvaluations } from './application/code-evaluations.js';
 import {
   createDraftGeneration,
@@ -174,8 +177,10 @@ export function createWorkflows(
     version: PublishedWorkflowVersion,
   ) => Promise<string[]>,
   caseWorkflows?: CaseWorkflows,
+  people?: WorkflowPeople,
 ) {
   return createWorkflowCatalog({
+    ...(people ? { people } : {}),
     ...(explain ? { explain } : {}),
     ...(caseWorkflows ? { caseWorkflows } : {}),
     ...(codeProcesses ? { codeProcesses } : {}),

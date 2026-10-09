@@ -159,7 +159,8 @@ export function WorkflowDetailPage({
             <WorkflowRuns
               detail={query.data}
               organizationId={organizationId}
-              runs={runs.data}
+              runs={runs.data?.items}
+              people={runs.data?.people ?? []}
               loading={runs.isPending}
               error={runs.error ? workflowError(runs.error) : undefined}
               refreshing={runs.isFetching}

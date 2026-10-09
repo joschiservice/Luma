@@ -18,6 +18,7 @@ import {
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
+import { personLabel } from '@luma/ui/lib/actor';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
@@ -133,7 +134,7 @@ export function CaseActivationForm({
         <p>
           {m.workflows_case_details_line({
             policy: detail.policyVersion,
-            principal: detail.principalId,
+            principal: personLabel(detail.people, detail.principalId),
           })}
         </p>
         <code>{version.digest}</code>
@@ -231,16 +232,22 @@ export function CaseWorkflowPanel({
           <>
             <StatePill state="running">{m.workflows_case_on()}</StatePill>
             <span>
-              {active.reviewedAt
-                ? rich(
-                    active.reviewedBy === detail.principalId
-                      ? m.workflows_case_mine_since
-                      : m.workflows_case_other_since,
-                    { date: <WorkspaceDate value={active.reviewedAt} /> },
-                  )
-                : active.reviewedBy === detail.principalId
-                  ? m.workflows_case_mine()
-                  : m.workflows_case_other()}
+              {active.reviewedBy === detail.principalId
+                ? active.reviewedAt
+                  ? rich(m.workflows_case_mine_since, {
+                      date: <WorkspaceDate value={active.reviewedAt} />,
+                    })
+                  : m.workflows_case_mine()
+                : !active.reviewedBy
+                  ? m.workflows_case_other()
+                  : active.reviewedAt
+                    ? rich(m.workflows_case_other_named_since, {
+                        person: personLabel(detail.people, active.reviewedBy),
+                        date: <WorkspaceDate value={active.reviewedAt} />,
+                      })
+                    : m.workflows_case_other_named({
+                        person: personLabel(detail.people, active.reviewedBy),
+                      })}
             </span>
           </>
         ) : (

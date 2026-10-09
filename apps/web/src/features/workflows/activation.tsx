@@ -5,6 +5,7 @@ import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { Select } from '@luma/ui/components/primitives/select';
+import { personLabel } from '@luma/ui/lib/actor';
 import { useState } from 'react';
 
 import { IdentityError } from '../identity/data';
@@ -196,7 +197,7 @@ export function ActivationForm({
         <p>
           {m.workflows_activation_details_line({
             policy: detail.policyVersion,
-            principal: detail.principalId,
+            principal: personLabel(detail.people, detail.principalId),
           })}
         </p>
         <code>{selected.digest}</code>
