@@ -1,10 +1,12 @@
 import {
   staffAccessGrantSchema,
+  staffAccessHistorySchema,
   staffConfigSchema,
   staffDirectorySchema,
   staffRevokeSessionsResultSchema,
   staffSessionSchema,
   staffWorkspaceDetailSchema,
+  staffWorkspaceHealthSchema,
 } from '@luma/api-contract/staff';
 
 import { staffActivity } from './activity';
@@ -130,6 +132,34 @@ export function createStaffApi(
       staffWorkspaceDetailSchema.parse(
         await request(
           `${workspace(workspaceId)}?${new URLSearchParams({ grantId })}`,
+          undefined,
+          signal,
+        ),
+      ),
+    health: async (
+      workspaceId: string,
+      grantId: string,
+      signal?: AbortSignal,
+    ) =>
+      staffWorkspaceHealthSchema.parse(
+        await request(
+          `${workspace(workspaceId)}/health?${new URLSearchParams({ grantId })}`,
+          undefined,
+          signal,
+        ),
+      ),
+    accessHistory: async (
+      workspaceId: string,
+      grantId: string,
+      cursor: string | null,
+      signal?: AbortSignal,
+    ) =>
+      staffAccessHistorySchema.parse(
+        await request(
+          `${workspace(workspaceId)}/access-history?${new URLSearchParams({
+            grantId,
+            ...(cursor ? { cursor } : {}),
+          })}`,
           undefined,
           signal,
         ),

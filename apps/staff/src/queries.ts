@@ -1,4 +1,8 @@
-import { type QueryClient, queryOptions } from '@tanstack/react-query';
+import {
+  infiniteQueryOptions,
+  type QueryClient,
+  queryOptions,
+} from '@tanstack/react-query';
 
 import { staffActivity } from './activity';
 import { staffApi, StaffApiError } from './api';
@@ -27,6 +31,28 @@ export const workspaceOptions = (workspaceId: string, grantId: string) =>
   queryOptions({
     queryKey: ['staff', 'workspace', workspaceId, grantId],
     queryFn: ({ signal }) => staffApi.workspace(workspaceId, grantId, signal),
+    enabled: grantId.length > 0,
+    retry: false,
+  });
+
+/** Reads workspace health under the support grant. Each read is audited, so it refreshes once a minute. */
+export const healthOptions = (workspaceId: string, grantId: string) =>
+  queryOptions({
+    queryKey: ['staff', 'workspace', workspaceId, grantId, 'health'],
+    queryFn: ({ signal }) => staffApi.health(workspaceId, grantId, signal),
+    enabled: grantId.length > 0,
+    retry: false,
+    refetchInterval: 60_000,
+  });
+
+/** Pages access changes, newest first, under the support grant. Older pages load on request. */
+export const accessHistoryOptions = (workspaceId: string, grantId: string) =>
+  infiniteQueryOptions({
+    queryKey: ['staff', 'workspace', workspaceId, grantId, 'access-history'],
+    queryFn: ({ signal, pageParam }) =>
+      staffApi.accessHistory(workspaceId, grantId, pageParam, signal),
+    initialPageParam: null as string | null,
+    getNextPageParam: (page) => page.nextCursor,
     enabled: grantId.length > 0,
     retry: false,
   });

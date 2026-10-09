@@ -107,6 +107,55 @@ async function fixture(t) {
   };
 }
 
+/** Adds a failing sync stream and 51 access changes; owner triggers are off for these rows. */
+async function seedHealth(db, tenantId, userId) {
+  const connection = randomUUID();
+  const seed = await db.owner.connect();
+  try {
+    await seed.query('BEGIN');
+    await seed.query('SET LOCAL session_replication_role=replica');
+    await seed.query(
+      'INSERT INTO connector_installations(tenant_id,id,version,document,secret) VALUES($1,$2,1,$3,$4)',
+      [
+        tenantId,
+        connection,
+        {
+          id: connection,
+          tenantId,
+          version: 1,
+          provider: 'shopify',
+          status: 'degraded',
+          credentialVersion: 2,
+          granted: ['orders.read'],
+        },
+        'private-credential-secret',
+      ],
+    );
+    await seed.query(
+      `INSERT INTO commerce_sync_streams(tenant_id,id,connection_id,record_type,principal_id,phase,attempts,error_code,error_message,error_at,failing_since)
+      VALUES($1,$2,$3,'orders',$4,'incremental',4,'authentication','The provider rejected the connection credentials.',now(),now()-interval '2 hours')`,
+      [tenantId, randomUUID(), connection, userId],
+    );
+    await seed.query(
+      `INSERT INTO workspace_access_events(id,tenant_id,actor_id,event_type,target_id,before_value,after_value,created_at)
+      SELECT gen_random_uuid(),$1,$2,'member.update',$3,$4,$5,now()-make_interval(mins=>n) FROM generate_series(1,51) n`,
+      [
+        tenantId,
+        userId,
+        randomUUID(),
+        { userId, roleName: 'Member' },
+        { userId, roleName: 'Admin' },
+      ],
+    );
+    await seed.query('COMMIT');
+  } catch (error) {
+    await seed.query('ROLLBACK');
+    throw error;
+  } finally {
+    seed.release();
+  }
+}
+
 async function signIn(page) {
   await page.goto('/');
   await expect(
@@ -129,6 +178,7 @@ test('staff investigates a workspace and retries an uncertain global revocation 
 }) => {
   const { page, db, customerApi, customer, workspace, errors } =
     await fixture(t);
+  await seedHealth(db, workspace.id, customer.userId);
   await signIn(page);
   await page.getByLabel('Name, email or workspace').fill('Support North');
   await page.getByRole('button', { name: 'Search', exact: true }).click();
@@ -145,6 +195,29 @@ test('staff investigates a workspace and retries an uncertain global revocation 
   await expect(
     page.getByRole('table', { name: 'Workspace members' }),
   ).toContainText('customer');
+  const streams = page.getByRole('table', { name: 'Sync streams' });
+  await expect(streams).toContainText('Failing');
+  await expect(streams).toContainText('authentication');
+  await expect(page.locator('body')).not.toContainText(
+    'private-credential-secret',
+  );
+  const history = page.getByRole('table', {
+    name: 'Workspace access changes, newest first',
+  });
+  await expect(history.getByRole('row')).toHaveCount(51);
+  await expect(history).toContainText('Member role changed');
+  await page.getByRole('button', { name: 'Load older changes' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(history.getByRole('row')).toHaveCount(52);
+  await expect(
+    page.getByText('This is the oldest recorded access change.'),
+  ).toBeVisible();
+  const reads = await db.owner.query(
+    "SELECT count(*) FILTER (WHERE event='workspace.health.read')::int AS health,count(*) FILTER (WHERE event='workspace.access-history.read')::int AS history FROM staff_audit WHERE tenant_id=$1",
+    [workspace.id],
+  );
+  expect(reads.rows[0].health).toBeGreaterThanOrEqual(1);
+  expect(reads.rows[0].history).toBeGreaterThanOrEqual(2);
   await page.screenshot({
     path: test.info().outputPath('workspace-light.png'),
     fullPage: true,

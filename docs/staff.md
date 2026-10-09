@@ -108,6 +108,37 @@ cannot update or delete the support audit log, grant
 staff privileges, or directly delete customer sessions. Provider credentials and commerce
 payloads are not included in the support response or general telemetry.
 
+## Workspace health and access history
+
+Under a support grant, the workspace page also shows health and access history. Health
+covers sync streams and runs, connection versions, lifecycle changes and latest read checks,
+actions with an unknown outcome or failure, workflow steps that need review, case and approval
+counts, failed workspace mail, installed apps and workspace settings. Access history lists
+member, invitation, role, policy and workspace changes with names from the workspace's people
+records; people without a record appear as unknown with a short ID.
+
+These reads expose metadata, codes and counts only. The staff runtime reads them through
+`staff_health_*` and `staff_access_history` views owned by `luma_staff_views`; it has no grant on
+the source tables. Keep it that way: the restricted-role test allowlists every customer column
+the runtime can select and rejects payload-like view columns. Never project connection targets
+or secrets, read-check documents (successful checks contain provider observations), action
+parameters, step values, invitation addresses or other before/after values. Sync error messages
+are Luma's fixed text for an error code, capped in length; review any new free-text column for
+provider text and personal data before exposing it.
+
+Row security on every source table limits the view owner to the workspace of the caller's
+current grant, evaluated once per statement. That policy applies before caller-supplied
+conditions, so the views need not be security barriers and ordered reads use tenant indexes.
+Every list holds the 20 most recent entries and marks truncation; action, mail and admission
+counts stop at 1,000. Access history pages hold 50 events, keyed by event time and ID. Each
+health read and history page is audited as `workspace.health.read` or
+`workspace.access-history.read`. The page refreshes health once a minute and history only on
+request, because every read writes audit evidence.
+
+Health is diagnostic evidence, not a verdict: a quiet health view does not establish that an
+issue is resolved. Actions with an unknown outcome may have changed the provider and need
+verification, not a repeat.
+
 ## Deployment boundary
 
 Serve the frontend on its own HTTPS origin. Proxy its `/api/` path exclusively to the staff

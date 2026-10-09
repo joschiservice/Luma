@@ -5,6 +5,7 @@ import {
   requireRecentStaffSession,
   requireStaffPermission,
 } from '../domain/access.js';
+import type { AccessHistoryPage, WorkspaceHealth } from './health.js';
 
 export interface DirectoryUser {
   id: string;
@@ -76,6 +77,17 @@ export interface StaffRepository {
       commandId: string;
     },
   ): Promise<SupportSessionRevocation>;
+  health(
+    context: StaffContext,
+    workspaceId: string,
+    grantId: string,
+  ): Promise<WorkspaceHealth>;
+  accessHistory(
+    context: StaffContext,
+    workspaceId: string,
+    grantId: string,
+    cursor: string | null,
+  ): Promise<AccessHistoryPage>;
 }
 
 /** Provides bounded staff operations using explicit privileges and tenant-scoped support grants. */
@@ -114,6 +126,23 @@ export function createStaffService(repository: StaffRepository) {
       requireRecentStaffSession(context);
 
       return repository.revoke(context, input);
+    },
+    /** Reads bounded health metadata after rechecking the support grant; each read is audited. */
+    health(context: StaffContext, workspaceId: string, grantId: string) {
+      requireStaffPermission(context, 'staff.workspace.inspect');
+
+      return repository.health(context, workspaceId, grantId);
+    },
+    /** Pages access changes, newest first, after rechecking the support grant; each page is audited. */
+    accessHistory(
+      context: StaffContext,
+      workspaceId: string,
+      grantId: string,
+      cursor: string | null,
+    ) {
+      requireStaffPermission(context, 'staff.workspace.inspect');
+
+      return repository.accessHistory(context, workspaceId, grantId, cursor);
     },
   };
 }

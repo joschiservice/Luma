@@ -76,6 +76,16 @@ describe('staff browser API', () => {
     );
   });
 
+  it('passes the access history cursor and grant without retaining them elsewhere', async () => {
+    const cursor = `2026-10-09T08:00:00.123456Z_${grantId}`;
+    const fetcher = fetchResult({ events: [], nextCursor: null });
+    await createStaffApi(fetcher).accessHistory(workspaceId, grantId, cursor);
+    expect(fetcher).toHaveBeenCalledWith(
+      `/api/v1/staff/workspaces/${workspaceId}/access-history?grantId=${grantId}&cursor=${encodeURIComponent(cursor)}`,
+      expect.objectContaining({ method: 'GET', cache: 'no-store' }),
+    );
+  });
+
   it('rejects malformed successful responses at the contract boundary', async () => {
     await expect(
       createStaffApi(

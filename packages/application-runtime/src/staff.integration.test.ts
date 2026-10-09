@@ -402,6 +402,411 @@ describe.skipIf(!databaseUrl)(
         ).rowCount,
       ).toBe(1);
     });
+    it('exposes only allowlisted customer columns and metadata views to the staff runtime', async () => {
+      const columns = await runtime.query<{ relname: string; attname: string }>(
+        `SELECT c.relname,a.attname FROM pg_class c JOIN pg_attribute a ON a.attrelid=c.oid
+        WHERE c.relnamespace='public'::regnamespace AND c.relkind IN ('r','p','v','m','f') AND a.attnum>0 AND NOT a.attisdropped
+        AND left(c.relname,6)<>'staff_' AND has_column_privilege(current_user,c.oid,a.attnum,'SELECT')
+        ORDER BY 1,2`,
+      );
+      expect(
+        columns.rows.map((row) => `${row.relname}.${row.attname}`),
+      ).toEqual([
+        'memberships.id',
+        'memberships.role',
+        'memberships.tenant_id',
+        'memberships.user_id',
+        'organizations.data_region',
+        'organizations.id',
+        'organizations.name',
+        'organizations.slug',
+        'organizations.status',
+        'users.email',
+        'users.id',
+        'users.name',
+      ]);
+      const views = await runtime.query<{ relname: string; attname: string }>(
+        `SELECT c.relname,a.attname FROM pg_class c JOIN pg_attribute a ON a.attrelid=c.oid
+        WHERE c.relnamespace='public'::regnamespace AND c.relkind='v' AND a.attnum>0
+        AND has_column_privilege(current_user,c.oid,a.attnum,'SELECT')`,
+      );
+      expect(views.rows.length).toBeGreaterThan(0);
+      for (const row of views.rows) {
+        expect(row.relname).toMatch(/^staff_/);
+        expect(row.attname).not.toMatch(
+          /^(document|secret|payload|token|password|credentials|target|manifest|before_value|after_value|values|email|request|result)$/,
+        );
+      }
+      await expect(
+        runtime.query('SELECT error_message FROM commerce_sync_streams'),
+      ).rejects.toMatchObject({ code: '42501' });
+      expect(
+        (await runtime.query('SELECT * FROM staff_health_sync_streams'))
+          .rowCount,
+      ).toBe(0);
+    });
+    it('reads bounded workspace health and access history under a current grant without payloads', async () => {
+      const connection = randomUUID();
+      const otherConnection = randomUUID();
+      const stream = randomUUID();
+      const proposal = randomUUID();
+      const failedRun = randomUUID();
+      const pendingRun = randomUUID();
+      const fingerprint = 'f'.repeat(64);
+      const seed = await owner.connect();
+      try {
+        await seed.query('BEGIN');
+        // Owner triggers and foreign keys are disabled: these rows only exercise staff reads.
+        await seed.query('SET LOCAL session_replication_role=replica');
+        const installation = (tenant: string, id: string) =>
+          seed.query(
+            'INSERT INTO connector_installations(tenant_id,id,version,document,secret) VALUES($1,$2,1,$3,$4)',
+            [
+              tenant,
+              id,
+              {
+                id,
+                tenantId: tenant,
+                version: 1,
+                provider: 'shopify',
+                status: 'active',
+                credentialVersion: 3,
+                target: { kind: 'shopify', shop: 'private-target.example' },
+                granted: ['orders.read', 'products.read'],
+              },
+              'private-credential-secret',
+            ],
+          );
+        await installation(tenantA, connection);
+        await installation(tenantB, otherConnection);
+        await seed.query(
+          `INSERT INTO commerce_sync_streams(tenant_id,id,connection_id,record_type,principal_id,phase,attempts,error_code,error_message,error_at,failing_since)
+          VALUES($1,$2,$3,'orders',$4,'incremental',3,'authentication','The provider rejected the connection credentials.',now(),now()-interval '1 hour'),
+          ($5,$6,$7,'orders',$4,'incremental',1,'tenant_b_error','Other workspace',now(),now())`,
+          [
+            tenantA,
+            stream,
+            connection,
+            customer,
+            tenantB,
+            randomUUID(),
+            otherConnection,
+          ],
+        );
+        await seed.query(
+          `INSERT INTO commerce_sync_runs(tenant_id,id,stream_id,kind,trigger,full_scan,started_at,outcome,records,failed,errors)
+          VALUES($1,$2,$3,'incremental','schedule',false,now(),'completed',10,2,1)`,
+          [tenantA, randomUUID(), stream],
+        );
+        await seed.query(
+          `INSERT INTO connector_read_checks(tenant_id,connection_id,capability,observed_at,succeeded,document)
+          VALUES($1,$2,'orders.read',now(),false,$3),($1,$2,'products.read',now(),true,$4)`,
+          [
+            tenantA,
+            connection,
+            { ok: false, error: { code: 'authentication' } },
+            {
+              ok: true,
+              value: {
+                items: [{ email: 'shopper-observation@example.test' }],
+              },
+            },
+          ],
+        );
+        await seed.query(
+          "INSERT INTO connector_lifecycle_events(tenant_id,connection_id,version,event,actor_id,status,credential_version) VALUES($1,$2,1,'connected',$3,'active',3)",
+          [tenantA, connection, customer],
+        );
+        await seed.query(
+          "INSERT INTO executed_actions(id,tenant_id,proposal_id,idempotency_key,action_hash,state,document) VALUES($1,$2,$3,$4,$5,'failed',$6)",
+          [
+            randomUUID(),
+            tenantA,
+            proposal,
+            `v0:${proposal}`,
+            'a'.repeat(64),
+            {
+              state: 'failed',
+              tenantId: tenantA,
+              proposalId: proposal,
+              intent: {
+                capability: 'inventory.available.reconcile',
+                connectionId: connection,
+                parameters: { sku: 'PRIVATE-ORDER-PARAMETER' },
+              },
+              attempt: { dispatch: 'dispatched', businessOutcome: 'pending' },
+            },
+          ],
+        );
+        await seed.query(
+          'INSERT INTO execution_failures(tenant_id,id,proposal_id,document) VALUES($1,$2,$3,$4)',
+          [
+            tenantA,
+            randomUUID(),
+            proposal,
+            {
+              phase: 'dispatch',
+              code: 'timeout',
+              retry: 'reconcile',
+              effect: 'unknown',
+              providerRequestId: 'private-provider-request',
+            },
+          ],
+        );
+        for (const run of [failedRun, pendingRun])
+          await seed.query(
+            `INSERT INTO workflow_trigger_runs(tenant_id,id,definition_id,version,version_digest,dedupe_key,request_digest,document,state,triggered_at)
+            VALUES($1,$2,'restock','1','digest',$4,'request',$3,'awaiting_admission',now()-interval '2 hours')`,
+            [
+              tenantA,
+              run,
+              {
+                tenantId: tenantA,
+                id: run,
+                definitionId: 'restock',
+                version: '1',
+                versionDigest: 'digest',
+                requestDigest: 'request',
+                trigger: { kind: 'event' },
+              },
+              run,
+            ],
+          );
+        await seed.query(
+          "INSERT INTO workflow_process_steps(tenant_id,run_id,step_id,state,document) VALUES($1,$2,'notify','failed',$3)",
+          [
+            tenantA,
+            failedRun,
+            {
+              stepId: 'notify',
+              state: 'failed',
+              kind: 'notify',
+              recordedAt: new Date().toISOString(),
+              values: { note: 'PRIVATE-STEP-VALUE' },
+            },
+          ],
+        );
+        const activation = randomUUID();
+        await seed.query(
+          "INSERT INTO workflow_case_activations(tenant_id,id,definition_id,principal_id,document,created_at) VALUES($1,$2,'shopify.hold',$3,$4,now())",
+          [
+            tenantA,
+            activation,
+            customer,
+            {
+              id: activation,
+              definitionId: 'shopify.hold',
+              principalId: customer,
+            },
+          ],
+        );
+        const exception = randomUUID();
+        await seed.query(
+          "INSERT INTO exceptions(id,tenant_id,fingerprint,state,document) VALUES($1,$2,$3,'awaiting_approval',$4)",
+          [
+            exception,
+            tenantA,
+            fingerprint,
+            {
+              id: exception,
+              tenantId: tenantA,
+              state: 'awaiting_approval',
+              fingerprint,
+              occurrenceCount: 1,
+              exceptionClass: 'sync_failure',
+              severity: 'high',
+            },
+          ],
+        );
+        await seed.query(
+          'INSERT INTO exception_uncertainty(tenant_id,fingerprint,first_deferred_at,review_required) VALUES($1,$2,now(),true)',
+          [tenantA, fingerprint],
+        );
+        await seed.query(
+          "INSERT INTO workspace_mail(tenant_id,id,event_key,kind,user_id,state,attempts) VALUES($1,$2,'failed-mail','issues',$3,'failed',5)",
+          [tenantA, randomUUID(), customer],
+        );
+        await seed.query(
+          "INSERT INTO workspace_apps(tenant_id,app_id,status,version,manifest) VALUES($1,'shopify','installed',2,$2)",
+          [tenantA, { version: '1.4.0', permissions: [], scopes: [] }],
+        );
+        await seed.query(
+          "INSERT INTO workspace_settings(tenant_id,timezone,always_require_approval) VALUES($1,'Europe/Berlin',true)",
+          [tenantA],
+        );
+        await seed.query(
+          `INSERT INTO workspace_access_events(id,tenant_id,actor_id,event_type,target_id,before_value,after_value,created_at)
+          SELECT gen_random_uuid(),$1,$2,'member.update',$3,$4,$5,now()-make_interval(mins=>n) FROM generate_series(1,55) n`,
+          [
+            tenantA,
+            customer,
+            randomUUID(),
+            { userId: customer, roleName: 'Member' },
+            {
+              userId: customer,
+              roleName: 'Admin',
+              email: 'private-invitee@example.test',
+            },
+          ],
+        );
+        await seed.query('COMMIT');
+      } catch (error) {
+        await seed.query('ROLLBACK');
+        throw error;
+      } finally {
+        seed.release();
+      }
+      const opened = await app.inject({
+        method: 'POST',
+        url: `/v1/staff/workspaces/${tenantA}/access`,
+        headers: { cookie, origin },
+        payload: { reason: 'Investigating a failing order sync' },
+      });
+      expect(opened.statusCode, opened.body).toBe(201);
+      const grant = opened.json().id;
+      const health = await app.inject({
+        url: `/v1/staff/workspaces/${tenantA}/health?grantId=${grant}`,
+        headers: { cookie },
+      });
+      expect(health.statusCode, health.body).toBe(200);
+      for (const hidden of [
+        'private-credential-secret',
+        'private-target.example',
+        'shopper-observation@example.test',
+        'PRIVATE-ORDER-PARAMETER',
+        'private-provider-request',
+        'PRIVATE-STEP-VALUE',
+        'tenant_b_error',
+      ])
+        expect(health.body).not.toContain(hidden);
+      const body = health.json();
+      expect(body.settings).toEqual({
+        timezone: 'Europe/Berlin',
+        alwaysRequireApproval: true,
+      });
+      expect(body.sync.streams).toEqual([
+        expect.objectContaining({
+          id: stream,
+          attempts: 3,
+          errorCode: 'authentication',
+          failingSince: expect.any(String),
+        }),
+      ]);
+      expect(body.sync.runs[0]).toMatchObject({ failed: 2, errors: 1 });
+      expect(body.connections.items).toEqual([
+        {
+          id: connection,
+          provider: 'shopify',
+          status: 'active',
+          version: 1,
+          credentialVersion: 3,
+        },
+      ]);
+      expect(body.connections.events[0].actor).toEqual({
+        id: customer,
+        name: 'Customer Alice',
+        member: true,
+      });
+      expect(body.connections.readChecks).toEqual([
+        expect.objectContaining({
+          capability: 'orders.read',
+          succeeded: false,
+          errorCode: 'authentication',
+        }),
+        expect.objectContaining({
+          capability: 'products.read',
+          succeeded: true,
+          errorCode: null,
+        }),
+      ]);
+      expect(body.execution.failed).toEqual({ count: 1, capped: false });
+      expect(body.execution.actions[0]).toMatchObject({
+        capability: 'inventory.available.reconcile',
+        connectionId: connection,
+      });
+      expect(body.execution.failures[0]).toMatchObject({
+        phase: 'dispatch',
+        code: 'timeout',
+      });
+      expect(body.workflows.steps).toEqual([
+        expect.objectContaining({ runId: failedRun, state: 'failed' }),
+      ]);
+      expect(body.workflows.awaitingAdmission).toMatchObject({
+        count: 1,
+        capped: false,
+      });
+      expect(body.workflows.activations[0].principal.name).toBe(
+        'Customer Alice',
+      );
+      expect(body.cases).toEqual({
+        open: 1,
+        byState: [{ state: 'awaiting_approval', count: 1 }],
+        awaitingApproval: 1,
+        reviewRequired: 1,
+      });
+      expect(body.mail.failed).toEqual({ count: 1, capped: false });
+      expect(body.apps).toEqual([
+        expect.objectContaining({ appId: 'shopify', appVersion: '1.4.0' }),
+      ]);
+      const first = await app.inject({
+        url: `/v1/staff/workspaces/${tenantA}/access-history?grantId=${grant}`,
+        headers: { cookie },
+      });
+      expect(first.statusCode, first.body).toBe(200);
+      expect(first.body).not.toContain('private-invitee@example.test');
+      const page = first.json();
+      expect(page.events).toHaveLength(50);
+      expect(page.events[0]).toMatchObject({
+        type: 'member.update',
+        summary: 'Member → Admin',
+        actor: { id: customer, name: 'Customer Alice', member: true },
+        subject: { id: customer, name: 'Customer Alice' },
+      });
+      const second = await app.inject({
+        url: `/v1/staff/workspaces/${tenantA}/access-history?grantId=${grant}&cursor=${page.nextCursor}`,
+        headers: { cookie },
+      });
+      expect(second.statusCode, second.body).toBe(200);
+      expect(second.json().events).toHaveLength(5);
+      expect(second.json().nextCursor).toBeNull();
+      expect(
+        new Set(
+          [...page.events, ...second.json().events].map(
+            (event: { id: string }) => event.id,
+          ),
+        ).size,
+      ).toBe(55);
+      const audit = await owner.query<{ event: string; count: number }>(
+        "SELECT event,count(*)::int AS count FROM staff_audit WHERE tenant_id=$1 AND event IN ('workspace.health.read','workspace.access-history.read') AND details->>'grantId'=$2 GROUP BY event ORDER BY event",
+        [tenantA, grant],
+      );
+      expect(audit.rows).toEqual([
+        { event: 'workspace.access-history.read', count: 2 },
+        { event: 'workspace.health.read', count: 1 },
+      ]);
+      for (const path of ['health', 'access-history'])
+        expect(
+          (
+            await app.inject({
+              url: `/v1/staff/workspaces/${tenantB}/${path}?grantId=${grant}`,
+              headers: { cookie },
+            })
+          ).statusCode,
+        ).toBe(403);
+      await owner.query(
+        "UPDATE staff_support_grants SET expires_at=now()-interval '1 second' WHERE id=$1",
+        [grant],
+      );
+      for (const path of ['health', 'access-history'])
+        expect(
+          (
+            await app.inject({
+              url: `/v1/staff/workspaces/${tenantA}/${path}?grantId=${grant}`,
+              headers: { cookie },
+            })
+          ).statusCode,
+        ).toBe(403);
+    });
     it('expires passive polling while extending idle time only for activity before expiry', async () => {
       const session = await owner.query<{ id: string }>(
         'SELECT s.id FROM staff_sessions s JOIN staff_users u ON u.id=s.user_id WHERE u.email=$1',
