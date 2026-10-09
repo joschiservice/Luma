@@ -7,6 +7,7 @@ import type {
 } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import type { Domain } from '@luma/ui/components/primitives/domain-icon';
+import type { PersonOption } from '@luma/ui/components/primitives/person-picker';
 import type { OperationalState } from '@luma/ui/components/primitives/state';
 
 export const viewLabels: Record<DecisionView, () => string> = {
@@ -179,4 +180,38 @@ export function memberName(
   const member = members.find((entry) => entry.userId === id);
 
   return member?.name || member?.email || m.decisions_member_former();
+}
+
+/**
+ * Lists the people a decision can be handed to, leaving out its current holder. The reader comes
+ * first as "You", with their own name and email underneath so a search for either finds them.
+ */
+export function assigneeOptions(
+  members: readonly {
+    userId: string;
+    name?: string | undefined;
+    email?: string | undefined;
+  }[],
+  holder: string | null,
+  self: string | undefined,
+): PersonOption[] {
+  const people = members
+    .filter((member) => member.userId !== holder)
+    .map((member) =>
+      member.userId === self
+        ? {
+            id: member.userId,
+            name: m.decisions_member_you(),
+            detail:
+              [member.name, member.email].filter(Boolean).join(' · ') ||
+              undefined,
+          }
+        : {
+            id: member.userId,
+            name: member.name || member.email || m.decisions_member_fallback(),
+            detail: member.name ? member.email : undefined,
+          },
+    );
+
+  return people.sort((a, b) => Number(b.id === self) - Number(a.id === self));
 }

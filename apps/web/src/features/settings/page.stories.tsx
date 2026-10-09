@@ -1,4 +1,4 @@
-import type { SettingsSnapshot } from '@luma/api-contract';
+import type { Membership, SettingsSnapshot } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -9,7 +9,7 @@ import {
   RouterProvider,
 } from '@tanstack/react-router';
 import { useState } from 'react';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import appStyles from '../../styles.css?inline';
 import { contextFixture } from '../identity/context.fixture';
@@ -36,16 +36,74 @@ const data: SettingsSnapshot = {
   lastTest: null,
 };
 
+// Enough people to need three pages of 25.
+const largeTeam: Membership[] = [
+  ...membersFixture,
+  ...Array.from({ length: 56 }, (_, index) => {
+    const id = `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`;
+
+    return {
+      ...membersFixture[3]!,
+      id,
+      userId: id,
+      name: `Teammate ${index + 1}`,
+      email: `teammate${index + 1}@northstar.example`,
+    };
+  }),
+];
+
+/**
+ * Answers the team reads with the seeded data. These queries are always stale, so the page
+ * fetches them again after mounting, and an unanswered request would show the access error.
+ */
+function mockTeam({
+  member = false,
+  team = 'small',
+}: {
+  member?: boolean;
+  team?: 'small' | 'large';
+}) {
+  const original = globalThis.fetch;
+  const answers: Record<string, unknown> = {
+    context: contextFixture(organizationId, member ? 'member' : 'owner'),
+    members: { items: team === 'large' ? largeTeam : membersFixture },
+    invitations: { items: [] },
+    roles: rolesFixture,
+  };
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(
+      input instanceof Request ? input.url : String(input),
+      location.origin,
+    );
+    const resource = url.pathname.split('/').at(-1) ?? '';
+    const method = input instanceof Request ? input.method : init?.method;
+    if (
+      url.pathname.includes(`/organizations/${organizationId}/`) &&
+      (method ?? 'GET') === 'GET' &&
+      resource in answers
+    )
+      return Response.json(answers[resource]);
+
+    return original(input, init);
+  };
+
+  return () => {
+    globalThis.fetch = original;
+  };
+}
+
 function Preview({
   section = 'workspace',
   state = 'ready',
   member = false,
   roleId,
+  team = 'small',
 }: {
   section?: SettingsSection;
   state?: 'ready' | 'loading' | 'error' | 'mail-unavailable';
   member?: boolean;
   roleId?: string;
+  team?: 'small' | 'large';
 }) {
   const [client] = useState(() => {
     const value = new QueryClient({
@@ -55,7 +113,10 @@ function Preview({
     value.setQueryData(contextOptions(organizationId).queryKey, context);
     value.setQueryData(sessionOptions().queryKey, null);
     value.setQueryData(rolesOptions(organizationId).queryKey, rolesFixture);
-    value.setQueryData(membersOptions(organizationId).queryKey, membersFixture);
+    value.setQueryData(
+      membersOptions(organizationId).queryKey,
+      team === 'large' ? largeTeam : membersFixture,
+    );
     value.setQueryData(invitationsOptions(organizationId).queryKey, []);
 
     return value;
@@ -100,6 +161,7 @@ const meta = {
   component: Preview,
   render: (args) => <Preview key={JSON.stringify(args)} {...args} />,
   parameters: { layout: 'fullscreen' },
+  beforeEach: ({ args }) => mockTeam(args),
 } satisfies Meta<typeof Preview>;
 
 export default meta;
@@ -190,3 +252,25 @@ export const BuiltInRoleReadOnly: Story = {
 };
 
 export const TeamWithCustomRoles: Story = { args: { section: 'team' } };
+
+export const LargeTeam: Story = {
+  args: { section: 'team', team: 'large' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const pages = canvas.getByRole('navigation', { name: 'Team pages' });
+    await expect(pages).toHaveTextContent('1–25 of 60 people');
+    await expect(pages).toHaveTextContent('Page 1 of 3');
+    await userEvent.click(within(pages).getByRole('button', { name: 'Next' }));
+    await waitFor(() => expect(pages).toHaveTextContent('26–50 of 60 people'));
+    await expect(canvas.getByText('Teammate 22')).toBeVisible();
+
+    await userEvent.type(
+      canvas.getByRole('textbox', { name: 'Search team' }),
+      'Teammate 5',
+    );
+    await waitFor(() => expect(pages).toHaveTextContent('1–8 of 8 people'));
+    await expect(
+      within(pages).getByRole('button', { name: 'Next' }),
+    ).toBeDisabled();
+  },
+};

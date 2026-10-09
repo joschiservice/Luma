@@ -7,7 +7,7 @@ import { IssuePanelClose } from '@luma/ui/components/issues/issue-panel-close';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
 import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
-import { Select } from '@luma/ui/components/primitives/select';
+import { PersonPicker } from '@luma/ui/components/primitives/person-picker';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import {
   WorkspaceDate,
@@ -18,6 +18,7 @@ import { ArrowUpRight, Clock } from 'lucide-react';
 import { type ReactNode, useContext, useId } from 'react';
 
 import {
+  assigneeOptions,
   decisionStatus,
   domainIcons,
   domainLabels,
@@ -188,26 +189,12 @@ function Assignment({
         </Button>
       ) : null}
       {staff && members.length > 1 ? (
-        <Select<string>
-          aria-label={m.decisions_assign_label()}
-          className="decision-assignee"
-          placeholder={m.decisions_assign_placeholder()}
-          value={null}
+        <PersonPicker
+          label={m.decisions_assign_placeholder()}
+          title={m.decisions_assign_label()}
           disabled={pending}
-          options={members
-            .filter((member) => member.userId !== holder)
-            .map((member) => ({
-              value: member.userId,
-              label:
-                member.userId === self
-                  ? m.decisions_member_you()
-                  : member.name ||
-                    member.email ||
-                    m.decisions_member_fallback(),
-            }))}
-          onValueChange={(value) => {
-            if (value) onAssign(value);
-          }}
+          people={assigneeOptions(members, holder, self)}
+          onSelect={onAssign}
         />
       ) : null}
     </div>

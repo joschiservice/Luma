@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from '@luma/ui/components/primitives/dialog';
 import { Input } from '@luma/ui/components/primitives/input';
+import { Pagination } from '@luma/ui/components/primitives/pagination';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
@@ -30,6 +31,8 @@ import {
 import { invitationsOptions, membersOptions, settingsApi } from './data';
 import { type RoleChoice, RolePicker } from './role-picker';
 import { rolesOptions, type WorkspaceRole } from './roles-data';
+
+const teamPageSize = 25;
 
 /**
  * Manages member access and email invitations with explicit confirmation and delivery status.
@@ -55,6 +58,7 @@ export function TeamSettings({
   const online = useSettingsOnline();
   const command = useSettingsCommand(organizationId);
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('member');
@@ -69,6 +73,16 @@ export function TeamSettings({
     `${member.name ?? ''} ${member.email ?? ''} ${roleName(member.role)}`
       .toLowerCase()
       .includes(search.toLowerCase()),
+  );
+  // Removing people can leave the reader past the last page; show the last one instead.
+  const lastPage = Math.max(
+    1,
+    Math.ceil((visible?.length ?? 0) / teamPageSize),
+  );
+  const shownPage = Math.min(page, lastPage);
+  const pageMembers = visible?.slice(
+    (shownPage - 1) * teamPageSize,
+    shownPage * teamPageSize,
   );
   const outstanding = invitations.data?.filter(
     (invitation) =>
@@ -196,14 +210,17 @@ export function TeamSettings({
           aria-label={m.settings_team_search_label()}
           placeholder={m.settings_team_search_placeholder()}
           value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setPage(1);
+          }}
         />
       </div>
       {members.isPending ? (
         <p role="status">{m.settings_team_loading()}</p>
       ) : null}
       <div className="settings-members">
-        {visible?.map((member) => (
+        {pageMembers?.map((member) => (
           <div className="settings-member" key={member.id}>
             <div className="settings-avatar" aria-hidden="true">
               {(member.name ?? member.email ?? '?').slice(0, 2).toUpperCase()}
@@ -263,13 +280,32 @@ export function TeamSettings({
                 : m.settings_team_empty()}
             </strong>
             {search ? (
-              <Button variant="ghost" onClick={() => setSearch('')}>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setSearch('');
+                  setPage(1);
+                }}
+              >
                 {m.settings_team_clear_search()}
               </Button>
             ) : null}
           </div>
         ) : null}
       </div>
+      {pageMembers?.length ? (
+        <Pagination
+          count={pageMembers.length}
+          totalCount={visible?.length}
+          page={shownPage}
+          pageSize={teamPageSize}
+          hasNext={shownPage < lastPage}
+          onPrevious={shownPage > 1 ? () => setPage(shownPage - 1) : undefined}
+          onNext={() => setPage(shownPage + 1)}
+          formatTotal={(count) => m.settings_team_pagination_total({ count })}
+          label={m.settings_team_pagination_label()}
+        />
+      ) : null}
       {manage ? (
         <div className="settings-invitations">
           <h3>
