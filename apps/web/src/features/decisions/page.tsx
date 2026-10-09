@@ -496,7 +496,7 @@ export function NeedsYouView({
                 !search.item ||
                 (event.target instanceof Element &&
                   event.target.closest(
-                    'input, textarea, select, [contenteditable="true"], [role="dialog"], [role="menu"], [role="listbox"]',
+                    'input, textarea, select, [contenteditable="true"], [role="combobox"], [role="dialog"], [role="menu"], [role="listbox"]',
                   ))
               )
                 return;

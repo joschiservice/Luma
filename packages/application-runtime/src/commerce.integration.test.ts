@@ -246,6 +246,8 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
     ).toEqual([]);
   });
 
+  // Projecting 55 positions takes about 220 sequential transactions. Under a full parallel
+  // test run this can pass 5 seconds, and a timed-out test keeps writing into the next one.
   it('bounds stock choices, pages without duplicates and searches literal SKU text', async () => {
     const ids = [];
     for (let i = 0; i < 55; i++) {
@@ -302,7 +304,7 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
     await expect(
       store.browseStocks(context(), { cursor: 'bad' }),
     ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
-  });
+  }, 30000);
   it('searches mapped records within one tenant and keeps differing source facts separate', async () => {
     const first = await mapStock(stock({ amount: '3' }), 'explorer-left');
     const second = await mapStock(

@@ -387,10 +387,15 @@ export const Selected: Story = {
     const [first, second] = within(people).getAllByRole('option');
     await expect(first).toHaveTextContent('YouAlex Morgan');
     await expect(second).toHaveTextContent('Sam Rivera');
+    // Escape closes only the picker, even before focus reaches its search field.
+    canvas.getByRole('combobox', { name: 'Assign to…' }).focus();
     await userEvent.keyboard('{Escape}');
     await waitFor(() =>
       expect(within(document.body).queryByRole('listbox')).toBeNull(),
     );
+    await expect(
+      canvas.getByRole('heading', { name: 'Why you’re needed' }),
+    ).toBeVisible();
     await userEvent.click(canvas.getByRole('button', { name: 'Close panel' }));
     await waitFor(() =>
       expect(
