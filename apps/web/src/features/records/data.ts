@@ -1,8 +1,4 @@
-import {
-  recordDetailSchema,
-  type RecordKind,
-  recordListSchema,
-} from '@luma/api-contract';
+import { type RecordKind } from '@luma/api-contract';
 import { queryOptions } from '@tanstack/react-query';
 import { z } from 'zod';
 
@@ -72,17 +68,8 @@ export function recordsOptions(
   return queryOptions({
     ...privateQueryDefaults,
     queryKey: ['private', 'organization', organizationId, 'records', query],
-    queryFn: async ({ signal }) => {
-      const result = await api.records.list({
-        params: { organizationId },
-        query,
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return recordListSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.records.list({ params: { organizationId }, query }, { signal }),
   });
 }
 
@@ -102,16 +89,11 @@ export function recordOptions(
       kind,
       recordId,
     ],
-    queryFn: async ({ signal }) => {
-      const result = await api.records.get({
-        params: { organizationId, kind, recordId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return recordDetailSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.records.get(
+        { params: { organizationId, kind, recordId } },
+        { signal },
+      ),
   });
 }
 

@@ -1,8 +1,4 @@
-import {
-  type AskAssistant,
-  assistantAnswerSchema,
-  assistantAvailabilitySchema,
-} from '@luma/api-contract';
+import { type AskAssistant } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import { queryOptions } from '@tanstack/react-query';
 
@@ -20,16 +16,8 @@ export const assistantAvailabilityOptions = (organizationId: string) =>
     // Availability changes only when the server restarts with other model routes.
     staleTime: 5 * 60_000,
     gcTime: 5 * 60_000,
-    queryFn: async ({ signal }) => {
-      const result = await api.assistant.availability({
-        params: { organizationId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return assistantAvailabilitySchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.assistant.availability({ params: { organizationId } }, { signal }),
   });
 
 /** Asks one question. Reads only, so repeating a question after a failure is safe. */
@@ -38,15 +26,7 @@ export async function askAssistant(
   body: AskAssistant,
   signal: AbortSignal,
 ) {
-  const result = await api.assistant.ask({
-    params: { organizationId },
-    body,
-    fetchOptions: { signal },
-  });
-  if (result.status !== 200)
-    throw new IdentityError(result.status, result.body);
-
-  return assistantAnswerSchema.parse(result.body);
+  return api.assistant.ask({ params: { organizationId }, body }, { signal });
 }
 
 /**

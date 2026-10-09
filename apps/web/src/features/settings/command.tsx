@@ -5,7 +5,7 @@ import { onlineManager, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState, useSyncExternalStore } from 'react';
 
 import { IdentityError } from '../identity/data';
-import { settingsApi, SettingsError } from './data';
+import { settingsApi } from './data';
 
 const subscribe = (changed: () => void) => onlineManager.subscribe(changed);
 
@@ -71,11 +71,9 @@ export function useSettingsCommand(organizationId: string) {
     setPending(true);
     setError(null);
     try {
-      const result = await settingsApi.settings.receipt({
+      await settingsApi.settings.receipt({
         params: { organizationId, commandId: command.id },
       });
-      if (result.status !== 200)
-        throw new SettingsError(result.status, result.body.message);
       await command.operation(command.id);
       uncertain.current = null;
       setNeedsCheck(false);

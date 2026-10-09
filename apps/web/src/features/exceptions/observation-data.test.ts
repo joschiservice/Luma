@@ -58,12 +58,12 @@ function mockReads(overrides: Record<string, unknown> = {}) {
   requests.length = 0;
   vi.stubGlobal(
     'fetch',
-    vi.fn(async (url: string, init: RequestInit) => {
-      requests.push(url);
+    vi.fn(async (request: Request, init: RequestInit) => {
+      requests.push(request.url);
       expect(init.credentials).toBe('same-origin');
       expect(init.cache).toBe('no-store');
-      expect(init.signal).toBeInstanceOf(AbortSignal);
-      const path = new URL(url, 'http://localhost');
+      expect(request.signal).toBeInstanceOf(AbortSignal);
+      const path = new URL(request.url);
       const resource = path.pathname.split('/').at(-1)!;
       const body =
         overrides[resource] ??

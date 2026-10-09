@@ -1,8 +1,4 @@
-import {
-  orderDetailSchema,
-  type OrderListQuery,
-  orderListSchema,
-} from '@luma/api-contract';
+import { type OrderListQuery } from '@luma/api-contract';
 import { nextCalendarDay, workspaceInstant } from '@luma/ui/lib/timezone';
 import { queryOptions } from '@tanstack/react-query';
 import { z } from 'zod';
@@ -148,17 +144,8 @@ export function ordersOptions(
     ...privateQueryDefaults,
     queryKey: ['private', 'organization', organizationId, 'orders', query],
     refetchOnReconnect: 'always',
-    queryFn: async ({ signal }) => {
-      const result = await api.orders.list({
-        params: { organizationId },
-        query,
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return orderListSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.orders.list({ params: { organizationId }, query }, { signal }),
   });
 }
 
@@ -168,15 +155,7 @@ export function orderOptions(organizationId: string, orderId: string) {
     ...privateQueryDefaults,
     queryKey: ['private', 'organization', organizationId, 'order', orderId],
     refetchOnReconnect: 'always',
-    queryFn: async ({ signal }) => {
-      const result = await api.orders.get({
-        params: { organizationId, orderId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return orderDetailSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.orders.get({ params: { organizationId, orderId } }, { signal }),
   });
 }

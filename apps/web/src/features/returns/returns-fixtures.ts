@@ -145,12 +145,29 @@ export const items: ReturnListItem[] = [
   }),
 ];
 
+/** Stage counts with every stage at zero, as the API reports them; override the stages needed. */
+export const noStages: ReturnList['counts']['stages'] = {
+  requested: 0,
+  awaiting_items: 0,
+  awaiting_refund: 0,
+  refund_pending: 0,
+  refund_failed: 0,
+  ready_to_close: 0,
+  refund_recorded: 0,
+  refunded: 0,
+  closed: 0,
+  declined: 0,
+  cancelled: 0,
+  unknown: 0,
+};
+
 export const list: ReturnList = {
   items,
   sources,
   counts: {
     views: { action: 3, waiting: 2, done: 7, all: 12 },
     stages: {
+      ...noStages,
       requested: 1,
       awaiting_items: 1,
       awaiting_refund: 1,

@@ -229,7 +229,11 @@ export function mockConnections(state: MockState = 'ready') {
     if (url.pathname.endsWith('/shopify/authorize')) return fail(503);
     if (url.pathname.endsWith('/connections') && method === 'GET')
       return Response.json({ items });
-    const body = JSON.parse(String(init?.body ?? '{}'));
+    const body = JSON.parse(
+      (input instanceof Request
+        ? await input.clone().text()
+        : String(init?.body ?? '')) || '{}',
+    );
     if (url.pathname.endsWith('/connections') && method === 'POST') {
       const item: InstalledConnection = {
         ...warehouse,

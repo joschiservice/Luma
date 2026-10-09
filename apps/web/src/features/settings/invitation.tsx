@@ -19,7 +19,7 @@ import {
   invitationToken,
 } from '../identity/invitation-return';
 import { roleName } from '../identity/permission-text';
-import { settingsApi, SettingsError } from './data';
+import { settingsApi } from './data';
 
 /** Reviews an email-bound invitation and reconciles acceptance before opening the workspace. */
 export function AcceptInvitation() {
@@ -41,26 +41,14 @@ export function AcceptInvitation() {
     queryKey: ['private', 'invitation', organizationId, invitationId, token],
     retry: false,
     gcTime: 0,
-    queryFn: async () => {
-      const result = await settingsApi.settings.previewInvitation({
-        body: proof,
-      });
-      if (result.status !== 200)
-        throw new SettingsError(result.status, result.body.message);
-
-      return result.body;
-    },
+    queryFn: () => settingsApi.settings.previewInvitation({ body: proof }),
   });
 
   async function accept() {
     setPending(true);
     setError('');
     try {
-      const result = await settingsApi.settings.acceptInvitation({
-        body: proof,
-      });
-      if (result.status !== 200)
-        throw new SettingsError(result.status, result.body.message);
+      await settingsApi.settings.acceptInvitation({ body: proof });
       forgetInvitationToken(path);
       await client.invalidateQueries({
         queryKey: ['private', 'organizations'],

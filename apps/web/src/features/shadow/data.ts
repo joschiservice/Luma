@@ -20,7 +20,6 @@ export type ShadowComparison = ReturnType<typeof shadowComparisonSchema.parse>;
 export type ShadowReview = ReturnType<typeof shadowReviewSchema.parse>;
 
 export type ShadowReport = ReturnType<typeof shadowReportSchema.parse>;
-const api = createWebApiClient();
 
 class ShadowError extends IdentityError {
   constructor(
@@ -31,10 +30,10 @@ class ShadowError extends IdentityError {
   }
 }
 
-function failure(result: { status: number; body: unknown }): never {
-  const body = result.body;
-  throw new ShadowError(
-    result.status,
+/** Keeps the server's message as feedback for error statuses. */
+function failure(status: number, body: unknown) {
+  return new ShadowError(
+    status,
     body &&
       typeof body === 'object' &&
       'message' in body &&
@@ -43,6 +42,8 @@ function failure(result: { status: number; body: unknown }): never {
       : m.shadow_error_unavailable(),
   );
 }
+
+const api = createWebApiClient('/api', failure);
 
 /** Keeps all Shadow cache entries inside the workspace's private cache. */
 export const shadowKey = (organizationId: string) =>
@@ -59,16 +60,12 @@ export function shadowLatestOptions(
     queryKey: [...shadowKey(organizationId), 'latest', exceptionId, workflow],
     enabled: Boolean(workflow),
     queryFn: async ({ signal }) => {
-      const result = await api.shadow.latest({
-        params: { organizationId, exceptionId },
-        query: { workflow },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200) return failure(result);
+      const result = await api.shadow.latest(
+        { params: { organizationId, exceptionId }, query: { workflow } },
+        { signal },
+      );
 
-      return result.body.item
-        ? shadowComparisonSchema.parse(result.body.item)
-        : null;
+      return result.item;
     },
   });
 }
@@ -102,16 +99,11 @@ export function shadowReportOptions(
   return queryOptions({
     ...privateQueryDefaults,
     queryKey: [...shadowKey(organizationId), 'report', window],
-    queryFn: async ({ signal }) => {
-      const result = await api.shadow.report({
-        params: { organizationId },
-        query: window,
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200) return failure(result);
-
-      return shadowReportSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.shadow.report(
+        { params: { organizationId }, query: window },
+        { signal },
+      ),
   });
 }
 
@@ -121,13 +113,10 @@ export async function evaluateShadow(
   exceptionId: string,
   request: { id: string; workflow: string },
 ) {
-  const result = await api.shadow.evaluate({
+  return api.shadow.evaluate({
     params: { organizationId, exceptionId },
     body: request,
   });
-  if (result.status !== 200) return failure(result);
-
-  return shadowEvaluationSchema.parse(result.body);
 }
 
 /** Records the first operator review; retry the identical body after an uncertain response. */
@@ -136,11 +125,10 @@ export async function reviewShadow(
   evaluationId: string,
   review: ShadowReview,
 ) {
-  const result = await api.shadow.review({
+  await api.shadow.review({
     params: { organizationId, evaluationId },
     body: shadowReviewSchema.parse(review),
   });
-  if (result.status !== 200) return failure(result);
 }
 
 /** Extracts the comparable business action from a retained candidate, tolerating missing data. */

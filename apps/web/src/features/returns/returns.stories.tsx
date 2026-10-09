@@ -12,7 +12,13 @@ import appStyles from '../../styles.css?inline';
 import type { ReturnsSearch } from './data';
 import { ReturnDetailView } from './detail';
 import { ReturnsView } from './page';
-import { detail, list, returnItem, sources } from './returns-fixtures';
+import {
+  detail,
+  list,
+  noStages,
+  returnItem,
+  sources,
+} from './returns-fixtures';
 
 const org = '99999999-9999-4999-8999-999999999999';
 
@@ -116,7 +122,7 @@ function Content({ state }: { state: string }) {
                 })),
                 counts: {
                   views: { action: 0, waiting: 0, done: 0, all: 0 },
-                  stages: {},
+                  stages: noStages,
                 },
               }
             : state === 'nothing-pending'
@@ -125,7 +131,12 @@ function Content({ state }: { state: string }) {
                   items: [],
                   counts: {
                     views: { action: 0, waiting: 2, done: 7, all: 9 },
-                    stages: { awaiting_items: 1, refund_pending: 1, closed: 7 },
+                    stages: {
+                      ...noStages,
+                      awaiting_items: 1,
+                      refund_pending: 1,
+                      closed: 7,
+                    },
                   },
                 }
               : list

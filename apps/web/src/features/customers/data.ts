@@ -1,9 +1,6 @@
 import {
-  customerDetailSchema,
-  customerListSchema,
   customerSortSchema,
   customerStateSchema,
-  orderListSchema,
   type OrderSort,
 } from '@luma/api-contract';
 import { queryOptions } from '@tanstack/react-query';
@@ -11,7 +8,6 @@ import { z } from 'zod';
 
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
-import { IdentityError } from '../identity/data';
 
 const api = createWebApiClient();
 
@@ -69,17 +65,8 @@ export function customersOptions(
     ...privateQueryDefaults,
     queryKey: ['private', 'organization', organizationId, 'customers', query],
     refetchOnReconnect: 'always',
-    queryFn: async ({ signal }) => {
-      const result = await api.customers.list({
-        params: { organizationId },
-        query,
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return customerListSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.customers.list({ params: { organizationId }, query }, { signal }),
   });
 }
 
@@ -103,15 +90,15 @@ export function customerSourceOptions(
       externalId,
     ],
     queryFn: async ({ signal }) => {
-      const result = await api.customers.list({
-        params: { organizationId },
-        query: { connectionId, externalId, limit: 1 },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
+      const result = await api.customers.list(
+        {
+          params: { organizationId },
+          query: { connectionId, externalId, limit: 1 },
+        },
+        { signal },
+      );
 
-      return customerListSchema.parse(result.body).items[0]?.id ?? null;
+      return result.items[0]?.id ?? null;
     },
   });
 }
@@ -128,16 +115,8 @@ export function customerOptions(organizationId: string, customerId: string) {
       customerId,
     ],
     refetchOnReconnect: 'always',
-    queryFn: async ({ signal }) => {
-      const result = await api.customers.get({
-        params: { organizationId, customerId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return customerDetailSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.customers.get({ params: { organizationId, customerId } }, { signal }),
   });
 }
 
@@ -178,16 +157,7 @@ export function customerOrdersOptions(
       query,
     ],
     refetchOnReconnect: 'always',
-    queryFn: async ({ signal }) => {
-      const result = await api.orders.list({
-        params: { organizationId },
-        query,
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return orderListSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.orders.list({ params: { organizationId }, query }, { signal }),
   });
 }

@@ -1,6 +1,5 @@
 import {
   type MeasurementCommand,
-  measurementHistorySchema,
   type OperationalMetricResponse,
 } from '@luma/api-contract';
 import { formatNumber } from '@luma/i18n/format';
@@ -14,7 +13,6 @@ import { useState } from 'react';
 
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
-import { IdentityError } from '../identity/data';
 
 const api = createWebApiClient();
 
@@ -90,17 +88,11 @@ export function ResolutionEvidence({
     ...privateQueryDefaults,
     enabled: open,
     retry: false,
-    queryFn: async ({ signal }) => {
-      const result = await api.operations.measurementHistory({
-        params: { organizationId, exceptionId: item.id },
-        query: { after },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return measurementHistorySchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.operations.measurementHistory(
+        { params: { organizationId, exceptionId: item.id }, query: { after } },
+        { signal },
+      ),
   });
 
   const evidenceCount = item.evidenceRefCount ?? item.evidenceRefs.length;

@@ -1,6 +1,5 @@
 import {
   activityOutcomes,
-  activityPageSchema,
   type ActivityQuery,
   activityTypes,
 } from '@luma/api-contract';
@@ -13,7 +12,6 @@ import { queryOptions } from '@tanstack/react-query';
 
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
-import { IdentityError } from '../identity/data';
 
 export interface ActivityFilters {
   from?: string | undefined;
@@ -120,16 +118,7 @@ export function activityOptions(
     refetchOnWindowFocus: head ? 'always' : false,
     refetchOnReconnect: 'always',
     refetchInterval: head ? 30_000 : false,
-    queryFn: async ({ signal }) => {
-      const result = await api.activity.list({
-        params: { organizationId },
-        query,
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return activityPageSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.activity.list({ params: { organizationId }, query }, { signal }),
   });
 }

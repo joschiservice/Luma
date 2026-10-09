@@ -2,8 +2,6 @@ import {
   type CaseDecision,
   caseDecisionSchema,
   type CaseReview,
-  caseReviewSchema,
-  decisionReceiptSchema,
 } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 
@@ -50,15 +48,10 @@ export async function sendDecision(
   exceptionId: string,
   body: CaseDecision,
 ) {
-  const result = await api.caseDesk.decide({
-    params: { organizationId, exceptionId },
-    body,
-    extraHeaders: { 'x-luma-action-id': body.commandId },
-  });
-  if (result.status !== 200)
-    throw new IdentityError(result.status, result.body);
-
-  return decisionReceiptSchema.parse(result.body);
+  return api.caseDesk.decide(
+    { params: { organizationId, exceptionId }, body },
+    { context: { headers: { 'x-luma-action-id': body.commandId } } },
+  );
 }
 
 /** Reads the receipt for an earlier command without resubmitting the decision. */
@@ -67,14 +60,9 @@ export async function recoverDecision(
   exceptionId: string,
   commandId: string,
 ) {
-  const result = await api.caseDesk.receipt({
+  return api.caseDesk.receipt({
     params: { organizationId, exceptionId, commandId },
-    fetchOptions: { cache: 'no-store' },
   });
-  if (result.status !== 200)
-    throw new IdentityError(result.status, result.body);
-
-  return decisionReceiptSchema.parse(result.body);
 }
 
 /**
@@ -93,31 +81,33 @@ export function decisionError(error: unknown) {
   return m.exceptions_decision_error_unclear();
 }
 
-/** Checks current source facts without recording a decision or executing the proposal. */
+/**
+ * Checks current source facts without recording a decision or executing the proposal. A 409
+ * keeps the server's description of the changed conditions; failures without a response, such
+ * as network errors, reject with a retryable 503.
+ */
 export async function refreshResolution(
   organizationId: string,
   exceptionId: string,
 ) {
   const unavailable = m.exceptions_refresh_unavailable();
-  const result = await api.caseDesk
-    .refresh({ params: { organizationId, exceptionId }, body: {} })
-    .catch(() => {
+  try {
+    return await api.caseDesk.refresh({
+      params: { organizationId, exceptionId },
+      body: {},
+    });
+  } catch (cause) {
+    if (!(cause instanceof IdentityError)) {
       const error = new IdentityError(503);
       error.message = unavailable;
       throw error;
-    });
-  if (result.status !== 200) {
-    const error = new IdentityError(result.status, result.body);
-    error.message =
-      result.status === 409
-        ? result.body.message
-        : [401, 403, 404].includes(result.status)
-          ? decisionError(error)
-          : unavailable;
-    throw error;
+    }
+    if (cause.status !== 409)
+      cause.message = [401, 403, 404].includes(cause.status)
+        ? decisionError(cause)
+        : unavailable;
+    throw cause;
   }
-
-  return caseReviewSchema.parse(result.body);
 }
 
 /** Compares the decision's scope, excluding evidence timestamps and immutable revision identifiers. */

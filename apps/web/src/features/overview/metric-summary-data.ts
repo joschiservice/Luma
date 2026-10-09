@@ -1,7 +1,6 @@
 import {
   type MetricRequest,
   type MetricSummaryRequest,
-  metricSummaryResponseSchema,
   type OperationalMetricRequest,
   type WorkspaceTopic,
 } from '@luma/api-contract';
@@ -9,7 +8,6 @@ import { queryOptions } from '@tanstack/react-query';
 
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
-import { IdentityError } from '../identity/data';
 
 const api = createWebApiClient();
 
@@ -33,17 +31,11 @@ export function metricSummaryOptions(
     retry: false,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
-    queryFn: async ({ signal }) => {
-      const result = await api.metrics.summary({
-        params: { organizationId },
-        body: { parts },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return metricSummaryResponseSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.metrics.summary(
+        { params: { organizationId }, body: { parts } },
+        { signal },
+      ),
   });
 }
 

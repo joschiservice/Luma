@@ -14,8 +14,7 @@ import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
 import { IdentityError } from '../identity/data';
 
-const api = createWebApiClient().procurement;
-
+/** A rejected procurement request, with the server's explanation when it sent one. */
 export class ProcurementError extends IdentityError {
   constructor(
     status: number,
@@ -25,15 +24,18 @@ export class ProcurementError extends IdentityError {
   }
 }
 
-function failure(response: { status: number; body: unknown }): never {
-  const body = response.body;
-  throw new ProcurementError(
-    response.status,
-    typeof body === 'object' && body !== null && 'message' in body
-      ? String(body.message)
-      : m.procurement_error_unavailable(),
-  );
-}
+const client = createWebApiClient(
+  undefined,
+  (status, body) =>
+    new ProcurementError(
+      status,
+      typeof body === 'object' && body !== null && 'message' in body
+        ? String(body.message)
+        : m.procurement_error_unavailable(),
+    ),
+);
+const api = client.procurement;
+const contextApi = client.procurementContext;
 
 /** Returns the private cache prefix for procurement in this workspace. */
 export const procurementKey = (organizationId: string) =>
@@ -44,15 +46,8 @@ export const suppliersOptions = (organizationId: string) =>
   queryOptions({
     queryKey: [...procurementKey(organizationId), 'suppliers'],
     ...privateQueryDefaults,
-    queryFn: async ({ signal }) => {
-      const response = await api.suppliers({
-        params: { organizationId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (response.status !== 200) failure(response);
-
-      return response.body;
-    },
+    queryFn: ({ signal }) =>
+      api.suppliers({ params: { organizationId } }, { signal }),
   });
 
 /** Reads purchase orders with their persisted lifecycle state. */
@@ -60,15 +55,8 @@ export const ordersOptions = (organizationId: string) =>
   queryOptions({
     queryKey: [...procurementKey(organizationId), 'orders'],
     ...privateQueryDefaults,
-    queryFn: async ({ signal }) => {
-      const response = await api.orders({
-        params: { organizationId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (response.status !== 200) failure(response);
-
-      return response.body;
-    },
+    queryFn: ({ signal }) =>
+      api.orders({ params: { organizationId } }, { signal }),
   });
 
 /** Reads immutable order details and lifecycle evidence together. */
@@ -79,15 +67,8 @@ export const purchaseOrderOptions = (
   queryOptions({
     queryKey: [...procurementKey(organizationId), 'orders', purchaseOrderId],
     ...privateQueryDefaults,
-    queryFn: async ({ signal }) => {
-      const response = await api.detail({
-        params: { organizationId, purchaseOrderId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (response.status !== 200) failure(response);
-
-      return response.body;
-    },
+    queryFn: ({ signal }) =>
+      api.detail({ params: { organizationId, purchaseOrderId } }, { signal }),
   });
 
 /** Creates a supplier; callers retain the body for retries. */
@@ -95,13 +76,10 @@ export async function createSupplier(
   organizationId: string,
   body: SupplierInput,
 ) {
-  const response = await api.createSupplier({
+  return api.createSupplier({
     params: { organizationId },
     body,
   });
-  if (response.status !== 200) failure(response);
-
-  return response.body;
 }
 
 /** Creates a draft order; callers retain the body for retries. */
@@ -109,10 +87,7 @@ export async function createOrder(
   organizationId: string,
   body: PurchaseOrderInput,
 ) {
-  const response = await api.createOrder({ params: { organizationId }, body });
-  if (response.status !== 200) failure(response);
-
-  return response.body;
+  return api.createOrder({ params: { organizationId }, body });
 }
 
 /** Applies a status command against the revision the user reviewed. */
@@ -121,13 +96,10 @@ export async function transitionOrder(
   purchaseOrderId: string,
   body: TransitionInput,
 ) {
-  const response = await api.transition({
+  return api.transition({
     params: { organizationId, purchaseOrderId },
     body,
   });
-  if (response.status !== 200) failure(response);
-
-  return response.body;
 }
 
 /** Describes permission, conflict and uncertain network failures. */
@@ -135,18 +107,6 @@ export function procurementError(error: unknown) {
   if (error instanceof ProcurementError) return error.feedback;
 
   return m.procurement_error_unconfirmed();
-}
-
-const contextApi = createWebApiClient().procurementContext;
-
-type Response = { status: number; body: unknown };
-
-function ok<T extends Response>(
-  response: T,
-): Extract<T, { status: 200 }>['body'] {
-  if (response.status !== 200) failure(response);
-
-  return response.body as Extract<T, { status: 200 }>['body'];
 }
 
 const read = <T>(
@@ -159,11 +119,6 @@ const read = <T>(
     queryFn: ({ signal }) => fn(signal),
   });
 
-const fetchOptions = (signal: AbortSignal) => ({
-  signal,
-  cache: 'no-store' as const,
-});
-
 /** Reads an order with its supplier lifecycle, evidence and next action. */
 export const purchaseOrderRecordOptions = (
   organizationId: string,
@@ -171,13 +126,8 @@ export const purchaseOrderRecordOptions = (
 ) =>
   read(
     [...procurementKey(organizationId), 'orders', purchaseOrderId, 'record'],
-    async (signal) =>
-      ok(
-        await api.record({
-          params: { organizationId, purchaseOrderId },
-          fetchOptions: fetchOptions(signal),
-        }),
-      ),
+    (signal) =>
+      api.record({ params: { organizationId, purchaseOrderId } }, { signal }),
   );
 
 /** Reads stock, products, issues and replenishment evidence around an order. */
@@ -187,24 +137,17 @@ export const purchaseOrderContextOptions = (
 ) =>
   read(
     [...procurementKey(organizationId), 'orders', purchaseOrderId, 'context'],
-    async (signal) =>
-      ok(
-        await contextApi.order({
-          params: { organizationId, purchaseOrderId },
-          fetchOptions: fetchOptions(signal),
-        }),
+    (signal) =>
+      contextApi.order(
+        { params: { organizationId, purchaseOrderId } },
+        { signal },
       ),
   );
 
 /** Reads each order's stage, expected date and attention for lists. */
 export const progressOptions = (organizationId: string) =>
-  read([...procurementKey(organizationId), 'progress'], async (signal) =>
-    ok(
-      await api.progress({
-        params: { organizationId },
-        fetchOptions: fetchOptions(signal),
-      }),
-    ),
+  read([...procurementKey(organizationId), 'progress'], (signal) =>
+    api.progress({ params: { organizationId } }, { signal }),
   );
 
 /** Reads a supplier record with its orders and messages. */
@@ -212,15 +155,8 @@ export const supplierRecordOptions = (
   organizationId: string,
   supplierId: string,
 ) =>
-  read(
-    [...procurementKey(organizationId), 'suppliers', supplierId],
-    async (signal) =>
-      ok(
-        await api.supplier({
-          params: { organizationId, supplierId },
-          fetchOptions: fetchOptions(signal),
-        }),
-      ),
+  read([...procurementKey(organizationId), 'suppliers', supplierId], (signal) =>
+    api.supplier({ params: { organizationId, supplierId } }, { signal }),
   );
 
 /** Reads stock for the SKUs a supplier provides. */
@@ -230,24 +166,17 @@ export const supplierContextOptions = (
 ) =>
   read(
     [...procurementKey(organizationId), 'suppliers', supplierId, 'context'],
-    async (signal) =>
-      ok(
-        await contextApi.supplier({
-          params: { organizationId, supplierId },
-          fetchOptions: fetchOptions(signal),
-        }),
+    (signal) =>
+      contextApi.supplier(
+        { params: { organizationId, supplierId } },
+        { signal },
       ),
   );
 
 /** Lists connections that can act as purchasing systems. */
 export const purchasingConnectionsOptions = (organizationId: string) =>
-  read([...procurementKey(organizationId), 'purchasing'], async (signal) =>
-    ok(
-      await api.purchasingConnections({
-        params: { organizationId },
-        fetchOptions: fetchOptions(signal),
-      }),
-    ),
+  read([...procurementKey(organizationId), 'purchasing'], (signal) =>
+    api.purchasingConnections({ params: { organizationId } }, { signal }),
   );
 
 /** Lists suppliers in one purchasing system, for linking. */
@@ -262,13 +191,10 @@ export const purchasingSuppliersOptions = (
       connectionId,
       'suppliers',
     ],
-    async (signal) =>
-      ok(
-        await api.purchasingSuppliers({
-          params: { organizationId, connectionId },
-          query: {},
-          fetchOptions: fetchOptions(signal),
-        }),
+    (signal) =>
+      api.purchasingSuppliers(
+        { params: { organizationId, connectionId }, query: {} },
+        { signal },
       ),
   );
 
@@ -278,9 +204,7 @@ export async function linkSupplier(
   supplierId: string,
   body: SupplierLinkInput,
 ) {
-  return ok(
-    await api.linkSupplier({ params: { organizationId, supplierId }, body }),
-  );
+  return api.linkSupplier({ params: { organizationId, supplierId }, body });
 }
 
 /** Requests approval to send an order; callers retain the body for retries. */
@@ -289,12 +213,10 @@ export async function requestSubmission(
   purchaseOrderId: string,
   body: { id: string; requestedDeliveryDate: string },
 ) {
-  return ok(
-    await api.requestSubmission({
-      params: { organizationId, purchaseOrderId },
-      body,
-    }),
-  );
+  return api.requestSubmission({
+    params: { organizationId, purchaseOrderId },
+    body,
+  });
 }
 
 /** Approves or rejects the exact submission the reader reviewed. */
@@ -303,12 +225,10 @@ export async function decideSubmission(
   submissionId: string,
   body: { decisionId: string; outcome: 'approved' | 'rejected' },
 ) {
-  return ok(
-    await api.decideSubmission({
-      params: { organizationId, submissionId },
-      body,
-    }),
-  );
+  return api.decideSubmission({
+    params: { organizationId, submissionId },
+    body,
+  });
 }
 
 /** Sends an approved submission now; repeated calls return the recorded attempt. */
@@ -316,12 +236,10 @@ export async function sendSubmission(
   organizationId: string,
   submissionId: string,
 ) {
-  return ok(
-    await api.sendSubmission({
-      params: { organizationId, submissionId },
-      body: {},
-    }),
-  );
+  return api.sendSubmission({
+    params: { organizationId, submissionId },
+    body: {},
+  });
 }
 
 /** Reads the purchasing system to settle an uncertain submission. */
@@ -329,12 +247,10 @@ export async function checkSubmission(
   organizationId: string,
   submissionId: string,
 ) {
-  return ok(
-    await api.checkSubmission({
-      params: { organizationId, submissionId },
-      body: {},
-    }),
-  );
+  return api.checkSubmission({
+    params: { organizationId, submissionId },
+    body: {},
+  });
 }
 
 /** Reads the purchasing-system order now. */
@@ -342,12 +258,10 @@ export async function refreshPurchaseOrder(
   organizationId: string,
   purchaseOrderId: string,
 ) {
-  return ok(
-    await api.refresh({
-      params: { organizationId, purchaseOrderId },
-      body: {},
-    }),
-  );
+  return api.refresh({
+    params: { organizationId, purchaseOrderId },
+    body: {},
+  });
 }
 
 /** Records a supplier message; callers retain the body for retries. */
@@ -356,12 +270,10 @@ export async function recordMessage(
   purchaseOrderId: string,
   body: MessageInput,
 ) {
-  return ok(
-    await api.recordMessage({
-      params: { organizationId, purchaseOrderId },
-      body,
-    }),
-  );
+  return api.recordMessage({
+    params: { organizationId, purchaseOrderId },
+    body,
+  });
 }
 
 /** Reads a message again after an unavailable or failed attempt. */
@@ -369,12 +281,10 @@ export async function readMessage(
   organizationId: string,
   communicationId: string,
 ) {
-  return ok(
-    await api.readMessage({
-      params: { organizationId, communicationId },
-      body: {},
-    }),
-  );
+  return api.readMessage({
+    params: { organizationId, communicationId },
+    body: {},
+  });
 }
 
 /** Removes a message's text, keeping its metadata and commitments. */
@@ -382,12 +292,10 @@ export async function removeMessageText(
   organizationId: string,
   communicationId: string,
 ) {
-  return ok(
-    await api.removeMessageText({
-      params: { organizationId, communicationId },
-      body: {},
-    }),
-  );
+  return api.removeMessageText({
+    params: { organizationId, communicationId },
+    body: {},
+  });
 }
 
 /** Records or corrects a commitment; callers retain the body for retries. */
@@ -396,12 +304,10 @@ export async function recordCommitment(
   purchaseOrderId: string,
   body: CommitmentInput,
 ) {
-  return ok(
-    await api.recordCommitment({
-      params: { organizationId, purchaseOrderId },
-      body,
-    }),
-  );
+  return api.recordCommitment({
+    params: { organizationId, purchaseOrderId },
+    body,
+  });
 }
 
 /** Confirms or rejects a commitment that needed review. */
@@ -410,12 +316,10 @@ export async function reviewCommitment(
   commitmentId: string,
   body: { outcome: 'confirmed' | 'rejected'; acceptChange?: boolean },
 ) {
-  return ok(
-    await api.reviewCommitment({
-      params: { organizationId, commitmentId },
-      body,
-    }),
-  );
+  return api.reviewCommitment({
+    params: { organizationId, commitmentId },
+    body,
+  });
 }
 
 /** Accepts a change or records a follow-up for an attention item. */
@@ -424,7 +328,5 @@ export async function respondToAttention(
   purchaseOrderId: string,
   body: FollowUpInput,
 ) {
-  return ok(
-    await api.respond({ params: { organizationId, purchaseOrderId }, body }),
-  );
+  return api.respond({ params: { organizationId, purchaseOrderId }, body });
 }

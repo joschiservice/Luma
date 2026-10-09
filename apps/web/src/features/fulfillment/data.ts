@@ -1,13 +1,8 @@
-import {
-  fulfillmentDetailSchema,
-  fulfillmentListSchema,
-} from '@luma/api-contract';
 import { queryOptions } from '@tanstack/react-query';
 import { z } from 'zod';
 
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
-import { IdentityError } from '../identity/data';
 
 const api = createWebApiClient();
 
@@ -66,17 +61,8 @@ export function fulfillmentsOptions(
     ...privateQueryDefaults,
     queryKey: ['private', 'organization', organizationId, 'fulfillment', query],
     refetchOnReconnect: 'always',
-    queryFn: async ({ signal }) => {
-      const result = await api.fulfillment.list({
-        params: { organizationId },
-        query,
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return fulfillmentListSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.fulfillment.list({ params: { organizationId }, query }, { signal }),
   });
 }
 
@@ -95,15 +81,10 @@ export function fulfillmentOptions(
       fulfillmentId,
     ],
     refetchOnReconnect: 'always',
-    queryFn: async ({ signal }) => {
-      const result = await api.fulfillment.get({
-        params: { organizationId, fulfillmentId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return fulfillmentDetailSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.fulfillment.get(
+        { params: { organizationId, fulfillmentId } },
+        { signal },
+      ),
   });
 }

@@ -1,10 +1,8 @@
-import { inventoryDetailSchema, inventoryListSchema } from '@luma/api-contract';
 import { queryOptions } from '@tanstack/react-query';
 import { z } from 'zod';
 
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
-import { IdentityError } from '../identity/data';
 
 const api = createWebApiClient();
 
@@ -38,17 +36,8 @@ export function inventoryOptions(
     ...privateQueryDefaults,
     queryKey: ['private', 'organization', organizationId, 'inventory', query],
     refetchOnReconnect: 'always',
-    queryFn: async ({ signal }) => {
-      const result = await api.inventory.list({
-        params: { organizationId },
-        query,
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return inventoryListSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.inventory.list({ params: { organizationId }, query }, { signal }),
   });
 }
 
@@ -58,15 +47,7 @@ export function stockOptions(organizationId: string, positionId: string) {
     ...privateQueryDefaults,
     queryKey: ['private', 'organization', organizationId, 'stock', positionId],
     refetchOnReconnect: 'always',
-    queryFn: async ({ signal }) => {
-      const result = await api.inventory.get({
-        params: { organizationId, positionId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return inventoryDetailSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.inventory.get({ params: { organizationId, positionId } }, { signal }),
   });
 }

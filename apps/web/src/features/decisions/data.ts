@@ -1,14 +1,9 @@
-import {
-  type DecisionAssignInput,
-  decisionAssignResultSchema,
-  decisionListSchema,
-} from '@luma/api-contract';
+import { type DecisionAssignInput } from '@luma/api-contract';
 import { queryOptions } from '@tanstack/react-query';
 import { z } from 'zod';
 
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
-import { IdentityError } from '../identity/data';
 
 const api = createWebApiClient();
 
@@ -64,17 +59,8 @@ export function decisionsOptions(
     refetchInterval: 30_000,
     refetchOnWindowFocus: 'always',
     refetchOnReconnect: 'always',
-    queryFn: async ({ signal }) => {
-      const result = await api.decisions.list({
-        params: { organizationId },
-        query,
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return decisionListSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.decisions.list({ params: { organizationId }, query }, { signal }),
   });
 }
 
@@ -83,15 +69,7 @@ export async function assignDecision(
   organizationId: string,
   body: DecisionAssignInput,
 ) {
-  const result = await api.decisions.assign({
-    params: { organizationId },
-    body,
-    fetchOptions: { cache: 'no-store' },
-  });
-  if (result.status !== 200)
-    throw new IdentityError(result.status, result.body);
-
-  return decisionAssignResultSchema.parse(result.body);
+  return api.decisions.assign({ params: { organizationId }, body });
 }
 
 /** Loads one decision for a direct link to an item outside the current page. */
@@ -103,15 +81,12 @@ export function decisionOptions(organizationId: string, id: string) {
     queryKey: [...decisionsKey(organizationId), 'item', id],
     refetchOnWindowFocus: 'always',
     queryFn: async ({ signal }) => {
-      const result = await api.decisions.list({
-        params: { organizationId },
-        query,
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
+      const result = await api.decisions.list(
+        { params: { organizationId }, query },
+        { signal },
+      );
 
-      return decisionListSchema.parse(result.body).items[0] ?? null;
+      return result.items[0] ?? null;
     },
   });
 }
