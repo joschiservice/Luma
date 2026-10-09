@@ -919,6 +919,34 @@
   font-size: 13px;
 }
 
+/* Person picker: a search field and a short list of names with their email below. */
+.person-picker-trigger svg {
+  color: var(--foreground-subtle);
+}
+
+.person-picker-list {
+  margin-top: 6px;
+}
+
+.person-picker-option {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+  overflow-wrap: anywhere;
+}
+
+.person-picker-option small {
+  color: var(--foreground-subtle);
+  font-size: 12px;
+}
+
+.person-picker-more {
+  padding: 8px 8px 2px;
+  color: var(--foreground-subtle);
+  font-size: 12px;
+}
+
 /* Responsive picker: anchored popover on desktop, bottom sheet on small screens. */
 .ui-picker-positioner {
   z-index: 60;

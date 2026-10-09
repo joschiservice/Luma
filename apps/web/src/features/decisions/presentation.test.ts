@@ -3,6 +3,7 @@ import { expect, it } from 'vitest';
 
 import {
   actionable,
+  assigneeOptions,
   decisionStatus,
   emptyCopy,
   groupDecisions,
@@ -62,4 +63,24 @@ it('names members and marks the reader and former members', () => {
   expect(memberName('b', members, 'b')).toBe('You');
   expect(memberName('c', members, 'b')).toBe('Former member');
   expect(memberName(null, members, 'b')).toBeNull();
+});
+
+it('offers everyone but the holder, with the reader first and findable by name', () => {
+  const members = [
+    { userId: 'a', name: 'Alex Morgan', email: 'alex@example.com' },
+    { userId: 'b', name: 'Bea Müller', email: 'bea@example.com' },
+    { userId: 'c', email: 'casey@example.com' },
+    { userId: 'd' },
+  ];
+
+  expect(assigneeOptions(members, 'a', 'b')).toEqual([
+    { id: 'b', name: 'You', detail: 'Bea Müller · bea@example.com' },
+    { id: 'c', name: 'casey@example.com', detail: undefined },
+    { id: 'd', name: 'Member', detail: undefined },
+  ]);
+  expect(assigneeOptions(members, null, undefined)[0]).toEqual({
+    id: 'a',
+    name: 'Alex Morgan',
+    detail: 'alex@example.com',
+  });
 });

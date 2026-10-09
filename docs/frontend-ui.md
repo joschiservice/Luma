@@ -22,6 +22,8 @@
 
 Interaction primitives (`Button`, `Field`, `Select`, `SearchableSelect`, `Dialog`, `DropdownMenu`, `Tabs`, `Pagination`, `SectionNavigation` and others) cover forms and navigation. Give link-styled buttons `buttonVariants()` on the link itself so link semantics survive. Coarse pointers get 44px targets automatically; don't shrink them. `Pagination` omits the total when a source does not report one, so never invent a count.
 
+Choose people with `PersonPicker`. It searches names and emails, ignoring case and accents, and draws only the first 50 matches, so a workspace's full member list loads in one read and pages are a display concern. Revisit that with server-side search if workspaces grow to thousands of members, because name lookups such as decision owners also read the full list.
+
 Map case states through `issueStatus` and `issueKind` in `components/issues/case-presentation` instead of per feature. Verified means the intended outcome was observed; an accepted request is still running. Keep source freshness separate from connection credentials and permissions.
 
 ## Composition rules

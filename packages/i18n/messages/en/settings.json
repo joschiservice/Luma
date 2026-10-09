@@ -122,6 +122,8 @@
   "settings_team_search_empty": "No people match your search",
   "settings_team_empty": "No members to show",
   "settings_team_clear_search": "Clear search",
+  "settings_team_pagination_total": "{count, plural, one {{count, number} person} other {{count, number} people}}",
+  "settings_team_pagination_label": "Team pages",
   "settings_team_only_owners": "Only owners can make someone an owner.",
   "settings_team_role_out_of_reach": "Includes permissions your role doesn’t have.",
   "settings_team_access_removed": "Workspace access removed.",

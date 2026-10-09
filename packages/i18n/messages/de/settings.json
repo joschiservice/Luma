@@ -122,6 +122,8 @@
   "settings_team_search_empty": "Keine Personen entsprechen deiner Suche",
   "settings_team_empty": "Keine Mitglieder vorhanden",
   "settings_team_clear_search": "Suche löschen",
+  "settings_team_pagination_total": "{count, plural, one {{count, number} Person} other {{count, number} Personen}}",
+  "settings_team_pagination_label": "Teamseiten",
   "settings_team_only_owners": "Nur Inhaber können jemanden zum Inhaber machen.",
   "settings_team_role_out_of_reach": "Enthält Berechtigungen, die deine Rolle nicht hat.",
   "settings_team_access_removed": "Zugriff auf den Workspace entfernt.",

@@ -227,10 +227,6 @@
   font-weight: 500;
 }
 
-.decision-assignee {
-  min-width: 150px;
-}
-
 .decision-error {
   color: var(--state-error-text);
   font-size: 13px;

@@ -380,6 +380,17 @@ export const Selected: Story = {
       canvas.getByText('Purchase-order draft, not sent'),
     ).toBeVisible();
     await expect(canvas.getByRole('button', { name: 'Take it' })).toBeEnabled();
+    await userEvent.click(canvas.getByRole('combobox', { name: 'Assign to…' }));
+    const people = await within(document.body).findByRole('listbox', {
+      name: 'Assign to a member',
+    });
+    const [first, second] = within(people).getAllByRole('option');
+    await expect(first).toHaveTextContent('YouAlex Morgan');
+    await expect(second).toHaveTextContent('Sam Rivera');
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(within(document.body).queryByRole('listbox')).toBeNull(),
+    );
     await userEvent.click(canvas.getByRole('button', { name: 'Close panel' }));
     await waitFor(() =>
       expect(
