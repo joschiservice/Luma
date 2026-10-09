@@ -2,7 +2,7 @@
 
 Luma helps commerce teams detect operational issues, investigate their causes, and resolve them through policy-controlled actions and workflows. Provider observations, canonical records, approvals, execution and fresh verification form one traceable path.
 
-The codebase is a TypeScript modular monolith: a Fastify/ts-rest API, a TanStack Start/React web app, separate Temporal workers, and PostgreSQL persistence. Domain packages share explicit contracts and are assembled by application runtime composition.
+The codebase is a TypeScript modular monolith: a Fastify/oRPC API, a TanStack Start/React web app, separate Temporal workers, and PostgreSQL persistence. Domain packages share explicit contracts and are assembled by application runtime composition.
 
 ## What matters
 

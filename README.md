@@ -4,7 +4,7 @@ Luma helps commerce teams detect operational issues, investigate their causes, a
 them through policy-controlled actions and workflows. Provider observations, canonical
 records, approvals, execution and fresh verification form one traceable path.
 
-It is a TypeScript modular monolith: a Fastify/ts-rest API, a TanStack Start/React web app,
+It is a TypeScript modular monolith: a Fastify/oRPC API, a TanStack Start/React web app,
 separate Temporal and sync workers, and PostgreSQL. Node.js 24, pnpm and Turborepo.
 
 ## Start locally

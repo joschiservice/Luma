@@ -1,6 +1,8 @@
 # ADR-001: Modular monolith boundaries
 
 > Source layout and package placement are superseded by [ADR-005](005-domain-packages-and-runtimes.md). The dependency graph and domain ownership remain applicable.
+>
+> ts-rest is replaced by oRPC in [ADR-010](010-orpc-http-contracts.md).
 
 Status: accepted for the initial backend. Decision: 2026-09-17, LUMA-4.
 
