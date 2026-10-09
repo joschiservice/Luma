@@ -104,6 +104,11 @@ export const syncPolicy = {
   /** Interval between full rereads when the source cannot filter by update time. */
   pollIntervalMs: 30 * 60_000,
   fullScanIntervalMs: 24 * 60 * 60_000,
+  /**
+   * Customers that complete full reads have not found for this long are removed. Personal data
+   * should not outlive the source, but one missed read may be a source fault, not a deletion.
+   */
+  missingCustomerRetentionMs: 30 * 24 * 60 * 60_000,
   /** Change notifications are batched briefly before a read starts. */
   hintDelayMs: 10_000,
   /** Incremental reads overlap the previous scan to tolerate clock skew and late commits. */

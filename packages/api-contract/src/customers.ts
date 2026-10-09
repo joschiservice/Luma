@@ -29,6 +29,11 @@ export const customerListItemSchema = z.object({
   shared: z.object({ contact: z.boolean(), address: z.boolean() }),
   sourceUpdatedAt: timestamp.nullable(),
   observedAt: timestamp,
+  missingSince: timestamp
+    .nullable()
+    .describe(
+      'When a complete read of the source first no longer found this customer; null while the source still has them. Luma removes customers that stay missing for 30 days.',
+    ),
 });
 
 export const customerSourceSchema = z.object({

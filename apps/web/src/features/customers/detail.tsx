@@ -218,6 +218,13 @@ export function CustomerDetailView({
           ))}
         </div>
       ) : null}
+      {item?.missingSince && error !== 'missing' ? (
+        <Alert tone="warning">
+          {m.customers_gone_notice({
+            source: detail?.source?.label ?? m.customers_source_fallback(),
+          })}
+        </Alert>
+      ) : null}
       {detail && item && error !== 'missing' ? (
         <div className="customers-layout">
           <div className="customers-main">
@@ -325,6 +332,11 @@ export function CustomerDetailView({
                 <Fact label={m.customers_fact_read()}>
                   <WorkspaceDate value={item.observedAt} />
                 </Fact>
+                {item.missingSince ? (
+                  <Fact label={m.customers_fact_gone()}>
+                    <WorkspaceDate value={item.missingSince} />
+                  </Fact>
+                ) : null}
               </dl>
               <p className="customers-note">{m.customers_source_note()}</p>
             </Section>

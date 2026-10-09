@@ -44,6 +44,16 @@ export interface CustomerProfiles {
     connectionId: string,
     externalIds?: string[],
   ): Promise<number>;
+  /**
+   * Deletes the listed source customers' profiles and order links, for customers the source no
+   * longer has. Unlike `erase`, a later read that reports them again imports them again. Accepts
+   * up to 1000 IDs. Requires `sync.manage`.
+   */
+  remove(
+    context: TenantContext,
+    connectionId: string,
+    externalIds: string[],
+  ): Promise<number>;
   /** Lists stored profiles for workspace members, newest source customers first. */
   list(
     context: TenantContext,

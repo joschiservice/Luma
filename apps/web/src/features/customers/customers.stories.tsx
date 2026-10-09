@@ -58,6 +58,7 @@ const customer = (
   shared: { contact: true, address: true },
   sourceUpdatedAt: timestamp,
   observedAt: timestamp,
+  missingSince: null,
   ...patch,
 });
 
@@ -72,6 +73,7 @@ const list: CustomerList = {
       orderCount: 1,
       amountSpent: { amount: '39.9', currency: 'EUR' },
       tags: [],
+      missingSince: '2026-10-02T03:00:00.000Z',
     }),
     customer(73, {
       displayName: null,
@@ -235,7 +237,7 @@ const jtlDetail: CustomerDetail = {
 function Content({ state }: { state: string }) {
   const [search, change] = useState<CustomersSearch>({});
   const [q, setQ] = useState('');
-  if (['detail', 'withheld', 'denied', 'empty', 'jtl'].includes(state))
+  if (['detail', 'withheld', 'denied', 'empty', 'jtl', 'gone'].includes(state))
     return (
       <CustomerDetailView
         organizationId={organizationId}
@@ -248,7 +250,15 @@ function Content({ state }: { state: string }) {
               }
             : state === 'jtl'
               ? jtlDetail
-              : detail
+              : state === 'gone'
+                ? {
+                    ...jtlDetail,
+                    item: {
+                      ...jtlDetail.item,
+                      missingSince: '2026-10-02T03:00:00.000Z',
+                    },
+                  }
+                : detail
         }
         refresh={() => {}}
         history={<History state={state} />}
@@ -341,6 +351,8 @@ export const Browse: Story = {
     await expect(
       canvas.getByText('jonas@example.test · Vienna store'),
     ).toBeVisible();
+    // A customer the source no longer has stays listed until Luma removes them.
+    await expect(canvas.getByText('No longer in Vienna store')).toBeVisible();
     // Without shared contact details the customer is named by source ID only.
     await expect(
       canvas.getByRole('link', { name: 'Customer 73' }),
@@ -441,6 +453,17 @@ export const JtlCustomer: Story = {
     ).toBeVisible();
     // JTL reports no order count or spend, so those facts are left out.
     await expect(canvas.queryByText('Amount spent')).not.toBeInTheDocument();
+  },
+};
+
+export const GoneFromSource: Story = {
+  args: { state: 'gone' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByText(/JTL-Wawi no longer has this customer/),
+    ).toBeVisible();
+    await expect(canvas.getByText('Missing from source since')).toBeVisible();
   },
 };
 

@@ -57,7 +57,7 @@
   "customers_detail_refresh": "Kundendaten aktualisieren",
   "customers_detail_offline": "Sie sind offline. Die Kundendaten sind möglicherweise veraltet.",
   "customers_detail_missing_title": "Kunde nicht gefunden",
-  "customers_detail_missing_body": "Diesen Kunden gibt es in diesem Workspace nicht, oder der Shop hat Luma gebeten, seine Daten zu löschen.",
+  "customers_detail_missing_body": "Diesen Kunden gibt es in diesem Workspace nicht. Möglicherweise hat der Shop Luma gebeten, seine Daten zu löschen, oder Luma hat ihn entfernt, nachdem er 30 Tage in seiner Quelle fehlte.",
   "customers_detail_browse": "Zu den Kunden",
   "customers_detail_refresh_failed": "Luma konnte diesen Kunden nicht aktualisieren. Die Angaben unten sind möglicherweise veraltet.",
   "customers_detail_load_failed": "Luma konnte diesen Kunden nicht laden. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
@@ -92,5 +92,8 @@
   "customers_fact_source_id": "Quell-ID",
   "customers_fact_updated": "In Quelle aktualisiert",
   "customers_fact_read": "Zuletzt von Luma gelesen",
-  "customers_source_note": "Jeder Shop und jedes ERP führt eigene Kunden. Luma führt Kunden verschiedener Quellen nie über Namen oder E-Mail-Adresse zusammen."
+  "customers_source_note": "Jeder Shop und jedes ERP führt eigene Kunden. Luma führt Kunden verschiedener Quellen nie über Namen oder E-Mail-Adresse zusammen.",
+  "customers_gone_badge": "Nicht mehr in {source}",
+  "customers_gone_notice": "{source} führt diesen Kunden nicht mehr. Luma entfernt Kunden, die 30 Tage lang fehlen, mitsamt ihrer Zuordnung zu Bestellungen. Meldet {source} den Kunden wieder, bleibt er erhalten.",
+  "customers_fact_gone": "In der Quelle nicht mehr gefunden seit"
 }

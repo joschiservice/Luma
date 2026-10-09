@@ -41,7 +41,8 @@ The history includes only orders Luma has imported. Shopify shares orders from t
 - JTL shares customers only when **Import customers** was chosen when the connection was added. To add it to an existing JTL connection, add the connection again with that option. See [Apps and connections](/docs/apps-and-connections#choose-what-luma-may-change-in-jtl).
 - **No orders yet** in the order history means Luma hasn’t imported an order for this customer. Orders already imported before the source shared customers are matched to them on the next full read.
 - If the order history says you need access to orders, ask a workspace admin for **View orders**.
-- **Customer not found** means the customer isn’t in this workspace, or the store asked Luma to erase their data.
+- **No longer in** a source, such as **No longer in JTL-Wawi**, means the source’s last full read didn’t include the customer, for example because they were deleted there. The profile and order history stay for 30 days. If the source still doesn’t have the customer after that, Luma removes the profile. If it reports the customer again, the label goes away.
+- **Customer not found** means the customer isn’t in this workspace, the store asked Luma to erase their data, or Luma removed them after they were missing from their source for 30 days.
 
 Someone whose role includes **Manage connections** can reconnect a store in **Apps**. See [Apps and connections](/docs/apps-and-connections#change-or-reconnect-a-connection).
 

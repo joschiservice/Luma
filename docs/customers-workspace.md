@@ -35,6 +35,11 @@ shared them (`Not shared` otherwise), account state, tags, and the source identi
 read time. Order count and amount spent are shown only when the source reports them; JTL
 reports neither.
 
+A customer that a complete full read no longer found keeps its profile and history but is
+marked `No longer in <source>` in the list and on the page, with the time it went missing.
+Sync removes it after 30 days unless the source reports it again; see
+[commerce sync](commerce-sync.md).
+
 Order history is the Orders list filtered by `customerId`, with the same rows, cursor
 paging and issue links. It reads Luma's imported orders, never the provider, so it needs no
 installed app and survives revoked store access. The filter follows the order links that
@@ -58,4 +63,5 @@ larger.
 - JTL shares customers only for connections set up with customer import. Contact and
   address fields have no separate approval in JTL.
 - Revoking store access does not remove the imported profile or its order history; both
-  follow the profile retention and erasure rules.
+  follow the profile retention and erasure rules. Missing-customer removal only runs while
+  customer reads continue, because it needs complete full reads.

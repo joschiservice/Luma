@@ -64,7 +64,7 @@ export interface SyncRunnerDependencies {
       reason: string,
     ): Promise<unknown>;
   };
-  customers: Pick<CustomerProfiles, 'upsert' | 'recordOrders'>;
+  customers: Pick<CustomerProfiles, 'upsert' | 'recordOrders' | 'remove'>;
   /** Records the read outcome for connection freshness. Customer records are never passed. */
   recordRead(
     context: TenantContext,
@@ -187,6 +187,37 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
     if (result === 'suppressed') return null;
 
     return { status: 'current', problem: null, entityId: null };
+  }
+
+  /**
+   * Removes the profiles of customers that complete full reads have not found for the retention
+   * period, leaving out customers on the current page. Returns their ledger keys, which the page
+   * commit forgets; a page that fails to commit repeats the removal when it is retried. Up to
+   * 1000 customers are removed per full read; the rest follow at the next one.
+   */
+  async function removeMissingCustomers(
+    tenant: TenantContext,
+    connectionId: string,
+    seen: ItemKey[],
+  ) {
+    const page = new Set(seen.map(itemKey));
+    const expired = (
+      await deps.store.missingSince(
+        tenant.tenantId,
+        connectionId,
+        'customers',
+        new Date(+now() - syncPolicy.missingCustomerRetentionMs).toISOString(),
+        1000,
+      )
+    ).filter((item) => !page.has(itemKey(item)));
+    if (expired.length)
+      await deps.customers.remove(
+        tenant,
+        connectionId,
+        expired.map((item) => item.externalId),
+      );
+
+    return expired;
   }
 
   /**
@@ -449,6 +480,14 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
           claimed.connectionId,
           changed.flatMap(({ observation }) => customerOrder(observation)),
         );
+      const forget =
+        claimed.recordType === 'customers' &&
+        !page.nextCursor &&
+        !page.deferred &&
+        !scan.since &&
+        !scan.createdSince
+          ? await removeMissingCustomers(tenant, claimed.connectionId, keys)
+          : [];
       for (const [index, { observation, digest }] of changed.entries()) {
         const outcome = outcomes[index];
         if (!outcome) {
@@ -481,6 +520,7 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
           ? null
           : { nextDueAt: nextDueAt(now(), supportsSince) },
         now: now().toISOString(),
+        forget,
         ...(page.deferred
           ? {
               deferred: true,

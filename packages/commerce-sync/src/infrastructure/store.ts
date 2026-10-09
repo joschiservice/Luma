@@ -1,6 +1,7 @@
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 
 import type {
+  ItemKey,
   LinkRequest,
   StreamCoverage,
   SyncConnection,
@@ -438,6 +439,20 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
 
       return found;
     },
+    async missingSince(tenantId, connectionId, recordType, before, limit) {
+      return db.transaction(
+        tenantId,
+        async (tx) =>
+          (
+            await tx.query<ItemKey>(
+              `SELECT resource,scope_key AS "scopeKey",external_id AS "externalId" FROM commerce_sync_items
+              WHERE tenant_id=$1 AND connection_id=$2 AND record_type=$3 AND missing_since < $4
+              ORDER BY missing_since,external_id LIMIT $5`,
+              [tenantId, connectionId, recordType, before, limit],
+            )
+          ).rows,
+      );
+    },
     async commitPage(tenantId, streamId, token, page) {
       return db.transaction(tenantId, async (tx) => {
         const current = await lockStream(tx, tenantId, streamId, token);
@@ -536,12 +551,21 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
             history?.requirement ?? null,
           ],
         );
+        if (page.forget?.length)
+          await tx.query(
+            `DELETE FROM commerce_sync_items i
+            USING jsonb_to_recordset($4::jsonb) AS e(resource text,"scopeKey" text,"externalId" text)
+            WHERE i.tenant_id=$1 AND i.connection_id=$2 AND i.record_type=$3 AND i.missing_since IS NOT NULL
+              AND i.resource=e.resource AND i.scope_key=e."scopeKey" AND i.external_id=e."externalId"`,
+            [...scope, JSON.stringify(page.forget)],
+          );
         if (!page.complete) return true;
         const full =
           current.scan_since === null && current.scan_created_since === null;
         let missing: number | null = null;
         if (full) {
-          // Only a complete scan can show that a record is gone; it is flagged, never deleted.
+          // Only a complete scan can show that a record is gone. It is flagged; only customers that
+          // stay missing are later forgotten, with their profiles.
           await tx.query(
             `UPDATE commerce_sync_items SET missing_since=COALESCE(missing_since,$5)
             WHERE tenant_id=$1 AND connection_id=$2 AND record_type=$3

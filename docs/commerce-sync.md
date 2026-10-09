@@ -61,8 +61,9 @@ The ledger holds one row per source record: a digest of the normalized observati
 status, source creation and update times, first/last seen and the last scan that saw it.
 A record whose digest and status are unchanged is not projected again, so re-imports and
 duplicate notifications add no snapshots. Full scans set `missing_since` on records they
-no longer return; nothing is deleted. The returns stream's ledger holds both returns and
-refunds.
+no longer return, and any later read that returns the record clears it. Only customers are
+ever deleted for being missing (see below). The returns stream's ledger holds both returns
+and refunds.
 
 Coverage per stream comes from the ledger (counts, oldest and newest creation date) and
 from the page `history` limit. `history_from` is the limit reported when the history
@@ -104,9 +105,18 @@ order links and ledger rows in its intake transaction and remembers erased custo
 digest, so later reads skip them and their orders get no new links. Erasure and customer
 imports of one connection take the same lock, so a read that started earlier cannot
 restore erased data. Other retained data still follows the
-[privacy operations](shopify-production.md#privacy-operations) procedure. JTL sends no
-erasure requests, and a customer deleted in JTL keeps its imported profile and links; a
-full read only flags it as no longer found.
+[privacy operations](shopify-production.md#privacy-operations) procedure.
+
+Sources do not always ask for erasure; JTL never does, so a customer deleted at the source
+is only seen as absent from full reads. One absent read is not proof, because a source fault
+or permission change can hide records too. So the profile stays, marked as missing, until it
+has been missing for 30 days (`missingCustomerRetentionMs`). The final page of the next
+complete full read then removes the profile and its order links and forgets the ledger rows,
+in batches of up to 1000 per read. Customers on that page, or already seen earlier in that
+read, are never removed. Removal is not an erasure: no digest is kept, so a customer the
+source reports again is imported as new. Order links follow the source's reassignment, so
+orders of a customer merged into another one move to the remaining customer on the next
+full read.
 
 ## Links
 

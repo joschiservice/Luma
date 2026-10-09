@@ -100988,6 +100988,12 @@
                           "observedAt": {
                             "type": "string",
                             "format": "date-time"
+                          },
+                          "missingSince": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "When a complete read of the source first no longer found this customer; null while the source still has them. Luma removes customers that stay missing for 30 days.",
+                            "nullable": true
                           }
                         },
                         "required": [
@@ -101004,7 +101010,8 @@
                           "tags",
                           "shared",
                           "sourceUpdatedAt",
-                          "observedAt"
+                          "observedAt",
+                          "missingSince"
                         ]
                       }
                     },
@@ -101469,6 +101476,12 @@
                         "observedAt": {
                           "type": "string",
                           "format": "date-time"
+                        },
+                        "missingSince": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "When a complete read of the source first no longer found this customer; null while the source still has them. Luma removes customers that stay missing for 30 days.",
+                          "nullable": true
                         }
                       },
                       "required": [
@@ -101485,7 +101498,8 @@
                         "tags",
                         "shared",
                         "sourceUpdatedAt",
-                        "observedAt"
+                        "observedAt",
+                        "missingSince"
                       ]
                     },
                     "address": {

@@ -68,6 +68,8 @@ export interface PageCommit {
   /** Provider export is still preparing; keep its checkpoint without claiming coverage. */
   deferred?: boolean;
   dueAt?: string;
+  /** Ledger entries to delete when they are still flagged missing. */
+  forget?: ItemKey[];
 }
 
 export interface SyncRun {
@@ -191,6 +193,17 @@ export interface SyncStore {
     recordType: RecordType,
     keys: ItemKey[],
   ): Promise<Map<string, LedgerState>>;
+  /**
+   * Records that complete full reads have not found since before `before`, oldest first, up to
+   * `limit`.
+   */
+  missingSince(
+    tenantId: string,
+    connectionId: string,
+    recordType: RecordType,
+    before: string,
+    limit: number,
+  ): Promise<ItemKey[]>;
   /** Commits one page; returns false when the lease was lost and nothing was written. */
   commitPage(
     tenantId: string,

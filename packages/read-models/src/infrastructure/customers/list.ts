@@ -10,14 +10,21 @@ import type {
 const iso = (column: string) =>
   `to_char(${column} AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
 
-/** Selects one `customer_profiles` row, aliased `p`, in the shape of a list item. */
+/**
+ * Selects one `customer_profiles` row, aliased `p`, in the shape of a list item. Whether full
+ * reads still find the customer comes from the sync ledger, where every source records
+ * customers as unscoped `customer` resources.
+ */
 const itemColumns = `p.id,p.connection_id AS "connectionId",p.external_id AS "externalId",
  p.display_name AS "displayName",p.email,p.phone,p.state,${iso('p.source_created_at')} AS "sourceCreatedAt",
  p.order_count AS "orderCount",
  CASE WHEN p.amount_spent IS NULL THEN NULL
   ELSE jsonb_build_object('amount',trim_scale(p.amount_spent)::text,'currency',p.currency) END AS "amountSpent",
  p.tags,jsonb_build_object('contact',p.contact_shared,'address',p.address_shared) AS shared,
- ${iso('p.source_updated_at')} AS "sourceUpdatedAt",${iso('p.observed_at')} AS "observedAt"`;
+ ${iso('p.source_updated_at')} AS "sourceUpdatedAt",${iso('p.observed_at')} AS "observedAt",
+ (SELECT ${iso('i.missing_since')} FROM commerce_sync_items i WHERE i.tenant_id=p.tenant_id
+  AND i.connection_id=p.connection_id AND i.record_type='customers' AND i.resource='customer'
+  AND i.scope_key='' AND i.external_id=p.external_id) AS "missingSince"`;
 
 // Missing values sort as the lowest key so every profile has a position.
 const sortKeys = {

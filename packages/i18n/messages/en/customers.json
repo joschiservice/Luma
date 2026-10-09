@@ -57,7 +57,7 @@
   "customers_detail_refresh": "Refresh customer",
   "customers_detail_offline": "You’re offline. This customer’s details may be out of date.",
   "customers_detail_missing_title": "Customer not found",
-  "customers_detail_missing_body": "This customer isn’t in this workspace, or the store asked Luma to erase their data.",
+  "customers_detail_missing_body": "This customer isn’t in this workspace. The store may have asked Luma to erase their data, or Luma removed them after they were missing from their source for 30 days.",
   "customers_detail_browse": "Go to customers",
   "customers_detail_refresh_failed": "Luma couldn’t refresh this customer. The details below may be out of date.",
   "customers_detail_load_failed": "Luma couldn’t load this customer. Check your connection and try again.",
@@ -92,5 +92,8 @@
   "customers_fact_source_id": "Source ID",
   "customers_fact_updated": "Updated in source",
   "customers_fact_read": "Last read by Luma",
-  "customers_source_note": "Each store and ERP keeps its own customers. Luma never merges customers across sources by name or email address."
+  "customers_source_note": "Each store and ERP keeps its own customers. Luma never merges customers across sources by name or email address.",
+  "customers_gone_badge": "No longer in {source}",
+  "customers_gone_notice": "{source} no longer has this customer. Luma removes customers that stay missing for 30 days, with their order links. If {source} reports the customer again, they stay.",
+  "customers_fact_gone": "Missing from source since"
 }

@@ -104,6 +104,27 @@ const lockConnection = (
     `customers:${tenantId}:${connectionId}`,
   ]);
 
+// Deletes profiles and order links of one connection, or only of the listed source customers.
+async function deleteCustomers(
+  tx: SqlTransaction,
+  tenantId: string,
+  connectionId: string,
+  externalIds: string[] | null,
+) {
+  await tx.query(
+    `DELETE FROM customer_orders WHERE tenant_id=$1 AND connection_id=$2
+    AND ($3::text[] IS NULL OR customer_external_id=ANY($3))`,
+    [tenantId, connectionId, externalIds],
+  );
+  const removed = await tx.query(
+    `DELETE FROM customer_profiles WHERE tenant_id=$1 AND connection_id=$2
+    AND ($3::text[] IS NULL OR external_id=ANY($3))`,
+    [tenantId, connectionId, externalIds],
+  );
+
+  return removed.rowCount ?? 0;
+}
+
 // Stored as exact decimals; strip the scale padding PostgreSQL adds.
 const decimal = (value: string) =>
   value.includes('.') ? value.replace(/\.?0+$/, '') : value;
@@ -271,18 +292,25 @@ export function createCustomerProfiles(db: TenantDatabase): CustomerProfiles {
             SELECT $1,$2,sha256(convert_to(id,'UTF8')) FROM unnest($3::text[]) id ON CONFLICT DO NOTHING`,
             [context.tenantId, connectionId, externalIds],
           );
-        await tx.query(
-          `DELETE FROM customer_orders WHERE tenant_id=$1 AND connection_id=$2
-          AND ($3::text[] IS NULL OR customer_external_id=ANY($3))`,
-          [context.tenantId, connectionId, externalIds ?? null],
-        );
-        const removed = await tx.query(
-          `DELETE FROM customer_profiles WHERE tenant_id=$1 AND connection_id=$2
-          AND ($3::text[] IS NULL OR external_id=ANY($3))`,
-          [context.tenantId, connectionId, externalIds ?? null],
-        );
 
-        return removed.rowCount ?? 0;
+        return deleteCustomers(
+          tx,
+          context.tenantId,
+          connectionId,
+          externalIds ?? null,
+        );
+      });
+    },
+    async remove(context, connectionId, externalIds) {
+      requirePermission(context, 'sync.manage');
+      z.string().uuid().parse(connectionId);
+      z.array(z.string().min(1).max(1024)).max(1000).parse(externalIds);
+      if (!externalIds.length) return 0;
+
+      return db.transaction(context.tenantId, async (tx) => {
+        await lockConnection(tx, context.tenantId, connectionId);
+
+        return deleteCustomers(tx, context.tenantId, connectionId, externalIds);
       });
     },
     async list(context, query) {

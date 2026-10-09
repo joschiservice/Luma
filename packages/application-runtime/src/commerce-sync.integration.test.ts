@@ -39,6 +39,7 @@ import {
 import type { TenantDatabase } from '@luma/platform';
 import { createTenantDatabase } from '@luma/platform/composition';
 import {
+  createCustomerWorkspace,
   createOrderWorkspace,
   createRecordExplorer,
 } from '@luma/read-models/composition';
@@ -1248,6 +1249,90 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
         )
       ).rowCount,
     ).toBe(0);
+  });
+
+  it('flags customers the source no longer has and removes them only after they stay missing', async () => {
+    const all = ['501', '502', '503', '504'];
+    source.set(
+      erp,
+      'customers.read',
+      all.map((id) => customer(erp, id)),
+    );
+    source.set(erp, 'orders.read', [order(erp, '9', { customer: '501' })]);
+    await drain();
+    const customers = createCustomerWorkspace(db);
+    const missing = async () =>
+      Object.fromEntries(
+        (
+          await customers.list(context(), {
+            q: '',
+            sort: 'name',
+            direction: 'asc',
+            limit: 50,
+          })
+        ).items.map((item) => [item.externalId, item.missingSince]),
+      );
+    const reconcile = async () => {
+      await service.command(
+        context(),
+        (await stream('customers', erp))!.id,
+        'reconcile',
+      );
+      await drain();
+    };
+    expect(await missing()).toEqual({
+      '501': null,
+      '502': null,
+      '503': null,
+      '504': null,
+    });
+
+    // One complete read without a customer only flags them; profile and order link stay.
+    source.set(
+      erp,
+      'customers.read',
+      all.slice(1).map((id) => customer(erp, id)),
+    );
+    await reconcile();
+    expect((await missing())['501']).not.toBeNull();
+    const links = async () =>
+      (
+        await owner.query<{ customer_external_id: string }>(
+          'SELECT customer_external_id FROM customer_orders WHERE tenant_id=$1',
+          [tenant],
+        )
+      ).rows.map((row) => row.customer_external_id);
+    expect(await links()).toEqual(['501']);
+
+    // After the retention period the next full read removes the customer. A customer flagged as
+    // long but found again in that read stays.
+    await owner.query(
+      `UPDATE commerce_sync_items SET missing_since=now()-interval '31 days'
+      WHERE tenant_id=$1 AND record_type='customers' AND external_id IN ('501','502')`,
+      [tenant],
+    );
+    await reconcile();
+    expect(await missing()).toEqual({ '502': null, '503': null, '504': null });
+    expect(await links()).toEqual([]);
+    const ledger = await owner.query(
+      "SELECT 1 FROM commerce_sync_items WHERE tenant_id=$1 AND record_type='customers' AND external_id='501'",
+      [tenant],
+    );
+    expect(ledger.rowCount).toBe(0);
+
+    // Removal is not an erasure: a customer the source reports again is imported again.
+    source.set(
+      erp,
+      'customers.read',
+      all.map((id) => customer(erp, id)),
+    );
+    await reconcile();
+    expect(await missing()).toEqual({
+      '501': null,
+      '502': null,
+      '503': null,
+      '504': null,
+    });
   });
 
   it('links equivalent SKUs from two sources on request and separates them again', async () => {
