@@ -475,7 +475,6 @@ export function CustomersView({
               hasNext={!!next}
               onPrevious={previous}
               onNext={() => next?.()}
-              disabled={refreshing}
               formatTotal={(count) =>
                 m.customers_list_pagination_total({ count })
               }

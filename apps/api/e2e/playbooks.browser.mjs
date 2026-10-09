@@ -176,7 +176,10 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
     path: '/tmp/luma72-browser/blocked-desktop.png',
     fullPage: false,
   });
-  await page.getByRole('link', { name: 'All workflows' }).click();
+  await page
+    .getByRole('navigation', { name: 'Breadcrumb' })
+    .getByRole('link', { name: 'Workflows' })
+    .click();
   await page.getByRole('tab', { name: /^Needs attention 1$/ }).click();
   await page.getByRole('link', { name }).waitFor();
   await page.getByText('Blocked', { exact: true }).first().waitFor();
@@ -303,7 +306,10 @@ test('finds, reviews, activates, reloads and revokes a persisted workflow with w
   await page.getByText('Version 0.1.0 · Revoked', { exact: true }).waitFor();
   await page.reload();
   await page.getByText('Version 0.1.0 · Revoked', { exact: true }).waitFor();
-  await page.getByRole('link', { name: 'All workflows' }).click();
+  await page
+    .getByRole('navigation', { name: 'Breadcrumb' })
+    .getByRole('link', { name: 'Workflows' })
+    .click();
   expect(await page.getByLabel('Search workflows').inputValue()).toBe(
     'shipping',
   );

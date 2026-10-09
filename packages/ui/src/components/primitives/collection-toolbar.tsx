@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 
+import { useSlowRequest } from '../../lib/use-slow-request';
 import { cn } from '../../lib/utils';
 import { Badge } from './badge';
 import { Button } from './button';
@@ -163,6 +164,7 @@ export function CollectionToolbar({
   /** Clears search and every removable filter; shown while any is applied. */
   onClear?: (() => void) | undefined;
   onRefresh: () => void;
+  /** A read is running. Refresh stays usable and spins only when the read is slow. */
   refreshing?: boolean | undefined;
   refreshLabel?: string;
 }) {
@@ -177,6 +179,7 @@ export function CollectionToolbar({
   const openChange = (key: string) => (next: boolean) =>
     setOpen(next ? key : null);
   const refreshName = refreshLabel ?? m.common_refresh();
+  const slow = useSlowRequest(refreshing);
 
   const refresh = (
     <Button
@@ -184,12 +187,11 @@ export function CollectionToolbar({
       className="collection-toolbar-refresh"
       aria-label={refreshName}
       title={refreshName}
-      disabled={refreshing}
       onClick={onRefresh}
     >
       <RefreshCw
         aria-hidden="true"
-        className={refreshing ? 'animate-spin motion-reduce:animate-none' : ''}
+        className={slow ? 'animate-spin motion-reduce:animate-none' : ''}
       />
       {m.common_refresh()}
     </Button>

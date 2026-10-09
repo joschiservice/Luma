@@ -3,19 +3,23 @@ import { m } from '@luma/i18n/messages';
 import { rich } from '@luma/i18n/rich';
 import { issueKind } from '@luma/ui/components/issues/case-presentation';
 import { Badge } from '@luma/ui/components/primitives/badge';
-import { Button } from '@luma/ui/components/primitives/button';
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from '@luma/ui/components/primitives/card';
-import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { Link } from '@tanstack/react-router';
-import { ArrowRight, Copy } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import {
+  ArrowRight,
+  Database,
+  Inbox,
+  type LucideIcon,
+  Workflow,
+} from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import {
   connectionStatusLabel,
@@ -25,70 +29,25 @@ import {
 
 function InspectorCard({
   title,
+  icon: Icon,
+  action,
   children,
 }: {
   title: string;
+  icon: LucideIcon;
+  action?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <Card as="section" aria-label={title}>
       <CardHeader>
-        <CardTitle as="h2">{title}</CardTitle>
+        <CardTitle as="h2">
+          <Icon aria-hidden="true" />
+          {title}
+        </CardTitle>
+        {action}
       </CardHeader>
       <CardContent>{children}</CardContent>
-    </Card>
-  );
-}
-
-function OrderActions({
-  detail,
-  organizationId,
-  here,
-}: {
-  detail: OrderDetail;
-  organizationId: string;
-  here: string;
-}) {
-  const [copied, setCopied] = useState(false);
-  const needsYou = detail.issues.find((issue) => issue.needsYou);
-
-  return (
-    <Card as="section" aria-label={m.common_actions()}>
-      <CardContent className="order-actions">
-        {needsYou ? (
-          <Link
-            className="order-primary-action"
-            to="/app/$organizationId/exceptions/$exceptionId"
-            params={{ organizationId, exceptionId: needsYou.id }}
-            search={{ view: 'needs_you' }}
-          >
-            {m.orders_inspector_review_issue()}{' '}
-            <ArrowRight size={14} aria-hidden="true" />
-          </Link>
-        ) : null}
-        <Link
-          to="/app/$organizationId/records/$kind/$recordId"
-          params={{ organizationId, kind: 'order', recordId: detail.order.id }}
-          search={{ from: here }}
-        >
-          {m.orders_inspector_open_records()}{' '}
-          <ArrowRight size={14} aria-hidden="true" />
-        </Link>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            void navigator.clipboard
-              ?.writeText(new URL(here, window.location.origin).href)
-              .then(() => setCopied(true));
-          }}
-        >
-          <Copy aria-hidden="true" /> {m.orders_inspector_copy_link()}
-        </Button>
-        <span role="status" className="order-note">
-          {copied ? m.orders_inspector_link_copied() : ''}
-        </span>
-      </CardContent>
     </Card>
   );
 }
@@ -203,8 +162,7 @@ function OrderSources({ sources }: { sources: OrderDetail['sources'] }) {
               {source.externalId
                 ? m.orders_inspector_source_id({ id: source.externalId })
                 : m.orders_inspector_source_id_missing()}
-            </small>
-            <small>
+              {' · '}
               {source.mappingMethod
                 ? source.mappingMethod.startsWith('Imported')
                   ? m.orders_inspector_link_imported()
@@ -246,8 +204,8 @@ function OrderSources({ sources }: { sources: OrderDetail['sources'] }) {
 }
 
 /**
- * Shows the order's actions, linked issues, workflow runs, sources and Luma identity beside the
- * record. `here` is the order path used for copied links and record back links.
+ * Shows the order's linked issues, workflow runs and sources beside the record. `here` is the
+ * order path that the raw record view links back to.
  */
 export function OrderInspector({
   detail,
@@ -260,28 +218,33 @@ export function OrderInspector({
 }) {
   return (
     <aside className="order-inspector" aria-label={m.orders_inspector_label()}>
-      <OrderActions
-        detail={detail}
-        organizationId={organizationId}
-        here={here}
-      />
-      <InspectorCard title={m.orders_inspector_issues()}>
+      <InspectorCard title={m.orders_inspector_issues()} icon={Inbox}>
         <OrderIssues issues={detail.issues} organizationId={organizationId} />
       </InspectorCard>
-      <InspectorCard title={m.orders_inspector_runs()}>
+      <InspectorCard title={m.orders_inspector_runs()} icon={Workflow}>
         <WorkflowRuns runs={detail.workflows} organizationId={organizationId} />
       </InspectorCard>
-      <InspectorCard title={m.orders_inspector_sources()}>
+      <InspectorCard
+        title={m.orders_inspector_sources()}
+        icon={Database}
+        action={
+          <Link
+            className="order-card-link"
+            to="/app/$organizationId/records/$kind/$recordId"
+            params={{
+              organizationId,
+              kind: 'order',
+              recordId: detail.order.id,
+            }}
+            search={{ from: here }}
+          >
+            {m.orders_inspector_open_records()}
+            <ArrowRight size={13} aria-hidden="true" />
+          </Link>
+        }
+      >
         <OrderSources sources={detail.sources} />
       </InspectorCard>
-      <Disclosure>
-        <summary>{m.orders_inspector_identity_title()}</summary>
-        <p className="order-note">
-          {rich(m.orders_inspector_identity_body, {
-            id: <code>{detail.order.id}</code>,
-          })}
-        </p>
-      </Disclosure>
     </aside>
   );
 }

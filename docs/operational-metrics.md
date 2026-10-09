@@ -85,23 +85,29 @@ supplied filter, so use separate requests when families need different scopes.
 
 `POST /v2/organizations/:organizationId/metrics/summary` reads up to four parts in one request.
 Each part is an order (v1) or operational (v2) query and follows that endpoint's rules. Parts
-return in request order with their own status: a failing part, such as a 409 for a changed
-snapshot or a 403 without `orders.read`, carries its error while the others succeed. Each part
-keeps its own snapshot, so page a part through its own query endpoint. `nextRefreshAt` is the
+return in request order with their own status: a failing part, such as a 404 for an unknown
+connection or a 403 without `orders.read`, carries its error while the others succeed. Each part
+returns its first cohort page; page a part through its own query endpoint. `nextRefreshAt` is the
 earliest boundary across the parts that were read.
 
-## Snapshots and paging
+## Consistency and paging
 
 Every count and cohort in a response uses the same facts inside one read-only, repeatable-read
-transaction, including coverage and case attention. `asOf` freezes deadline and expiry
-evaluation; `readAt` is the actual read time. The first request chooses its own `asOf`.
+transaction, including coverage and case attention. `asOf` is the evaluation time for deadlines
+and expiry, and every request evaluates at its own read time.
 
-Cohort pages default to 20 records and allow 100; offsets stop at 10,000. Full cohorts
-determine the counts and a SHA-256 `snapshot` before pagination. The snapshot binds the
-tenant, definition version or metric selection, filters, evaluation time, facts and coverage.
-Reuse `asOf` and `snapshot` for later pages; changed records or a snapshot older than 15
-minutes return 409, and the client restarts at offset zero. Snapshots are consistency checks,
-not access credentials or historical snapshots; authorization runs on every request.
+Full cohorts determine the counts before paging. Each metric returns a page of 20 records by
+default and up to 100, with `offset` (records paged past) and `nextCursor`. Passing a metric's
+`nextCursor` as `cursor` reads the records after the last one returned, in a fixed order per
+record type: orders and cases by ID, purchase orders by creation time, resolution outcomes by
+first detection, stock by SKU and connections by label, each with the ID as a tiebreaker.
+Other metrics in that request return their first page.
+
+Pages read current data, so a busy workspace never invalidates a later page. Records that join
+or leave a cohort don't shift the pages after them, but a record whose sort value changed can
+appear twice or not at all; clients deduplicate by ID, and `offset` only labels the page. A
+cursor names its metric and sort position; it is not an access credential, and authorization
+runs on every request.
 
 v1 `updatedFrom`/`updatedBefore` select accepted source update instants in `[from, before)`.
 Bounds must carry an offset; no browser time zone is inferred. Missing source update times
@@ -187,8 +193,10 @@ The browser marks delivery interrupted after 12 seconds without a heartbeat, rec
 and opens a new subscription when it comes back online. A page loads as soon as the stream
 opens; later changes are throttled to one summary read per two seconds, where the first
 change after a quiet period reads at once and a burst reads again when the interval ends.
-Reads are serialized and cancel older requests. A live refresh returns a paged cohort to page
-one, keeping the selected metric and open dialog. The UI keeps delivery state (live, reconnecting, offline, denied)
+Reads are serialized and cancel older requests. The first cohort page follows live refreshes;
+a later page stays in place, and once the metric's count changes the dialog offers to show the
+latest records. Refresh returns to the first page. A refresh shows progress only after it has
+run for 10 seconds, and controls stay usable while reads run. The UI keeps delivery state (live, reconnecting, offline, denied)
 separate from source observation age, stale source data and partial coverage. A live stream
 does not prove complete provider coverage.
 

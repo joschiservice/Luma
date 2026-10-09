@@ -15,22 +15,14 @@ import {
   CardTitle,
 } from '@luma/ui/components/primitives/card';
 import { DataTable } from '@luma/ui/components/primitives/data-table';
-import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
+import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
-import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { RecordHeader } from '@luma/ui/components/workspace/record-header';
 import { onlineManager, useQuery } from '@tanstack/react-query';
 import { Link, useParams, useSearch } from '@tanstack/react-router';
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  Minus,
-  RefreshCw,
-  Undo2,
-  X,
-} from 'lucide-react';
+import { ArrowRight, Check, Minus, Undo2, X } from 'lucide-react';
 import { type ReactNode, useSyncExternalStore } from 'react';
 
 import { appsOptions } from '../apps/data';
@@ -510,40 +502,28 @@ export function ReturnDetailView({
     : '';
 
   return (
-    <main className="returns-page">
-      {from ? (
-        <Link className="returns-back" to={from}>
-          <ArrowLeft size={14} aria-hidden="true" />
-          {m.returns_back_to_context()}
-        </Link>
-      ) : (
-        <Link
-          className="returns-back"
-          to="/app/$organizationId/returns"
-          params={{ organizationId }}
-          search={returnFilters(search)}
-        >
-          <ArrowLeft size={14} aria-hidden="true" />
-          {m.returns_back_to_returns()}
-        </Link>
-      )}
-      <PageHeader
+    <div className="returns-page">
+      <RecordHeader
+        section={{
+          label: m.returns_page_title(),
+          domain: 'returns',
+          link: (
+            <Link
+              to="/app/$organizationId/returns"
+              params={{ organizationId }}
+              search={returnFilters(search)}
+            />
+          ),
+        }}
         title={item ? returnLabel(item) : m.returns_detail_title_fallback()}
-        icon={<DomainIcon domain="returns" size="md" />}
-        description={
-          item
-            ? (item.kind === 'refund'
-                ? m.returns_detail_description_refund
-                : m.returns_detail_description_return)({
-                order: item.order.displayNumber ?? item.order.id.slice(0, 8),
-                source: detail?.source?.label ?? m.returns_source_fallback(),
-              })
-            : m.returns_detail_description_fallback()
+        back={from ? <Link to={from} /> : undefined}
+        actions={
+          <RefreshButton refreshing={refreshing} onClick={refresh}>
+            {m.returns_detail_refresh()}
+          </RefreshButton>
         }
-      />
-      <div className="returns-detail-toolbar">
-        <span className="returns-flags">
-          {item ? (
+        status={
+          item ? (
             <>
               <StatePill state={stageStates[item.stage]}>
                 {stageLabels[item.stage]}
@@ -565,13 +545,19 @@ export function ReturnDetailView({
                 <Badge tone="warning">{m.returns_removed_at_source()}</Badge>
               ) : null}
             </>
-          ) : null}
-        </span>
-        <Button variant="outline" disabled={refreshing} onClick={refresh}>
-          <RefreshCw size={14} aria-hidden="true" />
-          {m.returns_detail_refresh()}
-        </Button>
-      </div>
+          ) : null
+        }
+        description={
+          item
+            ? (item.kind === 'refund'
+                ? m.returns_detail_description_refund
+                : m.returns_detail_description_return)({
+                order: item.order.displayNumber ?? item.order.id.slice(0, 8),
+                source: detail?.source?.label ?? m.returns_source_fallback(),
+              })
+            : null
+        }
+      />
       {offline ? (
         <Alert role="status">{m.returns_detail_offline()}</Alert>
       ) : null}
@@ -823,6 +809,6 @@ export function ReturnDetailView({
           </div>
         </>
       ) : null}
-    </main>
+    </div>
   );
 }

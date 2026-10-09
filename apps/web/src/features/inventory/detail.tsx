@@ -8,13 +8,12 @@ import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Card } from '@luma/ui/components/primitives/card';
 import { DataTable } from '@luma/ui/components/primitives/data-table';
-import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
+import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
-import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { RecordHeader } from '@luma/ui/components/workspace/record-header';
 import { quantityUnit, unitOfMeasure } from '@luma/ui/lib/units';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams, useSearch } from '@tanstack/react-router';
-import { ArrowLeft, RefreshCw } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { appsOptions } from '../apps/data';
@@ -135,39 +134,33 @@ export function StockDetailView({
   const back = recordReturnPath(organizationId, returnTo);
 
   return (
-    <main className="inventory-page">
-      {back ? (
-        <Link className="inventory-back" to={back}>
-          <ArrowLeft size={14} />
-          {m.inventory_back_context()}
-        </Link>
-      ) : (
-        <Link
-          className="inventory-back"
-          to="/app/$organizationId/inventory"
-          params={{ organizationId }}
-          search={listSearch}
-        >
-          <ArrowLeft size={14} />
-          {m.inventory_detail_back()}
-        </Link>
-      )}
-      <PageHeader
+    <div className="inventory-page">
+      <RecordHeader
+        section={{
+          label: m.inventory_page_title(),
+          domain: 'inventory',
+          link: (
+            <Link
+              to="/app/$organizationId/inventory"
+              params={{ organizationId }}
+              search={listSearch}
+            />
+          ),
+        }}
         title={position?.sku ?? m.inventory_detail_title_fallback()}
-        icon={<DomainIcon domain="inventory" size="md" />}
+        back={back ? <Link to={back} /> : undefined}
+        actions={
+          <RefreshButton refreshing={refreshing} onClick={refresh}>
+            {m.inventory_detail_refresh()}
+          </RefreshButton>
+        }
+        status={position ? <StockState position={position} /> : null}
         description={
           position
             ? `${position.location} · ${unitOfMeasure(position.unit)}`
-            : m.inventory_detail_description_fallback()
+            : null
         }
       />
-      <div className="inventory-detail-toolbar">
-        {position ? <StockState position={position} /> : null}
-        <Button variant="outline" disabled={refreshing} onClick={refresh}>
-          <RefreshCw size={14} />
-          {m.inventory_detail_refresh()}
-        </Button>
-      </div>
       {offline ? <Alert role="status">{m.inventory_offline()}</Alert> : null}
       {error ? (
         <Alert tone="danger" role="alert">
@@ -454,6 +447,6 @@ export function StockDetailView({
           </section>
         </>
       ) : null}
-    </main>
+    </div>
   );
 }

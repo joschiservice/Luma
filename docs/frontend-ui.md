@@ -7,8 +7,10 @@
 | Need                                      | Use                             | Rule                                                                      |
 | ----------------------------------------- | ------------------------------- | ------------------------------------------------------------------------- |
 | Top-level page title                      | `PageTitle`                     | The page's `h1`, visually hidden; actions move into the workspace bar     |
-| Record title, description and actions     | `PageHeader`                    | The visible `h1` of a page about one record or subject                    |
+| Page about one record                     | `RecordHeader`                  | Names the record in the breadcrumb; shows its status and key facts        |
+| Subject title, description and actions    | `PageHeader`                    | The visible `h1` of a page outside a section, such as an app's settings   |
 | Where a piece of work stands              | `StateDot`, `StatePill`         | Always with a text label                                                  |
+| Reloading a record or view                | `RefreshButton`                 | Never disabled by background reads; spins only after a slow read          |
 | Domain identity in navigation and records | `DomainIcon`                    | External systems stay neutral                                             |
 | Bordered content and nested surfaces      | `Card` and its parts            | Group content that needs a boundary; prefer rows, toolbars and inspectors |
 | Notices and warnings                      | `Alert`                         | Choose the live-region role deliberately (below)                          |
@@ -39,7 +41,7 @@ Every `DataTable` needs a `caption`; it is visually hidden and names the table f
 
 ## Pages and navigation
 
-Top-level workspace pages are registered once in `workspaceDestinations` in the web identity feature. That list drives the sidebar, the command menu, the `G` keyboard shortcuts and the no-access explanation for its `permission`, so a page missing from it is unreachable by keyboard and search. Top-level pages are named once, by the breadcrumb; page-level explanations belong in contextual help or empty states, and page actions go into the bar through `WorkspacePageActionsSlot`. Pages about one record keep a visible `PageHeader` under the section breadcrumb. Page controls go into the top bar through `WorkspaceHeaderSlot`. Working views such as the issue inbox use `page-full`; reading pages use a comfortable maximum width.
+Top-level workspace pages are registered once in `workspaceDestinations` in the web identity feature. That list drives the sidebar, the command menu, the `G` keyboard shortcuts and the no-access explanation for its `permission`, so a page missing from it is unreachable by keyboard and search. Top-level pages are named once, by the breadcrumb; page-level explanations belong in contextual help or empty states, and page actions go into the bar through `WorkspacePageActionsSlot`. Pages about one record use `RecordHeader`: the breadcrumb reads “Section › Record” and is the only visible name, the `h1` stays for assistive technology, record actions go into the bar and the page opens with status flags and key facts. The section crumb returns to the list with its filters; when the reader arrived from another record, a back arrow before it returns there. Don't add a back link or a second title in the page. Page controls go into the top bar through `WorkspaceHeaderSlot`. Working views such as the issue inbox use `page-full`; reading pages use a comfortable maximum width.
 
 Home and sidebar pins are per-member layouts; see [workspace settings](workspace-settings.md#personal-layouts). Home's attention module and the sidebar count read the [Needs you queue](needs-you.md).
 

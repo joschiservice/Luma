@@ -76,7 +76,7 @@ test('finds a SKU, compares its store and ERP listings and follows affected orde
   ).toBe(true);
   await page.evaluate(() => document.documentElement.classList.remove('dark'));
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.getByRole('link', { name: 'Back to context' }).click();
+  await page.getByRole('link', { name: 'Back to previous page' }).click();
   await page.waitForURL(`**/orders/${catalog.soldOrderId}*`);
 
   // The catalog finds missing listings and unlinked matches, and keeps filters.
@@ -104,7 +104,10 @@ test('finds a SKU, compares its store and ERP listings and follows affected orde
     .getByRole('link', { name: 'Same code, not linked: GIFT-BOX' })
     .click();
   await page.getByRole('link', { name: 'Compare gift-box' }).waitFor();
-  await page.getByRole('link', { name: 'Back to products' }).click();
+  await page
+    .getByRole('navigation', { name: 'Breadcrumb' })
+    .getByRole('link', { name: 'Products' })
+    .click();
   const url = new URL(page.url());
   expect(url.searchParams.get('view')).toBe('missing');
   expect(url.searchParams.get('missingFrom')).toBe(catalog.erp);

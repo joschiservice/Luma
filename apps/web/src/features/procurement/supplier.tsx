@@ -12,15 +12,15 @@ import {
   DataTable,
   DataTableRowLink,
 } from '@luma/ui/components/primitives/data-table';
-import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
+import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
-import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { RecordHeader } from '@luma/ui/components/workspace/record-header';
 import { quantityWithUnit } from '@luma/ui/lib/units';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
-import { ArrowLeft, Building2, Plus, RefreshCw } from 'lucide-react';
+import { Building2, Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { SignInRedirect } from '../identity/common';
@@ -116,19 +116,70 @@ export function SupplierRecordView({
   );
 
   return (
-    <main className="procurement-page procurement-record">
-      <Link
-        className="procurement-back"
-        to="/app/$organizationId/procurement"
-        params={{ organizationId }}
-        search={{ view: 'suppliers', q: '', status: '' }}
-      >
-        <ArrowLeft size={14} aria-hidden="true" />
-        {m.procurement_supplier_back()}
-      </Link>
-      <PageHeader
+    <div className="procurement-page procurement-record">
+      <RecordHeader
+        section={{
+          label: m.procurement_title(),
+          domain: 'procurement',
+          link: (
+            <Link
+              to="/app/$organizationId/procurement"
+              params={{ organizationId }}
+              search={{ view: 'suppliers', q: '', status: '' }}
+            />
+          ),
+        }}
         title={supplier?.name ?? m.procurement_supplier_title_fallback()}
-        icon={<DomainIcon domain="procurement" size="md" />}
+        actions={
+          <>
+            <RefreshButton
+              variant="ghost"
+              refreshing={refreshing}
+              onClick={reload}
+            >
+              {m.common_refresh()}
+            </RefreshButton>
+            {record?.canManage ? (
+              <>
+                <Button variant="outline" onClick={() => setDialog('link')}>
+                  {supplier?.link
+                    ? m.procurement_supplier_change_link()
+                    : m.procurement_supplier_link_system()}
+                </Button>
+                <Button onClick={() => setDialog('order')}>
+                  <Plus size={15} aria-hidden="true" />
+                  {m.procurement_list_new_order()}
+                </Button>
+              </>
+            ) : null}
+          </>
+        }
+        status={
+          <>
+            {supplier ? (
+              supplier.link ? (
+                record?.connection?.status === 'active' ? (
+                  <StatePill state="verified">
+                    {m.procurement_supplier_link_active()}
+                  </StatePill>
+                ) : (
+                  <StatePill state="attention">
+                    {m.procurement_supplier_connection_unavailable()}
+                  </StatePill>
+                )
+              ) : (
+                <StatePill state="idle">{m.procurement_not_linked()}</StatePill>
+              )
+            ) : null}
+            {record ? (
+              <Badge>
+                {m.procurement_supplier_confirmation_window({
+                  hours: record.confirmationHours,
+                })}
+              </Badge>
+            ) : null}
+          </>
+        }
         description={
           supplier
             ? supplier.link
@@ -140,54 +191,9 @@ export function SupplierRecordView({
                   record?.connection?.label,
                 )
               : m.procurement_supplier_unlinked()
-            : m.procurement_supplier_description_fallback()
-        }
-        actions={
-          record?.canManage ? (
-            <>
-              <Button variant="outline" onClick={() => setDialog('link')}>
-                {supplier?.link
-                  ? m.procurement_supplier_change_link()
-                  : m.procurement_supplier_link_system()}
-              </Button>
-              <Button onClick={() => setDialog('order')}>
-                <Plus size={15} aria-hidden="true" />
-                {m.procurement_list_new_order()}
-              </Button>
-            </>
-          ) : null
+            : null
         }
       />
-      <div className="procurement-record-toolbar">
-        <span className="procurement-flags">
-          {supplier ? (
-            supplier.link ? (
-              record?.connection?.status === 'active' ? (
-                <StatePill state="verified">
-                  {m.procurement_supplier_link_active()}
-                </StatePill>
-              ) : (
-                <StatePill state="attention">
-                  {m.procurement_supplier_connection_unavailable()}
-                </StatePill>
-              )
-            ) : (
-              <StatePill state="idle">{m.procurement_not_linked()}</StatePill>
-            )
-          ) : null}
-          {record ? (
-            <Badge>
-              {m.procurement_supplier_confirmation_window({
-                hours: record.confirmationHours,
-              })}
-            </Badge>
-          ) : null}
-        </span>
-        <Button variant="ghost" disabled={refreshing} onClick={reload}>
-          <RefreshCw size={14} aria-hidden="true" />
-          {m.common_refresh()}
-        </Button>
-      </div>
       {error === 'missing' ? (
         <Empty>
           <Building2 size={30} aria-hidden="true" />
@@ -473,7 +479,7 @@ export function SupplierRecordView({
           }}
         />
       ) : null}
-    </main>
+    </div>
   );
 }
 

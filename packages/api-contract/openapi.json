@@ -69683,7 +69683,7 @@
     },
     "/v2/organizations/{organizationId}/metrics/query": {
       "post": {
-        "description": "Reads cases, monitored stock, purchase orders, connection health and evidence-backed resolution outcomes in one authorized snapshot. Select metric IDs explicitly. Filters must be supported by every selected metric. Reuse snapshot and asOf for pagination; refresh on 409. Resolution alone accepts environment and a 24-hour or seven-day first-detection window; other families describe current state. Null values, unknown classification and unavailable coverage are distinct from zero.",
+        "description": "Reads cases, monitored stock, purchase orders, connection health and evidence-backed resolution outcomes in one consistent, current read. Select metric IDs explicitly. Filters must be supported by every selected metric. Each metric returns its first page of records; pass a metric’s nextCursor as cursor to read the records after that page. Pages read current data, so records can join or leave between pages; deduplicate by ID. A cursor from another request returns 422. Resolution alone accepts environment and a 24-hour or seven-day first-detection window; other families describe current state. Null values, unknown classification and unavailable coverage are distinct from zero.",
         "summary": "Read selected operational metrics and matching records",
         "tags": ["metrics"],
         "parameters": [
@@ -69777,19 +69777,11 @@
                     "minimum": 1,
                     "maximum": 100
                   },
-                  "offset": {
-                    "default": 0,
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 10000
-                  },
-                  "asOf": {
+                  "cursor": {
                     "type": "string",
-                    "format": "date-time"
-                  },
-                  "snapshot": {
-                    "type": "string",
-                    "pattern": "^[a-f0-9]{64}$"
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "description": "A metric’s nextCursor. That metric lists the records after the previous page, read from current data; the other metrics return their first page."
                   }
                 },
                 "required": ["definitionVersion", "metrics"],
@@ -69850,9 +69842,6 @@
                       "type": "string",
                       "format": "date-time"
                     },
-                    "snapshot": {
-                      "type": "string"
-                    },
                     "timezone": {
                       "type": "string",
                       "enum": ["UTC"]
@@ -69863,9 +69852,6 @@
                       "nullable": true
                     },
                     "limit": {
-                      "type": "number"
-                    },
-                    "offset": {
                       "type": "number"
                     },
                     "metrics": {
@@ -70025,6 +70011,16 @@
                               },
                               "required": ["reason", "count"]
                             }
+                          },
+                          "offset": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Records paged past before this page. It labels the page; records may have changed since earlier pages."
+                          },
+                          "nextCursor": {
+                            "type": "string",
+                            "description": "Pass as cursor to read the records after this page. Null when no more records match.",
+                            "nullable": true
                           },
                           "items": {
                             "type": "array",
@@ -70407,6 +70403,8 @@
                           "dataThrough",
                           "nextRefreshAt",
                           "breakdown",
+                          "offset",
+                          "nextCursor",
                           "items"
                         ]
                       }
@@ -70417,11 +70415,9 @@
                     "scope",
                     "asOf",
                     "readAt",
-                    "snapshot",
                     "timezone",
                     "nextRefreshAt",
                     "limit",
-                    "offset",
                     "metrics"
                   ]
                 }
@@ -70536,42 +70532,6 @@
               }
             }
           },
-          "409": {
-            "description": "409",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "VALIDATION_ERROR",
-                        "UNAUTHENTICATED",
-                        "FORBIDDEN",
-                        "NOT_FOUND",
-                        "CONFLICT",
-                        "REGION_UNAVAILABLE",
-                        "SERVICE_UNAVAILABLE",
-                        "NOT_READY",
-                        "INTERNAL_ERROR",
-                        "PAYLOAD_TOO_LARGE",
-                        "TOO_MANY_REQUESTS",
-                        "UNSUPPORTED_MEDIA_TYPE"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["code", "message", "requestId"]
-                }
-              }
-            }
-          },
           "413": {
             "description": "413",
             "content": {
@@ -70610,6 +70570,42 @@
           },
           "415": {
             "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "422",
             "content": {
               "application/json": {
                 "schema": {
@@ -70721,7 +70717,7 @@
     },
     "/v2/organizations/{organizationId}/metrics/summary": {
       "post": {
-        "description": "Reads up to four parts, each an order (v1) or operational (v2) metric query, with the same rules as those endpoints, and returns them in request order. A part that fails carries its own status and error; the other parts are unaffected. Each part has its own snapshot and asOf; page a part through its own query endpoint. nextRefreshAt is the earliest boundary across the parts that were read.",
+        "description": "Reads up to four parts, each an order (v1) or operational (v2) metric query, with the same rules as those endpoints, and returns them in request order. A part that fails carries its own status and error; the other parts are unaffected. Each part returns its first page of records; read later pages through the part’s own query endpoint. nextRefreshAt is the earliest boundary across the parts that were read.",
         "summary": "Read several metric views in one request",
         "tags": ["metrics"],
         "parameters": [
@@ -70790,19 +70786,11 @@
                                   "minimum": 1,
                                   "maximum": 100
                                 },
-                                "offset": {
-                                  "default": 0,
-                                  "type": "integer",
-                                  "minimum": 0,
-                                  "maximum": 10000
-                                },
-                                "asOf": {
+                                "cursor": {
                                   "type": "string",
-                                  "format": "date-time"
-                                },
-                                "snapshot": {
-                                  "type": "string",
-                                  "pattern": "^[a-f0-9]{64}$"
+                                  "minLength": 1,
+                                  "maxLength": 2048,
+                                  "description": "A metric’s nextCursor. That metric lists the records after the previous page, read from current data; the other metrics return their first page."
                                 }
                               },
                               "additionalProperties": false
@@ -70893,19 +70881,11 @@
                                   "minimum": 1,
                                   "maximum": 100
                                 },
-                                "offset": {
-                                  "default": 0,
-                                  "type": "integer",
-                                  "minimum": 0,
-                                  "maximum": 10000
-                                },
-                                "asOf": {
+                                "cursor": {
                                   "type": "string",
-                                  "format": "date-time"
-                                },
-                                "snapshot": {
-                                  "type": "string",
-                                  "pattern": "^[a-f0-9]{64}$"
+                                  "minLength": 1,
+                                  "maxLength": 2048,
+                                  "description": "A metric’s nextCursor. That metric lists the records after the previous page, read from current data; the other metrics return their first page."
                                 }
                               },
                               "required": ["definitionVersion", "metrics"],
@@ -70999,9 +70979,6 @@
                                     "type": "string",
                                     "format": "date-time"
                                   },
-                                  "snapshot": {
-                                    "type": "string"
-                                  },
                                   "timezone": {
                                     "type": "string",
                                     "enum": ["UTC"]
@@ -71028,9 +71005,6 @@
                                     "type": "string"
                                   },
                                   "limit": {
-                                    "type": "number"
-                                  },
-                                  "offset": {
                                     "type": "number"
                                   },
                                   "metrics": {
@@ -71123,6 +71097,16 @@
                                           "type": "integer",
                                           "minimum": 0
                                         },
+                                        "offset": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "description": "Records paged past before this page. It labels the page; records may have changed since earlier pages."
+                                        },
+                                        "nextCursor": {
+                                          "type": "string",
+                                          "description": "Pass as cursor to read the records after this page. Null when no more records match.",
+                                          "nullable": true
+                                        },
                                         "items": {
                                           "type": "array",
                                           "items": {
@@ -71193,6 +71177,8 @@
                                         "total",
                                         "observedCount",
                                         "unknownCount",
+                                        "offset",
+                                        "nextCursor",
                                         "items"
                                       ]
                                     }
@@ -71203,7 +71189,6 @@
                                   "scope",
                                   "asOf",
                                   "readAt",
-                                  "snapshot",
                                   "timezone",
                                   "observedAt",
                                   "dataThrough",
@@ -71211,7 +71196,6 @@
                                   "coverage",
                                   "coverageExplanation",
                                   "limit",
-                                  "offset",
                                   "metrics"
                                 ]
                               }
@@ -71276,9 +71260,6 @@
                                     "type": "string",
                                     "format": "date-time"
                                   },
-                                  "snapshot": {
-                                    "type": "string"
-                                  },
                                   "timezone": {
                                     "type": "string",
                                     "enum": ["UTC"]
@@ -71289,9 +71270,6 @@
                                     "nullable": true
                                   },
                                   "limit": {
-                                    "type": "number"
-                                  },
-                                  "offset": {
                                     "type": "number"
                                   },
                                   "metrics": {
@@ -71459,6 +71437,16 @@
                                             },
                                             "required": ["reason", "count"]
                                           }
+                                        },
+                                        "offset": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "description": "Records paged past before this page. It labels the page; records may have changed since earlier pages."
+                                        },
+                                        "nextCursor": {
+                                          "type": "string",
+                                          "description": "Pass as cursor to read the records after this page. Null when no more records match.",
+                                          "nullable": true
                                         },
                                         "items": {
                                           "type": "array",
@@ -71849,6 +71837,8 @@
                                         "dataThrough",
                                         "nextRefreshAt",
                                         "breakdown",
+                                        "offset",
+                                        "nextCursor",
                                         "items"
                                       ]
                                     }
@@ -71859,11 +71849,9 @@
                                   "scope",
                                   "asOf",
                                   "readAt",
-                                  "snapshot",
                                   "timezone",
                                   "nextRefreshAt",
                                   "limit",
-                                  "offset",
                                   "metrics"
                                 ]
                               }
@@ -72499,7 +72487,7 @@
     },
     "/v1/organizations/{organizationId}/metrics/query": {
       "post": {
-        "description": "Returns open, overdue and attention counts with bounded cohorts from one consistent read snapshot. Null totals mean incomplete source coverage; observedCount counts only known matching orders. Reuse snapshot and asOf when paging. A 409 requires refreshing from offset zero. Windows filter accepted source update times using [updatedFrom, updatedBefore) UTC instants. Requests accept only registered fields, never executable code.",
+        "description": "Returns open, overdue and attention counts with a page of matching orders for each, from one consistent, current read. Null totals mean incomplete source coverage; observedCount counts only known matching orders. Pass a metric’s nextCursor as cursor to read the orders after that page; pages read current data, so deduplicate by ID. A cursor from another request returns 422. Windows filter accepted source update times using [updatedFrom, updatedBefore) UTC instants. Requests accept only registered fields, never executable code.",
         "summary": "Read order totals and their matching records",
         "tags": ["metrics"],
         "parameters": [
@@ -72551,19 +72539,11 @@
                     "minimum": 1,
                     "maximum": 100
                   },
-                  "offset": {
-                    "default": 0,
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 10000
-                  },
-                  "asOf": {
+                  "cursor": {
                     "type": "string",
-                    "format": "date-time"
-                  },
-                  "snapshot": {
-                    "type": "string",
-                    "pattern": "^[a-f0-9]{64}$"
+                    "minLength": 1,
+                    "maxLength": 2048,
+                    "description": "A metric’s nextCursor. That metric lists the records after the previous page, read from current data; the other metrics return their first page."
                   }
                 },
                 "additionalProperties": false
@@ -72615,9 +72595,6 @@
                       "type": "string",
                       "format": "date-time"
                     },
-                    "snapshot": {
-                      "type": "string"
-                    },
                     "timezone": {
                       "type": "string",
                       "enum": ["UTC"]
@@ -72644,9 +72621,6 @@
                       "type": "string"
                     },
                     "limit": {
-                      "type": "number"
-                    },
-                    "offset": {
                       "type": "number"
                     },
                     "metrics": {
@@ -72739,6 +72713,16 @@
                             "type": "integer",
                             "minimum": 0
                           },
+                          "offset": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Records paged past before this page. It labels the page; records may have changed since earlier pages."
+                          },
+                          "nextCursor": {
+                            "type": "string",
+                            "description": "Pass as cursor to read the records after this page. Null when no more records match.",
+                            "nullable": true
+                          },
                           "items": {
                             "type": "array",
                             "items": {
@@ -72809,6 +72793,8 @@
                           "total",
                           "observedCount",
                           "unknownCount",
+                          "offset",
+                          "nextCursor",
                           "items"
                         ]
                       }
@@ -72819,7 +72805,6 @@
                     "scope",
                     "asOf",
                     "readAt",
-                    "snapshot",
                     "timezone",
                     "observedAt",
                     "dataThrough",
@@ -72827,7 +72812,6 @@
                     "coverage",
                     "coverageExplanation",
                     "limit",
-                    "offset",
                     "metrics"
                   ]
                 }
@@ -72942,42 +72926,6 @@
               }
             }
           },
-          "409": {
-            "description": "409",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "VALIDATION_ERROR",
-                        "UNAUTHENTICATED",
-                        "FORBIDDEN",
-                        "NOT_FOUND",
-                        "CONFLICT",
-                        "REGION_UNAVAILABLE",
-                        "SERVICE_UNAVAILABLE",
-                        "NOT_READY",
-                        "INTERNAL_ERROR",
-                        "PAYLOAD_TOO_LARGE",
-                        "TOO_MANY_REQUESTS",
-                        "UNSUPPORTED_MEDIA_TYPE"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["code", "message", "requestId"]
-                }
-              }
-            }
-          },
           "413": {
             "description": "413",
             "content": {
@@ -73016,6 +72964,42 @@
           },
           "415": {
             "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "422",
             "content": {
               "application/json": {
                 "schema": {

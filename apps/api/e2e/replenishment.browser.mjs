@@ -167,7 +167,7 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
     path: '/tmp/luma76-stock-record.png',
     fullPage: true,
   });
-  await page.getByRole('link', { name: 'Back to context' }).click();
+  await page.getByRole('link', { name: 'Back to previous page' }).click();
   await page.waitForURL(`**${path}*`);
   await page.setViewportSize({ width: 375, height: 812 });
   await page

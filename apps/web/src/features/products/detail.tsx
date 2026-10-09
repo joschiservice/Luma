@@ -14,15 +14,15 @@ import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Card } from '@luma/ui/components/primitives/card';
 import { DataTable } from '@luma/ui/components/primitives/data-table';
-import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
+import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
-import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { RecordHeader } from '@luma/ui/components/workspace/record-header';
 import { quantityUnit } from '@luma/ui/lib/units';
 import { onlineManager, useQuery } from '@tanstack/react-query';
 import { Link, useParams, useSearch } from '@tanstack/react-router';
-import { ArrowLeft, PackageX, RefreshCw } from 'lucide-react';
+import { PackageX } from 'lucide-react';
 import { type ReactNode, useSyncExternalStore } from 'react';
 
 import { SignInRedirect } from '../identity/common';
@@ -339,48 +339,40 @@ export function ProductDetailView({
   const orderSearch = item?.listings.find((l) => l.code)?.code?.trim();
 
   return (
-    <main className="products-page">
-      {from ? (
-        <Link className="products-back" to={from}>
-          <ArrowLeft size={14} />
-          {m.products_back_context()}
-        </Link>
-      ) : (
-        <Link
-          className="products-back"
-          to="/app/$organizationId/products"
-          params={{ organizationId }}
-          search={productFilters(search)}
-        >
-          <ArrowLeft size={14} />
-          {m.products_detail_back()}
-        </Link>
-      )}
-      <PageHeader
+    <div className="products-page">
+      <RecordHeader
+        section={{
+          label: m.products_page_title(),
+          domain: 'products',
+          link: (
+            <Link
+              to="/app/$organizationId/products"
+              params={{ organizationId }}
+              search={productFilters(search)}
+            />
+          ),
+        }}
         title={item?.sku.trim() ?? m.products_detail_title_fallback()}
-        icon={<DomainIcon domain="products" size="md" />}
-        description={
-          item
-            ? (item.title ?? m.products_detail_no_title())
-            : m.products_detail_description_fallback()
+        back={from ? <Link to={from} /> : undefined}
+        actions={
+          <RefreshButton refreshing={refreshing} onClick={refresh}>
+            {m.products_detail_refresh()}
+          </RefreshButton>
         }
+        status={
+          <>
+            {state ? (
+              <StatePill state={state.state}>{state.label}</StatePill>
+            ) : null}
+            {item?.differences.map((field) => (
+              <Badge key={field} tone="warning">
+                {fieldLabels[field]}
+              </Badge>
+            ))}
+          </>
+        }
+        description={item ? (item.title ?? m.products_detail_no_title()) : null}
       />
-      <div className="products-detail-toolbar">
-        <span className="products-flags">
-          {state ? (
-            <StatePill state={state.state}>{state.label}</StatePill>
-          ) : null}
-          {item?.differences.map((field) => (
-            <Badge key={field} tone="warning">
-              {fieldLabels[field]}
-            </Badge>
-          ))}
-        </span>
-        <Button variant="outline" disabled={refreshing} onClick={refresh}>
-          <RefreshCw size={14} />
-          {m.products_detail_refresh()}
-        </Button>
-      </div>
       {offline ? (
         <Alert role="status">{m.products_detail_offline()}</Alert>
       ) : null}
@@ -693,6 +685,6 @@ export function ProductDetailView({
           </section>
         </>
       ) : null}
-    </main>
+    </div>
   );
 }

@@ -195,7 +195,7 @@ test('opens an imported customer from an order, lists their imported orders and 
   await page.emulateMedia({ colorScheme: 'light' });
   await page.getByRole('link', { name: '#2001', exact: true }).click();
   await page.waitForURL(`**/orders/${orderId}**`);
-  await page.getByRole('link', { name: 'Back to context' }).click();
+  await page.getByRole('link', { name: 'Back to previous page' }).click();
   await page.waitForURL(`**/customers/${averyId}`);
   await page.getByRole('link', { name: '#2001', exact: true }).waitFor();
   expect(requests.every((input) => input.kind === 'Order')).toBe(true);
@@ -208,7 +208,11 @@ test('opens an imported customer from an order, lists their imported orders and 
   ).toBe(0);
 
   // The list keeps same-name customers apart and search text out of the URL.
-  await page.getByRole('link', { name: 'Back to customers' }).click();
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page
+    .getByRole('navigation', { name: 'Breadcrumb' })
+    .getByRole('link', { name: 'Customers' })
+    .click();
   await page.getByRole('link', { name: 'Avery Tan' }).first().waitFor();
   await page.getByRole('searchbox', { name: 'Search customers' }).fill('72@');
   await page.keyboard.press('Enter');

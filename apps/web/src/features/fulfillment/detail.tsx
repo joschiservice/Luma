@@ -9,14 +9,14 @@ import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
 import { Card } from '@luma/ui/components/primitives/card';
 import { DataTable } from '@luma/ui/components/primitives/data-table';
-import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
+import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { StateDot, StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
-import { PageHeader } from '@luma/ui/components/workspace/page-header';
+import { RecordHeader } from '@luma/ui/components/workspace/record-header';
 import { onlineManager, useQuery } from '@tanstack/react-query';
 import { Link, useParams, useSearch } from '@tanstack/react-router';
-import { ArrowLeft, ExternalLink, PackageX, RefreshCw } from 'lucide-react';
+import { ExternalLink, PackageX } from 'lucide-react';
 import { type ReactNode, useSyncExternalStore } from 'react';
 
 import { activityLabel, activityState } from '../activity/presentation';
@@ -466,26 +466,40 @@ export function FulfillmentDetailView({
   const carrier = item?.tracking.find((entry) => entry.url);
 
   return (
-    <main className="fulfillment-page">
-      {from ? (
-        <Link className="fulfillment-back" to={from}>
-          <ArrowLeft size={14} aria-hidden="true" />
-          {m.fulfillment_back_to_context()}
-        </Link>
-      ) : (
-        <Link
-          className="fulfillment-back"
-          to="/app/$organizationId/fulfillment"
-          params={{ organizationId }}
-          search={fulfillmentFilters(search)}
-        >
-          <ArrowLeft size={14} aria-hidden="true" />
-          {m.fulfillment_back_to_list()}
-        </Link>
-      )}
-      <PageHeader
+    <div className="fulfillment-page">
+      <RecordHeader
+        section={{
+          label: m.fulfillment_page_title(),
+          domain: 'fulfillment',
+          link: (
+            <Link
+              to="/app/$organizationId/fulfillment"
+              params={{ organizationId }}
+              search={fulfillmentFilters(search)}
+            />
+          ),
+        }}
         title={item ? orderLabel(item) : m.fulfillment_detail_title_fallback()}
-        icon={<DomainIcon domain="fulfillment" size="md" />}
+        back={from ? <Link to={from} /> : undefined}
+        actions={
+          <RefreshButton refreshing={refreshing} onClick={refresh}>
+            {m.fulfillment_detail_refresh()}
+          </RefreshButton>
+        }
+        status={
+          <>
+            {state ? (
+              <StatePill state={state.state}>{state.label}</StatePill>
+            ) : null}
+            {item
+              ? otherSignals(item).map((signal) => (
+                  <Badge key={signal} tone="warning">
+                    {signalLabels[signal]}
+                  </Badge>
+                ))
+              : null}
+          </>
+        }
         description={
           detail && item
             ? item.units !== '0'
@@ -498,27 +512,9 @@ export function FulfillmentDetailView({
                   kind: kindLabels[item.kind],
                   source: detail.source.label,
                 })
-            : m.fulfillment_detail_description_fallback()
+            : null
         }
       />
-      <div className="fulfillment-detail-toolbar">
-        <span className="fulfillment-flags">
-          {state ? (
-            <StatePill state={state.state}>{state.label}</StatePill>
-          ) : null}
-          {item
-            ? otherSignals(item).map((signal) => (
-                <Badge key={signal} tone="warning">
-                  {signalLabels[signal]}
-                </Badge>
-              ))
-            : null}
-        </span>
-        <Button variant="outline" disabled={refreshing} onClick={refresh}>
-          <RefreshCw size={14} aria-hidden="true" />
-          {m.fulfillment_detail_refresh()}
-        </Button>
-      </div>
       {offline ? (
         <Alert role="status">{m.fulfillment_detail_offline()}</Alert>
       ) : null}
@@ -839,6 +835,6 @@ export function FulfillmentDetailView({
           </aside>
         </div>
       ) : null}
-    </main>
+    </div>
   );
 }

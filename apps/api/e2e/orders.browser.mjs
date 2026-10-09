@@ -218,7 +218,10 @@ test('finds an order by number or SKU, explains it and pages a historical import
     path: '/tmp/luma98-order-mobile.png',
     fullPage: true,
   });
-  await page.getByRole('link', { name: 'Back to orders' }).click();
+  await page
+    .getByRole('navigation', { name: 'Breadcrumb' })
+    .getByRole('link', { name: 'Orders' })
+    .click();
   await page.getByRole('heading', { name: 'Orders', exact: true }).waitFor();
   expect(
     await page.getByRole('searchbox', { name: 'Search orders' }).inputValue(),

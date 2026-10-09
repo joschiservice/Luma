@@ -157,7 +157,7 @@ export function ResolutionEvidence({
             <Button
               variant="outline"
               size="sm"
-              disabled={!after || query.isFetching}
+              disabled={!after}
               onClick={() => setAfter(Math.max(0, after - 100))}
             >
               {m.overview_evidence_previous()}
@@ -165,7 +165,7 @@ export function ResolutionEvidence({
             <Button
               variant="outline"
               size="sm"
-              disabled={query.data.nextRevision === null || query.isFetching}
+              disabled={query.data.nextRevision === null}
               onClick={() => {
                 if (query.data.nextRevision !== null)
                   setAfter(query.data.nextRevision);

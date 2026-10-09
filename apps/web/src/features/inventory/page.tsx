@@ -330,11 +330,7 @@ export function InventoryView({
             <span>{m.inventory_list_count({ count: list.items.length })}</span>
             <div>
               {previous ? (
-                <Button
-                  variant="outline"
-                  disabled={refreshing}
-                  onClick={previous}
-                >
+                <Button variant="outline" onClick={previous}>
                   {m.inventory_list_previous()}
                 </Button>
               ) : null}
@@ -345,7 +341,7 @@ export function InventoryView({
               ) : null}
               <Button
                 variant="outline"
-                disabled={!list.nextCursor || refreshing}
+                disabled={!list.nextCursor}
                 onClick={() =>
                   change({ ...search, cursor: list.nextCursor ?? undefined })
                 }

@@ -16,8 +16,7 @@
 .record-row-kind {
   white-space: nowrap;
 }
-.record-row-kind,
-.record-eyebrow {
+.record-row-kind {
   text-transform: uppercase;
   letter-spacing: 0.1em;
   font-size: 0.68rem;
@@ -52,33 +51,6 @@
   padding: 2rem;
   border: 1px dashed var(--border);
   border-radius: 12px;
-  color: var(--muted-foreground);
-}
-.record-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 1.2rem 0;
-  color: var(--muted-foreground);
-  text-decoration: none;
-  font-size: 0.85rem;
-}
-.record-back:hover {
-  text-decoration: underline;
-}
-.record-detail-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-  margin: 1rem 0 2rem;
-}
-.record-detail-head h1 {
-  margin: 0.35rem 0;
-  font-size: clamp(1.9rem, 3vw, 3rem);
-  letter-spacing: -0.04em;
-}
-.record-detail-head p:last-child {
   color: var(--muted-foreground);
 }
 .record-detail-grid {
@@ -211,8 +183,5 @@
   }
   .record-detail-grid {
     grid-template-columns: 1fr;
-  }
-  .record-detail-head {
-    display: block;
   }
 }

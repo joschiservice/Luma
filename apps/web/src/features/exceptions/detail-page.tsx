@@ -157,7 +157,6 @@ function IssueWorkspace({
         <Button
           variant="outline"
           aria-label={m.common_refresh()}
-          disabled={observation.snapshot.isFetching}
           onClick={observation.restart}
         >
           <RefreshCw size={14} aria-hidden="true" />

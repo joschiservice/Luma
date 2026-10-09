@@ -129,11 +129,20 @@ describe('order presentation', () => {
         (value) => value.slice(0, 10),
       ),
     ).toEqual([
-      'Shopify store reports the order as open. The order is paid.',
-      '2 units still to fulfill across 1 line.',
-      'Past the deadline of 2026-09-19 set in the source.',
-      '1 issue needs you.',
-      'Payment differs between sources: “Paid” in Shopify store and “Payment pending” in JTL-Wawi.',
+      {
+        kind: 'state',
+        text: 'Shopify store reports the order as open. The order is paid.',
+      },
+      { kind: 'remaining', text: '2 units still to fulfill across 1 line.' },
+      {
+        kind: 'overdue',
+        text: 'Past the deadline of 2026-09-19 set in the source.',
+      },
+      { kind: 'issues', text: '1 issue needs you.' },
+      {
+        kind: 'differs',
+        text: 'Payment differs between sources: “Paid” in Shopify store and “Payment pending” in JTL-Wawi.',
+      },
     ]);
   });
 
@@ -154,8 +163,9 @@ describe('order presentation', () => {
       }),
       (value) => value,
     );
-    expect(summary[1]).toBe(
-      'Luma can’t tell how much remains on 1 line because Shopify store doesn’t report canceled quantities. 1 of 3 units are fulfilled.',
-    );
+    expect(summary[1]).toEqual({
+      kind: 'unknown',
+      text: 'Luma can’t tell how much remains on 1 line because Shopify store doesn’t report canceled quantities. 1 of 3 units are fulfilled.',
+    });
   });
 });

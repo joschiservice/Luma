@@ -89,7 +89,7 @@ test('opens a return from its order, tells pending work from money returned and 
     ),
   ).toBe(true);
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.getByRole('link', { name: 'Back to context' }).click();
+  await page.getByRole('link', { name: 'Back to previous page' }).click();
   await page.waitForURL(`**/orders/${r.orders[1002]}*`);
 
   // The list opens on pending work and names the source that does not share returns.
@@ -120,7 +120,11 @@ test('opens a return from its order, tells pending work from money returned and 
   await page.getByRole('link', { name: '#1002-R1', exact: true }).waitFor();
   expect(new URL(page.url()).searchParams.get('stage')).toBe('refund_pending');
   await page.getByRole('link', { name: '#1002-R1', exact: true }).click();
-  await page.getByRole('link', { name: 'Back to returns' }).click();
+  await page.getByRole('heading', { name: '#1002-R1', level: 1 }).waitFor();
+  await page
+    .getByRole('navigation', { name: 'Breadcrumb' })
+    .getByRole('link', { name: 'Returns' })
+    .click();
   expect(new URL(page.url()).searchParams.get('stage')).toBe('refund_pending');
 
   // Search finds the refund without a return by its source ID.
