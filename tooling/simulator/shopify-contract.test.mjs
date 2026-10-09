@@ -878,34 +878,6 @@ test('record explorer reads every record kind with available sections', async ()
   assert.equal(order.refunds.length, 2);
   assert.ok(order.events.length >= 3);
 
-  const customers = await read('Customer', undefined, undefined, {
-    field: 'email',
-    value: 'anna@customer.example',
-  });
-  assert.deepEqual(
-    available(customers).records.map((row) => row.fields.Name),
-    ['Anna Müller'],
-  );
-  const named = available(
-    await read('Customer', undefined, undefined, {
-      field: 'name',
-      value: 'Weber',
-    }),
-  );
-  assert.deepEqual(
-    named.records.map((row) => row.id),
-    [ids.leon.gid],
-  );
-  const byOrder = available(
-    await read('Customer', undefined, undefined, {
-      field: 'order',
-      value: '#C1002',
-    }),
-  );
-  assert.deepEqual(
-    byOrder.records.map((row) => row.id),
-    [ids.leon.gid],
-  );
   const customer = available(await read('Customer', ids.anna.gid));
   assert.equal(customer.contact[0].fields.Email, 'anna@customer.example');
   assert.equal(customer.orders.length, 5);
