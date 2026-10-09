@@ -25,7 +25,7 @@ const viewFilters: Record<OrderView, string> = {
  * Builds the list query. Parameters: $1 tenant, $2 as-of time, $3 connection, $4 status,
  * $5 payment status, $6–$7 placed range, $8–$9 source update range, $10 page size plus one,
  * $11–$13 cursor rank, key and order ID. Selective search binds order IDs at $14. Broad search binds text at $14 and
- * its escaped ILIKE pattern at $15.
+ * its escaped ILIKE pattern at $15. `customer` names the parameter that binds the allowed order IDs.
  */
 export function listSql(
   queries: OrderReadQueries,
@@ -35,6 +35,7 @@ export function listSql(
   search: false | 'selective' | 'broad',
   connection = false,
   exactCount = false,
+  customer?: number,
 ) {
   const op = direction === 'desc' ? '<' : '>';
   const rank = `${sort}_rank`,
@@ -60,6 +61,7 @@ export function listSql(
  AND ($6::timestamptz IS NULL OR o.placed_at >= $6) AND ($7::timestamptz IS NULL OR o.placed_at < $7)
  AND ($8::timestamptz IS NULL OR o.source_updated_at >= $8) AND ($9::timestamptz IS NULL OR o.source_updated_at < $9)
  ${search === 'broad' ? `AND ${orderSearchPredicate}` : search === 'selective' ? 'AND o.entity_id=ANY($14::uuid[])' : ''}
+ ${customer ? `AND o.entity_id=ANY($${customer}::uuid[])` : ''}
  AND ${
    view === 'outstanding' || view === 'overdue'
      ? `((o.state_valid_from <= $2 AND o.open IS TRUE) OR (o.state_valid_from > $2 AND EXISTS

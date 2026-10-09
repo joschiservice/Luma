@@ -27,7 +27,7 @@ import {
   orderAttentionForOrders,
   orderAttentionQuery,
 } from '@luma/exceptions/composition';
-import type { TenantContext } from '@luma/identity';
+import { PermissionSet, type TenantContext } from '@luma/identity';
 import {
   builtInMembership,
   makeTenantContext,
@@ -263,6 +263,8 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
       number?: string;
       externalNumber?: string;
       extraLine?: boolean;
+      /** Source customer ID, or null for a guest order; omitted when not read. */
+      customer?: string | null;
     } = {},
   ): Item => ({
     source: source.source(connectionId, 'order', id),
@@ -276,6 +278,13 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
       ...(options.externalNumber === undefined
         ? {}
         : { externalOrderNumber: options.externalNumber }),
+      ...(options.customer === undefined
+        ? {}
+        : {
+            customer: options.customer
+              ? { externalId: options.customer, scopeKey: '' }
+              : null,
+          }),
       placedAt: options.placed ?? '2026-08-15T10:00:00.000Z',
       total: { amount: '10.00', currency: 'EUR' },
       status: options.status ?? 'open',
@@ -478,7 +487,7 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
   beforeEach(async () => {
     await owner.query(
       `TRUNCATE commerce_sync_runs,commerce_sync_items,commerce_sync_streams,commerce_identity_links,
-        customer_profiles,customer_erasures,connector_refresh_hints,connector_read_checks,
+        customer_profiles,customer_erasures,customer_orders,connector_refresh_hints,connector_read_checks,
         connector_mapping_revisions,connector_observations,connector_source_mappings,
         connector_lifecycle_events,connector_installations,orders_entities,inventory_entities CASCADE`,
     );
@@ -1087,6 +1096,158 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
     expect(
       checks.rows.every((row) => row.document.value.items.length === 0),
     ).toBe(true);
+  });
+
+  it('lists a customer’s orders from every source once and erases the order links with the profile', async () => {
+    const ada = 'gid://shopify/Customer/1',
+      grace = 'gid://shopify/Customer/2';
+    source.set(shop, 'customers.read', [
+      customer(shop, ada),
+      customer(shop, grace),
+    ]);
+    source.set(erp, 'customers.read', [customer(erp, '501')]);
+    source.set(shop, 'orders.read', [
+      order(shop, '1', { customer: ada, placed: '2026-08-01T10:00:00.000Z' }),
+      order(shop, '2', { customer: ada, placed: '2026-08-02T10:00:00.000Z' }),
+      order(shop, '3', { customer: null }),
+      order(shop, '4', { customer: grace }),
+    ]);
+    source.set(erp, 'orders.read', [
+      order(erp, '9', {
+        externalNumber: '#1',
+        number: 'SO-9',
+        customer: '501',
+      }),
+    ]);
+    await drain();
+
+    // Customer references never enter retained order evidence.
+    const evidence = await owner.query(
+      `SELECT 1 FROM connector_observations WHERE tenant_id=$1
+      AND document->'observation'->'data' ? 'customer'`,
+      [tenant],
+    );
+    expect(evidence.rowCount).toBe(0);
+    const profile = async (connectionId: string, externalId: string) =>
+      (
+        await owner.query<{ id: string }>(
+          'SELECT id FROM customer_profiles WHERE tenant_id=$1 AND connection_id=$2 AND external_id=$3',
+          [tenant, connectionId, externalId],
+        )
+      ).rows[0]?.id;
+    const ordersOf = async (customerId: string) =>
+      (
+        await workspace().list(context('viewer'), {
+          q: '',
+          view: 'all',
+          sort: 'placed',
+          direction: 'asc',
+          limit: 50,
+          count: 'exact',
+          customerId,
+        })
+      ).items.map((item) => item.id);
+    const adaId = (await profile(shop, ada))!;
+    const one = await canonical(shop, 'order', '1'),
+      two = await canonical(shop, 'order', '2');
+    expect(await ordersOf(adaId)).toEqual([one, two]);
+    expect(await ordersOf((await profile(erp, '501'))!)).toEqual([
+      await canonical(erp, 'order', '9'),
+    ]);
+    // Which orders a customer placed is customer data, not only order data.
+    const ordersOnly = context('viewer');
+    await expect(
+      workspace().list(
+        makeTenantContext(
+          { userId: 'viewer', sessionId: 'session' },
+          {
+            id: tenant,
+            name: 'Fixture',
+            slug: 'fixture',
+            status: 'active',
+            dataRegion: 'EU',
+          },
+          {
+            ...builtInMembership(
+              { id: 'm-viewer', organizationId: tenant, userId: 'viewer' },
+              'member',
+            ),
+            permissions: new PermissionSet(['orders.read']),
+          },
+          ordersOnly.requestId,
+        ),
+        {
+          q: '',
+          view: 'all',
+          sort: 'placed',
+          direction: 'asc',
+          limit: 50,
+          customerId: adaId,
+        },
+      ),
+    ).rejects.toMatchObject({ statusCode: 403 });
+
+    // Linked across sources, the order keeps one row for each source's customer.
+    await service.requestLink(context(), {
+      operation: 'link',
+      kind: 'order',
+      entityId: one,
+      otherId: await canonical(erp, 'order', '9'),
+      reason: 'Marketplace reference confirmed',
+    });
+    await drain();
+    // The linked order now sorts by the ERP's placed time; membership is what matters.
+    expect((await ordersOf(adaId)).sort()).toEqual([one, two].sort());
+    expect(await ordersOf((await profile(erp, '501'))!)).toEqual([one]);
+
+    // A later read that names another customer moves the order.
+    source.set(shop, 'orders.read', [
+      order(shop, '1', { customer: ada, placed: '2026-08-01T10:00:00.000Z' }),
+      order(shop, '2', {
+        customer: grace,
+        placed: '2026-08-02T10:00:00.000Z',
+        updated: new Date().toISOString(),
+      }),
+      order(shop, '3', { customer: null }),
+      order(shop, '4', { customer: grace }),
+    ]);
+    await due();
+    await drain();
+    expect(await ordersOf(adaId)).toEqual([one]);
+    expect((await ordersOf((await profile(shop, grace))!)).sort()).toEqual(
+      [two, await canonical(shop, 'order', '4')].sort(),
+    );
+
+    await owner.query(
+      'INSERT INTO shopify_installation_bindings(tenant_id,app,shop,connection_id) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING',
+      [tenant, 'test:app', 'fixture.myshopify.com', shop],
+    );
+    await runtime.query('SELECT erase_shopify_customer_data($1,$2,$3)', [
+      'test:app',
+      'fixture.myshopify.com',
+      [ada],
+    ]);
+    const links = await owner.query<{ customer_external_id: string }>(
+      'SELECT customer_external_id FROM customer_orders WHERE tenant_id=$1 AND connection_id=$2 ORDER BY 1',
+      [tenant, shop],
+    );
+    expect(links.rows.map((row) => row.customer_external_id)).toEqual([
+      grace,
+      grace,
+    ]);
+    expect(await ordersOf(adaId)).toEqual([]);
+
+    // A full reread does not restore the erased customer's links.
+    await service.command(context(), (await stream('orders'))!.id, 'reimport');
+    await drain();
+    expect(
+      (
+        await owner.query(
+          'SELECT 1 FROM customer_orders WHERE tenant_id=$1 AND customer_external_id=$2',
+          [tenant, ada],
+        )
+      ).rowCount,
+    ).toBe(0);
   });
 
   it('links equivalent SKUs from two sources on request and separates them again', async () => {

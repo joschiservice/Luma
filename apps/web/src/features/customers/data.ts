@@ -3,6 +3,8 @@ import {
   customerListSchema,
   customerSortSchema,
   customerStateSchema,
+  orderListSchema,
+  type OrderSort,
 } from '@luma/api-contract';
 import { queryOptions } from '@tanstack/react-query';
 import { z } from 'zod';
@@ -135,6 +137,57 @@ export function customerOptions(organizationId: string, customerId: string) {
         throw new IdentityError(result.status, result.body);
 
       return customerDetailSchema.parse(result.body);
+    },
+  });
+}
+
+export const customerOrderPageSize = 20;
+
+/** Sorting and paging of a customer's order history, kept in page state. */
+export interface CustomerOrdersState {
+  sort: OrderSort;
+  direction: 'asc' | 'desc';
+  cursor?: string | undefined;
+}
+
+/**
+ * Loads one page of the Luma orders whose source attributes them to this imported customer,
+ * with the exact number of matches. Requires order and customer access.
+ */
+export function customerOrdersOptions(
+  organizationId: string,
+  customerId: string,
+  state: CustomerOrdersState,
+) {
+  const query = {
+    customerId,
+    count: 'exact' as const,
+    sort: state.sort,
+    direction: state.direction,
+    cursor: state.cursor,
+    limit: customerOrderPageSize,
+  };
+
+  return queryOptions({
+    ...privateQueryDefaults,
+    queryKey: [
+      'private',
+      'organization',
+      organizationId,
+      'customer-orders',
+      query,
+    ],
+    refetchOnReconnect: 'always',
+    queryFn: async ({ signal }) => {
+      const result = await api.orders.list({
+        params: { organizationId },
+        query,
+        fetchOptions: { signal, cache: 'no-store' },
+      });
+      if (result.status !== 200)
+        throw new IdentityError(result.status, result.body);
+
+      return orderListSchema.parse(result.body);
     },
   });
 }

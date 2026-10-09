@@ -66,6 +66,7 @@ export function createOrderWorkspace(
   return {
     list: (context, query) =>
       read(context, async (tx, _scoped, fresh, asOf) => {
+        if (query.customerId) requirePermission(fresh, 'customers.read');
         const list = await listOrders(tx, queries, fresh, query, asOf);
 
         // The needs-you view still selects by issue, but readers without issue access get no links.

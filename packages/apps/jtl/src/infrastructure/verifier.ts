@@ -77,6 +77,11 @@ export function createInstallationVerifier(options: {
         capabilities: ['fulfillment.read'],
       },
       {
+        path: 'customers',
+        schema: jtl.customer,
+        capabilities: ['customers.read'],
+      },
+      {
         path: 'suppliers',
         schema: jtl.supplier,
         capabilities: ['suppliers.read'],

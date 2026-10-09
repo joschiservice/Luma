@@ -6,6 +6,7 @@ import type {
   CommerceObservation,
   CustomerSnapshot,
   Observation,
+  OrderSnapshot,
   ReadCapability,
 } from '@luma/connections';
 import type { CustomerProfiles } from '@luma/customers';
@@ -63,7 +64,7 @@ export interface SyncRunnerDependencies {
       reason: string,
     ): Promise<unknown>;
   };
-  customers: Pick<CustomerProfiles, 'upsert'>;
+  customers: Pick<CustomerProfiles, 'upsert' | 'recordOrders'>;
   /** Records the read outcome for connection freshness. Customer records are never passed. */
   recordRead(
     context: TenantContext,
@@ -209,7 +210,8 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
       ingestKey: `sync:${observation.id}`,
       input: {
         capability: recordCapabilities[recordType],
-        observation,
+        observation:
+          recordType === 'orders' ? withoutCustomer(observation) : observation,
       } as CommerceObservation,
     });
     try {
@@ -441,6 +443,12 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
         claimed.recordType,
         changed.map((item) => item.observation),
       );
+      if (claimed.recordType === 'orders')
+        await deps.customers.recordOrders(
+          tenant,
+          claimed.connectionId,
+          changed.flatMap(({ observation }) => customerOrder(observation)),
+        );
       for (const [index, { observation, digest }] of changed.entries()) {
         const outcome = outcomes[index];
         if (!outcome) {
@@ -623,6 +631,33 @@ async function retryConflict<T>(work: () => Promise<T>): Promise<T> {
 
     return work();
   }
+}
+
+/** The order's customer reference as a customer-store link; none when the read omits it. */
+function customerOrder(observation: Observation<unknown>) {
+  const customer = (observation.data as Partial<OrderSnapshot>).customer;
+  if (customer === undefined) return [];
+
+  return [
+    {
+      order: {
+        externalId: observation.source.externalId,
+        scopeKey: observation.source.scopeKey,
+      },
+      customerExternalId: customer?.externalId ?? null,
+      observedAt: observation.observedAt,
+    },
+  ];
+}
+
+// Customer references are erasable personal data; order observations are retained evidence.
+function withoutCustomer(observation: Observation<unknown>) {
+  if ((observation.data as Partial<OrderSnapshot>).customer === undefined)
+    return observation;
+  const data = { ...(observation.data as Partial<OrderSnapshot>) };
+  delete data.customer;
+
+  return { ...observation, data };
 }
 
 function grantedTypes(connection: SyncConnection): RecordType[] {

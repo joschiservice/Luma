@@ -1,6 +1,6 @@
 {
   "sourceUrl": "https://developer.jtl-software.com/openapi/erp/2.2.json",
-  "sourceSha256": "9afa86ef23b99c07389fd7deedd55eb9c257cc2d0f5e3a5ee576b144a05f579c",
+  "sourceSha256": "ea871864c99b19856ccd9f80b1519c4c64983abca4cb3e3ed33041c10932a064",
   "version": "2.2",
   "paths": {
     "/v2/sales-orders": {
@@ -396,6 +396,62 @@
       "scopes": ["suppliers.read"],
       "response": {
         "$ref": "#/components/schemas/JTL.Wawi.Suppliers.PublicApi.DataTransferObjects.V2.SupplierDomain.SupplierDetail"
+      }
+    },
+    "/v2/customers": {
+      "parameters": [
+        {
+          "name": "searchTerm",
+          "in": "query"
+        },
+        {
+          "name": "searchOperator",
+          "in": "query"
+        },
+        {
+          "name": "searchField",
+          "in": "query"
+        },
+        {
+          "name": "pageNumber",
+          "in": "query"
+        },
+        {
+          "name": "pageSize",
+          "in": "query"
+        },
+        {
+          "name": "sortBy",
+          "in": "query"
+        },
+        {
+          "name": "sortDescending",
+          "in": "query"
+        },
+        {
+          "name": "createdDateAfter",
+          "in": "query"
+        },
+        {
+          "name": "createdDateBefore",
+          "in": "query"
+        },
+        {
+          "name": "lastChangedAfter",
+          "in": "query"
+        },
+        {
+          "name": "lastChangedBefore",
+          "in": "query"
+        },
+        {
+          "name": "x-tenant-id",
+          "in": "header"
+        }
+      ],
+      "scopes": ["customers.read"],
+      "response": {
+        "$ref": "#/components/schemas/JTL.Framework.Api.Abstraction.Models.PagedListOfJTL.Wawi.Customers.PublicApi.DataTransferObjects.V2.CustomerDomain.CustomerListItem"
       }
     },
     "/v2/items/{itemId}/suppliers": {
@@ -2976,6 +3032,203 @@
       }
     },
     "JTL.Data.Contracts.Keys.WarenlagerKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Framework.Api.Abstraction.Models.PagedListOfJTL.Wawi.Customers.PublicApi.DataTransferObjects.V2.CustomerDomain.CustomerListItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalItems", "pageNumber", "pageSize", "items"],
+      "properties": {
+        "totalItems": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "pageNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "pageSize": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JTL.Wawi.Customers.PublicApi.DataTransferObjects.V2.CustomerDomain.CustomerListItem"
+          }
+        },
+        "totalPages": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "hasPreviousPage": {
+          "type": "boolean"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "nextPageNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "previousPageNumber": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "JTL.Wawi.Customers.PublicApi.DataTransferObjects.V2.CustomerDomain.CustomerListItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "hasNewsletter",
+        "isCashRegisterBased",
+        "isLocked",
+        "isJtlFulfillment"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.KundeKey"
+        },
+        "customerNumber": {
+          "type": "string"
+        },
+        "ebayName": {
+          "type": "string"
+        },
+        "birthday": {
+          "type": "string"
+        },
+        "homepage": {
+          "type": "string"
+        },
+        "lastName": {
+          "type": "string"
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "phoneNumber": {
+          "type": "string"
+        },
+        "faxNumber": {
+          "type": "string"
+        },
+        "emailAddress": {
+          "type": "string"
+        },
+        "companyName": {
+          "type": "string"
+        },
+        "postalCode": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "countryName": {
+          "type": "string"
+        },
+        "countryIso": {
+          "type": "string"
+        },
+        "additionalCompanyLine": {
+          "type": "string"
+        },
+        "salutation": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "street": {
+          "type": "string"
+        },
+        "additionalAddressLine": {
+          "type": "string"
+        },
+        "createdDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "lastChanged": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "mobilePhoneNumber": {
+          "type": "string"
+        },
+        "discountRate": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "vatId": {
+          "type": "string"
+        },
+        "gln": {
+          "type": "string"
+        },
+        "hasNewsletter": {
+          "type": "boolean"
+        },
+        "postId": {
+          "type": "string"
+        },
+        "paymentDueDateInDays": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "state": {
+          "type": "string"
+        },
+        "initialContact": {
+          "type": "string"
+        },
+        "isCashRegisterBased": {
+          "type": "boolean"
+        },
+        "isLocked": {
+          "type": "boolean"
+        },
+        "commercialRegisterNumber": {
+          "type": "string"
+        },
+        "accountsReceivableNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "customerCategoryName": {
+          "type": "string"
+        },
+        "customerGroupName": {
+          "type": "string"
+        },
+        "customerCategoryId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.KundenKategorieKey"
+        },
+        "customerGroupId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.KundenGruppeKey"
+        },
+        "isJtlFulfillment": {
+          "type": "boolean"
+        },
+        "labels": {
+          "type": "string"
+        },
+        "languageIso": {
+          "type": "string"
+        }
+      }
+    },
+    "JTL.Data.Contracts.Keys.KundenKategorieKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Data.Contracts.Keys.KundenGruppeKey": {
       "type": "string",
       "format": "uuid",
       "additionalProperties": false

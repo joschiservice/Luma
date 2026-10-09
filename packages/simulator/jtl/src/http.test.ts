@@ -222,6 +222,76 @@ describe('JTL ERP API', () => {
     expect((await call(context, 'delivery-notes/9')).status).toBe(404);
   });
 
+  it('assigns orders to customers by email address and lists customers changed after a time', async () => {
+    const { context } = await seeded();
+    const buyer = {
+      email: 'Mia.Keller@example.test',
+      firstName: 'Mia',
+      lastName: 'Keller',
+      phone: '+49 151 1234567',
+      street: 'Hauptstraße 12',
+      city: 'Berlin',
+      postalCode: '10115',
+      countryIso: 'DE',
+    };
+    const place = (customer?: typeof buyer) =>
+      jtl.command(context, {
+        kind: 'order',
+        lines: [{ itemId: '1', quantity: 1, price: 24 }],
+        shippingMethodId: '7',
+        currency: 'EUR',
+        paid: true,
+        ...(customer ? { customer } : {}),
+      });
+    const first = await place(buyer);
+    context.now += 60_000;
+    // The integration matches a returning customer by email address, ignoring case.
+    const second = await place({
+      ...buyer,
+      email: 'mia.keller@EXAMPLE.test',
+      street: 'Neue Straße 1',
+    });
+    const guest = await place();
+    context.now += 60_000;
+    await place({ ...buyer, email: 'jonas@example.test', firstName: 'Jonas' });
+    const customerOf = async (id: string) =>
+      (
+        (await call(context, `sales-orders/${id}`)).body as {
+          customerId: number | null;
+        }
+      ).customerId;
+    expect(await customerOf(first.id)).toBe(1);
+    expect(await customerOf(second.id)).toBe(1);
+    expect(await customerOf(guest.id)).toBeNull();
+    const customers = (await call(context, 'customers')).body as Page & {
+      items: { id: number; emailAddress: string; street: string }[];
+    };
+    expect(customers).toMatchObject({
+      totalItems: 2,
+      items: [
+        {
+          id: 1,
+          customerNumber: 'K000001',
+          emailAddress: 'Mia.Keller@example.test',
+          street: 'Hauptstraße 12',
+          countryIso: 'DE',
+          isLocked: false,
+        },
+        { id: 2, firstName: 'Jonas' },
+      ],
+    });
+    const changed = (
+      await call(
+        context,
+        `customers?lastChangedAfter=${new Date(start + 60_000).toISOString()}`,
+      )
+    ).body as Page;
+    expect(changed.items.map((item) => item.id)).toEqual([2]);
+    expect(
+      (await call(context, 'customers?lastChangedAfter=yesterday')).status,
+    ).toBe(400);
+  });
+
   it('names operations and resources for fault targeting', () => {
     const target = (path: string, method = 'GET') =>
       jtl.identify(request(path, method));
@@ -258,6 +328,9 @@ describe('JTL ERP API', () => {
     expect(target('suppliers/2')).toMatchObject({
       operation: 'suppliers.read',
       resource: '2',
+    });
+    expect(target('customers?pageNumber=1')).toMatchObject({
+      operation: 'customers.read',
     });
     expect(target('purchase-orders', 'POST')).toEqual({
       operation: 'purchase-orders.submit',

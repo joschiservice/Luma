@@ -69,8 +69,9 @@ A JTL connection always asks for read access to orders, products, inventory and 
 
 - **Allow shipping method corrections**: needs read and write access to sales orders in JTL.
 - **Allow sending approved purchase orders**: needs access to suppliers, purchase orders and items in JTL. Procurement uses it to [send purchase orders](/docs/procurement#send-an-order).
+- **Import customers**: reads customers, including names, contact details and addresses, and matches them to their orders. Needs read access to customers in JTL. The customers then appear in [Customers](/docs/customers) with their order history.
 
-Luma uses a write action only after it confirms that JTL granted it. People still need the matching app permission, and every change waits for approval.
+These options can only be chosen when you add the connection. Luma uses customers and write actions only after it confirms that JTL granted them. People still need the matching app permission, and every change waits for approval.
 
 ## Check a connection
 

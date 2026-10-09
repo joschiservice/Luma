@@ -63,10 +63,15 @@
   "customers_detail_load_failed": "Luma konnte diesen Kunden nicht laden. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
   "customers_detail_loading": "Kunde wird geladen…",
   "customers_history_title": "Bestellverlauf",
-  "customers_history_description": "Bestellungen, Fulfillment, Retouren und Erstattungen, live aus {store} mit den Berechtigungen der Verbindung gelesen. Wählen Sie eine Bestellung, um ihre offenen Probleme und die Aktionen von Luma zu sehen.",
-  "customers_history_description_generic": "Bestellungen, Fulfillment, Retouren und Erstattungen, live aus dem verbundenen Shop mit den Berechtigungen der Verbindung gelesen. Wählen Sie eine Bestellung, um ihre offenen Probleme und die Aktionen von Luma zu sehen.",
-  "customers_history_unavailable": "Luma liest den Bestellverlauf live über die {store}-App. Installieren und autorisieren Sie sie unter Apps, um die Bestellungen dieses Kunden zu sehen.",
-  "customers_history_unavailable_generic": "Luma liest den Bestellverlauf live über die App des Shops. Installieren und autorisieren Sie sie unter Apps, um die Bestellungen dieses Kunden zu sehen.",
+  "customers_history_description": "Bestellungen, die Luma aus {source} für diesen Kunden importiert hat. Eine über Quellen verknüpfte Bestellung erscheint einmal. Öffnen Sie eine Bestellung, um ihre Quellen, offenen Probleme und die Aktionen von Luma zu sehen.",
+  "customers_history_loading": "Bestellungen werden geladen…",
+  "customers_history_empty_title": "Noch keine Bestellungen",
+  "customers_history_empty_body": "Bestellungen erscheinen hier, sobald die Datensynchronisierung Bestellungen importiert, die die Quelle diesem Kunden zuordnet.",
+  "customers_history_access": "Sie benötigen Zugriff auf Bestellungen, um die Bestellungen dieses Kunden zu sehen.",
+  "customers_history_load_failed": "Luma konnte die Bestellungen dieses Kunden nicht laden.",
+  "customers_history_refresh_failed": "Luma konnte die Bestellungen dieses Kunden nicht aktualisieren. Die Liste unten ist möglicherweise veraltet.",
+  "customers_history_page_expired": "Diese Seite der Bestellungen passt nicht mehr zur Sortierung.",
+  "customers_history_pagination_label": "Seiten der Bestellungen dieses Kunden",
   "customers_profile_label": "Kundenprofil",
   "customers_contact_title": "Kontakt",
   "customers_fact_email": "E-Mail",
@@ -87,5 +92,5 @@
   "customers_fact_source_id": "Quell-ID",
   "customers_fact_updated": "In Quelle aktualisiert",
   "customers_fact_read": "Zuletzt von Luma gelesen",
-  "customers_source_note": "Jeder Shop behält seine eigenen Kunden. Luma führt Kunden verschiedener Shops nie über Namen oder E-Mail-Adresse zusammen."
+  "customers_source_note": "Jeder Shop und jedes ERP führt eigene Kunden. Luma führt Kunden verschiedener Quellen nie über Namen oder E-Mail-Adresse zusammen."
 }

@@ -10,7 +10,8 @@
       "salesOrderDate": "2026-09-12T09:15:00+02:00",
       "totalGrossAmount": 107.1,
       "currencyIso": "EUR",
-      "billingAddressEmailAddress": "excluded@example.test"
+      "billingAddressEmailAddress": "excluded@example.test",
+      "customerId": 501
     }
   ],
   "orderLines": [
@@ -49,7 +50,14 @@
       "isShopActive": false
     }
   ],
-  "notes": [{ "id": 30 }, { "id": 31 }],
+  "notes": [
+    {
+      "id": 30
+    },
+    {
+      "id": 31
+    }
+  ],
   "details": [
     {
       "id": 30,
@@ -98,5 +106,44 @@
       }
     ]
   ],
-  "warehouseStock": { "totalQuantity": 2.5, "lockedQuantity": 1 }
+  "warehouseStock": {
+    "totalQuantity": 2.5,
+    "lockedQuantity": 1
+  },
+  "customers": [
+    {
+      "id": 501,
+      "customerNumber": "K501",
+      "firstName": " Mia ",
+      "lastName": "Keller",
+      "companyName": "Keller GmbH",
+      "emailAddress": "mia@keller.example",
+      "phoneNumber": "",
+      "mobilePhoneNumber": "+49 151 1234567",
+      "street": "Hauptstraße 12",
+      "additionalAddressLine": "",
+      "postalCode": "10115",
+      "city": "Berlin",
+      "state": "",
+      "countryIso": "DE",
+      "countryName": "Deutschland",
+      "createdDate": "2025-02-01T10:00:00+01:00",
+      "lastChanged": "2026-09-10T08:00:00+02:00",
+      "isLocked": false,
+      "labels": "B2B, VIP,,B2B",
+      "hasNewsletter": true,
+      "isCashRegisterBased": false,
+      "isJtlFulfillment": false
+    },
+    {
+      "id": 502,
+      "lastName": null,
+      "emailAddress": "not-an-email-but-text",
+      "createdDate": "0001-01-01T00:00:00+00:00",
+      "isLocked": true,
+      "hasNewsletter": false,
+      "isCashRegisterBased": false,
+      "isJtlFulfillment": false
+    }
+  ]
 }

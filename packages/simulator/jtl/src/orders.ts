@@ -1,3 +1,4 @@
+import { customerFor } from './customers.js';
 import {
   allocate,
   cents,
@@ -99,6 +100,9 @@ export async function placeOrder(context: JtlContext, command: OrderCommand) {
     command.lines.map((line) => line.itemId),
   );
 
+  const customerId = command.customer
+    ? await customerFor(context, command.customer)
+    : null;
   const id = explicit ?? (await allocate(context, kinds.order));
   const lines: OrderRecord['lines'] = [];
   for (const line of command.lines) {
@@ -119,6 +123,7 @@ export async function placeOrder(context: JtlContext, command: OrderCommand) {
     id,
     number: `AU-${id.padStart(6, '0')}`,
     externalNumber: command.externalNumber ?? null,
+    customerId,
     cancelled: false,
     paid: command.paid,
     shippingMethodId: command.shippingMethodId,
@@ -358,6 +363,7 @@ export function salesOrderJson(order: OrderRecord) {
     id: Number(order.id),
     salesOrderNumber: order.number,
     externalSalesOrderNumber: order.externalNumber,
+    customerId: order.customerId ? Number(order.customerId) : null,
     isCancelled: order.cancelled,
     deliveryStatus: deliveryStatus(order),
     paymentStatus: order.paid ? 2 : 0,

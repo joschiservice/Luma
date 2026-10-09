@@ -6,7 +6,6 @@ export const appSlotSchema = z.enum([
   'app-settings',
   'page',
   'record',
-  'customers',
   'inventory',
   'fulfillment',
 ]);

@@ -1,3 +1,5 @@
+import './orders.css';
+
 import type { OrderListItem, OrderSort } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import { Badge } from '@luma/ui/components/primitives/badge';
@@ -131,9 +133,19 @@ function orderColumns(
   ];
 }
 
+export type OrderColumn =
+  | 'order'
+  | 'placed'
+  | 'status'
+  | 'fulfillment'
+  | 'total'
+  | 'sources'
+  | 'updated';
+
 /**
  * Lists one page of orders, or `empty` when the page has none. Each row opens its order with the
  * current filters, and sortable headers change the URL sort, starting from the first page.
+ * `columns` limits the table to those columns, for narrower placements.
  */
 export function OrdersTable({
   organizationId,
@@ -141,14 +153,19 @@ export function OrdersTable({
   items,
   change,
   empty,
+  columns,
 }: {
   organizationId: string;
   search: OrdersSearch;
   items: OrderListItem[];
   change: (next: OrdersSearch) => void;
   empty: ReactNode;
+  columns?: readonly OrderColumn[];
 }) {
   const sort = search.sort ?? 'updated';
+  const shown = orderColumns(organizationId, search).filter(
+    (column) => !columns || (columns as readonly string[]).includes(column.key),
+  );
 
   return (
     <DataTable
@@ -156,7 +173,7 @@ export function OrdersTable({
         view: viewLabels[search.view ?? 'all'],
         sort: sortLabels[sort],
       })}
-      columns={orderColumns(organizationId, search)}
+      columns={shown}
       rows={items}
       rowKey={(order) => order.id}
       empty={empty}

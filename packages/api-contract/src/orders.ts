@@ -96,6 +96,13 @@ export const orderListQuerySchema = z
     status: orderStatusSchema.optional(),
     paymentStatus: orderPaymentStatusSchema.optional(),
     connectionId: z.string().uuid().optional(),
+    customerId: z
+      .string()
+      .uuid()
+      .optional()
+      .describe(
+        'Imported customer ID: only orders the source attributes to this customer. Requires access to customers.',
+      ),
     placedFrom: timestamp.optional(),
     placedBefore: timestamp.optional(),
     updatedFrom: timestamp.optional(),

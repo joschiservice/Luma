@@ -15,6 +15,8 @@ export const kinds = {
   /** Delivery notes; parent is the sales-order ID. */
   note: 'delivery-note',
   purchaseOrder: 'purchase-order',
+  /** Customers; key is the lowercased email address the order integration matches on. */
+  customer: 'customer',
   /** Recorded purchase-order POST results, by Idempotency-Key. */
   purchaseOrderKey: 'purchase-order-key',
 } as const;
@@ -78,10 +80,29 @@ export interface OrderLineRecord {
   price: number;
 }
 
+/** A customer account, created by the order integration for a new email address. */
+export interface CustomerRecord {
+  id: string;
+  number: string;
+  firstName: string;
+  lastName: string;
+  company: string | null;
+  email: string;
+  phone: string | null;
+  street: string;
+  city: string;
+  postalCode: string;
+  countryIso: string;
+  created: string;
+  modified: string;
+}
+
 export interface OrderRecord {
   id: string;
   number: string;
   externalNumber: string | null;
+  /** The customer who placed the order; absent on orders stored before customers existed. */
+  customerId?: string | null;
   cancelled: boolean;
   paid: boolean;
   shippingMethodId: string;

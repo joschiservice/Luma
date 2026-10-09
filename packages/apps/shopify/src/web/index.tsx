@@ -9,7 +9,6 @@ import { useRef, useState } from 'react';
 import { z } from 'zod';
 
 import { ShopifyAccess } from './access.js';
-import { ShopifyCustomers } from './customers.js';
 import { ShopifyFulfillmentRecovery } from './fulfillment-recovery.js';
 import { ShopifyInventoryCorrection } from './inventory-correction.js';
 import { ShopifyOrderContext } from './order-context.js';
@@ -26,7 +25,6 @@ export default function ShopifySettings(props: AppUiProps) {
         services={props.services}
       />
     ) : null;
-  if (props.slot === 'customers') return <ShopifyCustomers {...props} />;
   if (props.slot === 'fulfillment')
     return props.fulfillment ? (
       <ShopifyFulfillmentRecovery

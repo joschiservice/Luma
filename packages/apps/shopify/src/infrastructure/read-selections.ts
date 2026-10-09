@@ -7,6 +7,11 @@ const connection = (field: string, size: number, fields: string) =>
 const order =
   'id updatedAt createdAt name cancelledAt closed displayFinancialStatus currentTotalPriceSet { shopMoney { amount currencyCode } }';
 const orderLine = 'id quantity name sku variant { inventoryItem { id } }';
+
+/** Order fields; the customer reference needs protected customer data access and `read_customers`. */
+export function orderSelection(customer = false) {
+  return customer ? `${order} customer { id }` : order;
+}
 const product =
   'id updatedAt title status vendor publishedAt priceRangeV2 { minVariantPrice { currencyCode } }';
 const variant = 'id sku title price barcode inventoryItem { id }';
@@ -30,11 +35,17 @@ const refundLine = 'quantity restockType restocked lineItem { id }';
 const transaction =
   'id kind status processedAt gateway amountSet { shopMoney { amount currencyCode } }';
 
-/** Nested first pages; overflow is drained before an observation is published. */
-export function readSelection(capability: ReadCapability): string {
+/**
+ * Nested first pages; overflow is drained before an observation is published. `orderCustomers`
+ * adds the customer reference to orders.
+ */
+export function readSelection(
+  capability: ReadCapability,
+  orderCustomers = false,
+): string {
   switch (capability) {
     case 'orders.read':
-      return `${order} ${connection('lineItems', 8, orderLine)}`;
+      return `${orderSelection(orderCustomers)} ${connection('lineItems', 8, orderLine)}`;
     case 'products.read':
       return `${product} ${connection('variants', 8, variant)}`;
     case 'inventory.read':
@@ -59,16 +70,20 @@ export function readPageSize(
   );
 }
 
-/** Complete export selection for high-volume streams; customer fields follow deployment approval. */
+/**
+ * Complete export selection for high-volume streams; customer fields follow deployment approval.
+ * `orderCustomers` adds the customer reference to orders.
+ */
 export function bulkReadSelection(
   capability: ReadCapability,
   access?: { contact: boolean; address: boolean },
+  orderCustomers = false,
 ): string {
   const all = (field: string, fields: string) =>
     `${field} { edges { node { ${fields} } } }`;
   switch (capability) {
     case 'orders.read':
-      return `${order} ${all('lineItems', orderLine)}`;
+      return `${orderSelection(orderCustomers)} ${all('lineItems', orderLine)}`;
     case 'products.read':
       return `${product} ${all('variants', variant)}`;
     case 'inventory.read':

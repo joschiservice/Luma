@@ -1,6 +1,6 @@
 import type { TenantContext } from '@luma/identity';
 
-import type { CustomerProfile } from '../domain/profiles.js';
+import type { CustomerOrder, CustomerProfile } from '../domain/profiles.js';
 
 export interface CustomerProfileQuery {
   /** Matches the start of a name or email address, case-insensitively. */
@@ -25,8 +25,19 @@ export interface CustomerProfiles {
     profile: CustomerProfile,
   ): Promise<'applied' | 'retained' | 'suppressed'>;
   /**
-   * Deletes stored profiles for one connection, or only the listed source customers, and
-   * prevents listed customers from being imported again. Requires `sync.manage`.
+   * Records which source customer placed each order of one connection, replacing an order's
+   * earlier customer unless the stored link was observed later. Orders without a customer, or
+   * whose customer was erased, lose their link. Order keys must be unique. Requires `sync.manage`.
+   */
+  recordOrders(
+    context: TenantContext,
+    connectionId: string,
+    orders: Omit<CustomerOrder, 'connectionId'>[],
+  ): Promise<void>;
+  /**
+   * Deletes stored profiles and their order links for one connection, or only those of the
+   * listed source customers, and prevents listed customers from being imported again.
+   * Requires `sync.manage`.
    */
   erase(
     context: TenantContext,

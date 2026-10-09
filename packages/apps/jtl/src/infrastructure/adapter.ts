@@ -6,6 +6,7 @@ import {
   type CapabilityOutput,
   type ConnectorConnection,
   ConnectorError,
+  type CustomerSnapshot,
   type ExternalId,
   type Observation,
   type ProductSnapshot,
@@ -64,6 +65,11 @@ export interface JtlConnectorOptions extends JtlTransportOptions {
   shippingMethodActions?: boolean;
   /** Enable only after confirming purchase-order write and item read grants and endpoint support. */
   purchaseOrderActions?: boolean;
+  /**
+   * Reads customers and reports which customer placed each order. Set only when the connection
+   * grants `customers.read`.
+   */
+  customers?: boolean;
   /** Map configured JTL unit labels to canonical units without converting quantities. */
   units?: Record<string, string>;
   now?: () => Date;
@@ -99,7 +105,6 @@ export function createJtlConnector(
     K extends Exclude<
       ReadCapability,
       | 'orders.shipping-method.read'
-      | 'customers.read'
       | 'returns.read'
       | 'suppliers.read'
       | 'purchase-orders.read'
@@ -111,6 +116,9 @@ export function createJtlConnector(
         minimumRisk: 'low',
         idempotency: 'none',
         retry: { maxAttempts: 3, initialDelayMs: 1000 },
+        ...(capability === 'customers.read'
+          ? { filters: ['updatedSince' as const] }
+          : {}),
       },
       parseInput: (value) =>
         s.inputs[capability].parse(value) as CapabilityInput<K>,
@@ -125,6 +133,8 @@ export function createJtlConnector(
           fail('unavailable');
         const filters = input as CapabilityInput<'inventory.read'> &
           CapabilityInput<'fulfillment.read'>;
+        const updatedSince =
+          'updatedSince' in input ? (input.updatedSince ?? null) : null;
         const binding = createHash('sha256')
           .update(
             JSON.stringify([
@@ -137,6 +147,7 @@ export function createJtlConnector(
               filters.sku ?? null,
               filters.location ?? null,
               filters.order ?? null,
+              updatedSince,
               units,
             ]),
           )
@@ -353,6 +364,14 @@ export function createJtlConnector(
                       currency: order.currencyIso!,
                     }
                   : null,
+              ...(options.customers && order.customerId !== undefined
+                ? {
+                    customer:
+                      order.customerId === 0 || order.customerId === null
+                        ? null
+                        : ref(order.customerId),
+                  }
+                : {}),
               status:
                 order.isCancelled || order.deliveryStatus === 0
                   ? 'cancelled'
@@ -382,6 +401,24 @@ export function createJtlConnector(
               })),
             });
           }
+        } else if (capability === 'customers.read') {
+          // JTL filters strictly after the given time; sync overlaps its windows.
+          const result = await page(
+            'customers',
+            s.customer,
+            pageNumber,
+            input.limit,
+            updatedSince ? { lastChangedAfter: updatedSince } : {},
+          );
+          hasNext = result.hasNext;
+          total = result.total;
+          for (const customer of result.items)
+            emit(
+              'customer',
+              ref(customer.id),
+              customer.lastChanged ?? null,
+              customerSnapshot(customer),
+            );
         } else if (capability === 'inventory.read' && filters.sku) {
           // A stock check for one SKU reads that item instead of paging the whole catalog.
           hasNext = false;
@@ -586,7 +623,67 @@ export function createJtlConnector(
       'products.read': handler('products.read'),
       'inventory.read': handler('inventory.read'),
       'fulfillment.read': handler('fulfillment.read'),
+      ...(options.customers
+        ? { 'customers.read': handler('customers.read') }
+        : {}),
     },
+  };
+}
+
+// Blank or oversized contact text is treated as not provided rather than truncated.
+const bounded = (value: string | null | undefined, max: number) => {
+  const trimmed = value?.trim();
+
+  return trimmed && trimmed.length <= max ? trimmed : null;
+};
+
+/**
+ * Maps a JTL customer to Luma's profile. JTL has no separate consent for contact and address
+ * data, so the connection's customer grant shares both. Order count and spend are not reported.
+ */
+function customerSnapshot(
+  customer: z.infer<typeof s.customer>,
+): CustomerSnapshot {
+  const person = bounded(
+    [customer.firstName?.trim(), customer.lastName?.trim()]
+      .filter(Boolean)
+      .join(' '),
+    512,
+  );
+  const company = bounded(customer.companyName, 512);
+  const address = {
+    line1: bounded(customer.street, 512),
+    line2: bounded(customer.additionalAddressLine, 512),
+    city: bounded(customer.city, 256),
+    region: bounded(customer.state, 256),
+    postalCode: bounded(customer.postalCode, 64),
+    country:
+      bounded(customer.countryIso, 128) ?? bounded(customer.countryName, 128),
+  };
+
+  return {
+    displayName:
+      person && company
+        ? bounded(`${person} (${company})`, 512)
+        : (person ?? company),
+    email: bounded(customer.emailAddress, 320),
+    phone:
+      bounded(customer.phoneNumber, 100) ??
+      bounded(customer.mobilePhoneNumber, 100),
+    address: Object.values(address).some(Boolean) ? address : null,
+    state: customer.isLocked ? 'disabled' : 'enabled',
+    createdAt: customer.createdDate ?? null,
+    orderCount: null,
+    amountSpent: null,
+    tags: [
+      ...new Set(
+        (customer.labels ?? '')
+          .split(',')
+          .map((label) => label.trim())
+          .filter((label) => label.length > 0 && label.length <= 255),
+      ),
+    ].slice(0, 250),
+    shared: { contact: true, address: true },
   };
 }
 

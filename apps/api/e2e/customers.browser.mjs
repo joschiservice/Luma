@@ -7,7 +7,7 @@ import { availablePort, startProcess } from './helpers.mjs';
 import { ordersFixture } from './orders-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
-test('opens an imported customer from an order, reads live history and keeps other stores and workspaces apart', async ({
+test('opens an imported customer from an order, lists their imported orders and keeps other stores and workspaces apart', async ({
   resources: t,
 }) => {
   const port = await availablePort();
@@ -87,13 +87,11 @@ test('opens an imported customer from an order, reads live history and keeps oth
     requiredScopes: [],
     message: null,
   });
-  let revoked = false;
   const requests = [];
+  // Only the order's live source panel reads Shopify; customer history never does.
   await page.route('**/apps/shopify/records', async (route) => {
     const input = route.request().postDataJSON();
     requests.push(input);
-    if (revoked)
-      return route.fulfill({ status: 403, json: { code: 'FORBIDDEN' } });
     const contact = row(
       customerId,
       {
@@ -112,33 +110,14 @@ test('opens an imported customer from an order, reads live history and keeps oth
       Fulfillment: 'FULFILLED',
       Total: '84.00 EUR',
     });
-    const sections =
-      input.kind === 'Order'
-        ? [
-            section('order', 'Order', [order]),
-            section('customer', 'Customer', [contact]),
-            section('returns', 'Returns', []),
-            section('refunds', 'Refunds', [
-              row('gid://shopify/Refund/9', { Refunded: '12.00 EUR' }),
-            ]),
-          ]
-        : input.id
-          ? [
-              section('contact', 'Contact', [contact]),
-              section('customer', 'Customer', [contact]),
-              section('orders', 'Customer orders', [order]),
-            ]
-          : [
-              section(
-                'records',
-                'Customers',
-                input.connectionId === source.erp
-                  ? []
-                  : input.search
-                    ? [contact, { ...contact, id: 'gid://shopify/Customer/72' }]
-                    : [contact],
-              ),
-            ];
+    const sections = [
+      section('order', 'Order', [order]),
+      section('customer', 'Customer', [contact]),
+      section('returns', 'Returns', []),
+      section('refunds', 'Refunds', [
+        row('gid://shopify/Refund/9', { Refunded: '12.00 EUR' }),
+      ]),
+    ];
 
     await route.fulfill({
       json: {
@@ -176,7 +155,13 @@ test('opens an imported customer from an order, reads live history and keeps oth
     return id;
   };
   const averyId = await profile(customerId, 'Avery Tan');
-  await profile('gid://shopify/Customer/72', 'Avery Tan');
+  const otherAveryId = await profile('gid://shopify/Customer/72', 'Avery Tan');
+  // Sync records which source customer placed each order.
+  await f.db.owner.query(
+    `INSERT INTO customer_orders(tenant_id,connection_id,order_scope_key,order_external_id,customer_external_id,observed_at)
+     VALUES($1,$2,'',$3,$4,now())`,
+    [f.org.id, source.store, 'gid://shopify/Order/2001', customerId],
+  );
 
   // The order's source panel links to the source customer, which opens the imported profile.
   await page.goto(`/app/${f.org.id}/orders/${orderId}`);
@@ -184,9 +169,7 @@ test('opens an imported customer from an order, reads live history and keeps oth
   await page.waitForURL(`**/customers/${averyId}`);
   await page.getByRole('heading', { name: 'Avery Tan', level: 1 }).waitFor();
   await page.getByText('71@example.test', { exact: true }).waitFor();
-  await page.getByRole('button', { name: '#2001', exact: true }).click();
-  await page.getByText('12.00 EUR', { exact: true }).waitFor();
-  await page.getByRole('link', { name: 'Open #2001 in Luma' }).waitFor();
+  await page.getByRole('link', { name: '#2001', exact: true }).waitFor();
   await page.screenshot({
     path: '/tmp/luma-customer-desktop.png',
     fullPage: true,
@@ -207,22 +190,24 @@ test('opens an imported customer from an order, reads live history and keeps oth
     fullPage: true,
   });
 
-  // Revoked store access withholds live history; retry reads it again.
-  revoked = true;
-  await page
-    .getByRole('button', { name: 'Refresh orders', exact: true })
-    .click();
-  await page
-    .getByRole('alert')
-    .filter({ hasText: 'doesn’t have access' })
-    .waitFor();
-  expect(await page.getByText('12.00 EUR', { exact: true }).count()).toBe(0);
-  revoked = false;
-  await page.getByRole('button', { name: 'Retry', exact: true }).click();
-  await page.getByRole('button', { name: '#2001', exact: true }).waitFor();
+  // An order opened from the history returns to the customer.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.getByRole('link', { name: '#2001', exact: true }).click();
+  await page.waitForURL(`**/orders/${orderId}**`);
+  await page.getByRole('link', { name: 'Back to context' }).click();
+  await page.waitForURL(`**/customers/${averyId}`);
+  await page.getByRole('link', { name: '#2001', exact: true }).waitFor();
+  expect(requests.every((input) => input.kind === 'Order')).toBe(true);
+
+  // The same-name customer of the same store placed no imported order.
+  await page.goto(`/app/${f.org.id}/customers/${otherAveryId}`);
+  await page.getByRole('heading', { name: 'No orders yet' }).waitFor();
+  expect(
+    await page.getByRole('link', { name: '#2001', exact: true }).count(),
+  ).toBe(0);
 
   // The list keeps same-name customers apart and search text out of the URL.
-  await page.setViewportSize({ width: 1280, height: 900 });
   await page.getByRole('link', { name: 'Back to customers' }).click();
   await page.getByRole('link', { name: 'Avery Tan' }).first().waitFor();
   await page.getByRole('searchbox', { name: 'Search customers' }).fill('72@');

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { requirePermission, requireTenant } from '@luma/identity';
-import type { TenantDatabase } from '@luma/platform';
+import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
 
 import type {
@@ -78,7 +78,31 @@ type Row = {
   updated_at: Date;
 };
 
+const orderSchema = z
+  .object({
+    order: z
+      .object({
+        externalId: z.string().min(1).max(1024),
+        scopeKey: z.string().max(1024),
+      })
+      .strict(),
+    customerExternalId: z.string().min(1).max(1024).nullable(),
+    observedAt: timestamp,
+  })
+  .strict();
+
 const iso = (value: Date | null) => value?.toISOString() ?? null;
+
+// Erasure and imports of one connection's customers serialize, so a read that started before
+// an erasure cannot store data the erasure already removed.
+const lockConnection = (
+  tx: SqlTransaction,
+  tenantId: string,
+  connectionId: string,
+) =>
+  tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+    `customers:${tenantId}:${connectionId}`,
+  ]);
 
 // Stored as exact decimals; strip the scale padding PostgreSQL adds.
 const decimal = (value: string) =>
@@ -110,8 +134,9 @@ function stored(row: Row): StoredCustomerProfile {
 }
 
 /**
- * Stores the current customer profile per connection and source customer. Erased customers
- * are remembered by a digest of their source ID so later reads cannot restore them.
+ * Stores the current customer profile per connection and source customer, and which source
+ * customer placed each order. Erased customers are remembered by a digest of their source ID
+ * so later reads cannot restore them or their order links.
  */
 export function createCustomerProfiles(db: TenantDatabase): CustomerProfiles {
   return {
@@ -122,6 +147,7 @@ export function createCustomerProfiles(db: TenantDatabase): CustomerProfiles {
       return db.transaction(context.tenantId, async (tx) => {
         const tenant = context.tenantId;
         const keys = [tenant, value.connectionId, value.externalId];
+        await lockConnection(tx, tenant, value.connectionId);
         const erased = await tx.query(
           `SELECT 1 FROM customer_erasures WHERE tenant_id=$1 AND connection_id=$2
           AND external_digest=sha256(convert_to($3,'UTF8'))`,
@@ -184,6 +210,53 @@ export function createCustomerProfiles(db: TenantDatabase): CustomerProfiles {
         return 'applied';
       });
     },
+    async recordOrders(context, connectionId, orders) {
+      requirePermission(context, 'sync.manage');
+      z.string().uuid().parse(connectionId);
+      const values = z
+        .array(orderSchema)
+        .max(1000)
+        .refine(
+          (items) =>
+            new Set(
+              items.map((item) =>
+                JSON.stringify([item.order.scopeKey, item.order.externalId]),
+              ),
+            ).size === items.length,
+          { message: 'Each order may appear once' },
+        )
+        .parse(orders);
+      if (!values.length) return;
+      const columns = [
+        values.map((item) => item.order.scopeKey),
+        values.map((item) => item.order.externalId),
+        values.map((item) => item.customerExternalId),
+        values.map((item) => item.observedAt),
+      ];
+      const rows = `unnest($3::text[],$4::text[],$5::text[],$6::timestamptz[]) AS v(scope_key,external_id,customer,observed_at)`;
+      const erased = `EXISTS (SELECT 1 FROM customer_erasures x WHERE x.tenant_id=$1 AND x.connection_id=$2
+        AND x.external_digest=sha256(convert_to(v.customer,'UTF8')))`;
+
+      await db.transaction(context.tenantId, async (tx) => {
+        await lockConnection(tx, context.tenantId, connectionId);
+        await tx.query(
+          `DELETE FROM customer_orders o USING ${rows}
+          WHERE o.tenant_id=$1 AND o.connection_id=$2 AND o.order_scope_key=v.scope_key
+          AND o.order_external_id=v.external_id AND o.observed_at<=v.observed_at
+          AND (v.customer IS NULL OR ${erased})`,
+          [context.tenantId, connectionId, ...columns],
+        );
+        await tx.query(
+          `INSERT INTO customer_orders(tenant_id,connection_id,order_scope_key,order_external_id,customer_external_id,observed_at)
+          SELECT $1,$2,v.scope_key,v.external_id,v.customer,v.observed_at FROM ${rows}
+          WHERE v.customer IS NOT NULL AND NOT ${erased}
+          ON CONFLICT(tenant_id,connection_id,order_scope_key,order_external_id) DO UPDATE
+          SET customer_external_id=EXCLUDED.customer_external_id,observed_at=EXCLUDED.observed_at
+          WHERE customer_orders.observed_at<=EXCLUDED.observed_at`,
+          [context.tenantId, connectionId, ...columns],
+        );
+      });
+    },
     async erase(context, connectionId, externalIds) {
       requirePermission(context, 'sync.manage');
       z.string().uuid().parse(connectionId);
@@ -191,12 +264,18 @@ export function createCustomerProfiles(db: TenantDatabase): CustomerProfiles {
         z.array(z.string().min(1).max(1024)).max(10000).parse(externalIds);
 
       return db.transaction(context.tenantId, async (tx) => {
+        await lockConnection(tx, context.tenantId, connectionId);
         if (externalIds?.length)
           await tx.query(
             `INSERT INTO customer_erasures(tenant_id,connection_id,external_digest)
             SELECT $1,$2,sha256(convert_to(id,'UTF8')) FROM unnest($3::text[]) id ON CONFLICT DO NOTHING`,
             [context.tenantId, connectionId, externalIds],
           );
+        await tx.query(
+          `DELETE FROM customer_orders WHERE tenant_id=$1 AND connection_id=$2
+          AND ($3::text[] IS NULL OR customer_external_id=ANY($3))`,
+          [context.tenantId, connectionId, externalIds ?? null],
+        );
         const removed = await tx.query(
           `DELETE FROM customer_profiles WHERE tenant_id=$1 AND connection_id=$2
           AND ($3::text[] IS NULL OR external_id=ANY($3))`,

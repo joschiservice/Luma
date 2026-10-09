@@ -1,10 +1,11 @@
 # Customers workspace
 
-Customers lists the customer profiles that data sync imports for approved deployments (see
-[Commerce sync](commerce-sync.md#customers)) and shows live order history from the installed
-app. Luma never establishes a canonical customer identity: each identity is a connection
-plus a source customer ID, and names or email addresses never merge records across stores,
-so same-name customers stay separate rows.
+Customers lists the customer profiles that data sync imports from Shopify (for approved
+deployments) and from JTL connections set up with customer import (see
+[Commerce sync](commerce-sync.md#customers)), and shows each customer's imported orders.
+Luma never establishes a canonical customer identity: each identity is a connection plus a
+source customer ID, and names or email addresses never merge records across sources, so
+same-name customers stay separate rows.
 
 Code: `@luma/customers` owns the profiles; `@luma/read-models` reads them. Reads require
 `customers.read`.
@@ -30,17 +31,22 @@ explicitly rather than guessed.
 ## Detail
 
 The detail page shows the imported profile: contact fields and address only when the source
-shared them (`Not shared` otherwise), the source's order count, amount spent, account state,
-tags, and the source identity with its read time.
+shared them (`Not shared` otherwise), account state, tags, and the source identity with its
+read time. Order count and amount spent are shown only when the source reports them; JTL
+reports neither.
 
-Order history comes from the installed app's `customers` UI slot. Shopify reads it live
-through its installation-gated `records` operation in 20-row cursor pages. History requires
-`read_orders`; older history needs `read_all_orders`. Missing access is shown distinctly from
-empty history.
+Order history is the Orders list filtered by `customerId`, with the same rows, cursor
+paging and issue links. It reads Luma's imported orders, never the provider, so it needs no
+installed app and survives revoked store access. The filter follows the order links that
+sync records for the customer's own connection, resolved through current mappings, so an
+order linked across sources appears once under its current canonical ID. Orders the source
+does not attribute to a customer, such as guest checkouts, appear in no history.
 
-A selected order resolves its exact source identity through the record-source endpoint. An
-unambiguous canonical order supplies the Orders read model's open issues and Luma activity.
-No mapping or an ambiguous mapping is stated explicitly.
+The filter needs `customers.read` as well as `orders.read`, because which orders a person
+placed is customer data; without either it returns 403, which the page shows as missing
+access rather than an empty history. It binds the customer's order IDs to the list query,
+so a customer with tens of thousands of orders makes each history read proportionally
+larger.
 
 ## Access and protected data
 
@@ -49,8 +55,7 @@ No mapping or an ambiguous mapping is stated explicitly.
 - Names, email addresses and phone numbers also need `SHOPIFY_CUSTOMER_CONTACT_APPROVED`;
   addresses need `SHOPIFY_CUSTOMER_ADDRESS_APPROVED`. See
   [Shopify partner readiness](shopify-production.md).
-- Revoking store access withholds live history but not the imported profile, which follows
-  the profile retention and erasure rules.
-- Live reads have no client cache and use non-cacheable POST responses. Customer, workspace
-  and session changes unmount the old view; refresh clears content before reading again,
-  superseded responses are ignored, and window focus rereads to recheck access.
+- JTL shares customers only for connections set up with customer import. Contact and
+  address fields have no separate approval in JTL.
+- Revoking store access does not remove the imported profile or its order history; both
+  follow the profile retention and erasure rules.

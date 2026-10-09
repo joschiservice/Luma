@@ -131,6 +131,7 @@ export function createJtlProvider(options: {
         ...(fetch ? { fetch } : {}),
         shippingMethodActions: true,
         purchaseOrderActions: true,
+        customers: current.connection.granted.includes('customers.read'),
         connection:
           target.kind === 'jtl-cloud'
             ? {

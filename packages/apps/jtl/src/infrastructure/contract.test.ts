@@ -197,6 +197,18 @@ describe('JTL 2.2 published contract', () => {
       validate({ sku: 'incorrect-casing' }, response('/v2/items', true)),
     ).toThrow('Unknown provider field');
   });
+  it('validates the customer projection and its change filter against the published contract', () => {
+    for (const row of commerce.customers)
+      validate(
+        s.customer.parse(cloudPayload(row)),
+        response('/v2/customers', true),
+      );
+    expect(api.paths['/v2/customers'].parameters).toContainEqual({
+      name: 'lastChangedAfter',
+      in: 'query',
+    });
+    expect(api.paths['/v2/customers'].scopes).toEqual(['customers.read']);
+  });
   it('accepts the optional item unit from the published contract', () => {
     const schema = resolve(response('/v2/items', true));
     expect(schema.properties?.unit).toEqual({ type: 'string' });
