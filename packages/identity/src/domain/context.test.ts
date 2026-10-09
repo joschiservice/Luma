@@ -2,9 +2,11 @@ import { expect, it } from 'vitest';
 
 import {
   hasPermission,
+  IdentityError,
   makeTenantContext,
   requirePermission,
   requireTenant,
+  WorkspaceInactiveError,
 } from './context.js';
 import { builtInReference, PermissionSet } from './roles.js';
 
@@ -84,3 +86,31 @@ it('grants app permissions to managing built-in roles and custom grants only', (
     'procurement.read',
   ]);
 });
+
+it.each(['suspended', 'closed'] as const)(
+  'rejects a %s workspace as not found, distinguishable from a missing membership',
+  (status) => {
+    const role = builtInReference('owner');
+    const member = {
+      id: 'm',
+      organizationId: 't',
+      userId: 'u',
+      role,
+      permissions: PermissionSet.forRole(role),
+    };
+    const resolve = (userId: string) => () =>
+      makeTenantContext(
+        { userId, sessionId: 's' },
+        { ...organization, status },
+        member,
+        'request',
+      );
+
+    expect(resolve('u')).toThrow(WorkspaceInactiveError);
+    expect(resolve('u')).toThrow(
+      expect.objectContaining({ statusCode: 404, code: 'NOT_FOUND' }),
+    );
+    expect(resolve('other')).toThrow(IdentityError);
+    expect(resolve('other')).not.toThrow(WorkspaceInactiveError);
+  },
+);

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { IdentityError } from '@luma/identity';
+import { IdentityError, WorkspaceInactiveError } from '@luma/identity';
 import type {
   ExceptionActivities,
   ExceptionWorkflowInput,
@@ -450,6 +450,81 @@ it.each([
     });
   },
 );
+
+it('reports a suspended workspace to the workflow without logging a failure', async () => {
+  const writeLog = vi.fn();
+  const captureActivityError = vi.fn();
+  const environment = new MockActivityEnvironment(
+    { workflowExecution: { workflowId: 'workflow', runId: 'run' } },
+    { logger: new DefaultLogger('WARN', writeLog) },
+  );
+  const activities = fixture();
+  activities.detect.mockRejectedValue(new WorkspaceInactiveError());
+  const wrapped = temporalActivities(activities, captureActivityError);
+
+  await expect(environment.run(wrapped.detect, input)).rejects.toMatchObject({
+    type: 'WorkspaceInactive',
+    nonRetryable: true,
+    cause: undefined,
+  });
+  expect(writeLog).not.toHaveBeenCalledWith(
+    expect.objectContaining({ level: 'ERROR' }),
+  );
+  expect(captureActivityError).not.toHaveBeenCalled();
+});
+
+it('pauses while the workspace is suspended and continues after reactivation', async (t) => {
+  const clock = await TestWorkflowEnvironment.createTimeSkipping();
+  t.onTestFinished(() => clock.teardown());
+  const now = await clock.currentTimeMs();
+  const suspended = ApplicationFailure.nonRetryable(
+    'Workspace is not active',
+    'WorkspaceInactive',
+  );
+  const activities = fixture();
+  activities.propose.mockResolvedValue({
+    id: 'proposal',
+    revision: 1,
+    expiresAt: new Date(now + 86_400_000).toISOString(),
+  });
+  activities.diagnose
+    .mockRejectedValueOnce(suspended)
+    .mockRejectedValueOnce(suspended);
+  activities.execute.mockRejectedValueOnce(suspended);
+  const taskQueue = randomUUID();
+  const worker = await Worker.create({
+    connection: clock.nativeConnection,
+    taskQueue,
+    workflowBundle: bundle,
+    activities,
+  });
+  await worker.runUntil(async () => {
+    const handle = await clock.client.workflow.start('exceptionWorkflow', {
+      workflowId: randomUUID(),
+      taskQueue,
+      args: [input],
+    });
+    expect(await handle.result()).toMatchObject({ phase: 'resolved' });
+    const timers = (await handle.fetchHistory()).events!.filter(
+      (event) => event.timerStartedEventAttributes,
+    );
+    // Rechecks wait one minute, then twice as long, and restart after the workspace resumes.
+    expect(
+      timers.map((event) =>
+        String(event.timerStartedEventAttributes!.startToFireTimeout!.seconds),
+      ),
+    ).toEqual(['60', '120', '60']);
+    await Worker.runReplayHistory(
+      { workflowBundle: bundle },
+      await handle.fetchHistory(),
+    );
+  });
+  expect(activities.diagnose).toHaveBeenCalledTimes(3);
+  // The rejected attempt ran no effect; the action runs once the workspace is active again.
+  expect(activities.execute).toHaveBeenCalledTimes(2);
+  expect(activities.reconcile).not.toHaveBeenCalled();
+  expect(activities.verify).toHaveBeenCalledTimes(1);
+}, 40_000);
 
 it('preserves the activity failure when error reporting fails', async () => {
   const environment = new MockActivityEnvironment(

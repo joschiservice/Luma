@@ -139,7 +139,8 @@ export interface WorkflowTriggerRun extends WorkflowRun {
   evidence: { sourceId: string; occurredAt: string };
   requestDigest: string;
   createdAt: string;
-  state: 'scheduled' | 'awaiting_admission' | 'cancelled';
+  /** `skipped`: the scheduled time came while the workspace was suspended or closed. */
+  state: 'scheduled' | 'awaiting_admission' | 'cancelled' | 'skipped';
   triggeredAt: string | null;
 }
 

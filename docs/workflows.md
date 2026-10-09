@@ -110,6 +110,9 @@ admission still applies policy approval to every action.
   authority.
 - Step outputs are append-only, keyed by run, step and state. A conflicting activity replay
   is rejected.
+- A suspended or closed workspace pauses its runs at the next activity, with the same
+  bounded waits as [exception workflows](exception-workflows.md#authority-retries-and-recovery).
+  Background starts and monitors skip the workspace until it is active again.
 - All process runs (replenishment, case, follow-up and computation workflows) share the
   `<taskQueue>-procurement` queue despite its name. Its client and worker must use the same
   queue, and the worker needs the adapter for every read, action and verification it can
@@ -141,6 +144,10 @@ evidence of ownership; admission resolves and authorizes the resource itself.
   `advance_workflow_schedules()` returns only a count, never cross-tenant data, and cannot
   dispatch. Cancellation takes the same row lock and succeeds only while pending. Scheduled
   starts are recorded but do not run custom workflows yet.
+- A start that comes due while its workspace is suspended or closed becomes `skipped` and
+  never runs, so reactivation does not fire missed starts. Starts due after reactivation
+  run at their time. Worker downtime is different: an active workspace's late starts still
+  run.
 
 ## Readiness
 

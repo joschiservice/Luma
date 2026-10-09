@@ -133,6 +133,7 @@ const runStateLabels: Record<string, string> = localizedLabels({
   inconclusive_verification: m.orders_run_state_inconclusive_verification,
   escalated: m.orders_run_state_escalated,
   cancelled: m.orders_run_state_cancelled,
+  skipped: m.orders_run_state_skipped,
 });
 
 const readable = (value: string) => value.replaceAll('_', ' ');

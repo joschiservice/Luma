@@ -58,7 +58,9 @@ export function presentTriggerRun(
                         ? 'Waiting for the scheduled time.'
                         : run.state === 'cancelled'
                           ? 'The scheduled start was cancelled.'
-                          : 'Trigger received. Execution requires a separate activation and admission.';
+                          : run.state === 'skipped'
+                            ? 'The scheduled time passed while the workspace was suspended, so this start was skipped.'
+                            : 'Trigger received. Execution requires a separate activation and admission.';
 
   return {
     id: run.id,

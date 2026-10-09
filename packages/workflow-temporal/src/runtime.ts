@@ -7,7 +7,11 @@ import type {
   Permission,
   TenantContext,
 } from '@luma/identity';
-import { IdentityError, requirePermission } from '@luma/identity';
+import {
+  IdentityError,
+  requirePermission,
+  WorkspaceInactiveError,
+} from '@luma/identity';
 import type { Observability } from '@luma/platform';
 import type {
   ExceptionActivities,
@@ -34,6 +38,8 @@ import { OpenTelemetryPlugin } from '@temporalio/interceptors-opentelemetry-v2';
 import type { NativeConnectionOptions } from '@temporalio/worker';
 import { NativeConnection, Worker } from '@temporalio/worker';
 import { z } from 'zod';
+
+import { workspaceInactiveFailure } from './workspace-pause.js';
 
 export interface TemporalSettings {
   captureActivityError?: Observability['captureActivityError'];
@@ -84,7 +90,8 @@ export function workflowPath() {
 
 /**
  * Logs and reports original failures before sanitizing errors for Temporal history.
- * Reporting failures do not change activity retry behavior.
+ * Reporting failures do not change activity retry behavior. A suspended or closed workspace
+ * is not a failure: it is reported to the workflow, which pauses, without logging.
  * Wrapped activities must run within a Temporal activity context.
  */
 export function temporalActivities<T extends object>(
@@ -100,6 +107,11 @@ export function temporalActivities<T extends object>(
             ...args,
           );
         } catch (error) {
+          if (error instanceof WorkspaceInactiveError)
+            throw ApplicationFailure.nonRetryable(
+              'Workspace is not active',
+              workspaceInactiveFailure,
+            );
           log.error('Workflow activity failed before sanitization', { error });
           try {
             const info = Context.current().info;

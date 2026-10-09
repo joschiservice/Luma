@@ -231,6 +231,7 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
     ['operator', 'owner'],
     ['viewer', 'member'],
   ]);
+  let workspaceStatus: 'active' | 'suspended' = 'active';
 
   function context(user = 'operator'): TenantContext {
     const role = members.get(user);
@@ -242,7 +243,7 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
         id: tenant,
         name: 'Fixture',
         slug: 'fixture',
-        status: 'active',
+        status: workspaceStatus,
         dataRegion: 'EU',
       },
       builtInMembership(
@@ -463,6 +464,11 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
       );
       setup.release();
     }
+    // Sync discovery returns active workspaces only.
+    await owner.query(
+      "INSERT INTO organizations(id,name,slug,created_at) VALUES($1,'Fixture',$2,now())",
+      [tenant, `fixture-${tenant}`],
+    );
     const password = randomUUID();
     await admin.query(
       `CREATE ROLE "${name}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
@@ -2332,6 +2338,43 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
       members.set('operator', 'owner');
       members.delete('admin');
     }
+  });
+
+  it('pauses while the workspace is suspended without blocking or failing its streams', async () => {
+    source.set(shop, 'orders.read', [order(shop, '1')]);
+    await owner.query(
+      "UPDATE organizations SET status='suspended' WHERE id=$1",
+      [tenant],
+    );
+    try {
+      expect(await runner.scopes()).not.toContain(tenant);
+      // A pass that began before the suspension stops at the rejected context.
+      workspaceStatus = 'suspended';
+      await runner.tick(tenant, 5000);
+      expect(await stream('orders')).toMatchObject({
+        blocked: null,
+        attempts: 0,
+        error_code: null,
+        phase: 'backfill',
+      });
+    } finally {
+      workspaceStatus = 'active';
+      await owner.query(
+        "UPDATE organizations SET status='active' WHERE id=$1",
+        [tenant],
+      );
+    }
+    // The paused page's lease expires; the stream then continues where it was.
+    await owner.query(
+      'UPDATE commerce_sync_streams SET lease_until=now() WHERE tenant_id=$1',
+      [tenant],
+    );
+    await drain();
+    expect(await stream('orders')).toMatchObject({
+      blocked: null,
+      phase: 'incremental',
+      error_code: null,
+    });
   });
 
   it('imports a page together and fails only the record that breaks record rules', async () => {

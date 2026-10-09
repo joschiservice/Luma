@@ -78,6 +78,7 @@
   "orders_run_state_inconclusive_verification": "Prüfung unklar",
   "orders_run_state_escalated": "Eskaliert",
   "orders_run_state_cancelled": "Abgebrochen",
+  "orders_run_state_skipped": "Übersprungen",
   "orders_sort_updated": "Zuletzt aktualisiert",
   "orders_sort_placed": "Bestelldatum",
   "orders_sort_number": "Bestellnummer",

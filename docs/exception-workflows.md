@@ -80,7 +80,14 @@ expiry and changed membership never authorize execution.
 Every activity rebuilds the initiating user's context through identity and checks current
 membership, role, organization status and EU placement. Serialized contexts, sessions,
 cookies and earlier roles are not trusted. Logout does not stop an explicitly started
-workflow; membership removal, role loss or organization suspension does.
+workflow; membership removal or role loss does.
+
+A suspended or closed workspace pauses the workflow instead. The rejected activity runs no
+effect and reports `WorkspaceInactive` without retrying; the workflow waits durably, one
+minute at first and doubling up to an hour, then calls the same activity again. The cap
+keeps history bounded during a long suspension; after reactivation the run continues when
+its current wait ends, at most an hour later. Cancellation recovery does not wait for
+reactivation.
 
 Activities retry up to five attempts within five minutes, with a one-minute attempt
 timeout. Diagnosis retries honor persisted reread backoff, up to five evaluations; a

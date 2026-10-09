@@ -55,6 +55,14 @@ A stream whose person no longer manages the workspace is blocked until someone w
 `sync.manage` resumes it, which makes them the stream's person. Streams stop while their
 connection is inactive or no longer grants the capability, and restart when it returns.
 
+A suspended or closed workspace is paused, not blocked. Discovery skips it, so its streams,
+link requests and automatic link rules keep their state and nothing is recorded as a
+failure. A page that started just before the suspension stops without changing its stream
+and runs again once its lease expires; a link request in progress goes back to waiting.
+Change notifications are still acknowledged and stored as hints, and Shopify privacy
+requests are always processed. After reactivation the stored hints and due streams run
+like any other, and scheduled scans cover what changed meanwhile.
+
 ## Ledger and coverage
 
 The ledger holds one row per source record: a digest of the normalized observation,

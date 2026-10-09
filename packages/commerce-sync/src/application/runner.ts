@@ -11,7 +11,11 @@ import type {
 } from '@luma/connections';
 import type { CustomerProfiles } from '@luma/customers';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requirePermission } from '@luma/identity';
+import {
+  IdentityError,
+  requirePermission,
+  WorkspaceInactiveError,
+} from '@luma/identity';
 
 import {
   failureMessage,
@@ -307,7 +311,10 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
     let tenant: TenantContext;
     try {
       tenant = await context(claimed, tenantId);
-    } catch {
+    } catch (error) {
+      // A suspended workspace pauses its sync without blocking the stream. The lease expires,
+      // and discovery returns the workspace once it is active again.
+      if (error instanceof WorkspaceInactiveError) return false;
       await fail('principal_unavailable', {
         block: 'principal_unavailable',
         message: principalMessage,
@@ -579,6 +586,15 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
           message: null,
         });
       } catch (error) {
+        // A suspended workspace keeps the request; it runs once the workspace is active again.
+        if (error instanceof WorkspaceInactiveError) {
+          await deps.store.finishLink(tenantId, request.id, {
+            state: 'requested',
+            message: null,
+          });
+
+          return;
+        }
         const expected =
           error instanceof LinkError || error instanceof IdentityError;
         if (!expected) log('Link request failed', error);

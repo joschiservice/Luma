@@ -18,6 +18,8 @@ import {
   sleep,
 } from '@temporalio/workflow';
 
+import { pauseWhileInactive } from './workspace-pause.js';
+
 export const progressQuery = defineQuery<WorkflowProgress>('progress');
 
 /** A wake-up hint only. The execution service reads the persisted approval. */
@@ -33,17 +35,23 @@ const activityOptions: ActivityOptions = {
   },
 };
 
-const activities = proxyActivities<ExceptionActivities>(activityOptions);
-const refreshActivities =
+// Cancellation recovery must finish promptly, so it does not wait for a suspended workspace.
+const recovery = proxyActivities<ExceptionActivities>(activityOptions);
+// Every other activity pauses the workflow while its workspace is suspended or closed.
+const activities = pauseWhileInactive(recovery);
+const refreshActivities = pauseWhileInactive(
   proxyActivities<Required<Pick<ExceptionActivities, 'refresh'>>>(
     activityOptions,
-  );
+  ),
+);
 
-const execution = proxyActivities<Pick<ExceptionActivities, 'execute'>>({
-  ...activityOptions,
-  // Recovery must not race a provider write that is still running.
-  cancellationType: ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
-});
+const execution = pauseWhileInactive(
+  proxyActivities<Pick<ExceptionActivities, 'execute'>>({
+    ...activityOptions,
+    // Recovery must not race a provider write that is still running.
+    cancellationType: ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
+  }),
+);
 
 /**
  * Runs the durable exception lifecycle, waiting for approval when required and reconciling
@@ -84,8 +92,10 @@ export async function exceptionWorkflow(
       diagnosis = await activities.diagnose(input, exceptionId);
     }
     if (input.shadow) {
-      await proxyActivities<Required<Pick<ExceptionActivities, 'shadow'>>>(
-        activityOptions,
+      await pauseWhileInactive(
+        proxyActivities<Required<Pick<ExceptionActivities, 'shadow'>>>(
+          activityOptions,
+        ),
       ).shadow(input, exceptionId);
 
       return finish('shadow_completed', 'simulation_only');
@@ -203,7 +213,7 @@ export async function exceptionWorkflow(
       if (dispatched && progress.proposalId) {
         await CancellationScope.nonCancellable(async () => {
           try {
-            await activities.reconcile(input, progress.proposalId!);
+            await recovery.reconcile(input, progress.proposalId!);
           } catch {
             /* Recovery remains visible in execution's durable attempt. */
           }

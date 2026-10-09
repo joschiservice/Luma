@@ -98,7 +98,9 @@ export function CodeRunDetails({
               </>
             ) : canManage &&
               !terminal &&
-              !['scheduled', 'cancelled'].includes(run.triggerState ?? '') ? (
+              !['scheduled', 'cancelled', 'skipped'].includes(
+                run.triggerState ?? '',
+              ) ? (
               <>
                 <p>{m.workflows_code_run_stop_help()}</p>
                 <Button

@@ -5,6 +5,7 @@ export {
   makeTenantContext,
   requirePermission,
   requireTenant,
+  WorkspaceInactiveError,
 } from './domain/context.js';
 
 export type {
