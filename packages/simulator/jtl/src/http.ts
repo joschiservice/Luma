@@ -8,6 +8,7 @@ import {
   type StoredRecord,
 } from '@luma/simulator-core';
 
+import { customerJson } from './customers.js';
 import {
   changeShippingMethod,
   noteJson,
@@ -28,6 +29,7 @@ import {
   ACTIVE,
   type AssignmentRecord,
   configId,
+  type CustomerRecord,
   type ItemRecord,
   type JtlContext,
   JtlError,
@@ -47,6 +49,7 @@ const roots = new Set([
   'delivery-notes',
   'shipping-methods',
   'suppliers',
+  'customers',
   'purchase-orders',
 ]);
 
@@ -96,11 +99,13 @@ export function identify(request: ProviderRequest): ProviderTarget {
             ? 'orders.read'
             : root === 'suppliers'
               ? 'suppliers.read'
-              : root === 'purchase-orders'
-                ? write
-                  ? 'purchase-orders.submit'
-                  : 'purchase-orders.read'
-                : 'unknown';
+              : root === 'customers'
+                ? 'customers.read'
+                : root === 'purchase-orders'
+                  ? write
+                    ? 'purchase-orders.submit'
+                    : 'purchase-orders.read'
+                  : 'unknown';
 
   return { operation, resource, write };
 }
@@ -389,6 +394,29 @@ async function suppliers(
   );
 }
 
+async function customers(
+  context: JtlContext,
+  url: URL,
+  page: PageRequest,
+  path: string[],
+) {
+  if (path.length) return undefined;
+  const after = url.searchParams.get('lastChangedAfter');
+  if (after !== null && !isDate(after))
+    throw new JtlError(400, 'Invalid date filter');
+
+  return storedPage<CustomerRecord>(
+    context,
+    page,
+    {
+      kind: kinds.customer,
+      // `lastChangedAfter` is exclusive; modification times are whole milliseconds.
+      ...(after === null ? {} : { updatedFrom: Date.parse(after) + 1 }),
+    },
+    (rows) => rows.map((row) => customerJson(row.data)),
+  );
+}
+
 async function purchaseOrders(
   context: JtlContext,
   request: ProviderRequest,
@@ -463,6 +491,7 @@ async function route(context: JtlContext, request: ProviderRequest) {
   if (root === 'warehouses') return warehouses(context, page, path);
   if (root === 'delivery-notes') return deliveryNotes(context, url, page, path);
   if (root === 'suppliers') return suppliers(context, page, path);
+  if (root === 'customers') return customers(context, url, page, path);
   if (root === 'shipping-methods' && !path.length)
     return memoryPage(
       context.config.shippingMethods.map((m) => ({

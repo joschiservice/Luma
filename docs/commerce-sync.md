@@ -61,8 +61,9 @@ The ledger holds one row per source record: a digest of the normalized observati
 status, source creation and update times, first/last seen and the last scan that saw it.
 A record whose digest and status are unchanged is not projected again, so re-imports and
 duplicate notifications add no snapshots. Full scans set `missing_since` on records they
-no longer return; nothing is deleted. The returns stream's ledger holds both returns and
-refunds.
+no longer return, and any later read that returns the record clears it. Only customers are
+ever deleted for being missing (see below). The returns stream's ledger holds both returns
+and refunds.
 
 Coverage per stream comes from the ledger (counts, oldest and newest creation date) and
 from the page `history` limit. `history_from` is the limit reported when the history
@@ -84,15 +85,38 @@ every record.
 
 ## Customers
 
-`customers.read` returns profiles only when the deployment sets
+Shopify's `customers.read` returns profiles only when the deployment sets
 `SHOPIFY_PROTECTED_CUSTOMER_DATA_APPROVED`; contact fields also need
 `SHOPIFY_CUSTOMER_CONTACT_APPROVED`, and default addresses
-`SHOPIFY_CUSTOMER_ADDRESS_APPROVED`. Profiles bypass observation storage: `@luma/customers`
-keeps only the current version, and customer read checks carry no items. A
-`customers/redact` or `shop/redact` request erases the affected imported profiles and
-ledger rows in its intake transaction and remembers erased customer IDs by digest, so
-later reads skip them. Other retained data still follows the
+`SHOPIFY_CUSTOMER_ADDRESS_APPROVED`. JTL offers `customers.read` only for connections set up
+with customer import and reads changed customers with `lastChangedAfter`. JTL has no separate
+consent for contact and address fields and reports no order count or spend. Profiles bypass
+observation storage: `@luma/customers` keeps only the current version, and customer read
+checks carry no items.
+
+When a connection grants `customers.read`, its order reads also report the customer who
+placed each order. Sync removes that reference before recording the order observation and
+stores it as an order link in `@luma/customers`, keyed by source order: a later read moves
+the order to another customer, and a read without a customer removes the link. Orders
+imported before a connection reported customers get links on their next full reread.
+
+A `customers/redact` or `shop/redact` request erases the affected imported profiles, their
+order links and ledger rows in its intake transaction and remembers erased customer IDs by
+digest, so later reads skip them and their orders get no new links. Erasure and customer
+imports of one connection take the same lock, so a read that started earlier cannot
+restore erased data. Other retained data still follows the
 [privacy operations](shopify-production.md#privacy-operations) procedure.
+
+Sources do not always ask for erasure; JTL never does, so a customer deleted at the source
+is only seen as absent from full reads. One absent read is not proof, because a source fault
+or permission change can hide records too. So the profile stays, marked as missing, until it
+has been missing for 30 days (`missingCustomerRetentionMs`). The final page of the next
+complete full read then removes the profile and its order links and forgets the ledger rows,
+in batches of up to 1000 per read. Customers on that page, or already seen earlier in that
+read, are never removed. Removal is not an erasure: no digest is kept, so a customer the
+source reports again is imported as new. Order links follow the source's reassignment, so
+orders of a customer merged into another one move to the remaining customer on the next
+full read.
 
 ## Links
 

@@ -4,7 +4,7 @@ import { z } from 'zod';
  * Version of this adapter's normalized output, recorded as observation provenance. Bump it
  * whenever the same provider response would normalize differently.
  */
-export const adapterVersion = 'jtl/4';
+export const adapterVersion = 'jtl/5';
 
 const timestamp = z.string().datetime({ offset: true });
 
@@ -111,6 +111,7 @@ export const outputs = {
         externalOrderNumber: z.string().nullable(),
         placedAt: timestamp.nullable(),
         total,
+        customer: externalId.nullable().optional(),
         status: z.enum(['open', 'completed', 'cancelled', 'unknown']),
         paymentStatus: z.enum([
           'pending',
@@ -132,6 +133,37 @@ export const outputs = {
           }),
         ),
       }),
+    ),
+  ),
+  'customers.read': page(
+    observation(
+      'customer',
+      z
+        .object({
+          displayName: z.string().min(1).max(512).nullable(),
+          email: z.string().min(1).max(320).nullable(),
+          phone: z.string().min(1).max(100).nullable(),
+          address: z
+            .object({
+              line1: text,
+              line2: text,
+              city: z.string().min(1).max(256).nullable(),
+              region: z.string().min(1).max(256).nullable(),
+              postalCode: z.string().min(1).max(64).nullable(),
+              country: z.string().min(1).max(128).nullable(),
+            })
+            .strict()
+            .nullable(),
+          state: z.enum(['enabled', 'disabled']),
+          createdAt: timestamp.nullable(),
+          orderCount: z.null(),
+          amountSpent: z.null(),
+          tags: z.array(z.string().min(1).max(255)).max(250),
+          shared: z
+            .object({ contact: z.literal(true), address: z.literal(true) })
+            .strict(),
+        })
+        .strict(),
     ),
   ),
   'products.read': page(

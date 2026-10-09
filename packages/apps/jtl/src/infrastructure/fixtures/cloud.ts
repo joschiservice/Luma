@@ -8,7 +8,7 @@ export function cloudPayload(value: unknown): unknown {
     return Object.fromEntries(
       Object.entries(value).map(([key, field]) => [
         key,
-        /^(id|itemId|salesOrderId|deliveryNoteId|salesOrderLineItemId)$/.test(
+        /^(id|itemId|salesOrderId|deliveryNoteId|salesOrderLineItemId|customerId)$/.test(
           key,
         ) && typeof field === 'number'
           ? field === 0

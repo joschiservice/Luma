@@ -59,8 +59,8 @@ changing one.
 | `SHOPIFY_CUSTOMER_ADDRESS_APPROVED`        | Address access; data sync then imports default addresses |
 | `SHOPIFY_ALL_ORDERS_APPROVED`              | Older-order access (requests `read_all_orders`)          |
 
-Without contact approval, Customers shows source identities and authorized order history,
-and imported profiles and live reads withhold names, email addresses and phone numbers.
+Without contact approval, Customers shows source identities and their imported orders, and
+imported profiles and live reads withhold names, email addresses and phone numbers.
 
 ## External approvals
 

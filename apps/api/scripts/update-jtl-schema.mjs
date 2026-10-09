@@ -73,6 +73,7 @@ for (const path of [
   '/v2/sales-orders/{salesOrderId}',
   '/v2/suppliers',
   '/v2/suppliers/{supplierId}',
+  '/v2/customers',
   '/v2/items/{itemId}/suppliers',
   '/v2/purchase-orders',
   '/v2/purchase-orders/{purchaseOrderId}',

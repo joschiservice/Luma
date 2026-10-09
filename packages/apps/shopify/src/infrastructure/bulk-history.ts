@@ -59,6 +59,8 @@ export async function readBulkHistory(options: {
   cursor: string | null;
   limit: number;
   customerAccess?: { contact: boolean; address: boolean };
+  /** Adds each order's customer reference. */
+  orderCustomers?: boolean;
 }): Promise<BulkHistoryPage> {
   const root =
     options.capability === 'products.read'
@@ -69,7 +71,7 @@ export async function readBulkHistory(options: {
           ? 'customers'
           : 'orders';
   const alias = `luma_${createHash('sha256').update(options.key).digest('hex').slice(0, 24)}`;
-  const query = `{ ${alias}: ${root} { edges { node { ${bulkReadSelection(options.capability, options.customerAccess)} } } } }`;
+  const query = `{ ${alias}: ${root} { edges { node { ${bulkReadSelection(options.capability, options.customerAccess, options.orderCustomers)} } } } }`;
   let offset = 0;
   let rootsSeen = 0;
   let current: z.infer<typeof operation> | undefined;

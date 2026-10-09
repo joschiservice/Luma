@@ -28,7 +28,11 @@ import {
 import { z } from 'zod';
 
 import { readBulkHistory } from './bulk-history.js';
-import { readPageSize, readSelection } from './read-selections.js';
+import {
+  orderSelection,
+  readPageSize,
+  readSelection,
+} from './read-selections.js';
 import * as s from './schemas.js';
 
 const pageFields = 'pageInfo { hasNextPage endCursor }';
@@ -212,6 +216,11 @@ export interface ShopifyConnectorOptions extends ShopifyTransportOptions {
    * (name, email, phone) and address fields are read only when approved separately.
    */
   customerAccess?: { contact: boolean; address: boolean };
+  /**
+   * Reports which customer placed each order. Takes effect only with `customerAccess`; set it
+   * when the connection grants `customers.read`.
+   */
+  orderCustomers?: boolean;
   /** Persist the batch before it is returned. Throw if durable recording fails. */
   recordObservations(evidence: ShopifyEvidence): Promise<void>;
   rawRetentionMs?: number;
@@ -233,6 +242,7 @@ export function createShopifyConnector(
   const request = createClient(options);
   const now = options.now ?? (() => new Date());
   const id = options.id ?? randomUUID;
+  const orderCustomers = !!options.customerAccess && !!options.orderCustomers;
 
   function handler<
     K extends Exclude<
@@ -469,6 +479,7 @@ export function createShopifyConnector(
               ...(options.customerAccess
                 ? { customerAccess: options.customerAccess }
                 : {}),
+              orderCustomers,
             })
           : null;
         const encode = (cursor: string | null) =>
@@ -600,7 +611,7 @@ export function createShopifyConnector(
           if (after) fail('invalid_input');
           roots = [{ id: selected.externalId }];
         } else {
-          const fields = readSelection(capability);
+          const fields = readSelection(capability, orderCustomers);
           const data = await request(
             root === 'inventoryItems'
               ? `query LumaPage($first: Int!, $after: String) { page: ${root}(first: $first, after: $after) { nodes { ${fields} } ${pageFields} } }`
@@ -626,7 +637,7 @@ export function createShopifyConnector(
             const order = await node(
               parent.id,
               'Order',
-              'id updatedAt createdAt name cancelledAt closed displayFinancialStatus currentTotalPriceSet { shopMoney { amount currencyCode } }',
+              orderSelection(orderCustomers),
               s.order,
             );
             const lines = await children(
@@ -643,6 +654,11 @@ export function createShopifyConnector(
               total: total
                 ? { amount: total.amount, currency: total.currencyCode }
                 : null,
+              ...(orderCustomers && order.customer !== undefined
+                ? {
+                    customer: order.customer ? ref(order.customer.id) : null,
+                  }
+                : {}),
               status: order.cancelledAt
                 ? 'cancelled'
                 : order.closed

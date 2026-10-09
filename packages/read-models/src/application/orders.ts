@@ -25,6 +25,11 @@ export interface OrderListQuery {
   status?: string | undefined;
   paymentStatus?: string | undefined;
   connectionId?: string | undefined;
+  /**
+   * Imported customer profile ID: only orders whose source reports this customer as the
+   * buyer. Requires `customers.read`.
+   */
+  customerId?: string | undefined;
   placedFrom?: string | undefined;
   placedBefore?: string | undefined;
   updatedFrom?: string | undefined;

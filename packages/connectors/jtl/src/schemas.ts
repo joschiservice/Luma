@@ -37,6 +37,11 @@ export const order = z.object({
   salesOrderDate: timestamp.nullable().optional().catch(null),
   totalGrossAmount: decimal.nullable().optional().catch(null),
   currencyIso: z.string().nullable().optional().catch(null),
+  // 0 and null mean no customer; a malformed value leaves the customer unknown.
+  customerId: z
+    .union([id, z.literal(0), z.null()])
+    .optional()
+    .catch(undefined),
 });
 
 export const orderLine = z.object({
@@ -130,6 +135,31 @@ const calendarDate = z
   .regex(/^\d{4}-\d{2}-\d{2}(?:$|T)/)
   .transform((value) => value.slice(0, 10))
   .refine((value) => !Number.isNaN(Date.parse(`${value}T00:00:00Z`)));
+
+const optionalText = z.string().nullable().optional().catch(null);
+
+/** Customer overview row; descriptive fields become unknown when missing or malformed. */
+export const customer = z.object({
+  id,
+  customerNumber: optionalText,
+  firstName: optionalText,
+  lastName: optionalText,
+  companyName: optionalText,
+  emailAddress: optionalText,
+  phoneNumber: optionalText,
+  mobilePhoneNumber: optionalText,
+  street: optionalText,
+  additionalAddressLine: optionalText,
+  postalCode: optionalText,
+  city: optionalText,
+  state: optionalText,
+  countryIso: optionalText,
+  countryName: optionalText,
+  createdDate: timestamp.nullable().optional().catch(null),
+  lastChanged: timestamp.nullable().optional().catch(null),
+  isLocked: z.boolean().nullable().optional().catch(null),
+  labels: optionalText,
+});
 
 /** Supplier overview row. The overview lists only active default-type suppliers. */
 export const supplier = z.object({

@@ -208,7 +208,7 @@ describe('Shopify read capabilities', () => {
         items: [
           {
             source: { provider: 'shopify', externalId: commerce.order.id },
-            adapterVersion: 'shopify/3',
+            adapterVersion: 'shopify/4',
             data: {
               paymentStatus: 'paid',
               placedAt: '2026-09-14T08:30:00Z',
@@ -1048,6 +1048,45 @@ describe('Shopify history import reads', () => {
     expect(query).toContain('defaultEmailAddress');
     expect(query).not.toContain('defaultAddress');
   });
+
+  it('reports who placed each order only with customer access and a customer grant', async () => {
+    const queries = (f: ReturnType<typeof fixture>) =>
+      f.fetch.mock.calls.map(
+        ([, init]) => JSON.parse(String(init?.body)).query as string,
+      );
+    const unapproved = fixture({ orderCustomers: true });
+    Object.assign(unapproved.data.order, {
+      customer: { id: 'gid://shopify/Customer/7' },
+    });
+    const plain = await unapproved.read('orders.read');
+    expect(plain.ok && plain.value.items[0]!.data).not.toHaveProperty(
+      'customer',
+    );
+    expect(queries(unapproved).some((q) => q.includes('customer {'))).toBe(
+      false,
+    );
+
+    const f = fixture({
+      customerAccess: { contact: false, address: false },
+      orderCustomers: true,
+    });
+    Object.assign(f.data.order, {
+      customer: { id: 'gid://shopify/Customer/7' },
+    });
+    expect(await f.read('orders.read')).toMatchObject({
+      ok: true,
+      value: {
+        items: [{ data: { customer: ref('gid://shopify/Customer/7') } }],
+      },
+    });
+    expect(queries(f).some((q) => q.includes('customer { id }'))).toBe(true);
+    // Guest checkouts have no customer.
+    Object.assign(f.data.order, { customer: null });
+    expect(await f.read('orders.read')).toMatchObject({
+      ok: true,
+      value: { items: [{ data: { customer: null } }] },
+    });
+  });
 });
 
 describe('Shopify query contract', () => {
@@ -1084,13 +1123,22 @@ describe('Shopify query contract', () => {
       ).toMatchObject({ ok: true });
     }
     expect(await customers.read('customers.read')).toMatchObject({ ok: true });
+    const buyers = fixture({
+      customerAccess: { contact: false, address: false },
+      orderCustomers: true,
+    });
+    expect(await buyers.read('orders.read')).toMatchObject({ ok: true });
     const operations = new Set(
-      [...f.fetch.mock.calls, ...customers.fetch.mock.calls].map(
+      [
+        ...f.fetch.mock.calls,
+        ...customers.fetch.mock.calls,
+        ...buyers.fetch.mock.calls,
+      ].map(
         ([, init]) =>
           (JSON.parse(String(init?.body)) as { query: string }).query,
       ),
     );
-    expect(operations.size).toBe(14);
+    expect(operations.size).toBe(15);
     for (const query of operations) {
       expect(
         validate(schema, parse(query)).map((error) => error.message),

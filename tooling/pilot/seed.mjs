@@ -213,6 +213,7 @@ export async function seedPilot(
                       'fulfillment.move',
                     ]
                   : [
+                      'customers.read',
                       'orders.shipping-method.read',
                       'orders.shipping-method.write',
                       'suppliers.read',

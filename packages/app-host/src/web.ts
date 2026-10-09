@@ -2,7 +2,6 @@ import type {
   InstallationCredentials,
   InstallationInput,
   InstalledConnection,
-  OrderDetail,
 } from '@luma/api-contract';
 
 /** Workspace-scoped services supplied to first-party UI contributions. */
@@ -20,7 +19,6 @@ export interface AppUiProps {
     | 'page'
     | 'record'
     | 'inventory'
-    | 'customers'
     | 'fulfillment';
   /** The source fulfillment and order whose actions the host is showing, by source ID. */
   fulfillment?:
@@ -29,9 +27,6 @@ export interface AppUiProps {
   /** Canonical stock position whose provider corrections the host is showing. */
   inventory?: { positionId: string } | undefined;
   connection?: InstalledConnection | undefined;
-  /** Opens a source customer without inferring identity from contact fields. */
-  customer?:
-    { connectionId?: string | undefined; id?: string | undefined } | undefined;
   /** The source record the host is showing, identified by its connection and source ID. */
   record?:
     { kind: 'order'; connectionId: string; externalId: string } | undefined;
@@ -52,14 +47,6 @@ export interface AppUiProps {
     ): Promise<InstalledConnection>;
     /** Sends an authenticated request within this app's workspace namespace. */
     request(path: string, body: unknown): Promise<unknown>;
-    /** Resolves an exact source order to its canonical context; ambiguous matches stay explicit. */
-    orderContext?(
-      connectionId: string,
-      externalId: string,
-    ): Promise<{
-      status: 'matched' | 'unmapped' | 'ambiguous';
-      order: OrderDetail | null;
-    }>;
     /** Produces safe, actionable feedback without exposing provider payloads. */
     error(error: unknown): string;
     /** Returns whether a failed mutation may have reached the server. */

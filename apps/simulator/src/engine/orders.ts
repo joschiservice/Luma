@@ -40,6 +40,8 @@ export interface WorldOrder {
   incidents: IncidentKindName[];
   /** Injected incidents waiting for the affected step, by kind. */
   planned?: Partial<Record<IncidentKindName, string>> | undefined;
+  /** Number of the shop customer who placed the order; absent for guest checkouts. */
+  customer?: number | null | undefined;
 }
 
 const orderKey = (shopName: string, order: string) => `${shopName}:${order}`;
@@ -153,7 +155,7 @@ async function customerFor(
     'customer',
     `${shopName}:${number}`,
   );
-  if (existing) return existing.data.id;
+  if (existing) return { id: existing.data.id, number };
   const shopInstance = instance(world, shopName);
   const country =
     shopInstance.kind === 'shopify' ? shopInstance.shop.country : 'DE';
@@ -164,7 +166,26 @@ async function customerFor(
   await store.put('customer', `${shopName}:${number}`, { id: result.id });
   await store.put('customers', shopName, { count: Math.max(count, number) });
 
-  return result.id;
+  return { id: result.id, number };
+}
+
+/** The shop customer as the order integration transfers it to the ERP. */
+function erpCustomer(world: World, shopName: string, number: number) {
+  const shopInstance = instance(world, shopName);
+  const country =
+    shopInstance.kind === 'shopify' ? shopInstance.shop.country : 'DE';
+  const person = customer(world.run.seed, shopName, country, number);
+
+  return {
+    email: person.email,
+    firstName: person.firstName,
+    lastName: person.lastName,
+    phone: person.phone,
+    street: person.address.address1,
+    city: person.address.city,
+    postalCode: person.address.zip,
+    countryIso: person.address.countryCode,
+  };
 }
 
 /**
@@ -226,12 +247,11 @@ export async function placeOrder(
     incidents.includes('fraud-hold') || fraudCheck
       ? ['HIGH_RISK_OF_FRAUD' as const]
       : [];
-  const customerId =
-    profile.name === 'test' ? null : await customerFor(world, shopName, random);
+  const buyer = await customerFor(world, shopName, random);
   const result = await shop(world, shopName, {
     kind: 'order',
     ...(options.id ? { id: options.id } : {}),
-    customer: customerId,
+    customer: buyer?.id ?? null,
     lines: lines.map(({ variant, quantity }) => ({
       variant: variant.id,
       quantity,
@@ -255,6 +275,7 @@ export async function placeOrder(
     })),
     incidents,
     planned: options.planned,
+    customer: buyer?.number ?? null,
   };
   await saveWorldOrder(world, order);
   world.metric('orders.created', 1, shopName);
@@ -393,6 +414,9 @@ export async function importOrder(
     kind: 'order',
     ...(erpId ? { id: erpId } : {}),
     externalNumber: order.name.replace(/^#/, ''),
+    ...(order.customer
+      ? { customer: erpCustomer(world, shopName, order.customer) }
+      : {}),
     lines: order.lines.map((line) => {
       const variant = world.model.variant(line.variant);
 

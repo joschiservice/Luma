@@ -93,3 +93,35 @@ describe('JTL purchasing grants', () => {
     expect(granted).toEqual(['purchase-orders.read']);
   });
 });
+
+describe('JTL customer grants', () => {
+  const customers = { ...purchasing, permissions: ['customers.read' as const] };
+
+  it('probes customers only when requested and grants them when JTL allows the read', async () => {
+    const fetch = denying([]);
+    expect(
+      await createInstallationVerifier({ fetch, jtlEndpoints: [] })(
+        customers,
+        credentials,
+      ),
+    ).toEqual(['customers.read']);
+    expect(
+      fetch.mock.calls.map(([url]) => new URL(String(url)).pathname),
+    ).toEqual(['/erp/v2/customers']);
+    expect(
+      await createInstallationVerifier({
+        fetch: denying([]),
+        jtlEndpoints: [],
+      })(purchasing, credentials),
+    ).not.toContain('customers.read');
+  });
+
+  it('omits customers when JTL denies the read', async () => {
+    expect(
+      await createInstallationVerifier({
+        fetch: denying(['customers']),
+        jtlEndpoints: [],
+      })(customers, credentials),
+    ).toEqual([]);
+  });
+});

@@ -17,7 +17,6 @@ import {
   connectionError,
   installConnection,
 } from '../connections/data';
-import { loadCustomerOrderContext } from '../customers/order-context';
 import { IdentityError, sessionOptions } from '../identity/data';
 import { NoAccess, usePermissions } from '../identity/permissions';
 import { appsOptions } from './data';
@@ -59,7 +58,6 @@ export function AppExtension({
   slot,
   connection,
   record,
-  customer,
   inventory,
   fulfillment,
   done,
@@ -69,7 +67,6 @@ export function AppExtension({
   slot: AppUiProps['slot'];
   connection?: InstalledConnection;
   record?: AppUiProps['record'];
-  customer?: AppUiProps['customer'];
   inventory?: AppUiProps['inventory'];
   fulfillment?: AppUiProps['fulfillment'];
   done: () => Promise<void>;
@@ -79,8 +76,6 @@ export function AppExtension({
   const { can } = usePermissions(organizationId);
   const services = useMemo<AppUiProps['services']>(
     () => ({
-      orderContext: (connectionId, externalId) =>
-        loadCustomerOrderContext(organizationId, connectionId, externalId),
       install: (input) => installConnection(organizationId, input),
       rotate: (current, credentials) =>
         changeConnection(organizationId, current, 'rotate', credentials),
@@ -137,7 +132,7 @@ export function AppExtension({
 
   return (
     <ExtensionBoundary
-      key={`${session.data?.sessionId ?? ''}/${organizationId}/${appId}/${slot}/${customer?.connectionId ?? ''}/${customer?.id ?? ''}/${record?.connectionId ?? ''}/${record?.externalId ?? ''}/${inventory?.positionId ?? ''}/${fulfillment?.fulfillmentId ?? ''}`}
+      key={`${session.data?.sessionId ?? ''}/${organizationId}/${appId}/${slot}/${record?.connectionId ?? ''}/${record?.externalId ?? ''}/${inventory?.positionId ?? ''}/${fulfillment?.fulfillmentId ?? ''}`}
     >
       <Suspense fallback={<p role="status">{m.apps_loading_app()}</p>}>
         {createElement(Extension, {
@@ -145,7 +140,6 @@ export function AppExtension({
           slot,
           connection,
           record,
-          customer,
           inventory,
           fulfillment,
           done,

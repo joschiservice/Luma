@@ -7,7 +7,7 @@ export * from '@luma/connector-shopify/schemas';
  * Version of this adapter's normalized output, recorded as observation provenance. Bump it
  * whenever the same provider response would normalize differently.
  */
-export const adapterVersion = 'shopify/3';
+export const adapterVersion = 'shopify/4';
 
 const externalId = z
   .object({ externalId: z.string().min(1), scopeKey: z.string() })
@@ -126,6 +126,7 @@ export const outputs = {
         displayNumber: z.string().nullable(),
         placedAt: timestamp.nullable(),
         total,
+        customer: externalId.nullable().optional(),
         status: z.enum(['open', 'completed', 'cancelled', 'unknown']),
         paymentStatus: z.enum([
           'pending',

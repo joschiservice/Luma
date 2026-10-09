@@ -45,6 +45,19 @@ export interface JtlSeedSupplier {
   profile: SupplierProfile;
 }
 
+/** A shop customer as the order integration transfers it. */
+export interface JtlCustomerInput {
+  email: string;
+  firstName: string;
+  lastName: string;
+  company?: string | undefined;
+  phone?: string | undefined;
+  street: string;
+  city: string;
+  postalCode: string;
+  countryIso: string;
+}
+
 /**
  * Merchant, integration, warehouse and supplier actions. `id` values are numeric JTL record
  * IDs; sales orders, items and purchase orders use separate numbering.
@@ -57,6 +70,11 @@ export type JtlCommand =
       id?: string | undefined;
       /** Shop order number set by the order integration. */
       externalNumber?: string | undefined;
+      /**
+       * The shop customer; the integration reuses the JTL customer with the same email address
+       * or creates one. Orders without a customer have none.
+       */
+      customer?: JtlCustomerInput | undefined;
       lines: {
         itemId: string;
         quantity: number;
@@ -71,6 +89,8 @@ export type JtlCommand =
     }
   | { kind: 'paid'; id: string }
   | { kind: 'cancel'; id: string }
+  /** Deletes a customer; their sales orders keep the customer ID. */
+  | { kind: 'delete-customer'; id: string }
   | {
       kind: 'ship';
       id: string;
@@ -117,7 +137,8 @@ export interface SupplierEvent {
 export interface JtlCommandResult {
   /**
    * The record the command created or changed: the sales order, the delivery note for `ship`,
-   * the purchase order, the item for `stock`, the supplier, or `catalog` for `seed-catalog`.
+   * the purchase order, the item for `stock`, the supplier, the deleted customer, or `catalog`
+   * for `seed-catalog`.
    */
   id: string;
   /**

@@ -88924,7 +88924,6 @@
                                 "app-settings",
                                 "page",
                                 "record",
-                                "customers",
                                 "inventory",
                                 "fulfillment"
                               ]
@@ -97215,7 +97214,7 @@
     },
     "/v1/organizations/{organizationId}/orders": {
       "get": {
-        "description": "Lists current orders from your connected sources. Search matches order numbers, source order IDs, SKU text on order lines and source SKU IDs. Filter by status, payment, source, placed or updated time, or a saved view. Outstanding, overdue and needs-you views count the same orders as the order metrics. Pass `count=exact` to include the total number of matches; otherwise `totalCount` is null. Results use `nextCursor` for the following page; a cursor is only valid with the filters and sort that produced it, and any other cursor returns 400 with a message to start from the first page.",
+        "description": "Lists current orders from your connected sources. Search matches order numbers, source order IDs, SKU text on order lines and source SKU IDs. Filter by status, payment, source, customer, placed or updated time, or a saved view. Filtering by customer also needs access to customers and returns 403 without it. Outstanding, overdue and needs-you views count the same orders as the order metrics. Pass `count=exact` to include the total number of matches; otherwise `totalCount` is null. Results use `nextCursor` for the following page; a cursor is only valid with the filters and sort that produced it, and any other cursor returns 400 with a message to start from the first page.",
         "summary": "List orders",
         "tags": ["orders"],
         "parameters": [
@@ -97282,6 +97281,15 @@
           {
             "name": "connectionId",
             "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "customerId",
+            "in": "query",
+            "description": "Imported customer ID: only orders the source attributes to this customer. Requires access to customers.",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -97592,6 +97600,42 @@
           },
           "401": {
             "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_ERROR",
+                        "UNAUTHENTICATED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "REGION_UNAVAILABLE",
+                        "SERVICE_UNAVAILABLE",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "PAYLOAD_TOO_LARGE",
+                        "TOO_MANY_REQUESTS",
+                        "UNSUPPORTED_MEDIA_TYPE"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message", "requestId"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
             "content": {
               "application/json": {
                 "schema": {
@@ -100928,6 +100972,12 @@
                           "observedAt": {
                             "type": "string",
                             "format": "date-time"
+                          },
+                          "missingSince": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "When a complete read of the source first no longer found this customer; null while the source still has them. Luma removes customers that stay missing for 30 days.",
+                            "nullable": true
                           }
                         },
                         "required": [
@@ -100944,7 +100994,8 @@
                           "tags",
                           "shared",
                           "sourceUpdatedAt",
-                          "observedAt"
+                          "observedAt",
+                          "missingSince"
                         ]
                       }
                     },
@@ -101409,6 +101460,12 @@
                         "observedAt": {
                           "type": "string",
                           "format": "date-time"
+                        },
+                        "missingSince": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "When a complete read of the source first no longer found this customer; null while the source still has them. Luma removes customers that stay missing for 30 days.",
+                          "nullable": true
                         }
                       },
                       "required": [
@@ -101425,7 +101482,8 @@
                         "tags",
                         "shared",
                         "sourceUpdatedAt",
-                        "observedAt"
+                        "observedAt",
+                        "missingSince"
                       ]
                     },
                     "address": {

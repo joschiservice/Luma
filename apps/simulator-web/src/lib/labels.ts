@@ -24,6 +24,7 @@ export const knownOperations = [
   'inventory.available.reconcile',
   'fulfillment.read',
   'returns.read',
+  'customers.read',
   'orders.shipping-method.read',
   'orders.shipping-method.write',
   'suppliers.read',

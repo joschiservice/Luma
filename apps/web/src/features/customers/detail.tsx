@@ -22,14 +22,13 @@ import { Link, useParams } from '@tanstack/react-router';
 import { UsersRound } from 'lucide-react';
 import { type ReactNode, useSyncExternalStore } from 'react';
 
-import { appsOptions } from '../apps/data';
-import { AppExtension } from '../apps/extension';
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
 import { formatMoney } from '../orders/presentation';
 import { systemName } from '../products/presentation';
 import { sourceId } from '../sync/presentation';
 import { customerOptions } from './data';
+import { CustomerOrders } from './orders';
 import {
   addressLines,
   customerName,
@@ -43,13 +42,12 @@ const serverSnapshot = () => true;
 
 export type CustomerError = 'missing' | 'access' | 'unavailable';
 
-/** Loads one imported customer and mounts its live order history from the source's app. */
+/** Loads one imported customer and the Luma orders its source attributes to them. */
 export function CustomerPage() {
   const { organizationId, customerId } = useParams({
     from: '/app/$organizationId/customers/$customerId',
   });
   const query = useQuery(customerOptions(organizationId, customerId));
-  const apps = useQuery(appsOptions(organizationId));
   const online = useSyncExternalStore(
     subscribe,
     onlineSnapshot,
@@ -59,17 +57,6 @@ export function CustomerPage() {
     return <SignInRedirect />;
   const status = query.error instanceof IdentityError ? query.error.status : 0;
   const detail = status === 403 ? undefined : query.data;
-  const appId = detail?.source?.appId;
-  const historyApp =
-    !!appId &&
-    (apps.data?.catalog ?? []).some(
-      (app) =>
-        app.id === appId &&
-        app.ui.includes('customers') &&
-        apps.data?.installations.some(
-          (item) => item.appId === app.id && item.status === 'installed',
-        ),
-    );
 
   return (
     <CustomerDetailView
@@ -89,17 +76,11 @@ export function CustomerPage() {
       }
       refresh={() => void query.refetch()}
       history={
-        detail && appId && historyApp ? (
-          <AppExtension
+        detail ? (
+          <CustomerOrders
             key={detail.item.id}
-            appId={appId}
             organizationId={organizationId}
-            slot="customers"
-            customer={{
-              connectionId: detail.item.connectionId,
-              id: detail.item.externalId,
-            }}
-            done={async () => undefined}
+            customerId={detail.item.id}
           />
         ) : null
       }
@@ -148,7 +129,7 @@ function Missing() {
   return <span className="customers-muted">{m.common_not_reported()}</span>;
 }
 
-/** Shows one customer: imported profile facts beside live order history from the source. */
+/** Shows one customer: imported profile facts beside the orders Luma imported for them. */
 export function CustomerDetailView({
   organizationId,
   detail,
@@ -166,7 +147,7 @@ export function CustomerDetailView({
   refreshing?: boolean;
   offline?: boolean;
   refresh: () => void;
-  /** Live order history and service context from the source's app. */
+  /** The customer's order history. */
   history?: ReactNode;
 }) {
   const item = detail?.item;
@@ -237,24 +218,23 @@ export function CustomerDetailView({
           ))}
         </div>
       ) : null}
+      {item?.missingSince && error !== 'missing' ? (
+        <Alert tone="warning">
+          {m.customers_gone_notice({
+            source: detail?.source?.label ?? m.customers_source_fallback(),
+          })}
+        </Alert>
+      ) : null}
       {detail && item && error !== 'missing' ? (
         <div className="customers-layout">
           <div className="customers-main">
             <Section
               title={m.customers_history_title()}
-              description={
-                store
-                  ? m.customers_history_description({ store })
-                  : m.customers_history_description_generic()
-              }
+              description={m.customers_history_description({
+                source: detail.source?.label ?? m.customers_source_fallback(),
+              })}
             >
-              {history ?? (
-                <p className="customers-muted">
-                  {store
-                    ? m.customers_history_unavailable({ store })
-                    : m.customers_history_unavailable_generic()}
-                </p>
-              )}
+              {history}
             </Section>
           </div>
           <aside
@@ -297,14 +277,17 @@ export function CustomerDetailView({
               }
             >
               <dl className="customers-facts">
-                <Fact label={m.customers_fact_orders()}>
-                  {item.orderCount === null
-                    ? missing
-                    : formatNumber(item.orderCount)}
-                </Fact>
-                <Fact label={m.customers_fact_spent()}>
-                  {formatMoney(item.amountSpent) ?? missing}
-                </Fact>
+                {/* Some sources, such as JTL, report neither; the order history counts imported orders. */}
+                {item.orderCount === null ? null : (
+                  <Fact label={m.customers_fact_orders()}>
+                    {formatNumber(item.orderCount)}
+                  </Fact>
+                )}
+                {item.amountSpent === null ? null : (
+                  <Fact label={m.customers_fact_spent()}>
+                    {formatMoney(item.amountSpent) ?? missing}
+                  </Fact>
+                )}
                 <Fact label={m.customers_fact_since()}>
                   {item.sourceCreatedAt ? (
                     <WorkspaceDate
@@ -349,6 +332,11 @@ export function CustomerDetailView({
                 <Fact label={m.customers_fact_read()}>
                   <WorkspaceDate value={item.observedAt} />
                 </Fact>
+                {item.missingSince ? (
+                  <Fact label={m.customers_fact_gone()}>
+                    <WorkspaceDate value={item.missingSince} />
+                  </Fact>
+                ) : null}
               </dl>
               <p className="customers-note">{m.customers_source_note()}</p>
             </Section>

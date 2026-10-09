@@ -1,15 +1,15 @@
 ---
 title: Find and understand a customer
-description: Find a customer from a connected store, read their profile and order history, and see the issues and actions on their orders.
+description: Find a customer from a connected store or ERP, read their profile and see their orders with the issues and actions on them.
 ---
 
-Customers shows the customer profiles your connected stores share with Luma. Use it to check who a customer is, what they ordered and what Luma did on their orders. Open **Customers** in the sidebar or press **G**, then **U**. From an order’s live Shopify details, **Open customer in Luma →** opens that order’s customer directly.
+Customers shows the customer profiles your connected stores and JTL share with Luma. Use it to check who a customer is, what they ordered and what Luma did on their orders. Open **Customers** in the sidebar or press **G**, then **U**. From an order’s live Shopify details, **Open customer in Luma →** opens that order’s customer directly.
 
 ## Find a customer
 
 Search by name, email address, phone number or the customer’s ID in the store. Narrow the list with **Account** and **Source**, and sort by **Customer since**, **Orders** or **Name**. **Account** shows whether the customer has a store account: **Has account**, **No account** (for example after a guest checkout), **Invited** or **Declined invite**.
 
-Each store keeps its own customers, and Luma never combines customers from different stores by name or email address. Someone who bought in two stores appears twice, once for each store. Compare the source and contact details before you choose.
+Each store and ERP keeps its own customers, and Luma never combines customers from different sources by name or email address. Someone who bought in two stores, or who is in both Shopify and JTL, appears once for each source. Compare the source and contact details before you choose.
 
 Your search text isn’t saved in the page address, so links you share or pin never contain a customer’s name or email address. Filters and sorting are saved.
 
@@ -20,24 +20,29 @@ Your search text isn’t saved in the page address, so links you share or pin ne
 The customer page shows the store and the customer’s ID in it, then:
 
 - **Contact**: email, phone and address, as far as the store shares them.
-- A section named after the store, such as **In Main Store**: the order count and amount spent the store reports, when the customer was created, their account state and tags.
+- A section named after the store, such as **In Main Store**: the order count and amount spent the store reports, when the customer was created, their account state and tags. JTL reports no order count or amount spent, so those are left out for JTL customers.
 - **Source and evidence**: the store, the customer’s ID, when the store last updated the profile and when Luma last read it.
 
 **Not shared** means the store withholds that field from Luma. **Not reported** means the store sent no value. Choose **Refresh customer** to load the profile again.
 
 ## Follow the order history
 
-**Order history** is read live from the store each time you open it, with the connection’s permissions. It lists each order with its payment, fulfillment and total. Use the page controls to move through it, and choose **Refresh orders** to read it again. Shopify shares orders from the last 60 days unless access to older orders is on for the store.
+**Order history** lists the orders Luma imported that the customer’s store or ERP attributes to them. Each order shows its status, payment, fulfillment, total and sources, and **Needs you** when it has an open issue. Sort by order number or placed date, and use the page controls to move through it.
 
-Select an order to see its service history: fulfillment, returns and refunds from the store. If the order is linked to an order in Luma, you also see its **Open issues** and **Luma actions**. The **Open … in Luma →** link opens the full order with its evidence and workflow runs. When the Shopify order isn’t linked to an order in Luma yet, or is linked to more than one, the page says so and shows only the store’s history.
+An order that Luma links across sources, such as a Shopify order that JTL also imported, appears once and names both sources. Open an order to see its evidence, issues and workflow runs; **Back** returns to the customer.
+
+The history includes only orders Luma has imported. Shopify shares orders from the last 60 days unless access to older orders is on for the store. Guest orders without a customer account appear in no customer’s history.
 
 ## When customer data is missing
 
 - **Customers aren’t shared yet** means no connected store shares customers with Luma. Shopify shares customers only after Shopify approves Luma’s access to customer data and your store grants it.
 - **Not shared** on contact details or the address means that part isn’t approved for sharing. The rest of the profile is still shown.
 - A store connected before Luma could read customers must be reconnected to share them. The page names each store that needs it, including stores that haven’t granted access to customers.
-- If the order history says the store’s app isn’t installed or authorized, someone with **Manage apps** can set it up in **Apps**. A permission notice in the history is different from an empty history.
-- **Customer not found** means the customer isn’t in this workspace, or the store asked Luma to erase their data.
+- JTL shares customers only when **Import customers** was chosen when the connection was added. To add it to an existing JTL connection, add the connection again with that option. See [Apps and connections](/docs/apps-and-connections#choose-what-luma-may-change-in-jtl).
+- **No orders yet** in the order history means Luma hasn’t imported an order for this customer. Orders already imported before the source shared customers are matched to them on the next full read.
+- If the order history says you need access to orders, ask a workspace admin for **View orders**.
+- **No longer in** a source, such as **No longer in JTL-Wawi**, means the source’s last full read didn’t include the customer, for example because they were deleted there. The profile and order history stay for 30 days. If the source still doesn’t have the customer after that, Luma removes the profile. If it reports the customer again, the label goes away.
+- **Customer not found** means the customer isn’t in this workspace, the store asked Luma to erase their data, or Luma removed them after they were missing from their source for 30 days.
 
 Someone whose role includes **Manage connections** can reconnect a store in **Apps**. See [Apps and connections](/docs/apps-and-connections#change-or-reconnect-a-connection).
 

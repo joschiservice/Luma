@@ -51,3 +51,14 @@ export function replacesProfile(incoming: Version, current: Version) {
 
   return Date.parse(incoming.observedAt) > Date.parse(current.observedAt);
 }
+
+/**
+ * The source customer one connection reports for one of its orders, as of `observedAt`.
+ * `customerExternalId` is null for guest orders and orders without a customer.
+ */
+export interface CustomerOrder {
+  connectionId: string;
+  order: { externalId: string; scopeKey: string };
+  customerExternalId: string | null;
+  observedAt: string;
+}

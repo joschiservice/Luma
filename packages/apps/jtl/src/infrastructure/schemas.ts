@@ -35,6 +35,9 @@ export const inputs = {
       .optional(),
   }),
   'fulfillment.read': query.extend({ order: ref.optional() }),
+  'customers.read': query.extend({
+    updatedSince: z.string().datetime({ offset: true }).optional(),
+  }),
 };
 
 /** Luma purchase-order IDs as stored in the JTL internal-comment marker. */

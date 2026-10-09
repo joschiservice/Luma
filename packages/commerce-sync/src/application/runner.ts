@@ -6,6 +6,7 @@ import type {
   CommerceObservation,
   CustomerSnapshot,
   Observation,
+  OrderSnapshot,
   ReadCapability,
 } from '@luma/connections';
 import type { CustomerProfiles } from '@luma/customers';
@@ -63,7 +64,7 @@ export interface SyncRunnerDependencies {
       reason: string,
     ): Promise<unknown>;
   };
-  customers: Pick<CustomerProfiles, 'upsert'>;
+  customers: Pick<CustomerProfiles, 'upsert' | 'recordOrders' | 'remove'>;
   /** Records the read outcome for connection freshness. Customer records are never passed. */
   recordRead(
     context: TenantContext,
@@ -189,6 +190,37 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
   }
 
   /**
+   * Removes the profiles of customers that complete full reads have not found for the retention
+   * period, leaving out customers on the current page. Returns their ledger keys, which the page
+   * commit forgets; a page that fails to commit repeats the removal when it is retried. Up to
+   * 1000 customers are removed per full read; the rest follow at the next one.
+   */
+  async function removeMissingCustomers(
+    tenant: TenantContext,
+    connectionId: string,
+    seen: ItemKey[],
+  ) {
+    const page = new Set(seen.map(itemKey));
+    const expired = (
+      await deps.store.missingSince(
+        tenant.tenantId,
+        connectionId,
+        'customers',
+        new Date(+now() - syncPolicy.missingCustomerRetentionMs).toISOString(),
+        1000,
+      )
+    ).filter((item) => !page.has(itemKey(item)));
+    if (expired.length)
+      await deps.customers.remove(
+        tenant,
+        connectionId,
+        expired.map((item) => item.externalId),
+      );
+
+    return expired;
+  }
+
+  /**
    * Imports a page's changed records together. When one record breaks Luma's record rules,
    * the batch is rolled back and its records are imported one by one, so only that record fails.
    */
@@ -209,7 +241,8 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
       ingestKey: `sync:${observation.id}`,
       input: {
         capability: recordCapabilities[recordType],
-        observation,
+        observation:
+          recordType === 'orders' ? withoutCustomer(observation) : observation,
       } as CommerceObservation,
     });
     try {
@@ -441,6 +474,20 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
         claimed.recordType,
         changed.map((item) => item.observation),
       );
+      if (claimed.recordType === 'orders')
+        await deps.customers.recordOrders(
+          tenant,
+          claimed.connectionId,
+          changed.flatMap(({ observation }) => customerOrder(observation)),
+        );
+      const forget =
+        claimed.recordType === 'customers' &&
+        !page.nextCursor &&
+        !page.deferred &&
+        !scan.since &&
+        !scan.createdSince
+          ? await removeMissingCustomers(tenant, claimed.connectionId, keys)
+          : [];
       for (const [index, { observation, digest }] of changed.entries()) {
         const outcome = outcomes[index];
         if (!outcome) {
@@ -473,6 +520,7 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
           ? null
           : { nextDueAt: nextDueAt(now(), supportsSince) },
         now: now().toISOString(),
+        forget,
         ...(page.deferred
           ? {
               deferred: true,
@@ -623,6 +671,33 @@ async function retryConflict<T>(work: () => Promise<T>): Promise<T> {
 
     return work();
   }
+}
+
+/** The order's customer reference as a customer-store link; none when the read omits it. */
+function customerOrder(observation: Observation<unknown>) {
+  const customer = (observation.data as Partial<OrderSnapshot>).customer;
+  if (customer === undefined) return [];
+
+  return [
+    {
+      order: {
+        externalId: observation.source.externalId,
+        scopeKey: observation.source.scopeKey,
+      },
+      customerExternalId: customer?.externalId ?? null,
+      observedAt: observation.observedAt,
+    },
+  ];
+}
+
+// Customer references are erasable personal data; order observations are retained evidence.
+function withoutCustomer(observation: Observation<unknown>) {
+  if ((observation.data as Partial<OrderSnapshot>).customer === undefined)
+    return observation;
+  const data = { ...(observation.data as Partial<OrderSnapshot>) };
+  delete data.customer;
+
+  return { ...observation, data };
 }
 
 function grantedTypes(connection: SyncConnection): RecordType[] {

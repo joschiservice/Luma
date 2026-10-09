@@ -1,7 +1,7 @@
 # JTL-Wawi connector
 
-The JTL app reads sales orders, items, stock, delivery notes, suppliers and purchase
-orders from JTL ERP API **2.2**, for on-premise (JTL-Wawi) and cloud connections with
+The JTL app reads sales orders, items, stock, delivery notes, suppliers, purchase orders
+and, when the connection opts in, customers from JTL ERP API **2.2**, for on-premise (JTL-Wawi) and cloud connections with
 shared normalization. It also offers two governed writes: shipping-method correction and
 purchase-order submission. Absence of data is never treated as evidence of shipment,
 deletion or confirmation. Code: `@luma/app-jtl`, with the protocol client in
@@ -18,8 +18,8 @@ deletion or confirmation. Code: `@luma/app-jtl`, with the protocol client in
 - **Cloud:** requests go to the fixed JTL Cloud host with a bearer token and `X-Tenant-ID`.
 
 Credentials are resolved on every request, allowing rotation. Register read access for
-sales orders and lines, items, warehouse stock, delivery notes and lines, suppliers and
-purchase orders. A licence or permission failure returns `permission_denied`, never an
+sales orders and lines, items, warehouse stock, delivery notes and lines, suppliers,
+purchase orders and, for customer import, customers. A licence or permission failure returns `permission_denied`, never an
 empty page. Older API versions are not interchangeable; confirm the installation supports
 the 2.2 endpoints before activation. Requests reject redirects and time out after 15
 seconds by default.
@@ -41,6 +41,13 @@ custom lines with item ID zero have no SKU reference. `externalSalesOrderNumber`
 as a marketplace reference for order link suggestions and configured automatic
 linking to one selected Shopify store. Malformed
 descriptive fields become null without rejecting the order.
+
+**Customers.** Only connections set up with customer import read customers and report each
+sales order's `customerId`; customer ID zero or null means no customer. A person's name is
+shown with the company in parentheses when both exist, a blank phone falls back to the
+mobile number, and locked customers are disabled. Labels become tags. `lastChanged` is the
+source update time; JTL's zero date counts as missing. Changed-customer reads use
+`lastChangedAfter`, which is exclusive, inside sync's overlapping windows.
 
 **Products.** Each JTL item is a product with its own item-ID SKU reference; SKU text
 preserves case and is never identity. `salesPriceGross` becomes a price without currency

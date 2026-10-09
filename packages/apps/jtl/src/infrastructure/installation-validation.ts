@@ -5,6 +5,7 @@ export const installationPermissions = z.enum([
   'products.read',
   'inventory.read',
   'fulfillment.read',
+  'customers.read',
   'orders.shipping-method.read',
   'orders.shipping-method.write',
   'suppliers.read',
@@ -61,7 +62,7 @@ export const installationInput = z
     permissions: z
       .array(installationPermissions)
       .min(1)
-      .max(9)
+      .max(installationPermissions.options.length)
       .refine((v) => new Set(v).size === v.length),
     credentials: installationCredentials,
   })

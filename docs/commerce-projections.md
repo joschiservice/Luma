@@ -158,5 +158,5 @@ creates a new snapshot without changing the original evidence.
 
 These reads do not authorize corrections, and ADR-002's field-group authority publication
 is not implemented by this layer. Raw provider payloads are not retained, and observations
-never carry customer or address data; imported customer profiles are stored separately
-(see [Commerce sync](commerce-sync.md#customers)).
+never carry customer or address data. Imported customer profiles and the customer references
+that order reads report are stored separately (see [Commerce sync](commerce-sync.md#customers)).

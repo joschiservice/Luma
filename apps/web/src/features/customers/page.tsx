@@ -10,6 +10,7 @@ import {
 import { formatNumber } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
+import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
 import { CollectionToolbar } from '@luma/ui/components/primitives/collection-toolbar';
 import {
@@ -199,6 +200,15 @@ function customerColumns(
               {customerName(item)}
             </DataTableRowLink>
             {details.length ? <small>{details.join(' · ')}</small> : null}
+            {item.missingSince ? (
+              <span>
+                <Badge tone="warning">
+                  {m.customers_gone_badge({
+                    source: sourceLabel(item.connectionId),
+                  })}
+                </Badge>
+              </span>
+            ) : null}
           </div>
         );
       },

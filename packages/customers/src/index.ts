@@ -1,4 +1,8 @@
-export type { CustomerAddress, CustomerProfile } from './domain/profiles.js';
+export type {
+  CustomerAddress,
+  CustomerOrder,
+  CustomerProfile,
+} from './domain/profiles.js';
 
 export { replacesProfile } from './domain/profiles.js';
 

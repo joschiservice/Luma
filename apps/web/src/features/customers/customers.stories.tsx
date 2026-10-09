@@ -2,8 +2,8 @@ import type {
   CustomerDetail,
   CustomerList,
   CustomerListItem,
+  OrderList,
 } from '@luma/api-contract';
-import type { AppUiProps } from '@luma/app-host/web';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import {
   createMemoryHistory,
@@ -11,24 +11,19 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { type ComponentType, lazy, Suspense, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { expect, userEvent, within } from 'storybook/test';
 
 import appStyles from '../../styles.css?inline';
 import type { CustomersSearch } from './data';
 import { CustomerDetailView } from './detail';
+import { CustomerOrdersView } from './orders';
 import { CustomersView } from './page';
 
-const modules = import.meta.glob<{ default: ComponentType<AppUiProps> }>(
-  '../../../../../packages/apps/*/src/web/index.tsx',
-);
-const load = Object.entries(modules).find(([path]) =>
-  path.includes('/shopify/'),
-)?.[1];
-const Shopify = load ? lazy(load) : null;
 const organizationId = '22222222-2222-4222-8222-222222222222';
 const tokyo = '11111111-1111-4111-8111-111111111111';
 const vienna = '33333333-3333-4333-8333-333333333333';
+const erp = '66666666-6666-4666-8666-666666666666';
 const timestamp = '2026-09-28T08:00:00.000Z';
 
 const source = (connectionId: string, label: string) => ({
@@ -63,6 +58,7 @@ const customer = (
   shared: { contact: true, address: true },
   sourceUpdatedAt: timestamp,
   observedAt: timestamp,
+  missingSince: null,
   ...patch,
 });
 
@@ -77,6 +73,7 @@ const list: CustomerList = {
       orderCount: 1,
       amountSpent: { amount: '39.9', currency: 'EUR' },
       tags: [],
+      missingSince: '2026-10-02T03:00:00.000Z',
     }),
     customer(73, {
       displayName: null,
@@ -108,94 +105,139 @@ const detail: CustomerDetail = {
   asOf: timestamp,
 };
 
-const order = {
-  id: 'gid://shopify/Order/2001',
-  sourceUpdatedAt: timestamp,
-  fields: {
-    Name: '#2001',
-    Created: timestamp,
-    Payment: 'PAID',
-    Fulfillment: 'FULFILLED',
-    Total: '84.00 EUR',
-  },
-  links: [],
+const orders: OrderList = {
+  items: [
+    {
+      id: '44444444-4444-4444-8444-444444444401',
+      displayNumber: '#2001',
+      placedAt: '2026-09-20T10:15:00.000Z',
+      total: { amount: '84', currency: 'EUR' },
+      status: 'open',
+      paymentStatus: 'paid',
+      fulfillment: 'partial',
+      lineCount: 2,
+      open: true,
+      overdue: false,
+      dueAt: null,
+      issueIds: ['55555555-5555-4555-8555-555555555501'],
+      differs: false,
+      // Linked across sources, the order appears once with both sources.
+      sources: [
+        {
+          connectionId: tokyo,
+          label: 'Tokyo store',
+          system: 'shopify',
+          connectionStatus: 'active',
+          externalId: 'gid://shopify/Order/2001',
+          selected: true,
+          deleted: false,
+          observedAt: timestamp,
+          sourceUpdatedAt: timestamp,
+        },
+        {
+          connectionId: erp,
+          label: 'JTL-Wawi',
+          system: 'jtl-onprem',
+          connectionStatus: 'active',
+          externalId: '1201',
+          selected: false,
+          deleted: false,
+          observedAt: timestamp,
+          sourceUpdatedAt: null,
+        },
+      ],
+      observedAt: timestamp,
+      sourceUpdatedAt: timestamp,
+    },
+    {
+      id: '44444444-4444-4444-8444-444444444402',
+      displayNumber: '#1874',
+      placedAt: '2026-06-02T08:00:00.000Z',
+      total: { amount: '129.5', currency: 'EUR' },
+      status: 'completed',
+      paymentStatus: 'paid',
+      fulfillment: 'fulfilled',
+      lineCount: 3,
+      open: false,
+      overdue: false,
+      dueAt: null,
+      issueIds: [],
+      differs: false,
+      sources: [
+        {
+          connectionId: tokyo,
+          label: 'Tokyo store',
+          system: 'shopify',
+          connectionStatus: 'active',
+          externalId: 'gid://shopify/Order/1874',
+          selected: true,
+          deleted: false,
+          observedAt: timestamp,
+          sourceUpdatedAt: timestamp,
+        },
+      ],
+      observedAt: timestamp,
+      sourceUpdatedAt: timestamp,
+    },
+  ],
+  totalCount: 2,
+  nextCursor: null,
+  asOf: timestamp,
 };
 
-/** Shopify's live order history slot with deterministic responses. */
-function History({ denied = false }: { denied?: boolean }) {
-  const services = useMemo<AppUiProps['services']>(
-    () => ({
-      install: async () => {
-        throw new Error('Unavailable');
-      },
-      rotate: async () => {
-        throw new Error('Unavailable');
-      },
-      uncertain: () => false,
-      error: () => 'Could not load order history. Try again.',
-      orderContext: async () => ({ status: 'unmapped', order: null }),
-      request: async (_path, body) => {
-        const input = body as { kind: string; id: string };
-        const sections = (
-          input.kind === 'Order'
-            ? [
-                { key: 'order', title: 'Order', rows: [order] },
-                { key: 'returns', title: 'Returns', rows: [] },
-                { key: 'refunds', title: 'Refunds', rows: [] },
-              ]
-            : [{ key: 'orders', title: 'Customer orders', rows: [order] }]
-        ).map((section) =>
-          denied && section.key === 'orders'
-            ? {
-                ...section,
-                rows: [],
-                status: 'missing_scope',
-                message: 'Reconnect Shopify with read_orders.',
-                requiredScopes: ['read_orders'],
-              }
-            : {
-                ...section,
-                status: 'available',
-                message: null,
-                requiredScopes: [],
-              },
-        );
-
-        return {
-          tenantId: organizationId,
-          connectionId: tokyo,
-          kind: input.kind,
-          id: input.id,
-          shop: 'tokyo.myshopify.com',
-          observedAt: timestamp,
-          apiVersion: '2026-07',
-          sections,
-          nextCursor: null,
-        };
-      },
-    }),
-    [denied],
-  );
-  if (!Shopify) return null;
-
+/** The customer's Luma orders in a fixed state. */
+function History({ state }: { state: string }) {
   return (
-    <Suspense fallback={<p>Loading…</p>}>
-      <Shopify
-        organizationId={organizationId}
-        slot="customers"
-        can={() => true}
-        customer={{ connectionId: tokyo, id: detail.item.externalId }}
-        services={services}
-        done={async () => {}}
-      />
-    </Suspense>
+    <CustomerOrdersView
+      organizationId={organizationId}
+      customerPath={`/app/${organizationId}/customers/${detail.item.id}`}
+      state={{ sort: 'placed', direction: 'desc' }}
+      list={
+        state === 'denied'
+          ? undefined
+          : state === 'empty'
+            ? { ...orders, items: [], totalCount: 0 }
+            : orders
+      }
+      error={state === 'denied' ? 'access' : undefined}
+      page={1}
+      change={() => {}}
+      retry={() => {}}
+    />
   );
 }
+
+const jtlDetail: CustomerDetail = {
+  item: customer(74, {
+    connectionId: erp,
+    externalId: '4711',
+    displayName: 'Mia Keller (Keller GmbH)',
+    email: 'mia@keller.example',
+    phone: '+49 30 1234567',
+    orderCount: null,
+    amountSpent: null,
+    tags: ['B2B'],
+  }),
+  address: {
+    line1: 'Hauptstraße 12',
+    line2: null,
+    city: 'Berlin',
+    region: null,
+    postalCode: '10115',
+    country: 'DE',
+  },
+  source: {
+    ...source(erp, 'JTL-Wawi'),
+    system: 'jtl-onprem',
+    appId: 'jtl',
+  },
+  asOf: timestamp,
+};
 
 function Content({ state }: { state: string }) {
   const [search, change] = useState<CustomersSearch>({});
   const [q, setQ] = useState('');
-  if (state === 'detail' || state === 'withheld' || state === 'denied')
+  if (['detail', 'withheld', 'denied', 'empty', 'jtl', 'gone'].includes(state))
     return (
       <CustomerDetailView
         organizationId={organizationId}
@@ -206,10 +248,20 @@ function Content({ state }: { state: string }) {
                 item: list.items[2]!,
                 address: null,
               }
-            : detail
+            : state === 'jtl'
+              ? jtlDetail
+              : state === 'gone'
+                ? {
+                    ...jtlDetail,
+                    item: {
+                      ...jtlDetail.item,
+                      missingSince: '2026-10-02T03:00:00.000Z',
+                    },
+                  }
+                : detail
         }
         refresh={() => {}}
-        history={<History denied={state === 'denied'} />}
+        history={<History state={state} />}
       />
     );
   if (state === 'not-found')
@@ -299,6 +351,8 @@ export const Browse: Story = {
     await expect(
       canvas.getByText('jonas@example.test · Vienna store'),
     ).toBeVisible();
+    // A customer the source no longer has stays listed until Luma removes them.
+    await expect(canvas.getByText('No longer in Vienna store')).toBeVisible();
     // Without shared contact details the customer is named by source ID only.
     await expect(
       canvas.getByRole('link', { name: 'Customer 73' }),
@@ -333,14 +387,14 @@ export const Detail: Story = {
       await canvas.findByRole('heading', { name: 'Avery Tan', level: 1 }),
     ).toBeVisible();
     await expect(canvas.getByText('150-0001 Shibuya')).toBeVisible();
-    await userEvent.click(
-      await canvas.findByRole('button', { name: '#2001' }, { timeout: 10000 }),
-    );
+    // An order linked across sources is listed once, naming both sources.
+    const row = canvas.getByRole('link', { name: '#2001' }).closest('tr')!;
+    await expect(within(row).getByText('JTL-Wawi')).toBeVisible();
+    await expect(within(row).getByText('Needs you')).toBeVisible();
+    // Opening an order returns to this customer.
     await expect(
-      await canvas.findByText(/isn’t linked to an order in Luma/, undefined, {
-        timeout: 10000,
-      }),
-    ).toBeVisible();
+      canvas.getByRole('link', { name: '#2001' }).getAttribute('href'),
+    ).toContain('from=');
   },
 };
 
@@ -371,11 +425,45 @@ export const HistoryDenied: Story = {
     const canvas = within(canvasElement);
     await expect(
       await canvas.findByText(
-        'Reconnect Shopify with read_orders.',
-        undefined,
-        { timeout: 10000 },
+        'You need access to orders to see this customer’s orders.',
       ),
     ).toBeVisible();
+  },
+};
+
+export const HistoryEmpty: Story = {
+  args: { state: 'empty' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByRole('heading', { name: 'No orders yet' }),
+    ).toBeVisible();
+  },
+};
+
+export const JtlCustomer: Story = {
+  args: { state: 'jtl' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByRole('heading', {
+        name: 'Mia Keller (Keller GmbH)',
+        level: 1,
+      }),
+    ).toBeVisible();
+    // JTL reports no order count or spend, so those facts are left out.
+    await expect(canvas.queryByText('Amount spent')).not.toBeInTheDocument();
+  },
+};
+
+export const GoneFromSource: Story = {
+  args: { state: 'gone' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByText(/JTL-Wawi no longer has this customer/),
+    ).toBeVisible();
+    await expect(canvas.getByText('Missing from source since')).toBeVisible();
   },
 };
 

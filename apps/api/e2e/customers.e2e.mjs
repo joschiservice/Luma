@@ -182,6 +182,7 @@ it('lists imported customers per store with search, filters, sorting and their s
     shared: { contact: true, address: true },
     sourceUpdatedAt: null,
     observedAt: expect.any(String),
+    missingSince: null,
   });
   expect(all.items[3]).toMatchObject({
     displayName: null,

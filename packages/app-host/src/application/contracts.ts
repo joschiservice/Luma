@@ -15,7 +15,6 @@ export type AppSlot =
   | 'page'
   | 'record'
   | 'inventory'
-  | 'customers'
   | 'fulfillment';
 
 /** A permission an app owns. People who can manage roles grant it like a core permission. */

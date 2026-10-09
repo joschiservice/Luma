@@ -19,6 +19,7 @@
   "jtl_setup_read_access": "Luma requests read access to orders, products, inventory, and fulfillment. After you save, validate access to see what JTL grants.",
   "jtl_setup_shipping_write": "Allow shipping method corrections. Requires read and write access to sales orders in JTL.",
   "jtl_setup_purchasing": "Allow sending approved purchase orders. Requires access to suppliers, purchase orders, and items in JTL.",
+  "jtl_setup_customers": "Import customers, including names, contact details, and addresses, and link them to their orders. Requires read access to customers in JTL.",
   "jtl_setup_uncertain": "Luma couldn’t confirm whether this was saved. Close this form and refresh the list before you try again.",
   "jtl_setup_confirm_replacement": "Confirm replacement",
   "jtl_setup_save": "Save connection"

@@ -41,7 +41,7 @@ const hits = `sku_hits AS MATERIALIZED (
  * Builds the list query. Parameters: $1 tenant, $2 as-of time, $3 connection, $4 status,
  * $5 payment status, $6–$7 placed range, $8–$9 source update range, $10 page size plus one,
  * $11–$13 cursor rank, key and order ID. With search, $14 is the text and $15 the escaped
- * ILIKE pattern.
+ * ILIKE pattern. `customer` names the parameter that binds the allowed order IDs.
  */
 export function legacyListSql(
   queries: OrderReadQueries,
@@ -50,6 +50,7 @@ export function legacyListSql(
   direction: 'asc' | 'desc',
   search: boolean,
   exactCount = false,
+  customer?: number,
 ) {
   const { state } = queries;
   const { anyDifference, sourceComparison } = state;
@@ -101,6 +102,11 @@ export function legacyListSql(
    search
      ? `
  AND o.entity_id IN (SELECT id FROM hits)`
+     : ''
+ }${
+   customer
+     ? `
+ AND o.entity_id=ANY($${customer}::uuid[])`
      : ''
  }
 ), attention AS MATERIALIZED (

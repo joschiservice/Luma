@@ -122,8 +122,6 @@ and uninstall. Members can view connections; `connections.manage` manages them.
 - `record`: live source context for a record the host shows. The host passes `kind`,
   `connectionId` and source `externalId`, only for a connection owned by the app. Read
   through the app's own authorized operations and do not retain the details.
-- `customers`: live order history and service context for one source customer on the
-  Customers detail page. The host lists imported profiles.
 - `inventory`: governed corrections for the supplied canonical `inventory.positionId`.
   The app resolves exact source identity, authority and grants on the server; the host
   never supplies a writable quantity.

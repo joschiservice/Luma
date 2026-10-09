@@ -115,7 +115,11 @@ export function createShopifyProvider(
             .credentials.token,
         recordObservations: runtime.recordObservations,
         ...(options.customerAccess
-          ? { customerAccess: options.customerAccess }
+          ? {
+              customerAccess: options.customerAccess,
+              orderCustomers:
+                current.connection.granted.includes('customers.read'),
+            }
           : {}),
         ...(fetch ? { fetch } : {}),
       });
@@ -193,7 +197,6 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         'settings',
         'page',
         'record',
-        'customers',
         'inventory',
         'fulfillment',
       ],
@@ -229,7 +232,6 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         settings: 'connections.manage',
         page: 'orders.read',
         record: 'orders.read',
-        customers: 'customers.read',
         inventory: 'shopify:inventory_corrections.apply',
         fulfillment: 'shopify:fulfillment_recovery.run',
       },

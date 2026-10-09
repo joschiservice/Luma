@@ -33,6 +33,28 @@ function pattern(query: string) {
 }
 
 /**
+ * Current Luma orders whose source order the customer's connection attributes to this imported
+ * customer. Linked orders appear once, under their current canonical ID.
+ */
+async function customerOrderIds(
+  tx: SqlTransaction,
+  tenantId: string,
+  customerId: string,
+) {
+  const result = await tx.query<{ id: string }>(
+    `SELECT DISTINCT m.canonical_id AS id FROM customer_profiles p
+     JOIN customer_orders c ON c.tenant_id=p.tenant_id AND c.connection_id=p.connection_id
+      AND c.customer_external_id=p.external_id
+     JOIN connector_source_mappings m ON m.tenant_id=c.tenant_id AND m.connection_id=c.connection_id
+      AND m.resource='order' AND m.scope_key=c.order_scope_key AND m.external_id=c.order_external_id
+     WHERE p.tenant_id=$1 AND p.id=$2`,
+    [tenantId, customerId],
+  );
+
+  return result.rows.map((row) => row.id);
+}
+
+/**
  * Reads one page of current orders and, when requested, the exact match count. Throws a 400 error when the
  * cursor was issued for other filters or sorting.
  */
@@ -86,6 +108,11 @@ export async function listOrders(
       values.push([...new Set(hits.rows.map(({ id }) => id))]);
     else values.push(query.q, pattern(query.q));
   } else if (search) values.push(query.q, pattern(query.q));
+  let customer: number | undefined;
+  if (query.customerId) {
+    values.push(await customerOrderIds(tx, context.tenantId, query.customerId));
+    customer = values.length;
+  }
   const sql = rebuilding.rowCount
     ? legacyListSql(
         queries,
@@ -94,6 +121,7 @@ export async function listOrders(
         query.direction,
         search,
         query.count === 'exact',
+        customer,
       )
     : listSql(
         queries,
@@ -103,6 +131,7 @@ export async function listOrders(
         searchPlan,
         !!query.connectionId,
         query.count === 'exact',
+        customer,
       );
   const result = await tx.query<{
     totalCount: number | null;

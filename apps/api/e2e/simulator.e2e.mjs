@@ -100,6 +100,57 @@ test('pilot imports simulated history through commerce sync, serves live metrics
   await expect.poll(listeners).toBe(0);
 });
 
+test('imports JTL customers with their orders and flags a customer deleted in JTL', async (t) => {
+  const f = await setupSimulator(t);
+  const base = `/v1/organizations/${f.manifest.organizationId}`;
+  const cookie = await operatorCookie(f);
+  const jtl = f.manifest.connections.jtl;
+  const api = async (url, options = {}) => {
+    const response = await f.pilot.app.inject({
+      url: `${base}${url}`,
+      headers: { cookie, origin: 'http://127.0.0.1:3000' },
+      ...options,
+    });
+    expect(response.statusCode).toBe(200);
+
+    return response.json();
+  };
+  const customers = async () =>
+    (await api(`/customers?connectionId=${jtl}`)).items;
+  await f.pilot.observe();
+  // The order integration carries each fixture order's shop customer into JTL.
+  const [buyer] = await customers();
+  expect(buyer).toMatchObject({ missingSince: null });
+  expect(buyer.email).toMatch(/@/);
+  const history = await api(`/orders?customerId=${buyer.id}`);
+  expect(history.items.length).toBeGreaterThan(0);
+  expect(
+    history.items.every((order) =>
+      order.sources.some((source) => source.connectionId === jtl),
+    ),
+  ).toBe(true);
+
+  await f.call('runs/operations/control', {
+    action: 'command',
+    instance: 'jtl',
+    command: { kind: 'delete-customer', id: buyer.externalId },
+  });
+  const stream = (await api('/sync')).connections
+    .find((item) => item.connectionId === jtl)
+    .recordTypes.find((item) => item.recordType === 'customers').stream;
+  await api(`/sync/${stream.id}/commands`, {
+    method: 'POST',
+    payload: { command: 'reconcile' },
+  });
+  await f.pilot.observe({ refresh: false });
+  // One full read without the customer flags them; the profile and its history stay.
+  const flagged = (await customers()).find((item) => item.id === buyer.id);
+  expect(flagged.missingSince).not.toBeNull();
+  expect((await api(`/orders?customerId=${buyer.id}`)).items).toHaveLength(
+    history.items.length,
+  );
+});
+
 test('signed Shopify webhooks reach the real change route and schedule early reads', async (t) => {
   const f = await setupSimulator(t);
   await f.pilot.observe();

@@ -61,6 +61,7 @@ function fixture(overrides: Partial<JtlConnectorOptions> = {}) {
       return found ? json(found) : new Response('', { status: 404 });
     }
     if (path === 'sales-orders') return page(data.orders);
+    if (path === 'customers') return page(data.customers);
     if (path === 'sales-orders/10/line-items') return json(data.orderLines);
     if (path === 'delivery-notes') return page(data.notes);
     if (path === 'warehouses/7/items/20/stocks')
@@ -139,7 +140,7 @@ describe('JTL read adapter', () => {
             {
               source: { provider: 'jtl', externalId: key(10) },
               sourceUpdatedAt: null,
-              adapterVersion: 'jtl/4',
+              adapterVersion: 'jtl/5',
               data: {
                 externalOrderNumber: '#1001',
                 status: 'open',
@@ -258,6 +259,83 @@ describe('JTL read adapter', () => {
       ]);
     },
   );
+
+  it('reads customers and attributes orders to them only with customer access', async () => {
+    const without = fixture();
+    const plain = await without.read('orders.read');
+    expect(plain.ok && plain.value.items[0]!.data).not.toHaveProperty(
+      'customer',
+    );
+    expect(without.connection.capabilities['customers.read']).toBeUndefined();
+
+    const f = fixture({ customers: true });
+    expect(await f.read('orders.read')).toMatchObject({
+      ok: true,
+      value: { items: [{ data: { customer: ref('501') } }] },
+    });
+    f.data.orders[0]!.customerId = 0;
+    expect(await f.read('orders.read')).toMatchObject({
+      ok: true,
+      value: { items: [{ data: { customer: null } }] },
+    });
+    expect(
+      f.connection.capabilities['customers.read']?.descriptor.filters,
+    ).toEqual(['updatedSince']);
+    expect(
+      await f.read('customers.read', {
+        limit: 10,
+        updatedSince: '2026-09-01T00:00:00.000Z',
+      }),
+    ).toMatchObject({
+      ok: true,
+      value: {
+        total: 2,
+        items: [
+          {
+            source: { resource: 'customer', externalId: '501' },
+            sourceUpdatedAt: '2026-09-10T08:00:00+02:00',
+            data: {
+              displayName: 'Mia Keller (Keller GmbH)',
+              email: 'mia@keller.example',
+              // A blank landline falls back to the mobile number.
+              phone: '+49 151 1234567',
+              address: {
+                line1: 'Hauptstraße 12',
+                line2: null,
+                city: 'Berlin',
+                region: null,
+                postalCode: '10115',
+                country: 'DE',
+              },
+              state: 'enabled',
+              createdAt: '2025-02-01T10:00:00+01:00',
+              orderCount: null,
+              amountSpent: null,
+              tags: ['B2B', 'VIP'],
+              shared: { contact: true, address: true },
+            },
+          },
+          {
+            source: { externalId: '502' },
+            // JTL's empty date is not a time.
+            sourceUpdatedAt: null,
+            data: {
+              displayName: null,
+              address: null,
+              state: 'disabled',
+              createdAt: null,
+              tags: [],
+            },
+          },
+        ],
+      },
+    });
+    const url = new URL(String(f.fetch.mock.calls.at(-1)![0]));
+    expect(url.pathname).toMatch(/\/customers$/);
+    expect(url.searchParams.get('lastChangedAfter')).toBe(
+      '2026-09-01T00:00:00.000Z',
+    );
+  });
 
   it('paginates and binds cursors to query, tenant, connection and mode', async () => {
     const f = fixture();

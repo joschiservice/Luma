@@ -20,6 +20,11 @@ export type CustomerListItem = {
   shared: { contact: boolean; address: boolean };
   sourceUpdatedAt: string | null;
   observedAt: string;
+  /**
+   * When a complete full read first no longer found the customer; null while the source still
+   * has them. Customers missing for 30 days are removed.
+   */
+  missingSince: string | null;
 };
 
 /** A commerce connection and whether it shares customers with Luma. */

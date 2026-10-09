@@ -110,6 +110,12 @@ export interface OrderSnapshot {
   placedAt?: string | null;
   /** Source-reported order total, including tax; null when the source does not report one. */
   total?: Money | null;
+  /**
+   * The source customer who placed the order; null for guest orders, omitted when the adapter
+   * does not read it. Customer references are personal data: sync stores them only in the
+   * erasable customer store, so they must be removed before an observation is recorded.
+   */
+  customer?: ExternalId | null;
   status: 'open' | 'completed' | 'cancelled' | 'unknown';
   paymentStatus:
     | 'pending'
