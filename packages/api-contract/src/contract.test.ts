@@ -184,6 +184,7 @@ it('validates SSE snapshots and closes malformed streams while allowing transpor
     expect(close).not.toHaveBeenCalled();
     const progress = {
       schemaVersion: 1,
+      people: [],
       caseRevision: 1,
       state: 'detected',
       diagnosisRevision: 0,

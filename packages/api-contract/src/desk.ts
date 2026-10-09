@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { activityActorSchema } from './activity.js';
 import { caseStates } from './cases.js';
 
 const id = z.string().uuid();
@@ -7,6 +8,10 @@ const id = z.string().uuid();
 const at = z.string().datetime();
 
 const ref = z.string().min(1).max(512);
+
+// People referenced by user ID in a case response, named as in Activity. A listed ID that
+// names nobody in the workspace reads as a former member.
+const casePeople = z.array(activityActorSchema).max(10);
 
 const fields = z.record(
   z.string(),
@@ -61,6 +66,8 @@ export const decisionReceiptSchema = z.object({
 });
 
 export const caseReviewSchema = z.object({
+  /** The people behind `proposal.requestedBy` and `proposal.approval.actorId`. */
+  people: casePeople,
   policyStale: z.boolean().optional(),
   refreshable: z.boolean().optional(),
   schemaVersion: z.literal(1),
@@ -110,6 +117,8 @@ export const caseReviewSchema = z.object({
 
 export const caseProgressSchema = z.object({
   schemaVersion: z.literal(1),
+  /** The people behind `execution.requestedBy` and `resolution.actorId`. */
+  people: casePeople,
   caseRevision: z.number().int().positive(),
   state: z.enum(caseStates),
   diagnosisRevision: z.number().int().nonnegative(),
@@ -180,7 +189,7 @@ export const caseTimelineSchema = z.object({
         id,
         type: ref,
         occurredAt: at,
-        actorId: ref.nullable(),
+        actor: activityActorSchema,
         proposalId: id.nullable(),
         outcome: ref.nullable(),
         evidenceRefs: z.array(ref).max(100),

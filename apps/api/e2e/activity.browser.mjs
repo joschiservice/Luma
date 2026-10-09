@@ -32,7 +32,7 @@ test('filters, expands, returns, paginates and recovers workspace activity on de
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/sign-up');
-  await page.getByLabel('Name', { exact: true }).fill('Ada');
+  await page.getByLabel('Name', { exact: true }).fill('Ada Lovelace');
   await page.getByLabel('Email', { exact: true }).fill('activity@example.test');
   await page
     .getByLabel('Password', { exact: true })
@@ -65,10 +65,13 @@ test('filters, expands, returns, paginates and recovers workspace activity on de
   await addFilter('System', 'jtl-cloud');
   await expect.poll(() => param('system')).toBe('jtl-cloud');
   const search = page.getByRole('searchbox', { name: 'Search activity' });
-  await search.fill(actor);
+  // People are shown and found by name rather than by user ID.
+  await search.fill('lovelace');
   await search.press('Enter');
-  await expect.poll(() => param('q')).toBe(actor);
+  await expect.poll(() => param('q')).toBe('lovelace');
   await page.locator('.activity-event').first().waitFor();
+  await page.getByText('Ada Lovelace · jtl-cloud').first().waitFor();
+  expect(await page.getByText(actor).count()).toBe(0);
   await addFilter('Outcome', 'Outcome unclear');
   await expect.poll(() => param('outcome')).toBe('uncertain');
   await page

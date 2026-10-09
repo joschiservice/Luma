@@ -21,6 +21,10 @@ The bridge exposes only email sign-up (passwords of at least 12 characters), sig
 - `members.manage` adds, reassigns and removes members. Only owners grant or revoke ownership. Nobody can assign a role, or change a member, with permissions the actor does not hold.
 - The last owner cannot be removed or demoted.
 - Membership mutations serialize on the organization row and recheck the acting membership after acquiring the lock.
+- `workspace_people` keeps each workspace's current and former members for attribution.
+  Triggers on memberships and user profiles maintain it, so no code path can skip it. Removal,
+  including account deletion, keeps the last recorded name and drops the email. Reads are
+  tenant-scoped under RLS; other domains name people through it instead of reading `users`.
 - Adding an existing user by UUID remains an explicit administrator action. Email invitations, role management and access history are described in [workspace settings](workspace-settings.md).
 
 ## Sign-in factors

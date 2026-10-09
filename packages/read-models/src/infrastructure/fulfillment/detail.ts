@@ -284,7 +284,7 @@ export async function readFulfillment(
         action: event.action,
         type: event.type,
         outcome: event.outcome,
-        actorKind: event.actorKind,
+        actor: event.actor,
         exceptionId: event.exceptionId,
         summary: event.summary,
       })),

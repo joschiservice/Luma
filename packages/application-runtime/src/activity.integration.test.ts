@@ -447,4 +447,223 @@ describe.skipIf(!databaseUrl)('Workspace activity on PostgreSQL', () => {
     });
     expect(none.items).toEqual([]);
   }, 60000);
+
+  it('names current and former members without reading other workspaces', async () => {
+    const workspace = randomUUID();
+    const neighbour = randomUUID();
+    const people = {
+      ada: randomUUID(),
+      ben: randomUUID(),
+      cleo: randomUUID(),
+      dora: randomUUID(),
+    };
+    const at = (day: number) =>
+      `2026-08-${String(day).padStart(2, '0')}T00:00:00Z`;
+    const events: Record<string, string> = {};
+    const client = await owner.connect();
+    try {
+      for (const id of [workspace, neighbour])
+        await client.query(
+          "INSERT INTO organizations(id,name,slug,created_at) VALUES($1,'People',$2,now())",
+          [id, `people-${id}`],
+        );
+      for (const [key, id] of Object.entries(people))
+        await client.query(
+          'INSERT INTO users(id,name,email,created_at,updated_at) VALUES($1,$2,$3,now(),now())',
+          [id, `${key} original`, `${key}@example.test`],
+        );
+      const join = (tenantId: string, userId: string) =>
+        client.query(
+          "INSERT INTO memberships(id,tenant_id,user_id,role,created_at) VALUES($1,$2,$3,'member',now())",
+          [randomUUID(), tenantId, userId],
+        );
+      await join(workspace, people.ada);
+      await join(workspace, people.ben);
+      await join(workspace, people.cleo);
+      await join(neighbour, people.dora);
+      // Ada's rename reaches the directory; Ben left first and keeps the name he had then.
+      await client.query(
+        'DELETE FROM memberships WHERE tenant_id=$1 AND user_id=$2',
+        [workspace, people.ben],
+      );
+      await client.query(
+        "UPDATE users SET name=CASE id WHEN $1::uuid THEN 'Ada Lovelace' ELSE 'Ben Renamed' END WHERE id IN ($1::uuid,$2::uuid)",
+        [people.ada, people.ben],
+      );
+      await client.query('DELETE FROM users WHERE id=$1', [people.cleo]);
+
+      const record = async (
+        key: string,
+        actor: { kind: string; id: string } | null,
+        day: number,
+        correlationId?: string,
+      ) => {
+        const id = randomUUID();
+        await client.query(
+          'INSERT INTO audit_entries(id,tenant_id,event_key,proposal_id,document,created_at) VALUES($1::uuid,$2,$1::text,$3,$4,$5)',
+          [
+            id,
+            workspace,
+            randomUUID(),
+            {
+              id,
+              tenantId: workspace,
+              eventType: 'execution.dispatched',
+              ...(actor ? { actor } : {}),
+              ...(correlationId ? { correlationId } : {}),
+            },
+            at(day),
+          ],
+        );
+        events[key] = id;
+      };
+      await record('ada', { kind: 'user', id: people.ada }, 1);
+      await record('ben', { kind: 'user', id: people.ben }, 2);
+      await record('cleo', { kind: 'user', id: people.cleo }, 3);
+      await record('dora', { kind: 'user', id: people.dora }, 4);
+      await record('service', { kind: 'service', id: 'luma.procurement' }, 5);
+      await record('unrecorded', null, 6);
+
+      // Reads ignore foreign keys, so the issue and workflow fixtures skip their parent chains.
+      await client.query("SET session_replication_role='replica'");
+      const detected = randomUUID();
+      await client.query(
+        'INSERT INTO exception_outbox(id,tenant_id,exception_id,document,created_at) VALUES($1,$2,$3,$4,$5)',
+        [
+          detected,
+          workspace,
+          randomUUID(),
+          { type: 'exception.detected' },
+          at(7),
+        ],
+      );
+      events.detected = detected;
+      const access = randomUUID();
+      await client.query(
+        "INSERT INTO workspace_access_events(id,tenant_id,actor_id,event_type,target_id,after_value,created_at) VALUES($1,$2::uuid,$3,'workspace.updated',$2::text,'{}',$4)",
+        [access, workspace, people.ben, at(9)],
+      );
+      events.access = `access:${access}`;
+
+      const digest = 'd'.repeat(64);
+      await client.query(
+        "INSERT INTO playbook_versions(tenant_id,definition_id,version,digest,document) VALUES($1,'replenish','1',$2,$3)",
+        [
+          workspace,
+          digest,
+          {
+            definition: { id: 'replenish', name: 'Replenish low stock' },
+            version: '1',
+            digest,
+          },
+        ],
+      );
+      const runId = randomUUID();
+      await client.query(
+        "INSERT INTO workflow_trigger_runs(tenant_id,id,definition_id,version,version_digest,dedupe_key,request_digest,document,state) VALUES($1,$2::uuid,'replenish','1',$3,$2::text,'r',$4,'awaiting_admission')",
+        [
+          workspace,
+          runId,
+          digest,
+          {
+            tenantId: workspace,
+            id: runId,
+            definitionId: 'replenish',
+            version: '1',
+            versionDigest: digest,
+            requestDigest: 'r',
+            trigger: { kind: 'event' },
+          },
+        ],
+      );
+      await record('workflow', { kind: 'user', id: people.ada }, 8, runId);
+    } finally {
+      await client.query("SET session_replication_role='origin'");
+      client.release();
+    }
+
+    let queries = 0;
+    const database = createTenantDatabase(reader);
+    const store = createActivityStore({
+      transaction: (tenantId, operation, options) =>
+        database.transaction(
+          tenantId,
+          (tx) =>
+            operation(
+              Object.assign(Object.create(tx) as typeof tx, {
+                query: (...args: Parameters<typeof tx.query>) => {
+                  queries++;
+
+                  return tx.query(...args);
+                },
+              }),
+            ),
+          options,
+        ),
+    });
+    const scoped = { ...context, tenantId: workspace };
+    const range = { from: at(1), to: '2026-09-01T00:00:00Z' };
+    const page = await store.list(scoped, { ...range, limit: 100 });
+    const actor = (key: string) =>
+      page.items.find((item) => item.id === events[key])?.actor;
+
+    expect(actor('ada')).toEqual({
+      kind: 'member',
+      id: people.ada,
+      name: 'Ada Lovelace',
+      email: 'ada@example.test',
+      workflow: null,
+    });
+    expect(actor('ben')).toMatchObject({
+      kind: 'former_member',
+      name: 'ben original',
+      email: null,
+    });
+    expect(actor('cleo')).toMatchObject({
+      kind: 'former_member',
+      name: 'cleo original',
+      email: null,
+    });
+    // Dora belongs to another workspace, so her name stays there.
+    expect(actor('dora')).toMatchObject({
+      kind: 'former_member',
+      id: people.dora,
+      name: null,
+    });
+    expect(actor('service')).toMatchObject({
+      kind: 'service',
+      name: 'luma.procurement',
+    });
+    expect(actor('unrecorded')).toMatchObject({
+      kind: 'unrecorded',
+      name: null,
+    });
+    expect(actor('detected')).toMatchObject({ kind: 'luma', id: null });
+    expect(actor('access')).toMatchObject({
+      kind: 'former_member',
+      name: 'ben original',
+    });
+    expect(actor('workflow')).toMatchObject({
+      kind: 'member',
+      name: 'Ada Lovelace',
+      workflow: { id: 'replenish', name: 'Replenish low stock' },
+    });
+
+    const search = async (q: string) =>
+      (await store.list(scoped, { ...range, limit: 100, q })).items.map(
+        (item) => item.id,
+      );
+    expect(await search('LOVELACE')).toEqual([events.workflow, events.ada]);
+    expect(await search('ada@example')).toEqual([events.workflow, events.ada]);
+    expect(await search('ben original')).toEqual([events.access, events.ben]);
+    expect(await search('dora original')).toEqual([]);
+    expect(await search('replenish low')).toEqual([events.workflow]);
+
+    queries = 0;
+    await store.list(scoped, { ...range, limit: 1 });
+    const small = queries;
+    queries = 0;
+    await store.list(scoped, { ...range, limit: 100 });
+    expect(queries).toBe(small);
+  }, 60000);
 });

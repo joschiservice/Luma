@@ -36,12 +36,25 @@ export interface ActivityQuery {
     { issueIds: string[]; runIds: string[]; orderRefs: string[] } | undefined;
 }
 
+/**
+ * Who recorded an event. People are current or former members of the workspace; former
+ * members keep the name recorded when they left, which may be missing. Email is present only
+ * for current members. Luma records detection and verification itself; services keep their
+ * recorded identifier as the name. `workflow` names the workflow whose run acted for a person.
+ */
+export interface ActivityActor {
+  kind: 'member' | 'former_member' | 'luma' | 'service' | 'unrecorded';
+  id: string | null;
+  name: string | null;
+  email: string | null;
+  workflow: { id: string; name: string | null } | null;
+}
+
 export interface ActivityEvent {
   id: string;
   recordedAt: string;
   occurredAt: string | null;
-  actorId: string | null;
-  actorKind: string | null;
+  actor: ActivityActor;
   action: string;
   type: ActivityType;
   outcome: ActivityOutcome;

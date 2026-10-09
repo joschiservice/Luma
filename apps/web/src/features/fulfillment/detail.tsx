@@ -14,6 +14,7 @@ import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { StateDot, StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { RecordHeader } from '@luma/ui/components/workspace/record-header';
+import { actorLabel } from '@luma/ui/lib/actor';
 import { onlineManager, useQuery } from '@tanstack/react-query';
 import { Link, useParams, useSearch } from '@tanstack/react-router';
 import { ExternalLink, PackageX } from 'lucide-react';
@@ -670,6 +671,7 @@ export function FulfillmentDetailView({
                         <span>{activityLabel(entry.action)}</span>
                         <small>
                           <WorkspaceDate value={entry.recordedAt} />
+                          {` · ${actorLabel(entry.actor)}`}
                           {entry.summary ? ` · ${entry.summary}` : ''}
                         </small>
                       </span>

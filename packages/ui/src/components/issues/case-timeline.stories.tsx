@@ -9,8 +9,25 @@ const id = '11111111-1111-4111-8111-111111111111';
 
 const at = '2026-09-20T04:00:00Z';
 
+const operator: CaseReview['people'][number] = {
+  kind: 'member',
+  id: '99999999-9999-4999-8999-999999999999',
+  name: 'Mia Keller',
+  email: 'mia@example.test',
+  workflow: null,
+};
+
+const luma: CaseReview['people'][number] = {
+  kind: 'luma',
+  id: null,
+  name: null,
+  email: null,
+  workflow: null,
+};
+
 const progress: CaseProgress = {
   schemaVersion: 1,
+  people: [operator],
   caseRevision: 3,
   diagnosisRevision: 1,
   state: 'awaiting_approval',
@@ -24,6 +41,7 @@ const progress: CaseProgress = {
 
 const review: CaseReview = {
   schemaVersion: 1,
+  people: [operator],
   caseRevision: 3,
   diagnosisRevision: 1,
   permittedDecisions: ['approve', 'reject', 'escalate'],
@@ -41,7 +59,7 @@ const review: CaseReview = {
     preconditions: { evidenceRefs: ['stock-before'], validUntil: at },
     risk: 'low',
     expiresAt: at,
-    requestedBy: 'inventory-worker',
+    requestedBy: operator.id!,
     policy: {
       id,
       policyVersion: 'policy-v1',
@@ -60,7 +78,7 @@ const execution: NonNullable<CaseProgress['execution']> = {
   state: 'succeeded',
   attemptId: id,
   attempt: 1,
-  requestedBy: 'inventory-worker',
+  requestedBy: operator.id!,
   executor: { kind: 'connector', id: 'shopify' },
   startedAt: at,
   finishedAt: at,
@@ -96,7 +114,7 @@ const meta = {
         id,
         type: 'execution.prepared',
         occurredAt: at,
-        actorId: 'inventory-worker',
+        actor: operator,
         proposalId: id,
         outcome: null,
         evidenceRefs: ['stock-before'],
@@ -125,6 +143,7 @@ export const ApprovalWait: Story = {
     await expect(canvas.getByText('Not sent yet')).toBeVisible();
     await userEvent.click(canvas.getByText('Change and expected outcome'));
     await expect(canvas.getByText('Quantity')).toBeVisible();
+    await expect(canvas.getByText('By Mia Keller')).toBeVisible();
     await expect(
       canvas.queryByText('never-render-parameters'),
     ).not.toBeInTheDocument();
@@ -178,7 +197,7 @@ const resolved: CaseProgress = {
   resolution: {
     kind: 'verification',
     at,
-    actorId: 'verification-worker',
+    actorId: operator.id!,
     evidenceRefs: ['stock-after'],
   },
   workflow: { availability: 'available', progress: { phase: 'resolved' } },
@@ -261,7 +280,7 @@ export const Recovery: Story = {
         id,
         type: 'execution.reconciled',
         occurredAt: at,
-        actorId: 'recovery-worker',
+        actor: luma,
         proposalId: id,
         outcome: 'succeeded',
         evidenceRefs: ['stock-after'],
@@ -291,10 +310,16 @@ export const HumanDisposition: Story = {
       resolution: {
         kind: 'human_disposition',
         at,
-        actorId: 'operator',
+        actorId: '88888888-8888-4888-8888-888888888888',
         evidenceRefs: [],
       },
     },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByText(/Closing doesn’t confirm .* · Former member/),
+    ).toBeVisible();
   },
 };
 
@@ -305,7 +330,7 @@ export const LongCollections: Story = {
       ...meta.args.timeline[0]!,
       id: `event-${index}`,
       occurredAt: new Date(Date.parse(at) - index * 60_000).toISOString(),
-      actorId: `operator-${index}`,
+      actor: { ...operator, name: `Operator ${index + 1}` },
       type: index % 2 ? 'execution.completed' : 'execution.prepared',
       outcome: index % 2 ? 'failed' : 'succeeded',
     })),
@@ -515,7 +540,7 @@ export const PageAuditHistory: Story = {
       id: `event-${index}`,
       type: 'exception.detected',
       occurredAt: `2026-09-24T06:50:0${index}.123Z`,
-      actorId: null,
+      actor: luma,
       proposalId: null,
       outcome: null,
       evidenceRefs: [],
@@ -535,9 +560,10 @@ export const PageAuditHistory: Story = {
     await expect(events).toHaveLength(3);
     const newest = within(events[0]!);
     await expect(newest.getByText(/^24 Sept? 2026, 06:50 UTC$/)).toBeVisible();
-    await expect(newest.getByText('Not recorded')).not.toBeVisible();
+    await expect(newest.getByText('By Luma')).toBeVisible();
+    await expect(newest.getByText('Luma', { exact: true })).not.toBeVisible();
     await userEvent.click(newest.getByText('Event details'));
-    await expect(newest.getByText('Not recorded')).toBeVisible();
+    await expect(newest.getByText('Luma', { exact: true })).toBeVisible();
     await expect(newest.getByText('2026-09-24T06:50:03.123Z')).toBeVisible();
     await userEvent.click(
       history.getByRole('button', { name: 'View full history (4)' }),

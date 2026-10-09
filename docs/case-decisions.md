@@ -21,7 +21,9 @@ they never evaluate models or connector preconditions.
   Events sort by timestamp at database precision, then ID; outbox and audit copies share
   one immutable event ID. Late events can land before a cursor, so refresh from the first
   page and deduplicate by ID. Entries carry bounded provenance, actors and outcomes, never
-  proposal parameters or raw provider payloads.
+  proposal parameters or raw provider payloads. Actors are named as in
+  [Activity](workspace-activity.md#attribution); review and progress keep user IDs and list
+  the people they reference in `people`.
 
 ## Decisions
 

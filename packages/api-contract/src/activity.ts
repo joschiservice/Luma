@@ -43,12 +43,34 @@ export const activityQuerySchema = z
     { message: 'Select a date range of at most 366 days' },
   );
 
+export const activityActorKinds = [
+  'member',
+  'former_member',
+  'luma',
+  'service',
+  'unrecorded',
+] as const;
+
+/**
+ * Who recorded an event. Former members keep the name recorded when they left, which may be
+ * missing. Email is present only for current members. Luma records detection and verification
+ * itself. `workflow` names the workflow whose run acted on the person's behalf.
+ */
+export const activityActorSchema = z.object({
+  kind: z.enum(activityActorKinds),
+  id: z.string().max(300).nullable(),
+  name: z.string().max(200).nullable(),
+  email: z.string().max(320).nullable(),
+  workflow: z
+    .object({ id: z.string().max(200), name: z.string().max(200).nullable() })
+    .nullable(),
+});
+
 export const activityEventSchema = z.object({
   id: z.string().max(200),
   recordedAt: z.string().datetime(),
   occurredAt: z.string().datetime().nullable(),
-  actorId: z.string().max(300).nullable(),
-  actorKind: z.string().max(40).nullable(),
+  actor: activityActorSchema,
   action: z.string().max(160),
   type: z.enum(activityTypes),
   outcome: z.enum(activityOutcomes),
@@ -85,6 +107,8 @@ export const activityPageSchema = z.object({
 });
 
 export type ActivityQuery = z.infer<typeof activityQuerySchema>;
+
+export type ActivityActor = z.infer<typeof activityActorSchema>;
 
 export type ActivityEvent = z.infer<typeof activityEventSchema>;
 

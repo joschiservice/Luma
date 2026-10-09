@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { activityActorSchema } from './activity.js';
 import { returnListItemSchema } from './returns.js';
 
 const timestamp = z.string().datetime();
@@ -205,7 +206,7 @@ export const orderActivitySchema = z.object({
   action: z.string(),
   type: z.string(),
   outcome: z.string(),
-  actorKind: z.string().nullable(),
+  actor: activityActorSchema,
   exceptionId: z.string().uuid().nullable(),
   summary: z.string().nullable(),
 });

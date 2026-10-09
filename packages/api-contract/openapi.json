@@ -2085,26 +2085,87 @@
                               }
                             ]
                           },
-                          "actorId": {
-                            "anyOf": [
-                              {
-                                "type": "string",
-                                "maxLength": 300
+                          "actor": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "enum": [
+                                  "member",
+                                  "former_member",
+                                  "luma",
+                                  "service",
+                                  "unrecorded"
+                                ],
+                                "type": "string"
                               },
-                              {
-                                "type": "null"
-                              }
-                            ]
-                          },
-                          "actorKind": {
-                            "anyOf": [
-                              {
-                                "type": "string",
-                                "maxLength": 40
+                              "id": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               },
-                              {
-                                "type": "null"
+                              "name": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 200
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "email": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 320
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "workflow": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "maxLength": 200
+                                      },
+                                      "name": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 200
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": ["id", "name"]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
+                            },
+                            "required": [
+                              "kind",
+                              "id",
+                              "name",
+                              "email",
+                              "workflow"
                             ]
                           },
                           "action": {
@@ -2329,8 +2390,7 @@
                           "id",
                           "recordedAt",
                           "occurredAt",
-                          "actorId",
-                          "actorKind",
+                          "actor",
                           "action",
                           "type",
                           "outcome",
@@ -48013,6 +48073,87 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "people": {
+                      "type": "array",
+                      "maxItems": 10,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "member",
+                              "former_member",
+                              "luma",
+                              "service",
+                              "unrecorded"
+                            ],
+                            "type": "string"
+                          },
+                          "id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 300
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "name": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 200
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "email": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 320
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "workflow": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "maxLength": 200
+                                  },
+                                  "name": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 200
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": ["id", "name"]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": ["kind", "id", "name", "email", "workflow"]
+                      }
+                    },
                     "policyStale": {
                       "type": "boolean"
                     },
@@ -48284,6 +48425,7 @@
                     }
                   },
                   "required": [
+                    "people",
                     "schemaVersion",
                     "caseRevision",
                     "diagnosisRevision",
@@ -48432,6 +48574,87 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "people": {
+                      "type": "array",
+                      "maxItems": 10,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "member",
+                              "former_member",
+                              "luma",
+                              "service",
+                              "unrecorded"
+                            ],
+                            "type": "string"
+                          },
+                          "id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 300
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "name": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 200
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "email": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 320
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "workflow": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "maxLength": 200
+                                  },
+                                  "name": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 200
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": ["id", "name"]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": ["kind", "id", "name", "email", "workflow"]
+                      }
+                    },
                     "policyStale": {
                       "type": "boolean"
                     },
@@ -48703,6 +48926,7 @@
                     }
                   },
                   "required": [
+                    "people",
                     "schemaVersion",
                     "caseRevision",
                     "diagnosisRevision",
@@ -49375,6 +49599,87 @@
                     "schemaVersion": {
                       "const": 1
                     },
+                    "people": {
+                      "type": "array",
+                      "maxItems": 10,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "member",
+                              "former_member",
+                              "luma",
+                              "service",
+                              "unrecorded"
+                            ],
+                            "type": "string"
+                          },
+                          "id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 300
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "name": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 200
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "email": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 320
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "workflow": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "maxLength": 200
+                                  },
+                                  "name": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 200
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": ["id", "name"]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": ["kind", "id", "name", "email", "workflow"]
+                      }
+                    },
                     "caseRevision": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -49641,6 +49946,7 @@
                   },
                   "required": [
                     "schemaVersion",
+                    "people",
                     "caseRevision",
                     "state",
                     "diagnosisRevision",
@@ -49821,16 +50127,87 @@
                             "type": "string",
                             "format": "date-time"
                           },
-                          "actorId": {
-                            "anyOf": [
-                              {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 512
+                          "actor": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "enum": [
+                                  "member",
+                                  "former_member",
+                                  "luma",
+                                  "service",
+                                  "unrecorded"
+                                ],
+                                "type": "string"
                               },
-                              {
-                                "type": "null"
+                              "id": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "name": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 200
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "email": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 320
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "workflow": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "maxLength": 200
+                                      },
+                                      "name": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 200
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": ["id", "name"]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
+                            },
+                            "required": [
+                              "kind",
+                              "id",
+                              "name",
+                              "email",
+                              "workflow"
                             ]
                           },
                           "proposalId": {
@@ -49870,7 +50247,7 @@
                           "id",
                           "type",
                           "occurredAt",
-                          "actorId",
+                          "actor",
                           "proposalId",
                           "outcome",
                           "evidenceRefs"
@@ -67078,14 +67455,87 @@
                               "outcome": {
                                 "type": "string"
                               },
-                              "actorKind": {
-                                "anyOf": [
-                                  {
+                              "actor": {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "enum": [
+                                      "member",
+                                      "former_member",
+                                      "luma",
+                                      "service",
+                                      "unrecorded"
+                                    ],
                                     "type": "string"
                                   },
-                                  {
-                                    "type": "null"
+                                  "id": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 300
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "name": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 200
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "email": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 320
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "workflow": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "maxLength": 200
+                                          },
+                                          "name": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string",
+                                                "maxLength": 200
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": ["id", "name"]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   }
+                                },
+                                "required": [
+                                  "kind",
+                                  "id",
+                                  "name",
+                                  "email",
+                                  "workflow"
                                 ]
                               },
                               "exceptionId": {
@@ -67116,7 +67566,7 @@
                               "action",
                               "type",
                               "outcome",
-                              "actorKind",
+                              "actor",
                               "exceptionId",
                               "summary"
                             ]
@@ -71316,14 +71766,87 @@
                               "outcome": {
                                 "type": "string"
                               },
-                              "actorKind": {
-                                "anyOf": [
-                                  {
+                              "actor": {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "enum": [
+                                      "member",
+                                      "former_member",
+                                      "luma",
+                                      "service",
+                                      "unrecorded"
+                                    ],
                                     "type": "string"
                                   },
-                                  {
-                                    "type": "null"
+                                  "id": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 300
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "name": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 200
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "email": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 320
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "workflow": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "maxLength": 200
+                                          },
+                                          "name": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string",
+                                                "maxLength": 200
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": ["id", "name"]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   }
+                                },
+                                "required": [
+                                  "kind",
+                                  "id",
+                                  "name",
+                                  "email",
+                                  "workflow"
                                 ]
                               },
                               "exceptionId": {
@@ -71354,7 +71877,7 @@
                               "action",
                               "type",
                               "outcome",
-                              "actorKind",
+                              "actor",
                               "exceptionId",
                               "summary"
                             ]

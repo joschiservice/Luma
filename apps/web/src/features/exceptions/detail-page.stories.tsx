@@ -41,7 +41,13 @@ const issue: CaseDetail = {
 const timeline = Array.from({ length: 32 }, (_, index) => ({
   id: `event-${index}`,
   type: 'execution.prepared',
-  actorId: 'inventory-worker',
+  actor: {
+    kind: 'member' as const,
+    id: '99999999-9999-4999-8999-999999999999',
+    name: 'Mia Keller',
+    email: 'mia@example.test',
+    workflow: null,
+  },
   proposalId: null,
   outcome: null,
   evidenceRefs: ['evidence-0'],

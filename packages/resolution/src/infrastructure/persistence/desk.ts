@@ -18,7 +18,9 @@ import type {
   DeskStore,
   TimelineEvent,
 } from '../../application/desk.js';
+import type { ActivityActor } from '../../domain/activity.js';
 import { approvalBlocksRenewal } from '../../domain/proposal-renewal.js';
+import { actorSql, personSql, readPeople } from './actors.js';
 
 const snapshotSql = `SELECT e.document AS incident,e.version AS revision,d.document AS diagnosis,
  (SELECT jsonb_build_object('action',p.document,'actionHash',p.action_hash,'version',p.version,'diagnosisRevision',p.diagnosis_revision)) AS proposal,
@@ -185,6 +187,7 @@ export function createDeskStore(
           },
           escalate: () =>
             dependencies.escalate(scoped, context, id, snapshot.revision),
+          people: (ids) => readPeople(tx, context.tenantId, ids),
         });
       }),
     publish: (context, id, revision, input) =>
@@ -358,6 +361,7 @@ export function createDeskStore(
           id: string;
           at: string;
           doc: Record<string, unknown>;
+          actor: ActivityActor;
         }>(
           `
         WITH proposals AS (SELECT id FROM case_proposals WHERE tenant_id=$1 AND exception_id=$2),
@@ -367,8 +371,12 @@ export function createDeskStore(
           UNION ALL SELECT 2,id,created_at,jsonb_build_object('eventType',document->'type','occurredAt',COALESCE(document->'document'->'evaluatedAt',document->'document'->'createdAt'),'actor',jsonb_build_object('id',COALESCE(document->'document'->'actorId',document->'document'->'approverId')),'proposalId',document->'document'->'proposalId','details',jsonb_build_object('outcome',document->'document'->'outcome')) FROM policy_outbox WHERE tenant_id=$1 AND (document->'document'->>'proposalId')::uuid IN (SELECT id FROM proposals)
           UNION ALL SELECT 3,id,created_at,jsonb_build_object('eventType',document->'type','occurredAt',COALESCE(document->'at',document->'resolution'->'at'),'actor',jsonb_build_object('id',COALESCE(document->'actorId',document->'resolution'->'actorId')),'evidenceRefs',document->'resolution'->'evidenceRefs') FROM exception_outbox WHERE tenant_id=$1 AND exception_id=$2
           UNION ALL SELECT 4,id,created_at,jsonb_build_object('eventType','case.' || (request->>'kind'),'occurredAt',document->'createdAt','actor',jsonb_build_object('id',actor_id),'proposalId',request->'proposalId','details',jsonb_build_object('outcome',request->'kind')) FROM case_commands WHERE tenant_id=$1 AND exception_id=$2
-        ), unique_events AS (SELECT DISTINCT ON(id) id,COALESCE((doc->>'occurredAt')::timestamptz,created_at) AS at,doc FROM events ORDER BY id,priority)
-        SELECT id,to_char(at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS at,doc FROM unique_events WHERE ($3::timestamptz IS NULL OR (at,id)>($3::timestamptz,$4::uuid)) ORDER BY at,id LIMIT $5`,
+        ), unique_events AS (SELECT DISTINCT ON(id) id,COALESCE((doc->>'occurredAt')::timestamptz,created_at) AS at,doc FROM events ORDER BY id,priority
+        ), page AS (SELECT * FROM unique_events WHERE ($3::timestamptz IS NULL OR (at,id)>($3::timestamptz,$4::uuid)) ORDER BY at,id LIMIT $5)
+        SELECT page.id,to_char(page.at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS at,page.doc,
+        ${actorSql({ row: 'person', kind: "COALESCE(page.doc->'actor'->>'kind','user')", id: "page.doc->'actor'->>'id'", luma: "page.doc->>'eventType' LIKE 'exception.%'", workflow: 'NULL' })} AS actor
+        FROM page ${personSql('person', '$1', "CASE WHEN COALESCE(page.doc->'actor'->>'kind','user')='user' THEN page.doc->'actor'->>'id' END")}
+        ORDER BY page.at,page.id`,
           [
             context.tenantId,
             id,
@@ -380,7 +388,6 @@ export function createDeskStore(
         const rows = result.rows.slice(0, query.limit);
         const items: TimelineEvent[] = rows.map((row) => {
           const d = row.doc;
-          const actor = d.actor as { id?: string } | null;
           const details = d.details as {
             outcome?: string;
             state?: string;
@@ -390,7 +397,7 @@ export function createDeskStore(
             id: row.id,
             type: String(d.eventType ?? 'case.updated'),
             occurredAt: row.at,
-            actorId: actor?.id ?? null,
+            actor: row.actor,
             proposalId: typeof d.proposalId === 'string' ? d.proposalId : null,
             outcome: details?.outcome ?? details?.state ?? null,
             evidenceRefs: Array.isArray(d.evidenceRefs)

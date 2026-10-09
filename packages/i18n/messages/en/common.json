@@ -55,5 +55,13 @@
   "common_save_failed": "Your change couldn’t be saved. Check your connection and try again.",
   "common_count_more": "{count, plural, one {{count, number} more} other {{count, number} more}}",
   "common_shown_of_total": "{shown, number} of {total, number}",
-  "common_empty_value": "—"
+  "common_empty_value": "—",
+  "common_actor_not_recorded": "Actor not recorded",
+  "common_actor_luma": "Luma",
+  "common_actor_former_member": "Former member",
+  "common_actor_former_member_named": "{name} (former member)",
+  "common_actor_service": "Service {name}",
+  "common_actor_via_workflow": "{actor} via {workflow}",
+  "common_actor_workflow_unnamed": "a Workflow",
+  "common_actor_with_email": "{actor} · {email}"
 }

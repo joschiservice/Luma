@@ -81,6 +81,8 @@ export type { PlaybookLibrary, PlaybookLibraryScope } from '@luma/workflows';
 
 export type { ActivityService } from './application/activity.js';
 
+export type { ActivityActor } from './domain/activity.js';
+
 export { WorkflowInputError } from './application/runtime.js';
 
 export { createProposalRefresher } from './application/refresh-proposal.js';

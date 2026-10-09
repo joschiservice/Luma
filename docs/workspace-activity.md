@@ -20,8 +20,19 @@ size; a change returns 400. Clients check for new records with a separate first-
 new rows never shift the page being read.
 
 Search is a case-insensitive literal substring over issue ID, persisted target reference,
-action label, actor ID and workflow run ID. It does not search raw payloads or free-form audit
-details.
+action label, actor ID, the actor's name and current email, workflow name and workflow run ID.
+It does not search raw payloads or free-form audit details.
+
+## Attribution
+
+Each event names its actor in the same page query, so cost does not grow with page size.
+People resolve through `workspace_people`, the workspace's own record of current and former
+members; Activity never reads the global users table, so a person who belongs only to another
+workspace stays unnamed. Former members keep the name recorded when they left and lose their
+email; a user ID with no recorded name reads as a former member rather than as an empty actor.
+Detection and verification events without an actor, and the nil UUID, read as Luma. Services
+and connectors keep their recorded identifier. Workflow runs act for the person who activated
+them, so an event correlated with a run names both that person and the workflow.
 
 ## Sources and safety
 

@@ -68,6 +68,14 @@ it('reads deterministic tenant history, safe provenance, bounded filters and rol
       .body.items.length,
   ).toBe(10);
   expect((await read({ q: owner.userId })).body.items.length).toBe(10);
+  // People are named, and found by name and email, without exposing other workspaces.
+  expect(all.find((i) => i.actor.id === owner.userId)?.actor).toMatchObject({
+    kind: 'member',
+    name: 'activity-owner',
+    email: 'activity-owner@example.test',
+  });
+  expect((await read({ q: 'ACTIVITY-OWNER' })).body.items.length).toBe(10);
+  expect((await read({ q: 'activity-outsider' })).body.items).toEqual([]);
   expect((await read({ q: 'must-not-appear' })).body.items).toEqual([]);
   expect(
     (await read({}, member.cookie)).body.items.every(
@@ -202,7 +210,7 @@ it('reads deterministic tenant history, safe provenance, bounded filters and rol
     verificationPhase: 'completed',
     outcome: 'uncertain',
     evidenceRefs: ['negative-read'],
-    actorId: owner.userId,
+    actor: { kind: 'member', id: owner.userId, name: 'activity-owner' },
   });
   const inconclusiveId = randomUUID();
   await db.owner.query(

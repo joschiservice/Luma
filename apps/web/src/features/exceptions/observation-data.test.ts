@@ -34,6 +34,7 @@ const detail = caseDetailSchema.parse({
 
 const progress = {
   schemaVersion: 1,
+  people: [],
   caseRevision: 1,
   diagnosisRevision: 0,
   state: 'verifying',
@@ -46,7 +47,7 @@ const event = {
   id,
   type: 'execution.prepared',
   occurredAt: at,
-  actorId: null,
+  actor: { kind: 'luma', id: null, name: null, email: null, workflow: null },
   proposalId: null,
   outcome: null,
   evidenceRefs: [],
@@ -71,6 +72,7 @@ function mockReads(overrides: Record<string, unknown> = {}) {
           [id]: detail,
           review: {
             schemaVersion: 1,
+            people: [],
             caseRevision: 1,
             diagnosisRevision: 0,
             permittedDecisions: [],
@@ -141,6 +143,7 @@ it('rejects a diagnosis-only transition even when review and progress agree', as
   mockReads({
     review: {
       schemaVersion: 1,
+      people: [],
       caseRevision: 1,
       diagnosisRevision: 1,
       permittedDecisions: [],
@@ -194,6 +197,7 @@ it('rejects a review-only diagnosis transition', async () => {
   mockReads({
     review: {
       schemaVersion: 1,
+      people: [],
       caseRevision: 1,
       diagnosisRevision: 1,
       permittedDecisions: [],

@@ -22,6 +22,7 @@ import {
   WorkspaceTimezone,
 } from '@luma/ui/components/primitives/workspace-date';
 import { PageTitle } from '@luma/ui/components/workspace/page-header';
+import { actorLabel } from '@luma/ui/lib/actor';
 import { workspaceDateValue } from '@luma/ui/lib/timezone';
 import { onlineManager, useQuery } from '@tanstack/react-query';
 import {
@@ -59,11 +60,6 @@ const label = activityLabel;
 type Label = () => string;
 
 // Recorded detail values that Luma knows; other values are shown as recorded.
-const actorKinds: Record<string, Label> = {
-  user: m.activity_actor_user,
-  system: m.activity_actor_system,
-  service: m.activity_actor_service,
-};
 const changeStates: Record<string, Label> = {
   unknown: m.activity_state_unknown,
   prepared: m.activity_state_prepared,
@@ -483,7 +479,7 @@ function ActivityRow({
           ) : null}
           <small>
             {m.activity_row_actor_system({
-              actor: item.actorId ?? m.activity_row_actor_not_recorded(),
+              actor: actorLabel(item.actor),
               system: item.system
                 ? providerName(item.system)
                 : m.activity_row_system_not_recorded(),
@@ -516,14 +512,7 @@ function ActivityRow({
             <dt>{m.activity_detail_event_id()}</dt>
             <dd>{item.id}</dd>
             <dt>{m.activity_detail_actor()}</dt>
-            <dd>
-              {m.activity_detail_actor_value({
-                kind: item.actorKind
-                  ? (actorKinds[item.actorKind]?.() ?? item.actorKind)
-                  : m.common_unknown(),
-                actor: item.actorId ?? m.activity_not_recorded(),
-              })}
-            </dd>
+            <dd>{actorLabel(item.actor, { email: true })}</dd>
             <dt>{m.activity_detail_occurred()}</dt>
             <dd>
               {item.occurredAt ? (

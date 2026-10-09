@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
+import { actorLabel, personLabel } from '../../lib/actor';
 import { Button } from '../primitives/button';
 import { Disclosure } from '../primitives/disclosure';
 import { WorkspaceDate } from '../primitives/workspace-date';
@@ -382,7 +383,7 @@ export function CaseTimeline({
                 {boundProposal.target.id}
               </dd>
               <dt>{m.issues_criteria_requested_by()}</dt>
-              <dd>{boundProposal.requestedBy}</dd>
+              <dd>{personLabel(review.people, boundProposal.requestedBy)}</dd>
             </dl>
             <Subheading>{m.issues_criteria_expected()}</Subheading>
             {Object.keys(boundProposal.expectedPostcondition).length ? (
@@ -415,7 +416,10 @@ export function CaseTimeline({
                     ? m.issues_criteria_approved_by
                     : m.issues_criteria_rejected_by,
                   {
-                    actor: boundProposal.approval.actorId,
+                    actor: personLabel(
+                      review.people,
+                      boundProposal.approval.actorId,
+                    ),
                     time: <CaseTime value={boundProposal.approval.createdAt} />,
                   },
                 )}
@@ -446,7 +450,7 @@ export function CaseTimeline({
               <dt>{m.issues_criteria_proposal()}</dt>
               <dd>{execution.proposalId}</dd>
               <dt>{m.issues_criteria_requested_by()}</dt>
-              <dd>{execution.requestedBy}</dd>
+              <dd>{personLabel(progress.people, execution.requestedBy)}</dd>
               <dt>{m.issues_execution_sent_by()}</dt>
               <dd>
                 {executors[execution.executor.kind]()} · {execution.executor.id}
@@ -507,7 +511,10 @@ export function CaseTimeline({
                   : m.issues_resolution_meta,
                 {
                   time: <CaseTime value={progress.resolution.at} />,
-                  actor: progress.resolution.actorId,
+                  actor: personLabel(
+                    progress.people,
+                    progress.resolution.actorId,
+                  ),
                 },
               )}
             </p>
@@ -639,9 +646,11 @@ export function CaseTimeline({
                         {eventOutcomeLabel(event.outcome)}
                       </p>
                     ) : null}
-                    {event.actorId ? (
+                    {event.actor.kind !== 'unrecorded' ? (
                       <p className="case-caption audit-actor">
-                        {m.issues_history_by({ actor: event.actorId })}
+                        {m.issues_history_by({
+                          actor: actorLabel(event.actor),
+                        })}
                       </p>
                     ) : null}
                     <Disclosure className="audit-event-details">
@@ -658,7 +667,7 @@ export function CaseTimeline({
                           </time>
                         </dd>
                         <dt>{m.issues_history_actor()}</dt>
-                        <dd>{event.actorId ?? m.issues_not_recorded()}</dd>
+                        <dd>{actorLabel(event.actor, { email: true })}</dd>
                         {event.proposalId ? (
                           <>
                             <dt>{m.issues_criteria_proposal()}</dt>

@@ -1,4 +1,5 @@
 import type { TenantContext } from '@luma/identity';
+import type { ActivityActor } from '@luma/resolution';
 
 import type { ReturnListItem } from './returns.js';
 
@@ -183,7 +184,7 @@ export interface OrderActivityEntry {
   action: string;
   type: string;
   outcome: string;
-  actorKind: string | null;
+  actor: ActivityActor;
   exceptionId: string | null;
   summary: string | null;
 }

@@ -17,8 +17,13 @@ const item: ActivityEvent = {
   id: '11111111-1111-4111-8111-111111111111',
   recordedAt: '2026-09-22T10:00:00Z',
   occurredAt: '2026-09-22T09:59:00Z',
-  actorId: 'Ada',
-  actorKind: 'user',
+  actor: {
+    kind: 'member',
+    id: '33333333-3333-4333-8333-333333333333',
+    name: 'Ada Lovelace',
+    email: 'ada@example.test',
+    workflow: { id: 'shipping-method', name: 'Correct shipping methods' },
+  },
   action: 'execution.completed',
   type: 'verification',
   outcome: 'uncertain',
@@ -39,6 +44,31 @@ const item: ActivityEvent = {
   verification: 'inconclusive',
   evidenceRefs: ['observation:shipping-1042'],
 };
+
+const others: ActivityEvent[] = [
+  {
+    ...item,
+    id: '66666666-6666-4666-8666-666666666666',
+    action: 'case.approve',
+    type: 'decision',
+    outcome: 'approved',
+    actor: {
+      kind: 'former_member',
+      id: '77777777-7777-4777-8777-777777777777',
+      name: 'Ben Ortiz',
+      email: null,
+      workflow: null,
+    },
+  },
+  {
+    ...item,
+    id: '88888888-8888-4888-8888-888888888888',
+    action: 'exception.detected',
+    type: 'issue',
+    outcome: 'recorded',
+    actor: { kind: 'luma', id: null, name: null, email: null, workflow: null },
+  },
+];
 
 const sources = [
   {
@@ -92,7 +122,7 @@ function Preview({
             ? undefined
             : {
                 visibility: 'admin',
-                items: state === 'empty' ? [] : [item],
+                items: state === 'empty' ? [] : [item, ...others],
                 nextCursor: null,
                 coverage:
                   'Recorded events only. Older unrecorded changes are unavailable.',
@@ -130,11 +160,20 @@ type Story = StoryObj<typeof meta>;
 export const History: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByText('Ben Ortiz (former member) · jtl-cloud'),
+    ).toBeVisible();
+    await expect(canvas.getByText('Luma · jtl-cloud')).toBeVisible();
     await userEvent.click(
       await canvas.findByRole('button', { name: /Change attempt finished/ }),
     );
     await expect(
       canvas.getByText('Inconclusive', { exact: true }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByText(
+        'Ada Lovelace · ada@example.test via Correct shipping methods',
+      ),
     ).toBeVisible();
     await expect(
       canvas.getByRole('link', { name: 'Open issue and evidence' }),

@@ -5,6 +5,7 @@ import { rich } from '@luma/i18n/rich';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { StateDot } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
+import { actorLabel } from '@luma/ui/lib/actor';
 import { Link } from '@tanstack/react-router';
 import { Activity, ArrowRight, History, Truck } from 'lucide-react';
 
@@ -185,6 +186,7 @@ export function LumaActivity({
                 <strong>{activityLabel(entry.action)}</strong>
                 <small>
                   <WorkspaceDate value={entry.recordedAt} />
+                  {` · ${actorLabel(entry.actor)}`}
                   {entry.summary ? ` · ${entry.summary}` : ''}
                 </small>
               </span>

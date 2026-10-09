@@ -57,6 +57,7 @@ function desk(fresh: TenantContext) {
         respond: vi.fn(),
         save: vi.fn(),
         escalate: vi.fn(),
+        people: async () => [],
       });
     },
     withRefresh: vi.fn(),

@@ -10,6 +10,7 @@ import {
 import type { Approval, PolicyDecision, ProposedAction } from '@luma/policies';
 import { currentPolicyVersion } from '@luma/policies';
 
+import type { ActivityActor } from '../domain/activity.js';
 import { approvalBlocksRenewal } from '../domain/proposal-renewal.js';
 import type { WorkflowProgress, WorkflowSource } from './runtime.js';
 
@@ -58,7 +59,7 @@ export interface TimelineEvent {
   id: string;
   type: string;
   occurredAt: string;
-  actorId: string | null;
+  actor: ActivityActor;
   proposalId: string | null;
   outcome: string | null;
   evidenceRefs: string[];
@@ -77,6 +78,8 @@ export interface DeskSession {
   ): Promise<Approval>;
   save(request: CaseDecision, receipt: DecisionReceipt): Promise<void>;
   escalate(): Promise<number>;
+  /** Names the people behind recorded user IDs; see {@link ActivityActor}. */
+  people(ids: readonly (string | null | undefined)[]): Promise<ActivityActor[]>;
 }
 
 export interface DeskStore {
@@ -274,8 +277,14 @@ export function createDeskService(deps: DeskDependencies) {
         context,
         id,
         false,
-        async ({ snapshot: s }) => ({
+        async ({ snapshot: s, people }) => ({
           schemaVersion: 1 as const,
+          people: await people([
+            s.proposal?.action.proposedBy.kind === 'user'
+              ? s.proposal.action.proposedBy.id
+              : null,
+            s.approval?.approverId,
+          ]),
           policyStale: s.policyStale ?? false,
           refreshable:
             hasPermission(context, 'actions.propose') &&
@@ -445,11 +454,15 @@ export function createDeskService(deps: DeskDependencies) {
         context,
         id,
         false,
-        async ({ snapshot: s }) => {
+        async ({ snapshot: s, people }) => {
           const e = s.execution;
 
           return {
             schemaVersion: 1 as const,
+            people: await people([
+              e?.attempt.requestedBy,
+              s.incident.resolution?.actorId,
+            ]),
             caseRevision: s.revision,
             state: s.incident.state,
             diagnosisRevision: s.diagnosis?.revision ?? 0,

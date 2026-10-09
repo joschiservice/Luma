@@ -2,6 +2,7 @@ import type { CaseProgress, CaseReview } from '@luma/api-contract';
 
 export const resolutionReview: CaseReview = {
   schemaVersion: 1,
+  people: [],
   caseRevision: 4,
   diagnosisRevision: 2,
   permittedDecisions: ['approve', 'reject', 'escalate'],
@@ -38,6 +39,7 @@ export const resolutionReview: CaseReview = {
 
 export const resolutionProgress: CaseProgress = {
   schemaVersion: 1,
+  people: [],
   caseRevision: 4,
   diagnosisRevision: 2,
   state: 'awaiting_approval',
