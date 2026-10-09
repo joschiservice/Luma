@@ -32,9 +32,14 @@ it('generates concrete response, parameter and error schemas with unique operati
     get.responses['200'].content['application/json'].schema.properties.category
       .enum,
   ).toEqual(['storefront', 'erp']);
-  expect(
-    get.responses['404'].content['application/json'].schema.required,
-  ).toEqual(['code', 'message', 'requestId']);
+  expect(get.responses['404'].content['application/json'].schema).toEqual({
+    $ref: '#/components/schemas/ApiError',
+  });
+  expect(document.components.schemas.ApiError.required).toEqual([
+    'code',
+    'message',
+    'requestId',
+  ]);
   const ids = Object.values(document.paths).flatMap((path) =>
     Object.values(path as Record<string, { operationId: string }>).map(
       (operation) => operation.operationId,
@@ -51,14 +56,59 @@ it('preserves organization and reserved region transport conventions', () => {
   ).toBe(false);
 });
 
-it('throws on undocumented statuses instead of asserting a false response type', async () => {
-  const client = createApiClient({
-    baseUrl: 'http://unused',
-    api: async () => ({ status: 418, body: {}, headers: new Headers() }),
-  });
+it('rejects error statuses and responses that do not match the contract', async () => {
+  const respond = (status: number, body: unknown) =>
+    createApiClient({
+      baseUrl: 'http://unused/api',
+      fetch: async () => Response.json(body, { status }),
+    });
+  const error = { code: 'NOT_FOUND', message: 'Missing', requestId: 'r' };
   await expect(
-    client.connectorProviders.get({ params: { providerId: 'shopify' } }),
-  ).rejects.toThrow();
+    respond(404, error).connectorProviders.get({
+      params: { providerId: 'shopify' },
+    }),
+  ).rejects.toMatchObject({ status: 404, body: error });
+  await expect(
+    respond(418, {}).connectorProviders.get({
+      params: { providerId: 'shopify' },
+    }),
+  ).rejects.toMatchObject({ status: 418 });
+  await expect(
+    respond(200, { id: 'shopify' }).connectorProviders.get({
+      params: { providerId: 'shopify' },
+    }),
+  ).rejects.toThrow('does not match');
+});
+
+it('sends contract parts, client headers and cancellation to fetch', async () => {
+  const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+    Response.json({ items: [] }),
+  );
+  const client = createApiClient({
+    baseUrl: 'https://luma.example/api',
+    headers: { 'x-base': '1' },
+    fetch,
+  });
+  const controller = new AbortController();
+  await client.connectorProviders.list(
+    { query: { category: 'erp' } },
+    {
+      signal: controller.signal,
+      context: { headers: { 'x-luma-action-id': 'action' } },
+    },
+  );
+  const [request, init] = fetch.mock.calls[0]!;
+  expect(request).toBeInstanceOf(Request);
+  const sent = request as Request;
+  expect(sent.url).toBe(
+    'https://luma.example/api/v1/connector-providers?category=erp',
+  );
+  expect(sent.headers.get('x-base')).toBe('1');
+  expect(sent.headers.get('x-luma-action-id')).toBe('action');
+  expect(init).toMatchObject({ credentials: 'same-origin', cache: 'no-store' });
+  expect(sent.signal.aborted).toBe(false);
+  controller.abort();
+  expect(sent.signal.aborted).toBe(true);
 });
 
 it('documents bounded tenant-scoped case evidence and validates its query', async () => {

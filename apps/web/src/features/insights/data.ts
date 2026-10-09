@@ -1,9 +1,4 @@
-import {
-  type InsightChart,
-  insightChartResponseSchema,
-  type InsightRange,
-  insightRecordListSchema,
-} from '@luma/api-contract';
+import { type InsightChart, type InsightRange } from '@luma/api-contract';
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import { z } from 'zod';
 
@@ -84,17 +79,11 @@ export function insightChartOptions(
     queryKey: [...insightsKey(organizationId), chart, query],
     refetchOnWindowFocus: true,
     refetchOnReconnect: 'always',
-    queryFn: async ({ signal }) => {
-      const result = await api.insights.chart({
-        params: { organizationId, chart },
-        query,
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return insightChartResponseSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.insights.chart(
+        { params: { organizationId, chart }, query },
+        { signal },
+      ),
   });
 }
 
@@ -125,15 +114,13 @@ export function insightRecordsOptions(
     getNextPageParam: (page: { nextOffset: number | null }) =>
       page.nextOffset ?? undefined,
     queryFn: async ({ signal, pageParam }) => {
-      const result = await api.insights.records({
-        params: { organizationId, chart },
-        query: { ...query, offset: pageParam, limit: recordPageSize },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return insightRecordListSchema.parse(result.body);
+      return api.insights.records(
+        {
+          params: { organizationId, chart },
+          query: { ...query, offset: pageParam, limit: recordPageSize },
+        },
+        { signal },
+      );
     },
   });
 }

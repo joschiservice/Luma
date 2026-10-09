@@ -2,7 +2,8 @@ import '@luma/identity/http';
 
 import { apiContract } from '@luma/api-contract';
 import { IdentityError } from '@luma/identity';
-import { initServer } from '@ts-rest/fastify';
+import type { HttpContext } from '@luma/identity/http';
+import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
 import type { SupplierCommitments } from '../application/commitments.js';
@@ -26,229 +27,211 @@ export function procurementRoutes(
     return { context: request.tenantContext, service, commitments };
   }
 
-  return initServer().router(apiContract.procurement, {
-    suppliers: async ({ request }) => {
+  const os = implement(apiContract.procurement).$context<HttpContext>();
+
+  return os.router({
+    suppliers: os.suppliers.handler(async ({ context: { request } }) => {
       const s = use(request);
 
-      return { status: 200, body: await s.service.suppliers(s.context) };
-    },
-    orders: async ({ request }) => {
+      return await s.service.suppliers(s.context);
+    }),
+    orders: os.orders.handler(async ({ context: { request } }) => {
       const s = use(request);
 
-      return { status: 200, body: await s.service.orders(s.context) };
-    },
-    createSupplier: async ({ request, body }) => {
-      const s = use(request);
+      return await s.service.orders(s.context);
+    }),
+    createSupplier: os.createSupplier.handler(
+      async ({ context: { request }, input: { body } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.service.createSupplier(s.context, body),
-      };
-    },
-    createOrder: async ({ request, body }) => {
-      const s = use(request);
+        return await s.service.createSupplier(s.context, body);
+      },
+    ),
+    createOrder: os.createOrder.handler(
+      async ({ context: { request }, input: { body } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.service.createOrder(s.context, body),
-      };
-    },
-    detail: async ({ request, params }) => {
-      const s = use(request);
+        return await s.service.createOrder(s.context, body);
+      },
+    ),
+    detail: os.detail.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.service.detail(s.context, params.purchaseOrderId),
-      };
-    },
-    supplier: async ({ request, params }) => {
-      const s = use(request);
+        return await s.service.detail(s.context, params.purchaseOrderId);
+      },
+    ),
+    supplier: os.supplier.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.commitments.supplier(s.context, params.supplierId),
-      };
-    },
-    linkSupplier: async ({ request, params, body }) => {
-      const s = use(request);
+        return await s.commitments.supplier(s.context, params.supplierId);
+      },
+    ),
+    linkSupplier: os.linkSupplier.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.commitments.linkSupplier(
+        return await s.commitments.linkSupplier(
           s.context,
           params.supplierId,
           body,
-        ),
-      };
-    },
-    purchasingConnections: async ({ request }) => {
-      const s = use(request);
+        );
+      },
+    ),
+    purchasingConnections: os.purchasingConnections.handler(
+      async ({ context: { request } }) => {
+        const s = use(request);
 
-      return { status: 200, body: await s.commitments.connections(s.context) };
-    },
-    purchasingSuppliers: async ({ request, params, query }) => {
-      const s = use(request);
+        return await s.commitments.connections(s.context);
+      },
+    ),
+    purchasingSuppliers: os.purchasingSuppliers.handler(
+      async ({ context: { request }, input: { params, query } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.commitments.purchasingSuppliers(
+        return await s.commitments.purchasingSuppliers(
           s.context,
           params.connectionId,
           query.cursor,
-        ),
-      };
-    },
-    progress: async ({ request }) => {
+        );
+      },
+    ),
+    progress: os.progress.handler(async ({ context: { request } }) => {
       const s = use(request);
 
-      return {
-        status: 200,
-        body: { items: await s.commitments.summaries(s.context) },
-      };
-    },
-    record: async ({ request, params }) => {
-      const s = use(request);
+      return { items: await s.commitments.summaries(s.context) };
+    }),
+    record: os.record.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.commitments.order(s.context, params.purchaseOrderId),
-      };
-    },
-    refresh: async ({ request, params }) => {
-      const s = use(request);
+        return await s.commitments.order(s.context, params.purchaseOrderId);
+      },
+    ),
+    refresh: os.refresh.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.commitments.refresh(s.context, params.purchaseOrderId),
-      };
-    },
-    requestSubmission: async ({ request, params, body }) => {
-      const s = use(request);
+        return await s.commitments.refresh(s.context, params.purchaseOrderId);
+      },
+    ),
+    requestSubmission: os.requestSubmission.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.commitments.requestSubmission(
+        return await s.commitments.requestSubmission(
           s.context,
           params.purchaseOrderId,
           body,
-        ),
-      };
-    },
-    decideSubmission: async ({ request, params, body }) => {
-      const s = use(request);
+        );
+      },
+    ),
+    decideSubmission: os.decideSubmission.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.commitments.decideSubmission(
+        return await s.commitments.decideSubmission(
           s.context,
           params.submissionId,
           body,
-        ),
-      };
-    },
-    sendSubmission: async ({ request, params }) => {
-      const s = use(request);
+        );
+      },
+    ),
+    sendSubmission: os.sendSubmission.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.commitments.sendSubmission(
+        return await s.commitments.sendSubmission(
           s.context,
           params.submissionId,
-        ),
-      };
-    },
-    checkSubmission: async ({ request, params }) => {
-      const s = use(request);
+        );
+      },
+    ),
+    checkSubmission: os.checkSubmission.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.commitments.checkSubmission(
+        return await s.commitments.checkSubmission(
           s.context,
           params.submissionId,
-        ),
-      };
-    },
-    recordMessage: async ({ request, params, body }) => {
-      const s = use(request);
+        );
+      },
+    ),
+    recordMessage: os.recordMessage.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.commitments.recordMessage(
+        return await s.commitments.recordMessage(
           s.context,
           params.purchaseOrderId,
           body,
-        ),
-      };
-    },
-    readMessage: async ({ request, params }) => {
-      const s = use(request);
+        );
+      },
+    ),
+    readMessage: os.readMessage.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.commitments.extractAgain(
+        return await s.commitments.extractAgain(
           s.context,
           params.communicationId,
-        ),
-      };
-    },
-    removeMessageText: async ({ request, params }) => {
-      const s = use(request);
+        );
+      },
+    ),
+    removeMessageText: os.removeMessageText.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.commitments.removeMessageText(
+        return await s.commitments.removeMessageText(
           s.context,
           params.communicationId,
-        ),
-      };
-    },
-    recordCommitment: async ({ request, params, body }) => {
-      const s = use(request);
+        );
+      },
+    ),
+    recordCommitment: os.recordCommitment.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.commitments.recordCommitment(
+        return await s.commitments.recordCommitment(
           s.context,
           params.purchaseOrderId,
           body,
-        ),
-      };
-    },
-    reviewCommitment: async ({ request, params, body }) => {
-      const s = use(request);
+        );
+      },
+    ),
+    reviewCommitment: os.reviewCommitment.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.commitments.reviewCommitment(
+        return await s.commitments.reviewCommitment(
           s.context,
           params.commitmentId,
           body,
-        ),
-      };
-    },
-    respond: async ({ request, params, body }) => {
-      const s = use(request);
+        );
+      },
+    ),
+    respond: os.respond.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.commitments.respond(
+        return await s.commitments.respond(
           s.context,
           params.purchaseOrderId,
           body,
-        ),
-      };
-    },
-    transition: async ({ request, params, body }) => {
-      const s = use(request);
+        );
+      },
+    ),
+    transition: os.transition.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.service.transition(
+        return await s.service.transition(
           s.context,
           params.purchaseOrderId,
           body,
-        ),
-      };
-    },
+        );
+      },
+    ),
   });
 }

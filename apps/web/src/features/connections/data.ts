@@ -2,7 +2,6 @@ import {
   type InstallationCredentials,
   type InstallationInput,
   type InstalledConnection,
-  installedConnectionSchema,
 } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import { queryOptions } from '@tanstack/react-query';
@@ -25,18 +24,9 @@ export const connectionsOptions = (organizationId: string) =>
   queryOptions({
     queryKey: connectionsKey(organizationId),
     ...privateQueryDefaults,
-    queryFn: async ({ signal }) => {
-      const result = await api.connections.list({
-        params: { organizationId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return result.body.items.map((item) =>
-        installedConnectionSchema.parse(item),
-      );
-    },
+    queryFn: async ({ signal }) =>
+      (await api.connections.list({ params: { organizationId } }, { signal }))
+        .items,
   });
 
 /**
@@ -47,14 +37,7 @@ export async function installConnection(
   organizationId: string,
   body: InstallationInput,
 ) {
-  const result = await api.connections.install({
-    params: { organizationId },
-    body,
-  });
-  if (result.status !== 201)
-    throw new IdentityError(result.status, result.body);
-
-  return installedConnectionSchema.parse(result.body);
+  return api.connections.install({ params: { organizationId }, body });
 }
 
 /**
@@ -69,17 +52,13 @@ export async function changeConnection(
 ) {
   const params = { organizationId, connectionId: connection.id };
   const body = { version: connection.version };
-  const result =
-    action === 'rotate'
-      ? await api.connections.rotate({
-          params,
-          body: { ...body, credentials: credentials! },
-        })
-      : await api.connections[action]({ params, body });
-  if (result.status !== 200)
-    throw new IdentityError(result.status, result.body);
 
-  return installedConnectionSchema.parse(result.body);
+  return action === 'rotate'
+    ? api.connections.rotate({
+        params,
+        body: { ...body, credentials: credentials! },
+      })
+    : api.connections[action]({ params, body });
 }
 
 /** Returns actionable connection feedback without exposing provider responses or credentials. */

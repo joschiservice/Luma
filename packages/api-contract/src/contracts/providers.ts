@@ -1,9 +1,6 @@
-import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
-import { apiErrorSchema } from '../common.js';
-
-const c = initContract();
+import { endpoint } from '../common.js';
 
 export const connectorProviderSchema = z.object({
   id: z.string().regex(/^[a-z][a-z0-9-]*$/),
@@ -13,36 +10,42 @@ export const connectorProviderSchema = z.object({
 
 export type ConnectorProvider = z.infer<typeof connectorProviderSchema>;
 
-export const connectorProvidersContract = c.router(
-  {
-    list: {
+export const connectorProvidersContract = {
+  list: endpoint
+    .route({
       method: 'GET',
-      path: '/connector-providers',
-      query: z
-        .object({ category: z.enum(['storefront', 'erp']).optional() })
-        .strict(),
-      responses: {
-        200: z.object({ items: z.array(connectorProviderSchema) }),
-      },
+      path: '/v1/connector-providers',
       summary: 'List connector providers',
       description:
         'Browse provider names and categories. Filter by storefront or ERP.',
-    },
-    get: {
-      method: 'GET',
-      path: '/connector-providers/:providerId',
-      pathParams: z.object({
-        providerId: z
-          .string()
-          .min(1)
-          .max(64)
-          .regex(/^[a-z][a-z0-9-]*$/),
+    })
+    .input(
+      z.object({
+        query: z
+          .object({ category: z.enum(['storefront', 'erp']).optional() })
+          .strict(),
       }),
-      responses: { 200: connectorProviderSchema, 404: apiErrorSchema },
+    )
+    .output(z.object({ items: z.array(connectorProviderSchema) })),
+  get: endpoint
+    .route({
+      method: 'GET',
+      path: '/v1/connector-providers/{providerId}',
       summary: 'Get a connector provider',
       description:
         'Look up a provider by its ID. Returns 404 if the provider is not in the catalog.',
-    },
-  },
-  { pathPrefix: '/v1' },
-);
+    })
+    .meta({ errors: [404] })
+    .input(
+      z.object({
+        params: z.object({
+          providerId: z
+            .string()
+            .min(1)
+            .max(64)
+            .regex(/^[a-z][a-z0-9-]*$/),
+        }),
+      }),
+    )
+    .output(connectorProviderSchema),
+};

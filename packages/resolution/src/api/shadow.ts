@@ -7,7 +7,8 @@ import {
   shadowReportSchema,
 } from '@luma/api-contract';
 import { IdentityError } from '@luma/identity';
-import { initServer } from '@ts-rest/fastify';
+import type { HttpContext } from '@luma/identity/http';
+import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
 import type { ShadowService } from '../application/shadow.js';
@@ -27,49 +28,47 @@ export function shadowRoutes(service?: ShadowService) {
     return { context: request.tenantContext, service };
   }
 
-  return initServer().router(apiContract.shadow, {
-    latest: async ({ request, params, query }) => {
-      const s = use(request);
-      const result = await s.service.latest(
-        s.context,
-        params.exceptionId,
-        query.workflow,
-      );
+  const os = implement(apiContract.shadow).$context<HttpContext>();
 
-      return {
-        status: 200,
-        body: {
+  return os.router({
+    latest: os.latest.handler(
+      async ({ context: { request }, input: { params, query } }) => {
+        const s = use(request);
+        const result = await s.service.latest(
+          s.context,
+          params.exceptionId,
+          query.workflow,
+        );
+
+        return {
           item: result.item ? shadowComparisonSchema.parse(result.item) : null,
-        },
-      };
-    },
-    evaluate: async ({ request, params, body }) => {
-      const s = use(request);
+        };
+      },
+    ),
+    evaluate: os.evaluate.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: shadowEvaluationSchema.parse(
+        return shadowEvaluationSchema.parse(
           await s.service.evaluate(s.context, params.exceptionId, body),
-        ),
-      };
-    },
-    review: async ({ request, params, body }) => {
-      const s = use(request);
+        );
+      },
+    ),
+    review: os.review.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.service.review(s.context, params.evaluationId, body),
-      };
-    },
-    report: async ({ request, query }) => {
-      const s = use(request);
+        return await s.service.review(s.context, params.evaluationId, body);
+      },
+    ),
+    report: os.report.handler(
+      async ({ context: { request }, input: { query } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: shadowReportSchema.parse(
+        return shadowReportSchema.parse(
           await s.service.report(s.context, query),
-        ),
-      };
-    },
+        );
+      },
+    ),
   });
 }

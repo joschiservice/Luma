@@ -1,18 +1,10 @@
-import {
-  type ActivateCaseWorkflow,
-  type ActivateWorkflow,
-  playbookSummarySchema,
-  replenishmentBatchResultSchema,
-  type ReplenishmentPositionQuery,
-  type ReplenishmentPreviewRequest,
-  replenishmentPreviewSchema,
-  type ReplenishmentRuleInput,
-  replenishmentSetupSchema,
-  workflowActivationSchema,
-  workflowCoverageSchema,
-  workflowDetailSchema,
-  workflowRunViewSchema,
-  workflowSummarySchema,
+import type {
+  ActivateCaseWorkflow,
+  ActivateWorkflow,
+  FireWorkflow,
+  ReplenishmentPositionQuery,
+  ReplenishmentPreviewRequest,
+  ReplenishmentRuleInput,
 } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import { queryOptions } from '@tanstack/react-query';
@@ -20,8 +12,6 @@ import { queryOptions } from '@tanstack/react-query';
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
 import { IdentityError } from '../identity/data';
-
-const api = createWebApiClient();
 
 class WorkflowError extends IdentityError {
   constructor(
@@ -32,17 +22,24 @@ class WorkflowError extends IdentityError {
   }
 }
 
-/** Throws a workflow error carrying the server's message for a non-200 result. */
-function failure(result: { status: number; body: unknown }): never {
-  const message =
-    typeof result.body === 'object' &&
-    result.body !== null &&
-    'message' in result.body &&
-    typeof result.body.message === 'string'
-      ? result.body.message
-      : m.workflows_error_fallback();
-  throw new WorkflowError(result.status, message);
-}
+/**
+ * API client for workflow screens. Error statuses reject with a workflow error carrying the
+ * server's message, which `workflowError` turns into feedback.
+ */
+export const workflowApi = createWebApiClient(
+  undefined,
+  (status, body) =>
+    new WorkflowError(
+      status,
+      typeof body === 'object' &&
+        body !== null &&
+        'message' in body &&
+        typeof body.message === 'string'
+        ? body.message
+        : m.workflows_error_fallback(),
+    ),
+);
+const api = workflowApi;
 
 /** Returns the private cache prefix for one workspace's workflows. */
 export const workflowsKey = (organizationId: string) =>
@@ -53,15 +50,9 @@ export const workflowsOptions = (organizationId: string) =>
   queryOptions({
     queryKey: workflowsKey(organizationId),
     ...privateQueryDefaults,
-    queryFn: async ({ signal }) => {
-      const result = await api.workflows.list({
-        params: { organizationId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200) return failure(result);
-
-      return result.body.items.map((item) => workflowSummarySchema.parse(item));
-    },
+    queryFn: async ({ signal }) =>
+      (await api.workflows.list({ params: { organizationId } }, { signal }))
+        .items,
   });
 
 /** Reads the exact versions, grants and prerequisites for one workflow. */
@@ -69,15 +60,11 @@ export const workflowOptions = (organizationId: string, definitionId: string) =>
   queryOptions({
     queryKey: [...workflowsKey(organizationId), definitionId],
     ...privateQueryDefaults,
-    queryFn: async ({ signal }) => {
-      const result = await api.workflows.detail({
-        params: { organizationId, definitionId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200) return failure(result);
-
-      return workflowDetailSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.workflows.detail(
+        { params: { organizationId, definitionId } },
+        { signal },
+      ),
   });
 
 /** Reads recent runs separately so unavailable history does not hide the workflow. */
@@ -88,15 +75,13 @@ export const workflowRunsOptions = (
   queryOptions({
     queryKey: [...workflowsKey(organizationId), definitionId, 'runs'],
     ...privateQueryDefaults,
-    queryFn: async ({ signal }) => {
-      const result = await api.workflows.runs({
-        params: { organizationId, definitionId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200) return failure(result);
-
-      return result.body.items.map((item) => workflowRunViewSchema.parse(item));
-    },
+    queryFn: async ({ signal }) =>
+      (
+        await api.workflows.runs(
+          { params: { organizationId, definitionId } },
+          { signal },
+        )
+      ).items,
   });
 
 /** Submits a reviewed scope. Keep the same request ID and body when retrying an uncertain response. */
@@ -105,13 +90,10 @@ export async function activateWorkflow(
   definitionId: string,
   body: ActivateWorkflow,
 ) {
-  const result = await api.workflows.activate({
+  return api.workflows.activate({
     params: { organizationId, definitionId },
     body,
   });
-  if (result.status !== 200) return failure(result);
-
-  return workflowActivationSchema.parse(result.body);
 }
 
 /**
@@ -123,13 +105,10 @@ export async function activateCaseWorkflow(
   definitionId: string,
   body: ActivateCaseWorkflow,
 ) {
-  const result = await api.workflows.activateCase({
+  return api.workflows.activateCase({
     params: { organizationId, definitionId },
     body,
   });
-  if (result.status !== 200) return failure(result);
-
-  return workflowActivationSchema.parse(result.body);
 }
 
 /** Permanently revokes the exact artifact; repeated submissions are safe. */
@@ -139,13 +118,10 @@ export async function revokeWorkflow(
   activationId: string,
   artifactDigest: string,
 ) {
-  const result = await api.workflows.revoke({
+  return api.workflows.revoke({
     params: { organizationId, definitionId, activationId },
     body: { artifactDigest },
   });
-  if (result.status !== 200) return failure(result);
-
-  return workflowActivationSchema.parse(result.body);
 }
 
 /** Provides actionable feedback for access loss, stale submissions and uncertain responses. */
@@ -165,16 +141,12 @@ export const resolutionWorkflowsOptions = (organizationId: string) =>
     queryKey: [...workflowsKey(organizationId), 'evaluation', 'library'],
     ...privateQueryDefaults,
     queryFn: async ({ signal }) => {
-      const result = await api.playbooks.list({
-        params: { organizationId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200) return failure(result);
+      const { items } = await api.playbooks.list(
+        { params: { organizationId } },
+        { signal },
+      );
 
-      return result.body.items.map((item) => ({
-        ...playbookSummarySchema.parse(item),
-        category: 'resolution',
-      }));
+      return items.map((item) => ({ ...item, category: 'resolution' }));
     },
   });
 
@@ -182,15 +154,12 @@ export const resolutionWorkflowsOptions = (organizationId: string) =>
 export async function fireWorkflow(
   organizationId: string,
   definitionId: string,
-  body: import('@luma/api-contract').FireWorkflow,
+  body: FireWorkflow,
 ) {
-  const result = await api.workflows.fire({
+  return api.workflows.fire({
     params: { organizationId, definitionId },
     body,
   });
-  if (result.status !== 200) return failure(result);
-
-  return workflowRunViewSchema.parse(result.body);
 }
 
 /** Cancels a scheduled start without changing its historical evidence. */
@@ -199,13 +168,10 @@ export async function cancelWorkflowStart(
   definitionId: string,
   runId: string,
 ) {
-  const result = await api.workflows.cancelStart({
+  return api.workflows.cancelStart({
     params: { organizationId, definitionId, runId },
     body: {},
   });
-  if (result.status !== 200) return failure(result);
-
-  return workflowRunViewSchema.parse(result.body);
 }
 
 /** Loads one stock choices page and readiness for the configured replenishment rules. */
@@ -221,16 +187,14 @@ export const replenishmentOptions = (
       query,
     ],
     ...privateQueryDefaults,
-    queryFn: async ({ signal }) => {
-      const result = await api.workflows.replenishmentSetup({
-        params: { organizationId, definitionId: 'inventory-replenishment' },
-        query,
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200) return failure(result);
-
-      return replenishmentSetupSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.workflows.replenishmentSetup(
+        {
+          params: { organizationId, definitionId: 'inventory-replenishment' },
+          query,
+        },
+        { signal },
+      ),
   });
 
 /** Checks server-owned stock and recovers an uncertain start using its request ID. */
@@ -238,13 +202,10 @@ export async function startReplenishment(
   organizationId: string,
   body: { id: string; activationId: string },
 ) {
-  const result = await api.workflows.startReplenishment({
+  return api.workflows.startReplenishment({
     params: { organizationId, definitionId: 'inventory-replenishment' },
     body,
   });
-  if (result.status !== 200) return failure(result);
-
-  return result.body;
 }
 
 /** Reads the exact proposal and whether the current operator may decide. */
@@ -260,19 +221,17 @@ export const replenishmentReviewOptions = (
       runId,
     ],
     ...privateQueryDefaults,
-    queryFn: async ({ signal }) => {
-      const result = await api.workflows.replenishmentReview({
-        params: {
-          organizationId,
-          definitionId: 'inventory-replenishment',
-          runId,
+    queryFn: ({ signal }) =>
+      api.workflows.replenishmentReview(
+        {
+          params: {
+            organizationId,
+            definitionId: 'inventory-replenishment',
+            runId,
+          },
         },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200) return failure(result);
-
-      return result.body;
-    },
+        { signal },
+      ),
   });
 
 /** Records a decision against the reviewed proposal, without granting authority to later proposals. */
@@ -281,13 +240,10 @@ export async function decideReplenishment(
   runId: string,
   body: { decisionId: string; outcome: 'approved' | 'rejected' },
 ) {
-  const result = await api.workflows.decideReplenishment({
+  return api.workflows.decideReplenishment({
     params: { organizationId, definitionId: 'inventory-replenishment', runId },
     body,
   });
-  if (result.status !== 200) return failure(result);
-
-  return result.body;
 }
 
 /** Checks proposed stock rules against current stock and rules. It changes nothing. */
@@ -295,13 +251,10 @@ export async function previewReplenishment(
   organizationId: string,
   body: ReplenishmentPreviewRequest,
 ) {
-  const result = await api.workflows.previewReplenishment({
+  return api.workflows.previewReplenishment({
     params: { organizationId, definitionId: 'inventory-replenishment' },
     body,
   });
-  if (result.status !== 200) return failure(result);
-
-  return replenishmentPreviewSchema.parse(result.body);
 }
 
 /**
@@ -312,13 +265,12 @@ export async function configureReplenishmentBatch(
   organizationId: string,
   items: ReplenishmentRuleInput[],
 ) {
-  const result = await api.workflows.configureReplenishmentBatch({
-    params: { organizationId, definitionId: 'inventory-replenishment' },
-    body: { items },
-  });
-  if (result.status !== 200) return failure(result);
-
-  return replenishmentBatchResultSchema.parse(result.body).results;
+  return (
+    await api.workflows.configureReplenishmentBatch({
+      params: { organizationId, definitionId: 'inventory-replenishment' },
+      body: { items },
+    })
+  ).results;
 }
 
 /** Reads how workflows cover one stock position, with readiness scoped to it. */
@@ -329,17 +281,14 @@ export const workflowCoverageOptions = (
   queryOptions({
     queryKey: [...workflowsKey(organizationId), 'coverage', positionId],
     ...privateQueryDefaults,
-    queryFn: async ({ signal }) => {
-      const result = await api.workflows.coverage({
-        params: { organizationId },
-        query: { subjectKind: 'inventory_position', subjectId: positionId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200) return failure(result);
-
-      return workflowCoverageSchema.parse(result.body).items;
-    },
+    queryFn: async ({ signal }) =>
+      (
+        await api.workflows.coverage(
+          {
+            params: { organizationId },
+            query: { subjectKind: 'inventory_position', subjectId: positionId },
+          },
+          { signal },
+        )
+      ).items,
   });
-
-/** Converts a non-200 API result into a workflow error with the server's message. */
-export const workflowFailure = failure;

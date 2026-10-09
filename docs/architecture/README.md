@@ -18,10 +18,11 @@ decisions.
 | [007](007-workflow-model.md)                      | First-class Workflow ownership                             | Accepted                           |
 | [008](008-workspace-read-models.md)               | Workspace read models                                      | Accepted                           |
 | [009](009-permissions-and-roles.md)               | Permission catalog and workspace roles                     | Accepted                           |
+| [010](010-orpc-http-contracts.md)                 | HTTP contracts with oRPC and one Zod version               | Accepted                           |
 
 ## Baseline
 
-- TypeScript and Node.js; Fastify; contract-first REST and OpenAPI through ts-rest.
+- TypeScript and Node.js; Fastify; contract-first REST and OpenAPI through oRPC.
 - PostgreSQL with Drizzle; Better Auth; modular monolith first.
 - TanStack Start for the web app; Vercel primarily for frontend delivery.
 - A canonical commerce model kept separate from provider payloads.

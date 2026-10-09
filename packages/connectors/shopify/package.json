@@ -23,7 +23,7 @@
     }
   },
   "dependencies": {
-    "zod": "catalog:zod3",
+    "zod": "catalog:",
     "@luma/connector-core": "workspace:*",
     "@shopify/admin-api-client": "2.0.0"
   }

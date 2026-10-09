@@ -41,7 +41,7 @@ With `NODE_ENV=production`, Better Auth rate-limits `/two-factor/*`, like sign-i
 
 Every Fastify route is protected by default. Only health, readiness, OpenAPI, the static connector-provider catalog and the restricted auth bridge are public. Organization listing and creation need a session. Tenant routes use `/v1/organizations/:organizationId/...`; the guard resolves an immutable `request.tenantContext`, which handlers pass explicitly into application use cases.
 
-Every tenant route declares who may call it: contract routes through `metadata` (`requires(...)` or `anyMember` from `@luma/api-contract`), other routes through `config.access`. The guard denies routes without a declaration, and callers without the declared permission receive 403. No database handles or auth instances leave the identity package.
+Every tenant route declares who may call it: contract routes through `access` in their metadata (`requires(...)` or `anyMember` from `@luma/api-contract`), other routes through `config.access`. The guard denies routes without a declaration, and callers without the declared permission receive 403. No database handles or auth instances leave the identity package.
 
 A path ID selects a tenant; it does not grant access. Each request reads the current session and membership. `activeOrganizationId`, tenant headers and client-supplied context are never authorization inputs.
 
@@ -92,7 +92,3 @@ location /api/ {
 `AuthSettings.plugins` accepts reviewed Better Auth server plugins. Adding a plugin does not expose HTTP endpoints: extend the auth allowlist, migrations and tests deliberately. Account and provider IDs stay separate from the canonical user UUID, and organization UUIDs stay stable across identity providers. Automatic account linking stays disabled until a verified linking policy exists.
 
 SCIM provisioning must resolve a verified installation to one organization and recheck authority, state and placement before changing memberships. A tenant ID is never proof of authority. Regional federation must preserve ADR-003's residency boundary. SSO, SCIM credentials and service actors are not enabled.
-
-## Dependency trap
-
-Better Auth's Better Call needs Zod 4 while ts-rest uses Zod 3. `.pnpmfile.cjs` gives Better Call a private Zod 4 dependency so strict peer checks stay enabled. Reassess the hook when upgrading either library.

@@ -1,35 +1,19 @@
-import {
-  acceptedProposalSchema,
-  type AcceptProposal,
-  authoringVocabularySchema,
-  type CodeStepSuggestionRequest,
-  codeStepSuggestionSchema,
-  type CreateWorkflowDraft,
-  type DescribeWorkflow,
-  draftProposalSchema,
-  draftTestExamplesSchema,
-  draftTestRunSchema,
-  draftTestSummarySchema,
-  draftValidationSchema,
-  generatedDraftSchema,
-  generationAvailabilitySchema,
-  publishedDraftSchema,
-  type RefineWorkflowDraft,
-  type SaveDraftTests,
-  type SaveWorkflowDraft,
-  type StartDraftTest,
-  type WorkflowDraftContent,
-  workflowDraftSchema,
-  workflowTemplateSchema,
+import type {
+  AcceptProposal,
+  CodeStepSuggestionRequest,
+  CreateWorkflowDraft,
+  DescribeWorkflow,
+  RefineWorkflowDraft,
+  SaveDraftTests,
+  SaveWorkflowDraft,
+  StartDraftTest,
+  WorkflowDraftContent,
 } from '@luma/api-contract';
 import { queryOptions } from '@tanstack/react-query';
 
-import { createWebApiClient } from '../../../lib/api-client';
 import { privateQueryDefaults } from '../../../lib/private-query';
-import { workflowFailure, workflowsKey } from '../data';
+import { workflowApi as api, workflowsKey } from '../data';
 import { localizeVocabulary } from './vocabulary-text';
-
-const api = createWebApiClient();
 
 /** Cache prefix for one workspace's drafts. */
 export const draftsKey = (organizationId: string) =>
@@ -40,17 +24,13 @@ export const templatesOptions = (organizationId: string) =>
   queryOptions({
     queryKey: [...workflowsKey(organizationId), 'templates'],
     ...privateQueryDefaults,
-    queryFn: async ({ signal }) => {
-      const result = await api.workflowDrafts.templates({
-        params: { organizationId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200) return workflowFailure(result);
-
-      return result.body.items.map((item) =>
-        workflowTemplateSchema.parse(item),
-      );
-    },
+    queryFn: async ({ signal }) =>
+      (
+        await api.workflowDrafts.templates(
+          { params: { organizationId } },
+          { signal },
+        )
+      ).items,
   });
 
 /** Adds a template's reviewed version to the workspace. Repeating it is safe. */
@@ -58,13 +38,10 @@ export async function installTemplate(
   organizationId: string,
   templateId: string,
 ) {
-  const result = await api.workflowDrafts.installTemplate({
+  return api.workflowDrafts.installTemplate({
     params: { organizationId, templateId },
     body: {},
   });
-  if (result.status !== 200) return workflowFailure(result);
-
-  return workflowTemplateSchema.parse(result.body);
 }
 
 /**
@@ -77,15 +54,8 @@ export const vocabularyOptions = (organizationId: string) =>
     ...privateQueryDefaults,
     staleTime: 60_000,
     gcTime: 300_000,
-    queryFn: async ({ signal }) => {
-      const result = await api.workflowDrafts.vocabulary({
-        params: { organizationId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200) return workflowFailure(result);
-
-      return authoringVocabularySchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.workflowDrafts.vocabulary({ params: { organizationId } }, { signal }),
     select: localizeVocabulary,
   });
 
@@ -94,15 +64,13 @@ export const draftsOptions = (organizationId: string) =>
   queryOptions({
     queryKey: draftsKey(organizationId),
     ...privateQueryDefaults,
-    queryFn: async ({ signal }) => {
-      const result = await api.workflowDrafts.list({
-        params: { organizationId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200) return workflowFailure(result);
-
-      return result.body.items.map((item) => workflowDraftSchema.parse(item));
-    },
+    queryFn: async ({ signal }) =>
+      (
+        await api.workflowDrafts.list(
+          { params: { organizationId } },
+          { signal },
+        )
+      ).items,
   });
 
 /** Reads one draft at its latest saved revision. */
@@ -110,15 +78,11 @@ export const draftOptions = (organizationId: string, draftId: string) =>
   queryOptions({
     queryKey: [...draftsKey(organizationId), draftId],
     ...privateQueryDefaults,
-    queryFn: async ({ signal }) => {
-      const result = await api.workflowDrafts.get({
-        params: { organizationId, draftId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200) return workflowFailure(result);
-
-      return workflowDraftSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.workflowDrafts.get(
+        { params: { organizationId, draftId } },
+        { signal },
+      ),
   });
 
 /** Starts a draft. Reuse the same ID and body after an uncertain response. */
@@ -126,13 +90,10 @@ export async function createDraft(
   organizationId: string,
   body: CreateWorkflowDraft,
 ) {
-  const result = await api.workflowDrafts.create({
+  return api.workflowDrafts.create({
     params: { organizationId },
     body,
   });
-  if (result.status !== 200) return workflowFailure(result);
-
-  return workflowDraftSchema.parse(result.body);
 }
 
 /** Saves against the loaded revision. A 409 means someone else saved first. */
@@ -141,13 +102,10 @@ export async function saveDraft(
   draftId: string,
   body: SaveWorkflowDraft,
 ) {
-  const result = await api.workflowDrafts.save({
+  return api.workflowDrafts.save({
     params: { organizationId, draftId },
     body,
   });
-  if (result.status !== 200) return workflowFailure(result);
-
-  return workflowDraftSchema.parse(result.body);
 }
 
 /** Checks content, code or a saved draft without changing anything. */
@@ -160,14 +118,13 @@ export async function validateDraft(
   },
   signal?: AbortSignal,
 ) {
-  const result = await api.workflowDrafts.validate({
-    params: { organizationId },
-    body: body as { draftId?: string; content?: Record<string, unknown> },
-    ...(signal ? { fetchOptions: { signal } } : {}),
-  });
-  if (result.status !== 200) return workflowFailure(result);
-
-  return draftValidationSchema.parse(result.body);
+  return api.workflowDrafts.validate(
+    {
+      params: { organizationId },
+      body,
+    },
+    signal ? { signal } : {},
+  );
 }
 
 /** Publishes the reviewed revision as a new immutable version. It does not activate it. */
@@ -176,13 +133,10 @@ export async function publishDraft(
   draftId: string,
   body: { revision: number; notes?: string },
 ) {
-  const result = await api.workflowDrafts.publish({
+  return api.workflowDrafts.publish({
     params: { organizationId, draftId },
     body,
   });
-  if (result.status !== 200) return workflowFailure(result);
-
-  return publishedDraftSchema.parse(result.body);
 }
 
 /** Discards an unpublished draft. Repeating it is safe. */
@@ -191,13 +145,10 @@ export async function discardDraft(
   draftId: string,
   revision: number,
 ) {
-  const result = await api.workflowDrafts.discard({
+  return api.workflowDrafts.discard({
     params: { organizationId, draftId },
     body: { revision },
   });
-  if (result.status !== 200) return workflowFailure(result);
-
-  return result.body;
 }
 
 /** Reads saved test cases and their latest results on the current revision. */
@@ -205,15 +156,8 @@ export const draftTestsOptions = (organizationId: string, draftId: string) =>
   queryOptions({
     queryKey: [...draftsKey(organizationId), draftId, 'tests'],
     ...privateQueryDefaults,
-    queryFn: async ({ signal }) => {
-      const result = await api.draftTests.list({
-        params: { organizationId, draftId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200) return workflowFailure(result);
-
-      return draftTestSummarySchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.draftTests.list({ params: { organizationId, draftId } }, { signal }),
   });
 
 /** Replaces saved test cases against the loaded tests revision. */
@@ -222,13 +166,10 @@ export async function saveDraftTests(
   draftId: string,
   body: SaveDraftTests,
 ) {
-  const result = await api.draftTests.save({
+  return api.draftTests.save({
     params: { organizationId, draftId },
     body,
   });
-  if (result.status !== 200) return workflowFailure(result);
-
-  return draftTestSummarySchema.parse(result.body);
 }
 
 /** Runs every saved case that hasn't run on this draft revision. Repeating it is safe. */
@@ -237,13 +178,10 @@ export async function runDraftTests(
   draftId: string,
   revision: number,
 ) {
-  const result = await api.draftTests.runAll({
+  return api.draftTests.runAll({
     params: { organizationId, draftId },
     body: { revision },
   });
-  if (result.status !== 200) return workflowFailure(result);
-
-  return draftTestSummarySchema.parse(result.body);
 }
 
 /** Suggests example data from declared fields, recent runs and scenarios. */
@@ -260,15 +198,11 @@ export const draftTestExamplesOptions = (
       revision,
     ],
     ...privateQueryDefaults,
-    queryFn: async ({ signal }) => {
-      const result = await api.draftTests.examples({
-        params: { organizationId, draftId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200) return workflowFailure(result);
-
-      return draftTestExamplesSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.draftTests.examples(
+        { params: { organizationId, draftId } },
+        { signal },
+      ),
   });
 
 /** Starts one test run. Reuse the same ID and body after an uncertain response. */
@@ -277,13 +211,10 @@ export async function startDraftTest(
   draftId: string,
   body: StartDraftTest,
 ) {
-  const result = await api.draftTests.start({
+  return api.draftTests.start({
     params: { organizationId, draftId },
     body,
   });
-  if (result.status !== 200) return workflowFailure(result);
-
-  return draftTestRunSchema.parse(result.body);
 }
 
 /** Reads one test run. Poll it while its state is `running`. */
@@ -295,15 +226,11 @@ export const draftTestRunOptions = (
   queryOptions({
     queryKey: [...draftsKey(organizationId), draftId, 'test-runs', runId],
     ...privateQueryDefaults,
-    queryFn: async ({ signal }) => {
-      const result = await api.draftTests.get({
-        params: { organizationId, draftId, runId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200) return workflowFailure(result);
-
-      return draftTestRunSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.draftTests.get(
+        { params: { organizationId, draftId, runId } },
+        { signal },
+      ),
   });
 
 /** Cancels a running test. Cancelling again is safe. */
@@ -312,13 +239,10 @@ export async function cancelDraftTest(
   draftId: string,
   runId: string,
 ) {
-  const result = await api.draftTests.cancel({
+  return api.draftTests.cancel({
     params: { organizationId, draftId, runId },
     body: {},
   });
-  if (result.status !== 200) return workflowFailure(result);
-
-  return draftTestRunSchema.parse(result.body);
 }
 
 /** Reads whether describing workflows is available here, and why not. */
@@ -326,15 +250,11 @@ export const generationAvailabilityOptions = (organizationId: string) =>
   queryOptions({
     queryKey: [...workflowsKey(organizationId), 'generation'],
     ...privateQueryDefaults,
-    queryFn: async ({ signal }) => {
-      const result = await api.workflowGeneration.availability({
-        params: { organizationId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200) return workflowFailure(result);
-
-      return generationAvailabilitySchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.workflowGeneration.availability(
+        { params: { organizationId } },
+        { signal },
+      ),
   });
 
 /** Drafts a workflow from a description. Reuse the same IDs and body after an uncertain response. */
@@ -343,14 +263,13 @@ export async function describeWorkflow(
   body: DescribeWorkflow,
   signal?: AbortSignal,
 ) {
-  const result = await api.workflowGeneration.describe({
-    params: { organizationId },
-    body,
-    ...(signal ? { fetchOptions: { signal } } : {}),
-  });
-  if (result.status !== 200) return workflowFailure(result);
-
-  return generatedDraftSchema.parse(result.body);
+  return api.workflowGeneration.describe(
+    {
+      params: { organizationId },
+      body,
+    },
+    signal ? { signal } : {},
+  );
 }
 
 /** Proposes a change to the loaded revision. Nothing is applied until it is accepted. */
@@ -360,14 +279,13 @@ export async function refineDraft(
   body: RefineWorkflowDraft,
   signal?: AbortSignal,
 ) {
-  const result = await api.workflowGeneration.refine({
-    params: { organizationId, draftId },
-    body,
-    ...(signal ? { fetchOptions: { signal } } : {}),
-  });
-  if (result.status !== 200) return workflowFailure(result);
-
-  return draftProposalSchema.parse(result.body);
+  return api.workflowGeneration.refine(
+    {
+      params: { organizationId, draftId },
+      body,
+    },
+    signal ? { signal } : {},
+  );
 }
 
 /** Applies a proposal to the revision it was made for. */
@@ -377,13 +295,10 @@ export async function acceptProposal(
   proposalId: string,
   body: AcceptProposal,
 ) {
-  const result = await api.workflowGeneration.accept({
+  return api.workflowGeneration.accept({
     params: { organizationId, draftId, proposalId },
     body,
   });
-  if (result.status !== 200) return workflowFailure(result);
-
-  return acceptedProposalSchema.parse(result.body);
 }
 
 /** Records that a proposal was rejected. The draft is unchanged. */
@@ -392,13 +307,12 @@ export async function rejectProposal(
   draftId: string,
   proposalId: string,
 ) {
-  const result = await api.workflowGeneration.reject({
+  const { proposal } = await api.workflowGeneration.reject({
     params: { organizationId, draftId, proposalId },
     body: {},
   });
-  if (result.status !== 200) return workflowFailure(result);
 
-  return draftProposalSchema.parse(result.body.proposal);
+  return proposal;
 }
 
 /** Suggests Code Step source for a described calculation. Nothing is saved. */
@@ -408,12 +322,11 @@ export async function suggestCodeStep(
   body: CodeStepSuggestionRequest,
   signal?: AbortSignal,
 ) {
-  const result = await api.workflowGeneration.codeStep({
-    params: { organizationId, draftId },
-    body,
-    ...(signal ? { fetchOptions: { signal } } : {}),
-  });
-  if (result.status !== 200) return workflowFailure(result);
-
-  return codeStepSuggestionSchema.parse(result.body);
+  return api.workflowGeneration.codeStep(
+    {
+      params: { organizationId, draftId },
+      body,
+    },
+    signal ? { signal } : {},
+  );
 }

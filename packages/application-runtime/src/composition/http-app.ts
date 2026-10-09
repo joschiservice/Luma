@@ -20,8 +20,10 @@ import type {
   SettingsService,
 } from '@luma/identity';
 import { IdentityError } from '@luma/identity';
+import type { HttpContext } from '@luma/identity/http';
 import {
   identityRoutes,
+  registerContractRoutes,
   registerIdentityGuards,
   rolesRoutes,
   settingsRoutes,
@@ -92,7 +94,7 @@ import {
   workflowGenerationRoutes,
   workflowRoutes,
 } from '@luma/workflows/http';
-import { initServer } from '@ts-rest/fastify';
+import { implement } from '@orpc/server';
 import type { FastifyServerOptions } from 'fastify';
 import Fastify, { LogController } from 'fastify';
 
@@ -208,7 +210,6 @@ export function buildApp(
   app.addHook('onClose', async () => {
     await dependencies.observability?.shutdown();
   });
-  const s = initServer();
   registerIdentityGuards(
     app,
     dependencies.identity,
@@ -328,118 +329,99 @@ export function buildApp(
       requestId: request.id,
     });
   });
-  app.register(async (routerApp) => {
-    s.registerRouter(
-      apiContract,
-      {
-        shadow: shadowRoutes(dependencies.shadow),
-        activity: activityRoutes(dependencies.activity),
-        playbooks: playbookRoutes(dependencies.playbooks),
-        workflows: workflowRoutes(dependencies.workflows),
-        workflowDrafts: workflowDraftRoutes(
-          dependencies.workflowDrafts,
-          dependencies.workflowTemplates,
-        ),
-        draftTests: draftTestRoutes(dependencies.draftTests),
-        workflowGeneration: workflowGenerationRoutes(
-          dependencies.workflowGeneration,
-        ),
-        procurement: procurementRoutes(
-          dependencies.procurement,
-          dependencies.commitments,
-        ),
-        exceptions: caseRoutes(dependencies.cases),
-        caseDesk: deskRoutes(dependencies.desk),
-        resolutionLearning: learningRoutes(dependencies.learning),
-        operations: operationsRoutes(
-          dependencies.operations,
-          dependencies.measurements,
-        ),
-        metrics: metricRoutes(
-          dependencies.metrics,
-          dependencies.operationalSummary,
-        ),
-        identity: identityRoutes(dependencies.identity),
-        settings: settingsRoutes(dependencies.settings),
-        roles: rolesRoutes(dependencies.roles),
-        apps: appRoutes(dependencies.apps),
-        connections: connectionRoutes(dependencies.connections),
-        system: {
-          health: async () => ({ status: 200, body: { status: 'ok' } }),
-          ready: async ({ request }) => {
-            let timeout: ReturnType<typeof setTimeout> | undefined;
-            try {
-              const ready =
-                !draining &&
-                (await Promise.race([
-                  Promise.resolve().then(
-                    () => dependencies.checkReadiness?.() ?? true,
-                  ),
-                  new Promise<boolean>((resolve) => {
-                    timeout = setTimeout(
-                      () => resolve(false),
-                      dependencies.readinessTimeoutMs ?? 1000,
-                    );
-                  }),
-                ]));
-              if (ready && !draining)
-                return { status: 200, body: { status: 'ready' } };
-            } catch (error) {
-              if (request.observation)
-                dependencies.observability?.captureError(error, {
-                  context: request.observation.context,
-                  message: 'Readiness check failed',
-                });
-              request.log.error(
-                { error: describeError(error) },
-                'Readiness check failed',
-              );
-            } finally {
-              clearTimeout(timeout);
-            }
+  const os = implement(apiContract).$context<HttpContext>();
+  registerContractRoutes(
+    app,
+    apiContract,
+    os.router({
+      shadow: shadowRoutes(dependencies.shadow),
+      activity: activityRoutes(dependencies.activity),
+      playbooks: playbookRoutes(dependencies.playbooks),
+      workflows: workflowRoutes(dependencies.workflows),
+      workflowDrafts: workflowDraftRoutes(
+        dependencies.workflowDrafts,
+        dependencies.workflowTemplates,
+      ),
+      draftTests: draftTestRoutes(dependencies.draftTests),
+      workflowGeneration: workflowGenerationRoutes(
+        dependencies.workflowGeneration,
+      ),
+      procurement: procurementRoutes(
+        dependencies.procurement,
+        dependencies.commitments,
+      ),
+      exceptions: caseRoutes(dependencies.cases),
+      caseDesk: deskRoutes(dependencies.desk),
+      resolutionLearning: learningRoutes(dependencies.learning),
+      operations: operationsRoutes(
+        dependencies.operations,
+        dependencies.measurements,
+      ),
+      metrics: metricRoutes(
+        dependencies.metrics,
+        dependencies.operationalSummary,
+      ),
+      identity: identityRoutes(dependencies.identity),
+      settings: settingsRoutes(dependencies.settings),
+      roles: rolesRoutes(dependencies.roles),
+      apps: appRoutes(dependencies.apps),
+      connections: connectionRoutes(dependencies.connections),
+      system: {
+        health: os.system.health.handler(() => ({ status: 'ok' as const })),
+        ready: os.system.ready.handler(async ({ context: { request } }) => {
+          let timeout: ReturnType<typeof setTimeout> | undefined;
+          try {
+            const ready =
+              !draining &&
+              (await Promise.race([
+                Promise.resolve().then(
+                  () => dependencies.checkReadiness?.() ?? true,
+                ),
+                new Promise<boolean>((resolve) => {
+                  timeout = setTimeout(
+                    () => resolve(false),
+                    dependencies.readinessTimeoutMs ?? 1000,
+                  );
+                }),
+              ]));
+            if (ready && !draining) return { status: 'ready' as const };
+          } catch (error) {
+            if (request.observation)
+              dependencies.observability?.captureError(error, {
+                context: request.observation.context,
+                message: 'Readiness check failed',
+              });
+            request.log.error(
+              { error: describeError(error) },
+              'Readiness check failed',
+            );
+          } finally {
+            clearTimeout(timeout);
+          }
 
-            return {
-              status: 503,
-              body: {
-                code: 'NOT_READY',
-                message: 'Service is not ready',
-                requestId: request.id,
-              },
-            };
-          },
-        },
-        connectorProviders: createConnectors(dependencies.providerCatalog),
-        records: recordRoutes(dependencies.records),
-        inventory: inventoryRoutes(dependencies.inventory),
-        products: productRoutes(dependencies.products),
-        procurementContext: procurementContextRoutes(
-          dependencies.procurementContext,
-        ),
-        fulfillment: fulfillmentRoutes(dependencies.fulfillment),
-        orders: orderRoutes(dependencies.orders),
-        returns: returnRoutes(dependencies.returns),
-        customers: customerRoutes(dependencies.customers),
-        sync: syncRoutes(dependencies.sync),
-        decisions: decisionRoutes(
-          dependencies.decisions,
-          dependencies.decisionAssignments,
-        ),
-        insights: insightRoutes(dependencies.insights),
-        assistant: assistantRoutes(dependencies.assistant),
+          throw new IdentityError(503, 'NOT_READY', 'Service is not ready');
+        }),
       },
-      routerApp,
-      {
-        responseValidation: true,
-        requestValidationErrorHandler: (_error, request, reply) => {
-          void reply.status(400).send({
-            code: 'VALIDATION_ERROR',
-            message: 'Invalid request',
-            requestId: request.id,
-          });
-        },
-      },
-    );
-  });
+      connectorProviders: createConnectors(dependencies.providerCatalog),
+      records: recordRoutes(dependencies.records),
+      inventory: inventoryRoutes(dependencies.inventory),
+      products: productRoutes(dependencies.products),
+      procurementContext: procurementContextRoutes(
+        dependencies.procurementContext,
+      ),
+      fulfillment: fulfillmentRoutes(dependencies.fulfillment),
+      orders: orderRoutes(dependencies.orders),
+      returns: returnRoutes(dependencies.returns),
+      customers: customerRoutes(dependencies.customers),
+      sync: syncRoutes(dependencies.sync),
+      decisions: decisionRoutes(
+        dependencies.decisions,
+        dependencies.decisionAssignments,
+      ),
+      insights: insightRoutes(dependencies.insights),
+      assistant: assistantRoutes(dependencies.assistant),
+    }),
+  );
   const apps = dependencies.apps;
   dependencies.appRegistry?.registerHttp(
     app,

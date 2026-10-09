@@ -102,8 +102,8 @@ export const returnListSchema = z.object({
   items: z.array(returnListItemSchema),
   sources: z.array(returnSourceSchema),
   counts: z.object({
-    views: z.record(returnViewSchema, z.number().int().nonnegative()),
-    stages: z.record(returnStageSchema, z.number().int().nonnegative()),
+    views: z.partialRecord(returnViewSchema, z.number().int().nonnegative()),
+    stages: z.partialRecord(returnStageSchema, z.number().int().nonnegative()),
   }),
   nextCursor: z.string().nullable(),
   asOf: timestamp,

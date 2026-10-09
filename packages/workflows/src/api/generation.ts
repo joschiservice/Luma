@@ -1,11 +1,10 @@
 import '@luma/identity/http';
 
-import type { ServerResponse } from 'node:http';
-
 import { apiContract } from '@luma/api-contract';
 import { IdentityError } from '@luma/identity';
+import type { HttpContext } from '@luma/identity/http';
 import type { TraceContext } from '@luma/platform';
-import { initServer } from '@ts-rest/fastify';
+import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
 import type {
@@ -13,24 +12,20 @@ import type {
   GenerationOptions,
 } from '../application/draft-generation.js';
 
-/** Aborts model work when the client disconnects before the response is sent. */
+/**
+ * Passes the request signal, which aborts model work when the client disconnects before the
+ * response is sent, and the request trace.
+ */
 function requestOptions(
   request: FastifyRequest,
-  reply: unknown,
+  signal: AbortSignal | undefined,
 ): GenerationOptions {
-  // ts-rest types the reply with other Fastify generics; `raw` is the Node response.
-  const { raw } = reply as { raw: ServerResponse };
-  const controller = new AbortController();
-  raw.once('close', () => {
-    if (!raw.writableFinished) controller.abort();
-  });
-
   // The HTTP host attaches the tenant-scoped request trace; model calls become its children.
   const { observation } = request as FastifyRequest & {
     observation?: { context: TraceContext } | null;
   };
 
-  return { signal: controller.signal, trace: observation?.context };
+  return { signal, trace: observation?.context };
 }
 
 /** Registers tenant-authenticated routes for describing, refining and generating Code Steps. */
@@ -48,84 +43,80 @@ export function workflowGenerationRoutes(service?: DraftGeneration) {
     return { context: request.tenantContext, service };
   }
 
-  return initServer().router(apiContract.workflowGeneration, {
-    availability: async ({ request }) => {
+  const os = implement(apiContract.workflowGeneration).$context<HttpContext>();
+
+  return os.router({
+    availability: os.availability.handler(async ({ context: { request } }) => {
       const s = use(request);
 
-      return { status: 200, body: await s.service.availability(s.context) };
-    },
-    describe: async ({ request, reply, body }) => {
-      const s = use(request);
+      return await s.service.availability(s.context);
+    }),
+    describe: os.describe.handler(
+      async ({ context: { request }, input: { body }, signal }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.service.describe(
+        return await s.service.describe(
           s.context,
           body,
-          requestOptions(request, reply),
-        ),
-      };
-    },
-    refine: async ({ request, reply, params, body }) => {
-      const s = use(request);
+          requestOptions(request, signal),
+        );
+      },
+    ),
+    refine: os.refine.handler(
+      async ({ context: { request }, input: { params, body }, signal }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.service.refine(
-          s.context,
-          params.draftId,
-          body,
-          requestOptions(request, reply),
-        ),
-      };
-    },
-    accept: async ({ request, params, body }) => {
-      const s = use(request);
-
-      return {
-        status: 200,
-        body: await s.service.accept(
+        return await s.service.refine(
           s.context,
           params.draftId,
-          params.proposalId,
           body,
-        ),
-      };
-    },
-    reject: async ({ request, params }) => {
-      const s = use(request);
+          requestOptions(request, signal),
+        );
+      },
+    ),
+    accept: os.accept.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.service.reject(
+        return await s.service.accept(
           s.context,
           params.draftId,
           params.proposalId,
-        ),
-      };
-    },
-    codeStep: async ({ request, reply, params, body }) => {
-      const s = use(request);
+          body,
+        );
+      },
+    ),
+    reject: os.reject.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.service.codeStep(
+        return await s.service.reject(
+          s.context,
+          params.draftId,
+          params.proposalId,
+        );
+      },
+    ),
+    codeStep: os.codeStep.handler(
+      async ({ context: { request }, input: { params, body }, signal }) => {
+        const s = use(request);
+
+        return await s.service.codeStep(
           s.context,
           params.draftId,
           body,
-          requestOptions(request, reply),
-        ),
-      };
-    },
-    generations: async ({ request, params }) => {
-      const s = use(request);
+          requestOptions(request, signal),
+        );
+      },
+    ),
+    generations: os.generations.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: {
+        return {
           items: await s.service.generations(s.context, params.draftId),
-        },
-      };
-    },
+        };
+      },
+    ),
   });
 }

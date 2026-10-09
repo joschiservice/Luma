@@ -1,11 +1,12 @@
 import type { RouteAccess } from '@luma/api-contract';
 import { apiContract } from '@luma/api-contract';
-import { initServer } from '@ts-rest/fastify';
+import { implement } from '@orpc/server';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 import type { IdentityService } from '../application/identity.js';
 import type { TenantContext } from '../domain/context.js';
 import { IdentityError } from '../domain/context.js';
+import type { HttpContext } from './contract-routes.js';
 
 /** Extracts the cookie and authorization headers used to resolve a request's session. */
 export function credentials(request: FastifyRequest) {
@@ -35,71 +36,64 @@ export function identityRoutes(service?: IdentityService) {
     return service;
   };
 
-  return initServer().router(apiContract.identity, {
-    listOrganizations: async ({ request }) => ({
-      status: 200,
-      body: { items: await use().listOrganizations(credentials(request)) },
-    }),
-    createOrganization: async ({ request, body }) => ({
-      status: 201,
-      body: await use().createOrganization(credentials(request), body),
-    }),
-    context: async ({ request }) => {
+  const os = implement(apiContract.identity).$context<HttpContext>();
+
+  return os.router({
+    listOrganizations: os.listOrganizations.handler(
+      async ({ context: { request } }) => ({
+        items: await use().listOrganizations(credentials(request)),
+      }),
+    ),
+    createOrganization: os.createOrganization.handler(
+      async ({ context: { request }, input: { body } }) =>
+        use().createOrganization(credentials(request), body),
+    ),
+    context: os.context.handler(({ context: { request } }) => {
       const context = tenantContext(request);
 
       return {
-        status: 200,
-        body: {
-          tenantId: context.tenantId,
-          dataRegion: context.dataRegion,
-          requestId: context.requestId,
-          actor: context.actor,
-          permissions: [...context.permissions],
-          allAppPermissions: context.permissions.allAppPermissions,
-        },
+        tenantId: context.tenantId,
+        dataRegion: context.dataRegion,
+        requestId: context.requestId,
+        actor: context.actor,
+        permissions: [...context.permissions],
+        allAppPermissions: context.permissions.allAppPermissions,
       };
-    },
-    listMembers: async ({ request }) => ({
-      status: 200,
-      body: {
-        items: await use().listMembers(tenantContext(request)),
-      },
     }),
-    addMember: async ({ request, body }) => {
-      const member = await use().changeMember(tenantContext(request), {
-        ...(request.headers['x-command-id']
-          ? { commandId: String(request.headers['x-command-id']) }
-          : {}),
-        action: 'add',
-        ...body,
-      });
-
-      return { status: 201, body: member! };
-    },
-    updateMember: async ({ request, params, body }) => {
-      const member = await use().changeMember(tenantContext(request), {
-        ...(request.headers['x-command-id']
-          ? { commandId: String(request.headers['x-command-id']) }
-          : {}),
-        action: 'update',
-        memberId: params.memberId,
-        roleId: body.roleId,
-      });
-
-      return { status: 200, body: member! };
-    },
-    removeMember: async ({ request, params }) => {
-      await use().changeMember(tenantContext(request), {
-        ...(request.headers['x-command-id']
-          ? { commandId: String(request.headers['x-command-id']) }
-          : {}),
-        action: 'remove',
-        memberId: params.memberId,
-      });
-
-      return { status: 204, body: undefined };
-    },
+    listMembers: os.listMembers.handler(async ({ context: { request } }) => ({
+      items: await use().listMembers(tenantContext(request)),
+    })),
+    addMember: os.addMember.handler(
+      async ({ context: { request }, input: { headers, body } }) =>
+        (await use().changeMember(tenantContext(request), {
+          ...commandId(headers),
+          action: 'add',
+          ...body,
+        }))!,
+    ),
+    updateMember: os.updateMember.handler(
+      async ({ context: { request }, input: { params, headers, body } }) =>
+        (await use().changeMember(tenantContext(request), {
+          ...commandId(headers),
+          action: 'update',
+          memberId: params.memberId,
+          roleId: body.roleId,
+        }))!,
+    ),
+    removeMember: os.removeMember.handler(
+      async ({ context: { request }, input: { params, headers } }) => {
+        await use().changeMember(tenantContext(request), {
+          ...commandId(headers),
+          action: 'remove',
+          memberId: params.memberId,
+        });
+      },
+    ),
   });
+}
+
+function commandId(headers: { 'x-command-id'?: string | undefined }) {
+  return headers['x-command-id'] ? { commandId: headers['x-command-id'] } : {};
 }
 
 // Deliberate public surface: newly registered routes require tenant authorization.
@@ -175,11 +169,7 @@ export function registerIdentityGuards(
 
 /** Reads the access a tenant route declares in its contract metadata or route config. */
 function routeAccess(request: FastifyRequest): RouteAccess | undefined {
-  const config = request.routeOptions.config;
-
-  return (
-    config.access ?? (config.tsRestRoute?.metadata as RouteAccess | undefined)
-  );
+  return request.routeOptions.config.access;
 }
 
 /**
@@ -211,10 +201,8 @@ declare module 'fastify' {
   interface FastifyContextConfig {
     /** App-owned handlers authenticate signed callbacks and webhooks themselves. */
     authentication?: 'app';
-    /** Who may call a tenant route registered outside a ts-rest contract. */
+    /** Who may call a tenant route; contract routes copy it from their metadata. */
     access?: import('@luma/api-contract').RouteAccess;
-    /** Set by ts-rest for contract routes; its metadata declares route access. */
-    tsRestRoute?: { metadata?: unknown };
   }
 
   interface FastifyRequest {

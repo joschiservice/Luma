@@ -49,10 +49,10 @@
     "@luma/resolution": "workspace:*",
     "@luma/workflow-temporal": "workspace:*",
     "@luma/workflows": "workspace:*",
-    "@ts-rest/fastify": "catalog:",
+    "@orpc/server": "catalog:",
     "fastify": "catalog:",
     "pg": "catalog:pg-8-20-0",
-    "zod": "catalog:zod3"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

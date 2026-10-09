@@ -40,7 +40,7 @@ import {
   useSettingsCommand,
   useSettingsOnline,
 } from './command';
-import { membersOptions, settingsApi, settingsResult } from './data';
+import { membersOptions, settingsApi } from './data';
 import type { RoleDraft } from './role-create';
 import { RoleHistory, RolePeople } from './role-history';
 import { RoleMark } from './roles';
@@ -148,7 +148,7 @@ export function RoleEditor({
           description: values.description.trim(),
           permissions: values.permissions,
         };
-        const result = role
+        const saved = role
           ? await settingsApi.roles.update({
               params: { organizationId, roleId: role.id },
               headers: { 'x-command-id': commandId },
@@ -159,7 +159,7 @@ export function RoleEditor({
               headers: { 'x-command-id': commandId },
               body,
             });
-        created = (settingsResult(result) as WorkspaceRole).id;
+        created = saved.id;
         setReviewing(false);
         setEdits(null);
       },
@@ -865,13 +865,11 @@ function ArchiveDialog({
                 disabled={command.locked}
                 onClick={() =>
                   void command.run(async (commandId) => {
-                    settingsResult(
-                      await settingsApi.roles.archive({
-                        params: { organizationId, roleId: role.id },
-                        headers: { 'x-command-id': commandId },
-                        body: { revision: role.revision },
-                      }),
-                    );
+                    await settingsApi.roles.archive({
+                      params: { organizationId, roleId: role.id },
+                      headers: { 'x-command-id': commandId },
+                      body: { revision: role.revision },
+                    });
                     close();
                     archived();
                   }, m.settings_role_archive_done())

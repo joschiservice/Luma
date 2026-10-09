@@ -19,10 +19,7 @@ export function fail(code: ConnectorErrorCode, retryAfterMs?: number): never {
  * Validates a provider response and throws an invalid-response connector failure when it
  * does not match the schema.
  */
-export function parse<T>(
-  schema: z.ZodType<T, z.ZodTypeDef, unknown>,
-  value: unknown,
-): T {
+export function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   const result = schema.safeParse(value);
   if (!result.success) fail('invalid_response');
 

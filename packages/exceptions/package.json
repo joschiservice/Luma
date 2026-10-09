@@ -30,9 +30,9 @@
     "@luma/identity": "workspace:*",
     "@luma/platform": "workspace:*",
     "@opentelemetry/api": "catalog:",
-    "@ts-rest/fastify": "catalog:",
+    "@orpc/server": "catalog:",
     "fastify": "catalog:",
-    "zod": "catalog:zod3"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

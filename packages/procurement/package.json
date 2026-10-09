@@ -27,16 +27,16 @@
   },
   "dependencies": {
     "@luma/api-contract": "workspace:*",
-    "@luma/identity": "workspace:*",
-    "@luma/platform": "workspace:*",
-    "@ts-rest/fastify": "catalog:",
-    "fastify": "catalog:",
-    "zod": "catalog:zod3",
     "@luma/audit": "workspace:*",
     "@luma/connections": "workspace:*",
     "@luma/execution": "workspace:*",
+    "@luma/identity": "workspace:*",
+    "@luma/platform": "workspace:*",
     "@luma/policies": "workspace:*",
-    "@luma/workflows": "workspace:*"
+    "@luma/workflows": "workspace:*",
+    "@orpc/server": "catalog:",
+    "fastify": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

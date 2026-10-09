@@ -1,11 +1,6 @@
-import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
-import {
-  apiErrorSchema,
-  organizationParamsSchema,
-  requires,
-} from '../common.js';
+import { endpoint, organizationParamsSchema, requires } from '../common.js';
 import {
   authoringVocabularySchema,
   createWorkflowDraftSchema,
@@ -18,132 +13,172 @@ import {
   workflowTemplateSchema,
 } from '../workflow-drafts.js';
 
-const c = initContract();
-const drafts = '/v1/organizations/:organizationId/workflow-drafts';
-const authoring = '/v1/organizations/:organizationId/workflow-authoring';
-const templates = '/v1/organizations/:organizationId/workflow-templates';
+const drafts = '/v1/organizations/{organizationId}/workflow-drafts';
+const authoring = '/v1/organizations/{organizationId}/workflow-authoring';
+const templates = '/v1/organizations/{organizationId}/workflow-templates';
 const draftParams = organizationParamsSchema.extend({
   draftId: z.string().uuid(),
 });
 
-export const workflowDraftsContract = c.router(
-  {
-    templates: {
+export const workflowDraftsContract = {
+  templates: endpoint
+    .route({
       method: 'GET',
-      metadata: requires('workflows.read'),
       path: templates,
-      pathParams: organizationParamsSchema,
-      responses: {
-        200: z.object({ items: z.array(workflowTemplateSchema) }),
-      },
       summary: 'List workflow templates',
       description:
         'Returns templates from installed adapters with what each needs before it can run, its readiness and its activation status here.',
-    },
-    installTemplate: {
+    })
+    .meta({
+      access: requires('workflows.read'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: organizationParamsSchema }))
+    .output(z.object({ items: z.array(workflowTemplateSchema) })),
+  installTemplate: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('workflows.publish'),
-      path: `${templates}/:templateId/install`,
-      pathParams: organizationParamsSchema.extend({
-        templateId: z.string().regex(/^[a-z][a-zA-Z0-9_-]{0,79}$/),
-      }),
-      body: z.object({}).strict(),
-      responses: { 200: workflowTemplateSchema },
+      path: `${templates}/{templateId}/install`,
       summary: 'Add a template to this workspace',
       description:
         'Requires `workflows.publish`. Publishes the template’s reviewed version here so it can be configured. Repeating the request is safe. Adding a template never activates it.',
-    },
-    vocabulary: {
+    })
+    .meta({
+      access: requires('workflows.publish'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(
+      z.object({
+        params: organizationParamsSchema.extend({
+          templateId: z.string().regex(/^[a-z][a-zA-Z0-9_-]{0,79}$/),
+        }),
+        body: z.object({}).strict(),
+      }),
+    )
+    .output(workflowTemplateSchema),
+  vocabulary: endpoint
+    .route({
       method: 'GET',
-      metadata: requires('workflows.read'),
       path: `${authoring}/vocabulary`,
-      pathParams: organizationParamsSchema,
-      responses: { 200: authoringVocabularySchema },
       summary: 'List what workflows can use in this workspace',
       description:
         'Returns triggers, step types, subjects, data sources, actions and result checks from installed adapters. Entries that cannot run here are included with the reason.',
-    },
-    validate: {
+    })
+    .meta({
+      access: requires('workflows.read'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: organizationParamsSchema }))
+    .output(authoringVocabularySchema),
+  validate: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('workflows.read'),
       path: `${authoring}/validate`,
-      pathParams: organizationParamsSchema,
-      body: validateWorkflowDraftSchema,
-      responses: { 200: draftValidationSchema },
       summary: 'Check a draft without saving it',
       description:
         'Checks a saved draft or supplied content. Diagnostics name the step and field to fix. Errors block publishing; warnings describe what cannot run in this workspace yet. Validation changes nothing.',
-    },
-    list: {
+    })
+    .meta({
+      access: requires('workflows.read'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(
+      z.object({
+        params: organizationParamsSchema,
+        body: validateWorkflowDraftSchema,
+      }),
+    )
+    .output(draftValidationSchema),
+  list: endpoint
+    .route({
       method: 'GET',
-      metadata: requires('workflows.read'),
       path: drafts,
-      pathParams: organizationParamsSchema,
-      responses: { 200: z.object({ items: z.array(workflowDraftSchema) }) },
       summary: 'List open workflow drafts',
       description:
         'Requires `workflows.read`. People can read drafts. Drafts never run and grant no access to connected systems.',
-    },
-    create: {
+    })
+    .meta({
+      access: requires('workflows.read'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: organizationParamsSchema }))
+    .output(z.object({ items: z.array(workflowDraftSchema) })),
+  create: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('workflows.author'),
       path: drafts,
-      pathParams: organizationParamsSchema,
-      body: createWorkflowDraftSchema,
-      responses: { 200: workflowDraftSchema },
       summary: 'Start a workflow draft',
       description:
         'Requires `workflows.author`. Starts a draft from scratch, from supplied content, or from a published version to edit it. Editing a published workflow never changes that version. Reuse the same ID and body after an uncertain response.',
-    },
-    get: {
+    })
+    .meta({
+      access: requires('workflows.author'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(
+      z.object({
+        params: organizationParamsSchema,
+        body: createWorkflowDraftSchema,
+      }),
+    )
+    .output(workflowDraftSchema),
+  get: endpoint
+    .route({
       method: 'GET',
-      metadata: requires('workflows.read'),
-      path: `${drafts}/:draftId`,
-      pathParams: draftParams,
-      responses: { 200: workflowDraftSchema },
+      path: `${drafts}/{draftId}`,
       summary: 'Read a workflow draft',
-    },
-    save: {
+    })
+    .meta({
+      access: requires('workflows.read'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: draftParams }))
+    .output(workflowDraftSchema),
+  save: endpoint
+    .route({
       method: 'PUT',
-      metadata: requires('workflows.author'),
-      path: `${drafts}/:draftId`,
-      pathParams: draftParams,
-      body: saveWorkflowDraftSchema,
-      responses: { 200: workflowDraftSchema },
+      path: `${drafts}/{draftId}`,
       summary: 'Save a workflow draft',
       description:
         'Requires `workflows.author`. Saves against the revision you loaded. If someone else saved first, the request returns 409 and nothing is overwritten. Reuse the same save ID and body after an uncertain response.',
-    },
-    publish: {
+    })
+    .meta({
+      access: requires('workflows.author'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: draftParams, body: saveWorkflowDraftSchema }))
+    .output(workflowDraftSchema),
+  publish: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('workflows.publish'),
-      path: `${drafts}/:draftId/publish`,
-      pathParams: draftParams,
-      body: publishWorkflowDraftSchema,
-      responses: { 200: publishedDraftSchema },
+      path: `${drafts}/{draftId}/publish`,
       summary: 'Publish a draft as a new version',
       description:
         'Requires `workflows.publish`. Publishes the exact revision you reviewed as an immutable version. Publishing does not activate the workflow or grant it access to anything. Retrying the same revision returns the same version.',
-    },
-    discard: {
+    })
+    .meta({
+      access: requires('workflows.publish'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: draftParams, body: publishWorkflowDraftSchema }))
+    .output(publishedDraftSchema),
+  discard: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('workflows.author'),
-      path: `${drafts}/:draftId/discard`,
-      pathParams: draftParams,
-      body: z.object({ revision: z.number().int().positive() }).strict(),
-      responses: { 200: z.object({ discarded: z.literal(true) }) },
+      path: `${drafts}/{draftId}/discard`,
       summary: 'Discard an unpublished draft',
       description:
         'Requires `workflows.author`. Discards a draft you no longer need. Discarding again is safe. Published drafts are kept.',
-    },
-  },
-  {
-    commonResponses: {
-      401: apiErrorSchema,
-      403: apiErrorSchema,
-      404: apiErrorSchema,
-      409: apiErrorSchema,
-      503: apiErrorSchema,
-    },
-  },
-);
+    })
+    .meta({
+      access: requires('workflows.author'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(
+      z.object({
+        params: draftParams,
+        body: z.object({ revision: z.number().int().positive() }).strict(),
+      }),
+    )
+    .output(z.object({ discarded: z.literal(true) })),
+};

@@ -35,7 +35,7 @@ import {
   useSettingsCommand,
   useSettingsOnline,
 } from './command';
-import { settingsApi, settingsOptions, settingsResult } from './data';
+import { settingsApi, settingsOptions } from './data';
 import { AppearanceSettings, HomeSidebarSettings } from './personal';
 import { RolesSettings } from './roles';
 import { SectionHeading } from './section-heading';
@@ -307,12 +307,10 @@ function WorkspaceForm({
             revision: value.revision,
           };
           void command.run(async (commandId) => {
-            settingsResult(
-              await settingsApi.settings.updateWorkspace({
-                params: { organizationId },
-                body: { ...input, commandId },
-              }),
-            );
+            await settingsApi.settings.updateWorkspace({
+              params: { organizationId },
+              body: { ...input, commandId },
+            });
             setDraft(null);
           });
         }}
@@ -427,12 +425,10 @@ function NotificationsForm({
         onSubmit={(event) => {
           event.preventDefault();
           void command.run(async (commandId) => {
-            settingsResult(
-              await settingsApi.settings.updateNotifications({
-                params: { organizationId },
-                body: { ...value, commandId },
-              }),
-            );
+            await settingsApi.settings.updateNotifications({
+              params: { organizationId },
+              body: { ...value, commandId },
+            });
             setDraft(null);
           });
         }}
@@ -488,13 +484,11 @@ function NotificationsForm({
           }
           onClick={() =>
             void test.run(
-              async (commandId) =>
-                settingsResult(
-                  await settingsApi.settings.testEmail({
-                    params: { organizationId },
-                    body: { commandId },
-                  }),
-                ),
+              (commandId) =>
+                settingsApi.settings.testEmail({
+                  params: { organizationId },
+                  body: { commandId },
+                }),
               m.settings_notifications_test_queued_notice(),
             )
           }
@@ -557,16 +551,14 @@ function ApprovalsForm({
         onSubmit={(event) => {
           event.preventDefault();
           void command.run(async (commandId) => {
-            settingsResult(
-              await settingsApi.settings.updateApprovals({
-                params: { organizationId },
-                body: {
-                  commandId,
-                  revision: draft?.revision ?? data.workspace.policyRevision,
-                  alwaysRequireApproval: required,
-                },
-              }),
-            );
+            await settingsApi.settings.updateApprovals({
+              params: { organizationId },
+              body: {
+                commandId,
+                revision: draft?.revision ?? data.workspace.policyRevision,
+                alwaysRequireApproval: required,
+              },
+            });
             setDraft(null);
           }, m.settings_approvals_saved());
         }}

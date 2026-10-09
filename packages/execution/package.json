@@ -26,7 +26,7 @@
     "@luma/identity": "workspace:*",
     "@luma/platform": "workspace:*",
     "@luma/policies": "workspace:*",
-    "zod": "catalog:zod3"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

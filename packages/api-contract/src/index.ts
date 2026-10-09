@@ -1,6 +1,3 @@
-import { initContract } from '@ts-rest/core';
-
-import { apiErrorSchema } from './common.js';
 import { activityContract } from './contracts/activity.js';
 import { appsContract } from './contracts/apps.js';
 import { assistantContract } from './contracts/assistant.js';
@@ -34,42 +31,11 @@ import { workflowDraftsContract } from './contracts/workflow-drafts.js';
 import { workflowGenerationContract } from './contracts/workflow-generation.js';
 import { workflowsContract } from './contracts/workflows.js';
 
-const c: ReturnType<typeof initContract> = initContract();
-
-const routes: {
-  shadow: typeof shadowContract;
-  activity: typeof activityContract;
-  playbooks: typeof playbooksContract;
-  workflows: typeof workflowsContract;
-  workflowDrafts: typeof workflowDraftsContract;
-  workflowGeneration: typeof workflowGenerationContract;
-  draftTests: typeof draftTestsContract;
-  procurement: typeof procurementContract;
-  procurementContext: typeof procurementContextContract;
-  resolutionLearning: typeof resolutionLearningContract;
-  caseDesk: typeof caseDeskContract;
-  operations: typeof operationsContract;
-  metrics: typeof metricsContract;
-  exceptions: typeof exceptionsContract;
-  identity: typeof identityContract;
-  settings: typeof settingsContract;
-  roles: typeof rolesContract;
-  connections: typeof connectionsContract;
-  apps: typeof appsContract;
-  system: typeof systemContract;
-  connectorProviders: typeof connectorProvidersContract;
-  records: typeof recordsContract;
-  fulfillment: typeof fulfillmentContract;
-  inventory: typeof inventoryContract;
-  products: typeof productsContract;
-  orders: typeof ordersContract;
-  returns: typeof returnsContract;
-  customers: typeof customersContract;
-  sync: typeof syncContract;
-  decisions: typeof decisionsContract;
-  insights: typeof insightsContract;
-  assistant: typeof assistantContract;
-} = {
+/**
+ * Every customer API route, keyed by area. Route keys form OpenAPI operation IDs, such as
+ * `orders.list`.
+ */
+export const apiContract = {
   shadow: shadowContract,
   activity: activityContract,
   playbooks: playbooksContract,
@@ -103,19 +69,6 @@ const routes: {
   insights: insightsContract,
   assistant: assistantContract,
 };
-const options = {
-  strictStatusCodes: true as const,
-  commonResponses: {
-    400: apiErrorSchema,
-    413: apiErrorSchema,
-    415: apiErrorSchema,
-    500: apiErrorSchema,
-  },
-};
-
-export const apiContract: ReturnType<
-  typeof c.router<typeof routes, string, typeof options>
-> = c.router(routes, options);
 
 export * from './activity.js';
 
@@ -143,7 +96,16 @@ export {
   requires,
 } from './common.js';
 
-export type { ApiError, RouteAccess } from './common.js';
+export type {
+  ApiError,
+  ErrorStatus,
+  RouteAccess,
+  RouteMeta,
+} from './common.js';
+
+export { contractRoutes } from './routes.js';
+
+export type { ContractRoute } from './routes.js';
 
 export {
   membershipSchema,
@@ -170,7 +132,7 @@ export {
   workspaceTopicSchema,
 } from './contracts/events.js';
 
-export type { WorkspaceTopic } from './contracts/events.js';
+export type { EventStreamRoute, WorkspaceTopic } from './contracts/events.js';
 
 export * from './playbooks.js';
 

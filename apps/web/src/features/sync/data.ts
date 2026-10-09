@@ -1,23 +1,15 @@
-import {
-  type AutoLinkInput,
-  type AutoLinkPair,
-  autoLinkPreviewSchema,
-  autoLinkRuleSchema,
-  autoLinkRulesSchema,
-  type IdentityDetail,
-  identityDetailSchema,
-  type LinkInput,
-  linkRequestSchema,
-  type SyncCommand,
-  type SyncOverview,
-  syncOverviewSchema,
-  syncStreamSchema,
+import type {
+  AutoLinkInput,
+  AutoLinkPair,
+  IdentityDetail,
+  LinkInput,
+  SyncCommand,
+  SyncOverview,
 } from '@luma/api-contract';
 import { queryOptions } from '@tanstack/react-query';
 
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
-import { IdentityError } from '../identity/data';
 
 const api = createWebApiClient();
 
@@ -46,16 +38,8 @@ export const syncOptions = (organizationId: string) =>
     queryKey: syncKey(organizationId),
     refetchOnReconnect: 'always',
     refetchInterval: (query) => (syncBusy(query.state.data) ? 3000 : 30000),
-    queryFn: async ({ signal }) => {
-      const result = await api.sync.overview({
-        params: { organizationId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return syncOverviewSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.sync.overview({ params: { organizationId } }, { signal }),
   });
 
 /** Sends an operator command for one sync and returns its updated state. */
@@ -64,14 +48,10 @@ export async function sendSyncCommand(
   streamId: string,
   command: SyncCommand,
 ) {
-  const result = await api.sync.command({
+  return api.sync.command({
     params: { organizationId, streamId },
     body: { command },
   });
-  if (result.status !== 200)
-    throw new IdentityError(result.status, result.body);
-
-  return syncStreamSchema.parse(result.body);
 }
 
 /** Query-key prefix for the sources behind one SKU or location. */
@@ -112,28 +92,16 @@ export const identityOptions = (
       )
         ? 1500
         : false,
-    queryFn: async ({ signal }) => {
-      const result = await api.sync.identity({
-        params: { organizationId, kind, entityId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return identityDetailSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.sync.identity(
+        { params: { organizationId, kind, entityId } },
+        { signal },
+      ),
   });
 
 /** Requests a link or unlink; Luma applies it in the background. */
 export async function requestLink(organizationId: string, body: LinkInput) {
-  const result = await api.sync.requestLink({
-    params: { organizationId },
-    body,
-  });
-  if (result.status !== 202)
-    throw new IdentityError(result.status, result.body);
-
-  return linkRequestSchema.parse(result.body);
+  return api.sync.requestLink({ params: { organizationId }, body });
 }
 
 /** Loads automatic link rules and their latest outcomes. */
@@ -142,16 +110,8 @@ export const autoLinkOptions = (organizationId: string) =>
     ...privateQueryDefaults,
     queryKey: [...syncKey(organizationId), 'automatic-links'],
     refetchInterval: 15000,
-    queryFn: async ({ signal }) => {
-      const result = await api.sync.autoLinkRules({
-        params: { organizationId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return autoLinkRulesSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.sync.autoLinkRules({ params: { organizationId } }, { signal }),
   });
 
 /** Reads current matching evidence without linking records. */
@@ -159,14 +119,7 @@ export async function previewAutoLinks(
   organizationId: string,
   body: AutoLinkPair,
 ) {
-  const result = await api.sync.previewAutoLinks({
-    params: { organizationId },
-    body,
-  });
-  if (result.status !== 200)
-    throw new IdentityError(result.status, result.body);
-
-  return autoLinkPreviewSchema.parse(result.body);
+  return api.sync.previewAutoLinks({ params: { organizationId }, body });
 }
 
 /** Saves a revision-checked rule; enabling continues with the caller's access. */
@@ -174,12 +127,5 @@ export async function saveAutoLinkRule(
   organizationId: string,
   body: AutoLinkInput,
 ) {
-  const result = await api.sync.saveAutoLinkRule({
-    params: { organizationId },
-    body,
-  });
-  if (result.status !== 200)
-    throw new IdentityError(result.status, result.body);
-
-  return autoLinkRuleSchema.parse(result.body);
+  return api.sync.saveAutoLinkRule({ params: { organizationId }, body });
 }

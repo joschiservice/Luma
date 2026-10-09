@@ -2,7 +2,6 @@ import {
   type HomeModule,
   type PinnedPage,
   type WorkspaceLayout,
-  workspaceLayoutSchema,
 } from '@luma/api-contract';
 import {
   queryOptions,
@@ -25,16 +24,8 @@ export const layoutOptions = (organizationId: string) =>
     ...privateQueryDefaults,
     gcTime: 5 * 60_000,
     queryKey: layoutKey(organizationId),
-    queryFn: async ({ signal }) => {
-      const result = await settingsApi.settings.layout({
-        params: { organizationId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new SettingsError(result.status, result.body.message);
-
-      return workspaceLayoutSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      settingsApi.settings.layout({ params: { organizationId } }, { signal }),
   });
 
 type LayoutChange = { home?: HomeModule[] | null; pinned?: PinnedPage[] };
@@ -67,7 +58,8 @@ export function useWorkspaceLayout(organizationId: string) {
       change: LayoutChange;
     }) => {
       const next = apply(base, change);
-      const result = await settingsApi.settings.saveLayout({
+
+      return settingsApi.settings.saveLayout({
         params: { organizationId },
         body: {
           revision: base.revision,
@@ -75,10 +67,6 @@ export function useWorkspaceLayout(organizationId: string) {
           pinned: next.pinned,
         },
       });
-      if (result.status !== 200)
-        throw new SettingsError(result.status, result.body.message);
-
-      return workspaceLayoutSchema.parse(result.body);
     },
     onSuccess: (saved) => {
       client.setQueryData(

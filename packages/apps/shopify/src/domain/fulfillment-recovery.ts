@@ -1,4 +1,4 @@
-import { z } from 'zod/v3';
+import { z } from 'zod';
 
 const gid = (kind: string) =>
   z.string().regex(new RegExp(`^gid://shopify/${kind}/[0-9]+$`));

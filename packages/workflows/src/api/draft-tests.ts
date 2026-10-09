@@ -2,7 +2,8 @@ import '@luma/identity/http';
 
 import { apiContract } from '@luma/api-contract';
 import { IdentityError } from '@luma/identity';
-import { initServer } from '@ts-rest/fastify';
+import type { HttpContext } from '@luma/identity/http';
+import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
 import type { DraftTests } from '../application/draft-tests.js';
@@ -22,62 +23,55 @@ export function draftTestRoutes(service?: DraftTests) {
     return { context: request.tenantContext, service };
   }
 
-  return initServer().router(apiContract.draftTests, {
-    list: async ({ request, params }) => {
+  const os = implement(apiContract.draftTests).$context<HttpContext>();
+
+  return os.router({
+    list: os.list.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = use(request);
+
+        return await s.service.cases(s.context, params.draftId);
+      },
+    ),
+    save: os.save.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = use(request);
+
+        return await s.service.saveCases(s.context, params.draftId, body);
+      },
+    ),
+    runAll: os.runAll.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = use(request);
+
+        return await s.service.runAll(s.context, params.draftId, body);
+      },
+    ),
+    examples: os.examples.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = use(request);
+
+        return await s.service.examples(s.context, params.draftId);
+      },
+    ),
+    start: os.start.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = use(request);
+
+        return await s.service.start(s.context, params.draftId, body);
+      },
+    ),
+    get: os.get.handler(async ({ context: { request }, input: { params } }) => {
       const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.service.cases(s.context, params.draftId),
-      };
-    },
-    save: async ({ request, params, body }) => {
-      const s = use(request);
+      return await s.service.get(s.context, params.draftId, params.runId);
+    }),
+    cancel: os.cancel.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.service.saveCases(s.context, params.draftId, body),
-      };
-    },
-    runAll: async ({ request, params, body }) => {
-      const s = use(request);
-
-      return {
-        status: 200,
-        body: await s.service.runAll(s.context, params.draftId, body),
-      };
-    },
-    examples: async ({ request, params }) => {
-      const s = use(request);
-
-      return {
-        status: 200,
-        body: await s.service.examples(s.context, params.draftId),
-      };
-    },
-    start: async ({ request, params, body }) => {
-      const s = use(request);
-
-      return {
-        status: 200,
-        body: await s.service.start(s.context, params.draftId, body),
-      };
-    },
-    get: async ({ request, params }) => {
-      const s = use(request);
-
-      return {
-        status: 200,
-        body: await s.service.get(s.context, params.draftId, params.runId),
-      };
-    },
-    cancel: async ({ request, params }) => {
-      const s = use(request);
-
-      return {
-        status: 200,
-        body: await s.service.cancel(s.context, params.draftId, params.runId),
-      };
-    },
+        return await s.service.cancel(s.context, params.draftId, params.runId);
+      },
+    ),
   });
 }

@@ -1,4 +1,3 @@
-import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
 import {
@@ -8,58 +7,55 @@ import {
   caseListSchema,
   caseQuerySchema,
 } from '../cases.js';
-import {
-  apiErrorSchema,
-  organizationParamsSchema,
-  requires,
-} from '../common.js';
+import { endpoint, organizationParamsSchema, requires } from '../common.js';
 
-const c = initContract();
-
-export const exceptionsContract = c.router(
-  {
-    list: {
+export const exceptionsContract = {
+  list: endpoint
+    .route({
       method: 'GET',
-      metadata: requires('issues.read'),
-      path: '/v1/organizations/:organizationId/exceptions',
-      pathParams: organizationParamsSchema,
-      query: caseQuerySchema,
-      responses: { 200: caseListSchema },
+      path: '/v1/organizations/{organizationId}/exceptions',
       summary: 'List cases in your organization',
       description:
         'Filter attention, active work or history by class, severity and state. Results sort by severity, oldest attention request or detection, then ID. Use the returned cursor with the same filters. Refresh from the first page as cases change.',
-    },
-    evidence: {
+    })
+    .meta({ access: requires('issues.read'), errors: [401, 404, 503] })
+    .input(
+      z.object({ params: organizationParamsSchema, query: caseQuerySchema }),
+    )
+    .output(caseListSchema),
+  evidence: endpoint
+    .route({
       method: 'GET',
-      metadata: requires('issues.read'),
-      path: '/v1/organizations/:organizationId/exceptions/:exceptionId/evidence',
-      pathParams: organizationParamsSchema.extend({
-        exceptionId: z.string().uuid(),
-      }),
-      query: caseEvidenceQuerySchema,
-      responses: { 200: caseEvidencePageSchema },
+      path: '/v1/organizations/{organizationId}/exceptions/{exceptionId}/evidence',
       summary: 'Read case evidence references',
       description:
         'Returns persisted observation and verification references ordered by immutable ID, including evidence outside the current diagnosis. Pages default to 25 references and allow at most 100. Reuse cursors only for the same organization, case and page size. As evidence arrives, refresh from the first page and deduplicate by ID. Completeness is unknown unless explicitly recorded for the observation. A null source update time means unknown, regardless of observation freshness.',
-    },
-    get: {
-      method: 'GET',
-      metadata: requires('issues.read'),
-      path: '/v1/organizations/:organizationId/exceptions/:exceptionId',
-      pathParams: organizationParamsSchema.extend({
-        exceptionId: z.string().uuid(),
+    })
+    .meta({ access: requires('issues.read'), errors: [401, 404, 503] })
+    .input(
+      z.object({
+        params: organizationParamsSchema.extend({
+          exceptionId: z.string().uuid(),
+        }),
+        query: caseEvidenceQuerySchema,
       }),
-      responses: { 200: caseDetailSchema },
+    )
+    .output(caseEvidencePageSchema),
+  get: endpoint
+    .route({
+      method: 'GET',
+      path: '/v1/organizations/{organizationId}/exceptions/{exceptionId}',
       summary: 'Read a case investigation',
       description:
         'Returns the current persisted investigation and up to 100 evidence references. Use the evidence endpoint to read further historical references. Recommendations require review; they do not authorize execution. Unavailable cases return not found.',
-    },
-  },
-  {
-    commonResponses: {
-      401: apiErrorSchema,
-      404: apiErrorSchema,
-      503: apiErrorSchema,
-    },
-  },
-);
+    })
+    .meta({ access: requires('issues.read'), errors: [401, 404, 503] })
+    .input(
+      z.object({
+        params: organizationParamsSchema.extend({
+          exceptionId: z.string().uuid(),
+        }),
+      }),
+    )
+    .output(caseDetailSchema),
+};

@@ -1,15 +1,9 @@
-import {
-  returnDetailSchema,
-  returnListSchema,
-  returnStageSchema,
-  type ReturnView,
-} from '@luma/api-contract';
+import { returnStageSchema, type ReturnView } from '@luma/api-contract';
 import { queryOptions } from '@tanstack/react-query';
 import { z } from 'zod';
 
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
-import { IdentityError } from '../identity/data';
 
 const api = createWebApiClient();
 
@@ -70,17 +64,8 @@ export function returnsOptions(organizationId: string, search: ReturnsSearch) {
     ...privateQueryDefaults,
     queryKey: ['private', 'organization', organizationId, 'returns', query],
     refetchOnReconnect: 'always',
-    queryFn: async ({ signal }) => {
-      const result = await api.returns.list({
-        params: { organizationId },
-        query,
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return returnListSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.returns.list({ params: { organizationId }, query }, { signal }),
   });
 }
 
@@ -90,16 +75,8 @@ export function returnOptions(organizationId: string, returnId: string) {
     ...privateQueryDefaults,
     queryKey: ['private', 'organization', organizationId, 'return', returnId],
     refetchOnReconnect: 'always',
-    queryFn: async ({ signal }) => {
-      const result = await api.returns.get({
-        params: { organizationId, returnId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return returnDetailSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.returns.get({ params: { organizationId, returnId } }, { signal }),
   });
 }
 
@@ -111,16 +88,7 @@ export function returnSummaryOptions(organizationId: string) {
     ...privateQueryDefaults,
     queryKey: ['private', 'organization', organizationId, 'returns', query],
     refetchOnReconnect: 'always',
-    queryFn: async ({ signal }) => {
-      const result = await api.returns.list({
-        params: { organizationId },
-        query,
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return returnListSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.returns.list({ params: { organizationId }, query }, { signal }),
   });
 }

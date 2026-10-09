@@ -2,7 +2,8 @@ import '@luma/identity/http';
 
 import { apiContract, installedConnectionSchema } from '@luma/api-contract';
 import { IdentityError } from '@luma/identity';
-import { initServer } from '@ts-rest/fastify';
+import type { HttpContext } from '@luma/identity/http';
+import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
 import type { InstallationService } from '../application/installations.js';
@@ -33,57 +34,52 @@ export function connectionRoutes(service?: ConnectionManagement) {
   // Parse summaries before serialization so credentials can never become response fields.
   const summary = (value: unknown) => installedConnectionSchema.parse(value);
 
-  return initServer().router(apiContract.connections, {
-    list: async ({ request }) => {
+  const os = implement(apiContract.connections).$context<HttpContext>();
+
+  return os.router({
+    list: os.list.handler(async ({ context: { request } }) => {
       const { service, context } = use(request);
 
-      return {
-        status: 200,
-        body: { items: (await service.list(context)).map(summary) },
-      };
-    },
-    install: async ({ request, body }) => {
-      const { service, context } = use(request);
+      return { items: (await service.list(context)).map(summary) };
+    }),
+    install: os.install.handler(
+      async ({ context: { request }, input: { body } }) => {
+        const { service, context } = use(request);
 
-      return {
-        status: 201,
-        body: summary(await service.install(context, body)),
-      };
-    },
-    check: async ({ request, params, body }) => {
-      const { service, context } = use(request);
+        return summary(await service.install(context, body));
+      },
+    ),
+    check: os.check.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const { service, context } = use(request);
 
-      return {
-        status: 200,
-        body: summary(
+        return summary(
           await service.check(context, params.connectionId, body.version),
-        ),
-      };
-    },
-    rotate: async ({ request, params, body }) => {
-      const { service, context } = use(request);
+        );
+      },
+    ),
+    rotate: os.rotate.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const { service, context } = use(request);
 
-      return {
-        status: 200,
-        body: summary(
+        return summary(
           await service.rotate(
             context,
             params.connectionId,
             body.version,
             body.credentials,
           ),
-        ),
-      };
-    },
-    disconnect: async ({ request, params, body }) => {
-      const { service, context } = use(request);
+        );
+      },
+    ),
+    disconnect: os.disconnect.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const { service, context } = use(request);
 
-      return {
-        status: 200,
-        body: summary(
+        return summary(
           await service.disconnect(context, params.connectionId, body.version),
-        ),
-      };
-    },
+        );
+      },
+    ),
   });
 }

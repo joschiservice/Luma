@@ -20,6 +20,6 @@
   },
   "dependencies": {
     "@luma/simulator-core": "workspace:*",
-    "zod": "catalog:zod3"
+    "zod": "catalog:"
   }
 }

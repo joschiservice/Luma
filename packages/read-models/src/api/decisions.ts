@@ -6,7 +6,8 @@ import {
   decisionListSchema,
 } from '@luma/api-contract';
 import { IdentityError } from '@luma/identity';
-import { initServer } from '@ts-rest/fastify';
+import type { HttpContext } from '@luma/identity/http';
+import { implement } from '@orpc/server';
 
 import type {
   DecisionAssignments,
@@ -18,40 +19,48 @@ export function decisionRoutes(
   queue?: DecisionQueue,
   assignments?: DecisionAssignments,
 ) {
-  return initServer().router(apiContract.decisions, {
-    list: async ({ request, query }) => {
-      if (!request.tenantContext)
-        throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
-      if (!queue)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Needs you is unavailable',
-        );
+  const os = implement(apiContract.decisions).$context<HttpContext>();
 
-      return {
-        status: 200,
-        body: decisionListSchema.parse(
+  return os.router({
+    list: os.list.handler(
+      async ({ context: { request }, input: { query } }) => {
+        if (!request.tenantContext)
+          throw new IdentityError(
+            401,
+            'UNAUTHENTICATED',
+            'Sign in to continue',
+          );
+        if (!queue)
+          throw new IdentityError(
+            503,
+            'SERVICE_UNAVAILABLE',
+            'Needs you is unavailable',
+          );
+
+        return decisionListSchema.parse(
           await queue.list(request.tenantContext, query),
-        ),
-      };
-    },
-    assign: async ({ request, body }) => {
-      if (!request.tenantContext)
-        throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
-      if (!assignments)
-        throw new IdentityError(
-          503,
-          'SERVICE_UNAVAILABLE',
-          'Assignments are unavailable',
         );
+      },
+    ),
+    assign: os.assign.handler(
+      async ({ context: { request }, input: { body } }) => {
+        if (!request.tenantContext)
+          throw new IdentityError(
+            401,
+            'UNAUTHENTICATED',
+            'Sign in to continue',
+          );
+        if (!assignments)
+          throw new IdentityError(
+            503,
+            'SERVICE_UNAVAILABLE',
+            'Assignments are unavailable',
+          );
 
-      return {
-        status: 200,
-        body: decisionAssignResultSchema.parse(
+        return decisionAssignResultSchema.parse(
           await assignments.assign(request.tenantContext, body),
-        ),
-      };
-    },
+        );
+      },
+    ),
   });
 }

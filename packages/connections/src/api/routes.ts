@@ -1,5 +1,7 @@
 import { apiContract } from '@luma/api-contract';
-import { initServer } from '@ts-rest/fastify';
+import { IdentityError } from '@luma/identity';
+import type { HttpContext } from '@luma/identity/http';
+import { implement } from '@orpc/server';
 
 import type { ProviderCatalog } from '../application/providers.js';
 
@@ -8,24 +10,18 @@ import type { ProviderCatalog } from '../application/providers.js';
  * unknown IDs.
  */
 export function createProviderRoutes(catalog: ProviderCatalog) {
-  return initServer().router(apiContract.connectorProviders, {
-    list: async ({ query }) => ({
-      status: 200,
-      body: { items: catalog.list(query.category) },
-    }),
-    get: async ({ params, request }) => {
-      const provider = catalog.get(params.providerId);
+  const os = implement(apiContract.connectorProviders).$context<HttpContext>();
 
-      return provider
-        ? { status: 200, body: provider }
-        : {
-            status: 404,
-            body: {
-              code: 'NOT_FOUND',
-              message: 'Provider not found',
-              requestId: request.id,
-            },
-          };
-    },
+  return os.router({
+    list: os.list.handler(async ({ input: { query } }) => ({
+      items: catalog.list(query.category),
+    })),
+    get: os.get.handler(async ({ input: { params } }) => {
+      const provider = catalog.get(params.providerId);
+      if (!provider)
+        throw new IdentityError(404, 'NOT_FOUND', 'Provider not found');
+
+      return provider;
+    }),
   });
 }

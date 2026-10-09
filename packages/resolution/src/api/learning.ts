@@ -7,7 +7,8 @@ import {
   resolutionRunSchema,
 } from '@luma/api-contract';
 import { IdentityError } from '@luma/identity';
-import { initServer } from '@ts-rest/fastify';
+import type { HttpContext } from '@luma/identity/http';
+import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
 import type { LearningService } from '../application/learning.js';
@@ -30,57 +31,55 @@ export function learningRoutes(service?: LearningService) {
     return { context: request.tenantContext, service };
   }
 
-  return initServer().router(apiContract.resolutionLearning, {
-    list: async ({ request, params, query }) => {
-      const s = use(request);
-      const page = await s.service.list(
-        s.context,
-        params.exceptionId,
-        query.after,
-      );
+  const os = implement(apiContract.resolutionLearning).$context<HttpContext>();
 
-      return {
-        status: 200,
-        body: {
+  return os.router({
+    list: os.list.handler(
+      async ({ context: { request }, input: { params, query } }) => {
+        const s = use(request);
+        const page = await s.service.list(
+          s.context,
+          params.exceptionId,
+          query.after,
+        );
+
+        return {
           ...page,
           items: page.items.map((item) => resolutionRunSchema.parse(item)),
-        },
-      };
-    },
-    start: async ({ request, params, body }) => {
-      const s = use(request);
+        };
+      },
+    ),
+    start: os.start.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: resolutionRunSchema.parse(
+        return resolutionRunSchema.parse(
           await s.service.start(s.context, params.exceptionId, body),
-        ),
-      };
-    },
-    append: async ({ request, params, body }) => {
-      const s = use(request);
+        );
+      },
+    ),
+    append: os.append.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: learningEventSchema.parse(
+        return learningEventSchema.parse(
           await s.service.append(
             s.context,
             params.exceptionId,
             params.runId,
             body,
           ),
-        ),
-      };
-    },
-    read: async ({ request, params }) => {
-      const s = use(request);
+        );
+      },
+    ),
+    read: os.read.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: resolutionHistorySchema.parse(
+        return resolutionHistorySchema.parse(
           await s.service.read(s.context, params.exceptionId, params.runId),
-        ),
-      };
-    },
+        );
+      },
+    ),
   });
 }

@@ -23,7 +23,7 @@
   "dependencies": {
     "@luma/identity": "workspace:*",
     "@luma/platform": "workspace:*",
-    "zod": "catalog:zod3"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

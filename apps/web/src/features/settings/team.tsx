@@ -27,12 +27,7 @@ import {
   useSettingsCommand,
   useSettingsOnline,
 } from './command';
-import {
-  invitationsOptions,
-  membersOptions,
-  settingsApi,
-  settingsResult,
-} from './data';
+import { invitationsOptions, membersOptions, settingsApi } from './data';
 import { type RoleChoice, RolePicker } from './role-picker';
 import { rolesOptions, type WorkspaceRole } from './roles-data';
 
@@ -114,18 +109,17 @@ export function TeamSettings({
     const target = selected;
     await command.run(
       async (commandId) => {
-        settingsResult(
-          remove
-            ? await settingsApi.identity.removeMember({
-                params: { organizationId, memberId: target.id },
-                headers: { 'x-command-id': commandId },
-              })
-            : await settingsApi.identity.updateMember({
-                params: { organizationId, memberId: target.id },
-                headers: { 'x-command-id': commandId },
-                body: { roleId: nextRole },
-              }),
-        );
+        if (remove)
+          await settingsApi.identity.removeMember({
+            params: { organizationId, memberId: target.id },
+            headers: { 'x-command-id': commandId },
+          });
+        else
+          await settingsApi.identity.updateMember({
+            params: { organizationId, memberId: target.id },
+            headers: { 'x-command-id': commandId },
+            body: { roleId: nextRole },
+          });
         setSelected(null);
       },
       remove
@@ -338,20 +332,18 @@ export function TeamSettings({
                         disabled={blocked || !deliveryAvailable}
                         onClick={() =>
                           void command.run(
-                            async (commandId) =>
-                              settingsResult(
-                                await settingsApi.settings.changeInvitation({
-                                  params: {
-                                    organizationId,
-                                    invitationId: invitation.id,
-                                  },
-                                  body: {
-                                    commandId,
-                                    generation: invitation.generation,
-                                    action: 'resend',
-                                  },
-                                }),
-                              ),
+                            (commandId) =>
+                              settingsApi.settings.changeInvitation({
+                                params: {
+                                  organizationId,
+                                  invitationId: invitation.id,
+                                },
+                                body: {
+                                  commandId,
+                                  generation: invitation.generation,
+                                  action: 'resend',
+                                },
+                              }),
                             m.settings_invitation_resent(),
                           )
                         }
@@ -363,20 +355,18 @@ export function TeamSettings({
                         disabled={blocked}
                         onClick={() =>
                           void command.run(
-                            async (commandId) =>
-                              settingsResult(
-                                await settingsApi.settings.changeInvitation({
-                                  params: {
-                                    organizationId,
-                                    invitationId: invitation.id,
-                                  },
-                                  body: {
-                                    commandId,
-                                    generation: invitation.generation,
-                                    action: 'revoke',
-                                  },
-                                }),
-                              ),
+                            (commandId) =>
+                              settingsApi.settings.changeInvitation({
+                                params: {
+                                  organizationId,
+                                  invitationId: invitation.id,
+                                },
+                                body: {
+                                  commandId,
+                                  generation: invitation.generation,
+                                  action: 'revoke',
+                                },
+                              }),
                             m.settings_invitation_revoked(),
                           )
                         }
@@ -408,16 +398,14 @@ export function TeamSettings({
             onSubmit={(event) => {
               event.preventDefault();
               void command.run(async (commandId) => {
-                settingsResult(
-                  await settingsApi.settings.invite({
-                    params: { organizationId },
-                    body: {
-                      commandId,
-                      email: email.trim().toLowerCase(),
-                      roleId: inviteRole,
-                    },
-                  }),
-                );
+                await settingsApi.settings.invite({
+                  params: { organizationId },
+                  body: {
+                    commandId,
+                    email: email.trim().toLowerCase(),
+                    roleId: inviteRole,
+                  },
+                });
                 setInviteOpen(false);
                 setEmail('');
               }, m.settings_invite_queued());

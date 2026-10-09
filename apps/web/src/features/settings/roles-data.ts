@@ -9,7 +9,7 @@ import { queryOptions } from '@tanstack/react-query';
 
 import { privateQueryDefaults } from '../../lib/private-query';
 import { localizeRoles } from '../identity/permission-text';
-import { settingsApi, SettingsError } from './data';
+import { settingsApi } from './data';
 
 export type { PermissionDefinition, PermissionGroup, WorkspaceRole };
 
@@ -21,16 +21,8 @@ export const rolesOptions = (organizationId: string) =>
   queryOptions({
     ...privateQueryDefaults,
     queryKey: ['private', 'organization', organizationId, 'roles'],
-    queryFn: async ({ signal }): Promise<RolesSnapshot> => {
-      const result = await settingsApi.roles.list({
-        params: { organizationId },
-        fetchOptions: { signal },
-      });
-      if (result.status !== 200)
-        throw new SettingsError(result.status, result.body.message);
-
-      return result.body;
-    },
+    queryFn: ({ signal }): Promise<RolesSnapshot> =>
+      settingsApi.roles.list({ params: { organizationId } }, { signal }),
     select: localizeRoles,
   });
 
@@ -39,16 +31,13 @@ export const roleHistoryOptions = (organizationId: string, roleId: string) =>
   queryOptions({
     ...privateQueryDefaults,
     queryKey: ['private', 'organization', organizationId, 'roles', roleId],
-    queryFn: async ({ signal }): Promise<RoleHistoryEvent[]> => {
-      const result = await settingsApi.roles.history({
-        params: { organizationId, roleId },
-        fetchOptions: { signal },
-      });
-      if (result.status !== 200)
-        throw new SettingsError(result.status, result.body.message);
-
-      return result.body.items;
-    },
+    queryFn: async ({ signal }): Promise<RoleHistoryEvent[]> =>
+      (
+        await settingsApi.roles.history(
+          { params: { organizationId, roleId } },
+          { signal },
+        )
+      ).items,
   });
 
 /** Splits a proposed permission set into additions and removals against the current set. */

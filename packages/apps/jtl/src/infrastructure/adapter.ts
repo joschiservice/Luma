@@ -172,10 +172,7 @@ export function createJtlConnector(
         }
         const payloads: unknown[] = [];
 
-        function capture<T>(
-          schema: z.ZodType<T, z.ZodTypeDef, unknown>,
-          value: unknown,
-        ): T {
+        function capture<T>(schema: z.ZodType<T>, value: unknown): T {
           const result = parse(schema, value);
           if (options.rawRetentionMs !== undefined) payloads.push(result);
 

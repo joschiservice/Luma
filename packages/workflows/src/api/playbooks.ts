@@ -2,7 +2,8 @@ import '@luma/identity/http';
 
 import { apiContract } from '@luma/api-contract';
 import { IdentityError } from '@luma/identity';
-import { initServer } from '@ts-rest/fastify';
+import type { HttpContext } from '@luma/identity/http';
+import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
 import type { PlaybookLibrary } from '../application/playbook-library.js';
@@ -22,48 +23,46 @@ export function playbookRoutes(service?: PlaybookLibrary) {
     return { context: request.tenantContext, service };
   }
 
-  return initServer().router(apiContract.playbooks, {
-    list: async ({ request }) => {
+  const os = implement(apiContract.playbooks).$context<HttpContext>();
+
+  return os.router({
+    list: os.list.handler(async ({ context: { request } }) => {
       const s = use(request);
 
-      return { status: 200, body: { items: await s.service.list(s.context) } };
-    },
-    detail: async ({ request, params }) => {
-      const s = use(request);
+      return { items: await s.service.list(s.context) };
+    }),
+    detail: os.detail.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.service.detail(s.context, params.definitionId),
-      };
-    },
-    runs: async ({ request, params }) => {
-      const s = use(request);
+        return await s.service.detail(s.context, params.definitionId);
+      },
+    ),
+    runs: os.runs.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: { items: await s.service.runs(s.context, params.definitionId) },
-      };
-    },
-    activate: async ({ request, params, body }) => {
-      const s = use(request);
+        return { items: await s.service.runs(s.context, params.definitionId) };
+      },
+    ),
+    activate: os.activate.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.service.activate(s.context, params.definitionId, body),
-      };
-    },
-    revoke: async ({ request, params, body }) => {
-      const s = use(request);
+        return await s.service.activate(s.context, params.definitionId, body);
+      },
+    ),
+    revoke: os.revoke.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = use(request);
 
-      return {
-        status: 200,
-        body: await s.service.revoke(
+        return await s.service.revoke(
           s.context,
           params.definitionId,
           params.activationId,
           body.artifactDigest,
-        ),
-      };
-    },
+        );
+      },
+    ),
   });
 }

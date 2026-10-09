@@ -2,7 +2,8 @@ import '@luma/identity/http';
 
 import { apiContract } from '@luma/api-contract';
 import { IdentityError } from '@luma/identity';
-import { initServer } from '@ts-rest/fastify';
+import type { HttpContext } from '@luma/identity/http';
+import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
 import type { AppService } from './index.js';
@@ -22,45 +23,44 @@ export function appRoutes(apps?: AppService) {
     return { apps, context: request.tenantContext };
   }
 
-  return initServer().router(apiContract.apps, {
-    list: async ({ request }) => {
+  const os = implement(apiContract.apps).$context<HttpContext>();
+
+  return os.router({
+    list: os.list.handler(async ({ context: { request } }) => {
       const { apps, context } = use(request);
 
-      return { status: 200, body: await apps.list(context) };
-    },
-    install: async ({ request, params, body }) => {
-      const { apps, context } = use(request);
+      return await apps.list(context);
+    }),
+    install: os.install.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const { apps, context } = use(request);
 
-      return {
-        status: 200,
-        body: await apps.install(
+        return await apps.install(
           context,
           params.appId,
           body.version,
           body.scopes,
-        ),
-      };
-    },
-    approveScopes: async ({ request, params, body }) => {
-      const { apps, context } = use(request);
+        );
+      },
+    ),
+    approveScopes: os.approveScopes.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const { apps, context } = use(request);
 
-      return {
-        status: 200,
-        body: await apps.approveScopes(
+        return await apps.approveScopes(
           context,
           params.appId,
           body.version,
           body.scopes,
-        ),
-      };
-    },
-    uninstall: async ({ request, params, body }) => {
-      const { apps, context } = use(request);
+        );
+      },
+    ),
+    uninstall: os.uninstall.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const { apps, context } = use(request);
 
-      return {
-        status: 200,
-        body: await apps.uninstall(context, params.appId, body.version),
-      };
-    },
+        return await apps.uninstall(context, params.appId, body.version);
+      },
+    ),
   });
 }

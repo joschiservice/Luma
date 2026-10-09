@@ -186,7 +186,7 @@ export const evidenceSchema = z
       })
       .strict()
       .nullable(),
-    facts: z.record(z.unknown()),
+    facts: z.record(z.string(), z.unknown()),
   })
   .strict();
 

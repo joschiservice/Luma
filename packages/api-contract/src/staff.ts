@@ -1,7 +1,6 @@
-import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
-import { apiErrorSchema } from './common.js';
+import { endpoint, type ErrorStatus } from './common.js';
 
 export const staffPermissionSchema = z.enum([
   'staff.directory.read',
@@ -82,72 +81,89 @@ export const staffRevokeSessionsResultSchema = z.object({
   completedAt: z.string().datetime(),
 });
 const workspaceParams = z.object({ workspaceId: z.string().uuid() });
-const c = initContract();
+const errors = [400, 401, 403, 404, 409, 503] as const satisfies ErrorStatus[];
 
 /** Dedicated staff API contract; customer routes do not include these capabilities. */
-export const staffContract = c.router(
-  {
-    config: {
+export const staffContract = {
+  config: endpoint
+    .route({
       method: 'GET',
       path: '/v1/staff/config',
-      responses: { 200: staffConfigSchema },
       summary: 'Get the staff sign-in method',
-    },
-    session: {
+    })
+    .meta({ errors })
+    .output(staffConfigSchema),
+  session: endpoint
+    .route({
       method: 'GET',
       path: '/v1/staff/session',
-      responses: { 200: staffSessionSchema },
       summary: 'Resolve current staff access',
-    },
-    directory: {
+    })
+    .meta({ errors })
+    .output(staffSessionSchema),
+  directory: endpoint
+    .route({
       method: 'GET',
       path: '/v1/staff/directory',
-      query: z.object({ query: z.string().trim().min(3).max(100) }),
-      responses: { 200: staffDirectorySchema },
       summary: 'Search the support directory',
-    },
-    grantAccess: {
+    })
+    .meta({ errors })
+    .input(
+      z.object({
+        query: z.object({ query: z.string().trim().min(3).max(100) }),
+      }),
+    )
+    .output(staffDirectorySchema),
+  grantAccess: endpoint
+    .route({
       method: 'POST',
-      path: '/v1/staff/workspaces/:workspaceId/access',
-      pathParams: workspaceParams,
-      body: z.object({ reason: staffReasonSchema }).strict(),
-      responses: { 201: staffAccessSchema },
+      path: '/v1/staff/workspaces/{workspaceId}/access',
+      successStatus: 201,
       summary: 'Open time-limited workspace support access',
-    },
-    workspace: {
+    })
+    .meta({ errors })
+    .input(
+      z.object({
+        params: workspaceParams,
+        body: z.object({ reason: staffReasonSchema }).strict(),
+      }),
+    )
+    .output(staffAccessSchema),
+  workspace: endpoint
+    .route({
       method: 'GET',
-      path: '/v1/staff/workspaces/:workspaceId',
-      pathParams: workspaceParams,
-      query: z.object({ grantId: z.string().uuid() }),
-      responses: { 200: staffDetailSchema },
+      path: '/v1/staff/workspaces/{workspaceId}',
       summary: 'Inspect a workspace using a current support grant',
-    },
-    revokeSessions: {
+    })
+    .meta({ errors })
+    .input(
+      z.object({
+        params: workspaceParams,
+        query: z.object({ grantId: z.string().uuid() }),
+      }),
+    )
+    .output(staffDetailSchema),
+  revokeSessions: endpoint
+    .route({
       method: 'POST',
-      path: '/v1/staff/workspaces/:workspaceId/users/:userId/revoke-sessions',
-      pathParams: workspaceParams.extend({ userId: z.string().uuid() }),
-      body: z
-        .object({
-          grantId: z.string().uuid(),
-          reason: staffReasonSchema,
-          commandId: z.string().uuid(),
-          acknowledgeGlobalEffect: z.literal(true),
-        })
-        .strict(),
-      responses: { 200: staffRevokeSessionsResultSchema },
+      path: '/v1/staff/workspaces/{workspaceId}/users/{userId}/revoke-sessions',
       summary: 'Revoke all customer sessions',
       description:
         'Revokes sessions across every workspace belonging to the user. Requires recent staff authentication and explicit acknowledgement. Repeated command IDs return the original receipt.',
-    },
-  },
-  {
-    commonResponses: {
-      400: apiErrorSchema,
-      401: apiErrorSchema,
-      403: apiErrorSchema,
-      404: apiErrorSchema,
-      409: apiErrorSchema,
-      503: apiErrorSchema,
-    },
-  },
-);
+    })
+    .meta({ errors })
+    .input(
+      z.object({
+        params: workspaceParams.extend({ userId: z.string().uuid() }),
+        body: z
+          .object({
+            grantId: z.string().uuid(),
+            reason: staffReasonSchema,
+            commandId: z.string().uuid(),
+            acknowledgeGlobalEffect: z.literal(true),
+          })
+          .strict(),
+      }),
+    )
+    .output(staffRevokeSessionsResultSchema),
+};

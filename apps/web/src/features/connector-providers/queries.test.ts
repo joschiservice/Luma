@@ -18,16 +18,14 @@ it('consumes the shared contract through the web Query client', async () => {
     connectorProviderQueryOptions(createWebApiClient(), 'shopify'),
   );
   expect(result.name).toBe('Shopify');
-  expect(fetch).toHaveBeenCalledWith(
+  expect(fetch).toHaveBeenCalledOnce();
+  const request: Request = fetch.mock.calls[0]![0];
+  expect(new URL(request.url).pathname).toBe(
     '/api/v1/connector-providers/shopify',
-    expect.objectContaining({
-      method: 'GET',
-      signal: expect.any(AbortSignal),
-      headers: expect.objectContaining({
-        'x-luma-action-id': expect.stringMatching(/^[0-9a-f-]{36}$/),
-      }),
-    }),
   );
+  expect(request.method).toBe('GET');
+  expect(request.signal).toBeInstanceOf(AbortSignal);
+  expect(request.headers.get('x-luma-action-id')).toMatch(/^[0-9a-f-]{36}$/);
   queryClient.clear();
 });
 

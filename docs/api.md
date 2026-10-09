@@ -1,6 +1,6 @@
 # HTTP API foundation
 
-One ts-rest contract in `@luma/api-contract` is shared by the Fastify server, the typed web client and the generated OpenAPI document. Requests and responses are validated on both sides, errors have one sanitized shape, and every tenant route is authorized by the identity guard before a handler runs. Session routes and tenant authorization are described in the [identity guide](identity.md).
+One oRPC contract in `@luma/api-contract` is shared by the Fastify server, the typed web client and the generated OpenAPI document ([ADR-010](architecture/010-orpc-http-contracts.md)). Requests and responses are validated on both sides, errors have one sanitized shape, and every tenant route is authorized by the identity guard before a handler runs. Session routes and tenant authorization are described in the [identity guide](identity.md).
 
 ## Serving and consuming
 
@@ -8,7 +8,7 @@ Browsers reach the API only through the same-origin `/api` proxy, which removes 
 
 - Browser clients call `/api`; server-side callers pass an absolute API origin.
 - Create credential-bearing clients per request, never as a server singleton. Session forwarding must stay explicit in the server authentication layer.
-- Query cancellation reaches `fetch`. Malformed responses and undocumented status codes are rejected by the client and never enter the query cache.
+- Client calls resolve with the validated response body. Error statuses reject with the status and error body; malformed responses reject with a validation error. Neither enters the query cache. Query cancellation reaches `fetch`.
 - Tenant queries include the organization ID in their cache keys.
 
 `@luma/api-contract/openapi` is a separate server and tooling entry point, so schema generation stays out of browser bundles. The server serves the document at `/openapi.json`; the committed copy in `packages/api-contract` must be regenerated with `pnpm --filter @luma/api-contract generate:openapi` after contract changes, and a test rejects a stale copy.
@@ -19,7 +19,9 @@ Browsers reach the API only through the same-origin `/api` proxy, which removes 
 
 - Business endpoints use `/v1`. Additive changes may stay in v1. Removing or renaming fields, changing types or narrowing accepted inputs needs a new major path and an explicit migration. Health and readiness stay unversioned.
 - Route keys form OpenAPI operation IDs; keep them stable.
-- Declare every intended response status. Use strict mutation objects so unexpected tenant or region fields are rejected.
+- Start routes from `endpoint` in the contract package. Declare a non-200 success status with `successStatus`, and every intended error status in the route's `errors` metadata; the OpenAPI document adds the shared error schema for them. Use strict mutation objects so unexpected tenant or region fields are rejected.
+- Contract paths use `{param}`. Each route is registered with Fastify as `:param`, which is the form hooks, the guard and route allowlists see.
+- Handlers report failures by throwing errors such as `IdentityError`, which the Fastify error handler turns into the error body. Do not throw oRPC errors from handlers: only input validation failures are mapped to 400, and any other oRPC error becomes a 500.
 - A new resource adds its schemas and routes to the shared contract, implements the owning package's application port and API mapping, and is wired in application runtime composition. Only API layers import the contract; inner layers stay framework independent. HTTP handlers map validated requests and use-case results; they hold no business rules.
 - Tenant resources follow [ADR-003](architecture/003-tenant-isolation-and-data-residency.md): `/v1/organizations/:organizationId/<resource>`, camelCase fields and UUID organization IDs. Schemas reserve `EU | US | APAC`, but only EU provisioning is enabled. Never treat path IDs or caller-supplied region or context as authorization.
 
@@ -50,4 +52,4 @@ Responses include a server-generated `x-request-id` and, when observability is w
 
 ## Dependency trap
 
-The stable ts-rest Fastify adapter declares a Fastify 4 peer, while the repository uses Fastify 5. A version-specific `peerDependencyRules` exception in `pnpm-workspace.yaml` allows this pairing; strict peer checking stays on elsewhere, and the API's real HTTP and error-path tests cover the integration. Because ts-rest needs Zod 3, the contract and server-side packages use the `zod3` catalog entry; only the web app and UI package use Zod 4. Review both exceptions when upgrading ts-rest; the pairing is not certified upstream ([upstream Fastify 5 work](https://github.com/ts-rest/ts-rest/pull/702)).
+oRPC is pinned to 1.x. Version 2 changes routing metadata, error status handling and client options, so upgrading is a deliberate migration of the contract package, the Fastify bridge in `@luma/identity/http` and the client.

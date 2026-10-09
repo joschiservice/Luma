@@ -56,7 +56,8 @@ export class IdentityError extends Error {
       | 'NOT_FOUND'
       | 'CONFLICT'
       | 'REGION_UNAVAILABLE'
-      | 'SERVICE_UNAVAILABLE',
+      | 'SERVICE_UNAVAILABLE'
+      | 'NOT_READY',
     message: string,
   ) {
     super(message);

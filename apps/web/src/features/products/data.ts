@@ -1,10 +1,8 @@
-import { productDetailSchema, productListSchema } from '@luma/api-contract';
 import { queryOptions } from '@tanstack/react-query';
 import { z } from 'zod';
 
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
-import { IdentityError } from '../identity/data';
 
 const api = createWebApiClient();
 
@@ -53,17 +51,8 @@ export function productsOptions(
     ...privateQueryDefaults,
     queryKey: ['private', 'organization', organizationId, 'products', query],
     refetchOnReconnect: 'always',
-    queryFn: async ({ signal }) => {
-      const result = await api.products.list({
-        params: { organizationId },
-        query,
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return productListSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.products.list({ params: { organizationId }, query }, { signal }),
   });
 }
 
@@ -73,16 +62,8 @@ export function productOptions(organizationId: string, skuId: string) {
     ...privateQueryDefaults,
     queryKey: ['private', 'organization', organizationId, 'product', skuId],
     refetchOnReconnect: 'always',
-    queryFn: async ({ signal }) => {
-      const result = await api.products.get({
-        params: { organizationId, skuId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return productDetailSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.products.get({ params: { organizationId, skuId } }, { signal }),
   });
 }
 
@@ -94,16 +75,7 @@ export function productSummaryOptions(organizationId: string) {
     ...privateQueryDefaults,
     queryKey: ['private', 'organization', organizationId, 'products', query],
     refetchOnReconnect: 'always',
-    queryFn: async ({ signal }) => {
-      const result = await api.products.list({
-        params: { organizationId },
-        query,
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return productListSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.products.list({ params: { organizationId }, query }, { signal }),
   });
 }

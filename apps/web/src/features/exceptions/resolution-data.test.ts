@@ -58,14 +58,16 @@ it.each(['approve', 'reject', 'escalate'] as const)(
     expect(await sendDecision(organizationId, exceptionId, command)).toEqual(
       receipt,
     );
-    expect(JSON.parse(fetch.mock.calls[0]![1].body)).toEqual(command);
-    expect(fetch.mock.calls[0]![0]).toContain(
+    const decision: Request = fetch.mock.calls[0]![0];
+    expect(await decision.json()).toEqual(command);
+    expect(decision.url).toContain(
       `/organizations/${organizationId}/exceptions/${exceptionId}/decisions`,
     );
+    expect(decision.headers.get('x-luma-action-id')).toBe(commandId);
     expect(
       await recoverDecision(organizationId, exceptionId, commandId),
     ).toEqual(receipt);
-    expect(fetch.mock.calls[1]![0]).toContain(`/decisions/${commandId}`);
+    expect(fetch.mock.calls[1]![0].url).toContain(`/decisions/${commandId}`);
   },
 );
 
@@ -140,7 +142,7 @@ it('refreshes through an explicit command and surfaces changed conditions', asyn
   await expect(refreshResolution(organizationId, exceptionId)).rejects.toThrow(
     'The order was cancelled.',
   );
-  expect(fetch.mock.calls[0]![1].method).toBe('POST');
+  expect(fetch.mock.calls[0]![0].method).toBe('POST');
 });
 
 it('treats a failed freshness read as retryable without implying an uncertain approval', async () => {

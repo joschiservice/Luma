@@ -47,7 +47,7 @@
     "ts-pattern": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:",
-    "zod": "catalog:zod4"
+    "zod": "catalog:"
   },
   "dependencies": {
     "@base-ui/react": "1.8.0",

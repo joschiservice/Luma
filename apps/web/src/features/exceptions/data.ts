@@ -1,10 +1,4 @@
-import {
-  caseClasses,
-  caseDetailSchema,
-  caseListSchema,
-  type CaseQuery,
-  caseStates,
-} from '@luma/api-contract';
+import { caseClasses, type CaseQuery, caseStates } from '@luma/api-contract';
 import { queryOptions } from '@tanstack/react-query';
 import { z } from 'zod';
 
@@ -44,17 +38,8 @@ export function casesOptions(organizationId: string, search: InboxSearch) {
   return queryOptions({
     ...options,
     queryKey: [...casesKey(organizationId), 'list', query],
-    queryFn: async ({ signal }) => {
-      const result = await api.exceptions.list({
-        params: { organizationId },
-        query,
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return caseListSchema.parse(result.body);
-    },
+    queryFn: ({ signal }) =>
+      api.exceptions.list({ params: { organizationId }, query }, { signal }),
   });
 }
 
@@ -70,14 +55,11 @@ export function caseOptions(organizationId: string, exceptionId: string) {
     queryFn: async ({ signal }) => {
       if (!z.uuid().safeParse(exceptionId).success)
         throw new IdentityError(404);
-      const result = await api.exceptions.get({
-        params: { organizationId, exceptionId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
 
-      return caseDetailSchema.parse(result.body);
+      return api.exceptions.get(
+        { params: { organizationId, exceptionId } },
+        { signal },
+      );
     },
   });
 }

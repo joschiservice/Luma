@@ -7,7 +7,8 @@ import {
 } from '@luma/api-contract';
 import type { TenantContext } from '@luma/identity';
 import { IdentityError } from '@luma/identity';
-import { initServer } from '@ts-rest/fastify';
+import type { HttpContext } from '@luma/identity/http';
+import { implement } from '@orpc/server';
 
 import type { Insights } from '../application/insights.js';
 
@@ -26,26 +27,26 @@ export function insightRoutes(service?: Insights) {
     return { service, context };
   };
 
-  return initServer().router(apiContract.insights, {
-    chart: async ({ request, params, query }) => {
-      const { service, context } = ready(request.tenantContext);
+  const os = implement(apiContract.insights).$context<HttpContext>();
 
-      return {
-        status: 200,
-        body: insightChartResponseSchema.parse(
+  return os.router({
+    chart: os.chart.handler(
+      async ({ context: { request }, input: { params, query } }) => {
+        const { service, context } = ready(request.tenantContext);
+
+        return insightChartResponseSchema.parse(
           await service.chart(context, params.chart, query),
-        ),
-      };
-    },
-    records: async ({ request, params, query }) => {
-      const { service, context } = ready(request.tenantContext);
+        );
+      },
+    ),
+    records: os.records.handler(
+      async ({ context: { request }, input: { params, query } }) => {
+        const { service, context } = ready(request.tenantContext);
 
-      return {
-        status: 200,
-        body: insightRecordListSchema.parse(
+        return insightRecordListSchema.parse(
           await service.records(context, params.chart, query),
-        ),
-      };
-    },
+        );
+      },
+    ),
   });
 }

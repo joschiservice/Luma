@@ -172,8 +172,13 @@ export function mockShadow(state: PreviewState) {
       location.origin,
     );
     if (!url.pathname.startsWith('/api/')) return original(input, init);
-    const method = init?.method ?? 'GET';
-    const body = JSON.parse(String(init?.body ?? '{}'));
+    const method =
+      input instanceof Request ? input.method : (init?.method ?? 'GET');
+    const body = JSON.parse(
+      (input instanceof Request
+        ? await input.clone().text()
+        : String(init?.body ?? '')) || '{}',
+    );
     requests.push({ method, path: url.pathname, body });
     const fail = (status: number) =>
       Response.json(

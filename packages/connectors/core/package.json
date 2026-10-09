@@ -23,6 +23,6 @@
     }
   },
   "dependencies": {
-    "zod": "catalog:zod3"
+    "zod": "catalog:"
   }
 }

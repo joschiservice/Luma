@@ -1,17 +1,15 @@
-import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
 import {
   anyMember,
-  apiErrorSchema,
+  endpoint,
   organizationParamsSchema,
   requires,
 } from '../common.js';
 import { saveWorkspaceLayoutSchema, workspaceLayoutSchema } from '../layout.js';
 import { invitationSchema, settingsSnapshotSchema } from '../settings.js';
 
-const c = initContract();
-const path = '/v1/organizations/:organizationId/settings';
+const path = '/v1/organizations/{organizationId}/settings';
 const command = z.object({ commandId: z.string().uuid() });
 const invitationParams = organizationParamsSchema.extend({
   invitationId: z.string().uuid(),
@@ -24,188 +22,236 @@ const invitationProof = z
   })
   .strict();
 
-export const settingsContract = c.router(
-  {
-    receipt: {
+export const settingsContract = {
+  receipt: endpoint
+    .route({
       method: 'GET',
-      metadata: anyMember,
-      path: `${path}/commands/:commandId`,
-      pathParams: organizationParamsSchema.extend({
-        commandId: z.string().uuid(),
-      }),
-      responses: { 200: z.object({ committed: z.boolean() }) },
+      path: `${path}/commands/{commandId}`,
       summary: 'Check whether your settings command committed',
-    },
-    get: {
+    })
+    .meta({ access: anyMember, errors: [401, 403, 404, 409, 503] })
+    .input(
+      z.object({
+        params: organizationParamsSchema.extend({
+          commandId: z.string().uuid(),
+        }),
+      }),
+    )
+    .output(z.object({ committed: z.boolean() })),
+  get: endpoint
+    .route({
       method: 'GET',
-      metadata: anyMember,
       path,
-      pathParams: organizationParamsSchema,
-      responses: { 200: settingsSnapshotSchema },
       summary: 'Read workspace settings and your email preferences',
-    },
-    updateWorkspace: {
+    })
+    .meta({ access: anyMember, errors: [401, 403, 404, 409, 503] })
+    .input(z.object({ params: organizationParamsSchema }))
+    .output(settingsSnapshotSchema),
+  updateWorkspace: endpoint
+    .route({
       method: 'PATCH',
-      metadata: requires('workspace.settings.manage'),
       path: `${path}/workspace`,
-      pathParams: organizationParamsSchema,
-      body: command
-        .extend({
-          revision: z.number().int().nonnegative(),
-          name: z.string().trim().min(1).max(200),
-          timezone: z
-            .string()
-            .min(1)
-            .max(100)
-            .refine((value) => {
-              try {
-                new Intl.DateTimeFormat('en', { timeZone: value });
-
-                return true;
-              } catch {
-                return false;
-              }
-            }),
-        })
-        .strict(),
-      responses: { 200: settingsSnapshotSchema },
       summary: 'Update the workspace name and display timezone',
-    },
-    updateApprovals: {
+    })
+    .meta({
+      access: requires('workspace.settings.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(
+      z.object({
+        params: organizationParamsSchema,
+        body: command
+          .extend({
+            revision: z.number().int().nonnegative(),
+            name: z.string().trim().min(1).max(200),
+            timezone: z
+              .string()
+              .min(1)
+              .max(100)
+              .refine((value) => {
+                try {
+                  new Intl.DateTimeFormat('en', { timeZone: value });
+
+                  return true;
+                } catch {
+                  return false;
+                }
+              }),
+          })
+          .strict(),
+      }),
+    )
+    .output(settingsSnapshotSchema),
+  updateApprovals: endpoint
+    .route({
       method: 'PATCH',
-      metadata: requires('workspace.approval_policy.manage'),
       path: `${path}/approvals`,
-      pathParams: organizationParamsSchema,
-      body: command
-        .extend({
-          revision: z.number().int().nonnegative(),
-          alwaysRequireApproval: z.boolean(),
-        })
-        .strict(),
-      responses: { 200: settingsSnapshotSchema },
       summary: 'Require independent approval for otherwise permitted changes',
       description:
         'Requires `workspace.approval_policy.manage`. This preference can only strengthen approval requirements. Platform denials and required approvals always apply. Changing this preference invalidates previous policy reviews.',
-    },
-    updateNotifications: {
+    })
+    .meta({
+      access: requires('workspace.approval_policy.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(
+      z.object({
+        params: organizationParamsSchema,
+        body: command
+          .extend({
+            revision: z.number().int().nonnegative(),
+            alwaysRequireApproval: z.boolean(),
+          })
+          .strict(),
+      }),
+    )
+    .output(settingsSnapshotSchema),
+  updateNotifications: endpoint
+    .route({
       method: 'PATCH',
-      metadata: anyMember,
       path: `${path}/notifications`,
-      pathParams: organizationParamsSchema,
-      body: command
-        .extend({
-          revision: z.number().int().nonnegative(),
-          issues: z.boolean(),
-          connections: z.boolean(),
-        })
-        .strict(),
-      responses: { 200: settingsSnapshotSchema },
       summary: 'Save your workspace email preferences',
-    },
-    layout: {
+    })
+    .meta({ access: anyMember, errors: [401, 403, 404, 409, 503] })
+    .input(
+      z.object({
+        params: organizationParamsSchema,
+        body: command
+          .extend({
+            revision: z.number().int().nonnegative(),
+            issues: z.boolean(),
+            connections: z.boolean(),
+          })
+          .strict(),
+      }),
+    )
+    .output(settingsSnapshotSchema),
+  layout: endpoint
+    .route({
       method: 'GET',
-      metadata: anyMember,
       path: `${path}/layout`,
-      pathParams: organizationParamsSchema,
-      responses: { 200: workspaceLayoutSchema },
       summary: 'Read your Home layout and pinned pages',
       description:
         'Layouts are personal: each member arranges their own Home and sidebar pins in each workspace. A null Home uses the default modules.',
-    },
-    saveLayout: {
+    })
+    .meta({ access: anyMember, errors: [401, 403, 404, 409, 503] })
+    .input(z.object({ params: organizationParamsSchema }))
+    .output(workspaceLayoutSchema),
+  saveLayout: endpoint
+    .route({
       method: 'PUT',
-      metadata: anyMember,
       path: `${path}/layout`,
-      pathParams: organizationParamsSchema,
-      body: saveWorkspaceLayoutSchema,
-      responses: { 200: workspaceLayoutSchema },
       summary: 'Save your Home layout and pinned pages',
       description:
         'Send the revision you last read. The save is rejected with 409 when another session saved a newer layout; read it again before retrying.',
-    },
-    testEmail: {
+    })
+    .meta({ access: anyMember, errors: [401, 403, 404, 409, 503] })
+    .input(
+      z.object({
+        params: organizationParamsSchema,
+        body: saveWorkspaceLayoutSchema,
+      }),
+    )
+    .output(workspaceLayoutSchema),
+  testEmail: endpoint
+    .route({
       method: 'POST',
-      metadata: anyMember,
       path: `${path}/notifications/test`,
-      pathParams: organizationParamsSchema,
-      body: command.strict(),
-      responses: { 200: settingsSnapshotSchema },
       summary: 'Queue a test email to your account',
-    },
-    invitations: {
+    })
+    .meta({ access: anyMember, errors: [401, 403, 404, 409, 503] })
+    .input(
+      z.object({ params: organizationParamsSchema, body: command.strict() }),
+    )
+    .output(settingsSnapshotSchema),
+  invitations: endpoint
+    .route({
       method: 'GET',
-      metadata: requires('members.manage'),
       path: `${path}/invitations`,
-      pathParams: organizationParamsSchema,
-      responses: { 200: z.object({ items: z.array(invitationSchema) }) },
       summary: 'List workspace invitations',
-    },
-    invite: {
+    })
+    .meta({
+      access: requires('members.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: organizationParamsSchema }))
+    .output(z.object({ items: z.array(invitationSchema) })),
+  invite: endpoint
+    .route({
       method: 'POST',
       path: `${path}/invitations`,
-      pathParams: organizationParamsSchema,
-      body: command
-        .extend({
-          email: z
-            .string()
-            .trim()
-            .email()
-            .max(254)
-            .transform((value) => value.toLowerCase()),
-          roleId: z.string().min(1),
-        })
-        .strict(),
-      responses: { 200: invitationSchema },
-      metadata: requires('members.manage'),
       summary: 'Invite a teammate by email',
       description:
         'Sending an invitation does not grant access. The invitation is bound to an active role other than Owner whose permissions you hold. An existing pending invitation must be resent or revoked; existing members cannot be invited.',
-    },
-    changeInvitation: {
+    })
+    .meta({
+      access: requires('members.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(
+      z.object({
+        params: organizationParamsSchema,
+        body: command
+          .extend({
+            email: z
+              .string()
+              .trim()
+              .email()
+              .max(254)
+              .transform((value) => value.toLowerCase()),
+            roleId: z.string().min(1),
+          })
+          .strict(),
+      }),
+    )
+    .output(invitationSchema),
+  changeInvitation: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('members.manage'),
-      path: `${path}/invitations/:invitationId`,
-      pathParams: invitationParams,
-      body: command
-        .extend({
-          action: z.enum(['resend', 'revoke']),
-          generation: z.number().int().positive(),
-        })
-        .strict(),
-      responses: { 200: invitationSchema },
+      path: `${path}/invitations/{invitationId}`,
       summary: 'Resend or revoke an invitation',
       description:
         'Resending replaces the previous link and starts a new seven-day expiry.',
-    },
-    previewInvitation: {
+    })
+    .meta({
+      access: requires('members.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(
+      z.object({
+        params: invitationParams,
+        body: command
+          .extend({
+            action: z.enum(['resend', 'revoke']),
+            generation: z.number().int().positive(),
+          })
+          .strict(),
+      }),
+    )
+    .output(invitationSchema),
+  previewInvitation: endpoint
+    .route({
       method: 'POST',
       path: '/v1/invitations/preview',
-      body: invitationProof,
-      responses: {
-        200: z.object({
-          name: z.string(),
-          email: z.string(),
-          role: z.object({ id: z.string(), name: z.string() }),
-          expiresAt: z.string(),
-        }),
-      },
       summary: 'Review an invitation for your signed-in email',
-    },
-    acceptInvitation: {
+    })
+    .meta({ errors: [401, 403, 404, 409, 503] })
+    .input(z.object({ body: invitationProof }))
+    .output(
+      z.object({
+        name: z.string(),
+        email: z.string(),
+        role: z.object({ id: z.string(), name: z.string() }),
+        expiresAt: z.string(),
+      }),
+    ),
+  acceptInvitation: endpoint
+    .route({
       method: 'POST',
       path: '/v1/invitations/accept',
-      body: invitationProof,
-      responses: { 200: z.object({ organizationId: z.string().uuid() }) },
       summary: 'Accept a single-use invitation for your signed-in email',
-    },
-  },
-  {
-    commonResponses: {
-      401: apiErrorSchema,
-      403: apiErrorSchema,
-      404: apiErrorSchema,
-      409: apiErrorSchema,
-      503: apiErrorSchema,
-    },
-  },
-);
+    })
+    .meta({ errors: [401, 403, 404, 409, 503] })
+    .input(z.object({ body: invitationProof }))
+    .output(z.object({ organizationId: z.string().uuid() })),
+};

@@ -1,8 +1,7 @@
-import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
 import { caseEvidenceQuerySchema } from '../cases.js';
-import { apiErrorSchema, caseParams, requires } from '../common.js';
+import { caseParams, endpoint, requires } from '../common.js';
 import {
   caseDecisionSchema,
   caseProgressSchema,
@@ -11,81 +10,91 @@ import {
   decisionReceiptSchema,
 } from '../desk.js';
 
-const c = initContract();
-
-export const caseDeskContract = c.router(
-  {
-    review: {
+export const caseDeskContract = {
+  review: endpoint
+    .route({
       method: 'GET',
-      metadata: requires('issues.read'),
-      path: '/v1/organizations/:organizationId/exceptions/:exceptionId/review',
-      pathParams: caseParams,
-      responses: { 200: caseReviewSchema },
+      path: '/v1/organizations/{organizationId}/exceptions/{exceptionId}/review',
       summary: 'Review a case proposal',
       description:
         'Returns an immutable proposal, its current policy result and permitted decisions. Unavailable capabilities cannot be approved. Manual recommendations remain in the case investigation.',
-    },
-    refresh: {
+    })
+    .meta({
+      access: requires('issues.read'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: caseParams }))
+    .output(caseReviewSchema),
+  refresh: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('actions.propose'),
-      path: '/v1/organizations/:organizationId/exceptions/:exceptionId/review/refresh',
-      pathParams: caseParams,
-      body: z.object({}).strict(),
-      responses: { 200: caseReviewSchema },
+      path: '/v1/organizations/{organizationId}/exceptions/{exceptionId}/review/refresh',
       summary: 'Check current facts for a resolution proposal',
       description:
         'Checks current source facts and prepares a current proposal where supported. Existing approvals and execution records are preserved. Changed conditions require review; provider unavailability can be retried.',
-    },
-    decide: {
+    })
+    .meta({
+      access: requires('actions.propose'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: caseParams, body: z.object({}).strict() }))
+    .output(caseReviewSchema),
+  decide: endpoint
+    .route({
       method: 'POST',
-      metadata: requires(['decisions.respond', 'issues.manage']),
-      path: '/v1/organizations/:organizationId/exceptions/:exceptionId/decisions',
-      pathParams: caseParams,
-      body: caseDecisionSchema,
-      responses: { 200: decisionReceiptSchema },
+      path: '/v1/organizations/{organizationId}/exceptions/{exceptionId}/decisions',
       summary: 'Approve, reject or escalate a case',
       description:
         'Use a unique commandId and the current case, diagnosis, proposal and policy versions from review. Exact retries return the committed receipt. Conflicts return 409. Approval records a decision; it does not mean execution or verification succeeded.',
-    },
-    receipt: {
+    })
+    .meta({
+      access: requires(['decisions.respond', 'issues.manage']),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: caseParams, body: caseDecisionSchema }))
+    .output(decisionReceiptSchema),
+  receipt: endpoint
+    .route({
       method: 'GET',
-      metadata: requires('issues.read'),
-      path: '/v1/organizations/:organizationId/exceptions/:exceptionId/decisions/:commandId',
-      pathParams: caseParams.extend({ commandId: z.string().uuid() }),
-      responses: { 200: decisionReceiptSchema },
+      path: '/v1/organizations/{organizationId}/exceptions/{exceptionId}/decisions/{commandId}',
       summary: 'Recover a decision result',
       description:
         'After a timeout, read the receipt using the original command ID or retry the identical request. Receipts are visible to their submitting actor.',
-    },
-    progress: {
+    })
+    .meta({
+      access: requires('issues.read'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(
+      z.object({ params: caseParams.extend({ commandId: z.string().uuid() }) }),
+    )
+    .output(decisionReceiptSchema),
+  progress: endpoint
+    .route({
       method: 'GET',
-      metadata: requires('issues.read'),
-      path: '/v1/organizations/:organizationId/exceptions/:exceptionId/progress',
-      pathParams: caseParams,
-      responses: { 200: caseProgressSchema },
+      path: '/v1/organizations/{organizationId}/exceptions/{exceptionId}/progress',
       summary: 'Read execution and verification progress',
       description:
         'Returns persisted execution and canonical resolution separately from workflow phase. An unavailable workflow service does not imply success or no activity.',
-    },
-    timeline: {
+    })
+    .meta({
+      access: requires('issues.read'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: caseParams }))
+    .output(caseProgressSchema),
+  timeline: endpoint
+    .route({
       method: 'GET',
-      metadata: requires('issues.read'),
-      path: '/v1/organizations/:organizationId/exceptions/:exceptionId/timeline',
-      pathParams: caseParams,
-      query: caseEvidenceQuerySchema,
-      responses: { 200: caseTimelineSchema },
+      path: '/v1/organizations/{organizationId}/exceptions/{exceptionId}/timeline',
       summary: 'Read case audit history',
       description:
         'Returns up to 100 persisted events, ordered by timestamp and ID. Reuse cursors with the same organization, case and page size. Refresh from the first page and deduplicate by ID as events arrive.',
-    },
-  },
-  {
-    commonResponses: {
-      401: apiErrorSchema,
-      403: apiErrorSchema,
-      404: apiErrorSchema,
-      409: apiErrorSchema,
-      503: apiErrorSchema,
-    },
-  },
-);
+    })
+    .meta({
+      access: requires('issues.read'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: caseParams, query: caseEvidenceQuerySchema }))
+    .output(caseTimelineSchema),
+};

@@ -1,16 +1,14 @@
-import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
 import {
   anyMember,
-  apiErrorSchema,
   dataRegionSchema,
+  endpoint,
+  type ErrorStatus,
   organizationParamsSchema,
   requires,
 } from '../common.js';
 import { roleReferenceSchema } from '../roles.js';
-
-const c = initContract();
 
 export const organizationSchema = z.object({
   id: z.string().uuid(),
@@ -55,96 +53,112 @@ export const memberParamsSchema = organizationParamsSchema.extend({
   memberId: z.string().uuid(),
 });
 
-export const identityContract = c.router(
-  {
-    listOrganizations: {
+const errors = [401, 403, 404, 409, 503] as const satisfies ErrorStatus[];
+const commandHeaders = z.object({
+  'x-command-id': z.string().uuid().optional(),
+});
+
+export const identityContract = {
+  listOrganizations: endpoint
+    .route({
       method: 'GET',
       path: '/v1/organizations',
-      responses: { 200: z.object({ items: z.array(organizationSchema) }) },
       summary: 'List your organizations',
-    },
-    createOrganization: {
+    })
+    .meta({ errors })
+    .output(z.object({ items: z.array(organizationSchema) })),
+  createOrganization: endpoint
+    .route({
       method: 'POST',
       path: '/v1/organizations',
-      body: z
-        .object({
-          name: z.string().trim().min(1).max(200),
-          slug: z
-            .string()
-            .min(1)
-            .max(100)
-            .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-          dataRegion: dataRegionSchema.optional(),
-        })
-        .strict(),
-      responses: { 201: organizationSchema, 422: apiErrorSchema },
+      successStatus: 201,
       summary: 'Create an organization',
       description:
         'Creates an EU organization with you as its owner. Other regions are unavailable.',
-    },
-    context: {
+    })
+    .meta({ errors: [...errors, 422] })
+    .input(
+      z.object({
+        body: z
+          .object({
+            name: z.string().trim().min(1).max(200),
+            slug: z
+              .string()
+              .min(1)
+              .max(100)
+              .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+            dataRegion: dataRegionSchema.optional(),
+          })
+          .strict(),
+      }),
+    )
+    .output(organizationSchema),
+  context: endpoint
+    .route({
       method: 'GET',
-      path: '/v1/organizations/:organizationId/context',
-      pathParams: organizationParamsSchema,
-      responses: { 200: tenantContextSchema },
-      metadata: anyMember,
+      path: '/v1/organizations/{organizationId}/context',
       summary: 'Resolve your organization access',
       description:
         'Returns your membership, role and effective permissions. Changes to your role apply on the next request.',
-    },
-    listMembers: {
+    })
+    .meta({ access: anyMember, errors })
+    .input(z.object({ params: organizationParamsSchema }))
+    .output(tenantContextSchema),
+  listMembers: endpoint
+    .route({
       method: 'GET',
-      path: '/v1/organizations/:organizationId/members',
-      pathParams: organizationParamsSchema,
-      responses: { 200: z.object({ items: z.array(membershipSchema) }) },
-      metadata: anyMember,
+      path: '/v1/organizations/{organizationId}/members',
       summary: 'List organization members',
-    },
-    addMember: {
-      headers: z.object({ 'x-command-id': z.string().uuid().optional() }),
+    })
+    .meta({ access: anyMember, errors })
+    .input(z.object({ params: organizationParamsSchema }))
+    .output(z.object({ items: z.array(membershipSchema) })),
+  addMember: endpoint
+    .route({
       method: 'POST',
-      path: '/v1/organizations/:organizationId/members',
-      pathParams: organizationParamsSchema,
-      body: z
-        .object({ userId: z.string().uuid(), roleId: z.string().min(1) })
-        .strict(),
-      responses: { 201: membershipSchema },
-      metadata: requires('members.manage'),
+      path: '/v1/organizations/{organizationId}/members',
+      successStatus: 201,
       summary: 'Add a registered user to an organization',
       description:
         'Requires `members.manage`. Only owners can grant ownership, and others can only assign roles whose permissions they hold.',
-    },
-    updateMember: {
-      headers: z.object({ 'x-command-id': z.string().uuid().optional() }),
+    })
+    .meta({ access: requires('members.manage'), errors })
+    .input(
+      z.object({
+        params: organizationParamsSchema,
+        headers: commandHeaders,
+        body: z
+          .object({ userId: z.string().uuid(), roleId: z.string().min(1) })
+          .strict(),
+      }),
+    )
+    .output(membershipSchema),
+  updateMember: endpoint
+    .route({
       method: 'PATCH',
-      path: '/v1/organizations/:organizationId/members/:memberId',
-      pathParams: memberParamsSchema,
-      body: z.object({ roleId: z.string().min(1) }).strict(),
-      responses: { 200: membershipSchema },
-      metadata: requires('members.manage'),
+      path: '/v1/organizations/{organizationId}/members/{memberId}',
       summary: 'Change a member role',
       description:
         'Requires `members.manage`. Only owners change ownership; others can only assign roles, and change members, whose permissions they hold. The last owner cannot be demoted.',
-    },
-    removeMember: {
-      headers: z.object({ 'x-command-id': z.string().uuid().optional() }),
+    })
+    .meta({ access: requires('members.manage'), errors })
+    .input(
+      z.object({
+        params: memberParamsSchema,
+        headers: commandHeaders,
+        body: z.object({ roleId: z.string().min(1) }).strict(),
+      }),
+    )
+    .output(membershipSchema),
+  removeMember: endpoint
+    .route({
       method: 'DELETE',
-      path: '/v1/organizations/:organizationId/members/:memberId',
-      pathParams: memberParamsSchema,
-      body: c.noBody(),
-      responses: { 204: c.noBody() },
-      metadata: requires('members.manage'),
+      path: '/v1/organizations/{organizationId}/members/{memberId}',
+      successStatus: 204,
       summary: 'Remove an organization member',
       description: 'The last owner cannot be removed or demoted.',
-    },
-  },
-  {
-    commonResponses: {
-      401: apiErrorSchema,
-      403: apiErrorSchema,
-      404: apiErrorSchema,
-      409: apiErrorSchema,
-      503: apiErrorSchema,
-    },
-  },
-);
+    })
+    .meta({ access: requires('members.manage'), errors })
+    .input(z.object({ params: memberParamsSchema, headers: commandHeaders }))
+    .output(z.void()),
+};

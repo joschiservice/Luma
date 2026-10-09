@@ -4,7 +4,6 @@ import { z } from 'zod';
 
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
-import { IdentityError } from '../identity/data';
 import { localizeManifest } from './catalog-text';
 
 const api = createWebApiClient();
@@ -30,16 +29,8 @@ export function appsOptions(organizationId: string) {
   return queryOptions({
     queryKey: ['private', 'organization', organizationId, 'apps'],
     ...privateQueryDefaults,
-    queryFn: async ({ signal }) => {
-      const result = await api.apps.list({
-        params: { organizationId },
-        fetchOptions: { signal, cache: 'no-store' },
-      });
-      if (result.status !== 200)
-        throw new IdentityError(result.status, result.body);
-
-      return result.body;
-    },
+    queryFn: ({ signal }) =>
+      api.apps.list({ params: { organizationId } }, { signal }),
     select: localizeCatalog,
   });
 }
@@ -61,17 +52,10 @@ export async function changeApp(
   scopes: readonly string[] = [],
 ) {
   const params = { organizationId, appId };
-  const result =
-    action === 'install'
-      ? await api.apps.install({
-          params,
-          body: { version, scopes: [...scopes] },
-        })
-      : await api.apps.uninstall({ params, body: { version: version! } });
-  if (result.status !== 200)
-    throw new IdentityError(result.status, result.body);
 
-  return result.body;
+  return action === 'install'
+    ? api.apps.install({ params, body: { version, scopes: [...scopes] } })
+    : api.apps.uninstall({ params, body: { version: version! } });
 }
 
 /** Grants access an upgraded app requests; earlier grants keep working until then. */
@@ -81,12 +65,8 @@ export async function approveAppScopes(
   version: number,
   scopes: readonly string[],
 ) {
-  const result = await api.apps.approveScopes({
+  return api.apps.approveScopes({
     params: { organizationId, appId },
     body: { version, scopes: [...scopes] },
   });
-  if (result.status !== 200)
-    throw new IdentityError(result.status, result.body);
-
-  return result.body;
 }
