@@ -42,6 +42,9 @@ orders}}`. Paraglide inserts `#` without number formatting and compares exact ma
   separate message for an empty state.
 - **Dates and times** are not formatted inside messages. Format them with the helpers below
   and pass the result as a placeholder.
+- **German addresses the reader as "du"**, lowercase mid-sentence (du, dich, dir, dein), to match
+  the Auren website and brand guide. Don't use "Sie" for the reader, in the interface or in the
+  guides. The queue is „Wartet auf dich“.
 - **Whole sentences only.** Don't join translated fragments or add plural endings in code;
   word order differs between languages. For links or emphasis inside a sentence, render the
   message with `rich` so translators keep control of where the element goes.

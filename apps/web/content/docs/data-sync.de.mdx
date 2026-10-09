@@ -1,9 +1,9 @@
 ---
 title: Verlauf importieren und Daten abgleichen
-description: Sehen Sie, was Luma aus jedem verbundenen System importiert, wie vollständig und aktuell es ist und was zu tun ist, wenn ein Abgleich Sie braucht.
+description: Sieh, was Luma aus jedem verbundenen System importiert, wie vollständig und aktuell es ist und was zu tun ist, wenn ein Abgleich dich braucht.
 ---
 
-Wenn Sie einen Shop oder ein ERP verbinden, importiert Luma dessen Verlauf und hält ihn danach aktuell. Der Abgleich liest nur: Luma ändert dabei nie Datensätze in Ihren Systemen. Öffnen Sie **Datenabgleich** in der Seitenleiste oder drücken Sie **G** und dann **D**, um zu sehen, was Luma aus jeder Verbindung hat.
+Wenn du einen Shop oder ein ERP verbindest, importiert Luma dessen Verlauf und hält ihn danach aktuell. Der Abgleich liest nur: Luma ändert dabei nie Datensätze in deinen Systemen. Öffne **Datenabgleich** in der Seitenleiste oder drücke **G** und dann **D**, um zu sehen, was Luma aus jeder Verbindung hat.
 
 ## Was Luma importiert [#what-luma-imports]
 
@@ -15,10 +15,10 @@ Jede Verbindung hat einen Abgleich pro Datensatztyp:
 | **Fulfillments**, etwa Fulfillment-Aufträge, Sendungen und Lieferscheine | Ja               | Ja                     |
 | **Produkte** mit Varianten und SKU-Codes                                 | Ja               | Ja                     |
 | **Bestände** pro SKU und Lagerort                                        | Ja               | Ja                     |
-| **Kunden**                                                               | Nach Genehmigung | Nein                   |
+| **Kunden**                                                               | Nach Genehmigung | Wenn gewählt           |
 | **Retouren und Erstattungen**                                            | Ja               | Nein                   |
 
-Kunden kommen aus Shopify nur, wenn Shopify den Zugriff auf Kundendaten genehmigt und der Shop ihn erteilt hat. Kontaktdaten und Adressen brauchen eine eigene Genehmigung. Ein Datensatztyp, den die Verbindung nicht umfasst, zeigt **Nicht Teil dieser Verbindung**. Einer, den das System nicht erteilt hat, zeigt **Die Quelle hat keinen Zugriff gewährt**. Zeigt ein Shopify-Shop bei Retouren und Erstattungen **Nicht Teil dieser Verbindung**, verbinden Sie den Shop neu, um sie hinzuzufügen. Was eine Verbindung lesen darf, ändern Sie über **Verbindung verwalten** daneben; siehe [Apps installieren und Systeme verbinden](/docs/apps-and-connections).
+Shopify teilt Kunden nur, wenn Shopify den Zugriff auf Kundendaten genehmigt und der Shop ihn erteilt hat. Kontaktdaten und Adressen brauchen eine eigene Genehmigung. JTL teilt Kunden nur, wenn beim Hinzufügen der Verbindung **Kunden importieren** gewählt wurde. Ein Datensatztyp, den die Verbindung nicht umfasst, zeigt **Nicht Teil dieser Verbindung**. Einer, den das System nicht erteilt hat, zeigt **Die Quelle hat keinen Zugriff gewährt**. Zeigt ein Shopify-Shop bei Retouren und Erstattungen **Nicht Teil dieser Verbindung**, verbinde den Shop neu, um sie hinzuzufügen. Was eine Verbindung lesen darf, änderst du über **Verbindung verwalten** daneben; siehe [Apps installieren und Systeme verbinden](/docs/apps-and-connections).
 
 Lieferanten und Lieferantenbestellungen aus JTL erscheinen hier nicht. Die [Beschaffung](/docs/procurement) liest sie für jede Lieferantenbestellung.
 
@@ -33,17 +33,17 @@ Oben fasst die Seite alle Abgleiche zusammen, etwa **Verlauf wird importiert**, 
 
 **Letzte Abgleichsläufe** listet jeden Verlaufsimport, Änderungsabgleich und jede vollständige Prüfung, was sie gestartet hat und wie viele Datensätze importiert, unverändert, wartend, nicht importiert oder nicht mehr gefunden sind.
 
-Sie können Luma nutzen, während der Verlauf importiert wird; Datensätze erscheinen, sobald sie ankommen. Bestellungen, Produkte, Fulfillment, Bestand, Retouren und Kunden zeigen über ihrer Liste eine einzeilige Zusammenfassung **Abdeckung**. Sie sagt, wenn die Liste noch unvollständig ist oder eine Quelle geprüft werden muss. Mit **Datenabgleich öffnen** sehen Sie die Einzelheiten.
+Du kannst Luma nutzen, während der Verlauf importiert wird; Datensätze erscheinen, sobald sie ankommen. Bestellungen, Produkte, Fulfillment, Bestand, Retouren und Kunden zeigen über ihrer Liste eine einzeilige Zusammenfassung **Abdeckung**. Sie sagt, wenn die Liste noch unvollständig ist oder eine Quelle geprüft werden muss. Mit **Datenabgleich öffnen** siehst du die Einzelheiten.
 
 ## Abdeckung verstehen [#understand-coverage]
 
 Shopify importiert zuerst die neueren Bestellungen, dann deren Fulfillments, Retouren und Erstattungen und danach im Hintergrund den älteren Verlauf. **Neuerer Verlauf importiert** heißt, der neuere Zeitraum ist vollständig; der ältere Verlauf hat einen eigenen Fortschritt und bleibt unvollständig, bis er fertig ist. Fulfillments und Retouren zeigen **Wartet auf Bestellungen**, bis die zugehörigen Bestellungen importiert sind.
 
-**Verlauf wird vorbereitet** heißt, die Quelle erstellt einen Export, daher gibt es eventuell noch keinen Fortschritt. Sie können die Seite verlassen. Luma macht selbstständig weiter und setzt nach einer Unterbrechung dort fort, wo es aufgehört hat.
+**Verlauf wird vorbereitet** heißt, die Quelle erstellt einen Export, daher gibt es eventuell noch keinen Fortschritt. Du kannst die Seite verlassen. Luma macht selbstständig weiter und setzt nach einer Unterbrechung dort fort, wo es aufgehört hat.
 
 Die Abdeckung zeigt genau, was Luma hat, und behauptet nie mehr. Manche Quellen geben nur den neueren Verlauf frei: Shopify gibt Bestellungen der letzten 60 Tage frei, es sei denn, der Zugriff auf ältere Bestellungen ist genehmigt. Der Datenabgleich zeigt dann **Nur neuere Bestellungen bereitgestellt** mit dem Datum, ab dem der Verlauf vorliegt. Luma behält alles, was es importiert, daher wächst die Abdeckung mit der Zeit. Werden ältere Datensätze verfügbar, zeigt der Datenabgleich **Ältere Bestellungen sind jetzt verfügbar** mit einer Schaltfläche, um sie zu importieren.
 
-Manche Datensätze brauchen Aufmerksamkeit. **Warten auf zugehörige Datensätze** heißt, Luma importiert sie, sobald die Datensätze vorliegen, von denen sie abhängen. **Import nicht möglich** nennt Datensätze, die Luma nicht lesen konnte, mit dem Grund. **Bei der letzten vollständigen Prüfung nicht gefunden** listet Datensätze, die die Quelle nicht mehr liefert. Luma behält sie; prüfen Sie, ob sie in der Quelle gelöscht wurden.
+Manche Datensätze brauchen Aufmerksamkeit. **Warten auf zugehörige Datensätze** heißt, Luma importiert sie, sobald die Datensätze vorliegen, von denen sie abhängen. **Import nicht möglich** nennt Datensätze, die Luma nicht lesen konnte, mit dem Grund. **Bei der letzten vollständigen Prüfung nicht gefunden** listet Datensätze, die die Quelle nicht mehr liefert. Luma behält sie; prüfe, ob sie in der Quelle gelöscht wurden.
 
 ## Wie Luma aktuell bleibt [#how-luma-stays-current]
 
@@ -55,40 +55,40 @@ Luma erkennt Datensätze, die es schon hat. Ein erneuter Import desselben Verlau
 
 ## Abgleich starten, pausieren oder neu importieren [#run-pause-or-re-import-a-sync]
 
-Enthält Ihre Rolle **Importe verwalten**, hat jeder Datensatztyp ein Aktionsmenü:
+Enthält deine Rolle **Importe verwalten**, hat jeder Datensatztyp ein Aktionsmenü:
 
 - **Jetzt abgleichen** liest sofort erneut aus der Quelle.
 - **Alle Datensätze prüfen** startet eine vollständige Prüfung.
 - **Verlauf neu importieren** liest alles erneut ein, was die Quelle bereitstellt. Datensätze, die bereits in Luma sind, bleiben verfügbar und werden nicht doppelt angelegt. Bei großen Datenmengen kann das eine Weile dauern.
 - **Pausieren** hält den Abgleich an. Bereits importierte Datensätze bleiben verfügbar. **Fortsetzen** setzt ihn fort.
 
-Ohne **Importe verwalten** können Sie jeden Abgleich verfolgen, aber nicht ändern.
+Ohne **Importe verwalten** kannst du jeden Abgleich verfolgen, aber nicht ändern.
 
 ## Automatisches Verknüpfen [#automatic-linking]
 
-Luma hält Datensätze aus verschiedenen Quellen getrennt, bis jemand sie verknüpft. Wenn Ihr Shop und Ihr ERP dieselben SKU-Codes verwenden oder JTL-Wawi bei jeder Bestellung die Shopify-Bestellnummer speichert, kann eine Verknüpfungsregel das für Sie übernehmen.
+Luma hält Datensätze aus verschiedenen Quellen getrennt, bis jemand sie verknüpft. Wenn dein Shop und dein ERP dieselben SKU-Codes verwenden oder JTL-Wawi bei jeder Bestellung die Shopify-Bestellnummer speichert, kann eine Verknüpfungsregel das für dich übernehmen.
 
-Wenn Ihre Rolle **Importe verwalten** enthält:
+Wenn deine Rolle **Importe verwalten** enthält:
 
-1. Gehen Sie in **Datenabgleich** zu **Automatisches Verknüpfen** und wählen Sie **Verknüpfungsregel hinzufügen**.
-2. Wählen Sie unter **Datensatztyp** entweder **SKUs: eindeutiger Code** oder **Bestellungen: JTL-Referenz zu Shopify**.
-3. Wählen Sie die beiden Verbindungen. Wählen Sie bei Bestellungen den Shopify-Shop, dessen Bestellnummern JTL-Wawi speichert.
-4. Wählen Sie **Treffer anzeigen**. Luma zeigt, wie viele Treffer es verknüpfen kann und warum es andere überspringt. Öffnen Sie bei einem Beispiel **Erster Datensatz** und **Anderer Datensatz**, um beide zu vergleichen.
-5. Wählen Sie **Automatisches Verknüpfen aktivieren**. Die Regel verknüpft die aktuellen Treffer und künftig auch neue.
+1. Gehe in **Datenabgleich** zu **Automatisches Verknüpfen** und wähle **Verknüpfungsregel hinzufügen**.
+2. Wähle unter **Datensatztyp** entweder **SKUs: eindeutiger Code** oder **Bestellungen: JTL-Referenz zu Shopify**.
+3. Wähle die beiden Verbindungen. Wähle bei Bestellungen den Shopify-Shop, dessen Bestellnummern JTL-Wawi speichert.
+4. Wähle **Treffer anzeigen**. Luma zeigt, wie viele Treffer es verknüpfen kann und warum es andere überspringt. Öffne bei einem Beispiel **Erster Datensatz** und **Anderer Datensatz**, um beide zu vergleichen.
+5. Wähle **Automatisches Verknüpfen aktivieren**. Die Regel verknüpft die aktuellen Treffer und künftig auch neue.
 
-Luma verknüpft nur eindeutige Treffer. SKU-Codes werden unabhängig von Groß- und Kleinschreibung und Leerzeichen am Anfang oder Ende abgeglichen. Jeder Code muss in jeder Verbindung zu genau einer SKU gehören, mit derselben Einheit. Eine Bestellung passt nur, wenn ihre externe Bestellreferenz in JTL-Wawi genau einer Bestellnummer im Shopify-Shop entspricht. Ähnliche Daten, Beträge, Namen oder E-Mail-Adressen reichen nie aus. Mehrdeutige und widersprüchliche Treffer sowie von Hand getrennte Datensätze überspringt Luma; verknüpfen Sie diese selbst, wenn Sie Ihre Entscheidung ändern. Verknüpfte Datensätze behalten ihre eigenen Mengen, Preise und Bestellstatus.
+Luma verknüpft nur eindeutige Treffer. SKU-Codes werden unabhängig von Groß- und Kleinschreibung und Leerzeichen am Anfang oder Ende abgeglichen. Jeder Code muss in jeder Verbindung zu genau einer SKU gehören, mit derselben Einheit. Eine Bestellung passt nur, wenn ihre externe Bestellreferenz in JTL-Wawi genau einer Bestellnummer im Shopify-Shop entspricht. Ähnliche Daten, Beträge, Namen oder E-Mail-Adressen reichen nie aus. Mehrdeutige und widersprüchliche Treffer sowie von Hand getrennte Datensätze überspringt Luma; verknüpfe diese selbst, wenn du deine Entscheidung änderst. Verknüpfte Datensätze behalten ihre eigenen Mengen, Preise und Bestellstatus.
 
-Eine Regel zeigt **Wartet auf Daten**, bis Luma beide Verbindungen vollständig und innerhalb des letzten Tages erfolgreich gelesen hat. Jede Regel zeigt, wie viele Verknüpfungen sie angewendet hat und wann Luma zuletzt geprüft hat. Eine Regel läuft mit dem Zugriff der Person, die sie aktiviert hat. Verliert diese Person **Importe verwalten**, zeigt die Regel **Zugriff erforderlich**, bis jemand mit dieser Berechtigung **Vorschau und aktivieren** wählt. **Deaktivieren** stoppt neue Verknüpfungen und behält die bestehenden. Um einen einzelnen Datensatz zu trennen, wählen Sie im Bereich **Verknüpfte Quellen** die Option **Trennen**.
+Eine Regel zeigt **Wartet auf Daten**, bis Luma beide Verbindungen vollständig und innerhalb des letzten Tages erfolgreich gelesen hat. Jede Regel zeigt, wie viele Verknüpfungen sie angewendet hat und wann Luma zuletzt geprüft hat. Eine Regel läuft mit dem Zugriff der Person, die sie aktiviert hat. Verliert diese Person **Importe verwalten**, zeigt die Regel **Zugriff erforderlich**, bis jemand mit dieser Berechtigung **Vorschau und aktivieren** wählt. **Deaktivieren** stoppt neue Verknüpfungen und behält die bestehenden. Um einen einzelnen Datensatz zu trennen, wähle im Bereich **Verknüpfte Quellen** die Option **Trennen**.
 
-## Wenn ein Abgleich Sie braucht [#when-a-sync-needs-you]
+## Wenn ein Abgleich dich braucht [#when-a-sync-needs-you]
 
 - **Neuer Versuch läuft**: Ein Lesevorgang ist fehlgeschlagen, und Luma versucht es automatisch erneut, mit jeweils etwas längerer Pause.
-- **Fehlgeschlagen**: Der Abgleich ist mehrmals hintereinander fehlgeschlagen. Die Meldung nennt den Grund. Beheben Sie die Ursache, etwa indem Sie die Verbindung neu verbinden, und wählen Sie dann **Jetzt erneut versuchen**.
+- **Fehlgeschlagen**: Der Abgleich ist mehrmals hintereinander fehlgeschlagen. Die Meldung nennt den Grund. Behebe die Ursache, etwa indem du die Verbindung neu verbindest, und wähle dann **Jetzt erneut versuchen**.
 - **Muss fortgesetzt werden**: Die Person, unter deren Zugriff der Abgleich lief, verwaltet den Workspace nicht mehr. Eine Person mit **Importe verwalten** wählt **Mit meinem Zugriff fortsetzen**, und der Abgleich läuft mit ihrem Zugriff weiter.
-- **Zugriff entfernt**: Die Verbindung erteilt diesen Datensatztyp nicht mehr. Verbinden Sie sie unter [Apps](/docs/apps-and-connections#change-or-reconnect-a-connection) mit dem nötigen Zugriff neu.
+- **Zugriff entfernt**: Die Verbindung erteilt diesen Datensatztyp nicht mehr. Verbinde sie unter [Apps](/docs/apps-and-connections#change-or-reconnect-a-connection) mit dem nötigen Zugriff neu.
 - **Verbindung nicht verfügbar**: Die Verbindung ist nicht aktiv. Der Abgleich pausiert, bis sie es wieder ist; bereits importierte Datensätze bleiben in Luma.
 - **Pausiert**: Jemand hat den Abgleich pausiert.
 
-Akzeptiert ein Shop oder ERP Luma nicht mehr, etwa weil das Token widerrufen oder die Luma-App dort entfernt wurde, zeigt die Verbindung **Zugriff entzogen**, und unter **Probleme** wird ein Problem geöffnet. Verbinden Sie über das Problem oder die Verbindung neu und geben Sie neuen Zugriff ein. Die Verbindung behält ihre Datensätze und Verknüpfungen, und das Problem wird nach dem nächsten vollständigen Abgleich geschlossen. Trennen Sie eine Verbindung selbst, wird kein Problem geöffnet.
+Akzeptiert ein Shop oder ERP Luma nicht mehr, etwa weil das Token widerrufen oder die Luma-App dort entfernt wurde, zeigt die Verbindung **Zugriff entzogen**, und unter **Probleme** wird ein Problem geöffnet. Verbinde über das Problem oder die Verbindung neu und gib neuen Zugriff ein. Die Verbindung behält ihre Datensätze und Verknüpfungen, und das Problem wird nach dem nächsten vollständigen Abgleich geschlossen. Trennst du eine Verbindung selbst, wird kein Problem geöffnet.
 
-Wie Sie dieselbe SKU über Quellen hinweg verknüpfen oder den Shopify-Bestand anhand Ihres ERP korrigieren, lesen Sie unter [Bestand](/docs/inventory).
+Wie du dieselbe SKU über Quellen hinweg verknüpfst oder den Shopify-Bestand anhand deines ERP korrigierst, liest du unter [Bestand](/docs/inventory).

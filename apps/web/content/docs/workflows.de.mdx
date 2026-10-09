@@ -1,9 +1,9 @@
 ---
 title: Workflows verwalten
-description: Sehen Sie, was jeder Workflow tut und ob er laufen kann, schalten Sie ihn ein oder aus und verfolgen Sie seine Ausführungen bis zum bestätigten Ergebnis.
+description: Sieh, was jeder Workflow tut und ob er laufen kann, schalte ihn ein oder aus und verfolge seine Ausführungen bis zum bestätigten Ergebnis.
 ---
 
-Ein Workflow reagiert auf etwas, etwa auf eine Person, die ihn startet, einen Zeitplan, niedrigen Bestand oder ein Problem, das Luma erkennt, und führt eine feste Folge von Schritten aus. Jede Änderung, die er vorschlägt, folgt den Genehmigungsregeln Ihres Workspace, und eine separate Prüfung bestätigt das Ergebnis. Öffnen Sie **Workflows** über die Seitenleiste oder mit **G**, dann **W**.
+Ein Workflow reagiert auf etwas, etwa auf eine Person, die ihn startet, einen Zeitplan, niedrigen Bestand oder ein Problem, das Luma erkennt, und führt eine feste Folge von Schritten aus. Jede Änderung, die er vorschlägt, folgt den Genehmigungsregeln deines Workspace, und eine separate Prüfung bestätigt das Ergebnis. Öffne **Workflows** über die Seitenleiste oder mit **G**, dann **W**.
 
 ## Workflow finden [#find-a-workflow]
 
@@ -12,58 +12,58 @@ Jeder Workflow in der Liste zeigt zwei Kennzeichnungen:
 - **Aktiviert**, **Pausiert** oder **Nicht eingerichtet**: ob jemand ihn eingeschaltet hat. **Pausiert** bedeutet, dass jede Aktivierung oder Bestandsregel widerrufen wurde.
 - **Bereit**, **Teilweise blockiert** oder **Blockiert**: ob er jetzt laufen kann. Auch ein aktivierter Workflow kann blockiert sein, etwa wenn eine Verbindung den Zugriff verloren hat oder keine Bestandsdaten mehr kommen.
 
-**Nächster Schritt** nennt das eine, was zu tun ist, mit einem Link zu der Stelle, an der Sie es beheben. **Umfasst** zeigt, was der Workflow überwacht, etwa eine Anzahl Bestandspositionen. Kann Luma das nicht feststellen, steht dort **Umfang unbekannt**, nie null.
+**Nächster Schritt** nennt das eine, was zu tun ist, mit einem Link zu der Stelle, an der du es behebst. **Umfasst** zeigt, was der Workflow überwacht, etwa eine Anzahl Bestandspositionen. Kann Luma das nicht feststellen, steht dort **Umfang unbekannt**, nie null.
 
-Mit den Ansichten finden Sie, was Sie braucht:
+Mit den Ansichten findest du, was dich braucht:
 
 - **Braucht Aufmerksamkeit**: blockierte oder teilweise blockierte Workflows, Workflows mit wartenden Entscheidungen und Workflows, deren letzte Ausführung ungelöst endete.
 - **Aktiviert** und **Nicht aktiviert**: ob ein Workflow eingeschaltet ist.
 
-Suchen Sie nach Namen oder filtern Sie nach **System**. **Entwürfe** listet Workflows, an denen noch geschrieben wird. Entwürfe laufen nie.
+Suche nach Namen oder filtere nach **System**. **Entwürfe** listet Workflows, an denen noch geschrieben wird. Entwürfe laufen nie.
 
 ## Workflow öffnen [#open-a-workflow]
 
-Oben steht, ob der Workflow **Läuft**, **Läuft mit Lücken**, **Pausiert**, **Bereit zur Einrichtung** oder **Derzeit nicht ausführbar** ist. Wählen Sie eine Version, um zu sehen, was sie tut. Veröffentlichte Versionen ändern sich nicht. Eine andere Version auszuwählen ändert nur, was die Seite zeigt.
+Oben steht, ob der Workflow **Läuft**, **Läuft mit Lücken**, **Pausiert**, **Bereit zur Einrichtung** oder **Derzeit nicht ausführbar** ist. Wähle eine Version, um zu sehen, was sie tut. Veröffentlichte Versionen ändern sich nicht. Eine andere Version auszuwählen ändert nur, was die Seite zeigt.
 
 - **Übersicht** zeigt, wann der Workflow startet, was Erfolg heißt, und seine Bereitschaft: die nächste Aktion, was ihn blockiert, was er umfasst, wie die Genehmigung gilt, was auf eine Person wartet und die letzten Ergebnisse. **So funktioniert es** beschreibt die Schritte in einfachen Worten.
-- **Aktivität** zeigt **Letzte Ausführungen**. Jede Ausführung zeigt, was Luma gefunden hat, die Entscheidung, die vorgeschlagene Änderung, den **Status der Änderung** und den **Status der Prüfung**. Bei Workflows, die Probleme beheben, vergleicht **Testergebnisse** die Workflow-Tests mit dem, was Ihr Team getan hat. Siehe [Workflow gefahrlos testen](/docs/shadow-mode).
-- Unter **Regeln** schalten Sie den Workflow ein oder aus und starten Ausführungen, wenn Ihre Rolle es erlaubt.
-- **Technische Details** listet Schritte und Aktionen, Voraussetzungen und Berechtigungen, Eingaben und den Versionsverlauf. Sie brauchen sie nicht, um den Workflow zu nutzen.
+- **Aktivität** zeigt **Letzte Ausführungen**. Jede Ausführung zeigt, was Luma gefunden hat, die Entscheidung, die vorgeschlagene Änderung, den **Status der Änderung** und den **Status der Prüfung**. Bei Workflows, die Probleme beheben, vergleicht **Testergebnisse** die Workflow-Tests mit dem, was dein Team getan hat. Siehe [Workflow gefahrlos testen](/docs/shadow-mode).
+- Unter **Regeln** schaltest du den Workflow ein oder aus und startest Ausführungen, wenn deine Rolle es erlaubt.
+- **Technische Details** listet Schritte und Aktionen, Voraussetzungen und Berechtigungen, Eingaben und den Versionsverlauf. Du brauchst sie nicht, um den Workflow zu nutzen.
 
 ## Ausführung verfolgen [#follow-a-run]
 
 Der Status einer Ausführung zeigt, wo sie steht:
 
-- **Läuft**, **Wartet** oder **Wartet auf Genehmigung**: Die Ausführung ist im Gang. Änderungen, die eine Genehmigung brauchen, warten unter [Wartet auf Sie](/docs/needs-you).
+- **Läuft**, **Wartet** oder **Wartet auf Genehmigung**: Die Ausführung ist im Gang. Änderungen, die eine Genehmigung brauchen, warten unter [Wartet auf dich](/docs/needs-you).
 - **Bestätigt**: Luma hat das Ergebnis unabhängig geprüft, und es stimmt.
 - **Ohne Änderung beendet**: Die Bedingungen waren nicht erfüllt, daher wurde nichts geändert.
 - **Abgelehnt**: Eine Person hat die Änderung abgelehnt.
-- **Prüfung fehlgeschlagen** oder **Nicht bestätigt**: Die Änderung hat nicht das erwartete Ergebnis gebracht, oder Luma konnte es nicht bestätigen. Prüfen Sie den Datensatz, bevor Sie es erneut versuchen.
+- **Prüfung fehlgeschlagen** oder **Nicht bestätigt**: Die Änderung hat nicht das erwartete Ergebnis gebracht, oder Luma konnte es nicht bestätigen. Prüfe den Datensatz, bevor du es erneut versuchst.
 - **An eine Person übergeben**: Jemand muss die Ausführung übernehmen.
 
 Eine angenommene Änderung ist für sich noch kein Erfolg. Erst eine bestandene Prüfung bestätigt sie. Ausführungen mit **Pilotdaten**, **Simulierte Daten** oder **Schattenmodus** zählen nie als bestätigte Korrekturen.
 
 ## Workflow ein- oder ausschalten [#turn-a-workflow-on-or-off]
 
-Wie Sie einen Workflow einschalten, hängt davon ab, was er tut. Sehen Sie unter **Regeln** nach:
+Wie du einen Workflow einschaltest, hängt davon ab, was er tut. Sieh unter **Regeln** nach:
 
-- Workflows, die bei Problemen starten: Wählen Sie **Einschalten**, prüfen Sie, was eine Ausführung startet und wer ihre Änderungen genehmigt, und bestätigen Sie. Ausführungen nutzen die Berechtigungen der Person, die den Workflow eingeschaltet hat. **Ausschalten** verhindert neue Ausführungen. Eine wartende Ausführung sendet keine neuen Änderungen, und bereits vorgenommene Änderungen werden nicht rückgängig gemacht. Sie brauchen **Workflows veröffentlichen und aktivieren**.
-- **Bestandsregeln** für den Nachschub: siehe [Nachschub einrichten](#set-up-replenishment). Sie brauchen **Beschaffung verwalten**.
-- Workflows, die bestimmte Bestellungen ändern: Wählen Sie **Aktivierung prüfen**, wählen Sie die Verbindung und bis zu 100 Bestellungen, bestätigen Sie, dass Sie alles geprüft haben, und wählen Sie **Geprüfte Version aktivieren**. Andere und künftige Bestellungen sind nicht enthalten. **Aktivierung widerrufen** verhindert neue Ausführungen. Bereits gesendete Änderungen können noch abgeschlossen werden. Sie brauchen **Problem-Workflows testen und einschalten**.
-- Workflows, die Sie selbst starten: Wählen Sie unter **Auslöser** je nach Startart **Workflow starten**, **Start planen**, **Ereignis erfassen**, **Bedingung prüfen** oder **Erkanntes Problem erfassen**. Ein Auslöser startet nur eine Ausführung und genehmigt nie eine Änderung. Einen geplanten Start können Sie unter **Letzte Ausführungen** abbrechen, bevor er beginnt. Sie brauchen **Workflow-Auslöser verwalten**.
+- Workflows, die bei Problemen starten: Wähle **Einschalten**, prüfe, was eine Ausführung startet und wer ihre Änderungen genehmigt, und bestätige. Ausführungen nutzen die Berechtigungen der Person, die den Workflow eingeschaltet hat. **Ausschalten** verhindert neue Ausführungen. Eine wartende Ausführung sendet keine neuen Änderungen, und bereits vorgenommene Änderungen werden nicht rückgängig gemacht. Du brauchst **Workflows veröffentlichen und aktivieren**.
+- **Bestandsregeln** für den Nachschub: siehe [Nachschub einrichten](#set-up-replenishment). Du brauchst **Beschaffung verwalten**.
+- Workflows, die bestimmte Bestellungen ändern: Wähle **Aktivierung prüfen**, wähle die Verbindung und bis zu 100 Bestellungen, bestätige, dass du alles geprüft hast, und wähle **Geprüfte Version aktivieren**. Andere und künftige Bestellungen sind nicht enthalten. **Aktivierung widerrufen** verhindert neue Ausführungen. Bereits gesendete Änderungen können noch abgeschlossen werden. Du brauchst **Problem-Workflows testen und einschalten**.
+- Workflows, die du selbst startest: Wähle unter **Auslöser** je nach Startart **Workflow starten**, **Start planen**, **Ereignis erfassen**, **Bedingung prüfen** oder **Erkanntes Problem erfassen**. Ein Auslöser startet nur eine Ausführung und genehmigt nie eine Änderung. Einen geplanten Start kannst du unter **Letzte Ausführungen** abbrechen, bevor er beginnt. Du brauchst **Workflow-Auslöser verwalten**.
 
-Können Sie etwas nicht ändern, nennt die Seite, was Ihre Rolle nicht erlaubt.
+Kannst du etwas nicht ändern, nennt die Seite, was deine Rolle nicht erlaubt.
 
 ## Nachschub einrichten [#set-up-replenishment]
 
-Öffnen Sie **Replenish low stock** und wählen Sie unter **Regeln** **Bestandsregeln hinzufügen**, oder starten Sie unter **Beschaffung** oder bei einer Bestandsposition. Sie können 25 Bestandspositionen auf einmal einrichten:
+Öffne **Replenish low stock** und wähle unter **Regeln** **Bestandsregeln hinzufügen**, oder starte unter **Beschaffung** oder bei einer Bestandsposition. Du kannst 25 Bestandspositionen auf einmal einrichten:
 
-1. Wählen Sie den Lieferanten und die Bestandspositionen. Suchen Sie nach SKU oder blättern Sie mit den Seitensteuerelementen; Ihre Auswahl bleibt über Seiten und Suchen hinweg erhalten. Positionen mit einer aktiven Regel lassen sich nicht auswählen.
-2. Legen Sie **Mindestbestand**, **Zielbestand** und **Schwelle für hohes Risiko** fest und wählen Sie **Regeln in der Vorschau ansehen**.
-3. Prüfen Sie jede Position. Luma zeigt den aktuellen Bestand, ob die erste Prüfung eine Bestellung vorschlagen würde und wer sie genehmigt. Sie können die Mengen je Position anpassen. Wählen Sie nach einer Änderung **Vorschau aktualisieren**.
-4. Wählen Sie die Schaltfläche zum Aktivieren, die die Anzahl der Regeln nennt, etwa **3 Regeln aktivieren**. Jede Position erhält eine eigene Regel und ein eigenes Ergebnis.
+1. Wähle den Lieferanten und die Bestandspositionen. Suche nach SKU oder blättere mit den Seitensteuerelementen; deine Auswahl bleibt über Seiten und Suchen hinweg erhalten. Positionen mit einer aktiven Regel lassen sich nicht auswählen.
+2. Lege **Mindestbestand**, **Zielbestand** und **Schwelle für hohes Risiko** fest und wähle **Regeln in der Vorschau ansehen**.
+3. Prüfe jede Position. Luma zeigt den aktuellen Bestand, ob die erste Prüfung eine Bestellung vorschlagen würde und wer sie genehmigt. Du kannst die Mengen je Position anpassen. Wähle nach einer Änderung **Vorschau aktualisieren**.
+4. Wähle die Schaltfläche zum Aktivieren, die die Anzahl der Regeln nennt, etwa **3 Regeln aktivieren**. Jede Position erhält eine eigene Regel und ein eigenes Ergebnis.
 
-Fällt der verfügbare Bestand unter das Minimum, erstellt Luma den Entwurf einer Lieferantenbestellung, die den Bestand auf das Ziel bringt, und wartet auf die Genehmigung. Jeder Entwurf braucht eine Genehmigung. Die Schwelle für hohes Risiko kennzeichnet nur größere Entwürfe als hohes Risiko. Solange für dieselbe SKU ein Entwurf oder eine offene Lieferantenbestellung existiert, erstellt Luma keinen neuen Entwurf. Zeigt ein Ergebnis **Unbestätigt**, wählen Sie **1 unbestätigte wiederholen**. Ein erneuter Versuch erstellt nie eine zweite Regel.
+Fällt der verfügbare Bestand unter das Minimum, erstellt Luma den Entwurf einer Lieferantenbestellung, die den Bestand auf das Ziel bringt, und wartet auf die Genehmigung. Jeder Entwurf braucht eine Genehmigung. Die Schwelle für hohes Risiko kennzeichnet nur größere Entwürfe als hohes Risiko. Solange für dieselbe SKU ein Entwurf oder eine offene Lieferantenbestellung existiert, erstellt Luma keinen neuen Entwurf. Zeigt ein Ergebnis **Unbestätigt**, wähle **1 unbestätigte wiederholen**. Ein erneuter Versuch erstellt nie eine zweite Regel.
 
 Die Seite einer Bestandsposition zeigt dieselbe Bereitschaft, einschließlich einer wartenden Entscheidung und der letzten Lieferantenbestellung.
 
@@ -71,21 +71,21 @@ Die Seite einer Bestandsposition zeigt dieselbe Bereitschaft, einschließlich ei
 
 Manche Workflows starten von selbst, wenn Luma ein Problem erkennt:
 
-- **Correct Shopify stock from the ERP** startet, wenn Shopify und Ihr ERP beim verknüpften Bestand voneinander abweichen. Er schlägt vor, Shopify auf die ERP-Menge zu setzen, und bestätigt das mit einem neuen Lesevorgang in Shopify. Den ERP-Bestand ändert er nie.
+- **Correct Shopify stock from the ERP** startet, wenn Shopify und dein ERP beim verknüpften Bestand voneinander abweichen. Er schlägt vor, Shopify auf die ERP-Menge zu setzen, und bestätigt das mit einem neuen Lesevorgang in Shopify. Den ERP-Bestand ändert er nie.
 - **Release an overdue fulfillment hold** startet, wenn eine Shopify-Bestellung zu lange in einer Betrugsprüfung oder manuellen Sperre hängt. Er schlägt vor, die Sperre aufzuheben, und bestätigt in Shopify, dass sie weg ist. Sperren wegen Zahlung, Adresse oder Bestand gehen an eine Person, weil zuerst ihre Ursache behoben werden muss.
 - **Check a failing connection** startet, wenn Lesevorgänge einer Verbindung wiederholt fehlschlagen oder ein System Luma nicht mehr akzeptiert. Ein verlorener Zugriff geht sofort an eine Person, und das Problem bietet an, die Verbindung neu zu verbinden. Sonst wartet der Workflow 15 Minuten, prüft erneut und übergibt das Problem nur, wenn die Lesevorgänge weiter fehlschlagen. Er ändert nichts.
 
-Jede Änderung wartet unter [Wartet auf Sie](/docs/needs-you) auf die Genehmigung einer weiteren Person, die Änderungen genehmigen darf. Ein Vorschlag bleibt vier Stunden offen. Direkt vor dem Handeln liest Luma den Bestand erneut: Ist die Änderung noch dieselbe, wird sie ausgeführt. Würde sie abweichen, bereitet Luma im selben Eintrag unter „Wartet auf Sie“ einen neuen Vorschlag vor. Eine abgelehnte Änderung, eine Änderung, die Luma nicht sicher ausführen kann, oder ein unklares Ergebnis übergibt das Problem an eine Person. Ohne Sie wird nichts wiederholt.
+Jede Änderung wartet unter [Wartet auf dich](/docs/needs-you) auf die Genehmigung einer weiteren Person, die Änderungen genehmigen darf. Ein Vorschlag bleibt vier Stunden offen. Direkt vor dem Handeln liest Luma den Bestand erneut: Ist die Änderung noch dieselbe, wird sie ausgeführt. Würde sie abweichen, bereitet Luma im selben Eintrag unter „Wartet auf dich“ einen neuen Vorschlag vor. Eine abgelehnte Änderung, eine Änderung, die Luma nicht sicher ausführen kann, oder ein unklares Ergebnis übergibt das Problem an eine Person. Ohne dich wird nichts wiederholt.
 
 ## Workflows, die nachfassen [#workflows-that-follow-up]
 
-Andere Workflows starten, wenn etwas zu lange liegen bleibt. Sie ändern nie etwas in Ihrem Shop oder bei Ihren Lieferanten:
+Andere Workflows starten, wenn etwas zu lange liegen bleibt. Sie ändern nie etwas in deinem Shop oder bei deinen Lieferanten:
 
-- **Follow up on an overdue supplier order** startet, wenn ein Lieferant eine gesendete Bestellung nicht rechtzeitig bestätigt hat oder eine Lieferung ihren erwarteten Termin überschritten hat. Luma vermerkt das Nachfassen an der Bestellung, wartet und prüft erneut. Schweigt der Lieferant weiter, landet die Bestellung für den Einkauf unter „Wartet auf Sie“.
-- **Chase a refund after a return arrives** startet, wenn zurückgeschickte Artikel angekommen sind, aber nicht rechtzeitig eine Erstattung erfasst wurde. Er übergibt die Retoure unter „Wartet auf Sie“ an eine Person. Luma erstattet nie selbst.
-- **Follow up on a payment that stays pending** startet, wenn die Zahlung einer Bestellung lange nach der Bestellung noch aussteht. Er übergibt die Bestellung unter „Wartet auf Sie“ an eine Person. Luma hält sie nie an und storniert sie nie.
+- **Follow up on an overdue supplier order** startet, wenn ein Lieferant eine gesendete Bestellung nicht rechtzeitig bestätigt hat oder eine Lieferung ihren erwarteten Termin überschritten hat. Luma vermerkt das Nachfassen an der Bestellung, wartet und prüft erneut. Schweigt der Lieferant weiter, landet die Bestellung für den Einkauf unter „Wartet auf dich“.
+- **Chase a refund after a return arrives** startet, wenn zurückgeschickte Artikel angekommen sind, aber nicht rechtzeitig eine Erstattung erfasst wurde. Er übergibt die Retoure unter „Wartet auf dich“ an eine Person. Luma erstattet nie selbst.
+- **Follow up on a payment that stays pending** startet, wenn die Zahlung einer Bestellung lange nach der Bestellung noch aussteht. Er übergibt die Bestellung unter „Wartet auf dich“ an eine Person. Luma hält sie nie an und storniert sie nie.
 
-Ein Nachfassen verschwindet von selbst aus „Wartet auf Sie“, sobald Luma sieht, dass es erledigt ist, etwa wenn die Erstattung erfasst ist oder die Zahlung eingeht. Kann ein Workflow in Ihrem Workspace nicht laufen, nennt seine Vorlage, was fehlt, etwa Zugriff auf Retouren oder einen mit Ihrem Einkaufssystem verknüpften Lieferanten, und verlinkt die Stelle, an der Sie es beheben.
+Ein Nachfassen verschwindet von selbst aus „Wartet auf dich“, sobald Luma sieht, dass es erledigt ist, etwa wenn die Erstattung erfasst ist oder die Zahlung eingeht. Kann ein Workflow in deinem Workspace nicht laufen, nennt seine Vorlage, was fehlt, etwa Zugriff auf Retouren oder einen mit deinem Einkaufssystem verknüpften Lieferanten, und verlinkt die Stelle, an der du es behebst.
 
 Ein Workflow schließt nie selbst ein Problem. Luma schließt es erst, wenn die eigene Prüfung bestätigt, dass das Problem weg ist. Das Aufheben einer Sperre versendet zum Beispiel die Bestellung nicht. Das Problem bleibt daher offen, bis das Lager weiterkommt.
 
@@ -97,4 +97,4 @@ Ein Workflow schließt nie selbst ein Problem. Luma schließt es erst, wenn die 
 - **Beschaffung verwalten**: Bestandsregeln hinzufügen und widerrufen.
 - **Problem-Workflows testen und einschalten**: Workflows aktivieren, die bestimmte Bestellungen ändern, und Workflows an Problemen testen.
 
-Um einen neuen Workflow zu erstellen, wählen Sie **Neuer Workflow**. Siehe [Workflow erstellen](/docs/workflows/create).
+Um einen neuen Workflow zu erstellen, wähle **Neuer Workflow**. Siehe [Workflow erstellen](/docs/workflows/create).

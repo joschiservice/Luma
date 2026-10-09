@@ -1,7 +1,7 @@
 {
   "layout_pin_current": "Diese Seite an die Seitenleiste anheften",
   "layout_pin_unpin_current": "Diese Seite lösen",
-  "layout_pin_limit": "{count, plural, one {Sie können bis zu {count, number} Seite anheften} other {Sie können bis zu {count, number} Seiten anheften}}",
+  "layout_pin_limit": "{count, plural, one {Du kannst bis zu {count, number} Seite anheften} other {Du kannst bis zu {count, number} Seiten anheften}}",
   "layout_pin_fallback_label": "Angeheftete Seite",
   "layout_pinned_heading": "Angeheftet",
   "layout_pin_unpin": "{page} lösen"
