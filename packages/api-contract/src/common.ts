@@ -1,3 +1,4 @@
+import { oc } from '@orpc/contract';
 import { z } from 'zod';
 
 export const dataRegionSchema = z.enum(['EU', 'US', 'APAC']);
@@ -47,3 +48,20 @@ export function requires<const P extends string | readonly string[]>(
 ) {
   return { permission } as const satisfies RouteAccess;
 }
+
+/** Error statuses a route documents; every route also documents 400, 413, 415 and 500. */
+export type ErrorStatus = 400 | 401 | 403 | 404 | 409 | 422 | 429 | 503;
+
+/** Route metadata read by the identity guard and the OpenAPI document. */
+export interface RouteMeta {
+  access?: RouteAccess;
+  errors?: readonly ErrorStatus[];
+}
+
+/**
+ * Starts a REST route. Handlers and clients receive `params`, `query`, `headers` and `body`
+ * separately; declare each part the route accepts in its input object.
+ */
+export const endpoint = oc
+  .$meta<RouteMeta>({})
+  .$route({ inputStructure: 'detailed' });

@@ -1,33 +1,31 @@
-import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
-import { apiErrorSchema, caseParams } from '../common.js';
+import { caseParams, type ErrorStatus } from '../common.js';
 
-const c = initContract();
+/**
+ * A server-sent event stream. Streams are plain Fastify routes, so the path uses Fastify's
+ * `:param` syntax; the OpenAPI document describes them from this record.
+ */
+export interface EventStreamRoute {
+  method: 'GET';
+  path: `/${string}`;
+  pathParams: z.ZodObject<Record<string, z.ZodType<string>>>;
+  errors: readonly ErrorStatus[];
+  summary: string;
+  description: string;
+}
 
-export const caseEventsContract = c.router({
+export const caseEventsContract = {
   events: {
     method: 'GET',
     path: '/v1/organizations/:organizationId/exceptions/:exceptionId/events',
     pathParams: caseParams,
-    responses: {
-      200: c.otherResponse({
-        contentType: 'text/event-stream',
-        body: z.string(),
-      }),
-      400: apiErrorSchema,
-      401: apiErrorSchema,
-      403: apiErrorSchema,
-      404: apiErrorSchema,
-      429: apiErrorSchema,
-      500: apiErrorSchema,
-      503: apiErrorSchema,
-    },
+    errors: [400, 401, 403, 404, 429, 503],
     summary: 'Follow case progress',
     description:
       'Authenticated SSE emits resync events with a current progress snapshot every five seconds. Refetch case, review and timeline on each event and reconnect. Last-Event-ID always resynchronizes current state; events are not an audit replay. Sessions and membership are checked before each snapshot. Streams reconnect after one minute. Slow consumers are disconnected. Use the timeline endpoint for persisted history.',
   },
-});
+} satisfies Record<string, EventStreamRoute>;
 
 /**
  * Areas of workspace data a change event can name. `decisions` covers every source of the Needs
@@ -62,25 +60,14 @@ export const metricStreamEventSchema = z.object({
   sentAt: z.string().datetime(),
 });
 
-export const metricEventsContract = c.router({
+export const metricEventsContract = {
   events: {
     method: 'GET',
     path: '/v1/organizations/:organizationId/metrics/events',
     pathParams: z.object({ organizationId: z.string().uuid() }),
-    responses: {
-      200: c.otherResponse({
-        contentType: 'text/event-stream',
-        body: z.string(),
-      }),
-      400: apiErrorSchema,
-      401: apiErrorSchema,
-      403: apiErrorSchema,
-      404: apiErrorSchema,
-      429: apiErrorSchema,
-      503: apiErrorSchema,
-    },
+    errors: [400, 401, 403, 404, 429, 503],
     summary: 'Follow workspace changes',
     description:
       'Authenticated SSE tells workspace members which areas of data changed. Subscribe before the first query. On resync events with refetch: true, read again the views that depend on a listed topic; on reconnect, read all of them. Topics are limited to areas the member can read; decisions is available to every member. Events contain no records, totals or replay history. Last-Event-ID requests current state. Access is rechecked at least every five seconds and the stream closes when it is lost. Slow consumers disconnect and must resynchronize. Reconciliation lists every readable topic every 30 seconds.',
   },
-});
+} satisfies Record<string, EventStreamRoute>;

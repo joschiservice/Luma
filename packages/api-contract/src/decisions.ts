@@ -154,9 +154,15 @@ export const decisionListSchema = z.object({
   /** Items before this page in the same view and filters. */
   offset: z.number().int().nonnegative(),
   counts: z.object({
-    views: z.record(decisionViewSchema, z.number().int().nonnegative()),
-    domains: z.record(decisionDomainSchema, z.number().int().nonnegative()),
-    reasons: z.record(decisionReasonSchema, z.number().int().nonnegative()),
+    views: z.partialRecord(decisionViewSchema, z.number().int().nonnegative()),
+    domains: z.partialRecord(
+      decisionDomainSchema,
+      z.number().int().nonnegative(),
+    ),
+    reasons: z.partialRecord(
+      decisionReasonSchema,
+      z.number().int().nonnegative(),
+    ),
   }),
   sources: z.array(decisionSourceSchema),
 });

@@ -150,7 +150,10 @@ export const fulfillmentListSchema = z.object({
       open: z.number().int().nonnegative(),
     }),
   ),
-  counts: z.record(fulfillmentViewSchema, z.number().int().nonnegative()),
+  counts: z.partialRecord(
+    fulfillmentViewSchema,
+    z.number().int().nonnegative(),
+  ),
   nextCursor: z.string().nullable(),
   /** Open work without reported progress for this long is stalled. */
   stalledAfterHours: z.number().int().positive(),

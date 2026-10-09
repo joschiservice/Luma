@@ -194,12 +194,12 @@ export const resolutionRunSchema = startResolutionRunSchema.extend({
 export const resolutionHistorySchema = z.object({
   run: resolutionRunSchema,
   events: z.array(learningEventSchema),
-  steps: z.array(z.record(z.unknown())),
-  executions: z.array(z.record(z.unknown())),
-  verifications: z.array(z.record(z.unknown())),
-  failures: z.array(z.record(z.unknown())),
-  incident: z.record(z.unknown()),
-  incidentVerifications: z.array(z.record(z.unknown())),
+  steps: z.array(z.record(z.string(), z.unknown())),
+  executions: z.array(z.record(z.string(), z.unknown())),
+  verifications: z.array(z.record(z.string(), z.unknown())),
+  failures: z.array(z.record(z.string(), z.unknown())),
+  incident: z.record(z.string(), z.unknown()),
+  incidentVerifications: z.array(z.record(z.string(), z.unknown())),
   recurrences: z.array(
     z.object({ id: z.string().uuid(), detectedAt: z.string().datetime() }),
   ),

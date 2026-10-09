@@ -1,11 +1,6 @@
-import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
-import {
-  apiErrorSchema,
-  organizationParamsSchema,
-  requires,
-} from '../common.js';
+import { endpoint, organizationParamsSchema, requires } from '../common.js';
 import {
   commitmentInputSchema,
   commitmentSchema,
@@ -32,8 +27,7 @@ import {
   transitionInputSchema,
 } from '../procurement.js';
 
-const c = initContract();
-const path = '/v1/organizations/:organizationId/procurement';
+const path = '/v1/organizations/{organizationId}/procurement';
 const orderParams = organizationParamsSchema.extend({
   purchaseOrderId: z.string().uuid(),
 });
@@ -53,276 +47,355 @@ const connectionParams = organizationParamsSchema.extend({
   connectionId: z.string().uuid(),
 });
 
-export const procurementContract = c.router(
-  {
-    suppliers: {
+export const procurementContract = {
+  suppliers: endpoint
+    .route({
       method: 'GET',
-      metadata: requires('procurement.read'),
       path: `${path}/suppliers`,
-      pathParams: organizationParamsSchema,
-      responses: {
-        200: z.object({
-          items: z.array(supplierSchema),
-          canManage: z.boolean(),
-        }),
-      },
       summary: 'List workspace suppliers',
-    },
-    createSupplier: {
+    })
+    .meta({
+      access: requires('procurement.read'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: organizationParamsSchema }))
+    .output(
+      z.object({
+        items: z.array(supplierSchema),
+        canManage: z.boolean(),
+      }),
+    ),
+  createSupplier: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('procurement.manage'),
       path: `${path}/suppliers`,
-      pathParams: organizationParamsSchema,
-      body: supplierInputSchema,
-      responses: { 200: supplierSchema },
       summary: 'Create a supplier',
       description:
         'Requires `procurement.manage`. Retry with the same ID and body after an uncertain response.',
-    },
-    orders: {
+    })
+    .meta({
+      access: requires('procurement.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(
+      z.object({ params: organizationParamsSchema, body: supplierInputSchema }),
+    )
+    .output(supplierSchema),
+  orders: endpoint
+    .route({
       method: 'GET',
-      metadata: requires('procurement.read'),
       path: `${path}/purchase-orders`,
-      pathParams: organizationParamsSchema,
-      responses: {
-        200: z.object({
-          items: z.array(purchaseOrderSchema),
-          canManage: z.boolean(),
-        }),
-      },
       summary: 'List workspace purchase orders',
-    },
-    createOrder: {
+    })
+    .meta({
+      access: requires('procurement.read'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: organizationParamsSchema }))
+    .output(
+      z.object({
+        items: z.array(purchaseOrderSchema),
+        canManage: z.boolean(),
+      }),
+    ),
+  createOrder: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('procurement.manage'),
       path: `${path}/purchase-orders`,
-      pathParams: organizationParamsSchema,
-      body: purchaseOrderInputSchema,
-      responses: { 200: purchaseOrderSchema },
       summary: 'Create a purchase order',
       description:
         'Requires `procurement.manage`. Creates a draft with immutable lines and provenance. Luma-owned orders support audited lifecycle changes. External ownership requires an external reference and prevents local lifecycle changes. Reuse the ID and body on retry.',
-    },
-    detail: {
+    })
+    .meta({
+      access: requires('procurement.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(
+      z.object({
+        params: organizationParamsSchema,
+        body: purchaseOrderInputSchema,
+      }),
+    )
+    .output(purchaseOrderSchema),
+  detail: endpoint
+    .route({
       method: 'GET',
-      metadata: requires('procurement.read'),
-      path: `${path}/purchase-orders/:purchaseOrderId`,
-      pathParams: orderParams,
-      responses: { 200: purchaseOrderDetailSchema },
+      path: `${path}/purchase-orders/{purchaseOrderId}`,
       summary: 'Read a purchase order and its lifecycle history',
-    },
-    supplier: {
+    })
+    .meta({
+      access: requires('procurement.read'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: orderParams }))
+    .output(purchaseOrderDetailSchema),
+  supplier: endpoint
+    .route({
       method: 'GET',
-      metadata: requires('procurement.read'),
-      path: `${path}/suppliers/:supplierId`,
-      pathParams: supplierParams,
-      responses: { 200: supplierRecordSchema },
+      path: `${path}/suppliers/{supplierId}`,
       summary: 'Read a supplier record',
       description:
         'Returns the supplier, its purchasing-system link, every purchase order with its stage and progress, and recent supplier messages. Stages come from recorded evidence: confirmation and receipt are read from the purchasing system or recorded from supplier messages; receipt only from the purchasing system.',
-    },
-    linkSupplier: {
+    })
+    .meta({
+      access: requires('procurement.read'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: supplierParams }))
+    .output(supplierRecordSchema),
+  linkSupplier: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('procurement.manage'),
-      path: `${path}/suppliers/:supplierId/link`,
-      pathParams: supplierParams,
-      body: supplierLinkInputSchema,
-      responses: { 200: supplierSchema },
+      path: `${path}/suppliers/{supplierId}/link`,
       summary: 'Link a supplier to its purchasing-system record',
       description:
         'Requires `procurement.manage`. Links the supplier to a supplier in a connected purchasing system, or removes the link, and sets how many hours the supplier has to confirm a sent order. Provide the current revision. The purchasing-system supplier is read again before it is linked.',
-    },
-    purchasingConnections: {
+    })
+    .meta({
+      access: requires('procurement.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: supplierParams, body: supplierLinkInputSchema }))
+    .output(supplierSchema),
+  purchasingConnections: endpoint
+    .route({
       method: 'GET',
-      metadata: requires('procurement.read'),
       path: `${path}/purchasing-connections`,
-      pathParams: organizationParamsSchema,
-      responses: { 200: z.array(purchasingConnectionSchema) },
       summary: 'List purchasing-system connections',
       description:
         'Connections that requested supplier or purchase-order access, with what they are currently allowed to do.',
-    },
-    purchasingSuppliers: {
+    })
+    .meta({
+      access: requires('procurement.read'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: organizationParamsSchema }))
+    .output(z.array(purchasingConnectionSchema)),
+  purchasingSuppliers: endpoint
+    .route({
       method: 'GET',
-      metadata: requires('procurement.manage'),
-      path: `${path}/purchasing-connections/:connectionId/suppliers`,
-      pathParams: connectionParams,
-      query: z.object({ cursor: z.string().max(4096).optional() }),
-      responses: {
-        200: z.object({
-          items: z.array(purchasingSupplierSchema),
-          nextCursor: z.string().nullable(),
-        }),
-      },
+      path: `${path}/purchasing-connections/{connectionId}/suppliers`,
       summary: 'List suppliers in a purchasing system',
       description:
         'Requires `procurement.manage`. Reads up to 100 suppliers per page from the connection, for linking. Nothing is stored.',
-    },
-    progress: {
+    })
+    .meta({
+      access: requires('procurement.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(
+      z.object({
+        params: connectionParams,
+        query: z.object({ cursor: z.string().max(4096).optional() }),
+      }),
+    )
+    .output(
+      z.object({
+        items: z.array(purchasingSupplierSchema),
+        nextCursor: z.string().nullable(),
+      }),
+    ),
+  progress: endpoint
+    .route({
       method: 'GET',
-      metadata: requires('procurement.read'),
       path: `${path}/purchase-orders/progress`,
-      pathParams: organizationParamsSchema,
-      responses: { 200: z.object({ items: z.array(orderSummarySchema) }) },
       summary: 'Summarize purchase-order progress',
       description:
         'One stage per order (draft, sending, awaiting confirmation, confirmed, changed, partially received, received, closed or cancelled), with the earliest expected date of outstanding units, how many items need attention and who acts next.',
-    },
-    record: {
+    })
+    .meta({
+      access: requires('procurement.read'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: organizationParamsSchema }))
+    .output(z.object({ items: z.array(orderSummarySchema) })),
+  record: endpoint
+    .route({
       method: 'GET',
-      metadata: requires('procurement.read'),
-      path: `${path}/purchase-orders/:purchaseOrderId/record`,
-      pathParams: orderParams,
-      responses: { 200: purchaseOrderRecordSchema },
+      path: `${path}/purchase-orders/{purchaseOrderId}/record`,
       summary: 'Read a purchase order record with its supplier lifecycle',
       description:
         'Returns the order, lifecycle history, its submission to a purchasing system, supplier messages and extraction attempts, every commitment with its source, purchasing-system reads, follow-up responses and derived progress. A draft, a sent order, a supplier confirmation and a booked goods receipt are separate milestones; only the purchasing system establishes receipt.',
-    },
-    refresh: {
+    })
+    .meta({
+      access: requires('procurement.read'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: orderParams }))
+    .output(purchaseOrderRecordSchema),
+  refresh: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('procurement.read'),
-      path: `${path}/purchase-orders/:purchaseOrderId/refresh`,
-      pathParams: orderParams,
-      body: z.object({}).strict(),
-      responses: { 200: purchaseOrderRecordSchema },
+      path: `${path}/purchase-orders/{purchaseOrderId}/refresh`,
       summary: 'Read the purchasing system now',
       description:
         'Reads the order in its purchasing system and records any new confirmation or receipt. Requires `procurement.read`.',
-    },
-    requestSubmission: {
+    })
+    .meta({
+      access: requires('procurement.read'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: orderParams, body: z.object({}).strict() }))
+    .output(purchaseOrderRecordSchema),
+  requestSubmission: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('procurement.manage'),
-      path: `${path}/purchase-orders/:purchaseOrderId/submissions`,
-      pathParams: orderParams,
-      body: submissionInputSchema,
-      responses: { 200: submissionViewSchema },
+      path: `${path}/purchase-orders/{purchaseOrderId}/submissions`,
       summary: 'Request approval to send an order to the supplier',
       description:
         'Requires `procurement.manage`. Asks for approval to place this draft or open order in the supplier’s linked purchasing system, with a requested delivery date. Someone else with `procurement.manage` and `decisions.respond` must approve. Every line’s SKU must be linked to a purchasing-system item. After approval Luma places the order once and verifies it with an independent read; the purchasing system sends it to the supplier. Reuse the ID and body after an uncertain response. Requests expire after 24 hours.',
-    },
-    decideSubmission: {
+    })
+    .meta({
+      access: requires('procurement.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: orderParams, body: submissionInputSchema }))
+    .output(submissionViewSchema),
+  decideSubmission: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('procurement.manage'),
-      path: `${path}/submissions/:submissionId/decision`,
-      pathParams: submissionParams,
-      body: submissionDecisionSchema,
-      responses: { 200: submissionViewSchema },
+      path: `${path}/submissions/{submissionId}/decision`,
       summary: 'Approve or reject sending an order',
       description:
         'Requires `procurement.manage` and `decisions.respond`, plus any app permission the purchasing capability declares. Someone other than the requester approves or rejects the exact submission. Approval dispatches it as the requester after their membership, the order and the supplier link are checked again.',
-    },
-    sendSubmission: {
+    })
+    .meta({
+      access: requires('procurement.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(
+      z.object({ params: submissionParams, body: submissionDecisionSchema }),
+    )
+    .output(submissionViewSchema),
+  sendSubmission: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('procurement.manage'),
-      path: `${path}/submissions/:submissionId/send`,
-      pathParams: submissionParams,
-      body: z.object({}).strict(),
-      responses: { 200: submissionViewSchema },
+      path: `${path}/submissions/{submissionId}/send`,
       summary: 'Send an approved order now',
       description:
         'The requester dispatches an approved submission that has not been sent. Repeated calls return the recorded attempt.',
-    },
-    checkSubmission: {
+    })
+    .meta({
+      access: requires('procurement.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: submissionParams, body: z.object({}).strict() }))
+    .output(submissionViewSchema),
+  checkSubmission: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('procurement.manage'),
-      path: `${path}/submissions/:submissionId/check`,
-      pathParams: submissionParams,
-      body: z.object({}).strict(),
-      responses: { 200: submissionViewSchema },
+      path: `${path}/submissions/{submissionId}/check`,
       summary: 'Check an uncertain submission',
       description:
         'Reads the purchasing system to settle whether an uncertain submission created the order. It never sends the order again.',
-    },
-    recordMessage: {
+    })
+    .meta({
+      access: requires('procurement.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: submissionParams, body: z.object({}).strict() }))
+    .output(submissionViewSchema),
+  recordMessage: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('procurement.manage'),
-      path: `${path}/purchase-orders/:purchaseOrderId/messages`,
-      pathParams: orderParams,
-      body: messageInputSchema,
-      responses: {
-        200: z.object({
-          communicationId: z.string().uuid(),
-          duplicate: z.boolean(),
-        }),
-      },
+      path: `${path}/purchase-orders/{purchaseOrderId}/messages`,
       summary: 'Record a supplier message',
       description:
         'Requires `procurement.manage`. Records a supplier message for this order. When an EU model route is configured, Luma lists the commitments it states, each with the exact words it came from; changes, uncertain readings and conditions wait for review. The same message, by message ID or content, is recorded once. Text is removed after the retention period.',
-    },
-    readMessage: {
+    })
+    .meta({
+      access: requires('procurement.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: orderParams, body: messageInputSchema }))
+    .output(
+      z.object({
+        communicationId: z.string().uuid(),
+        duplicate: z.boolean(),
+      }),
+    ),
+  readMessage: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('procurement.manage'),
-      path: `${path}/messages/:communicationId/read`,
-      pathParams: messageParams,
-      body: z.object({}).strict(),
-      responses: { 200: extractionSchema },
+      path: `${path}/messages/{communicationId}/read`,
       summary: 'Read a supplier message again',
       description:
         'Retries reading a message whose earlier attempts were unavailable or failed.',
-    },
-    removeMessageText: {
+    })
+    .meta({
+      access: requires('procurement.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: messageParams, body: z.object({}).strict() }))
+    .output(extractionSchema),
+  removeMessageText: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('procurement.manage'),
-      path: `${path}/messages/:communicationId/remove-text`,
-      pathParams: messageParams,
-      body: z.object({}).strict(),
-      responses: { 200: communicationSchema },
+      path: `${path}/messages/{communicationId}/remove-text`,
       summary: 'Remove a supplier message’s text',
       description:
         'Requires `procurement.manage`. Removes the subject and text now. The sender, time, content digest and recorded commitments remain; quotes can no longer be shown.',
-    },
-    recordCommitment: {
+    })
+    .meta({
+      access: requires('procurement.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: messageParams, body: z.object({}).strict() }))
+    .output(communicationSchema),
+  recordCommitment: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('procurement.manage'),
-      path: `${path}/purchase-orders/:purchaseOrderId/commitments`,
-      pathParams: orderParams,
-      body: commitmentInputSchema,
-      responses: { 200: commitmentSchema },
+      path: `${path}/purchase-orders/{purchaseOrderId}/commitments`,
       summary: 'Record or correct a supplier commitment',
       description:
         'Requires `procurement.manage`. Records a confirmed quantity, promised date, shipment or condition by selecting the words in a supplier message, or corrects an earlier commitment with a reason. Corrections add a commitment; nothing is overwritten. Receipt cannot be recorded here.',
-    },
-    reviewCommitment: {
+    })
+    .meta({
+      access: requires('procurement.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: orderParams, body: commitmentInputSchema }))
+    .output(commitmentSchema),
+  reviewCommitment: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('procurement.manage'),
-      path: `${path}/commitments/:commitmentId/review`,
-      pathParams: commitmentParams,
-      body: reviewInputSchema,
-      responses: { 200: commitmentSchema },
+      path: `${path}/commitments/{commitmentId}/review`,
       summary: 'Confirm or reject an extracted commitment',
       description:
         'Requires `procurement.manage`. Confirms or rejects a commitment that needed review. `acceptChange` also accepts a quantity or date change.',
-    },
-    respond: {
+    })
+    .meta({
+      access: requires('procurement.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: commitmentParams, body: reviewInputSchema }))
+    .output(commitmentSchema),
+  respond: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('procurement.manage'),
-      path: `${path}/purchase-orders/:purchaseOrderId/follow-ups`,
-      pathParams: orderParams,
-      body: followUpInputSchema,
-      responses: { 200: followUpSchema },
+      path: `${path}/purchase-orders/{purchaseOrderId}/follow-ups`,
       summary: 'Respond to a change or missed deadline',
       description:
         'Requires `procurement.manage`. Accepts a supplier change, or records a follow-up with when Luma should check again (within 60 days). The key must be one of the order’s current attention items.',
-    },
-    transition: {
+    })
+    .meta({
+      access: requires('procurement.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: orderParams, body: followUpInputSchema }))
+    .output(followUpSchema),
+  transition: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('procurement.manage'),
-      path: `${path}/purchase-orders/:purchaseOrderId/transitions`,
-      pathParams: orderParams,
-      body: transitionInputSchema,
-      responses: { 200: purchaseOrderSchema },
+      path: `${path}/purchase-orders/{purchaseOrderId}/transitions`,
       summary: 'Change purchase order status',
       description:
         'Requires `procurement.manage`. Moves drafts to open or cancelled, and open orders to closed or cancelled. Provide the current revision and a reason. Reuse the command ID and body on retry. Closing records completion; it does not record a warehouse receipt.',
-    },
-  },
-  {
-    commonResponses: {
-      401: apiErrorSchema,
-      403: apiErrorSchema,
-      404: apiErrorSchema,
-      409: apiErrorSchema,
-      503: apiErrorSchema,
-    },
-  },
-);
+    })
+    .meta({
+      access: requires('procurement.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: orderParams, body: transitionInputSchema }))
+    .output(purchaseOrderSchema),
+};

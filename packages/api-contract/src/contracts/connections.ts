@@ -1,9 +1,8 @@
-import { initContract } from '@ts-rest/core';
 import { z } from 'zod';
 
 import {
   anyMember,
-  apiErrorSchema,
+  endpoint,
   organizationParamsSchema,
   requires,
 } from '../common.js';
@@ -13,8 +12,6 @@ import {
   installedConnectionSchema,
 } from '../connections.js';
 
-const c = initContract();
-
 export const connectionParams = organizationParamsSchema.extend({
   connectionId: z.string().uuid(),
 });
@@ -23,69 +20,78 @@ export const connectionVersion = z
   .object({ version: z.number().int().positive() })
   .strict();
 
-export const connectionsContract = c.router(
-  {
-    list: {
+export const connectionsContract = {
+  list: endpoint
+    .route({
       method: 'GET',
-      metadata: anyMember,
-      path: '/v1/organizations/:organizationId/connections',
-      pathParams: organizationParamsSchema,
-      responses: {
-        200: z.object({ items: z.array(installedConnectionSchema) }),
-      },
+      path: '/v1/organizations/{organizationId}/connections',
       summary: 'List installed organization connections',
-    },
-    install: {
+    })
+    .meta({ access: anyMember, errors: [401, 403, 404, 409, 422, 503] })
+    .input(z.object({ params: organizationParamsSchema }))
+    .output(z.object({ items: z.array(installedConnectionSchema) })),
+  install: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('connections.manage'),
-      path: '/v1/organizations/:organizationId/connections',
-      pathParams: organizationParamsSchema,
-      body: installationInput,
-      responses: { 201: installedConnectionSchema },
+      path: '/v1/organizations/{organizationId}/connections',
+      successStatus: 201,
       summary: 'Install a connection',
       description:
         'Requires `connections.manage`. The connection remains pending until a successful permission check.',
-    },
-    check: {
+    })
+    .meta({
+      access: requires('connections.manage'),
+      errors: [401, 403, 404, 409, 422, 503],
+    })
+    .input(
+      z.object({ params: organizationParamsSchema, body: installationInput }),
+    )
+    .output(installedConnectionSchema),
+  check: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('connections.manage'),
-      path: '/v1/organizations/:organizationId/connections/:connectionId/check',
-      pathParams: connectionParams,
-      body: connectionVersion,
-      responses: { 200: installedConnectionSchema },
+      path: '/v1/organizations/{organizationId}/connections/{connectionId}/check',
       summary: 'Validate credentials and requested permissions',
-    },
-    rotate: {
+    })
+    .meta({
+      access: requires('connections.manage'),
+      errors: [401, 403, 404, 409, 422, 503],
+    })
+    .input(z.object({ params: connectionParams, body: connectionVersion }))
+    .output(installedConnectionSchema),
+  rotate: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('connections.manage'),
-      path: '/v1/organizations/:organizationId/connections/:connectionId/credentials',
-      pathParams: connectionParams,
-      body: connectionVersion.extend({ credentials: installationCredentials }),
-      responses: { 200: installedConnectionSchema },
+      path: '/v1/organizations/{organizationId}/connections/{connectionId}/credentials',
       summary: 'Replace connection credentials',
       description:
         'Replaces credentials and clears verified permissions. Check the connection again to restore access. Also reconnects a connection whose provider revoked access, keeping its ID, mappings and history; a disconnected connection returns 409. Use the latest connection version.',
-    },
-    disconnect: {
+    })
+    .meta({
+      access: requires('connections.manage'),
+      errors: [401, 403, 404, 409, 422, 503],
+    })
+    .input(
+      z.object({
+        params: connectionParams,
+        body: connectionVersion.extend({
+          credentials: installationCredentials,
+        }),
+      }),
+    )
+    .output(installedConnectionSchema),
+  disconnect: endpoint
+    .route({
       method: 'POST',
-      metadata: requires('connections.manage'),
-      path: '/v1/organizations/:organizationId/connections/:connectionId/disconnect',
-      pathParams: connectionParams,
-      body: connectionVersion,
-      responses: { 200: installedConnectionSchema },
+      path: '/v1/organizations/{organizationId}/connections/{connectionId}/disconnect',
       summary: 'Disconnect an installed connection',
       description:
         'Deletes stored credentials and stops further use. Does not revoke provider tokens or cancel requests already sent. Install a new connection to reconnect.',
-    },
-  },
-  {
-    commonResponses: {
-      401: apiErrorSchema,
-      403: apiErrorSchema,
-      404: apiErrorSchema,
-      409: apiErrorSchema,
-      422: apiErrorSchema,
-      503: apiErrorSchema,
-    },
-  },
-);
+    })
+    .meta({
+      access: requires('connections.manage'),
+      errors: [401, 403, 404, 409, 422, 503],
+    })
+    .input(z.object({ params: connectionParams, body: connectionVersion }))
+    .output(installedConnectionSchema),
+};

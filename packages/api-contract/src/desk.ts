@@ -9,6 +9,7 @@ const at = z.string().datetime();
 const ref = z.string().min(1).max(512);
 
 const fields = z.record(
+  z.string(),
   z.union([z.string().max(1000), z.number().finite(), z.boolean(), z.null()]),
 );
 

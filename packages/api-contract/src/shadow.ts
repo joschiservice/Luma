@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 const code = z.string().min(1).max(200);
 const fields = z.record(
+  z.string(),
   z.union([z.string().max(1000), z.number().finite(), z.boolean(), z.null()]),
 );
 
@@ -48,8 +49,8 @@ export const shadowEvaluationSchema = z.object({
   mode: z.literal('shadow'),
   executed: z.literal(false),
   createdAt: z.string().datetime(),
-  diagnosis: z.record(z.unknown()).nullable(),
-  candidate: z.record(z.unknown()).nullable(),
+  diagnosis: z.record(z.string(), z.unknown()).nullable(),
+  candidate: z.record(z.string(), z.unknown()).nullable(),
   eligibility: z.enum([
     'eligible',
     'ineligible',

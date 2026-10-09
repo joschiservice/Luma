@@ -84,7 +84,7 @@ export const productQuerySchema = z
 export const productListSchema = z.object({
   items: z.array(catalogItemSchema),
   sources: z.array(catalogSourceSchema),
-  counts: z.record(catalogViewSchema, z.number().int().nonnegative()),
+  counts: z.partialRecord(catalogViewSchema, z.number().int().nonnegative()),
   nextCursor: z.string().nullable(),
   asOf: timestamp,
 });
