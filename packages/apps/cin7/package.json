@@ -1,0 +1,36 @@
+{
+  "name": "@luma/app-cin7",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "luma-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@luma/api-contract": "workspace:*",
+    "@luma/app-host": "workspace:*",
+    "@luma/connections": "workspace:*",
+    "@luma/connector-cin7": "workspace:*",
+    "@luma/i18n": "workspace:*",
+    "@luma/identity": "workspace:*",
+    "@luma/ui": "workspace:*",
+    "@tanstack/react-form": "catalog:",
+    "react": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@luma/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "vitest": "catalog:"
+  }
+}

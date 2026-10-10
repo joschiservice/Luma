@@ -39,7 +39,7 @@ for Luma's users live in `apps/web/content/docs`.
   [installed connections](installed-connections.md).
 - [Shopify connector](shopify.md), [Shopify actions](shopify-actions.md) and
   [Shopify partner readiness](shopify-production.md).
-- [JTL-Wawi connector](jtl.md).
+- [JTL-Wawi connector](jtl.md) and [Cin7 Core connector](cin7.md).
 - [Canonical commerce projections](commerce-projections.md) and
   [commerce sync](commerce-sync.md).
 

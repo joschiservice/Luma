@@ -9,16 +9,16 @@ Wenn du einen Shop oder ein ERP verbindest, importiert Luma dessen Verlauf und h
 
 Jede Verbindung hat einen Abgleich pro Datensatztyp:
 
-| Datensatztyp                                                             | Shopify          | JTL Cloud und JTL-Wawi |
-| ------------------------------------------------------------------------ | ---------------- | ---------------------- |
-| **Bestellungen** mit Positionen, Summen und Bestelldatum                 | Ja               | Ja                     |
-| **Fulfillments**, etwa Fulfillment-Aufträge, Sendungen und Lieferscheine | Ja               | Ja                     |
-| **Produkte** mit Varianten und SKU-Codes                                 | Ja               | Ja                     |
-| **Bestände** pro SKU und Lagerort                                        | Ja               | Ja                     |
-| **Kunden**                                                               | Nach Genehmigung | Wenn gewählt           |
-| **Retouren und Erstattungen**                                            | Ja               | Nein                   |
+| Datensatztyp                                                             | Shopify          | JTL Cloud und JTL-Wawi | Cin7 Core        |
+| ------------------------------------------------------------------------ | ---------------- | ---------------------- | ---------------- |
+| **Bestellungen** mit Positionen, Summen und Bestelldatum                 | Ja               | Ja                     | Ja               |
+| **Fulfillments**, etwa Fulfillment-Aufträge, Sendungen und Lieferscheine | Ja               | Ja                     | Ja               |
+| **Produkte** mit Varianten und SKU-Codes                                 | Ja               | Ja                     | Ja               |
+| **Bestände** pro SKU und Lagerort                                        | Ja               | Ja                     | Ja               |
+| **Kunden**                                                               | Nach Genehmigung | Wenn gewählt           | Wenn gewählt     |
+| **Retouren und Erstattungen**                                            | Ja               | Nein                   | Nur Erstattungen |
 
-Shopify teilt Kunden nur, wenn Shopify den Zugriff auf Kundendaten genehmigt und der Shop ihn erteilt hat. Kontaktdaten und Adressen brauchen eine eigene Genehmigung. JTL teilt Kunden nur, wenn beim Hinzufügen der Verbindung **Kunden importieren** gewählt wurde. Ein Datensatztyp, den die Verbindung nicht umfasst, zeigt **Nicht Teil dieser Verbindung**. Einer, den das System nicht erteilt hat, zeigt **Die Quelle hat keinen Zugriff gewährt**. Zeigt ein Shopify-Shop bei Retouren und Erstattungen **Nicht Teil dieser Verbindung**, verbinde den Shop neu, um sie hinzuzufügen. Was eine Verbindung lesen darf, änderst du über **Verbindung verwalten** daneben; siehe [Apps installieren und Systeme verbinden](/docs/apps-and-connections).
+Shopify teilt Kunden nur, wenn Shopify den Zugriff auf Kundendaten genehmigt und der Shop ihn erteilt hat. Kontaktdaten und Adressen brauchen eine eigene Genehmigung. JTL und Cin7 Core teilen Kunden nur, wenn beim Hinzufügen der Verbindung **Kunden importieren** gewählt wurde. Cin7 Core teilt seine Gutschriften als Erstattungen; Retourenanfragen gibt es dort nicht, und Angebote sowie Auftragsentwürfe werden erst importiert, wenn sie zu Aufträgen werden. Ein Datensatztyp, den die Verbindung nicht umfasst, zeigt **Nicht Teil dieser Verbindung**. Einer, den das System nicht erteilt hat, zeigt **Die Quelle hat keinen Zugriff gewährt**. Zeigt ein Shopify-Shop bei Retouren und Erstattungen **Nicht Teil dieser Verbindung**, verbinde den Shop neu, um sie hinzuzufügen. Was eine Verbindung lesen darf, änderst du über **Verbindung verwalten** daneben; siehe [Apps installieren und Systeme verbinden](/docs/apps-and-connections).
 
 Lieferanten und Lieferantenbestellungen aus JTL erscheinen hier nicht. Die [Beschaffung](/docs/procurement) liest sie für jede Lieferantenbestellung.
 

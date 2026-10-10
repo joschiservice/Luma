@@ -1,4 +1,5 @@
 {
   "catalog_app_shopify_description": "Connect Shopify stores to read orders, products, inventory, and fulfillment.",
-  "catalog_app_jtl_description": "Connect JTL Cloud or JTL-Wawi to read commerce data, correct shipping methods, and send approved purchase orders."
+  "catalog_app_jtl_description": "Connect JTL Cloud or JTL-Wawi to read commerce data, correct shipping methods, and send approved purchase orders.",
+  "catalog_app_cin7_description": "Connect Cin7 Core to read orders, fulfillments, credit notes, products, stock, customers, and purchasing."
 }

@@ -67,8 +67,6 @@
     "@eslint/js": "^10.0.1",
     "@luma/app-catalog": "workspace:*",
     "@luma/app-host": "workspace:*",
-    "@luma/app-jtl": "workspace:*",
-    "@luma/app-shopify": "workspace:*",
     "@luma/application-runtime": "workspace:*",
     "@luma/commerce-sync": "workspace:*",
     "@luma/connections": "workspace:*",
@@ -106,6 +104,9 @@
     "typescript-eslint": "^8.46.0",
     "vitest": "catalog:",
     "yaml": "2.9.0",
-    "@luma/staff": "workspace:*"
+    "@luma/staff": "workspace:*",
+    "@luma/app-cin7": "workspace:*",
+    "@luma/app-jtl": "workspace:*",
+    "@luma/app-shopify": "workspace:*"
   }
 }

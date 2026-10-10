@@ -293,6 +293,9 @@ importers:
       '@luma/app-catalog':
         specifier: workspace:*
         version: link:packages/app-catalog
+      '@luma/app-cin7':
+        specifier: workspace:*
+        version: link:packages/apps/cin7
       '@luma/app-host':
         specifier: workspace:*
         version: link:packages/app-host
@@ -754,6 +757,9 @@ importers:
 
   packages/app-catalog:
     dependencies:
+      '@luma/app-cin7':
+        specifier: workspace:*
+        version: link:../apps/cin7
       '@luma/app-host':
         specifier: workspace:*
         version: link:../app-host
@@ -898,6 +904,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
+      '@luma/app-cin7':
+        specifier: workspace:*
+        version: link:../apps/cin7
       '@luma/app-jtl':
         specifier: workspace:*
         version: link:../apps/jtl
@@ -934,6 +943,52 @@ importers:
       tsx:
         specifier: 'catalog:'
         version: 4.23.13
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
+
+  packages/apps/cin7:
+    dependencies:
+      '@luma/api-contract':
+        specifier: workspace:*
+        version: link:../../api-contract
+      '@luma/app-host':
+        specifier: workspace:*
+        version: link:../../app-host
+      '@luma/connections':
+        specifier: workspace:*
+        version: link:../../connections
+      '@luma/connector-cin7':
+        specifier: workspace:*
+        version: link:../../connectors/cin7
+      '@luma/i18n':
+        specifier: workspace:*
+        version: link:../../i18n
+      '@luma/identity':
+        specifier: workspace:*
+        version: link:../../identity
+      '@luma/ui':
+        specifier: workspace:*
+        version: link:../../ui
+      '@tanstack/react-form':
+        specifier: 'catalog:'
+        version: 1.33.5(@tanstack/react-start@1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.8)))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      react:
+        specifier: 'catalog:'
+        version: 19.3.0
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.5
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.3.0
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
@@ -1196,6 +1251,19 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
+
+  packages/connectors/cin7:
+    dependencies:
+      '@luma/connector-core':
+        specifier: workspace:*
+        version: link:../core
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
 
   packages/connectors/core:
     dependencies:

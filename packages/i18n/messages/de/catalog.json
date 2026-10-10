@@ -1,4 +1,5 @@
 {
   "catalog_app_shopify_description": "Verbinde Shopify-Shops, um Bestellungen, Produkte, Bestand und Fulfillment zu lesen.",
-  "catalog_app_jtl_description": "Verbinde JTL Cloud oder JTL-Wawi, um Handelsdaten zu lesen, Versandarten zu korrigieren und genehmigte Lieferantenbestellungen zu senden."
+  "catalog_app_jtl_description": "Verbinde JTL Cloud oder JTL-Wawi, um Handelsdaten zu lesen, Versandarten zu korrigieren und genehmigte Lieferantenbestellungen zu senden.",
+  "catalog_app_cin7_description": "Verbinde Cin7 Core, um Aufträge, Fulfillments, Gutschriften, Produkte, Bestand, Kunden und Einkauf zu lesen."
 }

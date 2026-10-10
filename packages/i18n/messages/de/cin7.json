@@ -1,0 +1,13 @@
+{
+  "cin7_setup_help": "Füge in Cin7 Core auf der Seite für die API-Einrichtung eine API-Anwendung für Luma hinzu und gib dann ihre Account-ID und ihren Application Key ein.",
+  "cin7_setup_invalid": "Prüfe die markierten Felder. Gib einen Namen für die Verbindung, die Account-ID aus Cin7 Core und den Application Key ein.",
+  "cin7_setup_invalid_replace": "Gib den neuen Application Key ein.",
+  "cin7_setup_label_name": "Name der Verbindung",
+  "cin7_setup_label_account": "Account-ID",
+  "cin7_setup_label_key": "Application Key",
+  "cin7_setup_read_access": "Luma fordert Lesezugriff auf Aufträge, Fulfillments, Gutschriften, Produkte, Bestand, Lieferanten und Lieferantenbestellungen an. Cin7 erlaubt 60 Anfragen pro Minute und API-Anwendung, daher dauert der Import großer Konten mehrere Stunden.",
+  "cin7_setup_customers": "Kunden importieren, einschließlich Namen, Kontaktdaten und Adressen, und ihren Aufträgen zuordnen.",
+  "cin7_setup_uncertain": "Luma konnte nicht bestätigen, ob die Eingaben gespeichert wurden. Schließe dieses Formular und aktualisiere die Liste, bevor du es erneut versuchst.",
+  "cin7_setup_confirm_replacement": "Ersetzen bestätigen",
+  "cin7_setup_save": "Verbindung speichern"
+}

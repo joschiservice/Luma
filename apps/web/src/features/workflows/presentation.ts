@@ -7,6 +7,7 @@ export function workflowSystemLabel(system: string): string {
       {
         'jtl-cloud': 'JTL Cloud',
         'jtl-onprem': 'JTL-Wawi',
+        'cin7-core': 'Cin7 Core',
         shopify: 'Shopify',
         luma: 'Luma',
       } as Record<string, string>

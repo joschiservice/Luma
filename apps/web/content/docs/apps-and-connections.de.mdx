@@ -1,9 +1,9 @@
 ---
 title: Apps installieren und Systeme verbinden
-description: Installiere die Apps für Shopify und JTL, verbinde Shops und ERP und halte jede Verbindung funktionsfähig.
+description: Installiere die Apps für Shopify, JTL und Cin7 Core, verbinde Shops und ERP und halte jede Verbindung funktionsfähig.
 ---
 
-Apps verbinden Luma mit den Systemen, die du bereits nutzt. Jede App, etwa Shopify oder JTL, bringt eigene Verbindungen, Berechtigungen und Seiten in deinen Workspace. Eine Verbindung ist ein Shop oder eine ERP-Installation, aus der Luma liest und die Luma, wo du es erlaubst, auch ändert. Öffne **Apps** in der Seitenleiste oder drücke **G** und dann **C**.
+Apps verbinden Luma mit den Systemen, die du bereits nutzt. Jede App, etwa Shopify, JTL oder Cin7 Core, bringt eigene Verbindungen, Berechtigungen und Seiten in deinen Workspace. Eine Verbindung ist ein Shop oder eine ERP-Installation, aus der Luma liest und die Luma, wo du es erlaubst, auch ändert. Öffne **Apps** in der Seitenleiste oder drücke **G** und dann **C**.
 
 ## Deine Apps finden [#find-your-apps]
 
@@ -17,11 +17,11 @@ Alle im Workspace sehen Apps und Verbindungen. Zum Installieren, Deinstallieren 
 
 ## App installieren [#install-an-app]
 
-1. Wähle unter **Verfügbare Apps** die Option **Shopify installieren** oder **JTL installieren**.
+1. Wähle unter **Verfügbare Apps** die Schaltfläche zum Installieren der App, zum Beispiel **Cin7 Core installieren**.
 2. Prüfe, was die App erhält:
    - **Daten und Aktionen, die die App nutzen kann**, etwa Bestellungen, Bestand oder das Vorschlagen von Aktionen. Einträge mit **Sensibel** können Daten in deinen Systemen ändern, Geld bewegen, Zugriffe oder Genehmigungsregeln ändern oder personenbezogene Daten lesen.
    - **Neue Berechtigungen für Rollen**: die eigenen Berechtigungen der App. Shopify ergänzt **Shopify-Fulfillments wiederherstellen** und **Shopify-Bestand korrigieren**. JTL ergänzt **Lieferantenbestellungen an JTL senden** und **JTL-Versandarten ändern**. Inhaber und Admins erhalten sie automatisch. Für eine andere Rolle bearbeitest du die Rolle unter [Einstellungen → Rollen](/docs/roles-and-permissions).
-3. Wähle im Dialog **Shopify installieren** oder **JTL installieren**. Luma öffnet die Seite der App, damit du eine Verbindung hinzufügen kannst.
+3. Wähle im Dialog erneut die Schaltfläche zum Installieren. Luma öffnet die Seite der App, damit du eine Verbindung hinzufügen kannst.
 
 Eine App arbeitet für die Person, die sie nutzt, und tut nie mehr, als die Rolle dieser Person erlaubt. Du kannst nur Zugriff erteilen, den deine eigene Rolle enthält. Fehlt dir ein Teil davon, sagt der Dialog das, und eine Person mit der Rolle Inhaber muss die App installieren.
 
@@ -73,6 +73,16 @@ Eine JTL-Verbindung fordert immer Lesezugriff auf Bestellungen, Produkte, Bestan
 
 Diese Optionen lassen sich nur beim Hinzufügen der Verbindung wählen. Luma nutzt Kunden und schreibende Aktionen erst, wenn bestätigt ist, dass JTL sie erteilt hat. Personen brauchen weiterhin die passende App-Berechtigung, und jede Änderung wartet auf Genehmigung.
 
+## Cin7 Core verbinden [#connect-cin7-core]
+
+1. Füge in Cin7 Core auf der Seite für die API-Einrichtung eine API-Anwendung für Luma hinzu. Cin7 zeigt ihre Account-ID und ihren Application Key.
+2. Wähle auf der Seite der App Cin7 Core **Verbindung hinzufügen**.
+3. Gib einen **Namen der Verbindung**, die **Account-ID** und den **Application Key** ein.
+4. Wähle **Kunden importieren**, wenn Luma Kunden einschließlich Namen, Kontaktdaten und Adressen lesen und ihren Aufträgen zuordnen soll.
+5. Wähle **Verbindung speichern** und dann **Zugriff prüfen**.
+
+Luma liest aus Cin7 Core nur und ändert dort nie etwas. Cin7 erlaubt jeder API-Anwendung 60 Anfragen pro Minute, daher dauert der erste Import eines großen Kontos mehrere Stunden. Gib Luma eine eigene API-Anwendung: Integrationen, die sich eine teilen, teilen sich auch ihr Limit.
+
 ## Verbindung prüfen [#check-a-connection]
 
 Die Karte jeder Verbindung zeigt ihren Zustand, was Luma darüber tun darf, und eine Zusammenfassung des Abgleichs mit **Datenabgleich ansehen**.
@@ -91,7 +101,7 @@ Meldet ein Formular, dass Luma nicht bestätigen konnte, ob deine Änderung gesp
 
 ## Verbindung ändern oder neu verbinden [#change-or-reconnect-a-connection]
 
-Über die **Verbindungseinstellungen** aktualisierst du den Zugriff einer Verbindung. Bei Shopify autorisiert **Weiter zu Shopify** denselben Shop erneut und fordert dabei auch neu hinzugekommenen Zugriff an. Bei JTL gibst du das neue Zugriffstoken ein, bei lokal installierter JTL-Wawi auch den Challenge-Code. Wähle dann **Ersetzen bestätigen** und prüfe den Zugriff erneut. Konto oder Adresse einer Verbindung lassen sich nicht ändern; füge für ein anderes Konto eine neue Verbindung hinzu.
+Über die **Verbindungseinstellungen** aktualisierst du den Zugriff einer Verbindung. Bei Shopify autorisiert **Weiter zu Shopify** denselben Shop erneut und fordert dabei auch neu hinzugekommenen Zugriff an. Bei JTL gibst du das neue Zugriffstoken ein, bei lokal installierter JTL-Wawi auch den Challenge-Code, bei Cin7 Core den neuen Application Key. Wähle dann **Ersetzen bestätigen** und prüfe den Zugriff erneut. Konto oder Adresse einer Verbindung lassen sich nicht ändern; füge für ein anderes Konto eine neue Verbindung hinzu.
 
 Zeigt eine Verbindung **Zugriff entzogen**, öffnet Luma zusätzlich ein Problem. Wähle **Neu verbinden** auf der Karte der Verbindung oder die Schaltfläche zum Neuverbinden im Problem und gib neuen Zugriff ein. Die Verbindung behält ihre Datensätze und Verknüpfungen, und der Abgleich läuft weiter. Siehe [Datenabgleich](/docs/data-sync#when-a-sync-needs-you).
 

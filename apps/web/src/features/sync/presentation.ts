@@ -121,7 +121,11 @@ export const recordTypes: Record<
   ),
 };
 
-const providers: Record<string, string> = { shopify: 'Shopify', jtl: 'JTL' };
+const providers: Record<string, string> = {
+  shopify: 'Shopify',
+  jtl: 'JTL',
+  cin7: 'Cin7',
+};
 
 /** The display name of a provider ID, such as Shopify. */
 export const providerName = (provider: string) =>

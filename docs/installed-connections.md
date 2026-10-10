@@ -1,7 +1,7 @@
 # Installed connections
 
 An installed connection binds a workspace to one provider account (a Shopify shop, a JTL
-Cloud tenant or a JTL-Wawi on-premise API) with encrypted credentials and verified
+Cloud tenant, a JTL-Wawi on-premise API or a Cin7 Core account) with encrypted credentials and verified
 permissions. Capabilities are usable only while the connection is active and the
 provider has confirmed them, and every credential read rechecks tenant membership,
 installation and status. Code: `@luma/connections`; provider verification and setup live
@@ -22,8 +22,9 @@ each request, and requires a list refresh after an uncertain result before resub
 
 Target identity is immutable; create a new installation to change account or endpoint.
 Shopify targets are a lowercase `*.myshopify.com` hostname, JTL Cloud targets the provider
-tenant UUID, and JTL on-premise targets an HTTPS API root with trailing slash, app ID and
-app version (the challenge code is stored with the encrypted credentials). Shopify
+tenant UUID, JTL on-premise targets an HTTPS API root with trailing slash, app ID and
+app version (the challenge code is stored with the encrypted credentials), and Cin7 Core
+targets the account ID (the API application key is the credential). Shopify
 connections are normally created through [OAuth](shopify.md#authorization-and-recovery-guarantees);
 manual token setup remains for internal fixtures and deployments without OAuth.
 

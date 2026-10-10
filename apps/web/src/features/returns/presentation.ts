@@ -13,12 +13,13 @@ import type { OperationalState } from '@luma/ui/components/primitives/state';
 import { formatMoney } from '../orders/presentation';
 
 /** The system a return comes from, for messages that name it. */
-export type ReturnSystem = 'shopify' | 'jtl' | 'other';
+export type ReturnSystem = 'shopify' | 'jtl' | 'cin7' | 'other';
 
 /** Maps a source system ID to the name messages use for it. */
 export function returnSystem(system: string | null): ReturnSystem {
   if (system === 'shopify') return 'shopify';
   if (system?.startsWith('jtl')) return 'jtl';
+  if (system?.startsWith('cin7')) return 'cin7';
 
   return 'other';
 }

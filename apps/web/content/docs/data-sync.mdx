@@ -9,16 +9,16 @@ When you connect a store or ERP, Luma imports its history and then keeps it curr
 
 Each connection has one sync per record type:
 
-| Record type                                                                | Shopify       | JTL Cloud and JTL-Wawi |
-| -------------------------------------------------------------------------- | ------------- | ---------------------- |
-| **Orders** with lines, totals and placed dates                             | Yes           | Yes                    |
-| **Fulfillments**, such as fulfillment orders, shipments and delivery notes | Yes           | Yes                    |
-| **Products** with their variants and SKU codes                             | Yes           | Yes                    |
-| **Stock levels** per SKU and location                                      | Yes           | Yes                    |
-| **Customers**                                                              | When approved | When chosen            |
-| **Returns and refunds**                                                    | Yes           | No                     |
+| Record type                                                                | Shopify       | JTL Cloud and JTL-Wawi | Cin7 Core    |
+| -------------------------------------------------------------------------- | ------------- | ---------------------- | ------------ |
+| **Orders** with lines, totals and placed dates                             | Yes           | Yes                    | Yes          |
+| **Fulfillments**, such as fulfillment orders, shipments and delivery notes | Yes           | Yes                    | Yes          |
+| **Products** with their variants and SKU codes                             | Yes           | Yes                    | Yes          |
+| **Stock levels** per SKU and location                                      | Yes           | Yes                    | Yes          |
+| **Customers**                                                              | When approved | When chosen            | When chosen  |
+| **Returns and refunds**                                                    | Yes           | No                     | Refunds only |
 
-Shopify shares customers only when Shopify approved access to customer data and the store granted it. Contact details and addresses need their own approval. JTL shares customers only when **Import customers** was chosen when the connection was added. A record type the connection doesn’t cover shows **Not part of this connection**. One the system didn’t grant shows **The source didn’t grant access**. If a Shopify store shows **Not part of this connection** for returns and refunds, reconnect the store to add them. To change what a connection may read, open **Manage connection** next to it; see [Install apps and connect your systems](/docs/apps-and-connections).
+Shopify shares customers only when Shopify approved access to customer data and the store granted it. Contact details and addresses need their own approval. JTL and Cin7 Core share customers only when **Import customers** was chosen when the connection was added. Cin7 Core shares its credit notes as refunds; it has no return requests, and quotes and draft orders aren’t imported until they become orders. A record type the connection doesn’t cover shows **Not part of this connection**. One the system didn’t grant shows **The source didn’t grant access**. If a Shopify store shows **Not part of this connection** for returns and refunds, reconnect the store to add them. To change what a connection may read, open **Manage connection** next to it; see [Install apps and connect your systems](/docs/apps-and-connections).
 
 Suppliers and purchase orders from JTL aren’t listed here. [Procurement](/docs/procurement) reads them for each purchase order.
 

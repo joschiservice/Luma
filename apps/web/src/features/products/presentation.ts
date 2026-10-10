@@ -54,6 +54,7 @@ export const viewDescriptions: Record<CatalogView, string> = localizedLabels({
 export function systemName(system: string | null) {
   if (system === 'shopify') return 'Shopify';
   if (system?.startsWith('jtl')) return 'JTL-Wawi';
+  if (system?.startsWith('cin7')) return 'Cin7 Core';
 
   return m.products_system_fallback();
 }

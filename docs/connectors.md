@@ -8,7 +8,7 @@ as verified success.
 
 Code: the capability contract and runtime live in `@luma/connections`, shared transport
 and errors in `@luma/connector-core`, and provider adapters in the workspace apps
-([Shopify](shopify.md), [JTL](jtl.md)). Tenant setup, encrypted credentials and
+([Shopify](shopify.md), [JTL](jtl.md), [Cin7](cin7.md)). Tenant setup, encrypted credentials and
 permission-gated composition are covered in [installed connections](installed-connections.md).
 
 ## Contract
@@ -107,7 +107,7 @@ effect, and unknown effects always require reconciliation regardless of retry ad
 idempotency support. Unclassified exceptions and malformed write responses are unknown.
 Provider exception text is discarded.
 
-The Shopify and JTL transports make up to three attempts at a read that fails with no
+The Shopify, JTL and Cin7 transports make up to three attempts at a read that fails with no
 effect and delay advice of at most two seconds. Shopify retries only query documents;
 writes and mutations are sent once. Longer advice and other failures reach the caller
 unchanged.
@@ -134,6 +134,12 @@ Sales-order lines are an unpaged array, while delivery-note lines are separately
 There is no nested selection or batch read of complete orders, so child reads run at most
 four at a time; keep concurrency bounded and honor 429/503 `Retry-After`. Orders support
 `salesOrderDateAfter`, which is a creation filter, not an update filter.
+
+Cin7 Core v2 pages lists with `Page`/`Limit` (at most 1,000) and a `Total`, allows 60
+calls per minute per API application, and returns sales, credit notes and purchases
+without lines, so each needs a detail read. Its stock report names locations and splits
+products by bin and batch. See [Cin7](cin7.md#read-cost) for how the adapter paces and
+groups these reads.
 
 To compare read patterns, build the adapter and simulator packages and run
 `node tooling/benchmarks/commerce.mjs`; `BENCHMARK_*` variables at the top of the script

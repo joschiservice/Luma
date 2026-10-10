@@ -53,9 +53,12 @@ export const statuses = localized({
 } satisfies Record<InstalledConnection['status'], () => string>);
 
 /** The system a connection reaches, for messages that name it. */
-export function connectionSystem(kind: string): 'shopify' | 'jtl' | 'other' {
+export function connectionSystem(
+  kind: string,
+): 'shopify' | 'jtl' | 'cin7' | 'other' {
   if (kind === 'shopify') return 'shopify';
   if (kind.startsWith('jtl')) return 'jtl';
+  if (kind.startsWith('cin7')) return 'cin7';
 
   return 'other';
 }
@@ -65,6 +68,7 @@ export function connectionKindName(kind: string) {
   if (kind === 'shopify') return 'Shopify';
   if (kind === 'jtl-cloud') return 'JTL Cloud';
   if (kind === 'jtl-onprem') return m.connections_kind_jtl_onprem();
+  if (kind === 'cin7-core') return 'Cin7 Core';
 
   return kind;
 }
