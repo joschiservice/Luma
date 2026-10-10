@@ -955,9 +955,6 @@ importers:
 
   packages/apps/cin7:
     dependencies:
-      '@luma/api-contract':
-        specifier: workspace:*
-        version: link:../../api-contract
       '@luma/app-host':
         specifier: workspace:*
         version: link:../../app-host

@@ -16,7 +16,6 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@luma/api-contract": "workspace:*",
     "@luma/app-host": "workspace:*",
     "@luma/connections": "workspace:*",
     "@luma/connector-cin7": "workspace:*",

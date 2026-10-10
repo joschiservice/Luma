@@ -33,8 +33,8 @@ export type {
  */
 export function createCin7Provider(
   options: {
-    fetch?: typeof globalThis.fetch;
-    simulation?: SimulationTransport;
+    fetch?: typeof globalThis.fetch | undefined;
+    simulation?: SimulationTransport | undefined;
   } = {},
 ): ConnectionProvider {
   const shared = new Map<

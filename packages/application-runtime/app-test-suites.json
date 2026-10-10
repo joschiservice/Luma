@@ -1,6 +1,6 @@
 [
   {
-    "apps": ["jtl", "shopify"],
+    "apps": ["cin7", "jtl", "shopify"],
     "files": [
       "src/connections.test.ts",
       "src/installation-verifier.test.ts",

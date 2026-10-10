@@ -14,15 +14,19 @@ describe('control API schemas', () => {
       expect(chaosProfileSchema.parse(preset)).toEqual(preset);
   });
 
-  it('defaults new runs to the large merchant with realistic failures', () => {
+  it('defaults new runs to the large merchant on JTL with realistic failures', () => {
     expect(createRunSchema.parse({ id: 'pilot-44' })).toEqual({
       id: 'pilot-44',
       seed: 44,
       profile: 'large',
+      erp: 'jtl',
       chaos: 'realistic',
       running: true,
     });
     expect(() => createRunSchema.parse({ id: 'Pilot 44' })).toThrow();
+    expect(() =>
+      createRunSchema.parse({ id: 'pilot-44', erp: 'omni' }),
+    ).toThrow();
   });
 
   it('rejects out-of-range controls and unknown incident kinds', () => {

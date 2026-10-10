@@ -68,7 +68,7 @@ const probes: {
  * account's plan doesn't include.
  */
 export function createInstallationVerifier(options: {
-  fetch?: typeof globalThis.fetch;
+  fetch?: typeof globalThis.fetch | undefined;
   simulation?: SimulationTransport | undefined;
   /** The connection's shared request pacer. */
   pacer(connection: InstalledConnection): RequestPacer;

@@ -1,3 +1,4 @@
+import { createCin7Provider } from '@luma/app-cin7';
 import { createJtlProvider } from '@luma/app-jtl';
 import {
   createShopifyOAuth,
@@ -16,7 +17,11 @@ import { requirePermission } from '@luma/identity';
 
 /** Composes real provider contributions against injected fixture transports. */
 export function providers(options: Parameters<typeof createJtlProvider>[0]) {
-  return [createJtlProvider(options), createShopifyProvider(options)];
+  return [
+    createJtlProvider(options),
+    createShopifyProvider(options),
+    createCin7Provider(options),
+  ];
 }
 
 /** Exercises provider validation with in-memory lifecycle repositories. */
