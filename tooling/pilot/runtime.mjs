@@ -175,77 +175,80 @@ export async function createPilot(
     }
 
     const id = manifest.incidents.workflow_failure;
-    const connector = createJtlConnector({
-      tenantId: manifest.organizationId,
-      connectionId: manifest.connections.jtl,
-      connection: {
-        kind: 'onprem',
-        baseUrl: 'http://127.0.0.1:5883/api/eazybusiness/',
-        appId: 'LumaSyntheticPilot',
-        appVersion: '1',
-        challengeCode: 'synthetic',
-        apiKey: async () => {
-          if (
-            !(await connectionAvailable(
-              await context(),
-              manifest.connections.jtl,
-            ))
-          )
-            throw new ConnectorError({
-              code: 'unavailable',
-              effect: 'none',
-              retry: 'never',
+    // The plain pilot's synthetic JTL order; simulator runs read their providers instead.
+    const connector = simulation
+      ? null
+      : createJtlConnector({
+          tenantId: manifest.organizationId,
+          connectionId: manifest.connections.jtl,
+          connection: {
+            kind: 'onprem',
+            baseUrl: 'http://127.0.0.1:5883/api/eazybusiness/',
+            appId: 'LumaSyntheticPilot',
+            appVersion: '1',
+            challengeCode: 'synthetic',
+            apiKey: async () => {
+              if (
+                !(await connectionAvailable(
+                  await context(),
+                  manifest.connections.jtl,
+                ))
+              )
+                throw new ConnectorError({
+                  code: 'unavailable',
+                  effect: 'none',
+                  retry: 'never',
+                });
+
+              return 'synthetic';
+            },
+          },
+          shippingMethodActions: true,
+          recordObservations: ({ observations }) =>
+            mutate((state) => {
+              state.observations.push(...observations);
+            }),
+          fetch: async (input, init) => {
+            const url = new URL(String(input));
+            if (!url.pathname.endsWith('/sales-orders/10'))
+              throw new Error('Unknown synthetic provider target');
+            if (init?.method !== 'PATCH') {
+              const order = (await readJson(path)).order;
+
+              return Response.json({
+                shippingDetails: { shippingDate: null },
+                ...order,
+              });
+            }
+            if (manifest.scenario === 'failed')
+              return new Response(null, { status: 409 });
+            if (manifest.scenario === 'executing') await pause('executing');
+            const key = new Headers(init.headers).get('Idempotency-Key');
+            const body = JSON.parse(String(init.body));
+            await mutate((state) => {
+              if (
+                !key ||
+                body.disableAutomaticWorkflows !== true ||
+                String(body.shippingMethodId) !== '8'
+              )
+                throw new Error('Unexpected synthetic write');
+              state.patchRequests = (state.patchRequests ?? 0) + 1;
+              if (!state.effects.some((effect) => effect.key === key)) {
+                state.order.shippingMethodId = '8';
+                state.effects.push({ key, shippingMethodId: '8' });
+              }
             });
+            if (manifest.scenario === 'recovery') {
+              console.log(
+                'PILOT_EFFECT_COMMITTED: kill the worker now; restart to reconcile without another write.',
+              );
+              await delay(40_000);
+              throw new Error('Simulated lost provider response');
+            }
 
-          return 'synthetic';
-        },
-      },
-      shippingMethodActions: true,
-      recordObservations: ({ observations }) =>
-        mutate((state) => {
-          state.observations.push(...observations);
-        }),
-      fetch: async (input, init) => {
-        const url = new URL(String(input));
-        if (!url.pathname.endsWith('/sales-orders/10'))
-          throw new Error('Unknown synthetic provider target');
-        if (init?.method !== 'PATCH') {
-          const order = (await readJson(path)).order;
-
-          return Response.json({
-            shippingDetails: { shippingDate: null },
-            ...order,
-          });
-        }
-        if (manifest.scenario === 'failed')
-          return new Response(null, { status: 409 });
-        if (manifest.scenario === 'executing') await pause('executing');
-        const key = new Headers(init.headers).get('Idempotency-Key');
-        const body = JSON.parse(String(init.body));
-        await mutate((state) => {
-          if (
-            !key ||
-            body.disableAutomaticWorkflows !== true ||
-            String(body.shippingMethodId) !== '8'
-          )
-            throw new Error('Unexpected synthetic write');
-          state.patchRequests = (state.patchRequests ?? 0) + 1;
-          if (!state.effects.some((effect) => effect.key === key)) {
-            state.order.shippingMethodId = '8';
-            state.effects.push({ key, shippingMethodId: '8' });
-          }
+            return Response.json({ salesOrderId: '10' });
+          },
         });
-        if (manifest.scenario === 'recovery') {
-          console.log(
-            'PILOT_EFFECT_COMMITTED: kill the worker now; restart to reconcile without another write.',
-          );
-          await delay(40_000);
-          throw new Error('Simulated lost provider response');
-        }
-
-        return Response.json({ salesOrderId: '10' });
-      },
-    });
     const commerce = simulation ? createCommerceServices(db) : undefined;
     const installedOptions = {
       installations,

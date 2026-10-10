@@ -289,7 +289,11 @@ export async function seedPilot(
       context,
       shippingMethodPlaybook.definition.id,
     );
-    if (!history.activations.some((item) => item.id === manifest.proposalId))
+    // The shipping-method example corrects a JTL order; Cin7 connections are read-only.
+    if (
+      manifest.connections.jtl &&
+      !history.activations.some((item) => item.id === manifest.proposalId)
+    )
       await playbooks.activate(context, {
         id: manifest.proposalId,
         definitionId: shippingMethodPlaybook.definition.id,
