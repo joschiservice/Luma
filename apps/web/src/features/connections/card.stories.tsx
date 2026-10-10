@@ -4,6 +4,7 @@ import { expect, fn, userEvent, within } from 'storybook/test';
 import { ConnectionCard } from './connection-card';
 import {
   ConnectionsPreview,
+  loadAppUi,
   mockConnections,
   organizationId,
   shopify,
@@ -20,6 +21,7 @@ const meta = {
     refresh: fn(async () => {}),
   },
   parameters: { layout: 'fullscreen' },
+  loaders: [loadAppUi],
   beforeEach: () => mockConnections(),
   decorators: [
     (Story) => (
@@ -68,9 +70,10 @@ export const ReplaceCredentials: Story = {
       }),
     );
     const d = within(await within(document.body).findByRole('dialog'));
-    await expect(
-      await d.findByLabelText('Access token', {}, { timeout: 5000 }),
-    ).toHaveAttribute('type', 'password');
+    await expect(await d.findByLabelText('Access token')).toHaveAttribute(
+      'type',
+      'password',
+    );
   },
 };
 
@@ -97,9 +100,7 @@ export const ReconnectShopify: Story = {
       }),
     );
     const d = within(await within(document.body).findByRole('dialog'));
-    await expect(
-      await d.findByLabelText('Shop hostname', {}, { timeout: 5000 }),
-    ).toBeDisabled();
+    await expect(await d.findByLabelText('Shop hostname')).toBeDisabled();
   },
 };
 

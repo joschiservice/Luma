@@ -4,6 +4,7 @@ import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { Connections } from './page';
 import {
   ConnectionsPreview,
+  loadAppUi,
   mockConnections,
   type MockState,
   organizationId,
@@ -14,6 +15,7 @@ const meta = {
   component: Connections,
   args: { organizationId },
   parameters: { layout: 'fullscreen' },
+  loaders: [loadAppUi],
   beforeEach: (context) =>
     mockConnections(
       context.parameters.connectionState as MockState | undefined,
@@ -85,10 +87,8 @@ export const ShopifySetup: Story = {
       }),
     );
     const dialog = await within(document.body).findByRole('dialog');
-    await waitFor(
-      () =>
-        expect(within(dialog).getByLabelText('Shop hostname')).toBeVisible(),
-      { timeout: 5000 },
+    await waitFor(() =>
+      expect(within(dialog).getByLabelText('Shop hostname')).toBeVisible(),
     );
   },
 };

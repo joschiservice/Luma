@@ -151,6 +151,12 @@ const meta = {
   title: 'Orders/Shopify fulfillment recovery',
   component: Preview,
   parameters: { layout: 'padded' },
+  // Import the lazily loaded app module first so Vite's compile time stays out of play waits.
+  loaders: [
+    async () => {
+      await load?.();
+    },
+  ],
 } satisfies Meta<typeof Preview>;
 
 export default meta;
@@ -161,11 +167,7 @@ export const HeldOrder: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(
-      await canvas.findByRole(
-        'button',
-        { name: 'Preview recovery' },
-        { timeout: 10000 },
-      ),
+      await canvas.findByRole('button', { name: 'Preview recovery' }),
     );
     await expect(await canvas.findByText('Release hold 17 only')).toBeVisible();
     await expect(
@@ -195,11 +197,7 @@ export const MissingAccess: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(
-      await canvas.findByRole(
-        'button',
-        { name: 'Preview recovery' },
-        { timeout: 10000 },
-      ),
+      await canvas.findByRole('button', { name: 'Preview recovery' }),
     ).toBeDisabled();
   },
 };
@@ -208,11 +206,7 @@ export const Uncertain: Story = {
   args: { uncertain: true },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(
-      await canvas.findByText('Outcome unclear', undefined, {
-        timeout: 10000,
-      }),
-    ).toBeVisible();
+    await expect(await canvas.findByText('Outcome unclear')).toBeVisible();
     await expect(
       canvas.queryByRole('button', { name: 'Send to Shopify' }),
     ).not.toBeInTheDocument();

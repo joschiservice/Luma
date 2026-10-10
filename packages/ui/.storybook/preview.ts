@@ -1,6 +1,11 @@
 import '../src/styles/globals.css';
 
 import type { Preview } from '@storybook/react-vite';
+import { configure } from 'storybook/test';
+
+// One wait budget for every play function, instead of per-query timeouts. Waits still end as
+// soon as the element appears; the budget covers debounced saves and slow renders under load.
+configure({ asyncUtilTimeout: 5000 });
 
 const preview: Preview = {
   globalTypes: {

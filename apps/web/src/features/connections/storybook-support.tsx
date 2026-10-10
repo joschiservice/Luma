@@ -13,6 +13,62 @@ import appStyles from '../../styles.css?inline';
 import { AppSettings } from '../apps/settings';
 import { contextFixture } from '../identity/context.fixture';
 
+/** Apps the mocked workspace offers and, except in the empty state, has installed. */
+const catalog = [
+  {
+    id: 'shopify',
+    name: 'Shopify',
+    description: 'Read commerce data from your stores.',
+    version: '1.0.0',
+    category: 'storefront',
+    ui: ['connections', 'settings'],
+    connectionTypes: [{ kind: 'shopify', name: 'Shopify' }],
+    permissions: [],
+    scopes: ['orders.read', 'products.read'],
+    slotAccess: {
+      connections: 'connections.manage',
+      settings: 'connections.manage',
+    },
+  },
+  {
+    id: 'jtl',
+    name: 'JTL',
+    description: 'Connect JTL Cloud or JTL-Wawi.',
+    version: '1.0.0',
+    category: 'erp',
+    ui: ['connections', 'settings'],
+    connectionTypes: [
+      { kind: 'jtl-cloud', name: 'JTL Cloud' },
+      { kind: 'jtl-onprem', name: 'JTL-Wawi on-premise' },
+    ],
+    permissions: [],
+    scopes: ['orders.read', 'procurement.read'],
+    slotAccess: {
+      connections: 'connections.manage',
+      settings: 'connections.manage',
+    },
+  },
+];
+
+const appUi = import.meta.glob(
+  '../../../../../packages/apps/*/src/web/index.tsx',
+);
+
+/**
+ * Storybook loader that imports the UI modules of the mocked apps before the story renders.
+ * Vite compiles a lazily imported module on first request, which can take seconds on a busy
+ * machine; loading it first keeps that time out of the play function's waits.
+ */
+export async function loadAppUi() {
+  await Promise.all(
+    Object.entries(appUi)
+      .filter(([path]) =>
+        catalog.some((app) => path.includes(`/apps/${app.id}/`)),
+      )
+      .map(([, load]) => load()),
+  );
+}
+
 export const organizationId = '22222222-2222-4222-8222-222222222222';
 
 export const warehouse: InstalledConnection = {
@@ -115,41 +171,6 @@ export type MockState = 'ready' | 'empty' | 'loading' | 'error' | 'member';
 export function mockConnections(state: MockState = 'ready') {
   const original = globalThis.fetch;
   let items = state === 'empty' ? [] : structuredClone([shopify, warehouse]);
-  const catalog = [
-    {
-      id: 'shopify',
-      name: 'Shopify',
-      description: 'Read commerce data from your stores.',
-      version: '1.0.0',
-      category: 'storefront',
-      ui: ['connections', 'settings'],
-      connectionTypes: [{ kind: 'shopify', name: 'Shopify' }],
-      permissions: [],
-      scopes: ['orders.read', 'products.read'],
-      slotAccess: {
-        connections: 'connections.manage',
-        settings: 'connections.manage',
-      },
-    },
-    {
-      id: 'jtl',
-      name: 'JTL',
-      description: 'Connect JTL Cloud or JTL-Wawi.',
-      version: '1.0.0',
-      category: 'erp',
-      ui: ['connections', 'settings'],
-      connectionTypes: [
-        { kind: 'jtl-cloud', name: 'JTL Cloud' },
-        { kind: 'jtl-onprem', name: 'JTL-Wawi on-premise' },
-      ],
-      permissions: [],
-      scopes: ['orders.read', 'procurement.read'],
-      slotAccess: {
-        connections: 'connections.manage',
-        settings: 'connections.manage',
-      },
-    },
-  ];
   const installations =
     state === 'empty'
       ? []

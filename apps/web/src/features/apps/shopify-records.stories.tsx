@@ -140,6 +140,12 @@ const meta = {
   title: 'Apps/Shopify records',
   component: Preview,
   parameters: { layout: 'fullscreen' },
+  // Import the lazily loaded app module first so Vite's compile time stays out of play waits.
+  loaders: [
+    async () => {
+      await load?.();
+    },
+  ],
 } satisfies Meta<typeof Preview>;
 
 export default meta;
@@ -151,11 +157,7 @@ export const BrowseAndFollowLinks: Story = {
     if (!Shopify) return;
     const canvas = within(canvasElement);
     await userEvent.click(
-      await canvas.findByRole(
-        'button',
-        { name: 'Browse orders' },
-        { timeout: 10000 },
-      ),
+      await canvas.findByRole('button', { name: 'Browse orders' }),
     );
     await userEvent.click(await canvas.findByRole('button', { name: '#1001' }));
     await expect(await canvas.findByText('84.00 EUR')).toBeVisible();
@@ -178,9 +180,7 @@ export const OrderContext: Story = {
   play: async ({ canvasElement }) => {
     if (!Shopify) return;
     const canvas = within(canvasElement);
-    await expect(
-      await canvas.findByText('84.00 EUR', undefined, { timeout: 10000 }),
-    ).toBeVisible();
+    await expect(await canvas.findByText('84.00 EUR')).toBeVisible();
     await expect(
       canvas.getByRole('link', { name: 'Open in Shopify admin' }),
     ).toHaveAttribute('href', 'https://tokyo.myshopify.com/admin/orders/123');

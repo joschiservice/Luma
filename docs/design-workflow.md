@@ -35,6 +35,7 @@ The brand values are working tokens. To change one:
 ## Review process
 
 - Build and review component states in Storybook (`pnpm storybook`). **Foundations/Theme** shows tokens, states, domain landmarks, typography and marks; feature stories cover domain compositions in both themes and at narrow widths.
+- Play functions share one 5-second wait budget, set in the Storybook preview; don't add per-query timeouts. A story that mounts a workspace app's UI must import that module in a `loaders` entry, such as `loadAppUi` from the connections story support. Vite compiles lazily imported modules on first request, which can take seconds on a busy machine and otherwise fails waits intermittently.
 - Stories don't exercise authentication, routing, live data or personal layouts. Review those journeys in the app, using the [synthetic pilot](pilot-environment.md) or the [simulator](simulator.md) for realistic issues, approvals and connections.
 - Figma is optional for explorations. There is no Figma library or token snapshot to keep in sync; implement and review the result in Storybook.
 

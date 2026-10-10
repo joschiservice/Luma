@@ -3,6 +3,7 @@ import { expect, userEvent, within } from 'storybook/test';
 
 import {
   ConnectionsPreview,
+  loadAppUi,
   mockConnections,
   type MockState,
   organizationId,
@@ -14,6 +15,7 @@ const meta = {
   component: AppSettings,
   args: { organizationId, appId: 'jtl' },
   parameters: { layout: 'fullscreen' },
+  loaders: [loadAppUi],
   beforeEach: (context) =>
     mockConnections(
       context.parameters.connectionState as MockState | undefined,
