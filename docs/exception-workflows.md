@@ -82,7 +82,8 @@ membership, role, organization status and EU placement. Serialized contexts, ses
 cookies and earlier roles are not trusted. Logout does not stop an explicitly started
 workflow; membership removal or role loss does.
 
-A suspended or closed workspace, or a suspended initiating member, pauses the workflow instead.
+A suspended or closed workspace, or a suspended initiating member or disabled account, pauses
+the workflow instead.
 The rejected activity runs no effect and reports `WorkspaceInactive` or `MembershipSuspended`
 without retrying; the workflow waits durably, one
 minute at first and doubling up to an hour, then calls the same activity again. The cap

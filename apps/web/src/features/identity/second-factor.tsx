@@ -56,7 +56,10 @@ export function SecondFactorForm({
         : await auth.twoFactor.verifyTotp({ code: value });
       if (result.error) {
         const errorCode = result.error.code ?? '';
-        if (expiredCodes.has(errorCode)) {
+        if (errorCode === 'ACCOUNT_DISABLED') {
+          setExpired(true);
+          setMessage(m.identity_auth_account_disabled());
+        } else if (expiredCodes.has(errorCode)) {
           setExpired(true);
           setMessage(m.identity_factor_expired());
         } else if (errorCode === 'ACCOUNT_TEMPORARILY_LOCKED') {

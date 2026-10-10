@@ -63,11 +63,13 @@ export function AuthForm({
       const result = await auth.signIn.passkey();
       if (result.error) {
         setMessage(
-          result.error.status === 400
-            ? m.identity_auth_passkey_canceled()
-            : result.error.status === 401
-              ? m.identity_auth_passkey_unknown()
-              : m.identity_auth_passkey_failed(),
+          'code' in result.error && result.error.code === 'ACCOUNT_DISABLED'
+            ? m.identity_auth_account_disabled()
+            : result.error.status === 400
+              ? m.identity_auth_passkey_canceled()
+              : result.error.status === 401
+                ? m.identity_auth_passkey_unknown()
+                : m.identity_auth_passkey_failed(),
         );
 
         return;
@@ -108,11 +110,13 @@ export function AuthForm({
           setMessage(
             signup
               ? m.identity_auth_signup_failed()
-              : result.error.status === 401
-                ? m.identity_auth_signin_invalid()
-                : result.error.status === 429
-                  ? m.identity_auth_signin_rate_limited()
-                  : m.identity_auth_signin_failed(),
+              : result.error.code === 'ACCOUNT_DISABLED'
+                ? m.identity_auth_account_disabled()
+                : result.error.status === 401
+                  ? m.identity_auth_signin_invalid()
+                  : result.error.status === 429
+                    ? m.identity_auth_signin_rate_limited()
+                    : m.identity_auth_signin_failed(),
           );
 
           return;

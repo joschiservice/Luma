@@ -314,7 +314,7 @@ describe.skipIf(!databaseUrl)(
       },
     );
 
-    it('skips work acting as a suspended member until the membership is reactivated', async () => {
+    it('skips work acting as a suspended member or disabled account until access returns', async () => {
       const member = randomUUID();
       await owner.query(
         "INSERT INTO users(id,name,email,email_verified,created_at,updated_at) VALUES($1,'Suspended principal',$2,true,now(),now())",
@@ -371,6 +371,20 @@ describe.skipIf(!databaseUrl)(
         "UPDATE memberships SET status='active',suspended_at=NULL,suspended_by_kind=NULL,suspended_by=NULL WHERE tenant_id=$1 AND user_id=$2",
         [workspaces.active, member],
       );
+      expect((await principals()).detection_worker_scopes).toEqual([member]);
+
+      // A disabled account is skipped in every workspace, whatever the membership says.
+      await owner.query(
+        "INSERT INTO account_disablements(user_id,disabled_by,reason_category,reason) VALUES($1,$2,'compromised','Integration test disablement')",
+        [member, randomUUID()],
+      );
+      for (const [scope, found] of Object.entries(await principals())) {
+        expect(found, scope).not.toContain(member);
+        expect(found, scope).toContain('operator');
+      }
+      await owner.query('DELETE FROM account_disablements WHERE user_id=$1', [
+        member,
+      ]);
       expect((await principals()).detection_worker_scopes).toEqual([member]);
     });
 

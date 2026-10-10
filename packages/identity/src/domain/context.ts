@@ -24,6 +24,8 @@ export interface Membership {
   role: RoleReference;
   /** Stored memberships always carry it; trusted fixtures may omit it for an active member. */
   status?: MembershipStatus;
+  /** Whether Luma staff disabled the person's account; then no workspace accepts them. */
+  accountDisabled?: boolean;
   /** Effective grants of the role; resolved with the membership. */
   permissions: PermissionSet;
 }
@@ -102,18 +104,29 @@ export class WorkspaceInactiveError extends IdentityError {
  * Background work acting as the member pauses and checks again later instead of failing.
  */
 export class MembershipSuspendedError extends IdentityError {
+  constructor(
+    message = 'Your access to this workspace is suspended. Contact a workspace owner or Luma support.',
+  ) {
+    super(403, 'ACCESS_SUSPENDED', message);
+  }
+}
+
+/**
+ * Rejects a person whose account Luma staff disabled, in every workspace. It is a
+ * `MembershipSuspendedError`, so background work acting as them pauses the same way and continues
+ * after the account is enabled. Requests normally fail earlier: the account has no sessions.
+ */
+export class AccountDisabledError extends MembershipSuspendedError {
   constructor() {
     super(
-      403,
-      'ACCESS_SUSPENDED',
-      'Your access to this workspace is suspended. Contact a workspace owner or Luma support.',
+      'This account is disabled. Contact your workspace owner or Luma support.',
     );
   }
 }
 
 /**
  * Reports whether background work should pause and check again later instead of failing:
- * the workspace is inactive, or the member it acts as is suspended.
+ * the workspace is inactive, or the member it acts as is suspended or their account disabled.
  */
 export function pausesBackgroundWork(error: unknown): boolean {
   return (
@@ -122,8 +135,12 @@ export function pausesBackgroundWork(error: unknown): boolean {
   );
 }
 
-/** Throws `MembershipSuspendedError` unless the membership is active. */
+/**
+ * Throws `AccountDisabledError` when the person's account is disabled, and
+ * `MembershipSuspendedError` when the membership is suspended.
+ */
 export function requireActiveMembership(member: Membership): void {
+  if (member.accountDisabled) throw new AccountDisabledError();
   if (member.status === 'suspended') throw new MembershipSuspendedError();
 }
 
@@ -149,7 +166,8 @@ export function requireChangesAllowed(context: TenantContext): void {
 /**
  * Creates an immutable context for a matching, active membership in an active EU organization;
  * rejects inaccessible or unsupported organizations. A suspended or closed organization
- * raises `WorkspaceInactiveError`, and a suspended membership `MembershipSuspendedError`.
+ * raises `WorkspaceInactiveError`, a suspended membership `MembershipSuspendedError` and a
+ * disabled account `AccountDisabledError`.
  * `supportView` marks a read-only context for Luma staff viewing the workspace as the member.
  */
 export function makeTenantContext(

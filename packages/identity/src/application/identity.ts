@@ -75,7 +75,10 @@ export interface IdentityTransaction {
   selectTenant(organizationId: string): Promise<void>;
   lockOrganization(organizationId: string): Promise<void>;
   listMembers(organizationId: string): Promise<Membership[]>;
-  /** Returns which of the given user IDs have a suspended membership in the workspace. */
+  /**
+   * Returns which of the given user IDs have a suspended membership in the workspace or a
+   * disabled account.
+   */
   suspendedMembers(
     organizationId: string,
     userIds: readonly string[],
@@ -434,8 +437,9 @@ export function createIdentityService(repository: IdentityRepository) {
       );
     },
     /**
-     * Returns which of the given users have a suspended membership in the context's workspace.
-     * Callers authorize the read that referenced them; work acting as them is paused.
+     * Returns which of the given users can't act in the context's workspace: their membership is
+     * suspended or their account disabled. Callers authorize the read that referenced them; work
+     * acting as them is paused and needs a new owner.
      */
     async suspendedMembers(
       context: TenantContext,

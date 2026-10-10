@@ -39,7 +39,7 @@ async function supportMail(
 ) {
   const owner = (
     await tx.query<{ email: string }>(
-      "SELECT u.email FROM memberships m JOIN users u ON u.id=m.user_id WHERE m.tenant_id=$1 AND m.user_id=$2 AND m.role='owner' AND m.status='active'",
+      "SELECT u.email FROM memberships m JOIN users u ON u.id=m.user_id WHERE m.tenant_id=$1 AND m.user_id=$2 AND m.role='owner' AND m.status='active' AND NOT EXISTS(SELECT FROM account_disablements d WHERE d.user_id=m.user_id)",
       [tenantId, message.user_id],
     )
   ).rows[0];
@@ -194,6 +194,7 @@ export function createMailDelivery(
                 inviter &&
                 (invite.role !== 'custom' || invite.roleName) &&
                 inviter.status === 'active' &&
+                !inviter.accountDisabled &&
                 membershipFromRow(inviter).permissions.has('members.manage');
               const roleName =
                 invite?.roleName ??
@@ -220,7 +221,8 @@ export function createMailDelivery(
                   connections: boolean;
                 }>(
                   `SELECT u.email,COALESCE(p.issues,false) AS issues,COALESCE(p.connections,false) AS connections FROM memberships m JOIN users u ON u.id=m.user_id
-              LEFT JOIN notification_preferences p ON p.tenant_id=m.tenant_id AND p.user_id=m.user_id WHERE m.tenant_id=$1 AND m.user_id=$2 AND m.status='active'`,
+              LEFT JOIN notification_preferences p ON p.tenant_id=m.tenant_id AND p.user_id=m.user_id WHERE m.tenant_id=$1 AND m.user_id=$2 AND m.status='active'
+                AND NOT EXISTS(SELECT FROM account_disablements d WHERE d.user_id=m.user_id)`,
                   [tenantId, message.user_id],
                 )
               ).rows[0];

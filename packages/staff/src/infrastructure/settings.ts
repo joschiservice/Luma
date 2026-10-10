@@ -55,6 +55,7 @@ const provisioningSchema = z
         'staff.memberships.manage',
         'staff.view-as',
         'staff.view-as.emergency',
+        'staff.accounts.manage',
       ]),
     ),
     operator: z.string().trim().min(1).max(200),

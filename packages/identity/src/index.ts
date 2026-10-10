@@ -1,4 +1,5 @@
 export {
+  AccountDisabledError,
   builtInMembership,
   hasPermission,
   IdentityError,
@@ -73,12 +74,15 @@ export type {
 export type { MailProvider } from './application/mail.js';
 
 export {
+  changeAccountForSupport,
   changeMembershipForSupport,
   revokeCustomerSessionsForSupport,
 } from './application/support.js';
 
 export type {
+  AccountDisableCategory,
   IdentitySupportTransaction,
+  SupportAccountChange,
   SupportMembershipChange,
   SupportSessionRevocation,
 } from './application/support.js';

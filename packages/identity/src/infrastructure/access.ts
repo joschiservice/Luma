@@ -8,13 +8,14 @@ import {
 } from '../domain/roles.js';
 
 /**
- * Selects memberships with their role and, for custom roles, granted permissions in one
- * statement. Callers append the `WHERE` clause on `m`.
+ * Selects memberships with their role, for custom roles the granted permissions, and whether the
+ * account is disabled, in one statement. Callers append the `WHERE` clause on `m`.
  */
 export const membershipSelect = `SELECT m.id,m.tenant_id AS "organizationId",m.user_id AS "userId",m.role,m.status,
   m.custom_role_id AS "customRoleId",r.name AS "roleName",r.revision AS "roleRevision",
   CASE WHEN m.custom_role_id IS NULL THEN NULL ELSE ARRAY(SELECT p.permission FROM workspace_role_permissions p
-    WHERE p.tenant_id=m.tenant_id AND p.role_id=m.custom_role_id ORDER BY p.permission) END AS permissions
+    WHERE p.tenant_id=m.tenant_id AND p.role_id=m.custom_role_id ORDER BY p.permission) END AS permissions,
+  EXISTS(SELECT FROM account_disablements d WHERE d.user_id=m.user_id) AS "accountDisabled"
   FROM memberships m LEFT JOIN workspace_roles r ON r.tenant_id=m.tenant_id AND r.id=m.custom_role_id`;
 
 export type MembershipRow = {
@@ -27,6 +28,7 @@ export type MembershipRow = {
   roleName: string | null;
   roleRevision: number | null;
   permissions: string[] | null;
+  accountDisabled: boolean;
 };
 
 /** Maps a stored role reference to its public form; unknown roles grant nothing and fail closed. */
@@ -60,6 +62,7 @@ export function membershipFromRow(row: MembershipRow): Membership {
     role,
     // Unknown states fail closed as suspended.
     status: row.status === 'active' ? 'active' : 'suspended',
+    accountDisabled: row.accountDisabled,
     permissions: PermissionSet.forRole(role, row.permissions ?? []),
   };
 }

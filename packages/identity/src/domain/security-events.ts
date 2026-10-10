@@ -10,6 +10,8 @@ export const securityEventTypes = [
   'password.changed',
   'sessions.revoked',
   'sessions.revoked-by-staff',
+  'account.disabled',
+  'account.enabled',
 ] as const;
 
 export type SecurityEventType = (typeof securityEventTypes)[number];
@@ -27,6 +29,7 @@ export type SecurityEventReason =
   | 'locked'
   | 'challenge-expired'
   | 'passkey-rejected'
+  | 'account-disabled'
   | 'rejected'
   | 'second-factor-required'
   | 'authenticator-code'
@@ -85,6 +88,8 @@ export function signInFailureReason(
       return 'locked';
     case 'INVALID_TWO_FACTOR_COOKIE':
       return 'challenge-expired';
+    case 'ACCOUNT_DISABLED':
+      return 'account-disabled';
     default:
       return 'rejected';
   }

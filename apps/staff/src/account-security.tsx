@@ -26,6 +26,8 @@ const eventLabels: Record<SecurityEvent['type'], string> = {
   'password.changed': 'Password changed',
   'sessions.revoked': 'Sessions signed out by the customer',
   'sessions.revoked-by-staff': 'Sessions revoked by staff',
+  'account.disabled': 'Account disabled by staff',
+  'account.enabled': 'Account enabled by staff',
 };
 
 const reasonLabels: Record<string, string> = {
@@ -35,6 +37,7 @@ const reasonLabels: Record<string, string> = {
   locked: 'Code entry locked',
   'challenge-expired': 'Sign-in attempt expired',
   'passkey-rejected': 'Passkey not accepted',
+  'account-disabled': 'Account disabled',
   rejected: 'Rejected',
   'second-factor-required': 'Password accepted, code requested',
   'authenticator-code': 'Authenticator code',

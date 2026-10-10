@@ -48,6 +48,7 @@
   "identity_auth_no_account": "Neu bei Luma?",
   "identity_auth_session_unconfirmed": "Luma konnte deine Sitzung nicht bestätigen. Melde dich an, um fortzufahren.",
   "identity_auth_signin_invalid": "E-Mail-Adresse oder Passwort ist falsch. Prüfe beides und versuch es erneut.",
+  "identity_auth_account_disabled": "Dieses Konto ist deaktiviert. Wende dich an einen Inhaber deines Workspace oder den Luma-Support.",
   "identity_auth_signin_rate_limited": "Zu viele Anmeldeversuche. Warte einen Moment und versuch es erneut.",
   "identity_auth_signin_failed": "Luma konnte dich gerade nicht anmelden. Versuch es gleich noch einmal.",
   "identity_auth_signup_failed": "Luma konnte das Konto nicht erstellen. Falls du bereits ein Konto hast, melde dich an. Prüfe andernfalls deine Angaben und versuch es erneut.",

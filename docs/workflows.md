@@ -174,10 +174,10 @@ covers and what should happen next.
 - `nextAction` picks the first blocking issue, then waiting decisions, partial coverage,
   setup and the latest unresolved run.
 - `owner_suspended` means the workflow needs a new owner: the person whose access its runs
-  use is suspended, so they pause. A case workflow blocks; replenishment degrades until every
+  use is suspended or their account disabled, so they pause. A case workflow blocks; replenishment degrades until every
   active rule is affected. Turning the workflow on again, or setting the rule up again, runs it
   with the new person's access. Runs already started keep their principal and continue only
-  after reactivation.
+  after reactivation or once the account is enabled.
 
 Each owner computes its own readiness facts. The record-scoped coverage endpoint returns
 the same readiness for one record, and 404 outside the workspace.

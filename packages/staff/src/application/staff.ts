@@ -1,5 +1,7 @@
 import type {
+  AccountDisableCategory,
   SecurityEventType,
+  SupportAccountChange,
   SupportMembershipChange,
   SupportSessionRevocation,
 } from '@luma/identity';
@@ -48,6 +50,8 @@ export interface WorkspaceDetail {
     status: 'active' | 'suspended';
     suspendedAt: string | null;
     suspendedBy: 'staff' | 'customer' | null;
+    onlyWorkspace: boolean;
+    accountDisabled: boolean;
   }[];
   connections: {
     id: string;
@@ -93,6 +97,12 @@ export interface AccountAccess {
 
 export interface AccountDetail {
   account: { id: string; name: string; email: string; createdAt: string };
+  disabled: {
+    at: string;
+    category: AccountDisableCategory;
+    reason: string;
+    byName: string | null;
+  } | null;
   security: { twoFactorEnabled: boolean; passkeys: number };
   workspacesTruncated: boolean;
   workspaces: {
@@ -144,6 +154,16 @@ export interface MembershipChangeInput {
   commandId: string;
   acknowledgeLastOwner: boolean;
 }
+
+/** Disables or enables one customer account under a current account grant. */
+export type AccountChangeInput = {
+  userId: string;
+  grantId: string;
+  reason: string;
+  commandId: string;
+} & (
+  { action: 'disable'; category: AccountDisableCategory } | { action: 'enable' }
+);
 
 export interface StaffRepository {
   directory(
@@ -226,6 +246,10 @@ export interface StaffRepository {
     grantId: string,
     cursor: string | undefined,
   ): Promise<AccountSecurityEvents>;
+  changeAccount(
+    context: StaffContext,
+    input: AccountChangeInput,
+  ): Promise<SupportAccountChange>;
 }
 
 /**
@@ -366,6 +390,18 @@ export function createStaffService(
       requireStaffPermission(context, 'staff.accounts.inspect');
 
       return repository.accountSecurityEvents(context, userId, grantId, cursor);
+    },
+    /**
+     * Disables or enables a customer account through identity's atomic audited command. Disabling
+     * ends every session and locks the person out of all their workspaces; memberships stay, so
+     * enabling restores them.
+     */
+    changeAccount(context: StaffContext, input: AccountChangeInput) {
+      requireStaffPermission(context, 'staff.accounts.inspect');
+      requireStaffPermission(context, 'staff.accounts.manage');
+      requireRecentStaffSession(context);
+
+      return repository.changeAccount(context, input);
     },
   };
 }

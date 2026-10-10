@@ -117,6 +117,7 @@ export function temporalActivities<T extends object>(
               'Workspace is not active',
               workspaceInactiveFailure,
             );
+          // Includes a disabled account, which no workspace accepts.
           if (error instanceof MembershipSuspendedError)
             throw ApplicationFailure.nonRetryable(
               'Acting member is suspended',

@@ -1,7 +1,7 @@
 # Staff access
 
 The staff console provides customer account lookup, account and workspace inspection,
-controlled session revocation, membership suspension and read-only support views. Its identities, sessions and permissions are separate from customer
+controlled session revocation, membership suspension, account disabling and read-only support views. Its identities, sessions and permissions are separate from customer
 workspace access. Customer Owners and Admins cannot grant staff privileges.
 
 ## Authentication and provisioning
@@ -60,7 +60,8 @@ staff credentials cannot perform it. Opening workspace support grants
 requires both `staff.directory.read` and `staff.workspace.inspect`; opening account grants
 requires `staff.directory.read` and `staff.accounts.inspect`. Global customer
 session revocation additionally requires `staff.sessions.revoke`, and suspending or
-reactivating a membership requires `staff.memberships.manage`. Starting a consented support
+reactivating a membership requires `staff.memberships.manage`. Disabling or enabling an account
+requires `staff.accounts.manage` together with `staff.accounts.inspect`. Starting a consented support
 view or requesting consent requires `staff.view-as`; an emergency view requires
 `staff.view-as.emergency`. Reviewing the staff audit
 log requires `staff.audit.read`; grant it separately, to the people accountable for
@@ -162,6 +163,33 @@ with the customer's own membership changes. The membership change, its receipt, 
   the staff reason is stored on the membership but never returned to customers.
 - Workflows acting as the person pause and show that they need a new owner. Sync streams they
   ran block until someone resumes them; reactivation doesn't unblock them.
+
+## Account disabling
+
+Disabling locks one person out of Luma entirely: every session ends, sign-in is refused and every
+workspace rejects them. Use it for a compromised or abusive account; use membership suspension
+when only one workspace is affected. Enabling restores access to all their workspaces with the
+same roles. See [disabled accounts](identity.md#disabled-accounts) for enforcement.
+
+Disable and enable from the account page under an account grant. Both commands require
+`staff.accounts.manage`, staff authentication within fifteen minutes, a reason and a command ID;
+disabling also needs a category (compromised, abuse, fraud, legal request or other) and an
+acknowledgement that every workspace is affected. `identity_support_change_account` checks the
+permission, account grant and session age and serializes commands per account. The disablement,
+session deletion, receipt, the customer's `account.disabled` or `account.enabled` security event
+and the `customer.account.disabled` or `customer.account.enabled` staff audit row commit together.
+
+- Retries and command ID reuse behave as for membership commands; command IDs are unique across
+  session, membership and account commands.
+- Disabling a disabled account, or enabling an active one, returns 409.
+- The customer sees neither the category nor the reason. The account page shows both to staff,
+  with who disabled it and when.
+- Workspace Activity isn't written: the change belongs to the account, not to one workspace.
+
+**Banning a workspace.** A ban is a workspace suspension plus disabling the accounts that belong
+only to that workspace. The workspace page marks those members **Only in this workspace** and
+disabled accounts **Account disabled**; open each member's account page to disable them. Members
+who also belong to other workspaces keep their accounts; suspend their membership instead.
 
 ## Support view
 

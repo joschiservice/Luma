@@ -12,6 +12,16 @@ export const staffPermissionSchema = z.enum([
   'staff.memberships.manage',
   'staff.view-as',
   'staff.view-as.emergency',
+  'staff.accounts.manage',
+]);
+
+/** Why staff disabled an account. Staff see it; the customer never does. */
+export const staffAccountDisableCategorySchema = z.enum([
+  'compromised',
+  'abuse',
+  'fraud',
+  'legal_request',
+  'other',
 ]);
 
 /** A suspended membership keeps its role and the account; it has no access to the workspace. */
@@ -55,6 +65,10 @@ export const staffDetailSchema = z.object({
       suspendedAt: z.string().datetime().nullable(),
       /** Who suspended the membership: Luma staff or someone in the workspace. */
       suspendedBy: z.enum(['staff', 'customer']).nullable(),
+      /** The person belongs to no other workspace; banning the workspace may disable them too. */
+      onlyWorkspace: z.boolean(),
+      /** Luma staff disabled the person's account, so no workspace accepts them. */
+      accountDisabled: z.boolean(),
     }),
   ),
   connections: z.array(
@@ -104,6 +118,15 @@ export const staffWorkspaceDetailSchema = staffDetailSchema;
 
 export const staffRevokeSessionsResultSchema = z.object({
   commandId: z.string().uuid(),
+  revokedSessions: z.number().int().nonnegative(),
+  completedAt: z.string().datetime(),
+});
+
+/** The receipt of an account disable or enable; retries return the original. */
+export const staffAccountChangeSchema = z.object({
+  commandId: z.string().uuid(),
+  status: z.enum(['disabled', 'enabled']),
+  /** Sessions ended by disabling; enabling ends none. */
   revokedSessions: z.number().int().nonnegative(),
   completedAt: z.string().datetime(),
 });
@@ -407,6 +430,16 @@ export const staffAccountDetailSchema = z.object({
     email: z.string(),
     createdAt: z.string().datetime(),
   }),
+  /** Present while Luma staff have the account disabled. */
+  disabled: z
+    .object({
+      at: z.string().datetime(),
+      category: staffAccountDisableCategorySchema,
+      reason: z.string(),
+      /** The staff member's current name; null when they no longer exist. */
+      byName: z.string().nullable(),
+    })
+    .nullable(),
   security: z.object({
     twoFactorEnabled: z.boolean(),
     passkeys: z.number().int().nonnegative(),
@@ -748,4 +781,50 @@ export const staffContract = {
       }),
     )
     .output(staffAccountSecurityEventsSchema),
+  disableAccount: endpoint
+    .route({
+      method: 'POST',
+      path: '/v1/staff/accounts/{userId}/disable',
+      summary: 'Disable a customer account',
+      description:
+        'Ends every session of the account at once and refuses new sign-ins with a message that names no reason. Every workspace rejects the person and workflows acting as them pause; memberships are kept. Uses a current account grant. Requires `staff.accounts.manage`, recent staff authentication and acknowledgement of the effect on all workspaces. Repeated command IDs return the original receipt; reusing one for another request returns 409.',
+    })
+    .meta({ errors })
+    .input(
+      z.object({
+        params: accountParams,
+        body: z
+          .object({
+            grantId: z.string().uuid(),
+            category: staffAccountDisableCategorySchema,
+            reason: staffReasonSchema,
+            commandId: z.string().uuid(),
+            acknowledgeGlobalEffect: z.literal(true),
+          })
+          .strict(),
+      }),
+    )
+    .output(staffAccountChangeSchema),
+  enableAccount: endpoint
+    .route({
+      method: 'POST',
+      path: '/v1/staff/accounts/{userId}/enable',
+      summary: 'Enable a disabled customer account',
+      description:
+        'Allows sign-in again and restores access to every workspace the person belongs to, with their roles. Paused workflows acting as them continue. Uses a current account grant. Requires `staff.accounts.manage` and recent staff authentication. Repeated command IDs return the original receipt; reusing one for another request returns 409.',
+    })
+    .meta({ errors })
+    .input(
+      z.object({
+        params: accountParams,
+        body: z
+          .object({
+            grantId: z.string().uuid(),
+            reason: staffReasonSchema,
+            commandId: z.string().uuid(),
+          })
+          .strict(),
+      }),
+    )
+    .output(staffAccountChangeSchema),
 };

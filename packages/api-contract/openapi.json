@@ -57461,7 +57461,9 @@
                               "passkey.removed",
                               "password.changed",
                               "sessions.revoked",
-                              "sessions.revoked-by-staff"
+                              "sessions.revoked-by-staff",
+                              "account.disabled",
+                              "account.enabled"
                             ],
                             "type": "string"
                           },

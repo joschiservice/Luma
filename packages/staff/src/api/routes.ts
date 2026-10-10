@@ -31,6 +31,8 @@ const protectedRoutes = new Set([
   'POST /v1/staff/accounts/:userId/access',
   'GET /v1/staff/accounts/:userId',
   'GET /v1/staff/accounts/:userId/security-events',
+  'POST /v1/staff/accounts/:userId/disable',
+  'POST /v1/staff/accounts/:userId/enable',
 ]);
 const routePermissions: Record<string, StaffPermission[]> = {
   'GET /v1/staff/session': [],
@@ -69,6 +71,14 @@ const routePermissions: Record<string, StaffPermission[]> = {
   ],
   'GET /v1/staff/accounts/:userId': ['staff.accounts.inspect'],
   'GET /v1/staff/accounts/:userId/security-events': ['staff.accounts.inspect'],
+  'POST /v1/staff/accounts/:userId/disable': [
+    'staff.accounts.inspect',
+    'staff.accounts.manage',
+  ],
+  'POST /v1/staff/accounts/:userId/enable': [
+    'staff.accounts.inspect',
+    'staff.accounts.manage',
+  ],
 };
 const publicRoutes = new Set([
   'GET /health',
@@ -405,6 +415,22 @@ export function registerStaffHttp(app: FastifyInstance, staff: StaffRuntime) {
           query.grantId,
           query.cursor,
         ),
+    ),
+    disableAccount: os.disableAccount.handler(
+      async ({ context: { request }, input: { params, body } }) =>
+        await staff.service.changeAccount(context(request.staffContext), {
+          ...params,
+          ...body,
+          action: 'disable',
+        }),
+    ),
+    enableAccount: os.enableAccount.handler(
+      async ({ context: { request }, input: { params, body } }) =>
+        await staff.service.changeAccount(context(request.staffContext), {
+          ...params,
+          ...body,
+          action: 'enable',
+        }),
     ),
   });
   registerContractRoutes(app, staffContract, router);

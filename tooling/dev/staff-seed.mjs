@@ -28,6 +28,7 @@ export async function seedStaff(
         'staff.memberships.manage',
         'staff.view-as',
         'staff.view-as.emergency',
+        'staff.accounts.manage',
       ],
     },
     migrationUrl,

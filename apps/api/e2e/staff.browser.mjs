@@ -74,6 +74,7 @@ async function fixture(t) {
         'staff.audit.read',
         'staff.accounts.inspect',
         'staff.memberships.manage',
+        'staff.accounts.manage',
       ],
     },
     db.ownerUrl,
@@ -376,6 +377,133 @@ test('staff suspends the only active owner after acknowledgement and reactivates
   expect(audit.rows.map((row) => row.event)).toEqual([
     'customer.membership.suspended',
     'customer.membership.reactivated',
+  ]);
+  expect(errors).toEqual([]);
+});
+
+test('staff disables an account, its sign-in is refused, and enabling restores it', async ({
+  resources: t,
+}) => {
+  const { page, db, customerApi, customer, workspace, errors } =
+    await fixture(t);
+  // The customer signs in through their own web app and API origin.
+  const customerPort = await availablePort();
+  const customerOrigin = `http://127.0.0.1:${customerPort}`;
+  const customerWebApi = await startApi(t, db, customerOrigin);
+  const customerWeb = startProcess(
+    t,
+    'e2e/web-server.mjs',
+    {
+      TEST_API_ORIGIN: customerWebApi.origin,
+      TEST_WEB_PORT: String(customerPort),
+    },
+    true,
+  );
+  await customerWeb.message('listening');
+  const customerContext = await t.newContext({
+    baseURL: customerOrigin,
+    viewport: { width: 1440, height: 900 },
+  });
+  const customerPage = await customerContext.newPage();
+  customerPage.on('pageerror', (error) => errors.push(error.message));
+  const customerSignIn = async () => {
+    await customerPage.goto('/sign-in');
+    await customerPage
+      .getByLabel('Email', { exact: true })
+      .fill('customer@example.test');
+    await customerPage
+      .getByLabel('Password', { exact: true })
+      .fill('long-e2e-test-password');
+    await customerPage
+      .getByRole('button', { name: 'Sign in', exact: true })
+      .click();
+  };
+
+  await signIn(page);
+  await page.getByLabel('Name, email or workspace').fill('customer@example');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page
+    .getByRole('link', { name: 'Open account customer@example.test' })
+    .click();
+  await page
+    .getByRole('button', { name: 'Open account access', exact: true })
+    .click();
+  await page
+    .getByRole('dialog')
+    .getByLabel('Support reason or ticket reference')
+    .fill('Compromised account report, ticket 5120');
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Open account access', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: 'Disable account', exact: true })
+    .click();
+  const dialog = page.getByRole('dialog');
+  await dialog
+    .getByLabel('Reason for disabling the account')
+    .fill('Credentials posted publicly, ticket 5120');
+  const submit = dialog.getByRole('button', {
+    name: 'Disable account',
+    exact: true,
+  });
+  await expect(submit).toBeDisabled();
+  await dialog.getByRole('checkbox').check();
+  await submit.click();
+  await expect(page.getByRole('status')).toContainText(
+    'Account disabled. 1 session ended.',
+  );
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(page.locator('body')).toContainText(
+    'Compromised account: Credentials posted publicly, ticket 5120',
+  );
+  await expect(
+    page.getByRole('heading', { name: 'No active sessions' }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: test.info().outputPath('account-disabled.png'),
+    fullPage: true,
+    animations: 'disabled',
+  });
+
+  // The existing session is gone, and a new sign-in is refused without the reason.
+  await customerApi.request('/v1/organizations', {
+    cookie: customer.cookie,
+    status: 401,
+  });
+  await customerSignIn();
+  await expect(customerPage.locator('body')).toContainText(
+    'This account is disabled. Contact your workspace owner or Luma support.',
+  );
+  await expect(customerPage.locator('body')).not.toContainText('ticket 5120');
+  await expect(customerPage).toHaveURL(/\/sign-in/);
+
+  await page
+    .getByRole('button', { name: 'Enable account', exact: true })
+    .click();
+  await page
+    .getByRole('dialog')
+    .getByLabel('Reason for enabling the account')
+    .fill('Password reset confirmed by the account holder');
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Enable account', exact: true })
+    .click();
+  await expect(page.getByRole('status')).toContainText('Account enabled.');
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: 'Disable account', exact: true }),
+  ).toBeVisible();
+
+  await customerSignIn();
+  await expect(customerPage).not.toHaveURL(/\/sign-in/);
+  await expect(customerPage).toHaveURL(new RegExp(workspace.id));
+  const audit = await db.owner.query(
+    "SELECT event FROM staff_audit WHERE event LIKE 'customer.account.%' ORDER BY sequence",
+  );
+  expect(audit.rows.map((row) => row.event)).toEqual([
+    'customer.account.disabled',
+    'customer.account.enabled',
   ]);
   expect(errors).toEqual([]);
 });

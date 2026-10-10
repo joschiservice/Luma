@@ -67,6 +67,10 @@ function eventLabel(event: SecurityEventResponse) {
           : m.settings_security_event_signed_out_others();
     case 'sessions.revoked-by-staff':
       return m.settings_security_event_signed_out_by_support();
+    case 'account.disabled':
+      return m.settings_security_event_account_disabled();
+    case 'account.enabled':
+      return m.settings_security_event_account_enabled();
   }
 }
 
@@ -84,6 +88,8 @@ function failureReason(reason: string | null) {
       return m.settings_security_reason_challenge_expired();
     case 'passkey-rejected':
       return m.settings_security_reason_passkey_rejected();
+    case 'account-disabled':
+      return m.settings_security_reason_account_disabled();
     default:
       return m.settings_security_reason_rejected();
   }

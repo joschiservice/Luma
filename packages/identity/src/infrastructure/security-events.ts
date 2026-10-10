@@ -384,7 +384,7 @@ export function securityEventsPlugin(
               return record(
                 'sign-in.passkey',
                 'failed',
-                'passkey-rejected',
+                failure === 'account-disabled' ? failure : 'passkey-rejected',
                 owner?.user_id ?? null,
                 null,
               );

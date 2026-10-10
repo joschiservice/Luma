@@ -1594,7 +1594,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         .catch((error: unknown) => {
           if (error instanceof MembershipSuspendedError)
             conflict(
-              'The person who requested this order has suspended access to this workspace. Luma checks it after their access is restored.',
+              'The person who requested this order can’t access this workspace right now. Luma checks it after their access is restored.',
             );
           throw error;
         });

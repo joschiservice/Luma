@@ -50,14 +50,23 @@ With `NODE_ENV=production`, Better Auth rate-limits `/two-factor/*`, like sign-i
 
 ## Security events
 
-`account_security_events` records sign-ins and account security changes: password, passkey and two-factor sign-in steps with their failure category, two-factor on and off, backup code replacement, passkeys added and removed, password changes, and sessions revoked by the person or by staff. Submitted passwords, codes and credentials are never stored. People read their own events in **Settings › Security**; the account comes from the session. Staff read them on the account page under an account grant.
+`account_security_events` records sign-ins and account security changes: password, passkey and two-factor sign-in steps with their failure category, two-factor on and off, backup code replacement, passkeys added and removed, password changes, sessions revoked by the person or by staff, and accounts disabled or enabled by staff. Submitted passwords, codes and credentials are never stored. People read their own events in **Settings › Security**; the account comes from the session. Staff read them on the account page under an account grant.
 
 - A Better Auth plugin registered after the factor plugins records Better Auth endpoints from `hooks.before` and `hooks.after`, so a password sign-in that still needs a code is recorded as pending, not as a session. Responses are unchanged, so failures for known and unknown emails stay identical. A failure for an unknown email stores an HMAC of the normalized email, keyed with `BETTER_AUTH_SECRET`, instead of a user; rotating the secret breaks correlation with older hashes.
 - Changes are recorded only when the state changed: a retried disable, revocation or passkey removal that changes nothing writes no event, and a session is signed in once. Each failed attempt is its own event. Attempts rejected by the rate limiter before reaching the endpoint are not recorded.
-- Hooks run after Better Auth's own writes. If the event can't be written the request fails and no new session cookie is delivered, but a change already made, such as a new passkey, stays. Staff session revocation writes its event inside `identity_support_revoke_sessions`, with the command receipt, in one transaction.
+- Hooks run after Better Auth's own writes. If the event can't be written the request fails and no new session cookie is delivered, but a change already made, such as a new passkey, stays. Staff session revocation and account disabling write their events inside `identity_support_revoke_sessions` and `identity_support_change_account`, with the command receipt, in one transaction. The disable event carries no reason; the staff reason stays in the staff audit.
 - The IP address comes from `X-Forwarded-For` like Better Auth's own, so it is only trustworthy behind the [production proxy](#production-proxy). User agents are client-supplied hints.
 
 Retention: the API clears IP addresses and user agents after 90 days and deletes events after a year, in bounded batches a minute after start and then hourly. Several API instances may run it concurrently. Deleting a user deletes their events.
+
+## Disabled accounts
+
+Luma staff disable an account that is compromised or abused ([staff access](staff.md#account-disabling)). A row in `account_disablements` exists while the account is disabled; only `identity_support_change_account`, owned by `luma_identity_support`, writes it, and the runtime can read only its `user_id`. Memberships, roles and factors are untouched, so enabling restores every previous workspace.
+
+- **Sign-in.** A Better Auth database hook refuses every new session of a disabled account with 403 `ACCOUNT_DISABLED`. Password, passkey and two-factor sign-ins check their credentials first, so the response reveals the state only to someone who already proved the credential. The message names no reason; it tells the person to contact their workspace owner or Luma support. The failed sign-in is recorded with reason `account-disabled`.
+- **Existing sessions.** Disabling deletes all of the account's sessions in the same transaction. Session resolution also rejects disabled accounts, which covers a session created concurrently with the disable.
+- **Every workspace.** The membership read carries the account's state, so tenant resolution, `resolveWorkflowContext` and `refreshContext` raise `AccountDisabledError`. It subclasses `MembershipSuspendedError`: background work pauses exactly as for a suspended member, Temporal activities report `MembershipSuspended`, worker discovery skips the principal, and `suspendedMembers` includes it so work shows that it needs a new owner. Disabled accounts receive no workspace mail.
+- **Support views** can't start for a disabled account, and an open view is rejected on its next request.
 
 ## Context and isolation
 
@@ -72,6 +81,7 @@ A path ID selects a tenant; it does not grant access. Each request reads the cur
 | Not a member, or the organization does not exist | 404      |
 | Organization suspended or closed                 | 404      |
 | Membership suspended (`ACCESS_SUSPENDED`)        | 403      |
+| Account disabled (sessions are gone)             | 401      |
 | Member without the required permission           | 403      |
 | Organization placed in another region            | 503      |
 | Provisioning in an unavailable region (US, APAC) | 422      |

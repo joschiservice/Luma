@@ -48,6 +48,7 @@
   "identity_auth_no_account": "New to Luma?",
   "identity_auth_session_unconfirmed": "Luma couldn’t confirm your session. Sign in to continue.",
   "identity_auth_signin_invalid": "The email or password isn’t correct. Check both and try again.",
+  "identity_auth_account_disabled": "This account is disabled. Contact your workspace owner or Luma support.",
   "identity_auth_signin_rate_limited": "Too many sign-in attempts. Wait a moment and try again.",
   "identity_auth_signin_failed": "Luma couldn’t sign you in right now. Try again in a moment.",
   "identity_auth_signup_failed": "Luma couldn’t create the account. If you already have one, sign in instead. Otherwise check your details and try again.",

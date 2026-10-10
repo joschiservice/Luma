@@ -62,6 +62,10 @@ export function WorkspacePage() {
       (member) => member.owner && member.status === 'active',
     ).length ?? 0;
   const membersTruncated = detail.data?.membersTruncated ?? false;
+  const onlyHere =
+    detail.data?.members.filter(
+      (member) => member.onlyWorkspace && !member.accountDisabled,
+    ).length ?? 0;
 
   return (
     <>
@@ -147,6 +151,15 @@ export function WorkspacePage() {
             aria-labelledby="workspace-members"
           >
             <h2 id="workspace-members">Members</h2>
+            {onlyHere > 0 ? (
+              <p className="staff-muted">
+                {onlyHere === 1
+                  ? '1 member belongs only to this workspace.'
+                  : `${onlyHere} members belong only to this workspace.`}{' '}
+                To ban the workspace, disable their accounts from their account
+                pages as well.
+              </p>
+            ) : null}
             {detail.data.membersTruncated ? (
               <Alert tone="warning">
                 <AlertDescription>
@@ -164,11 +177,28 @@ export function WorkspacePage() {
                   header: 'Member',
                   cell: (row) => (
                     <div>
-                      {row.name}
+                      <Link
+                        to="/accounts/$userId"
+                        params={{ userId: row.userId }}
+                        search={{}}
+                        className="staff-link"
+                      >
+                        {row.name}
+                      </Link>
                       <p className="staff-muted">{row.email}</p>
                       <p className="staff-muted staff-member-role-narrow">
                         Workspace role: {row.role}
                       </p>
+                      {row.accountDisabled || row.onlyWorkspace ? (
+                        <div className="staff-badges">
+                          {row.accountDisabled ? (
+                            <Badge tone="danger">Account disabled</Badge>
+                          ) : null}
+                          {row.onlyWorkspace ? (
+                            <Badge>Only in this workspace</Badge>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
                   ),
                 },
@@ -212,13 +242,16 @@ export function WorkspacePage() {
                           email: string;
                           owner: boolean;
                           status: 'active' | 'suspended';
+                          accountDisabled: boolean;
                         }) => (
                           <div className="staff-actions">
                             {(canViewAs && consented) || canEmergencyView ? (
                               <Button
                                 variant="outline"
                                 size="sm"
-                                disabled={row.status !== 'active'}
+                                disabled={
+                                  row.status !== 'active' || row.accountDisabled
+                                }
                                 onClick={() => setViewAs(row)}
                                 aria-label={`View as ${row.email}`}
                               >

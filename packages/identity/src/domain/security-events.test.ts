@@ -15,6 +15,7 @@ describe('security events', () => {
     expect(signInFailureReason('INVALID_TWO_FACTOR_COOKIE')).toBe(
       'challenge-expired',
     );
+    expect(signInFailureReason('ACCOUNT_DISABLED')).toBe('account-disabled');
     expect(signInFailureReason(undefined)).toBe('rejected');
   });
 

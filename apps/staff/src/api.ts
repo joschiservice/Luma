@@ -1,7 +1,9 @@
+import type { staffAccountDisableCategorySchema } from '@luma/api-contract/staff';
 import {
   staffAccessGrantSchema,
   staffAccessHistorySchema,
   staffAccountAccessSchema,
+  staffAccountChangeSchema,
   staffAccountDetailSchema,
   staffAccountSecurityEventsSchema,
   staffAuditPageSchema,
@@ -15,6 +17,7 @@ import {
   staffWorkspaceDetailSchema,
   staffWorkspaceHealthSchema,
 } from '@luma/api-contract/staff';
+import type { z } from 'zod';
 
 import { staffActivity } from './activity';
 
@@ -271,6 +274,27 @@ export function createStaffApi(
           body,
         ),
       ),
+    changeAccount: async (
+      userId: string,
+      body: { grantId: string; reason: string; commandId: string } & (
+        | {
+            action: 'disable';
+            category: z.infer<typeof staffAccountDisableCategorySchema>;
+          }
+        | { action: 'enable' }
+      ),
+    ) => {
+      const { action, ...rest } = body;
+
+      return staffAccountChangeSchema.parse(
+        await request(
+          `${account(userId)}/${action}`,
+          action === 'disable'
+            ? { ...rest, acknowledgeGlobalEffect: true }
+            : rest,
+        ),
+      );
+    },
     grantAccount: async (userId: string, reason: string) =>
       staffAccountAccessSchema.parse(
         await request(`${account(userId)}/access`, { reason }),

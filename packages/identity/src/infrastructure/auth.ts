@@ -6,6 +6,7 @@ import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { organization, twoFactor } from 'better-auth/plugins';
+import { sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import * as schema from './schema.js';
@@ -36,6 +37,24 @@ const rejectedFactorOptions = createAuthMiddleware(async (ctx) => {
     });
 });
 
+/**
+ * Refuses every new session of a disabled account: password, passkey and two-factor sign-ins
+ * fail with `ACCOUNT_DISABLED` after their credentials were checked. The message names no reason.
+ */
+function refuseDisabledAccounts(db: NodePgDatabase<typeof schema>) {
+  return async (session: { userId: string }) => {
+    const disabled = await db.execute(
+      sql`SELECT 1 FROM account_disablements WHERE user_id=${session.userId}`,
+    );
+    if (disabled.rows.length)
+      throw new APIError('FORBIDDEN', {
+        code: 'ACCOUNT_DISABLED',
+        message:
+          'This account is disabled. Contact your workspace owner or Luma support.',
+      });
+  };
+}
+
 // Factors are reached only through the auth bridge, so server callers need no plugin API types.
 function factorPlugins(settings: AuthSettings): BetterAuthPlugin[] {
   return [
@@ -51,7 +70,8 @@ function factorPlugins(settings: AuthSettings): BetterAuthPlugin[] {
  * Configures email and password sign-in, authenticator-app two-factor authentication, passkeys
  * and organization support using the supplied database and trusted origins. Passkeys use the
  * `baseURL` host as relying-party ID and accept assertions only from trusted origins.
- * `observers` run after every other plugin, so their hooks see final responses.
+ * Disabled accounts get no new session. `observers` run after every other plugin, so their hooks
+ * see final responses.
  */
 export function createAuth(
   db: NodePgDatabase<typeof schema>,
@@ -81,6 +101,9 @@ export function createAuth(
       },
     },
     hooks: { before: rejectedFactorOptions },
+    databaseHooks: {
+      session: { create: { before: refuseDisabledAccounts(db) } },
+    },
     advanced: {
       ...(settings.cookiePrefix ? { cookiePrefix: settings.cookiePrefix } : {}),
       database: {

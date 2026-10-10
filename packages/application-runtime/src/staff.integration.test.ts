@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { generateKeyPairSync, randomUUID, sign } from 'node:crypto';
 import { promisify } from 'node:util';
 
+import { AccountDisabledError } from '@luma/identity';
 import { createIdentity } from '@luma/identity/composition';
 import {
   createStaff,
@@ -334,6 +335,10 @@ describe.skipIf(!databaseUrl)(
           .sort();
       expect(await columns('staff_account_profile')).toEqual([
         'created_at',
+        'disabled_at',
+        'disabled_by_name',
+        'disabled_reason',
+        'disabled_reason_category',
         'email',
         'id',
         'name',
@@ -853,6 +858,259 @@ describe.skipIf(!databaseUrl)(
         await owner.query(
           "DELETE FROM workspace_access_events WHERE tenant_id=$1 AND actor_kind='staff'",
           [tenantA],
+        );
+      }
+    });
+    it('disables and enables an account everywhere with a receipt, evidence and refused sign-ins', async () => {
+      const bob = (
+        await owner.query<{ id: string }>(
+          "SELECT id FROM users WHERE email='bob@example.test'",
+        )
+      ).rows[0]!.id;
+      await owner.query(
+        "INSERT INTO memberships(id,tenant_id,user_id,role,created_at) VALUES($1,$2,$3,'admin',now())",
+        [randomUUID(), tenantA, bob],
+      );
+      const customerOrigin = 'http://localhost:3209';
+      const signIn = () =>
+        identity.handler(
+          new Request(`${customerOrigin}/auth/sign-in/email`, {
+            method: 'POST',
+            headers: {
+              origin: customerOrigin,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: 'bob@example.test',
+              password: 'customer-test-password-long-enough',
+            }),
+          }),
+        );
+      const credentials = { cookie: customerCookie };
+      expect(
+        (await identity.service.resolveTenant(credentials, tenantA, 'before'))
+          .actor.role.key,
+      ).toBe('admin');
+      const accountGrant = await app.inject({
+        method: 'POST',
+        url: `/v1/staff/accounts/${bob}/access`,
+        headers: { cookie, origin },
+        payload: { reason: 'Compromise report from the workspace owner' },
+      });
+      expect(accountGrant.statusCode, accountGrant.body).toBe(201);
+      const accountGrantId: string = accountGrant.json().id;
+      const change = (
+        action: 'disable' | 'enable',
+        payload: Record<string, unknown>,
+      ) =>
+        app.inject({
+          method: 'POST',
+          url: `/v1/staff/accounts/${bob}/${action}`,
+          headers: { cookie, origin },
+          payload: { grantId: accountGrantId, ...payload },
+        });
+      const disabling = {
+        category: 'compromised',
+        reason: 'Credentials posted publicly, ticket 5120',
+        commandId: randomUUID(),
+        acknowledgeGlobalEffect: true,
+      };
+      expect((await change('disable', disabling)).statusCode).toBe(403);
+
+      await owner.query(
+        "UPDATE staff_access SET permissions=ARRAY['staff.directory.read','staff.workspace.inspect','staff.sessions.revoke','staff.accounts.inspect','staff.accounts.manage'] WHERE email='support@example.test'",
+      );
+      try {
+        expect(
+          (
+            await change('disable', {
+              ...disabling,
+              acknowledgeGlobalEffect: undefined,
+            })
+          ).statusCode,
+        ).toBe(400);
+        const disabled = await change('disable', disabling);
+        expect(disabled.statusCode, disabled.body).toBe(200);
+        expect(disabled.json()).toMatchObject({
+          commandId: disabling.commandId,
+          status: 'disabled',
+          revokedSessions: 1,
+        });
+        // An exact retry returns the original receipt; other requests can't reuse the ID.
+        expect((await change('disable', disabling)).json()).toEqual(
+          disabled.json(),
+        );
+        const revoked = (
+          await owner.query<{ command_id: string }>(
+            'SELECT command_id FROM identity_support_commands LIMIT 1',
+          )
+        ).rows[0]!.command_id;
+        for (const reuse of [
+          change('disable', { ...disabling, category: 'abuse' }),
+          change('enable', {
+            reason: disabling.reason,
+            commandId: disabling.commandId,
+          }),
+          change('disable', { ...disabling, commandId: revoked }),
+        ])
+          expect((await reuse).statusCode).toBe(409);
+        expect(
+          (
+            await change('disable', { ...disabling, commandId: randomUUID() })
+          ).json().message,
+        ).toMatch(/already disabled/);
+
+        // The deleted session is rejected and new sign-ins are refused, without a session.
+        await expect(
+          identity.service.resolveTenant(credentials, tenantA, 'disabled'),
+        ).rejects.toMatchObject({ statusCode: 401 });
+        const refused = await signIn();
+        expect(refused.status).toBe(403);
+        expect(await refused.json()).toMatchObject({
+          code: 'ACCOUNT_DISABLED',
+          message:
+            'This account is disabled. Contact your workspace owner or Luma support.',
+        });
+        expect(
+          (await owner.query('SELECT 1 FROM sessions WHERE user_id=$1', [bob]))
+            .rowCount,
+        ).toBe(0);
+
+        // Background re-checks reject the person and other owners see the work needs a new owner.
+        await expect(
+          identity.service.resolveWorkflowContext(bob, tenantA, 'workflow'),
+        ).rejects.toBeInstanceOf(AccountDisabledError);
+        const ownerContext = await identity.service.resolveWorkflowContext(
+          customer,
+          tenantA,
+          'owner-read',
+        );
+        expect(
+          await identity.service.suspendedMembers(ownerContext, [
+            bob,
+            customer,
+          ]),
+        ).toEqual(new Set([bob]));
+
+        const account = await app.inject({
+          url: `/v1/staff/accounts/${bob}?grantId=${accountGrantId}`,
+          headers: { cookie },
+        });
+        expect(account.json().disabled).toEqual({
+          at: expect.any(String),
+          category: 'compromised',
+          reason: disabling.reason,
+          byName: 'Support operator',
+        });
+        expect(account.json().sessions).toEqual([]);
+        const workspace = await app.inject({
+          url: `/v1/staff/workspaces/${tenantA}?grantId=${grantId}`,
+          headers: { cookie },
+        });
+        expect(
+          workspace
+            .json()
+            .members.map(
+              (member: {
+                userId: string;
+                onlyWorkspace: boolean;
+                accountDisabled: boolean;
+              }) => [
+                member.userId,
+                member.onlyWorkspace,
+                member.accountDisabled,
+              ],
+            ),
+        ).toEqual(
+          expect.arrayContaining([
+            [bob, true, true],
+            [customer, false, false],
+          ]),
+        );
+        const audit = await owner.query(
+          "SELECT tenant_id,reason,details FROM staff_audit WHERE event='customer.account.disabled'",
+        );
+        expect(audit.rows).toEqual([
+          {
+            tenant_id: null,
+            reason: disabling.reason,
+            details: expect.objectContaining({
+              commandId: disabling.commandId,
+              userId: bob,
+              reasonCategory: 'compromised',
+              revokedSessions: 1,
+            }),
+          },
+        ]);
+
+        // Enabling restores sign-in and the previous workspace with its role.
+        const enabling = {
+          reason: 'Password reset confirmed by the account holder',
+          commandId: randomUUID(),
+        };
+        const enabled = await change('enable', enabling);
+        expect(enabled.statusCode, enabled.body).toBe(200);
+        expect(enabled.json()).toMatchObject({
+          status: 'enabled',
+          revokedSessions: 0,
+        });
+        expect((await change('enable', enabling)).json()).toEqual(
+          enabled.json(),
+        );
+        expect(
+          (
+            await change('enable', { ...enabling, commandId: randomUUID() })
+          ).json().message,
+        ).toMatch(/already enabled/);
+        const signedIn = await signIn();
+        expect(signedIn.status).toBe(200);
+        customerCookie = signedIn.headers
+          .getSetCookie()
+          .map((value) => value.split(';')[0])
+          .join('; ');
+        expect(
+          (
+            await identity.service.resolveTenant(
+              { cookie: customerCookie },
+              tenantA,
+              'after',
+            )
+          ).actor.role.key,
+        ).toBe('admin');
+        const events = await owner.query(
+          "SELECT event_type,outcome,reason_code,staff_command_id FROM account_security_events WHERE user_id=$1 AND (event_type LIKE 'account.%' OR reason_code='account-disabled') ORDER BY created_at",
+          [bob],
+        );
+        expect(events.rows).toEqual([
+          {
+            event_type: 'account.disabled',
+            outcome: 'succeeded',
+            reason_code: null,
+            staff_command_id: disabling.commandId,
+          },
+          {
+            event_type: 'sign-in.password',
+            outcome: 'failed',
+            reason_code: 'account-disabled',
+            staff_command_id: null,
+          },
+          {
+            event_type: 'account.enabled',
+            outcome: 'succeeded',
+            reason_code: null,
+            staff_command_id: enabling.commandId,
+          },
+        ]);
+      } finally {
+        await owner.query(
+          "UPDATE staff_access SET permissions=ARRAY['staff.directory.read','staff.workspace.inspect','staff.sessions.revoke','staff.accounts.inspect'] WHERE email='support@example.test'",
+        );
+        await owner.query('DELETE FROM account_disablements WHERE user_id=$1', [
+          bob,
+        ]);
+        await owner.query(
+          'DELETE FROM memberships WHERE tenant_id=$1 AND user_id=$2',
+          [tenantA, bob],
         );
       }
     });

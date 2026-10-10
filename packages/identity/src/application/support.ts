@@ -89,3 +89,54 @@ export async function changeMembershipForSupport(
     completedAt: new Date(receipt.completedAt).toISOString(),
   };
 }
+
+/** Why staff disabled an account; recorded for staff, never shown to the customer. */
+export type AccountDisableCategory =
+  'compromised' | 'abuse' | 'fraud' | 'legal_request' | 'other';
+
+export interface SupportAccountChange {
+  commandId: string;
+  status: 'disabled' | 'enabled';
+  /** Sessions deleted by disabling; enabling deletes none. */
+  revokedSessions: number;
+  completedAt: string;
+}
+
+/**
+ * Disables or enables one customer account through the narrowly granted identity function.
+ * Disabling deletes every session of the account; the disablement, receipt, security event and
+ * staff audit commit atomically in the caller's transaction. Memberships are untouched, so
+ * enabling restores every previous workspace. PostgreSQL errors carry the codes documented on
+ * `identity_support_change_account`.
+ */
+export async function changeAccountForSupport(
+  tx: IdentitySupportTransaction,
+  input: {
+    commandId: string;
+    userId: string;
+    reason: string;
+    requestId: string;
+  } & (
+    | { action: 'disable'; category: AccountDisableCategory }
+    | { action: 'enable' }
+  ),
+): Promise<SupportAccountChange> {
+  const result = await tx.query<{ receipt: SupportAccountChange }>(
+    'SELECT identity_support_change_account($1,$2,$3,$4,$5,$6) AS receipt',
+    [
+      input.commandId,
+      input.userId,
+      input.action,
+      input.action === 'disable' ? input.category : null,
+      input.reason,
+      input.requestId,
+    ],
+  );
+  const receipt = result.rows[0]?.receipt;
+  if (!receipt) throw new Error('Support command returned no receipt.');
+
+  return {
+    ...receipt,
+    completedAt: new Date(receipt.completedAt).toISOString(),
+  };
+}

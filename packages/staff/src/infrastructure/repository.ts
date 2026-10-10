@@ -1,7 +1,8 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
-import type { SecurityEventType } from '@luma/identity';
+import type { AccountDisableCategory, SecurityEventType } from '@luma/identity';
 import {
+  changeAccountForSupport,
   changeMembershipForSupport,
   decodeSecurityEventCursor,
   describeUserAgent,
@@ -37,6 +38,10 @@ const stateConflicts: Record<string, string> = {
     'This workspace is suspended or closed, so it can’t be viewed.',
   'request pending': 'A request is already waiting for the workspace’s answer.',
   'access allowed': 'The workspace already allows support access.',
+  'account disabled':
+    'This person’s account is disabled, so there is nothing to view.',
+  'already disabled': 'This account is already disabled. Refresh the account.',
+  'already enabled': 'This account is already enabled. Refresh the account.',
 };
 
 /** Creates a deliberately narrow cross-owner read adapter and identity support command adapter. */
@@ -76,7 +81,12 @@ export function createStaffRepository(pool: Pool): StaffRepository {
             'Command ID was already used for another action.',
           );
         if (error.code === 'P0002')
-          throw new StaffError(404, 'Customer membership unavailable.');
+          throw new StaffError(
+            404,
+            'message' in error && error.message === 'account unavailable'
+              ? 'Customer account unavailable.'
+              : 'Customer membership unavailable.',
+          );
         if (error.code === '22023')
           throw new StaffError(400, 'Check the reason and details.');
         if (error.code === '55000' && 'message' in error)
@@ -229,8 +239,10 @@ export function createStaffRepository(pool: Pool): StaffRepository {
             status: 'active' | 'suspended';
             suspendedAt: Date | null;
             suspendedBy: 'staff' | 'customer' | null;
+            onlyWorkspace: boolean;
+            accountDisabled: boolean;
           }>(
-            'SELECT m.id,m.user_id AS "userId",u.name,u.email,m.role,m.role=\'owner\' AS owner,m.status,m.suspended_at AS "suspendedAt",m.suspended_by_kind AS "suspendedBy" FROM memberships m JOIN users u ON u.id=m.user_id WHERE m.tenant_id=$1 ORDER BY u.name LIMIT 101',
+            'SELECT m.id,m.user_id AS "userId",u.name,u.email,m.role,m.role=\'owner\' AS owner,m.status,m.suspended_at AS "suspendedAt",m.suspended_by_kind AS "suspendedBy",a.only_workspace AS "onlyWorkspace",a.account_disabled AS "accountDisabled" FROM memberships m JOIN users u ON u.id=m.user_id JOIN staff_workspace_member_accounts($1) a ON a.user_id=m.user_id WHERE m.tenant_id=$1 ORDER BY u.name LIMIT 101',
             [workspaceId],
           );
           const connections = await tx.query<{
@@ -476,8 +488,12 @@ export function createStaffRepository(pool: Pool): StaffRepository {
             created_at: Date;
             two_factor_enabled: boolean;
             passkey_count: number;
+            disabled_at: Date | null;
+            disabled_reason_category: AccountDisableCategory | null;
+            disabled_reason: string | null;
+            disabled_by_name: string | null;
           }>(
-            'SELECT id,name,email,created_at,two_factor_enabled,passkey_count FROM staff_account_profile WHERE id=$1',
+            'SELECT id,name,email,created_at,two_factor_enabled,passkey_count,disabled_at,disabled_reason_category,disabled_reason,disabled_by_name FROM staff_account_profile WHERE id=$1',
             [userId],
           );
           const account = profile.rows[0];
@@ -520,6 +536,17 @@ export function createStaffRepository(pool: Pool): StaffRepository {
               email: account.email,
               createdAt: account.created_at.toISOString(),
             },
+            disabled:
+              account.disabled_at &&
+              account.disabled_reason_category &&
+              account.disabled_reason
+                ? {
+                    at: account.disabled_at.toISOString(),
+                    category: account.disabled_reason_category,
+                    reason: account.disabled_reason,
+                    byName: account.disabled_by_name,
+                  }
+                : null,
             security: {
               twoFactorEnabled: account.two_factor_enabled,
               passkeys: account.passkey_count,
@@ -608,6 +635,21 @@ export function createStaffRepository(pool: Pool): StaffRepository {
                   })
                 : null,
           };
+        },
+      );
+    },
+    changeAccount(context, input) {
+      return transaction(
+        context,
+        input.grantId,
+        'staff.accounts.manage',
+        async (tx) => {
+          await validateAccountGrant(tx, input.userId);
+
+          return changeAccountForSupport(tx, {
+            ...input,
+            requestId: context.requestId,
+          });
         },
       );
     },

@@ -25,6 +25,7 @@ import { useState } from 'react';
 
 import { reasonSchema } from './access';
 import { AccountSecurityEvents } from './account-security';
+import { AccountStatusDialog, categoryLabel } from './account-status';
 import { staffApi } from './api';
 import { Failure, Loading } from './feedback';
 import { accountOptions, sessionOptions } from './queries';
@@ -54,8 +55,14 @@ export function AccountPage() {
     refetchInterval: 30_000,
   });
   const [requestAccess, setRequestAccess] = useState(false);
+  // Fixed when the dialog opens, so the refetch after the change doesn't flip its wording.
+  const [statusChange, setStatusChange] = useState<'disable' | 'enable' | null>(
+    null,
+  );
   const canInspect =
     session.data?.permissions.includes('staff.accounts.inspect') ?? false;
+  const canManage =
+    session.data?.permissions.includes('staff.accounts.manage') ?? false;
 
   return (
     <>
@@ -96,15 +103,44 @@ export function AccountPage() {
             title={detail.data.account.name}
             description={detail.data.account.email}
             actions={
-              <Button
-                variant="outline"
-                disabled={detail.isFetching}
-                onClick={() => void detail.refetch()}
-              >
-                Refresh
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  disabled={detail.isFetching}
+                  onClick={() => void detail.refetch()}
+                >
+                  Refresh
+                </Button>
+                {canManage ? (
+                  <Button
+                    variant={detail.data.disabled ? 'default' : 'destructive'}
+                    onClick={() =>
+                      setStatusChange(
+                        detail.data.disabled ? 'enable' : 'disable',
+                      )
+                    }
+                  >
+                    {detail.data.disabled
+                      ? 'Enable account'
+                      : 'Disable account'}
+                  </Button>
+                ) : null}
+              </>
             }
           />
+          {detail.data.disabled ? (
+            <Alert tone="danger">
+              <AlertDescription>
+                Account disabled {dateTime(detail.data.disabled.at)}
+                {detail.data.disabled.byName
+                  ? ` by ${detail.data.disabled.byName}`
+                  : ''}{' '}
+                · {categoryLabel(detail.data.disabled.category)}:{' '}
+                {detail.data.disabled.reason}. The person can’t sign in, and
+                every workspace rejects them.
+              </AlertDescription>
+            </Alert>
+          ) : null}
           <div className="staff-metadata">
             <span>Created: {dateTime(detail.data.account.createdAt)}</span>
             <span>
@@ -251,6 +287,15 @@ export function AccountPage() {
           <AccountSecurityEvents userId={userId} grantId={grantId} />
         </>
       )}
+      {statusChange && detail.data ? (
+        <AccountStatusDialog
+          userId={userId}
+          grantId={grantId}
+          email={detail.data.account.email}
+          action={statusChange}
+          onClose={() => setStatusChange(null)}
+        />
+      ) : null}
       {requestAccess && canInspect ? (
         <AccountAccessDialog
           userId={userId}

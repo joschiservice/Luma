@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import {
+  AccountDisabledError,
   IdentityError,
   MembershipSuspendedError,
   WorkspaceInactiveError,
@@ -458,6 +459,11 @@ it.each([
 it.each([
   ['workspace', new WorkspaceInactiveError(), 'WorkspaceInactive'],
   ['acting member', new MembershipSuspendedError(), 'MembershipSuspended'],
+  [
+    'acting member (account disabled)',
+    new AccountDisabledError(),
+    'MembershipSuspended',
+  ],
 ])(
   'reports a suspended %s to the workflow without logging a failure',
   async (_name, error, type) => {

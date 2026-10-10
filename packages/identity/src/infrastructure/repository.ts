@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { APIError } from 'better-auth/api';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import type { Pool } from 'pg';
 
@@ -91,6 +91,12 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
       });
 
       if (!session) return null;
+      // Disabling deletes the account's sessions; this also rejects one created concurrently.
+      const disabled = await pool.query(
+        'SELECT 1 FROM account_disablements WHERE user_id=$1',
+        [session.user.id],
+      );
+      if (disabled.rowCount) return null;
       if (sessionActivityDue(session.session.lastActiveAt, new Date()))
         // The SQL condition keeps concurrent requests from writing more than once per interval.
         await pool.query(
@@ -219,8 +225,11 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
                 .where(
                   and(
                     eq(schema.member.organizationId, organizationId),
-                    eq(schema.member.status, 'suspended'),
                     inArray(schema.member.userId, [...userIds]),
+                    or(
+                      eq(schema.member.status, 'suspended'),
+                      sql`EXISTS(SELECT FROM account_disablements d WHERE d.user_id=${schema.member.userId})`,
+                    ),
                   ),
                 );
 
