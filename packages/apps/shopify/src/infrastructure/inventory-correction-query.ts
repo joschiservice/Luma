@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 
+import type { AuthorityReader } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
 import { IdentityError } from '@luma/identity';
 import { canonicalJson, type TenantDatabase } from '@luma/platform';
@@ -36,7 +37,10 @@ const rowSchema = z.object({
 type Row = z.infer<typeof rowSchema>;
 
 /** Reads source authority and exact mappings without writing inventory-owned projections. */
-export function createCorrectionQuery(database: TenantDatabase) {
+export function createCorrectionQuery(
+  database: TenantDatabase,
+  sourceAuthority?: AuthorityReader,
+) {
   async function rows(
     context: TenantContext,
     positionId: string,
@@ -119,6 +123,22 @@ export function createCorrectionQuery(database: TenantDatabase) {
       context: TenantContext,
       target: z.infer<typeof correctionTarget>,
     ) {
+      const authority = await sourceAuthority?.read(context);
+      const stockAuthority = authority?.groups.find(
+        (group) => group.group === 'inventory_stock',
+      );
+      const sellingAuthority = authority?.groups.find(
+        (group) => group.group === 'inventory_selling',
+      );
+      if (
+        stockAuthority?.connectionId !== target.sourceConnectionId ||
+        sellingAuthority?.connectionId !== target.connectionId
+      )
+        throw new IdentityError(
+          409,
+          'CONFLICT',
+          'Source authority changed or is inconclusive. Review the workspace source authority before correcting stock.',
+        );
       const sources = await rows(context, target.positionId);
       const shopify = sources.find(
         (r) => r.connectionId === target.connectionId,
@@ -187,7 +207,7 @@ export function createCorrectionQuery(database: TenantDatabase) {
       // The revision covers the authoritative value and mappings, not which read reported it:
       // a newer read of the same quantity keeps a reviewed correction valid. Freshness is
       // checked separately against `observedAt`.
-      const authority = {
+      const sourceFacts = {
         connectionId: erp.connectionId,
         provider: erp.provider,
         active: erp.active,
@@ -213,7 +233,8 @@ export function createCorrectionQuery(database: TenantDatabase) {
           revision: createHash('sha256')
             .update(
               canonicalJson({
-                erp: authority,
+                source: sourceFacts,
+                authorityRevision: authority!.revision,
                 targetMappings: shopify.mappings,
               }),
             )

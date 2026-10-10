@@ -22,7 +22,7 @@
   "permissions_app_group_description": "Berechtigungen für die Funktionen von {app}.",
   "permissions_app_group_unavailable": "{app} ist auf diesem Luma-Server nicht verfügbar, daher haben seine Berechtigungen keine Wirkung.",
   "permissions_workspace_settings_manage_label": "Workspace-Einstellungen bearbeiten",
-  "permissions_workspace_settings_manage_description": "Namen und Anzeige-Zeitzone des Workspace ändern.",
+  "permissions_workspace_settings_manage_description": "Namen, Anzeige-Zeitzone und maßgebliche Quellen des Workspace ändern.",
   "permissions_workspace_approval_policy_manage_label": "Genehmigungsregeln verwalten",
   "permissions_workspace_approval_policy_manage_description": "Festlegen, ob jede erlaubte Änderung von einer zweiten Person genehmigt werden muss.",
   "permissions_members_manage_label": "Mitglieder verwalten",

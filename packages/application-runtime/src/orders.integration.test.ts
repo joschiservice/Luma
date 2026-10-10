@@ -7,7 +7,10 @@ import {
   createWorkspaceAssistant,
 } from '@luma/assistant/composition';
 import type { CommerceObservation } from '@luma/connections';
-import { createConnectionCoverage } from '@luma/connections/composition';
+import {
+  createConnectionCoverage,
+  createSourceAuthority,
+} from '@luma/connections/composition';
 import {
   orderAttentionForOrders,
   orderAttentionQuery,
@@ -85,6 +88,17 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
       },
       createActivityStore,
       async (value) => value,
+      (db) =>
+        createSourceAuthority(
+          db,
+          (provider) =>
+            provider === 'jtl'
+              ? 'erp'
+              : provider === 'shopify'
+                ? 'storefront'
+                : null,
+          async (value) => value,
+        ),
       () => clock,
     );
   }
@@ -317,8 +331,8 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
             appInstallationVersion: 1,
             target: { kind },
             label,
-            permissions: [],
-            granted: [],
+            permissions: ['orders.read', 'fulfillment.read', 'inventory.read'],
+            granted: ['orders.read', 'fulfillment.read', 'inventory.read'],
           },
           'encrypted-fixture',
         ],
@@ -340,8 +354,131 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
   beforeEach(async () => {
     clock = new Date('2026-09-20T12:00:00Z');
     await owner.query(
-      'TRUNCATE connector_observations,connector_source_mappings,orders_entities,inventory_entities,exceptions,playbook_definitions CASCADE',
+      'TRUNCATE connector_authority_settings,connector_authority_events,connector_observations,connector_source_mappings,orders_entities,inventory_entities,exceptions,playbook_definitions CASCADE',
     );
+  });
+
+  it('resolves order fact groups independently and audits overrides without rewriting source evidence', async () => {
+    const id = await seedOrder({
+      connectionId: shopify,
+      external: 'shop-order',
+      key: 'authority-order',
+      updatedAt: '2026-09-19T10:00:00Z',
+      data: {},
+      lines: [{ external: 'shop-line', key: 'shop-line', quantity: '2' }],
+    });
+    await seedOrder({
+      connectionId: jtl,
+      external: 'erp-order',
+      key: 'authority-order',
+      updatedAt: '2026-09-20T10:00:00Z',
+      data: { status: 'completed' },
+      lines: [{ external: 'erp-line', key: 'erp-line', quantity: '7' }],
+    });
+    await seedShipment({
+      connectionId: jtl,
+      order: 'erp-order',
+      external: 'shipment',
+      line: 'erp-line',
+      quantity: '7',
+      status: 'shipped',
+    });
+    const settings = createSourceAuthority(
+      createTenantDatabase(reader),
+      (provider) => (provider === 'jtl' ? 'erp' : 'storefront'),
+      async (value) => value,
+    );
+    const initial = (await workspace().get(context(), id))!;
+    expect(initial.authority.lines).toMatchObject({
+      connectionId: shopify,
+      lines: [{ quantity: '2' }],
+    });
+    expect(initial.authority.lifecycle).toMatchObject({
+      connectionId: shopify,
+      status: 'open',
+    });
+    expect(initial.authority.fulfillments).toMatchObject([
+      { connectionId: jtl, status: 'shipped' },
+    ]);
+    const before = (
+      await owner.query(
+        'SELECT id,document FROM orders_snapshots WHERE tenant_id=$1 ORDER BY id',
+        [tenant],
+      )
+    ).rows;
+    const command = {
+      commandId: randomUUID(),
+      revision: 0,
+      group: 'order_lines' as const,
+      connectionId: jtl,
+    };
+    const event = await settings.change(context(), command);
+    expect(event).toMatchObject({
+      actorId: 'operator',
+      previousConnectionId: null,
+      connectionId: jtl,
+      revision: 1,
+    });
+    const changed = (await workspace().get(context(), id))!;
+    expect(changed.authority.lines).toMatchObject({
+      connectionId: jtl,
+      lines: [{ quantity: '7' }],
+    });
+    expect(changed.authority.fulfillments).toMatchObject([
+      { connectionId: jtl, status: 'shipped' },
+    ]);
+    expect(changed.sources).toEqual(initial.sources);
+    expect(
+      (
+        await owner.query(
+          'SELECT id,document FROM orders_snapshots WHERE tenant_id=$1 ORDER BY id',
+          [tenant],
+        )
+      ).rows,
+    ).toEqual(before);
+    expect(await settings.change(context(), command)).toEqual(event);
+    expect(await settings.history(context())).toEqual([event]);
+    await expect(
+      settings.change(context(), { ...command, commandId: randomUUID() }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    await expect(
+      settings.change(context(), { ...command, group: 'order_lifecycle' }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    await expect(
+      settings.change(context(), {
+        ...command,
+        commandId: randomUUID(),
+        revision: 1,
+        connectionId: foreign,
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(await settings.history(context(otherTenant))).toEqual([]);
+    const concurrent = await Promise.allSettled([
+      settings.change(context(), {
+        ...command,
+        revision: 1,
+        commandId: randomUUID(),
+        connectionId: null,
+      }),
+      settings.change(context(), {
+        ...command,
+        revision: 1,
+        commandId: randomUUID(),
+        connectionId: shopify,
+      }),
+    ]);
+    expect(
+      concurrent.filter((item) => item.status === 'fulfilled'),
+    ).toHaveLength(1);
+    expect(await settings.history(context())).toHaveLength(2);
+    await createTenantDatabase(reader).transaction(tenant, async (tx) => {
+      await expect(
+        tx.query(
+          'UPDATE connector_authority_events SET revision=99 WHERE tenant_id=$1',
+          [tenant],
+        ),
+      ).rejects.toMatchObject({ code: '42501' });
+    });
   });
 
   async function seedWorkspace() {
@@ -1363,6 +1500,17 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
       },
       createActivityStore,
       async (value) => value,
+      (db) =>
+        createSourceAuthority(
+          db,
+          (provider) =>
+            provider === 'jtl'
+              ? 'erp'
+              : provider === 'shopify'
+                ? 'storefront'
+                : null,
+          async (value) => value,
+        ),
       () => clock,
     );
     const orders = workspace();

@@ -101,3 +101,11 @@ Choose the **Language** and **Theme** (**System**, **Light** or **Dark**), and w
 ## Home & sidebar
 
 Choose which **Home modules** appear, in which order and at which width, or select **Reset to default**. Under **Pinned pages**, rename, reorder or unpin the pages in your sidebar; you can pin up to 12. Only you see these choices, and they belong to this workspace. See [Customize Home](/docs/home#customize-home) and [Pin a page](/docs/navigation#pin-a-page).
+
+## Source authority
+
+Open **Settings → Source authority** to review which connection supplies each order fact and inventory quantity. A storefront supplies order lines and lifecycle by default; an ERP supplies fulfillment, tracking and stock. Order groups can use the other category when only that source is available.
+
+To change a fact group, choose a connection under **Workspace override**, then choose **Save**. Choose **Use category default** to restore the default. You need **Edit workspace settings** to change these choices. Every change is recorded and applies to the next detection run without changing earlier source evidence.
+
+**Unknown authority** means no eligible source can supply the fact, or an override is unavailable. **Conflicting authority** means several connections match the default. Select a connection to resolve it. Automatic stock corrections remain blocked while authority is unknown or conflicting.

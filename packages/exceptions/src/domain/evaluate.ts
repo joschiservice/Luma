@@ -97,6 +97,8 @@ export function evaluate(
     }
     case 'inventory_mismatch': {
       const f = parsed.facts;
+      if (f.authorityState && f.authorityState !== 'resolved')
+        return result('defer', 'inconclusive_authority');
       if (!f.mappedSku) return result('defer', 'unmapped_sku');
       if (!f.equivalentPool || f.connectionIds[0] === f.connectionIds[1])
         return result('defer', 'incomparable_pool');

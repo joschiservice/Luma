@@ -59,7 +59,7 @@ export const rolesFixture: RolesSnapshot = {
       'workspace.settings.manage',
       'workspace',
       'Edit workspace settings',
-      'Change the workspace name and display timezone.',
+      'Change the workspace name, display time zone and authoritative sources.',
     ),
     permission(
       'workspace.approval_policy.manage',

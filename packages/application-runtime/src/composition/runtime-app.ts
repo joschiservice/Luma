@@ -144,6 +144,7 @@ export async function buildRuntimeApp(
     const application = createApplicationServices({
       database: tenantDatabase(),
       identity: identity.service,
+      providerCatalog: installedConnections.providerCatalog,
       execution: processClient
         ? { kind: 'enabled', effects: { resolve: async () => null } }
         : { kind: 'disabled' },

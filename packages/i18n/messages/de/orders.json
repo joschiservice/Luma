@@ -243,5 +243,20 @@
   "orders_link_total_unknown": "Summe nicht gemeldet",
   "orders_link_review": "Verknüpfung prüfen",
   "orders_link_review_failed": "Luma konnte diese Bestellung nicht laden. Versuch die Prüfung erneut.",
-  "orders_run_state_awaiting_approval": "Wartet auf Genehmigung"
+  "orders_run_state_awaiting_approval": "Wartet auf Genehmigung",
+  "orders_authority_title": "Maßgebliche Quelle",
+  "orders_authority_lines": "Bestellpositionen und Mengen",
+  "orders_authority_lifecycle": "Bestellstatus und Stornierung",
+  "orders_authority_fulfillment": "Abwicklung und Standort",
+  "orders_authority_tracking": "Sendungsverfolgung",
+  "orders_authority_stock": "Bestandsmengen",
+  "orders_authority_selling": "Verkaufsquelle",
+  "orders_authority_unknown": "Maßgebliche Quelle unbekannt",
+  "orders_authority_conflicting": "Widersprüchliche Quellenzuordnung",
+  "orders_authority_default": "{source} (Standard)",
+  "orders_authority_override": "{source} (angepasst)",
+  "orders_authority_missing": "Quelle hat keine Daten für diese Bestellung",
+  "orders_authority_not_configured": "Keine Quellenregel für diese Angabe",
+  "orders_comparison_location": "Standort",
+  "orders_comparison_cancelled": "Stornierte Mengen"
 }

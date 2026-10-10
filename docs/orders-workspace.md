@@ -50,6 +50,14 @@ that option does not invalidate a cursor.
 
 ### Detail
 
+Detail resolves lines and quantities, lifecycle and cancellations, fulfillment and location,
+and tracking independently through the workspace authority reader in the same database
+snapshot. The comparison labels each group's authoritative connection or shows unknown or
+conflicting authority. Missing or removed reports from the selected authority yield null
+facts, never another source's values. Unread tracking remains null. The default line view
+uses line authority when that source reports the order; people can still inspect other
+sources. Payment, totals and display metadata have no authority rule in this initial model.
+
 The detail read returns every source's facts and differences, fulfillments with source IDs,
 up to 100 snapshots of the order and its fulfillments, linked issues and workflow runs, and
 the latest 25 activity events from the past year. Activity uses the same visibility rules as

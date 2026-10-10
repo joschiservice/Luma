@@ -2,10 +2,15 @@ import { randomBytes } from 'node:crypto';
 
 import { createWorkspaceAssistant } from '@luma/assistant/composition';
 import { createAuditLog } from '@luma/audit/composition';
-import type { ConnectionManagement, EffectRegistry } from '@luma/connections';
+import type {
+  ConnectionManagement,
+  EffectRegistry,
+  ProviderCatalog,
+} from '@luma/connections';
 import {
   createConnectionCoverage,
   createPlaybookGrantReader,
+  createSourceAuthority,
   type InstalledPurchaseOrderRuntime,
 } from '@luma/connections/composition';
 import type { VerificationEvaluator } from '@luma/exceptions';
@@ -158,6 +163,7 @@ export interface ApplicationServices {
     returns: ReturnType<typeof createReturnWorkspace>;
     customers: ReturnType<typeof createCustomerWorkspace>;
     orders: ReturnType<typeof createOrderWorkspace>;
+    sourceAuthority: ReturnType<typeof createSourceAuthority>;
     decisions: ReturnType<typeof createDecisionQueue>;
     decisionAssignments: ReturnType<typeof createDecisionAssignments>;
     insights: ReturnType<typeof createInsights>;
@@ -167,6 +173,8 @@ export interface ApplicationServices {
 
 export interface ApplicationOptions {
   database: TenantDatabase;
+  /** Registered connection categories used for workspace source authority. */
+  providerCatalog?: ProviderCatalog;
   identity: IdentityService;
   execution: ExecutionConfiguration;
   replenishmentTransport?: ReplenishmentTransport;
@@ -214,10 +222,18 @@ export function createApplicationServices(
     options.execution.kind === 'enabled'
       ? options.execution.effects
       : { resolve: async () => null };
+  const authority = (scoped: TenantDatabase) =>
+    createSourceAuthority(
+      scoped,
+      (provider) => options.providerCatalog?.get(provider)?.category ?? null,
+      identity.refreshContext,
+    );
   const detection = createDetectionServices(
     database,
     undefined,
     options.verifier,
+    {},
+    authority(database),
   );
   const procurement = createProcurement(
     database,
@@ -469,6 +485,7 @@ export function createApplicationServices(
     orderQueries,
     createActivityStore,
     identity.refreshContext,
+    authority,
   );
   const fulfillment = createFulfillmentWorkspace(
     database,
@@ -553,6 +570,7 @@ export function createApplicationServices(
       customers: createCustomerWorkspace(database),
       records: createRecordExplorer(database),
       orders,
+      sourceAuthority: authority(database),
       fulfillment,
       decisions,
       decisionAssignments,

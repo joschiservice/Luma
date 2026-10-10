@@ -1,5 +1,24 @@
 export type { Provider, ProviderCatalog } from './application/providers.js';
 
+export {
+  authorityGroups,
+  eligibleAuthority,
+  resolveAuthority,
+} from './domain/authority.js';
+
+export type {
+  AuthorityConnection,
+  AuthorityGroup,
+  AuthorityOverrides,
+  FactAuthority,
+} from './domain/authority.js';
+
+export type {
+  AuthorityReader,
+  AuthoritySettings,
+  AuthoritySnapshot,
+} from './application/authority.js';
+
 export type {
   EffectAdapter,
   EffectIntent,

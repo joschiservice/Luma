@@ -42,7 +42,7 @@ In the bar at the top, **Review issue** opens the issue that needs you. Choose *
 
 If an order exists in more than one system, **Source comparison** lines up what each source reports, and **Differs** marks the fields that disagree. Order numbers and dates are shown but not compared, because each system assigns its own.
 
-**Current state** names each difference, for example: Payment differs between sources: “Paid” in Shopify and “Payment pending” in JTL-Wawi. Luma doesn’t treat either system as correct. Systems often update at different times, so compare when each source last updated the order before you decide which one is wrong. Correct the order in that system; Luma shows the change after its next read.
+**Current state** names each difference, for example: Payment differs between sources: “Paid” in Shopify and “Payment pending” in JTL-Wawi. The **Authoritative source** column shows which connection your workspace trusts for lines, cancellation, fulfillment, location and tracking. Each fact can use a different source. **Unknown authority** or **Conflicting authority** means Luma cannot choose a trusted source. Review the choice in [Source authority settings](/docs/workspace-settings#source-authority). Payment and totals have no authority rule yet. Systems often update at different times, so compare when each source last updated the order before you decide which one is wrong. Correct the order in that system; Luma shows the change after its next read.
 
 ## See live Shopify details
 

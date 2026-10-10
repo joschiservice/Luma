@@ -1392,3 +1392,9 @@
   display: flex;
   gap: 8px;
 }
+.settings-authority-control {
+  display: flex;
+  gap: var(--content-gap);
+  align-items: center;
+  min-width: 260px;
+}

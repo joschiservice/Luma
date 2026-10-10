@@ -111,6 +111,32 @@ const line = (
 });
 
 const detail: OrderDetail = {
+  authority: {
+    revision: 0,
+    groups: [
+      'order_lines',
+      'order_lifecycle',
+      'order_fulfillment',
+      'order_tracking',
+    ].map((group) => ({
+      group: group as
+        | 'order_lines'
+        | 'order_lifecycle'
+        | 'order_fulfillment'
+        | 'order_tracking',
+      state: 'resolved',
+      basis: 'default',
+      connectionId:
+        group === 'order_lines' || group === 'order_lifecycle' ? shop : erp,
+      overrideConnectionId: null,
+      candidateIds: [],
+      eligibleIds: [shop, erp],
+    })),
+    lines: null,
+    lifecycle: null,
+    fulfillments: [],
+    tracking: [],
+  },
   order: list.items[0]!,
   sources: [
     {
@@ -157,6 +183,8 @@ const detail: OrderDetail = {
       connectionId: shop,
       externalId: 'gid://shopify/Fulfillment/51',
       status: 'shipped',
+      location: null,
+      tracking: null,
       lastProgressAt: '2026-09-27T10:00:00.000Z',
       failureCode: null,
       deleted: false,
@@ -493,7 +521,12 @@ export const OrderRecord: Story = {
       ),
     ).toBeVisible();
     await userEvent.click(canvas.getByRole('button', { name: 'Tokyo store' }));
-    await expect(canvas.getByText('Not reported')).toBeVisible();
+    const lines = within(
+      canvas.getByRole('table', {
+        name: 'Lines reported by Tokyo store',
+      }),
+    );
+    await expect(lines.getByText('Not reported')).toBeVisible();
     await expect(
       canvas.getByRole('link', { name: /Review issue/ }),
     ).toBeVisible();

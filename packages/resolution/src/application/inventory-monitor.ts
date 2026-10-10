@@ -152,7 +152,7 @@ export function createInventoryMonitor(options: InventoryMonitorOptions) {
               ? 'failed'
               : 'inconclusive',
         complete: true,
-        authoritative: true,
+        authoritative: mapping.authority !== null,
         evidence,
         bindings: evidence.map((item) => ({
           evidenceKey: item.key,

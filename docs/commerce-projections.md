@@ -4,8 +4,8 @@ Commerce ingestion turns validated provider observations into immutable, per-sou
 canonical snapshots of orders, fulfillments, returns, refunds, products and stock
 positions. Every snapshot points to the stored observation it came from, and equivalence
 between source records is established only by explicit, evidenced mappings. These are
-per-source projections, not an authority selection: consumers choose a source, and
-detection configuration owns comparison authority.
+per-source projections, not an authority selection: display consumers choose a source, while the shared Connections authority reader
+resolves workspace authority for compared order and inventory fact groups.
 
 Code: `@luma/commerce-ingestion`, with the `@luma/orders` and `@luma/inventory` owners,
 composed by `createCommerceServices` in `@luma/application-runtime`. Run it with a
@@ -156,7 +156,8 @@ commit together. Restricted roles cannot update or delete observations, mappings
 snapshots. Snapshots include a mapping signature, so resolving a previously unknown SKU
 creates a new snapshot without changing the original evidence.
 
-These reads do not authorize corrections, and ADR-002's field-group authority publication
-is not implemented by this layer. Raw provider payloads are not retained, and observations
+These reads do not authorize corrections. Workspace authority is separate configuration,
+with audited overrides described in [workspace settings](workspace-settings.md#source-authority).
+ADR-002's full versioned field-group publication remains designed rather than implemented. Raw provider payloads are not retained, and observations
 never carry customer or address data. Imported customer profiles and the customer references
 that order reads report are stored separately (see [Commerce sync](commerce-sync.md#customers)).

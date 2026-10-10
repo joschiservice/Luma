@@ -1,7 +1,9 @@
+import type { AuthorityReader } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
 import type { SqlTransaction } from '@luma/platform';
 
 import { hiddenSections } from '../../application/access.js';
+import { resolveOrderFacts } from '../../application/order-authority.js';
 import type {
   OrderActivityReader,
   OrderDetail,
@@ -66,6 +68,23 @@ async function readFulfillments(
       deleted: row.document.deleted === true,
       observedAt: iso(row.document.observedAt)!,
       sourceUpdatedAt: iso(row.document.sourceUpdatedAt),
+      location: data.location
+        ? {
+            locationId: text(object(data.location).locationId),
+            name: text(object(data.location).name),
+          }
+        : null,
+      tracking: Array.isArray(data.tracking)
+        ? data.tracking.map((value) => {
+            const tracking = object(value);
+
+            return {
+              carrier: text(tracking.carrier),
+              number: text(tracking.number),
+              url: text(tracking.url),
+            };
+          })
+        : null,
       lines: (Array.isArray(data.lines) ? data.lines : []).map((value) => {
         const line = object(value);
 
@@ -88,6 +107,7 @@ export async function readDetail(
   tx: SqlTransaction,
   queries: OrderReadQueries,
   activity: OrderActivityReader,
+  authority: AuthorityReader,
   context: TenantContext,
   orderId: string,
   asOf: string,
@@ -165,6 +185,11 @@ export async function readDetail(
     : { items: [], nextCursor: null };
 
   return {
+    authority: resolveOrderFacts(
+      await authority.read(context),
+      sources,
+      shown('fulfillments') ? fulfillments : null,
+    ),
     redirectedFrom: requestedId === orderId ? null : requestedId,
     order: {
       id: orderId,

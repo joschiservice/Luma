@@ -36,6 +36,11 @@ export interface DiagnosisRereader {
 }
 
 export interface DiagnosisOptions {
+  /** Checks live authority before exposing actionable findings; historical evidence stays unchanged. */
+  authorityCurrent?(
+    context: TenantContext,
+    snapshot: Readonly<DiagnosisInput>,
+  ): Promise<boolean>;
   model?: { gateway: ModelGateway; profile: string };
   rereader?: DiagnosisRereader;
 }
@@ -70,6 +75,14 @@ export function createDiagnosisService(
       if (!row) return null;
       const value = structuredClone(row.document);
       value.superseded = row.resolved || expired(value);
+      const authorityCurrent =
+        (await options.authorityCurrent?.(context, row.snapshot)) ?? true;
+      if (!authorityCurrent) {
+        value.superseded = true;
+        value.status = 'insufficient_evidence';
+        value.reason = 'source_authority_changed';
+        value.nextSteps = [];
+      }
       if (expired(value)) {
         value.status = 'insufficient_evidence';
         value.reason = 'stale_evidence';
@@ -106,7 +119,12 @@ export function createDiagnosisService(
       const id = boundary.id(exceptionId);
       const row = await repository.current(context.tenantId, id);
       if (!row) return null;
-      if (row.resolved || !['pending', 'failed'].includes(row.document.status))
+      if (
+        (options.authorityCurrent &&
+          !(await options.authorityCurrent(context, row.snapshot))) ||
+        row.resolved ||
+        !['pending', 'failed'].includes(row.document.status)
+      )
         return this.get(context, id);
       if (
         row.document.provenance.reread.retryAfter !== null &&

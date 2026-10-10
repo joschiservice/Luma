@@ -1,12 +1,28 @@
 import { randomUUID } from 'node:crypto';
 
+import type { TenantContext } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 
+import { createAuthorityService } from './application/authority.js';
 import type { InstallationDependencies } from './application/installations.js';
 import { createInstallationService as createService } from './application/installations.js';
+import type { AuthorityConnection } from './domain/authority.js';
+import { createAuthorityRepository } from './infrastructure/authority.js';
 import { createInstallationRepository } from './infrastructure/installations/repository.js';
 import { createSecretCipher } from './infrastructure/installations/secret-cipher.js';
 import { installationBoundary } from './infrastructure/installations/validation.js';
+
+/** Creates persisted workspace authority using the installed provider catalog's categories. */
+export function createSourceAuthority(
+  db: TenantDatabase,
+  category: (provider: string) => AuthorityConnection['category'],
+  refreshContext: (context: TenantContext) => Promise<TenantContext>,
+) {
+  return createAuthorityService(
+    createAuthorityRepository(db, category),
+    refreshContext,
+  );
+}
 
 /** Creates persistent connection management with encrypted app-owned credentials. */
 export function createInstalledConnections(

@@ -27,7 +27,10 @@ export function createShopifyWorkflows(
     corrections: ReturnType<typeof createShopifyInventoryCorrection>;
   },
 ) {
-  const query = createCorrectionQuery(context.database);
+  const query = createCorrectionQuery(
+    context.database,
+    context.sourceAuthority,
+  );
 
   async function connections(tenant: TenantContext) {
     try {

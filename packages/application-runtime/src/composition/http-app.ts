@@ -10,8 +10,16 @@ import type { Assistant } from '@luma/assistant';
 import { assistantRoutes } from '@luma/assistant/http';
 import type { SyncService } from '@luma/commerce-sync';
 import { syncRoutes } from '@luma/commerce-sync/http';
-import type { ConnectionManagement, ProviderCatalog } from '@luma/connections';
-import { connectionRoutes, createConnectors } from '@luma/connections/http';
+import type {
+  AuthoritySettings,
+  ConnectionManagement,
+  ProviderCatalog,
+} from '@luma/connections';
+import {
+  connectionRoutes,
+  createConnectors,
+  sourceAuthorityRoutes,
+} from '@luma/connections/http';
 import type { CaseService } from '@luma/exceptions';
 import { caseRoutes } from '@luma/exceptions/http';
 import type {
@@ -144,6 +152,7 @@ export interface AppDependencies {
   appRegistry?: AppRegistry;
   cases?: CaseService;
   connections?: ConnectionManagement;
+  sourceAuthority?: AuthoritySettings;
   modelGateway?: ModelGateway;
   identity?: IdentityService;
   settings?: SettingsService;
@@ -366,6 +375,7 @@ export function buildApp(
       roles: rolesRoutes(dependencies.roles),
       apps: appRoutes(dependencies.apps),
       connections: connectionRoutes(dependencies.connections),
+      sourceAuthority: sourceAuthorityRoutes(dependencies.sourceAuthority),
       system: {
         health: os.system.health.handler(() => ({ status: 'ok' as const })),
         ready: os.system.ready.handler(async ({ context: { request } }) => {

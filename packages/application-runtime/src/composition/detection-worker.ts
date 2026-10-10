@@ -4,7 +4,10 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { createAppHost } from '@luma/app-catalog';
 import type { ConnectionsConfig } from '@luma/config';
 import type { CapabilityReader } from '@luma/connections';
-import { createInstalledRuntime } from '@luma/connections/composition';
+import {
+  createInstalledRuntime,
+  createSourceAuthority,
+} from '@luma/connections/composition';
 import type { Configuration } from '@luma/exceptions';
 import { defaultConfiguration } from '@luma/exceptions';
 import type { IdentityService, TenantContext } from '@luma/identity';
@@ -72,6 +75,11 @@ export function createScheduledDetection(options: {
   const commerce = createCommerceServices(options.database);
   const sources = createDetectionSources(options.database);
   const exceptions = () => options.detection().exceptions;
+  const authority = createSourceAuthority(
+    options.database,
+    options.category,
+    async (context) => context,
+  );
   const monitor = createDetectionMonitor({
     sources,
     capabilities: options.capabilities,
@@ -92,7 +100,7 @@ export function createScheduledDetection(options: {
 
       return outcome.status === 'applied' && outcome.entityId === positionId;
     },
-    category: options.category,
+    authority,
     configuration: options.configuration ?? defaultConfiguration,
     ...(options.holdOverdueSeconds
       ? { holdOverdueSeconds: options.holdOverdueSeconds }
@@ -101,7 +109,7 @@ export function createScheduledDetection(options: {
     ...(options.log ? { log: options.log } : {}),
   });
 
-  return { ...monitor, sources, close: commerce.close };
+  return { ...monitor, sources, authority, close: commerce.close };
 }
 
 /**
@@ -142,6 +150,8 @@ export function createDetectionWorker(options: {
     options.database,
     undefined,
     monitor.verifier,
+    {},
+    monitor.authority,
   );
   const stop = new AbortController();
 

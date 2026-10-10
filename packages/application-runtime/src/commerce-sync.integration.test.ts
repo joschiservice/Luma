@@ -21,7 +21,10 @@ import type {
   Observation,
   ReadCapability,
 } from '@luma/connections';
-import { createReadChecks } from '@luma/connections/composition';
+import {
+  createReadChecks,
+  createSourceAuthority,
+} from '@luma/connections/composition';
 import { createCustomerProfiles } from '@luma/customers/composition';
 import {
   orderAttentionForOrders,
@@ -1898,6 +1901,17 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
       queries,
       createActivityStore,
       async (value) => value,
+      (db) =>
+        createSourceAuthority(
+          db,
+          (provider) =>
+            provider === 'jtl'
+              ? 'erp'
+              : provider === 'shopify'
+                ? 'storefront'
+                : null,
+          async (value) => value,
+        ),
     );
   }
 

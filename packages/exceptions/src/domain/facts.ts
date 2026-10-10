@@ -87,6 +87,8 @@ interface FactMap {
     complete: boolean;
     projectionCurrent: boolean;
     authority: 'left' | 'right' | null;
+    /** Shared workspace authority; absent on legacy observations. */
+    authorityState?: 'resolved' | 'unknown' | 'conflicting';
     sellingSource: 'left' | 'right';
     tolerance: string;
   };
