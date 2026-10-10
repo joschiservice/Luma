@@ -286,7 +286,9 @@ export type SummaryLine = { kind: SummaryKind; text: string };
 
 /**
  * Explains an order's current state and outstanding work in short sentences, using the source
- * shown in the list and naming disagreements between sources.
+ * shown in the list and naming disagreements between sources. The source's status and payment
+ * are only spelled out when several sources report the order, or when nothing else needs saying.
+ * `date` formats the due date as a workspace calendar date.
  */
 export function orderSummary(
   detail: Pick<
@@ -305,10 +307,9 @@ export function orderSummary(
   const say = (kind: SummaryKind, text: string) => lines.push({ kind, text });
   if (source.deleted)
     say('removed', m.orders_summary_removed({ source: source.label }));
-  say(
-    'state',
-    `${(statusSentences[source.status] ?? m.orders_summary_status_unknown)({ source: source.label })} ${(paymentSentences[source.paymentStatus] ?? m.orders_summary_payment_unknown)()}`,
-  );
+  const state = `${(statusSentences[source.status] ?? m.orders_summary_status_unknown)({ source: source.label })} ${(paymentSentences[source.paymentStatus] ?? m.orders_summary_payment_unknown)()}`;
+  // The header already shows one source's status and payment; with several, name whose they are.
+  if (detail.sources.length > 1) say('state', state);
   const remaining = source.lines.flatMap((line) =>
     line.remainingQuantity === null ? [] : [line.remainingQuantity],
   );
@@ -398,6 +399,8 @@ export function orderSummary(
       }),
     );
   }
+
+  if (!lines.length) say('state', state);
 
   return lines;
 }

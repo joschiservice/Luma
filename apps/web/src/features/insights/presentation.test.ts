@@ -85,7 +85,7 @@ describe('chart presentation', () => {
       ['Thu 1 Oct', false],
     ]);
     expect(categories[2]!.note).toBe(
-      'Incomplete: sources read through 1 Oct, 09:30',
+      'Incomplete: sources read through 1 Oct 09:30',
     );
     expect(categories[1]!.note).toBeUndefined();
   });
@@ -113,7 +113,7 @@ describe('chart presentation', () => {
       }).label,
     ).toBe('No source in this view');
     expect(dataThroughText(orders, 'Europe/Berlin')).toBe(
-      'Data through 1 Oct, 11:30',
+      'Data through 1 Oct 11:30',
     );
     expect(dataThroughText({ ...orders, dataThrough: null }, 'UTC')).toMatch(
       /unknown/,

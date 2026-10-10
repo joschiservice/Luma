@@ -497,9 +497,6 @@ export const OrderRecord: Story = {
     await expect(
       canvas.getByRole('link', { name: /Review issue/ }),
     ).toBeVisible();
-    await expect(
-      canvas.getByRole('button', { name: 'Copy link' }),
-    ).toBeVisible();
     // The breadcrumb names the order once; Luma's internal ID stays out of the page.
     await expect(
       canvas.getByText('SO-10', { selector: '[aria-current]' }),

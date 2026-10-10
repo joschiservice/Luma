@@ -269,16 +269,9 @@ export function bucketLabel(point: InsightPoint, bucket: 'day' | 'week') {
       });
 }
 
-/** Formats a time in the workspace time zone, such as "1 Oct, 14:05". */
+/** Formats a time in the workspace time zone, such as "1 Oct 14:05". */
 export function moment(value: string, timeZone: string) {
-  return formatDateTime(value, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-    timeZone,
-  });
+  return `${formatDateTime(value, { month: 'short', day: 'numeric', timeZone })} ${formatDateTime(value, { hour: '2-digit', minute: '2-digit', timeZone })}`;
 }
 
 /** Describes a day range, such as "2 Sept – 1 Oct". */

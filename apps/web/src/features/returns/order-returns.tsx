@@ -4,7 +4,7 @@ import type { OrderDetail } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { Link } from '@tanstack/react-router';
-import { ArrowRight, Undo2 } from 'lucide-react';
+import { ChevronRight, Undo2 } from 'lucide-react';
 
 import { OrderSection } from '../orders/order-section';
 import {
@@ -34,38 +34,42 @@ export function OrderReturns({
         <ul className="order-list order-returns">
           {detail.returns.map((item) => (
             <li key={item.id}>
-              <span className="returns-cell">
-                <strong>
-                  {item.deleted
-                    ? m.returns_order_section_removed({
-                        label: returnLabel(item),
-                      })
-                    : returnLabel(item)}
-                </strong>
-                <span>
-                  <StatePill state={stageStates[item.stage]}>
-                    {stageLabels[item.stage]}
-                  </StatePill>
-                </span>
-                <small>
-                  {item.kind === 'return'
-                    ? m.returns_order_section_units({
-                        source: label(item.connectionId),
-                        units: Number(item.quantity),
-                        refund: refundSummary(item),
-                      })
-                    : m.returns_order_section_refund({
-                        source: label(item.connectionId),
-                        refund: refundSummary(item),
-                      })}
-                </small>
-              </span>
               <Link
+                className="order-row-link"
                 to="/app/$organizationId/returns/$returnId"
                 params={{ organizationId, returnId: item.id }}
                 search={{ from }}
               >
-                {m.common_open()} <ArrowRight size={13} aria-hidden="true" />
+                <span className="returns-cell">
+                  <strong>
+                    {item.deleted
+                      ? m.returns_order_section_removed({
+                          label: returnLabel(item),
+                        })
+                      : returnLabel(item)}
+                  </strong>
+                  <span>
+                    <StatePill state={stageStates[item.stage]}>
+                      {stageLabels[item.stage]}
+                    </StatePill>
+                  </span>
+                  <small>
+                    {item.kind === 'return'
+                      ? m.returns_order_section_units({
+                          source: label(item.connectionId),
+                          units: Number(item.quantity),
+                          refund: refundSummary(item),
+                        })
+                      : m.returns_order_section_refund({
+                          source: label(item.connectionId),
+                          refund: refundSummary(item),
+                        })}
+                  </small>
+                </span>
+                <ChevronRight
+                  className="order-row-chevron"
+                  aria-hidden="true"
+                />
               </Link>
             </li>
           ))}

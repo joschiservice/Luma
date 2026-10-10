@@ -333,10 +333,6 @@
 }
 
 /* Returns section on the order detail. */
-.order-returns li > .returns-cell {
-  flex: 1;
-}
-
 @media (max-width: 1200px) {
   .returns-stages {
     grid-template-columns: repeat(3, minmax(0, 1fr));

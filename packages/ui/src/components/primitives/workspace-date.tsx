@@ -3,43 +3,56 @@ import { createContext, useContext } from 'react';
 
 export const WorkspaceTimezone = createContext('UTC');
 
-const precisions = {
-  day: { dateStyle: 'medium' },
-  time: {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  },
-  second: { dateStyle: 'medium', timeStyle: 'medium' },
+const dateFields = {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+} satisfies Intl.DateTimeFormatOptions;
+
+const timeFields = {
+  time: { hour: '2-digit', minute: '2-digit' },
+  second: { hour: '2-digit', minute: '2-digit', second: '2-digit' },
 } satisfies Record<string, Intl.DateTimeFormatOptions>;
 
 /**
+ * Joins the date and the time with a space. Browsers disagree on the joiner when both are
+ * formatted together (“9 Oct 2026, 07:25” or “9 Oct 2026 at 07:25”), so each part is formatted
+ * on its own.
+ */
+function dateAndTime(
+  value: Date | string,
+  timeZone: string,
+  time: Intl.DateTimeFormatOptions,
+) {
+  return `${formatDateTime(value, { ...dateFields, timeZone })} ${formatDateTime(value, { ...time, timeZone })}`;
+}
+
+/**
  * Formats a UTC timestamp in the workspace display timezone and the interface language, such as
- * "8 Oct 2026, 14:05". The zone isn't named, because every time in a workspace shares it;
+ * "8 Oct 2026 14:05". The zone isn't named, because every time in a workspace shares it;
  * `formatWorkspaceInstant` names it where the exact moment matters. `day` shows only the
  * workspace date and `second` adds seconds for audit detail.
  */
 export function formatWorkspaceDateTime(
   value: Date | string,
   timeZone: string,
-  precision: keyof typeof precisions = 'time',
+  precision: 'day' | keyof typeof timeFields = 'time',
 ) {
-  return formatDateTime(value, { ...precisions[precision], timeZone });
+  return precision === 'day'
+    ? formatDateTime(value, { ...dateFields, timeZone })
+    : dateAndTime(value, timeZone, timeFields[precision]);
 }
 
-/** Formats the exact moment with seconds and the zone name, such as "8 Oct 2026, 14:05:32 CEST". */
+/** Formats the exact moment with seconds and the zone name, such as "8 Oct 2026 14:05:32 CEST". */
 export function formatWorkspaceInstant(value: Date | string, timeZone: string) {
-  return formatDateTime(value, {
-    dateStyle: 'medium',
-    timeStyle: 'long',
-    timeZone,
+  return dateAndTime(value, timeZone, {
+    ...timeFields.second,
+    timeZoneName: 'short',
   });
 }
 
 /**
- * Shows a UTC timestamp in workspace time without the zone name, such as "8 Oct 2026, 14:05", and
+ * Shows a UTC timestamp in workspace time without the zone name, such as "8 Oct 2026 14:05", and
  * names the exact moment with its zone in the `title`. `precision="day"` shows only the workspace
  * date, for facts such as when a customer joined.
  */

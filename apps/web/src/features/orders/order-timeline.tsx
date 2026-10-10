@@ -7,7 +7,7 @@ import { StateDot } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { actorLabel } from '@luma/ui/lib/actor';
 import { Link } from '@tanstack/react-router';
-import { Activity, ArrowRight, History, Truck } from 'lucide-react';
+import { Activity, ChevronRight, History, Truck } from 'lucide-react';
 
 import { activityLabel, activityState } from '../activity/presentation';
 import { OrderSection } from './order-section';
@@ -70,50 +70,50 @@ export function OrderFulfillments({
 
             return (
               <li key={`${item.id}:${item.connectionId}`}>
-                <span className="orders-cell-stack">
-                  <strong>
-                    {item.deleted
-                      ? m.orders_fulfillments_removed({ status })
-                      : status}
-                  </strong>
-                  <small>
-                    {[
-                      sourceLabel(detail, item.connectionId),
-                      m.orders_fulfillments_quantities({
-                        quantities: formatList(
-                          item.lines.map((line) =>
-                            formatQuantity(line.quantity, line.unit),
-                          ),
-                          { type: 'unit' },
-                        ),
-                      }),
-                      item.failureCode
-                        ? m.orders_fulfillments_failure_code({
-                            code: item.failureCode,
-                          })
-                        : null,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </small>
-                  <small>
-                    {item.lastProgressAt
-                      ? rich(m.orders_fulfillments_progress, {
-                          date: <WorkspaceDate value={item.lastProgressAt} />,
-                        })
-                      : m.orders_fulfillments_no_progress()}
-                    {item.externalId
-                      ? ` · ${m.orders_fulfillments_source_id({ id: item.externalId })}`
-                      : ''}
-                  </small>
-                </span>
                 <Link
+                  className="order-row-link"
                   to="/app/$organizationId/fulfillment/$fulfillmentId"
                   params={{ organizationId, fulfillmentId: item.id }}
                   search={{ from }}
-                  aria-label={m.orders_fulfillments_open({ status })}
                 >
-                  {m.common_open()} <ArrowRight size={13} aria-hidden="true" />
+                  <span className="orders-cell-stack">
+                    <strong>
+                      {item.deleted
+                        ? m.orders_fulfillments_removed({ status })
+                        : status}
+                    </strong>
+                    <small>
+                      {[
+                        sourceLabel(detail, item.connectionId),
+                        m.orders_fulfillments_quantities({
+                          quantities: formatList(
+                            item.lines.map((line) =>
+                              formatQuantity(line.quantity, line.unit),
+                            ),
+                            { type: 'unit' },
+                          ),
+                        }),
+                        item.failureCode
+                          ? m.orders_fulfillments_failure_code({
+                              code: item.failureCode,
+                            })
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </small>
+                    <small>
+                      {item.lastProgressAt
+                        ? rich(m.orders_fulfillments_progress, {
+                            date: <WorkspaceDate value={item.lastProgressAt} />,
+                          })
+                        : m.orders_fulfillments_no_progress()}
+                    </small>
+                  </span>
+                  <ChevronRight
+                    className="order-row-chevron"
+                    aria-hidden="true"
+                  />
                 </Link>
               </li>
             );
