@@ -1,8 +1,6 @@
 import type { OrderDetail, OrderListItem } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
-import { Badge } from '@luma/ui/components/primitives/badge';
 import { buttonVariants } from '@luma/ui/components/primitives/button';
-import { StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import {
   type RecordFact,
@@ -84,7 +82,15 @@ function orderFacts(order: OrderListItem): RecordFact[] {
             key: 'due',
             icon: CalendarClock,
             label: m.orders_fact_due(),
-            value: <WorkspaceDate value={order.dueAt} />,
+            value: order.overdue ? (
+              <>
+                <WorkspaceDate value={order.dueAt} />
+                {' · '}
+                {m.orders_flag_overdue()}
+              </>
+            ) : (
+              <WorkspaceDate value={order.dueAt} />
+            ),
             tone: order.overdue ? ('danger' as const) : undefined,
           },
         ]
@@ -99,9 +105,9 @@ function orderFacts(order: OrderListItem): RecordFact[] {
 }
 
 /**
- * Names the order in the workspace breadcrumb and opens the page with its attention flags and
- * key facts. Without `detail`, only the breadcrumb is shown. `returnPath` is the record the
- * reader came from.
+ * Names the order in the workspace breadcrumb and opens the page with its key facts. Current
+ * state below says what needs attention, so the header doesn't repeat it as flags. Without
+ * `detail`, only the breadcrumb is shown. `returnPath` is the record the reader came from.
  */
 export function OrderHeader({
   organizationId,
@@ -143,23 +149,6 @@ export function OrderHeader({
             {m.orders_inspector_review_issue()}
             <ArrowRight aria-hidden="true" />
           </Link>
-        ) : null
-      }
-      status={
-        order ? (
-          <>
-            {order.issueIds.length ? (
-              <StatePill state="attention">
-                {m.orders_flag_needs_you()}
-              </StatePill>
-            ) : null}
-            {order.overdue ? (
-              <Badge tone="danger">{m.orders_flag_overdue()}</Badge>
-            ) : null}
-            {order.differs ? (
-              <Badge tone="warning">{m.orders_flag_differs()}</Badge>
-            ) : null}
-          </>
         ) : null
       }
       facts={order ? orderFacts(order) : []}
