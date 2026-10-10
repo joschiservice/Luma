@@ -37,6 +37,7 @@ import { useState } from 'react';
 
 import { connectionsOptions } from '../connections/data';
 import { IdentityError } from '../identity/data';
+import { linkMethodLabel } from '../sync/presentation';
 import {
   recordListError,
   recordOptions,
@@ -589,7 +590,7 @@ export function RecordDetailPage() {
                       <small>
                         {source.mappingMethod
                           ? m.records_detail_link_method({
-                              method: source.mappingMethod,
+                              method: linkMethodLabel(source.mappingMethod),
                             })
                           : m.records_detail_link_derived()}
                       </small>

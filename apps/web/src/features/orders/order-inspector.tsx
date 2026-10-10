@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
+import { linkMethodLabel } from '../sync/presentation';
 import {
   connectionStatusLabel,
   issueStateLabel,
@@ -159,15 +160,7 @@ function OrderSources({ sources }: { sources: OrderDetail['sources'] }) {
             </strong>
             <small>
               {source.mappingMethod
-                ? source.mappingMethod.startsWith('Imported')
-                  ? m.orders_inspector_link_imported()
-                  : source.mappingMethod.startsWith('Linked')
-                    ? m.orders_inspector_link_linked()
-                    : source.mappingMethod.startsWith('Unlinked')
-                      ? m.orders_inspector_link_unlinked()
-                      : m.orders_inspector_link_confirmed({
-                          method: source.mappingMethod.replaceAll('-', ' '),
-                        })
+                ? linkMethodLabel(source.mappingMethod)
                 : m.orders_inspector_link_unrecorded()}
             </small>
             <small>

@@ -202,6 +202,7 @@
   "sync_links_method_linked": "Linked by a person",
   "sync_links_method_unlinked": "Unlinked",
   "sync_links_method_imported": "Imported",
+  "sync_links_method_automatic": "Linked by a rule",
   "sync_links_method_matched": "Matched on import",
   "sync_links_unlink": "Unlink",
   "sync_links_link": "Link",

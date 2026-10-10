@@ -767,7 +767,8 @@ export function orderDetail(): OrderDetail {
       {
         ...shopSource,
         appId: 'shopify',
-        mappingMethod: 'operator-confirmed',
+        mappingMethod:
+          'Linked by a person as the same record in another source',
         displayNumber: '#48213',
         status: 'open',
         paymentStatus: 'paid',
@@ -781,7 +782,8 @@ export function orderDetail(): OrderDetail {
       {
         ...erpSource,
         appId: 'jtl',
-        mappingMethod: 'operator-confirmed',
+        mappingMethod:
+          'Linked by a person as the same record in another source',
         displayNumber: 'AU-2026-48213',
         status: 'open',
         paymentStatus: 'paid',

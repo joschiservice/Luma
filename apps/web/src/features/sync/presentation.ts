@@ -24,6 +24,23 @@ import {
 
 type Message = () => string;
 
+/**
+ * Names how a source record was linked to its Luma record. Luma stores the method as an English
+ * sentence, so known methods are recognized by how they start; anything else, such as an explicit
+ * mapping from a tool, reads as matched on import.
+ */
+export function linkMethodLabel(method: string) {
+  if (method.startsWith('Imported')) return m.sync_links_method_imported();
+  if (method.startsWith('Unlinked')) return m.sync_links_method_unlinked();
+  // Records under a linked order are re-keyed as part of that person's link.
+  if (method.startsWith('Linked') || method.startsWith('Re-keyed'))
+    return m.sync_links_method_linked();
+  if (method.startsWith('Automatically linked'))
+    return m.sync_links_method_automatic();
+
+  return m.sync_links_method_matched();
+}
+
 type CountMessage = (inputs: { count: number }) => string;
 
 const recordType = (

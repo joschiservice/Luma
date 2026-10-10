@@ -116,7 +116,7 @@ const detail: OrderDetail = {
     {
       ...sources[0]!,
       appId: 'shopify',
-      mappingMethod: 'operator-confirmed',
+      mappingMethod: 'Linked by a person as the same record in another source',
       displayNumber: '#1001',
       status: 'open',
       paymentStatus: 'paid',
@@ -130,7 +130,7 @@ const detail: OrderDetail = {
     {
       ...sources[1]!,
       appId: 'jtl',
-      mappingMethod: 'operator-confirmed',
+      mappingMethod: 'Linked by a person as the same record in another source',
       displayNumber: 'SO-10',
       status: 'open',
       paymentStatus: 'pending',
