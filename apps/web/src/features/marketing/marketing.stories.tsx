@@ -51,6 +51,8 @@ function mockHomeApi() {
     ['/decisions', decisionList],
     ['/exceptions', activeCases],
     ['/activity', activity],
+    // The default layout, so Customize is available as it is in the product.
+    ['/layout', () => ({ home: null, pinned: [], revision: 0 })],
   ];
   globalThis.fetch = async (input, init) => {
     const url = new URL(

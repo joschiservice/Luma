@@ -3,11 +3,9 @@ import {
   formatList,
   formatNumber,
   formatPercent,
-  formatRelativeTime,
   formatTime,
 } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
-import { rich } from '@luma/i18n/rich';
 import {
   elapsed,
   issueStatus,
@@ -19,7 +17,10 @@ import {
   StateDot,
   StatePill,
 } from '@luma/ui/components/primitives/state';
-import { WorkspaceTimezone } from '@luma/ui/components/primitives/workspace-date';
+import {
+  formatWorkspaceInstant,
+  WorkspaceTimezone,
+} from '@luma/ui/components/primitives/workspace-date';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { ArrowRight, Plus } from 'lucide-react';
@@ -74,6 +75,7 @@ export function AttentionModule({
   organizationId: string;
   overview: OperationsOverview;
 }) {
+  const timeZone = useContext(WorkspaceTimezone);
   const decisions = useQuery(decisionsOptions(organizationId, {}, 5));
   const now = useNow();
   if (decisions.isPending) return <ModuleSkeleton />;
@@ -92,9 +94,11 @@ export function AttentionModule({
         </p>
       ) : null}
       {items.length ? (
-        <ol className="home-rows operations-decisions">
+        <ol className="home-rows home-rows-aligned operations-decisions">
           {items.map((item) => {
             const status = decisionStatus(item);
+            const deadline =
+              item.urgency === 'expiring' ? item.deadline : undefined;
 
             return (
               <li key={item.id}>
@@ -111,9 +115,15 @@ export function AttentionModule({
                   </span>
                   <span className="home-row-meta">
                     <StatePill state={status.state}>{status.label}</StatePill>
-                    <span className="home-row-age" title={item.requestedAt}>
-                      {item.deadline && item.urgency === 'expiring'
-                        ? timeLeft(item.deadline, now)
+                    <span
+                      className="home-row-age"
+                      title={formatWorkspaceInstant(
+                        deadline ?? item.requestedAt,
+                        timeZone,
+                      )}
+                    >
+                      {deadline
+                        ? timeLeft(deadline, now)
                         : elapsed(item.requestedAt, now)}
                     </span>
                   </span>
@@ -258,10 +268,13 @@ export function ConnectionsModule({
   organizationId: string;
   overview: OperationsOverview;
 }) {
+  const timeZone = useContext(WorkspaceTimezone);
+  const now = useNow();
+
   return (
     <>
       {overview.connections.length ? (
-        <ul className="home-rows home-rows-compact">
+        <ul className="home-rows home-rows-compact home-rows-aligned">
           {overview.connections.map((connection) => {
             const health = connectionState(connection);
 
@@ -271,20 +284,23 @@ export function ConnectionsModule({
                 <span className="home-row-main">
                   <strong>{connection.label}</strong>
                 </span>
-                <span className="home-row-status">
+                <span className="home-row-status">{health.label}</span>
+                <span
+                  className="home-row-age"
+                  title={
+                    connection.lastObservedAt
+                      ? formatWorkspaceInstant(
+                          connection.lastObservedAt,
+                          timeZone,
+                        )
+                      : undefined
+                  }
+                >
                   {connection.lastObservedAt
-                    ? rich(m.home_connection_status_age, {
-                        status: health.label,
-                        age: (
-                          <span
-                            className="home-row-age"
-                            title={connection.lastObservedAt}
-                          >
-                            {formatRelativeTime(connection.lastObservedAt)}
-                          </span>
-                        ),
+                    ? m.home_connection_age({
+                        age: elapsed(connection.lastObservedAt, now),
                       })
-                    : health.label}
+                    : null}
                 </span>
               </li>
             );
@@ -352,7 +368,10 @@ export function ActivityModule({ organizationId }: { organizationId: string }) {
         <ol className="home-timeline">
           {activity.data.items.slice(0, 6).map((event) => (
             <li key={event.id}>
-              <time dateTime={event.recordedAt} title={event.recordedAt}>
+              <time
+                dateTime={event.recordedAt}
+                title={formatWorkspaceInstant(event.recordedAt, timeZone)}
+              >
                 {formatTime(event.recordedAt, { timeZone, timeStyle: 'short' })}
               </time>
               <StateDot state={activityState(event.outcome)} />

@@ -34,9 +34,9 @@ it('says who a decision waits for and only asks the reader when they can act', (
 
 it('counts down deadlines without claiming time that has passed', () => {
   const now = Date.parse('2026-09-30T09:00:00Z');
-  expect(timeLeft('2026-09-30T09:04:30Z', now)).toBe('4 min left');
-  expect(timeLeft('2026-09-30T09:00:30Z', now)).toBe('Under a minute left');
-  expect(timeLeft('2026-09-30T12:00:00Z', now)).toBe('3 h left');
+  expect(timeLeft('2026-09-30T09:04:30Z', now)).toBe('4m left');
+  expect(timeLeft('2026-09-30T09:00:30Z', now)).toBe('<1m left');
+  expect(timeLeft('2026-09-30T12:00:00Z', now)).toBe('3h left');
   expect(timeLeft('2026-09-30T08:59:59Z', now)).toBe('Expired');
 });
 

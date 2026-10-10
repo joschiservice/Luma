@@ -33,19 +33,6 @@
   letter-spacing: -0.028em;
 }
 
-.home-lead {
-  margin-top: 4px;
-  color: var(--foreground-muted);
-  font-size: 14px;
-}
-
-.home-asof {
-  margin-top: 6px;
-  color: var(--foreground-subtle);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
 .home-header-actions {
   display: flex;
   align-items: center;
@@ -356,6 +343,33 @@ a.home-row:hover {
   font-size: 12.5px;
 }
 
+/* Rows share status and age columns, so labels of different lengths line up. */
+.home-rows-aligned {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  column-gap: 10px;
+}
+
+.home-rows-aligned > li,
+.home-rows-aligned .home-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+}
+
+.home-rows-aligned .home-row-meta {
+  display: contents;
+}
+
+.home-rows-aligned .lu-state-pill,
+.home-rows-aligned .home-row-status {
+  justify-self: start;
+}
+
+.home-rows-aligned .home-row-age {
+  justify-self: end;
+}
+
 .home-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -366,7 +380,7 @@ a.home-row:hover {
 .home-stats > div {
   padding: 10px 12px;
   border-radius: 10px;
-  background: var(--surface-sunken);
+  background: var(--surface-tile);
 }
 
 .home-stats dt {
@@ -476,7 +490,7 @@ a.home-row:hover {
   gap: 4px;
   padding: 12px;
   border-radius: 10px;
-  background: var(--surface-sunken);
+  background: var(--surface-tile);
 }
 
 .home-outcomes span {
@@ -581,6 +595,10 @@ a.home-row:hover {
 
   .home-row-meta .lu-state-pill {
     display: none;
+  }
+
+  .home-rows-aligned:has(.home-row-meta) {
+    grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
   .home-module-footer {

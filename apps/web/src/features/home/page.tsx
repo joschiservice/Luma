@@ -8,7 +8,6 @@ import type {
 import { homeModuleIds } from '@luma/api-contract';
 import { formatDate } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
-import { rich } from '@luma/i18n/rich';
 import { CaseNotice } from '@luma/ui/components/issues/case-investigation';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -22,7 +21,7 @@ import {
 } from '@luma/ui/components/primitives/dropdown-menu';
 import { Select } from '@luma/ui/components/primitives/select';
 import {
-  WorkspaceDate,
+  formatWorkspaceDateTime,
   WorkspaceTimezone,
 } from '@luma/ui/components/primitives/workspace-date';
 import { useSlowRequest } from '@luma/ui/lib/use-slow-request';
@@ -48,7 +47,6 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useContext, useState } from 'react';
 
-import { decisionsOptions } from '../decisions/data';
 import { sessionOptions } from '../identity/data';
 import { useWorkspaceLayout } from '../layout/data';
 import { overviewOptions } from '../overview/data';
@@ -286,10 +284,6 @@ export function HomePage() {
   const session = client.getQueryData(sessionOptions().queryKey);
   const overview = useQuery(overviewOptions(organizationId, window));
   const slowOverview = useSlowRequest(overview.isFetching);
-  const waiting = useQuery({
-    ...decisionsOptions(organizationId, {}, 5),
-    select: (list) => list.counts.views.all,
-  });
   const workspace = useWorkspaceLayout(organizationId);
   const [editing, setEditing] = useState(false);
   const [dragged, setDragged] = useState<HomeModuleId | null>(null);
@@ -376,20 +370,6 @@ export function HomePage() {
         <div className="home-header-copy">
           <p className="home-date">{today}</p>
           <h1>{greeting(timeZone, session?.user.name)}</h1>
-          <p className="home-lead">
-            {waiting.data !== undefined
-              ? waiting.data
-                ? m.home_lead_waiting({ count: waiting.data })
-                : m.home_lead_none()
-              : m.home_lead_loading()}
-          </p>
-          {data ? (
-            <p className="home-asof">
-              {rich(m.home_updated, {
-                time: <WorkspaceDate value={data.generatedAt} />,
-              })}
-            </p>
-          ) : null}
         </div>
         <div className="home-header-actions">
           <Select<HomeWindow>
@@ -408,6 +388,13 @@ export function HomePage() {
             variant="outline"
             onClick={() => void overview.refetch()}
             disabled={overview.isPaused}
+            title={
+              data
+                ? m.home_updated({
+                    time: formatWorkspaceDateTime(data.generatedAt, timeZone),
+                  })
+                : undefined
+            }
           >
             <RefreshCw
               aria-hidden="true"

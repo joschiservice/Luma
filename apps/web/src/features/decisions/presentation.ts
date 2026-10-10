@@ -107,7 +107,7 @@ export function decisionStatus(
 export const actionable = (item: Pick<DecisionItem, 'response'>) =>
   ['decide', 'run', 'check', 'investigate'].includes(item.response);
 
-/** Describes the time left before a proposal loses its authority, such as `4 min left`. */
+/** Describes the time left before a proposal loses its authority, such as `4m left`. */
 export function timeLeft(deadline: string, now: number) {
   const ms = Date.parse(deadline) - now;
   if (ms <= 0) return m.decisions_time_expired();

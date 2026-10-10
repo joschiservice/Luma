@@ -25,6 +25,8 @@
   --surface: #ffffff;
   --surface-raised: #ffffff;
   --surface-sunken: #f1f3f6;
+  /* Figures and stat tiles inside a card; lifted from the card in dark mode. */
+  --surface-tile: #eef1f6;
   --surface-hover: #15171c0a;
   --surface-selected: #316bff14;
   --foreground: #15171c;
@@ -140,6 +142,7 @@
   --surface: #0f1526;
   --surface-raised: #141b2f;
   --surface-sunken: #0c1222;
+  --surface-tile: #1c2440;
   --surface-hover: #ffffff0d;
   --surface-selected: #54a3ff1f;
   --foreground: #f2f4f9;

@@ -38,7 +38,7 @@
   "decisions_status_unconfirmed": "Ergebnis nicht bestätigt",
   "decisions_status_waiting_approver": "Wartet auf Genehmigung",
   "decisions_time_expired": "Abgelaufen",
-  "decisions_time_under_minute": "Noch unter 1 Min.",
+  "decisions_time_under_minute": "Noch <1 Min.",
   "decisions_time_minutes": "{minutes, plural, one {Noch {minutes, number} Min.} other {Noch {minutes, number} Min.}}",
   "decisions_time_hours": "{hours, plural, one {Noch {hours, number} Std.} other {Noch {hours, number} Std.}}",
   "decisions_time_days": "{days, plural, one {Noch {days, number} Tag} other {Noch {days, number} Tage}}",
