@@ -1,6 +1,7 @@
 import type {
   AuthoringVocabulary,
   DraftValidation,
+  WorkflowDiagnostic,
   WorkflowDraftContent,
 } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
@@ -9,15 +10,90 @@ import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { Input } from '@luma/ui/components/primitives/input';
 import { Select } from '@luma/ui/components/primitives/select';
 import { Textarea } from '@luma/ui/components/primitives/textarea';
+import { WorkspaceTimezone } from '@luma/ui/components/primitives/workspace-date';
+import { workspaceDateValue, workspaceInstant } from '@luma/ui/lib/timezone';
+import { useContext, useState } from 'react';
 
 import { diagnosticsAt, type FieldType } from './draft-model';
 import { Field, FieldListEditor, ScalarInput } from './step-forms';
 
 const triggerFields: Record<string, string> = {
   event: 'eventType',
-  schedule: 'at',
   exception: 'issueType',
 };
+
+/**
+ * Edits a one-time start in workspace time and reports it as a UTC instant. A local time that
+ * doesn't exist, such as one skipped by a clock change, is shown as a problem and not reported.
+ */
+function ScheduleField({
+  at,
+  diagnostics,
+  readOnly,
+  onChange,
+}: {
+  at: string;
+  diagnostics: WorkflowDiagnostic[];
+  readOnly: boolean;
+  onChange(at: string): void;
+}) {
+  const timeZone = useContext(WorkspaceTimezone);
+  const [rejected, setRejected] = useState<{ text: string; message: string }>();
+  const stored = Number.isNaN(Date.parse(at))
+    ? ''
+    : workspaceDateValue(new Date(at), timeZone, true).slice(0, 16);
+  const problem: WorkflowDiagnostic[] = rejected
+    ? [
+        {
+          severity: 'error',
+          code: 'schedule_time',
+          stepIndex: null,
+          stepId: null,
+          field: 'applicability.trigger.at',
+          message: rejected.message,
+          detail: '',
+        },
+      ]
+    : [];
+
+  return (
+    <Field
+      label={m.authoring_settings_schedule()}
+      hint={m.authoring_settings_schedule_hint({ timeZone })}
+      diagnostics={[...problem, ...diagnostics]}
+    >
+      {(props) => (
+        <Input
+          {...props}
+          type="datetime-local"
+          disabled={readOnly}
+          value={rejected?.text ?? stored}
+          onChange={(event) => {
+            const text = event.target.value;
+            if (!text) {
+              setRejected(undefined);
+              onChange('');
+
+              return;
+            }
+            try {
+              onChange(workspaceInstant(text, timeZone));
+              setRejected(undefined);
+            } catch (error) {
+              setRejected({
+                text,
+                message:
+                  error instanceof Error
+                    ? error.message
+                    : m.ui_time_error_invalid(),
+              });
+            }
+          }}
+        />
+      )}
+    </Field>
+  );
+}
 
 /** Edits name, trigger, subject, inputs and evidence for the whole workflow. */
 export function WorkflowSettings({
@@ -163,14 +239,28 @@ export function WorkflowSettings({
             />
           )}
         </Field>
+        {trigger.kind === 'schedule' ? (
+          <ScheduleField
+            at={trigger.at}
+            diagnostics={at('applicability.trigger.at')}
+            readOnly={readOnly}
+            onChange={(next) =>
+              onChange({
+                ...content,
+                applicability: {
+                  ...content.applicability,
+                  trigger: { ...trigger, at: next },
+                },
+              })
+            }
+          />
+        ) : null}
         {trigger.kind in triggerFields ? (
           <Field
             label={
               trigger.kind === 'event'
                 ? m.authoring_settings_event()
-                : trigger.kind === 'schedule'
-                  ? m.authoring_settings_schedule()
-                  : m.authoring_settings_issue_type()
+                : m.authoring_settings_issue_type()
             }
             diagnostics={at(
               `applicability.trigger.${triggerFields[trigger.kind]}`,

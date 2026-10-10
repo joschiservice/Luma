@@ -7,7 +7,6 @@ import type {
   WorkflowDiagnostic,
   WorkflowDraftContent,
 } from '@luma/api-contract';
-import { formatDateTime } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -21,6 +20,10 @@ import {
 } from '@luma/ui/components/primitives/dropdown-menu';
 import { Input } from '@luma/ui/components/primitives/input';
 import {
+  formatWorkspaceDateTime,
+  WorkspaceTimezone,
+} from '@luma/ui/components/primitives/workspace-date';
+import {
   ArrowDown,
   ArrowUp,
   ChevronDown,
@@ -31,22 +34,17 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useContext } from 'react';
 
 import { humanize, stepFacts } from './draft-model';
 import { Field, FieldProblems, StepForm } from './step-forms';
 import { StepKindIcon, stepKinds } from './step-kinds';
 
-/** Shows a scheduled start in the reader's language, or the raw text while it isn't a valid time. */
-function scheduledAt(value: string) {
+/** Shows a scheduled start in workspace time, or the raw text while it isn't a valid time. */
+function scheduledAt(value: string, timeZone: string) {
   return Number.isNaN(Date.parse(value))
     ? value
-    : formatDateTime(value, {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-        timeZone: 'UTC',
-        timeZoneName: 'short',
-      });
+    : formatWorkspaceDateTime(value, timeZone);
 }
 
 /** Shows how and for what the workflow starts, at the top of the step list. */
@@ -57,6 +55,7 @@ export function StartNode({
   content: WorkflowDraftContent;
   vocabulary: AuthoringVocabulary;
 }) {
+  const timeZone = useContext(WorkspaceTimezone);
   const trigger = content.applicability.trigger;
   const label =
     vocabulary.triggers.find((item) => item.kind === trigger.kind)?.label ??
@@ -74,7 +73,7 @@ export function StartNode({
         : trigger.kind === 'exception'
           ? humanize(trigger.issueType) || m.authoring_start_issue_unset()
           : trigger.kind === 'schedule'
-            ? scheduledAt(trigger.at)
+            ? scheduledAt(trigger.at, timeZone)
             : null;
   const subject =
     vocabulary.subjects.find(
