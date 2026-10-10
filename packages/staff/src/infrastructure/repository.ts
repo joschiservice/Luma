@@ -10,6 +10,8 @@ import type {
 } from '../application/staff.js';
 import type { StaffContext, StaffPermission } from '../domain/access.js';
 import { StaffError } from '../domain/access.js';
+import { readStaffAudit } from './audit.js';
+import { readAccessHistory, readWorkspaceHealth } from './health.js';
 
 /** Creates a deliberately narrow cross-owner read adapter and identity support command adapter. */
 export function createStaffRepository(pool: Pool): StaffRepository {
@@ -223,6 +225,56 @@ export function createStaffRepository(pool: Pool): StaffRepository {
           });
         },
       );
+    },
+    health(context, workspaceId, grantId) {
+      return transaction(
+        context,
+        grantId,
+        'staff.workspace.inspect',
+        async (tx) => {
+          await validateGrant(tx, workspaceId);
+          const health = await readWorkspaceHealth(tx, workspaceId);
+          await audit(tx, context, 'workspace.health.read', workspaceId, null, {
+            grantId,
+          });
+
+          return health;
+        },
+      );
+    },
+    accessHistory(context, workspaceId, grantId, cursor) {
+      return transaction(
+        context,
+        grantId,
+        'staff.workspace.inspect',
+        async (tx) => {
+          await validateGrant(tx, workspaceId);
+          const page = await readAccessHistory(tx, workspaceId, cursor);
+          await audit(
+            tx,
+            context,
+            'workspace.access-history.read',
+            workspaceId,
+            null,
+            { grantId, cursor, events: page.events.length },
+          );
+
+          return page;
+        },
+      );
+    },
+    audit(context, query) {
+      return transaction(context, null, 'staff.audit.read', async (tx) => {
+        const page = await readStaffAudit(tx, query);
+        const { cursor, ...filters } = query;
+        await audit(tx, context, 'staff.audit.read', null, null, {
+          filters,
+          cursor: cursor ?? null,
+          entries: page.entries.length,
+        });
+
+        return page;
+      });
     },
   };
 }

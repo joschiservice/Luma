@@ -86,6 +86,99 @@
   font-weight: 600;
 }
 
+.staff-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.staff-health-group {
+  display: grid;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+}
+
+.staff-health-group h3 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.staff-health-group h4 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+
+.staff-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.5rem;
+}
+
+.staff-facts > div {
+  display: grid;
+  align-content: start;
+  gap: 0.25rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.staff-health-empty {
+  padding: 0.75rem 1rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  color: var(--foreground-muted);
+}
+
+.staff-facts dt {
+  color: var(--foreground-muted);
+  font-size: 0.8125rem;
+}
+
+.staff-facts dd {
+  font-size: 1.125rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.staff-facts-compact dd {
+  font-size: 0.9375rem;
+}
+
+.staff-audit-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  align-items: start;
+  gap: 0.75rem 1rem;
+}
+
+.staff-audit-filters > .staff-actions {
+  grid-column: 1 / -1;
+}
+
+.staff-link {
+  font-size: 0.8125rem;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.staff-target {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.staff-details {
+  max-width: 28rem;
+  overflow-x: auto;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .staff-metadata {
   display: flex;
   flex-wrap: wrap;

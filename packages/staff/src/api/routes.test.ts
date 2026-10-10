@@ -3,17 +3,26 @@ import Fastify from 'fastify';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { StaffRuntime } from '../application/staff.js';
+import type { StaffPermission } from '../domain/access.js';
 import { StaffError } from '../domain/access.js';
 import { registerStaffHttp } from './routes.js';
 
 const origin = 'http://localhost:3000';
 
-function fixture(mode: 'local' | 'google' = 'local') {
+function fixture(
+  mode: 'local' | 'google' = 'local',
+  permissions: StaffPermission[] = ['staff.workspace.inspect'],
+) {
   const directory = vi.fn(async () => ({
     usersTruncated: false,
     workspacesTruncated: false,
     users: [],
     workspaces: [],
+  }));
+  const accessHistory = vi.fn(async () => ({ events: [], nextCursor: null }));
+  const audit = vi.fn<StaffRuntime['service']['audit']>(async () => ({
+    entries: [],
+    nextCursor: null,
   }));
   const staff: StaffRuntime = {
     settings: { publicOrigin: origin, mode },
@@ -28,6 +37,11 @@ function fixture(mode: 'local' | 'google' = 'local') {
       revoke: async () => {
         throw new Error('Unused');
       },
+      health: async () => {
+        throw new Error('Unused');
+      },
+      accessHistory,
+      audit,
     },
     authHandler: vi.fn(
       async () =>
@@ -55,7 +69,7 @@ function fixture(mode: 'local' | 'google' = 'local') {
           userId: 'staff',
           sessionId: 'session',
           sessionCreatedAt: new Date(),
-          permissions: ['staff.workspace.inspect'],
+          permissions,
           requestId,
         },
         user: { id: 'staff', name: 'Staff', email: 'staff@example.test' },
@@ -67,7 +81,7 @@ function fixture(mode: 'local' | 'google' = 'local') {
   const app = Fastify();
   registerStaffHttp(app, staff);
 
-  return { app, staff, directory };
+  return { app, staff, directory, accessHistory, audit };
 }
 
 describe('staff HTTP security boundary', () => {
@@ -144,6 +158,84 @@ describe('staff HTTP security boundary', () => {
         ).statusCode,
       ).toBe(403);
       expect(directory).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+    }
+  });
+  it('requires inspection permission and a well-formed cursor before reading access history', async () => {
+    const workspace = '00000000-0000-4000-8000-000000000001';
+    const grant = '00000000-0000-4000-8000-000000000002';
+    const denied = fixture('local', ['staff.directory.read']);
+    try {
+      for (const path of ['health', 'access-history'])
+        expect(
+          (
+            await denied.app.inject({
+              url: `/v1/staff/workspaces/${workspace}/${path}?grantId=${grant}`,
+              headers: { cookie: 'staff' },
+            })
+          ).statusCode,
+        ).toBe(403);
+      expect(denied.accessHistory).not.toHaveBeenCalled();
+    } finally {
+      await denied.app.close();
+    }
+    const { app, accessHistory } = fixture();
+    try {
+      const malformed = await app.inject({
+        url: `/v1/staff/workspaces/${workspace}/access-history?grantId=${grant}&cursor=1'%20OR%201=1`,
+        headers: { cookie: 'staff' },
+      });
+      expect(malformed.statusCode).toBe(400);
+      const cursor = `2026-10-09T08:00:00.123456Z_${grant}`;
+      const response = await app.inject({
+        url: `/v1/staff/workspaces/${workspace}/access-history?grantId=${grant}&cursor=${cursor}`,
+        headers: { cookie: 'staff' },
+      });
+      expect(response.statusCode, response.body).toBe(200);
+      expect(accessHistory).toHaveBeenCalledOnce();
+      expect(accessHistory.mock.calls[0]).toEqual([
+        expect.objectContaining({ permissions: ['staff.workspace.inspect'] }),
+        workspace,
+        grant,
+        cursor,
+      ]);
+    } finally {
+      await app.close();
+    }
+  });
+  it('requires the separate audit permission and rejects inverted time ranges', async () => {
+    const denied = fixture('local', [
+      'staff.directory.read',
+      'staff.workspace.inspect',
+      'staff.sessions.revoke',
+    ]);
+    try {
+      const response = await denied.app.inject({
+        url: '/v1/staff/audit',
+        headers: { cookie: 'staff' },
+      });
+      expect(response.statusCode).toBe(403);
+      expect(denied.audit).not.toHaveBeenCalled();
+    } finally {
+      await denied.app.close();
+    }
+    const { app, audit } = fixture('local', ['staff.audit.read']);
+    try {
+      const inverted = await app.inject({
+        url: '/v1/staff/audit?from=2026-10-09T00:00:00.000Z&to=2026-10-08T00:00:00.000Z',
+        headers: { cookie: 'staff' },
+      });
+      expect(inverted.statusCode).toBe(400);
+      const response = await app.inject({
+        url: '/v1/staff/audit?staff=support%40example.test&event=customer.sessions.revoked',
+        headers: { cookie: 'staff' },
+      });
+      expect(response.statusCode, response.body).toBe(200);
+      expect(audit.mock.calls[0]?.[1]).toEqual({
+        staff: 'support@example.test',
+        event: 'customer.sessions.revoked',
+      });
     } finally {
       await app.close();
     }

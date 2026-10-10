@@ -2,6 +2,7 @@ export const staffPermissions = [
   'staff.directory.read',
   'staff.workspace.inspect',
   'staff.sessions.revoke',
+  'staff.audit.read',
 ] as const;
 
 export type StaffPermission = (typeof staffPermissions)[number];

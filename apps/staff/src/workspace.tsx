@@ -9,7 +9,9 @@ import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 
 import { AccessDialog, RevokeSessionsDialog } from './access';
+import { AccessHistory } from './access-history';
 import { Failure, Loading } from './feedback';
+import { WorkspaceHealth } from './health';
 import { sessionOptions, workspaceOptions } from './queries';
 import { workspaceRoute } from './router';
 
@@ -202,6 +204,8 @@ export function WorkspacePage() {
               }
             />
           </section>
+          <WorkspaceHealth workspaceId={workspaceId} grantId={grantId} />
+          <AccessHistory workspaceId={workspaceId} grantId={grantId} />
         </>
       )}
       {requestAccess && canInspect ? (

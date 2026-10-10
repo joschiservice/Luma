@@ -21,6 +21,9 @@ const protectedRoutes = new Set([
   'POST /v1/staff/workspaces/:workspaceId/access',
   'GET /v1/staff/workspaces/:workspaceId',
   'POST /v1/staff/workspaces/:workspaceId/users/:userId/revoke-sessions',
+  'GET /v1/staff/workspaces/:workspaceId/health',
+  'GET /v1/staff/workspaces/:workspaceId/access-history',
+  'GET /v1/staff/audit',
 ]);
 const routePermissions: Record<string, StaffPermission[]> = {
   'GET /v1/staff/session': [],
@@ -34,6 +37,11 @@ const routePermissions: Record<string, StaffPermission[]> = {
     'staff.workspace.inspect',
     'staff.sessions.revoke',
   ],
+  'GET /v1/staff/workspaces/:workspaceId/health': ['staff.workspace.inspect'],
+  'GET /v1/staff/workspaces/:workspaceId/access-history': [
+    'staff.workspace.inspect',
+  ],
+  'GET /v1/staff/audit': ['staff.audit.read'],
 };
 const publicRoutes = new Set([
   'GET /health',
@@ -291,6 +299,27 @@ export function registerStaffHttp(app: FastifyInstance, staff: StaffRuntime) {
           ...params,
           ...body,
         }),
+    ),
+    health: os.health.handler(
+      async ({ context: { request }, input: { params, query } }) =>
+        await staff.service.health(
+          context(request.staffContext),
+          params.workspaceId,
+          query.grantId,
+        ),
+    ),
+    accessHistory: os.accessHistory.handler(
+      async ({ context: { request }, input: { params, query } }) =>
+        await staff.service.accessHistory(
+          context(request.staffContext),
+          params.workspaceId,
+          query.grantId,
+          query.cursor ?? null,
+        ),
+    ),
+    audit: os.audit.handler(
+      async ({ context: { request }, input: { query } }) =>
+        await staff.service.audit(context(request.staffContext), query),
     ),
   });
   registerContractRoutes(app, staffContract, router);
