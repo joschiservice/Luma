@@ -6,9 +6,9 @@ import type {
 import { m } from '@luma/i18n/messages';
 import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
-import { Button } from '@luma/ui/components/primitives/button';
 import { Card, CardHeader } from '@luma/ui/components/primitives/card';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
+import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import {
   type OperationalState,
   StatePill,
@@ -149,9 +149,11 @@ export function WorkflowRuns({
     >
       <CardHeader className="workflows-heading">
         <h2 id="runs-title">{m.workflows_runs_title()}</h2>
-        <Button variant="outline" disabled={refreshing} onClick={refetch}>
-          {m.workflows_runs_refresh()}
-        </Button>
+        <RefreshButton
+          label={m.workflows_runs_refresh()}
+          refreshing={refreshing}
+          onClick={refetch}
+        />
       </CardHeader>
       <p>
         {detail.versions.every((version) => version.format === 'workflow/2')

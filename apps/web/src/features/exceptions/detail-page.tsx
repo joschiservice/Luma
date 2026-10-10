@@ -1,7 +1,7 @@
 import { m } from '@luma/i18n/messages';
 import { caseLabel } from '@luma/ui/components/issues/case-investigation';
 import { IssuePageLayout } from '@luma/ui/components/issues/issue-page-layout';
-import { Button } from '@luma/ui/components/primitives/button';
+import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { useQuery } from '@tanstack/react-query';
 import {
   Link,
@@ -9,7 +9,7 @@ import {
   useParams,
   useSearch,
 } from '@tanstack/react-router';
-import { ArrowLeft, ArrowRight, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { z } from 'zod';
 
 import { connectionsOptions } from '../connections/data';
@@ -153,16 +153,7 @@ function IssueWorkspace({
           ) : null}
         </>
       }
-      refresh={
-        <Button
-          variant="outline"
-          aria-label={m.common_refresh()}
-          onClick={observation.restart}
-        >
-          <RefreshCw size={14} aria-hidden="true" />
-          <span className="issue-page-desktop-label">{m.common_refresh()}</span>
-        </Button>
-      }
+      refresh={<RefreshButton onClick={observation.restart} />}
       canReview={Boolean(
         item && observation.snapshot.data?.review.permittedDecisions.length,
       )}

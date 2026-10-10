@@ -5,6 +5,7 @@ import { CaseNotice } from '@luma/ui/components/issues/case-investigation';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Card, CardTitle } from '@luma/ui/components/primitives/card';
 import { Field, FieldLabel } from '@luma/ui/components/primitives/field';
+import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { Select } from '@luma/ui/components/primitives/select';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
@@ -171,13 +172,12 @@ function ShadowCaseControls({
               ? m.shadow_case_retry()
               : m.shadow_case_run()}
         </Button>
-        <Button
-          variant="outline"
-          disabled={pending || latest.isFetching}
+        <RefreshButton
+          label={m.shadow_case_refresh()}
+          refreshing={latest.isFetching}
+          disabled={pending}
           onClick={() => void refresh()}
-        >
-          {m.shadow_case_refresh()}
-        </Button>
+        />
         <Link
           to="/app/$organizationId/workflows/$definitionId"
           params={{ organizationId, definitionId: workflow }}

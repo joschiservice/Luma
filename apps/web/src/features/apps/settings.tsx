@@ -10,6 +10,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@luma/ui/components/primitives/dialog';
+import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { PageHeader } from '@luma/ui/components/workspace/page-header';
 import { WorkspaceBreadcrumb } from '@luma/ui/components/workspace/workspace-breadcrumb';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -214,15 +215,11 @@ export function AppSettings({
                   {m.apps_settings_connections_title()}
                 </h2>
                 <div className="connection-actions">
-                  <Button
-                    variant="outline"
-                    disabled={connections.isFetching}
+                  <RefreshButton
+                    label={m.apps_settings_refresh()}
+                    refreshing={connections.isFetching}
                     onClick={() => void refresh()}
-                  >
-                    {connections.isFetching
-                      ? m.common_refreshing()
-                      : m.apps_settings_refresh()}
-                  </Button>
+                  />
                   {available && canManage && app.ui.includes('connections') ? (
                     <Button onClick={() => setDialog('add')}>
                       {m.apps_settings_add_connection()}

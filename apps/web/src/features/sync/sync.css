@@ -9,22 +9,6 @@
   color: var(--signal-text);
 }
 
-.sync-spin {
-  animation: sync-spin 1s linear infinite;
-}
-
-@keyframes sync-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .sync-spin {
-    animation: none;
-  }
-}
-
 .sync-loading,
 .sync-footnote,
 .sync-stream-muted,

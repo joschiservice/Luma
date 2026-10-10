@@ -15,6 +15,7 @@ import { IssueViewTabs } from '@luma/ui/components/issues/issue-view-tabs';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { Pagination } from '@luma/ui/components/primitives/pagination';
+import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Link,
@@ -23,7 +24,7 @@ import {
   useParams,
   useSearch,
 } from '@tanstack/react-router';
-import { ChevronRight, Maximize2, RefreshCw } from 'lucide-react';
+import { ChevronRight, Maximize2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { connectionsOptions } from '../connections/data';
@@ -371,14 +372,11 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                 header={
                   <IssueInspectorHeader
                     refresh={
-                      <Button
+                      <RefreshButton
                         variant="ghost"
-                        aria-label={m.exceptions_refresh_issue()}
-                        title={m.exceptions_refresh_issue()}
+                        label={m.exceptions_refresh_issue()}
                         onClick={observation.restart}
-                      >
-                        <RefreshCw size={14} aria-hidden="true" />
-                      </Button>
+                      />
                     }
                     className="inbox-case-nav"
                     item={item}

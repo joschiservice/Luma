@@ -12,6 +12,7 @@ import {
   FieldLabel,
 } from '@luma/ui/components/primitives/field';
 import { Input } from '@luma/ui/components/primitives/input';
+import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { WorkspaceTimezone } from '@luma/ui/components/primitives/workspace-date';
 import { workspaceDateValue } from '@luma/ui/lib/timezone';
 import { useQuery } from '@tanstack/react-query';
@@ -97,13 +98,11 @@ export function ShadowReport({
           <p className="shadow-label">{m.shadow_preview_label()}</p>
           <h2 id={`${id}-title`}>{m.shadow_report_title()}</h2>
         </div>
-        <Button
-          variant="outline"
-          disabled={query.isFetching}
+        <RefreshButton
+          label={m.shadow_report_refresh()}
+          refreshing={query.isFetching}
           onClick={() => void query.refetch()}
-        >
-          {m.shadow_report_refresh()}
-        </Button>
+        />
       </CardHeader>
       <p>{m.shadow_report_description()}</p>
       <form

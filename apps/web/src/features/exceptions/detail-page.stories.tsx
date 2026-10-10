@@ -18,8 +18,9 @@ import {
 } from '@luma/ui/components/issues/resolution-fixtures';
 import { ResolutionReview } from '@luma/ui/components/issues/resolution-review';
 import { Button } from '@luma/ui/components/primitives/button';
+import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { ArrowLeft, Maximize2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Maximize2 } from 'lucide-react';
 import { useState } from 'react';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
@@ -101,12 +102,7 @@ function IssuePagePreview({
                 <ArrowLeft size={16} /> Issues
               </Button>
             }
-            refresh={
-              <Button variant="outline" aria-label="Refresh">
-                <RefreshCw size={14} />
-                <span className="issue-page-desktop-label">Refresh</span>
-              </Button>
-            }
+            refresh={<RefreshButton />}
             canReview={!unavailable}
             actions={
               unavailable ? null : (

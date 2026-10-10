@@ -355,9 +355,11 @@ export function ProductDetailView({
         title={item?.sku.trim() ?? m.products_detail_title_fallback()}
         back={from ? <Link to={from} /> : undefined}
         actions={
-          <RefreshButton refreshing={refreshing} onClick={refresh}>
-            {m.products_detail_refresh()}
-          </RefreshButton>
+          <RefreshButton
+            refreshing={refreshing}
+            onClick={refresh}
+            label={m.products_detail_refresh()}
+          />
         }
         status={
           <>

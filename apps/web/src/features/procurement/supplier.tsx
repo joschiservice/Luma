@@ -132,13 +132,7 @@ export function SupplierRecordView({
         title={supplier?.name ?? m.procurement_supplier_title_fallback()}
         actions={
           <>
-            <RefreshButton
-              variant="ghost"
-              refreshing={refreshing}
-              onClick={reload}
-            >
-              {m.common_refresh()}
-            </RefreshButton>
+            <RefreshButton refreshing={refreshing} onClick={reload} />
             {record?.canManage ? (
               <>
                 <Button variant="outline" onClick={() => setDialog('link')}>

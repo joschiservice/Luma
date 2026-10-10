@@ -294,7 +294,6 @@ function Content({
       loading={state === 'loading'}
       error={state === 'error' ? 'Try Refresh.' : undefined}
       offline={state === 'offline'}
-      live={state === 'offline' ? 'interrupted' : 'live'}
       onNext={() => {}}
       onChange={setSearch}
       onRefresh={() => {}}

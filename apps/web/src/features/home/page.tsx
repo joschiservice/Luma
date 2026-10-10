@@ -19,6 +19,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@luma/ui/components/primitives/dropdown-menu';
+import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { Select } from '@luma/ui/components/primitives/select';
 import {
   formatWorkspaceDateTime,
@@ -384,24 +385,28 @@ export function HomePage() {
               { value: '7d', label: m.home_window_7d() },
             ]}
           />
-          <Button
-            variant="outline"
-            onClick={() => void overview.refetch()}
-            disabled={overview.isPaused}
-            title={
-              data
-                ? m.home_updated({
-                    time: formatWorkspaceDateTime(data.generatedAt, timeZone),
-                  })
-                : undefined
-            }
-          >
-            <RefreshCw
-              aria-hidden="true"
-              className={slowOverview ? 'home-spin' : undefined}
+          {overview.isError ? (
+            <Button variant="outline" onClick={() => void overview.refetch()}>
+              <RefreshCw
+                aria-hidden="true"
+                className={slowOverview ? 'home-spin' : undefined}
+              />
+              {m.common_retry()}
+            </Button>
+          ) : (
+            <RefreshButton
+              refreshing={overview.isFetching}
+              onClick={() => void overview.refetch()}
+              disabled={overview.isPaused}
+              detail={
+                data
+                  ? m.home_updated({
+                      time: formatWorkspaceDateTime(data.generatedAt, timeZone),
+                    })
+                  : undefined
+              }
             />
-            {overview.isError ? m.common_retry() : m.common_refresh()}
-          </Button>
+          )}
           <Button
             variant={editing ? 'default' : 'outline'}
             aria-pressed={editing}

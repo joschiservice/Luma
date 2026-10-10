@@ -4,21 +4,22 @@
 
 ## Choosing a component
 
-| Need                                      | Use                             | Rule                                                                      |
-| ----------------------------------------- | ------------------------------- | ------------------------------------------------------------------------- |
-| Top-level page title                      | `PageTitle`                     | The page's `h1`, visually hidden; actions move into the workspace bar     |
-| Page about one record                     | `RecordHeader`                  | Names the record in the breadcrumb; shows its status and key facts        |
-| Subject title, description and actions    | `PageHeader`                    | The visible `h1` of a page outside a section, such as an app's settings   |
-| Where a piece of work stands              | `StateDot`, `StatePill`         | Always with a text label                                                  |
-| Reloading a record or view                | `RefreshButton`                 | Never disabled by background reads; spins only after a slow read          |
-| Domain identity in navigation and records | `DomainIcon`                    | External systems stay neutral                                             |
-| Bordered content and nested surfaces      | `Card` and its parts            | Group content that needs a boundary; prefer rows, toolbars and inspectors |
-| Notices and warnings                      | `Alert`                         | Choose the live-region role deliberately (below)                          |
-| Short labels                              | `Badge`                         | Always text                                                               |
-| Empty collections                         | `Empty`                         | Describe this view, not the whole business                                |
-| Supporting detail                         | `Disclosure`                    | Evidence, audit events, metadata and technical details                    |
-| Record lists and fact tables              | `DataTable`, `DataTableRowLink` | See [tables](#tables)                                                     |
-| Counts over time or by category           | `BarChart`, `ChartLegend`       | Pair with a table of the same values                                      |
+| Need                                      | Use                             | Rule                                                                            |
+| ----------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------- |
+| Top-level page title                      | `PageTitle`                     | The page's `h1`, visually hidden; actions move into the workspace bar           |
+| Page about one record                     | `RecordHeader`                  | Names the record in the breadcrumb; shows its status and key facts              |
+| Subject title, description and actions    | `PageHeader`                    | The visible `h1` of a page outside a section, such as an app's settings         |
+| Where a piece of work stands              | `StateDot`, `StatePill`         | Always with a text label                                                        |
+| Reloading a record or view                | `RefreshButton`                 | Icon-only, named by its tooltip; a labelled Retry when recovering from an error |
+| Naming an icon-only control               | `Tooltip`                       | The trigger keeps its own accessible name; tooltips don't open on touch         |
+| Domain identity in navigation and records | `DomainIcon`                    | External systems stay neutral                                                   |
+| Bordered content and nested surfaces      | `Card` and its parts            | Group content that needs a boundary; prefer rows, toolbars and inspectors       |
+| Notices and warnings                      | `Alert`                         | Choose the live-region role deliberately (below)                                |
+| Short labels                              | `Badge`                         | Always text                                                                     |
+| Empty collections                         | `Empty`                         | Describe this view, not the whole business                                      |
+| Supporting detail                         | `Disclosure`                    | Evidence, audit events, metadata and technical details                          |
+| Record lists and fact tables              | `DataTable`, `DataTableRowLink` | See [tables](#tables)                                                           |
+| Counts over time or by category           | `BarChart`, `ChartLegend`       | Pair with a table of the same values                                            |
 
 Interaction primitives (`Button`, `Field`, `Select`, `SearchableSelect`, `Dialog`, `DropdownMenu`, `Tabs`, `Pagination`, `SectionNavigation` and others) cover forms and navigation. Give link-styled buttons `buttonVariants()` on the link itself so link semantics survive. Coarse pointers get 44px targets automatically; don't shrink them. `Pagination` omits the total when a source does not report one, so never invent a count.
 

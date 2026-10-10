@@ -10,7 +10,6 @@ import type {
 } from '@luma/api-contract';
 import { formatList, formatNumber } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
-import { rich } from '@luma/i18n/rich';
 import { CaseNotice } from '@luma/ui/components/issues/case-investigation';
 import { elapsed } from '@luma/ui/components/issues/case-presentation';
 import { IssueSplitView } from '@luma/ui/components/issues/issue-split-view';
@@ -67,7 +66,7 @@ import {
   type NeedsYouSearch,
 } from './data';
 import { DecisionDeadline, DecisionInspector, type Member } from './inspector';
-import { type DecisionUpdates, useDecisionUpdates, useNow } from './live';
+import { useDecisionUpdates, useNow } from './live';
 import { OwnerReview } from './owner-review';
 import {
   actionable,
@@ -144,25 +143,27 @@ function DecisionRow({
         </span>
       </div>
       <div className="issue-row-meta">
-        {item.urgency === 'expiring' ? (
-          <DecisionDeadline deadline={item.deadline} now={now} />
-        ) : (
-          <span
-            className="issue-severity"
-            data-severity={item.impact.level === 'high' ? 'high' : undefined}
-          >
-            {impactLabels[item.impact.level]()}
-          </span>
-        )}
         <StatePill state={status.state}>{status.label}</StatePill>
         <span
-          className="case-row-time"
-          title={formatWorkspaceInstant(item.requestedAt, timeZone)}
+          className="issue-severity"
+          data-severity={item.impact.level === 'high' ? 'high' : undefined}
         >
-          <time dateTime={item.requestedAt}>
-            {elapsed(item.requestedAt, now)}
-          </time>
+          {impactLabels[item.impact.level]()}
         </span>
+        {item.urgency === 'expiring' ? (
+          <span className="case-row-time">
+            <DecisionDeadline deadline={item.deadline} now={now} />
+          </span>
+        ) : (
+          <span
+            className="case-row-time"
+            title={formatWorkspaceInstant(item.requestedAt, timeZone)}
+          >
+            <time dateTime={item.requestedAt}>
+              {elapsed(item.requestedAt, now)}
+            </time>
+          </span>
+        )}
       </div>
     </div>
   );
@@ -180,7 +181,6 @@ export function NeedsYouView({
   refreshing = false,
   error,
   offline = false,
-  live = 'live',
   page,
   onPrevious,
   onNext,
@@ -200,7 +200,6 @@ export function NeedsYouView({
   refreshing?: boolean;
   error?: string | undefined;
   offline?: boolean;
-  live?: DecisionUpdates;
   page?: number | undefined;
   onPrevious?: (() => void) | undefined;
   onNext: () => void;
@@ -249,45 +248,12 @@ export function NeedsYouView({
     <div
       className={`inbox page-full decisions ${search.item ? 'inbox-selected' : ''}`}
     >
-      <header className="inbox-heading">
-        <h1 className="sr-only">{m.decisions_page_title()}</h1>
-        <div className="issue-summary" aria-live="polite">
-          {list ? (
-            <>
-              <span className="issue-stat">
-                {rich(m.decisions_summary_waiting, {
-                  count: (
-                    <strong>{formatNumber(list.counts.views.all ?? 0)}</strong>
-                  ),
-                })}
-              </span>
-              <span className="issue-stat">
-                {rich(m.decisions_summary_mine, {
-                  count: (
-                    <strong>{formatNumber(list.counts.views.mine ?? 0)}</strong>
-                  ),
-                })}
-              </span>
-              <span className="issue-stat">
-                {rich(m.decisions_summary_unassigned, {
-                  count: (
-                    <strong>
-                      {formatNumber(list.counts.views.unassigned ?? 0)}
-                    </strong>
-                  ),
-                })}
-              </span>
-            </>
-          ) : null}
-          <span className="decisions-live" data-state={live}>
-            {live === 'live'
-              ? m.decisions_live_on()
-              : live === 'connecting'
-                ? m.decisions_live_connecting()
-                : m.decisions_live_polling()}
-          </span>
-        </div>
-      </header>
+      <h1 className="sr-only">{m.decisions_page_title()}</h1>
+      <p className="sr-only" role="status">
+        {list
+          ? m.decisions_summary_waiting({ count: list.counts.views.all ?? 0 })
+          : null}
+      </p>
       <div className="decisions-toolbar">
         <CollectionToolbar
           refreshLabel={m.decisions_refresh()}
@@ -553,7 +519,7 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
   const search = useSearch({ from: '/app/$organizationId/needs-you' });
   const navigate = useNavigate({ from: '/app/$organizationId/needs-you' });
   const client = useQueryClient();
-  const live = useDecisionUpdates(organizationId);
+  useDecisionUpdates(organizationId);
   const now = useNow();
   const online = useSyncExternalStore(
     (listener) => onlineManager.subscribe(listener),
@@ -703,7 +669,6 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
             : undefined
       }
       offline={!online}
-      live={live}
       page={pageIndex >= 0 ? pageIndex + 1 : undefined}
       onPrevious={goPrevious}
       onNext={goNext}

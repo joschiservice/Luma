@@ -17,15 +17,14 @@ import {
   Flag,
   History,
   Play,
-  RefreshCw,
   Search,
   ShieldCheck,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { actorLabel, personLabel } from '../../lib/actor';
-import { Button } from '../primitives/button';
 import { Disclosure } from '../primitives/disclosure';
+import { RefreshButton } from '../primitives/refresh-button';
 import { WorkspaceDate } from '../primitives/workspace-date';
 import { caseLabel, CaseNotice, CaseTime } from './case-investigation';
 import {
@@ -551,15 +550,13 @@ export function CaseTimeline({
         enabled={expanded}
         status={
           expanded && onRefresh ? (
-            <Button
+            <RefreshButton
               variant="ghost"
-              size="sm"
+              size="icon-sm"
+              label={m.issues_history_refresh()}
+              refreshing={loadingHistory}
               onClick={onRefresh}
-              disabled={loadingHistory}
-            >
-              <RefreshCw size={14} aria-hidden="true" />{' '}
-              {m.issues_history_refresh()}
-            </Button>
+            />
           ) : undefined
         }
       >
@@ -575,10 +572,10 @@ export function CaseTimeline({
             </Subheading>
           )}
           {!expanded && onRefresh ? (
-            <Button variant="outline" onClick={onRefresh}>
-              <RefreshCw size={14} aria-hidden="true" />{' '}
-              {m.issues_progress_refresh()}
-            </Button>
+            <RefreshButton
+              label={m.issues_progress_refresh()}
+              onClick={onRefresh}
+            />
           ) : null}
         </div>
         {timeline.length ? (
