@@ -1,4 +1,8 @@
-import { type QueryClient, queryOptions } from '@tanstack/react-query';
+import {
+  infiniteQueryOptions,
+  type QueryClient,
+  queryOptions,
+} from '@tanstack/react-query';
 
 import { staffActivity } from './activity';
 import { staffApi, StaffApiError } from './api';
@@ -36,6 +40,18 @@ export const accountOptions = (userId: string, grantId: string) =>
   queryOptions({
     queryKey: ['staff', 'account', userId, grantId],
     queryFn: ({ signal }) => staffApi.account(userId, grantId, signal),
+    enabled: grantId.length > 0,
+    retry: false,
+  });
+
+/** Pages through an account's security events under its account grant, newest first. */
+export const accountSecurityEventsOptions = (userId: string, grantId: string) =>
+  infiniteQueryOptions({
+    queryKey: ['staff', 'account', userId, grantId, 'security-events'],
+    queryFn: ({ pageParam, signal }) =>
+      staffApi.accountSecurityEvents(userId, grantId, pageParam, signal),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
     enabled: grantId.length > 0,
     retry: false,
   });

@@ -101,6 +101,12 @@ is audited as `account.access.opened` and each read as `account.inspected`. IP a
 user agents come from the customer's requests; treat them as hints, not proof of device or
 location.
 
+The account page also pages through the account's
+[security events](identity.md#security-events), 25 at a time, under the same grant. Each page
+is audited as `account.security-events.inspected`. Email hashes for unknown-email failures are
+not exposed. Events older than 90 days have no IP address or user agent, and events older
+than a year are gone. Staff session revocations appear with their command ID.
+
 Staff sessions have an eight-hour absolute lifetime and a thirty-minute idle limit.
 Passive polling does not extend the idle deadline. Only browser interaction reported on
 private requests advances activity; background refresh and focus checks still resolve

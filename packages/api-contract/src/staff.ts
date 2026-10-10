@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { endpoint, type ErrorStatus } from './common.js';
+import { securityEventTypeSchema } from './contracts/identity.js';
 
 export const staffPermissionSchema = z.enum([
   'staff.directory.read',
@@ -127,6 +128,25 @@ export const staffAccountDetailSchema = z.object({
     }),
   ),
 });
+
+export const staffAccountSecurityEventsSchema = z.object({
+  items: z.array(
+    z.object({
+      id: z.string().uuid(),
+      type: securityEventTypeSchema,
+      outcome: z.enum(['succeeded', 'failed']),
+      reason: z.string().nullable(),
+      createdAt: z.string().datetime(),
+      sessionId: z.string().uuid().nullable(),
+      ipAddress: z.string().nullable(),
+      browser: z.string().nullable(),
+      os: z.string().nullable(),
+      requestId: z.string(),
+      staffCommandId: z.string().uuid().nullable(),
+    }),
+  ),
+  nextCursor: z.string().nullable(),
+});
 const workspaceParams = z.object({ workspaceId: z.string().uuid() });
 const accountParams = z.object({ userId: z.string().uuid() });
 const errors = [400, 401, 403, 404, 409, 503] as const satisfies ErrorStatus[];
@@ -247,4 +267,23 @@ export const staffContract = {
       }),
     )
     .output(staffAccountDetailSchema),
+  accountSecurityEvents: endpoint
+    .route({
+      method: 'GET',
+      path: '/v1/staff/accounts/{userId}/security-events',
+      summary: 'Page through a customer account’s security events',
+      description:
+        'Returns sign-ins, failed attempts and security changes, newest first, 25 per page, using a current account grant. IP addresses and user agents are cleared after 90 days; events are deleted after a year.',
+    })
+    .meta({ errors })
+    .input(
+      z.object({
+        params: accountParams,
+        query: z.object({
+          grantId: z.string().uuid(),
+          cursor: z.string().max(200).optional(),
+        }),
+      }),
+    )
+    .output(staffAccountSecurityEventsSchema),
 };

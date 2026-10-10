@@ -36,6 +36,7 @@ function fixture(mode: 'local' | 'google' = 'local') {
       },
       accountGrant,
       account,
+      accountSecurityEvents: account,
     },
     authHandler: vi.fn(
       async () =>

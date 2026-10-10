@@ -214,6 +214,57 @@ test('protects sign-in with an authenticator app and signs in with a passkey', a
     .getByRole('button', { name: 'Turn off' })
     .click();
   await expect(page.getByText('Not set up', { exact: true })).toBeVisible();
+
+  // Every factor change and sign-in step appears once, newest first.
+  const events = await db.owner.query(
+    "SELECT e.event_type,e.outcome,e.reason_code FROM account_security_events e JOIN users u ON u.id=e.user_id WHERE u.email='grace@example.test' ORDER BY e.created_at,e.id",
+  );
+  expect(
+    events.rows.map((row) =>
+      [row.event_type, row.outcome, row.reason_code].join(' '),
+    ),
+  ).toEqual([
+    'two-factor.enabled succeeded ',
+    'sign-in.password succeeded second-factor-required',
+    'sign-in.two-factor failed invalid-code',
+    'sign-in.two-factor succeeded backup-code',
+    'sign-in.password succeeded second-factor-required',
+    'sign-in.two-factor failed invalid-code',
+    'sign-in.two-factor succeeded authenticator-code',
+    'passkey.added succeeded ',
+    'sign-in.passkey succeeded ',
+    'passkey.removed succeeded ',
+    'two-factor.disabled succeeded ',
+  ]);
+  const activity = page.getByRole('list', { name: 'Security activity' });
+  await expect(activity.getByRole('listitem').first()).toContainText(
+    'Two-factor authentication turned off',
+  );
+  await expect(activity.getByRole('listitem')).toHaveCount(11);
+  await expect(activity.getByText('Code entry failed')).toHaveCount(2);
+  await expect(
+    activity.getByText('Signed in with a passkey', { exact: true }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await activity.scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: test.info().outputPath('security-activity-light-narrow.png'),
+    fullPage: true,
+    animations: 'disabled',
+  });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.screenshot({
+    path: test.info().outputPath('security-activity-dark.png'),
+    fullPage: true,
+    animations: 'disabled',
+  });
+  await page.emulateMedia({ colorScheme: 'light' });
+
   await page.goto('/sign-out');
   await signInWithPassword(page);
   await heading(page, 'Needs your attention');

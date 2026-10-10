@@ -111,6 +111,7 @@ function fixture() {
     });
   const service = createIdentityService({
     getSession,
+    listSecurityEvents: async () => [],
     withUser: async (_userId, operation) => operation(tx),
   });
   const app = Fastify();

@@ -1,13 +1,17 @@
 import { randomUUID } from 'node:crypto';
 
+import type { SecurityEventType } from '@luma/identity';
 import {
+  decodeSecurityEventCursor,
   describeUserAgent,
+  encodeSecurityEventCursor,
   revokeCustomerSessionsForSupport,
 } from '@luma/identity';
 import type { Pool, PoolClient } from 'pg';
 
 import type {
   AccountDetail,
+  AccountSecurityEvents,
   DirectoryUser,
   DirectoryWorkspace,
   StaffRepository,
@@ -353,6 +357,68 @@ export function createStaffRepository(pool: Pool): StaffRepository {
               ipAddress: row.ip_address,
               ...describeUserAgent(row.user_agent),
             })),
+          };
+        },
+      );
+    },
+    accountSecurityEvents(context, userId, grantId, cursor) {
+      const after = cursor ? decodeSecurityEventCursor(cursor) : null;
+      if (cursor && !after)
+        throw new StaffError(400, 'The page position is invalid.');
+      const pageSize = 25;
+
+      return transaction(
+        context,
+        grantId,
+        'staff.accounts.inspect',
+        async (tx): Promise<AccountSecurityEvents> => {
+          await validateAccountGrant(tx, userId);
+          const result = await tx.query<{
+            id: string;
+            event_type: SecurityEventType;
+            outcome: 'succeeded' | 'failed';
+            reason_code: string | null;
+            session_id: string | null;
+            ip_address: string | null;
+            user_agent: string | null;
+            request_id: string;
+            staff_command_id: string | null;
+            created_at: Date;
+          }>(
+            'SELECT id,event_type,outcome,reason_code,session_id,ip_address,user_agent,request_id,staff_command_id,created_at FROM staff_account_security_events WHERE user_id=$1 AND ($2::timestamptz IS NULL OR (created_at,id)<($2::timestamptz,$3::uuid)) ORDER BY created_at DESC,id DESC LIMIT $4',
+            [userId, after?.createdAt ?? null, after?.id ?? null, pageSize + 1],
+          );
+          const rows = result.rows.slice(0, pageSize);
+          await audit(
+            tx,
+            context,
+            'account.security-events.inspected',
+            null,
+            null,
+            { grantId, userId, events: rows.length, firstPage: !after },
+          );
+          const last = rows.at(-1);
+
+          return {
+            items: rows.map((row) => ({
+              id: row.id,
+              type: row.event_type,
+              outcome: row.outcome,
+              reason: row.reason_code,
+              createdAt: row.created_at.toISOString(),
+              sessionId: row.session_id,
+              ipAddress: row.ip_address,
+              ...describeUserAgent(row.user_agent),
+              requestId: row.request_id,
+              staffCommandId: row.staff_command_id,
+            })),
+            nextCursor:
+              result.rows.length > pageSize && last
+                ? encodeSecurityEventCursor({
+                    createdAt: last.created_at,
+                    id: last.id,
+                  })
+                : null,
           };
         },
       );

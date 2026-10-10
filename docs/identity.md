@@ -41,6 +41,17 @@ The passkey relying-party ID is the `BETTER_AUTH_URL` hostname, and assertions a
 
 With `NODE_ENV=production`, Better Auth rate-limits `/two-factor/*`, like sign-in, to three requests per 10 seconds per client IP. Without a forwarded client address all callers share one bucket, so the [production proxy](#production-proxy) must overwrite `X-Forwarded-For`. The limit store is per process; several API instances need shared storage before relying on these limits.
 
+## Security events
+
+`account_security_events` records sign-ins and account security changes: password, passkey and two-factor sign-in steps with their failure category, two-factor on and off, backup code replacement, passkeys added and removed, password changes, and sessions revoked by the person or by staff. Submitted passwords, codes and credentials are never stored. People read their own events in **Settings › Security**; the account comes from the session. Staff read them on the account page under an account grant.
+
+- A Better Auth plugin registered after the factor plugins records Better Auth endpoints from `hooks.before` and `hooks.after`, so a password sign-in that still needs a code is recorded as pending, not as a session. Responses are unchanged, so failures for known and unknown emails stay identical. A failure for an unknown email stores an HMAC of the normalized email, keyed with `BETTER_AUTH_SECRET`, instead of a user; rotating the secret breaks correlation with older hashes.
+- Changes are recorded only when the state changed: a retried disable, revocation or passkey removal that changes nothing writes no event, and a session is signed in once. Each failed attempt is its own event. Attempts rejected by the rate limiter before reaching the endpoint are not recorded.
+- Hooks run after Better Auth's own writes. If the event can't be written the request fails and no new session cookie is delivered, but a change already made, such as a new passkey, stays. Staff session revocation writes its event inside `identity_support_revoke_sessions`, with the command receipt, in one transaction.
+- The IP address comes from `X-Forwarded-For` like Better Auth's own, so it is only trustworthy behind the [production proxy](#production-proxy). User agents are client-supplied hints.
+
+Retention: the API clears IP addresses and user agents after 90 days and deletes events after a year, in bounded batches a minute after start and then hourly. Several API instances may run it concurrently. Deleting a user deletes their events.
+
 ## Context and isolation
 
 Every Fastify route is protected by default. Only health, readiness, OpenAPI, the static connector-provider catalog and the restricted auth bridge are public. Organization listing and creation need a session. Tenant routes use `/v1/organizations/:organizationId/...`; the guard resolves an immutable `request.tenantContext`, which handlers pass explicitly into application use cases.

@@ -12,6 +12,7 @@ import { createResendMail } from './infrastructure/mail.js';
 import { createMailDelivery } from './infrastructure/mail-delivery.js';
 import { createRepository } from './infrastructure/repository.js';
 import { createRolesRepository } from './infrastructure/roles.js';
+import { purgeSecurityEvents } from './infrastructure/security-events.js';
 import { createSettingsRepository } from './infrastructure/settings.js';
 
 /**
@@ -71,6 +72,12 @@ export function createIdentity(
         now: () => new Date(),
       }),
     mailDelivery,
+    /**
+     * Applies security event retention as of `now`: clears IP addresses and user agents after
+     * 90 days and deletes events after a year. Safe to run repeatedly and concurrently.
+     */
+    purgeSecurityEvents: (now: Date = new Date()) =>
+      purgeSecurityEvents(pool, now),
     trustedOrigins: settings.trustedOrigins,
     handler: auth.handler,
     baseURL: settings.baseURL,

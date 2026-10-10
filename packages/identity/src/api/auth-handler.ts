@@ -53,6 +53,8 @@ export function registerAuthHandler(
         if (value !== undefined)
           headers.set(key, Array.isArray(value) ? value.join(', ') : value);
       }
+      // Security events cite the server request ID; a caller-supplied value is replaced.
+      headers.set('x-luma-request-id', request.id);
       const response = await handler(
         new Request(url, {
           method: request.method,

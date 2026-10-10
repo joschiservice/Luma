@@ -2,6 +2,7 @@ import {
   staffAccessGrantSchema,
   staffAccountAccessSchema,
   staffAccountDetailSchema,
+  staffAccountSecurityEventsSchema,
   staffConfigSchema,
   staffDirectorySchema,
   staffRevokeSessionsResultSchema,
@@ -161,6 +162,22 @@ export function createStaffApi(
       staffAccountDetailSchema.parse(
         await request(
           `${account(userId)}?${new URLSearchParams({ grantId })}`,
+          undefined,
+          signal,
+        ),
+      ),
+    accountSecurityEvents: async (
+      userId: string,
+      grantId: string,
+      cursor: string | undefined,
+      signal?: AbortSignal,
+    ) =>
+      staffAccountSecurityEventsSchema.parse(
+        await request(
+          `${account(userId)}/security-events?${new URLSearchParams({
+            grantId,
+            ...(cursor ? { cursor } : {}),
+          })}`,
           undefined,
           signal,
         ),

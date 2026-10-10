@@ -24,6 +24,7 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 
 import { reasonSchema } from './access';
+import { AccountSecurityEvents } from './account-security';
 import { staffApi } from './api';
 import { Failure, Loading } from './feedback';
 import { accountOptions, sessionOptions } from './queries';
@@ -242,6 +243,7 @@ export function AccountPage() {
               }
             />
           </section>
+          <AccountSecurityEvents userId={userId} grantId={grantId} />
         </>
       )}
       {requestAccess && canInspect ? (

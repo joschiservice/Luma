@@ -51,11 +51,13 @@ function factorPlugins(settings: AuthSettings): BetterAuthPlugin[] {
  * Configures email and password sign-in, authenticator-app two-factor authentication, passkeys
  * and organization support using the supplied database and trusted origins. Passkeys use the
  * `baseURL` host as relying-party ID and accept assertions only from trusted origins.
+ * `observers` run after every other plugin, so their hooks see final responses.
  */
 export function createAuth(
   db: NodePgDatabase<typeof schema>,
   settings: AuthSettings,
   provisionId?: string,
+  observers: BetterAuthPlugin[] = [],
 ) {
   return betterAuth({
     secret: settings.secret,
@@ -109,6 +111,7 @@ export function createAuth(
       }),
       ...factorPlugins(settings),
       ...(settings.plugins ?? []),
+      ...observers,
     ],
   });
 }

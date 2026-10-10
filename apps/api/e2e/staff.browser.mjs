@@ -254,12 +254,16 @@ test('staff opens a customer account and follows a workspace into its own suppor
       .getByRole('table', { name: 'Active customer sessions' })
       .getByRole('row'),
   ).toHaveCount(2);
+  await expect(
+    page.getByRole('heading', { name: 'No security activity' }),
+  ).toBeVisible();
   const audit = await db.owner.query(
-    "SELECT event,details->>'userId' AS \"userId\" FROM staff_audit WHERE event LIKE 'account.%' ORDER BY sequence",
+    "SELECT event,details->>'userId' AS \"userId\" FROM staff_audit WHERE event LIKE 'account.%' ORDER BY event",
   );
   expect(audit.rows).toEqual([
     { event: 'account.access.opened', userId: customer.userId },
     { event: 'account.inspected', userId: customer.userId },
+    { event: 'account.security-events.inspected', userId: customer.userId },
   ]);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ colorScheme: 'dark' });

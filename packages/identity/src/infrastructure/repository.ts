@@ -22,6 +22,7 @@ import { membershipFromRow, membershipSelect, storedRole } from './access.js';
 import type { AuthSettings } from './auth.js';
 import { createAuth } from './auth.js';
 import * as schema from './schema.js';
+import { listSecurityEvents, securityEventsPlugin } from './security-events.js';
 
 const organizationDto = (
   row: typeof schema.organization.$inferSelect,
@@ -78,7 +79,9 @@ function normalizeDatabaseError(error: unknown): never {
  */
 export function createRepository(pool: Pool, settings: AuthSettings) {
   const db = drizzle(pool, { schema });
-  const auth = createAuth(db, settings);
+  const auth = createAuth(db, settings, undefined, [
+    securityEventsPlugin(pool, settings.secret),
+  ]);
   const repository: IdentityRepository = {
     async getSession(credentials) {
       const session = await auth.api.getSession({
@@ -96,6 +99,8 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
 
       return { userId: session.user.id, sessionId: session.session.id };
     },
+    listSecurityEvents: (userId, after, limit) =>
+      listSecurityEvents(pool, userId, after, limit),
     async withUser(userId, operation) {
       try {
         return await db.transaction(async (tx) => {
