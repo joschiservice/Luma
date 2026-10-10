@@ -7263,7 +7263,12 @@
                       "minLength": 1
                     },
                     "triggerState": {
-                      "enum": ["scheduled", "awaiting_admission", "cancelled"],
+                      "enum": [
+                        "scheduled",
+                        "awaiting_admission",
+                        "cancelled",
+                        "skipped"
+                      ],
                       "type": "string"
                     },
                     "triggerEvidence": {
@@ -10609,7 +10614,8 @@
                             "enum": [
                               "scheduled",
                               "awaiting_admission",
-                              "cancelled"
+                              "cancelled",
+                              "skipped"
                             ],
                             "type": "string"
                           },
@@ -11482,7 +11488,12 @@
                       "minLength": 1
                     },
                     "triggerState": {
-                      "enum": ["scheduled", "awaiting_admission", "cancelled"],
+                      "enum": [
+                        "scheduled",
+                        "awaiting_admission",
+                        "cancelled",
+                        "skipped"
+                      ],
                       "type": "string"
                     },
                     "triggerEvidence": {
@@ -12103,7 +12114,12 @@
                       "minLength": 1
                     },
                     "triggerState": {
-                      "enum": ["scheduled", "awaiting_admission", "cancelled"],
+                      "enum": [
+                        "scheduled",
+                        "awaiting_admission",
+                        "cancelled",
+                        "skipped"
+                      ],
                       "type": "string"
                     },
                     "triggerEvidence": {

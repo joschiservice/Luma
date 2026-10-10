@@ -8,6 +8,7 @@ import { createInstalledRuntime } from '@luma/connections/composition';
 import type { Configuration } from '@luma/exceptions';
 import { defaultConfiguration } from '@luma/exceptions';
 import type { IdentityService, TenantContext } from '@luma/identity';
+import { WorkspaceInactiveError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 import { createFailureLog } from '@luma/platform';
 import { createDetectionMonitor, createStockRefresh } from '@luma/resolution';
@@ -162,6 +163,8 @@ export function createDetectionWorker(options: {
           ),
         );
       } catch (error) {
+        // Suspended between discovery and this check; discovery skips it from the next pass.
+        if (error instanceof WorkspaceInactiveError) continue;
         log('Detection failed for a workspace; retrying.', error);
       }
     }

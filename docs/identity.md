@@ -57,6 +57,11 @@ A path ID selects a tenant; it does not grant access. Each request reads the cur
 | Organization placed in another region            | 503      |
 | Provisioning in an unavailable region (US, APAC) | 422      |
 
+For a member, a suspended or closed organization raises `WorkspaceInactiveError`, a 404
+`IdentityError` subclass. Callers see the same response; background work uses the subclass
+to pause instead of failing or blocking. Cross-tenant worker discovery returns active
+organizations only.
+
 The context carries an audit identity: user, initiating user, session, membership, role reference, tenant, region and server request ID, plus the role's effective permissions, resolved in the same membership statement. There is no long-lived permission cache. It never contains passwords or session tokens. It is evidence metadata, not an audit log; each audit producer writes its own evidence through the audit package.
 
 The identity role has DML grants on auth tables and narrowly scoped grants on organization tables. It owns no tables and has no commerce grants. Organizations, memberships, invitations, workspace roles and role permissions force RLS; a member can read their own role before a tenant is selected, so context resolution needs no extra round trip. Bootstrap reads expose only the verified user's memberships and organizations. Provisioning uses a server-generated organization UUID. Tenant context is installed with transaction-local `set_config` only after membership, state and placement checks, so it does not survive rollback or pooled reuse. Runtime grants prohibit changing tenant ownership, placement or organization status.

@@ -15,37 +15,46 @@ import {
   sleep,
 } from '@temporalio/workflow';
 
+import { pauseWhileInactive } from './workspace-pause.js';
+
 export const processProgressQuery =
   defineQuery<ProcessProgress>('processProgress');
 
 export const processDecisionChanged = defineSignal('processDecisionChanged');
 
-const activities = proxyActivities<ProcessActivities>({
-  startToCloseTimeout: '1 minute',
-  scheduleToCloseTimeout: '5 minutes',
-  retry: {
-    initialInterval: '1 second',
-    maximumInterval: '30 seconds',
-    maximumAttempts: 5,
-  },
-});
-const action = proxyActivities<Pick<ProcessActivities, 'action'>>({
-  startToCloseTimeout: '1 minute',
-  scheduleToCloseTimeout: '5 minutes',
-  retry: {
-    initialInterval: '1 second',
-    maximumInterval: '30 seconds',
-    maximumAttempts: 5,
-  },
-  cancellationType: ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
-});
+// Every activity pauses the run while its workspace is suspended or closed.
+const activities = pauseWhileInactive(
+  proxyActivities<ProcessActivities>({
+    startToCloseTimeout: '1 minute',
+    scheduleToCloseTimeout: '5 minutes',
+    retry: {
+      initialInterval: '1 second',
+      maximumInterval: '30 seconds',
+      maximumAttempts: 5,
+    },
+  }),
+);
+const action = pauseWhileInactive(
+  proxyActivities<Pick<ProcessActivities, 'action'>>({
+    startToCloseTimeout: '1 minute',
+    scheduleToCloseTimeout: '5 minutes',
+    retry: {
+      initialInterval: '1 second',
+      maximumInterval: '30 seconds',
+      maximumAttempts: 5,
+    },
+    cancellationType: ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
+  }),
+);
 
-const code = proxyActivities<Required<Pick<ProcessActivities, 'code'>>>({
-  startToCloseTimeout: '1 minute',
-  scheduleToCloseTimeout: '5 minutes',
-  retry: { maximumAttempts: 5 },
-  cancellationType: ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
-});
+const code = pauseWhileInactive(
+  proxyActivities<Required<Pick<ProcessActivities, 'code'>>>({
+    startToCloseTimeout: '1 minute',
+    scheduleToCloseTimeout: '5 minutes',
+    retry: { maximumAttempts: 5 },
+    cancellationType: ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
+  }),
+);
 
 /** Replays a version-bound process with durable waits and activity-backed effects. */
 export async function processWorkflow(

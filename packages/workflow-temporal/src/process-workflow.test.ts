@@ -5,14 +5,14 @@ import type {
   ProcessRun,
   ProcessWorkflowVersion,
 } from '@luma/workflows';
+import { ApplicationFailure } from '@temporalio/common';
 import { TestWorkflowEnvironment } from '@temporalio/testing';
 import { bundleWorkflowCode, Worker } from '@temporalio/worker';
 import { expect, it, vi } from 'vitest';
 
 import { workflowPath } from './runtime.js';
 
-it('replays a multi-step process without redispatching its capability action', async () => {
-  const env = await TestWorkflowEnvironment.createLocal();
+function fixture() {
   const version: ProcessWorkflowVersion = {
     schemaVersion: 2,
     format: 'workflow/2',
@@ -120,6 +120,11 @@ it('replays a multi-step process without redispatching its capability action', a
     createdAt: new Date().toISOString(),
   };
   const recorded: string[] = [];
+  const action = vi.fn<ProcessActivities['action']>(async () => ({
+    state: 'accepted',
+    proposalId: 'proposal',
+    receiptId: 'receipt',
+  }));
   const activities: ProcessActivities = {
     code: vi.fn(async (_run, _version, step) => ({
       state: 'completed' as const,
@@ -140,11 +145,7 @@ it('replays a multi-step process without redispatching its capability action', a
       observedAt: new Date().toISOString(),
     }),
     decision: async () => ({ state: 'approved', decisionId: 'decision' }),
-    action: vi.fn(async () => ({
-      state: 'accepted' as const,
-      proposalId: 'proposal',
-      receiptId: 'receipt',
-    })),
+    action,
     verify: async () => ({
       state: 'verified',
       values: { reserved: true },
@@ -154,6 +155,13 @@ it('replays a multi-step process without redispatching its capability action', a
       recorded.push(output.stepId);
     },
   };
+
+  return { version, run, recorded, action, activities };
+}
+
+it('replays a multi-step process without redispatching its capability action', async () => {
+  const env = await TestWorkflowEnvironment.createLocal();
+  const { version, run, recorded, activities } = fixture();
   const bundle = await bundleWorkflowCode({ workflowsPath: workflowPath() });
   const taskQueue = randomUUID();
   const worker = await Worker.create({
@@ -179,6 +187,47 @@ it('replays a multi-step process without redispatching its capability action', a
       );
     });
     expect(activities.action).toHaveBeenCalledTimes(1);
+    expect(activities.code).toHaveBeenCalledTimes(1);
+    expect(recorded).toEqual(version.steps.map((step) => step.id));
+  } finally {
+    await env.teardown();
+  }
+}, 60_000);
+
+it('pauses a run while its workspace is suspended without repeating completed steps', async () => {
+  const env = await TestWorkflowEnvironment.createTimeSkipping();
+  const { version, run, recorded, action, activities } = fixture();
+  const suspended = ApplicationFailure.nonRetryable(
+    'Workspace is not active',
+    'WorkspaceInactive',
+  );
+  action.mockRejectedValueOnce(suspended).mockRejectedValueOnce(suspended);
+  const bundle = await bundleWorkflowCode({ workflowsPath: workflowPath() });
+  const taskQueue = randomUUID();
+  const worker = await Worker.create({
+    connection: env.nativeConnection,
+    taskQueue,
+    workflowBundle: bundle,
+    activities,
+  });
+  try {
+    await worker.runUntil(async () => {
+      const handle = await env.client.workflow.start('processWorkflow', {
+        workflowId: randomUUID(),
+        taskQueue,
+        args: [run, version],
+      });
+      expect(await handle.result()).toMatchObject({
+        state: 'verified',
+        stepId: 'end',
+      });
+      await Worker.runReplayHistory(
+        { workflowBundle: bundle },
+        await handle.fetchHistory(),
+      );
+    });
+    // Both rejected attempts ran no effect; the action runs once after reactivation.
+    expect(action).toHaveBeenCalledTimes(3);
     expect(activities.code).toHaveBeenCalledTimes(1);
     expect(recorded).toEqual(version.steps.map((step) => step.id));
   } finally {

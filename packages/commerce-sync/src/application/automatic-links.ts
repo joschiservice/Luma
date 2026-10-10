@@ -1,5 +1,9 @@
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requirePermission } from '@luma/identity';
+import {
+  IdentityError,
+  requirePermission,
+  WorkspaceInactiveError,
+} from '@luma/identity';
 
 import type {
   AutoLinkInput,
@@ -112,6 +116,8 @@ export function createAutoLinkRunner(deps: {
           requirePermission(context, 'sync.manage');
           await deps.store.apply(context, rule.id);
         } catch (error) {
+          // A suspended workspace leaves its rules due; they run once it is active again.
+          if (error instanceof WorkspaceInactiveError) return;
           const denied = error instanceof IdentityError;
           if (!denied) deps.log('Automatic linking failed; retrying.', error);
           await deps.store.block(

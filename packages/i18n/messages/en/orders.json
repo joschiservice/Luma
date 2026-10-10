@@ -78,6 +78,7 @@
   "orders_run_state_inconclusive_verification": "Check unclear",
   "orders_run_state_escalated": "Escalated",
   "orders_run_state_cancelled": "Canceled",
+  "orders_run_state_skipped": "Skipped",
   "orders_sort_updated": "Last updated",
   "orders_sort_placed": "Date placed",
   "orders_sort_number": "Order number",
