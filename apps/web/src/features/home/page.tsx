@@ -62,6 +62,7 @@ import {
   ConnectionsModule,
   FulfillmentModule,
   HandlingModule,
+  ModuleLink,
   OutcomesModule,
   ReturnsModule,
 } from './modules';
@@ -156,6 +157,7 @@ function ModuleFrame({
   onDragStart,
   onDrop,
   onDragEnd,
+  link,
   children,
 }: {
   module: HomeModule;
@@ -170,6 +172,7 @@ function ModuleFrame({
   onDragStart: () => void;
   onDrop: () => void;
   onDragEnd: () => void;
+  link?: ReactNode;
   children: ReactNode;
 }) {
   const [over, setOver] = useState(false);
@@ -262,7 +265,7 @@ function ModuleFrame({
             <info.Icon size={15} aria-hidden="true" />
             {info.title}
           </h2>
-          {controls}
+          {controls ?? link}
         </header>
       ) : null}
       <div className="home-module-body" inert={editing ? true : undefined}>
@@ -359,9 +362,7 @@ export function HomePage() {
           <ConnectionsModule organizationId={organizationId} overview={data} />
         );
       case 'outcomes':
-        return (
-          <OutcomesModule overview={data} organizationId={organizationId} />
-        );
+        return <OutcomesModule overview={data} />;
     }
   }
 
@@ -526,6 +527,12 @@ export function HomePage() {
                 module.id === 'order-metrics'
               }
               dragging={dragged === module.id}
+              link={
+                <ModuleLink
+                  module={module.id}
+                  organizationId={organizationId}
+                />
+              }
               onMove={(offset) =>
                 update(moveModule(modules, module.id, offset))
               }

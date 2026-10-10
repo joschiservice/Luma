@@ -1,4 +1,4 @@
-import type { OperationsOverview } from '@luma/api-contract';
+import type { HomeModuleId, OperationsOverview } from '@luma/api-contract';
 import {
   formatList,
   formatNumber,
@@ -17,13 +17,21 @@ import {
   StateDot,
   StatePill,
 } from '@luma/ui/components/primitives/state';
+import { Tooltip } from '@luma/ui/components/primitives/tooltip';
 import {
   formatWorkspaceInstant,
   WorkspaceTimezone,
 } from '@luma/ui/components/primitives/workspace-date';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { ArrowRight, Plus } from 'lucide-react';
+import {
+  ArrowRight,
+  CircleCheck,
+  CircleDashed,
+  Percent,
+  Plus,
+  Sparkles,
+} from 'lucide-react';
 import { useContext } from 'react';
 
 import { activityOptions } from '../activity/data';
@@ -42,6 +50,7 @@ import { productSummaryOptions } from '../products/data';
 import { viewLabels } from '../products/presentation';
 import { returnSummaryOptions } from '../returns/data';
 import { stageLabels, stageStates, workStages } from '../returns/presentation';
+import { homeModules } from './preferences';
 
 type Connection = OperationsOverview['connections'][number];
 
@@ -52,6 +61,68 @@ function LinkLabel({ children }: { children: string }) {
       <ArrowRight size={14} aria-hidden="true" />
     </>
   );
+}
+
+/**
+ * Links a Home module to the page with everything it summarizes. Shown in the module header;
+ * the accessible name includes the module so several "View all" links stay distinct.
+ */
+export function ModuleLink({
+  module,
+  organizationId,
+}: {
+  module: HomeModuleId;
+  organizationId: string;
+}) {
+  const props = {
+    className: 'home-module-link',
+    'aria-label': m.home_view_all_label({ module: homeModules[module].title }),
+    children: <LinkLabel>{m.home_view_all()}</LinkLabel>,
+  };
+  const params = { organizationId };
+  switch (module) {
+    case 'attention':
+      return (
+        <Link {...props} to="/app/$organizationId/needs-you" params={params} />
+      );
+    case 'handling':
+      return (
+        <Link
+          {...props}
+          to="/app/$organizationId/exceptions"
+          params={params}
+          search={{ view: 'active' }}
+        />
+      );
+    case 'connections':
+      return <Link {...props} to="/app/$organizationId/sync" params={params} />;
+    case 'activity':
+      return (
+        <Link {...props} to="/app/$organizationId/activity" params={params} />
+      );
+    case 'outcomes':
+      return (
+        <Link {...props} to="/app/$organizationId/insights" params={params} />
+      );
+    case 'catalog':
+      return (
+        <Link {...props} to="/app/$organizationId/products" params={params} />
+      );
+    case 'fulfillment':
+      return (
+        <Link
+          {...props}
+          to="/app/$organizationId/fulfillment"
+          params={params}
+        />
+      );
+    case 'returns':
+      return (
+        <Link {...props} to="/app/$organizationId/returns" params={params} />
+      );
+    default:
+      return null;
+  }
 }
 
 function ModuleSkeleton({ rows = 3 }: { rows?: number }) {
@@ -81,7 +152,7 @@ export function AttentionModule({
   if (decisions.isPending) return <ModuleSkeleton />;
   if (decisions.isError)
     return <p className="home-note">{m.home_attention_failed()}</p>;
-  const { items, counts, sources } = decisions.data;
+  const { items, sources } = decisions.data;
   const missing = sources.filter((source) => source.state === 'unavailable');
 
   return (
@@ -145,18 +216,6 @@ export function AttentionModule({
           </div>
         </div>
       )}
-      <footer className="home-module-footer">
-        <span className="lu-numeric">
-          {m.home_attention_footer({ count: counts.views.all ?? 0 })}
-        </span>
-        <Link
-          className="home-module-link"
-          to="/app/$organizationId/needs-you"
-          params={{ organizationId }}
-        >
-          <LinkLabel>{m.home_attention_link()}</LinkLabel>
-        </Link>
-      </footer>
     </>
   );
 }
@@ -177,7 +236,10 @@ export function HandlingModule({
     <>
       <dl className="home-stats">
         <div>
-          <dt>{m.home_handling_in_progress()}</dt>
+          <dt>
+            <CircleDashed aria-hidden="true" />
+            {m.home_handling_in_progress()}
+          </dt>
           <dd className="lu-numeric">
             {formatNumber(
               Math.max(0, overview.activeCount - overview.attentionCount),
@@ -185,13 +247,19 @@ export function HandlingModule({
           </dd>
         </div>
         <div>
-          <dt>{m.home_handling_verified()}</dt>
+          <dt>
+            <CircleCheck aria-hidden="true" />
+            {m.home_handling_verified()}
+          </dt>
           <dd className="lu-numeric">
             {formatNumber(overview.verifiedResolutions)}
           </dd>
         </div>
         <div>
-          <dt>{m.home_handling_without_help()}</dt>
+          <dt>
+            <Sparkles aria-hidden="true" />
+            {m.home_handling_without_help()}
+          </dt>
           <dd className="lu-numeric">
             {overview.automaticallyResolved === null
               ? m.common_empty_value()
@@ -227,17 +295,6 @@ export function HandlingModule({
       ) : (
         <p className="home-note">{m.home_handling_empty()}</p>
       )}
-      <footer className="home-module-footer">
-        <span>{m.home_handling_footer()}</span>
-        <Link
-          className="home-module-link"
-          to="/app/$organizationId/exceptions"
-          params={{ organizationId }}
-          search={{ view: 'active' }}
-        >
-          <LinkLabel>{m.home_handling_link()}</LinkLabel>
-        </Link>
-      </footer>
     </>
   );
 }
@@ -284,7 +341,20 @@ export function ConnectionsModule({
                 <span className="home-row-main">
                   <strong>{connection.label}</strong>
                 </span>
-                <span className="home-row-status">{health.label}</span>
+                {health.state === 'verified' ? (
+                  <Tooltip
+                    content={m.home_connections_recent_hint({
+                      hours: overview.freshnessThresholdHours,
+                    })}
+                  >
+                    {/* Focusable so keyboard users can read the definition too. */}
+                    <span className="home-row-status" tabIndex={0}>
+                      {health.label}
+                    </span>
+                  </Tooltip>
+                ) : (
+                  <span className="home-row-status">{health.label}</span>
+                )}
                 <span
                   className="home-row-age"
                   title={
@@ -324,29 +394,6 @@ export function ConnectionsModule({
           </div>
         </div>
       )}
-      <footer className="home-module-footer">
-        <span>
-          {m.home_connections_footer({
-            hours: overview.freshnessThresholdHours,
-          })}
-        </span>
-        <span className="home-module-links">
-          <Link
-            className="home-module-link"
-            to="/app/$organizationId/sync"
-            params={{ organizationId }}
-          >
-            <LinkLabel>{m.home_connections_sync_link()}</LinkLabel>
-          </Link>
-          <Link
-            className="home-module-link"
-            to="/app/$organizationId/apps"
-            params={{ organizationId }}
-          >
-            <LinkLabel>{m.home_connections_apps_link()}</LinkLabel>
-          </Link>
-        </span>
-      </footer>
     </>
   );
 }
@@ -392,16 +439,6 @@ export function ActivityModule({ organizationId }: { organizationId: string }) {
       ) : (
         <p className="home-note">{m.home_activity_empty()}</p>
       )}
-      <footer className="home-module-footer">
-        <span>{m.home_activity_footer()}</span>
-        <Link
-          className="home-module-link"
-          to="/app/$organizationId/activity"
-          params={{ organizationId }}
-        >
-          <LinkLabel>{m.home_activity_link()}</LinkLabel>
-        </Link>
-      </footer>
     </>
   );
 }
@@ -416,13 +453,7 @@ const coverageMessages = {
 >;
 
 /** Summarizes verified resolutions and how much Luma resolved without help. */
-export function OutcomesModule({
-  overview,
-  organizationId,
-}: {
-  overview: OperationsOverview;
-  organizationId?: string;
-}) {
+export function OutcomesModule({ overview }: { overview: OperationsOverview }) {
   const rate =
     overview.automation && overview.automation.denominator > 0
       ? overview.automation.numerator / overview.automation.denominator
@@ -432,7 +463,10 @@ export function OutcomesModule({
     <>
       <div className="home-outcomes operations-metrics">
         <div>
-          <span>{m.home_outcomes_verified_label()}</span>
+          <span className="home-tile-label">
+            <CircleCheck aria-hidden="true" />
+            {m.home_outcomes_verified_label()}
+          </span>
           <strong className="lu-numeric">
             {formatNumber(
               overview.measurement?.verified ?? overview.verifiedResolutions,
@@ -445,7 +479,10 @@ export function OutcomesModule({
           </p>
         </div>
         <div>
-          <span>{m.home_outcomes_automatic_label()}</span>
+          <span className="home-tile-label">
+            <Sparkles aria-hidden="true" />
+            {m.home_outcomes_automatic_label()}
+          </span>
           <strong
             className="lu-numeric"
             data-text={overview.automaticallyResolved === null ? '' : undefined}
@@ -466,7 +503,10 @@ export function OutcomesModule({
           </p>
         </div>
         <div>
-          <span>{m.home_outcomes_rate_label()}</span>
+          <span className="home-tile-label">
+            <Percent aria-hidden="true" />
+            {m.home_outcomes_rate_label()}
+          </span>
           <strong
             className="lu-numeric"
             data-text={rate === null ? '' : undefined}
@@ -497,20 +537,11 @@ export function OutcomesModule({
           </p>
         </div>
       </div>
-      <footer className="home-module-footer">
-        {overview.measurement ? (
-          <span>{coverageMessages[overview.measurement.coverage]()}</span>
-        ) : null}
-        {organizationId ? (
-          <Link
-            className="home-module-link"
-            to="/app/$organizationId/insights"
-            params={{ organizationId }}
-          >
-            <LinkLabel>{m.home_outcomes_link()}</LinkLabel>
-          </Link>
-        ) : null}
-      </footer>
+      {overview.measurement && overview.measurement.coverage !== 'complete' ? (
+        <p className="home-note">
+          {coverageMessages[overview.measurement.coverage]()}
+        </p>
+      ) : null}
     </>
   );
 }
@@ -521,7 +552,7 @@ export function CatalogModule({ organizationId }: { organizationId: string }) {
   if (catalog.isPending) return <ModuleSkeleton />;
   if (catalog.isError)
     return <p className="home-note">{m.home_catalog_failed()}</p>;
-  const { counts, sources } = catalog.data;
+  const { counts } = catalog.data;
   const views = [
     ['differs', 'attention'],
     ['missing', 'waiting'],
@@ -569,23 +600,6 @@ export function CatalogModule({ organizationId }: { organizationId: string }) {
           </div>
         </div>
       )}
-      <footer className="home-module-footer">
-        <span>
-          {m.home_catalog_footer({
-            skus: counts.all ?? 0,
-            sources: sources.length,
-          })}
-        </span>
-        <span className="home-module-links">
-          <Link
-            className="home-module-link"
-            to="/app/$organizationId/products"
-            params={{ organizationId }}
-          >
-            <LinkLabel>{m.home_catalog_link()}</LinkLabel>
-          </Link>
-        </span>
-      </footer>
     </>
   );
 }
@@ -650,23 +664,6 @@ export function FulfillmentModule({
           </div>
         </div>
       )}
-      <footer className="home-module-footer">
-        <span>
-          {m.home_fulfillment_footer({
-            attention: counts.attention ?? 0,
-            open: counts.open ?? 0,
-          })}
-        </span>
-        <span className="home-module-links">
-          <Link
-            className="home-module-link"
-            to="/app/$organizationId/fulfillment"
-            params={{ organizationId }}
-          >
-            <LinkLabel>{m.home_fulfillment_link()}</LinkLabel>
-          </Link>
-        </span>
-      </footer>
     </>
   );
 }
@@ -739,23 +736,6 @@ export function ReturnsModule({ organizationId }: { organizationId: string }) {
           </div>
         </div>
       )}
-      <footer className="home-module-footer">
-        <span>
-          {m.home_returns_footer({
-            action: counts.views.action ?? 0,
-            waiting: counts.views.waiting ?? 0,
-          })}
-        </span>
-        <span className="home-module-links">
-          <Link
-            className="home-module-link"
-            to="/app/$organizationId/returns"
-            params={{ organizationId }}
-          >
-            <LinkLabel>{m.home_returns_link()}</LinkLabel>
-          </Link>
-        </span>
-      </footer>
     </>
   );
 }
