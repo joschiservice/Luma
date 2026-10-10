@@ -20,6 +20,7 @@ import {
   createInstallationService as connections,
   createProviderCatalog,
   createSecretCipher,
+  createSourceAuthority,
 } from '@luma/connections/composition';
 import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
@@ -61,6 +62,7 @@ export function createAppHost(
     (options.factories ?? factories).map((factory) =>
       factory({
         database,
+        sourceAuthority: { read: (context) => sourceAuthority.read(context) },
         cipher,
         ...(options.simulation ? { simulation: options.simulation } : {}),
         ...(options.refreshStock ? { refreshStock: options.refreshStock } : {}),
@@ -132,6 +134,18 @@ export function createAppHost(
     refreshCredential: (context, id, target) =>
       provider(target).refreshCredential?.(context, id) ?? Promise.resolve(),
   });
+
+  const sourceAuthority = createSourceAuthority(
+    database,
+    (provider) => {
+      const category = registry
+        .list()
+        .find((app) => app.id === provider)?.category;
+
+      return category === 'erp' || category === 'storefront' ? category : null;
+    },
+    options.refreshContext,
+  );
 
   return {
     registry,

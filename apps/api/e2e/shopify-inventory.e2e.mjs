@@ -188,6 +188,29 @@ test('a newer ERP read of the same quantity keeps an approved correction valid',
   );
 });
 
+test('an authority override invalidates a reviewed correction before dispatch', async (t) => {
+  const { f, admin, call, target, mutations } = await correctionFixture(t);
+  const preview = await call(f.owner, 'preview', {
+    ...target,
+    requestId: randomUUID(),
+  });
+  await call(admin, 'approve', { id: preview.id, outcome: 'approved' });
+  await f.request(f.owner, `${f.base}/source-authority`, 'POST', {
+    commandId: randomUUID(),
+    revision: 0,
+    group: 'inventory_stock',
+    connectionId: target.connectionId,
+  });
+  await call(f.owner, 'execute', { id: preview.id }, 409);
+  assert.equal(mutations.length, 0);
+  const history = await f.request(
+    f.owner,
+    `${f.base}/source-authority/history`,
+  );
+  assert.equal(history.items.length, 1);
+  assert.equal(history.items[0].connectionId, target.connectionId);
+});
+
 test('source freshness, ambiguous mappings, source changes and provider CAS stop writes', async (t) => {
   const { f, admin, call, target, mutations, stock, race, level } =
     await correctionFixture(t);

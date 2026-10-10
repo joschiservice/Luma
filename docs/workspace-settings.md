@@ -5,13 +5,33 @@ Workspace settings cover the workspace name and timezone, team access, custom ro
 ## Authority
 
 - Every member can read workspace settings and manage their own email preferences and layout.
-- `workspace.settings.manage` changes the name and display timezone. Slug and region are read-only.
+- `workspace.settings.manage` changes the name, display timezone and source authority. Slug and region are read-only.
 - `workspace.approval_policy.manage` changes the approval preference.
 - `members.manage` invites, reassigns and removes people. Only owners grant or revoke ownership, and nobody can assign a role with permissions they do not hold. The [membership rules](identity.md#membership-rules) apply.
 - `roles.manage` creates, edits and archives custom roles and reads role history.
 - `support_access.manage` allows and revokes Luma support access and answers support requests.
 
 Sections a role cannot change say which permission they need. Team and role mutations recheck authority under the organization row lock, including concurrent last-owner changes. Access, role and policy changes are appended to `workspace_access_events` with actor, timestamp and bounded before/after values.
+
+## Source authority
+
+Source authority chooses a connection for each order fact group and for inventory stock
+and selling source. Every member can review the settings; `workspace.settings.manage`
+changes one override or restores its category default. The server validates the tenant,
+connection availability and read grants. Inventory selling authority requires a storefront.
+
+Defaults prefer storefront order lines and lifecycle, ERP fulfillment and tracking, ERP
+stock and storefront selling. Order groups fall back to the other category when the
+preferred category has no eligible connection. Multiple preferred sources conflict;
+unavailable overrides stay unknown instead of reverting to a default. Unknown or
+conflicting authority defers workspace inventory comparisons and cannot authorize a correction.
+
+Overrides use a workspace revision and a stable command ID. Concurrent edits at the same
+revision allow one winner; exact retries return the original audit receipt. History retains
+who changed the override, its previous and new connection, revision and timestamp. Reads
+use current configuration without changing source snapshots or old comparison evidence.
+An override revision change supersedes inventory diagnosis recommendations and invalidates
+reviewed Shopify stock corrections; fresh detection and review are required.
 
 ## Roles
 

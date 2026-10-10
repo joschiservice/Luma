@@ -441,5 +441,11 @@
   "settings_support_guardrail_read_only": "Support sees exactly what the chosen member sees and can’t change anything.",
   "settings_support_guardrail_activity": "Every view, and each page it opens, appears in Activity. Owners get an email when a view starts.",
   "settings_support_guardrail_limits": "Each view ends after 30 minutes. Revoking access ends open views.",
-  "settings_support_emergency_note": "For a security incident or legal request, Luma support can open a view without your approval. Owners get an email when it ends, and it appears in Activity."
+  "settings_support_emergency_note": "For a security incident or legal request, Luma support can open a view without your approval. Owners get an email when it ends, and it appears in Activity.",
+  "settings_section_authority": "Source authority",
+  "settings_authority_description": "Choose which connection supplies each order fact and inventory quantity. Defaults use connection categories. Unknown or conflicting authority prevents automatic corrections. Changes are recorded and apply to the next detection run.",
+  "settings_authority_fact": "Fact group",
+  "settings_authority_override": "Workspace override",
+  "settings_authority_default": "Use category default",
+  "settings_authority_unavailable": "{source} (unavailable)"
 }

@@ -441,5 +441,11 @@
   "settings_support_guardrail_read_only": "Der Support sieht genau, was das gewählte Mitglied sieht, und kann nichts ändern.",
   "settings_support_guardrail_activity": "Jede Ansicht und jede Seite, die sie öffnet, erscheint in der Aktivität. Inhaber erhalten eine E-Mail, wenn eine Ansicht beginnt.",
   "settings_support_guardrail_limits": "Jede Ansicht endet nach 30 Minuten. Wenn du den Zugriff entziehst, enden geöffnete Ansichten.",
-  "settings_support_emergency_note": "Bei einem Sicherheitsvorfall oder einer rechtlichen Anfrage kann der Luma-Support eine Ansicht ohne deine Zustimmung öffnen. Inhaber erhalten eine E-Mail, wenn sie endet, und sie erscheint in der Aktivität."
+  "settings_support_emergency_note": "Bei einem Sicherheitsvorfall oder einer rechtlichen Anfrage kann der Luma-Support eine Ansicht ohne deine Zustimmung öffnen. Inhaber erhalten eine E-Mail, wenn sie endet, und sie erscheint in der Aktivität.",
+  "settings_section_authority": "Maßgebliche Quellen",
+  "settings_authority_description": "Wähle, welche Verbindung die einzelnen Bestellangaben und Bestandsmengen liefert. Standards folgen den Verbindungskategorien. Bei unbekannter oder widersprüchlicher Zuordnung sind automatische Korrekturen gesperrt. Änderungen werden protokolliert und gelten beim nächsten Erkennungslauf.",
+  "settings_authority_fact": "Angabengruppe",
+  "settings_authority_override": "Workspace-Anpassung",
+  "settings_authority_default": "Kategorienstandard verwenden",
+  "settings_authority_unavailable": "{source} (nicht verfügbar)"
 }

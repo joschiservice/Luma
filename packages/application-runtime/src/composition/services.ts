@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import type { AuditLog } from '@luma/audit';
 import { createAuditLog } from '@luma/audit/composition';
 import { createCommerceIngestion } from '@luma/commerce-ingestion';
-import type { EffectRegistry } from '@luma/connections';
+import type { AuthorityReader, EffectRegistry } from '@luma/connections';
 import {
   createProductIdentityReader,
   createSourceRecords,
@@ -83,6 +83,7 @@ export function createDetectionServices(
   now: () => Date = () => new Date(),
   verifier?: VerificationEvaluator,
   diagnosisOptions: DiagnosisOptions = {},
+  sourceAuthority?: AuthorityReader,
 ): {
   exceptions: ReturnType<typeof createExceptions>;
   cases: ReturnType<typeof createCases>;
@@ -100,7 +101,43 @@ export function createDetectionServices(
   return {
     exceptions,
     cases: createCases(db, now, createProductIdentityReader(db)),
-    diagnoses: createDiagnoses(db, now, diagnosisOptions),
+    diagnoses: createDiagnoses(db, now, {
+      ...diagnosisOptions,
+      ...(sourceAuthority
+        ? {
+            authorityCurrent: async (context, snapshot) => {
+              if (snapshot.input.exceptionClass !== 'inventory_mismatch')
+                return true;
+              const authority = await sourceAuthority.read(context);
+              const stock = authority.groups.find(
+                (group) => group.group === 'inventory_stock',
+              );
+              const selling = authority.groups.find(
+                (group) => group.group === 'inventory_selling',
+              );
+              const facts = snapshot.input.facts;
+              const captured = snapshot.evidence.find(
+                (item) => 'sourceAuthority' in item.facts,
+              )?.facts.sourceAuthority;
+              if (
+                captured &&
+                typeof captured === 'object' &&
+                'revision' in captured &&
+                captured.revision !== authority.revision
+              )
+                return false;
+
+              return (
+                facts.authority !== null &&
+                stock?.connectionId ===
+                  facts.connectionIds[facts.authority === 'left' ? 0 : 1] &&
+                selling?.connectionId ===
+                  facts.connectionIds[facts.sellingSource === 'left' ? 0 : 1]
+              );
+            },
+          }
+        : {}),
+    }),
     pipeline: createDetectionPipeline(exceptions, (value) =>
       createHash('sha256').update(value).digest('hex'),
     ),

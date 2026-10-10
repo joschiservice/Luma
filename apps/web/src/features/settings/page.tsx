@@ -41,6 +41,7 @@ import { AppearanceSettings, HomeSidebarSettings } from './personal';
 import { RolesSettings } from './roles';
 import { SectionHeading } from './section-heading';
 import { SecuritySettings } from './security';
+import { SourceAuthoritySettings } from './source-authority';
 import { SupportAccessSettings } from './support-access';
 import { TeamSettings } from './team';
 
@@ -50,6 +51,12 @@ export const settingsSections = [
     label: m.settings_section_workspace,
     group: m.settings_group_workspace,
     Icon: Building2,
+  },
+  {
+    id: 'authority',
+    label: m.settings_section_authority,
+    group: m.settings_group_workspace,
+    Icon: ShieldCheck,
   },
   {
     id: 'team',
@@ -165,7 +172,7 @@ export function SettingsView({
 }) {
   const online = useSettingsOnline();
   const required =
-    section === 'workspace'
+    section === 'workspace' || section === 'authority'
       ? 'workspace.settings.manage'
       : section === 'approvals'
         ? 'workspace.approval_policy.manage'
@@ -242,6 +249,15 @@ export function SettingsView({
                   data={data}
                   organizationId={organizationId}
                   disabled={!can('workspace.settings.manage') || !online}
+                />
+              ) : null}
+              {section === 'authority' ? (
+                <SourceAuthoritySettings
+                  key={organizationId}
+                  organizationId={organizationId}
+                  disabled={
+                    !can('workspace.settings.manage') || !online || supportView
+                  }
                 />
               ) : null}
               {section === 'notifications' ? (

@@ -1,4 +1,6 @@
 import type {
+  AuthorityReader,
+  AuthoritySnapshot,
   CapabilityReader,
   ExternalId,
   FulfillmentSnapshot,
@@ -133,8 +135,8 @@ export interface DetectionMonitorOptions {
     observation: Observation<InventorySnapshot>,
     positionId: string,
   ): Promise<boolean>;
-  /** Whether a provider is an ERP or a storefront; others are not compared. */
-  category(provider: string): 'erp' | 'storefront' | null;
+  /** Read current workspace authority on each pass and again for verification. */
+  authority: AuthorityReader;
   configuration: Configuration;
   hash(value: string): string;
   /** Fresh stock and fulfillment checks per workspace and pass. */
@@ -189,6 +191,7 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
   function stockMappings(
     context: TenantContext,
     position: StockPosition,
+    authority: AuthoritySnapshot,
   ): InventoryMapping[] {
     const side = (source: StockSource) => ({
       source: {
@@ -204,22 +207,55 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
     });
     const of = (category: 'erp' | 'storefront') =>
       position.sources.filter(
-        (source) => options.category(source.provider) === category,
+        (source) =>
+          authority.connections.find(
+            (connection) => connection.id === source.connectionId,
+          )?.category === category,
       );
 
-    return of('erp').flatMap((erp) =>
+    const stock = authority.groups.find(
+      (group) => group.group === 'inventory_stock',
+    )!;
+    const selling = authority.groups.find(
+      (group) => group.group === 'inventory_selling',
+    )!;
+    const erps = of('erp');
+    const chosen = position.sources.find(
+      (source) => source.connectionId === stock.connectionId,
+    );
+    if (
+      chosen &&
+      !erps.includes(chosen) &&
+      chosen.connectionId !== selling.connectionId
+    )
+      erps.push(chosen);
+
+    return erps.flatMap((erp) =>
       of('storefront').map((store) => ({
         tenantId: context.tenantId,
         version: hash(
-          JSON.stringify([...erp.mappingIds, ...store.mappingIds].sort()),
+          JSON.stringify({
+            mappings: [...erp.mappingIds, ...store.mappingIds].sort(),
+            revision: authority.revision,
+            stock,
+            selling,
+          }),
         ),
         publishedAt: [erp.mappedAt, store.mappedAt].sort().at(-1)!,
         skuId: position.skuId,
         locationId: position.locationId,
         left: side(erp),
         right: side(store),
-        authority: 'left' as const,
+        authority:
+          selling.connectionId !== store.connectionId
+            ? null
+            : stock.connectionId === erp.connectionId
+              ? ('left' as const)
+              : stock.connectionId === store.connectionId
+                ? ('right' as const)
+                : null,
         sellingSource: 'right' as const,
+        sourceAuthority: { revision: authority.revision, stock, selling },
       })),
     );
   }
@@ -243,7 +279,11 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
       limit: 1,
     });
     const mapping = position
-      ? stockMappings(context, position).find(
+      ? stockMappings(
+          context,
+          position,
+          await options.authority.read(context),
+        ).find(
           (candidate) =>
             JSON.stringify(
               [
@@ -478,8 +518,9 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
       })),
       limit: limits.stock,
     });
+    const authority = await options.authority.read(context);
     for (const position of positions)
-      for (const mapping of stockMappings(context, position)) {
+      for (const mapping of stockMappings(context, position, authority)) {
         const monitor = inventoryMonitor(mapping, position.positionId);
         const incident = tracked.find(monitor.matches);
         try {

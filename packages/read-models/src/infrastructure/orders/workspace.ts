@@ -1,3 +1,4 @@
+import type { AuthorityReader } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
@@ -25,6 +26,7 @@ export function createOrderWorkspace(
   queries: OrderReadQueries,
   activity: (db: TenantDatabase) => OrderActivityReader,
   refreshContext: (context: TenantContext) => Promise<TenantContext>,
+  authority: (db: TenantDatabase) => AuthorityReader,
   now = () => new Date(),
 ): OrderWorkspace {
   async function read<T>(
@@ -79,7 +81,15 @@ export function createOrderWorkspace(
       }),
     get: (context, orderId) =>
       read(context, (tx, scoped, fresh, asOf) =>
-        readDetail(tx, queries, activity(scoped), fresh, orderId, asOf),
+        readDetail(
+          tx,
+          queries,
+          activity(scoped),
+          authority(scoped),
+          fresh,
+          orderId,
+          asOf,
+        ),
       ),
   };
 }

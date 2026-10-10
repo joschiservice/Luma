@@ -10,7 +10,7 @@ Workspace details and approval rules.
 
 | Permission | Key | Description | Sensitive | Owner | Admin | Member |
 | --- | --- | --- | --- | --- | --- | --- |
-| Edit workspace settings | `workspace.settings.manage` | Change the workspace name and display time zone. |  | Yes | Yes |  |
+| Edit workspace settings | `workspace.settings.manage` | Change the workspace name, display time zone and authoritative sources. |  | Yes | Yes |  |
 | Manage approval rules | `workspace.approval_policy.manage` | Decide whether every allowed change needs approval from a second person. | Yes | Yes | Yes |  |
 
 ## Team and access

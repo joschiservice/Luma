@@ -1,6 +1,7 @@
 import { activityContract } from './contracts/activity.js';
 import { appsContract } from './contracts/apps.js';
 import { assistantContract } from './contracts/assistant.js';
+import { sourceAuthorityContract } from './contracts/authority.js';
 import { exceptionsContract } from './contracts/cases.js';
 import { connectionsContract } from './contracts/connections.js';
 import { customersContract } from './contracts/customers.js';
@@ -68,6 +69,7 @@ export const apiContract = {
   decisions: decisionsContract,
   insights: insightsContract,
   assistant: assistantContract,
+  sourceAuthority: sourceAuthorityContract,
 };
 
 export * from './activity.js';
@@ -83,6 +85,8 @@ export * from './measurement.js';
 export * from './cases.js';
 
 export * from './connections.js';
+
+export * from './authority.js';
 
 export { diagnosisSchema } from './diagnosis.js';
 

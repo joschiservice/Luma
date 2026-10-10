@@ -105,6 +105,7 @@ export const factSchemas = {
       complete: z.boolean(),
       projectionCurrent: z.boolean(),
       authority: z.enum(['left', 'right']).nullable(),
+      authorityState: z.enum(['resolved', 'unknown', 'conflicting']).optional(),
       sellingSource: z.enum(['left', 'right']),
       tolerance: decimal.refine((value) => !value.startsWith('-')),
     })

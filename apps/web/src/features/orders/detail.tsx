@@ -201,6 +201,9 @@ export function OrderDetailView({
     : '';
   const shown =
     detail?.sources.find((source) => source.connectionId === chosen) ??
+    detail?.sources.find(
+      (source) => source.connectionId === detail.authority.lines?.connectionId,
+    ) ??
     detail?.sources.find((source) => source.selected) ??
     detail?.sources[0];
   const contexts =

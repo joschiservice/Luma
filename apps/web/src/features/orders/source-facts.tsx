@@ -1,4 +1,8 @@
-import type { OrderDetail, OrderSourceFacts } from '@luma/api-contract';
+import type {
+  AuthorityGroup,
+  OrderDetail,
+  OrderSourceFacts,
+} from '@luma/api-contract';
 import { formatList } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { Badge } from '@luma/ui/components/primitives/badge';
@@ -12,6 +16,7 @@ import { Link } from '@tanstack/react-router';
 import { GitCompareArrows, ListOrdered } from 'lucide-react';
 import type { ReactNode } from 'react';
 
+import { authorityLabel } from './authority';
 import { OrderSection } from './order-section';
 import {
   formatMoney,
@@ -152,7 +157,8 @@ type ComparedFact = {
   key: string;
   label: () => string;
   field?: string;
-  value: (source: OrderSourceFacts) => ReactNode;
+  authority?: AuthorityGroup;
+  value: (source: OrderSourceFacts, detail: OrderDetail) => ReactNode;
 };
 
 function comparedItems(source: OrderSourceFacts) {
@@ -190,6 +196,7 @@ const comparedFacts: ComparedFact[] = [
     key: 'status',
     label: m.orders_comparison_status,
     field: 'status',
+    authority: 'order_lifecycle',
     value: (source) => statusLabels[source.status] ?? source.status,
   },
   {
@@ -209,12 +216,65 @@ const comparedFacts: ComparedFact[] = [
     key: 'items',
     label: m.orders_comparison_items,
     field: 'lines',
+    authority: 'order_lines',
     value: comparedItems,
   },
   {
     key: 'fulfillment',
+    authority: 'order_fulfillment',
     label: m.orders_comparison_fulfillment,
     value: (source) => fulfillmentLabel(source),
+  },
+  {
+    key: 'location',
+    label: m.orders_comparison_location,
+    authority: 'order_fulfillment',
+    value: (source, detail) => {
+      const locations = detail.fulfillments
+        .filter(
+          (item) => item.connectionId === source.connectionId && !item.deleted,
+        )
+        .map((item) => item.location?.name ?? item.location?.locationId)
+        .filter((name): name is string => !!name);
+
+      return locations.length
+        ? formatList([...new Set(locations)])
+        : m.common_not_reported();
+    },
+  },
+  {
+    key: 'tracking',
+    label: m.orders_authority_tracking,
+    authority: 'order_tracking',
+    value: (source, detail) => {
+      const fulfillments = detail.fulfillments.filter(
+        (item) => item.connectionId === source.connectionId && !item.deleted,
+      );
+      const tracking = fulfillments
+        .flatMap((item) => item.tracking ?? [])
+        .map((item) => item.number ?? item.url ?? item.carrier)
+        .filter((value): value is string => !!value);
+
+      return tracking.length
+        ? formatList(tracking)
+        : fulfillments.some((item) => item.tracking !== null)
+          ? m.common_none()
+          : m.common_not_reported();
+    },
+  },
+  {
+    key: 'cancellation',
+    label: m.orders_comparison_cancelled,
+    authority: 'order_lifecycle',
+    value: (source) =>
+      formatList(
+        source.lines.map((line) =>
+          line.cancelledQuantity === null
+            ? m.common_not_reported()
+            : formatQuantity(line.cancelledQuantity, line.unit),
+        ),
+        { type: 'unit' },
+      ),
   },
   {
     key: 'placed',
@@ -264,12 +324,28 @@ export function SourceComparison({ detail }: { detail: OrderDetail }) {
         </span>
       ),
     },
+    {
+      key: 'authority',
+      header: m.orders_authority_title(),
+      cell: (fact) =>
+        fact.authority
+          ? authorityLabel(
+              detail.authority.groups.find(
+                (group) => group.group === fact.authority,
+              ),
+              detail.sources.map((source) => ({
+                id: source.connectionId,
+                label: source.label,
+              })),
+            )
+          : m.orders_authority_not_configured(),
+    },
     ...detail.sources.map((source) => ({
       key: source.connectionId,
       header: source.deleted
         ? m.orders_source_removed({ source: source.label })
         : source.label,
-      cell: (fact: ComparedFact) => fact.value(source),
+      cell: (fact: ComparedFact) => fact.value(source, detail),
     })),
   ];
 

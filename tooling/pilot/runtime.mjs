@@ -444,6 +444,7 @@ export async function createPilot(
       execution: { kind: 'enabled', effects },
       verifier,
       decisionSources: installations.decisionSources(),
+      providerCatalog: installations.providerCatalog,
       workflowSources: installations.registry.workflowSources(),
       ...(detectionTiming.followUps
         ? { followUps: detectionTiming.followUps }

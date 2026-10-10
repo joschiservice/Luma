@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { activityActorSchema } from './activity.js';
+import { factAuthoritySchema } from './authority.js';
 import { returnListItemSchema } from './returns.js';
 
 const timestamp = z.string().datetime();
@@ -171,6 +172,21 @@ export const orderFulfillmentSchema = z.object({
   deleted: z.boolean(),
   observedAt: timestamp,
   sourceUpdatedAt: timestamp.nullable(),
+  location: z
+    .object({
+      locationId: z.string().uuid().nullable(),
+      name: z.string().nullable(),
+    })
+    .nullable(),
+  tracking: z
+    .array(
+      z.object({
+        carrier: z.string().nullable(),
+        number: z.string().nullable(),
+        url: z.string().nullable(),
+      }),
+    )
+    .nullable(),
   lines: z.array(
     z.object({
       orderLineId: z.string().uuid(),
@@ -249,6 +265,45 @@ export const orderDetailSchema = z.object({
     truncated: z.boolean(),
   }),
   asOf: timestamp,
+  authority: z.object({
+    revision: z.number().int().nonnegative(),
+    groups: z.array(factAuthoritySchema),
+    lines: z
+      .object({
+        connectionId: z.string().uuid(),
+        lines: z.array(
+          orderLineSchema.omit({
+            fulfilledQuantity: true,
+            remainingQuantity: true,
+            cancelledQuantity: true,
+          }),
+        ),
+      })
+      .nullable(),
+    lifecycle: z
+      .object({
+        connectionId: z.string().uuid(),
+        status: orderStatusSchema,
+        cancelledQuantities: z.array(
+          z.object({
+            lineId: z.string().uuid(),
+            quantity: z.string().nullable(),
+            unit: z.string(),
+          }),
+        ),
+      })
+      .nullable(),
+    fulfillments: z.array(orderFulfillmentSchema).nullable(),
+    tracking: z
+      .array(
+        z.object({
+          fulfillmentId: z.string().uuid(),
+          connectionId: z.string().uuid(),
+          tracking: orderFulfillmentSchema.shape.tracking,
+        }),
+      )
+      .nullable(),
+  }),
 });
 
 export type OrderView = z.infer<typeof orderViewSchema>;

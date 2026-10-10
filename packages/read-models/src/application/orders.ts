@@ -1,3 +1,4 @@
+import type { FactAuthority } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
 import type { ActivityActor } from '@luma/resolution';
 
@@ -115,6 +116,41 @@ export type OrderDetailSection =
   'fulfillments' | 'returns' | 'issues' | 'workflows' | 'activity';
 
 export interface OrderDetail {
+  /** Live source authority and resolved facts; null means no authoritative source report. */
+  authority: {
+    revision: number;
+    groups: FactAuthority[];
+    lines: {
+      connectionId: string;
+      lines: Omit<
+        OrderSourceFacts['lines'][number],
+        'fulfilledQuantity' | 'remainingQuantity' | 'cancelledQuantity'
+      >[];
+    } | null;
+    lifecycle: {
+      connectionId: string;
+      status: string;
+      cancelledQuantities: {
+        lineId: string;
+        quantity: string | null;
+        unit: string;
+      }[];
+    } | null;
+    fulfillments: OrderDetail['fulfillments'] | null;
+    tracking:
+      | {
+          fulfillmentId: string;
+          connectionId: string;
+          tracking:
+            | {
+                carrier: string | null;
+                number: string | null;
+                url: string | null;
+              }[]
+            | null;
+        }[]
+      | null;
+  };
   /** Retired URL identity, when this read resolved to the current order. */
   redirectedFrom?: string | null;
   order: OrderListItem;
@@ -130,6 +166,11 @@ export interface OrderDetail {
     deleted: boolean;
     observedAt: string;
     sourceUpdatedAt: string | null;
+    location: { locationId: string | null; name: string | null } | null;
+    /** Null distinguishes unread tracking from a reported empty list. */
+    tracking:
+      | { carrier: string | null; number: string | null; url: string | null }[]
+      | null;
     lines: {
       orderLineId: string;
       quantity: string;
