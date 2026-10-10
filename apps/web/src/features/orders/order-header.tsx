@@ -81,16 +81,11 @@ function orderFacts(order: OrderListItem): RecordFact[] {
           {
             key: 'due',
             icon: CalendarClock,
-            label: m.orders_fact_due(),
-            value: order.overdue ? (
-              <>
-                <WorkspaceDate value={order.dueAt} />
-                {' · '}
-                {m.orders_flag_overdue()}
-              </>
-            ) : (
-              <WorkspaceDate value={order.dueAt} />
-            ),
+            // The label says it in words, so the highlight doesn't rely on color alone.
+            label: order.overdue
+              ? m.orders_fact_overdue_since()
+              : m.orders_fact_due(),
+            value: <WorkspaceDate value={order.dueAt} />,
             tone: order.overdue ? ('danger' as const) : undefined,
           },
         ]

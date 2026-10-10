@@ -158,6 +158,7 @@
   "orders_fact_total": "Total",
   "orders_fact_placed": "Placed",
   "orders_fact_due": "Due",
+  "orders_fact_overdue_since": "Overdue since",
   "orders_fact_read": "Last read",
   "orders_detail_offline": "You’re offline. This order may be out of date.",
   "orders_detail_missing": "This order isn’t in this workspace, or no connected system reports it anymore.",

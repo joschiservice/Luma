@@ -158,6 +158,7 @@
   "orders_fact_total": "Summe",
   "orders_fact_placed": "Bestellt",
   "orders_fact_due": "Fällig",
+  "orders_fact_overdue_since": "Überfällig seit",
   "orders_fact_read": "Zuletzt gelesen",
   "orders_detail_offline": "Du bist offline. Diese Bestellung ist möglicherweise veraltet.",
   "orders_detail_missing": "Diese Bestellung gibt es in diesem Workspace nicht, oder kein verbundenes System meldet sie mehr.",
