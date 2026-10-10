@@ -17,9 +17,11 @@ import {
 import { Input } from '@luma/ui/components/primitives/input';
 import { Select } from '@luma/ui/components/primitives/select';
 import { Textarea } from '@luma/ui/components/primitives/textarea';
+import { WorkspaceTimezone } from '@luma/ui/components/primitives/workspace-date';
+import { workspaceDateValue, workspaceInstant } from '@luma/ui/lib/timezone';
 import { quantityWithUnit } from '@luma/ui/lib/units';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useContext, useState } from 'react';
 
 import {
   linkSupplier,
@@ -218,14 +220,6 @@ const channelOptions = () => [
   { value: 'other', label: m.procurement_channel_other() },
 ];
 
-const localNow = () => {
-  const now = new Date();
-
-  return new Date(now.getTime() - now.getTimezoneOffset() * 60_000)
-    .toISOString()
-    .slice(0, 16);
-};
-
 /** Records a supplier message for this order. With a model configured, Luma reads it. */
 export function MessageDialog({
   organizationId,
@@ -236,6 +230,7 @@ export function MessageDialog({
   record: PurchaseOrderRecord;
   close: () => void;
 }) {
+  const timeZone = useContext(WorkspaceTimezone);
   const [id] = useState(() => crypto.randomUUID());
   const [channel, setChannel] = useState<
     'email' | 'portal' | 'phone' | 'other'
@@ -243,7 +238,9 @@ export function MessageDialog({
   const [from, setFrom] = useState('');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
-  const [receivedAt, setReceivedAt] = useState(localNow);
+  const [receivedAt, setReceivedAt] = useState(() =>
+    workspaceDateValue(new Date(), timeZone, true).slice(0, 16),
+  );
   const [messageId, setMessageId] = useState('');
   const command = useCommand(
     organizationId,
@@ -268,13 +265,29 @@ export function MessageDialog({
         className="procurement-form"
         onSubmit={(e) => {
           e.preventDefault();
+          const received = e.currentTarget.elements.namedItem('receivedAt');
+          let instant: string;
+          try {
+            instant = workspaceInstant(receivedAt, timeZone);
+          } catch (error) {
+            if (received instanceof HTMLInputElement) {
+              received.setCustomValidity(
+                error instanceof Error
+                  ? error.message
+                  : m.ui_time_error_invalid(),
+              );
+              received.reportValidity();
+            }
+
+            return;
+          }
           command.submit({
             id,
             channel,
             from,
             subject,
             body,
-            receivedAt: new Date(receivedAt).toISOString(),
+            receivedAt: instant,
             messageId: messageId.trim() || null,
           });
         }}
@@ -293,12 +306,16 @@ export function MessageDialog({
               />
             </label>
             <label>
-              {m.procurement_message_dialog_received()}
+              {m.procurement_message_dialog_received({ timeZone })}
               <Input
                 type="datetime-local"
+                name="receivedAt"
                 required
                 value={receivedAt}
-                onChange={(e) => setReceivedAt(e.target.value)}
+                onChange={(e) => {
+                  e.currentTarget.setCustomValidity('');
+                  setReceivedAt(e.target.value);
+                }}
               />
             </label>
           </div>

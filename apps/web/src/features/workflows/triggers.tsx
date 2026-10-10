@@ -12,9 +12,13 @@ import { Card, CardHeader } from '@luma/ui/components/primitives/card';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { Input } from '@luma/ui/components/primitives/input';
 import { Select } from '@luma/ui/components/primitives/select';
-import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
+import {
+  WorkspaceDate,
+  WorkspaceTimezone,
+} from '@luma/ui/components/primitives/workspace-date';
+import { workspaceInstant } from '@luma/ui/lib/timezone';
 import { ArrowRight, Clock3, Play, ShieldCheck, Zap } from 'lucide-react';
-import { useState } from 'react';
+import { useContext, useState } from 'react';
 
 import { IdentityError } from '../identity/data';
 import { cancelWorkflowStart, fireWorkflow, workflowError } from './data';
@@ -45,6 +49,7 @@ export function WorkflowTriggers({
   refresh: () => Promise<void>;
   accessLost: () => Promise<void>;
 }) {
+  const timeZone = useContext(WorkspaceTimezone);
   const trigger = version.applicability.trigger;
   const [subject, setSubject] = useState('');
   const [source, setSource] = useState('');
@@ -84,7 +89,18 @@ export function WorkflowTriggers({
   async function submit() {
     if (pending) return;
     const now = new Date().toISOString();
-    const observationTime = external ? new Date(observedAt).toISOString() : now;
+    let observationTime = now;
+    if (external && !request) {
+      try {
+        observationTime = workspaceInstant(observedAt, timeZone);
+      } catch (error) {
+        setError(
+          error instanceof Error ? error.message : m.ui_time_error_invalid(),
+        );
+
+        return;
+      }
+    }
     const sourceId = external ? source.trim() : crypto.randomUUID();
     const body: FireWorkflow = request ?? {
       version: version.version,
@@ -233,7 +249,7 @@ export function WorkflowTriggers({
                   value={observedAt}
                   onChange={(event) => setObservedAt(event.target.value)}
                 />
-                <span>{m.workflows_triggers_occurred_help()}</span>
+                <span>{m.workflows_triggers_occurred_help({ timeZone })}</span>
               </label>
             ) : null}
           </fieldset>

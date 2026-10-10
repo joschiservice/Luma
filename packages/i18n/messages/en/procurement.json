@@ -347,7 +347,7 @@
   "procurement_message_dialog_description_read": "Paste what the supplier wrote. Luma lists each commitment with the words it came from. Changes and unclear wording wait for your review.",
   "procurement_message_dialog_description_manual": "Paste what the supplier wrote. Then select the words that state a commitment to record it. Luma can’t read messages automatically in this workspace.",
   "procurement_message_dialog_from": "From",
-  "procurement_message_dialog_received": "Received",
+  "procurement_message_dialog_received": "Received ({timeZone})",
   "procurement_message_dialog_channel": "Channel",
   "procurement_message_dialog_subject": "Subject",
   "procurement_message_dialog_subject_placeholder": "Re: {order}",

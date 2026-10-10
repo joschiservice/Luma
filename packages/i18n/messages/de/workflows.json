@@ -276,7 +276,7 @@
   "workflows_triggers_source_id": "Ereignis-ID der Quelle",
   "workflows_triggers_source_help": "Verwende die ID aus dem Quellsystem. Wird dieselbe ID erneut gesendet, startet keine zweite Ausführung.",
   "workflows_triggers_occurred_at": "Zeitpunkt",
-  "workflows_triggers_occurred_help": "Gib die Zeit in deiner lokalen Zeitzone ein.",
+  "workflows_triggers_occurred_help": "In der Zeitzone des Workspace: {timeZone}.",
   "workflows_triggers_inputs_legend": "Eingaben",
   "workflows_triggers_data_legend": "Aktuelle Daten",
   "workflows_triggers_choose_value": "Wert auswählen",

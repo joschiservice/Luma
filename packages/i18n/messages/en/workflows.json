@@ -276,7 +276,7 @@
   "workflows_triggers_source_id": "Source event ID",
   "workflows_triggers_source_help": "Use the ID from the source system. Sending the same ID again doesn’t start a second run.",
   "workflows_triggers_occurred_at": "Happened at",
-  "workflows_triggers_occurred_help": "Enter the time in your local time zone.",
+  "workflows_triggers_occurred_help": "In the workspace time zone, {timeZone}.",
   "workflows_triggers_inputs_legend": "Inputs",
   "workflows_triggers_data_legend": "Current data",
   "workflows_triggers_choose_value": "Choose a value",

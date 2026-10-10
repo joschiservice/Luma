@@ -347,7 +347,7 @@
   "procurement_message_dialog_description_read": "Füge ein, was der Lieferant geschrieben hat. Luma listet jede Zusage mit den Wörtern auf, aus denen sie stammt. Änderungen und unklare Formulierungen warten auf deine Prüfung.",
   "procurement_message_dialog_description_manual": "Füge ein, was der Lieferant geschrieben hat. Markiere dann die Wörter, die eine Zusage enthalten, um sie zu erfassen. Luma kann in diesem Workspace Nachrichten nicht automatisch lesen.",
   "procurement_message_dialog_from": "Von",
-  "procurement_message_dialog_received": "Empfangen",
+  "procurement_message_dialog_received": "Empfangen ({timeZone})",
   "procurement_message_dialog_channel": "Kanal",
   "procurement_message_dialog_subject": "Betreff",
   "procurement_message_dialog_subject_placeholder": "AW: {order}",
