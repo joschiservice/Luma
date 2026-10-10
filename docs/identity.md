@@ -29,8 +29,9 @@ The bridge exposes only email sign-up (passwords of at least 12 characters), sig
   workspace mail, and can't rejoin through an invitation, because they are still a member.
 - Membership mutations serialize on the organization row and recheck the acting membership after acquiring the lock.
 - `workspace_people` keeps each workspace's current and former members for attribution.
-  Triggers on memberships and user profiles maintain it, so no code path can skip it. Removal,
-  including account deletion, keeps the last recorded name and drops the email. Reads are
+  Triggers on memberships and user profiles maintain it, so no code path can skip it. Removal
+  keeps the last recorded name and drops the email; [erasure](#account-deletion) also drops the
+  name, so the person reads as "Former member" with their opaque ID. Reads are
   tenant-scoped under RLS; other domains name people through it instead of reading `users`.
 - Adding an existing user by UUID remains an explicit administrator action. Email invitations, role management and access history are described in [workspace settings](workspace-settings.md).
 
@@ -50,23 +51,36 @@ With `NODE_ENV=production`, Better Auth rate-limits `/two-factor/*`, like sign-i
 
 ## Security events
 
-`account_security_events` records sign-ins and account security changes: password, passkey and two-factor sign-in steps with their failure category, two-factor on and off, backup code replacement, passkeys added and removed, password changes, sessions revoked by the person or by staff, and accounts disabled or enabled by staff. Submitted passwords, codes and credentials are never stored. People read their own events in **Settings › Security**; the account comes from the session. Staff read them on the account page under an account grant.
+`account_security_events` records sign-ins and account security changes: password, passkey and two-factor sign-in steps with their failure category, two-factor on and off, backup code replacement, passkeys added and removed, password changes, sessions revoked by the person or by staff, accounts disabled or enabled by staff, and deletions scheduled or restored by staff. Submitted passwords, codes and credentials are never stored. People read their own events in **Settings › Security**; the account comes from the session. Staff read them on the account page under an account grant.
 
 - A Better Auth plugin registered after the factor plugins records Better Auth endpoints from `hooks.before` and `hooks.after`, so a password sign-in that still needs a code is recorded as pending, not as a session. Responses are unchanged, so failures for known and unknown emails stay identical. A failure for an unknown email stores an HMAC of the normalized email, keyed with `BETTER_AUTH_SECRET`, instead of a user; rotating the secret breaks correlation with older hashes.
 - Changes are recorded only when the state changed: a retried disable, revocation or passkey removal that changes nothing writes no event, and a session is signed in once. Each failed attempt is its own event. Attempts rejected by the rate limiter before reaching the endpoint are not recorded.
 - Hooks run after Better Auth's own writes. If the event can't be written the request fails and no new session cookie is delivered, but a change already made, such as a new passkey, stays. Staff session revocation and account disabling write their events inside `identity_support_revoke_sessions` and `identity_support_change_account`, with the command receipt, in one transaction. The disable event carries no reason; the staff reason stays in the staff audit.
 - The IP address comes from `X-Forwarded-For` like Better Auth's own, so it is only trustworthy behind the [production proxy](#production-proxy). User agents are client-supplied hints.
 
-Retention: the API clears IP addresses and user agents after 90 days and deletes events after a year, in bounded batches a minute after start and then hourly. Several API instances may run it concurrently. Deleting a user deletes their events.
+Retention: the API clears IP addresses and user agents after 90 days and deletes events after a year, in bounded batches a minute after start and then hourly. Several API instances may run it concurrently. Erasing an account deletes its events.
 
 ## Disabled accounts
 
-Luma staff disable an account that is compromised or abused ([staff access](staff.md#account-disabling)). A row in `account_disablements` exists while the account is disabled; only `identity_support_change_account`, owned by `luma_identity_support`, writes it, and the runtime can read only its `user_id`. Memberships, roles and factors are untouched, so enabling restores every previous workspace.
+Luma staff disable an account that is compromised or abused ([staff access](staff.md#account-disabling)). A row in `account_disablements` exists while the account is disabled; only `identity_support_change_account`, owned by `luma_identity_support`, and the [deletion](#account-deletion) functions write it, and the runtime can read only its `user_id`. Memberships, roles and factors are untouched, so enabling restores every previous workspace.
 
 - **Sign-in.** A Better Auth database hook refuses every new session of a disabled account with 403 `ACCOUNT_DISABLED`. Password, passkey and two-factor sign-ins check their credentials first, so the response reveals the state only to someone who already proved the credential. The message names no reason; it tells the person to contact their workspace owner or Luma support. The failed sign-in is recorded with reason `account-disabled`.
 - **Existing sessions.** Disabling deletes all of the account's sessions in the same transaction. Session resolution also rejects disabled accounts, which covers a session created concurrently with the disable.
 - **Every workspace.** The membership read carries the account's state, so tenant resolution, `resolveWorkflowContext` and `refreshContext` raise `AccountDisabledError`. It subclasses `MembershipSuspendedError`: background work pauses exactly as for a suspended member, Temporal activities report `MembershipSuspended`, worker discovery skips the principal, and `suspendedMembers` includes it so work shows that it needs a new owner. Disabled accounts receive no workspace mail.
 - **Support views** can't start for a disabled account, and an open view is rejected on its next request.
+
+## Account deletion
+
+Luma staff delete accounts on request ([staff access](staff.md#account-deletion)). Deletion is a flag with a 30-day restore window, then permanent erasure. `account_deletions` records each scheduling and stays as the erasure receipt. Its functions are owned by `luma_account_deletion`: the staff runtime may schedule, restore and request immediate erasure; the customer runtime may only erase deletions that are due.
+
+- **During the window** the account is disabled: scheduling adds an `account_disablements` row with category `account_deletion` unless the account is already disabled, ends its sessions and suspends its active memberships with `suspended_by_kind='account_deletion'`, so the [disabled-account rules](#disabled-accounts) apply and owners no longer count it. Enabling the account or reactivating those memberships separately returns 409; restore the account instead.
+- **Restore** reactivates exactly the memberships the deletion suspended and removes only the disablement it added, so roles, earlier suspensions and an earlier disablement are as before. Ended sessions stay ended.
+- **Owners.** An account that is the only active owner of a workspace that isn't closed can't be scheduled; owners whose accounts are disabled don't count. Transfer ownership first.
+- **Erasure** runs in the customer API every minute, up to 20 accounts per pass, each in one transaction: an interrupted erasure rolls back and the next pass repeats it, and an erased deletion is skipped. It deletes the account, credentials, sessions, factors, memberships, notification preferences, Home layouts, pending verifications, account grants, support views and security events. In `workspace_people` the name and email become empty. Invitations sent to the email, and access events and workspace commands that name the email or name, replace them with `erased-<account ID>` and "Former member"; pending invitations are revoked. Activity, audit and attribution columns keep the opaque account ID, and each workspace gets a `member.remove` access event by Luma support.
+- **Afterwards** worker discovery skips the account, and background work recorded as it raises `AccountErasedError`, a `MembershipSuspendedError`: it pauses and `suspendedMembers` reports that it needs a new owner. It never runs as the person again.
+- **Receipt.** The `account_deletions` row keeps the opaque account ID, timestamps, category, request reference and the staff who scheduled, restored or requested erasure, without personal data. The staff audit keeps `customer.account.erased` without a staff actor.
+- **Notices.** The person is emailed when the deletion is scheduled and restored, and before erasure. Notices live in `account_mail` without an address; the recipient is read from the account when sending. With mail configured, erasure waits until the completion notice is sent or has failed (five attempts or 23 hours). Like workspace mail, the notices are English only.
+- **Backups.** Erased data stays in database backups until they expire under the deployment's backup retention, and is never restored from them. Before a restored backup goes into service, erase again every account with a `customer.account.erased` staff audit entry or an `erased` deletion recorded after the backup was taken.
 
 ## Context and isolation
 
@@ -81,7 +95,7 @@ A path ID selects a tenant; it does not grant access. Each request reads the cur
 | Not a member, or the organization does not exist | 404      |
 | Organization suspended or closed                 | 404      |
 | Membership suspended (`ACCESS_SUSPENDED`)        | 403      |
-| Account disabled (sessions are gone)             | 401      |
+| Account disabled or deleted (sessions are gone)  | 401      |
 | Member without the required permission           | 403      |
 | Organization placed in another region            | 503      |
 | Provisioning in an unavailable region (US, APAC) | 422      |

@@ -84,6 +84,9 @@ function fixture() {
     findMembership: vi
       .fn<IdentityTransaction['findMembership']>()
       .mockResolvedValue(owner),
+    accountErased: vi
+      .fn<IdentityTransaction['accountErased']>()
+      .mockResolvedValue(false),
     findOrganization: vi
       .fn<IdentityTransaction['findOrganization']>()
       .mockResolvedValue(organization),

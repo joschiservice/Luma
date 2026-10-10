@@ -233,11 +233,19 @@ export async function buildRuntimeApp(
         .catch(() => app.log.error('Support view sweep failed'));
     }, 60_000);
     supportViewTimer.unref();
+    // Deletions become due after their restore window, or at once for an erasure request.
+    const erasureTimer = setInterval(() => {
+      void identity
+        .eraseDueAccounts()
+        .catch(() => app.log.error('Account erasure pass failed'));
+    }, 60_000);
+    erasureTimer.unref();
     resources.add(async () => {
       clearInterval(deliveryTimer);
       clearTimeout(retentionStart);
       clearInterval(retentionTimer);
       clearInterval(supportViewTimer);
+      clearInterval(erasureTimer);
       await identity.mailDelivery.drain();
     });
     app.addHook('onClose', resources.close);

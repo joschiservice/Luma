@@ -71,6 +71,10 @@ function eventLabel(event: SecurityEventResponse) {
       return m.settings_security_event_account_disabled();
     case 'account.enabled':
       return m.settings_security_event_account_enabled();
+    case 'account.deletion-scheduled':
+      return m.settings_security_event_account_deletion_scheduled();
+    case 'account.restored':
+      return m.settings_security_event_account_restored();
   }
 }
 

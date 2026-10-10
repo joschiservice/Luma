@@ -28,6 +28,8 @@ const eventLabels: Record<SecurityEvent['type'], string> = {
   'sessions.revoked-by-staff': 'Sessions revoked by staff',
   'account.disabled': 'Account disabled by staff',
   'account.enabled': 'Account enabled by staff',
+  'account.deletion-scheduled': 'Account scheduled for deletion by staff',
+  'account.restored': 'Account restored by staff',
 };
 
 const reasonLabels: Record<string, string> = {

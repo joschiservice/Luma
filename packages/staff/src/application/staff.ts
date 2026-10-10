@@ -1,7 +1,10 @@
 import type {
+  AccountDeletionCategory,
+  AccountDeletionCommand,
   AccountDisableCategory,
   SecurityEventType,
   SupportAccountChange,
+  SupportAccountDeletion,
   SupportMembershipChange,
   SupportSessionRevocation,
 } from '@luma/identity';
@@ -49,7 +52,7 @@ export interface WorkspaceDetail {
     owner: boolean;
     status: 'active' | 'suspended';
     suspendedAt: string | null;
-    suspendedBy: 'staff' | 'customer' | null;
+    suspendedBy: 'staff' | 'customer' | 'account_deletion' | null;
     onlyWorkspace: boolean;
     accountDisabled: boolean;
   }[];
@@ -102,6 +105,15 @@ export interface AccountDetail {
     category: AccountDisableCategory;
     reason: string;
     byName: string | null;
+  } | null;
+  deletion: {
+    id: string;
+    scheduledAt: string;
+    eraseAfter: string;
+    category: AccountDeletionCategory;
+    reference: string;
+    byName: string | null;
+    eraseRequestedAt: string | null;
   } | null;
   security: { twoFactorEnabled: boolean; passkeys: number };
   workspacesTruncated: boolean;
@@ -164,6 +176,14 @@ export type AccountChangeInput = {
 } & (
   { action: 'disable'; category: AccountDisableCategory } | { action: 'enable' }
 );
+
+/** Schedules, restores or immediately erases one customer account under an account grant. */
+export type AccountDeletionInput = {
+  userId: string;
+  grantId: string;
+  reason: string;
+  commandId: string;
+} & AccountDeletionCommand;
 
 export interface StaffRepository {
   directory(
@@ -250,6 +270,10 @@ export interface StaffRepository {
     context: StaffContext,
     input: AccountChangeInput,
   ): Promise<SupportAccountChange>;
+  changeAccountDeletion(
+    context: StaffContext,
+    input: AccountDeletionInput,
+  ): Promise<SupportAccountDeletion>;
 }
 
 /**
@@ -402,6 +426,18 @@ export function createStaffService(
       requireRecentStaffSession(context);
 
       return repository.changeAccount(context, input);
+    },
+    /**
+     * Schedules an account for deletion, restores it within the 30-day window, or erases it
+     * without the window for a verified erasure request, through identity's atomic audited
+     * commands. Erasure itself runs in the customer API's erasure pass.
+     */
+    changeAccountDeletion(context: StaffContext, input: AccountDeletionInput) {
+      requireStaffPermission(context, 'staff.accounts.inspect');
+      requireStaffPermission(context, 'staff.accounts.delete');
+      requireRecentStaffSession(context);
+
+      return repository.changeAccountDeletion(context, input);
     },
   };
 }

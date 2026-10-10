@@ -24,6 +24,10 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 
 import { reasonSchema } from './access';
+import {
+  AccountDeletionDialog,
+  deletionCategoryLabel,
+} from './account-deletion';
 import { AccountSecurityEvents } from './account-security';
 import { AccountStatusDialog, categoryLabel } from './account-status';
 import { staffApi } from './api';
@@ -63,6 +67,11 @@ export function AccountPage() {
     session.data?.permissions.includes('staff.accounts.inspect') ?? false;
   const canManage =
     session.data?.permissions.includes('staff.accounts.manage') ?? false;
+  const canDelete =
+    session.data?.permissions.includes('staff.accounts.delete') ?? false;
+  const [deletionChange, setDeletionChange] = useState<
+    'schedule' | 'restore' | 'erase_now' | null
+  >(null);
 
   return (
     <>
@@ -111,7 +120,8 @@ export function AccountPage() {
                 >
                   Refresh
                 </Button>
-                {canManage ? (
+                {/* A scheduled deletion keeps the account disabled until it is restored. */}
+                {canManage && !detail.data.deletion ? (
                   <Button
                     variant={detail.data.disabled ? 'default' : 'destructive'}
                     onClick={() =>
@@ -124,6 +134,28 @@ export function AccountPage() {
                       ? 'Enable account'
                       : 'Disable account'}
                   </Button>
+                ) : null}
+                {canDelete && !detail.data.deletion?.eraseRequestedAt ? (
+                  <>
+                    <Button
+                      variant={detail.data.deletion ? 'default' : 'outline'}
+                      onClick={() =>
+                        setDeletionChange(
+                          detail.data.deletion ? 'restore' : 'schedule',
+                        )
+                      }
+                    >
+                      {detail.data.deletion
+                        ? 'Restore account'
+                        : 'Schedule deletion'}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => setDeletionChange('erase_now')}
+                    >
+                      Erase now
+                    </Button>
+                  </>
                 ) : null}
               </>
             }
@@ -138,6 +170,18 @@ export function AccountPage() {
                 · {categoryLabel(detail.data.disabled.category)}:{' '}
                 {detail.data.disabled.reason}. The person can’t sign in, and
                 every workspace rejects them.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+          {detail.data.deletion ? (
+            <Alert tone="danger">
+              <AlertDescription>
+                {detail.data.deletion.eraseRequestedAt
+                  ? `Erasure requested ${dateTime(detail.data.deletion.eraseRequestedAt)}; the account is erased within minutes and can’t be restored.`
+                  : `Scheduled for deletion ${dateTime(detail.data.deletion.scheduledAt)}${detail.data.deletion.byName ? ` by ${detail.data.deletion.byName}` : ''}. Erased after ${dateTime(detail.data.deletion.eraseAfter)} unless restored.`}{' '}
+                {deletionCategoryLabel(detail.data.deletion.category)},
+                reference {detail.data.deletion.reference}. The person can’t
+                sign in, and their memberships are suspended.
               </AlertDescription>
             </Alert>
           ) : null}
@@ -294,6 +338,15 @@ export function AccountPage() {
           email={detail.data.account.email}
           action={statusChange}
           onClose={() => setStatusChange(null)}
+        />
+      ) : null}
+      {deletionChange && detail.data ? (
+        <AccountDeletionDialog
+          userId={userId}
+          grantId={grantId}
+          email={detail.data.account.email}
+          action={deletionChange}
+          onClose={() => setDeletionChange(null)}
         />
       ) : null}
       {requestAccess && canInspect ? (

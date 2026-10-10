@@ -12,6 +12,8 @@ export const securityEventTypes = [
   'sessions.revoked-by-staff',
   'account.disabled',
   'account.enabled',
+  'account.deletion-scheduled',
+  'account.restored',
 ] as const;
 
 export type SecurityEventType = (typeof securityEventTypes)[number];

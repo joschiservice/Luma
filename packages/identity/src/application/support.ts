@@ -140,3 +140,80 @@ export async function changeAccountForSupport(
     completedAt: new Date(receipt.completedAt).toISOString(),
   };
 }
+
+/** Why staff scheduled an account for deletion; recorded with the erasure receipt. */
+export type AccountDeletionCategory =
+  'customer_request' | 'gdpr_erasure' | 'abuse' | 'inactivity';
+
+export interface SupportAccountDeletion {
+  commandId: string;
+  deletionId: string;
+  /** `erasing`: erasure was requested without the restore window and can't be restored. */
+  status: 'scheduled' | 'restored' | 'erasing';
+  /** When the erasure pass erases the account. */
+  eraseAfter: string;
+  /** Sessions ended by this command. */
+  revokedSessions: number;
+  completedAt: string;
+}
+
+/** A deletion command for one account, with the request reference it fulfils. */
+export type AccountDeletionCommand =
+  | {
+      action: 'schedule';
+      category: AccountDeletionCategory;
+      reference: string;
+    }
+  | { action: 'restore' }
+  | { action: 'erase_now'; reference: string };
+
+/**
+ * Schedules, restores or immediately erases one customer account through the narrowly granted
+ * deletion functions. Scheduling disables the account, ends its sessions and suspends its active
+ * memberships for 30 days; restoring undoes exactly that; erasing now skips the window. The
+ * change, receipt, staff audit, security event and notice commit atomically in the caller's
+ * transaction. PostgreSQL errors carry the codes documented on the functions.
+ */
+export async function changeAccountDeletionForSupport(
+  tx: IdentitySupportTransaction,
+  input: {
+    commandId: string;
+    userId: string;
+    reason: string;
+    requestId: string;
+  } & AccountDeletionCommand,
+): Promise<SupportAccountDeletion> {
+  const result = await tx.query<{ receipt: SupportAccountDeletion }>(
+    input.action === 'schedule'
+      ? 'SELECT identity_support_schedule_account_deletion($1,$2,$3,$4,$5,$6) AS receipt'
+      : input.action === 'restore'
+        ? 'SELECT identity_support_restore_account($1,$2,$3,$4) AS receipt'
+        : 'SELECT identity_support_erase_account_now($1,$2,$3,$4,$5) AS receipt',
+    input.action === 'schedule'
+      ? [
+          input.commandId,
+          input.userId,
+          input.category,
+          input.reference,
+          input.reason,
+          input.requestId,
+        ]
+      : input.action === 'restore'
+        ? [input.commandId, input.userId, input.reason, input.requestId]
+        : [
+            input.commandId,
+            input.userId,
+            input.reference,
+            input.reason,
+            input.requestId,
+          ],
+  );
+  const receipt = result.rows[0]?.receipt;
+  if (!receipt) throw new Error('Support command returned no receipt.');
+
+  return {
+    ...receipt,
+    eraseAfter: new Date(receipt.eraseAfter).toISOString(),
+    completedAt: new Date(receipt.completedAt).toISOString(),
+  };
+}

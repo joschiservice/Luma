@@ -4,6 +4,7 @@ import type { MailProvider } from '../application/mail.js';
 import { builtInRoles, isBuiltInRole } from '../domain/roles.js';
 import type { MembershipRow } from './access.js';
 import { membershipFromRow, membershipSelect } from './access.js';
+import { drainAccountMail } from './account-deletion.js';
 import { workspaceTransaction } from './settings.js';
 
 interface Delivery {
@@ -100,6 +101,7 @@ export function createMailDelivery(
 
   async function drain() {
     if (!provider) return;
+    await drainAccountMail(pool, provider);
     const tenants = await pool.query<{ tenant_id: string }>(
       'SELECT tenant_id FROM workspace_mail_tenants()',
     );

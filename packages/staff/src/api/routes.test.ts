@@ -49,6 +49,9 @@ function fixture(
       changeAccount: async () => {
         throw new Error('Unused');
       },
+      changeAccountDeletion: async () => {
+        throw new Error('Unused');
+      },
       health: async () => {
         throw new Error('Unused');
       },
