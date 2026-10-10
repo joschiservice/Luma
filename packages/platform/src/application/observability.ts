@@ -90,6 +90,7 @@ export interface Observability {
    * diagnostics, to the log stream.
    */
   captureActivityError(error: unknown, context: ActivityFailureContext): void;
+  /** Sends a product event to PostHog in staging and production; elsewhere it does nothing. */
   capture(context: TraceContext, event: ProductEvent): void;
   /**
    * Evaluates a release flag for the context's tenant, or its action or request when no tenant

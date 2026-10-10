@@ -427,9 +427,10 @@ it('returns the fallback without calling PostHog when definitions are unavailabl
   expect(onlyDefinitionPolls(urls)).toBe(true);
 });
 
-it('never asks PostHog for flags in development or test', async () => {
+it('never contacts PostHog in development or test', async () => {
   const { telemetry, urls } = locallyEvaluated(200, 'development');
   const root = telemetry.request(randomUUID());
+  telemetry.capture(root.context, 'observability_test_completed');
   expect(await telemetry.flag(root.context, 'observability-test')).toBe(false);
   expect(await telemetry.flag(root.context, 'observability-test', true)).toBe(
     true,
@@ -453,8 +454,10 @@ it('never asks PostHog for flags in development or test', async () => {
     { posthog },
   );
   const request = remote.request(randomUUID());
+  remote.capture(request.context, 'observability_test_completed');
   expect(await remote.flag(request.context, 'observability-test')).toBe(false);
   request.end();
   await remote.shutdown();
+  expect(posthog.capture).not.toHaveBeenCalled();
   expect(posthog.isFeatureEnabled).not.toHaveBeenCalled();
 });

@@ -9,6 +9,7 @@ Credentials go in the API and worker `.env` files; see `apps/api/.env.example`. 
 - Only EU ingestion hosts are accepted: Sentry `o<org>.ingest.de.sentry.io`, `https://cloud.langfuse.com` and `https://eu.i.posthog.com`. There is no cross-region fallback. Operators must also verify each project's processing location, access and retention under [ADR-003](architecture/003-tenant-isolation-and-data-residency.md), and set retention before enabling customer traffic.
 - `OBSERVABILITY_TENANT_HASH_KEY`, a random secret of at least 32 characters, is required whenever any exporter is enabled.
 - Both Langfuse keys are required together; a partial pair fails startup.
+- PostHog receives product events and evaluates flags only in staging and production. Development and test never contact it, even when its keys are set.
 - `POSTHOG_SECRET_KEY`, a project secret key (`phs_`) or personal API key (`phx_`), enables [local flag evaluation](#feature-flags) and requires `POSTHOG_API_KEY`. Keep it out of public configuration; the project key (`phc_`) is rejected.
 - `OBSERVABILITY_SAMPLE_RATE` samples traces; all spans of a trace share the decision. Errors and explicit product events are not sampled.
 
@@ -34,7 +35,7 @@ Flags are server-side release toggles evaluated through `Observability.flag`. Th
 
 - Add the key to `featureFlags` in `@luma/platform` before creating the flag in PostHog. Unlisted keys always return the fallback.
 - Evaluation uses `tenant_ref` as the distinct ID, so a percentage rollout keeps each workspace on one side. Without a tenant, it uses the action or request ID. The only property sent is `environment`.
-- Development and test never ask PostHog for flags, even when PostHog is configured: a flag returns its override or the fallback, and no definitions are polled. Product events are still sent when `POSTHOG_API_KEY` is set. To try a flag against PostHog locally, run with `OBSERVABILITY_ENVIRONMENT=staging` and a non-production project.
+- In development and test a flag returns its override or the fallback, and no definitions are polled. To try a flag or product event against PostHog locally, run with `OBSERVABILITY_ENVIRONMENT=staging` and a non-production project.
 - In staging and production with `POSTHOG_SECRET_KEY`, the server polls flag definitions every 30 seconds and evaluates in process; checks never call PostHog. The fallback applies until the first poll succeeds, while polling fails, and for flags PostHog cannot evaluate locally, such as static cohorts or experience continuity. Without the key, each check calls PostHog with a 3-second timeout. Use local evaluation in staging and production.
 - A failed or unavailable evaluation returns the caller's fallback, `false` by default. Choose the fallback that is safe while PostHog is unreachable.
 - `FEATURE_FLAG_OVERRIDES=observability-test=true,…` fixes flag values with or without PostHog, for development, the pilot, simulators and tests. Startup fails for unlisted keys, duplicates, or any environment other than development and test.

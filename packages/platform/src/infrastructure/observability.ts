@@ -64,9 +64,9 @@ const operations: Record<Operation, string> = {
 };
 
 /**
- * Explicit context keeps concurrent requests and background work isolated. Flags are evaluated
- * by PostHog only in staging and production. Throws when a flag override names a flag outside
- * the allowlist.
+ * Explicit context keeps concurrent requests and background work isolated. PostHog receives
+ * product events and evaluates flags only in staging and production. Throws when a flag
+ * override names a flag outside the allowlist.
  */
 export function createObservability(
   settings: TelemetrySettings,
@@ -80,8 +80,9 @@ export function createObservability(
     posthogFetch?: PostHogOptions['fetch'];
   } = {},
 ): Observability {
-  // Development and test never ask PostHog for flags; they use overrides or the fallback.
-  const hostedFlags =
+  // Development and test never contact PostHog: no product events, and flags use overrides
+  // or the fallback.
+  const usePostHog =
     settings.environment === 'staging' || settings.environment === 'production';
   const flagOverrides = new Map<string, boolean>();
   for (const [flag, enabled] of Object.entries(
@@ -236,27 +237,28 @@ export function createObservability(
     ? trace.getTracer('luma')
     : provider.getTracer('luma');
   const activeSpans = new Map<string, Span>();
-  const posthog =
-    testing.posthog ??
-    (settings.posthog
-      ? new PostHog(settings.posthog.apiKey, {
-          host: settings.posthog.host,
-          ...(testing.posthogFetch ? { fetch: testing.posthogFetch } : {}),
-          disableGeoip: true,
-          requestTimeout: 3000,
-          fetchRetryCount: 0,
-          enableExceptionAutocapture: false,
-          sendFeatureFlagEvent: false,
-          // Polled definitions keep flag checks off the request path; flags they cannot
-          // resolve return the caller's fallback instead of calling PostHog.
-          ...(hostedFlags && settings.posthog.secretKey
-            ? {
-                secretKey: settings.posthog.secretKey,
-                strictLocalEvaluation: true,
-              }
-            : {}),
-        })
-      : undefined);
+  const posthog = usePostHog
+    ? (testing.posthog ??
+      (settings.posthog
+        ? new PostHog(settings.posthog.apiKey, {
+            host: settings.posthog.host,
+            ...(testing.posthogFetch ? { fetch: testing.posthogFetch } : {}),
+            disableGeoip: true,
+            requestTimeout: 3000,
+            fetchRetryCount: 0,
+            enableExceptionAutocapture: false,
+            sendFeatureFlagEvent: false,
+            // Polled definitions keep flag checks off the request path; flags they cannot
+            // resolve return the caller's fallback instead of calling PostHog.
+            ...(settings.posthog.secretKey
+              ? {
+                  secretKey: settings.posthog.secretKey,
+                  strictLocalEvaluation: true,
+                }
+              : {}),
+          })
+        : undefined))
+    : undefined;
   if (posthog instanceof PostHog)
     posthog.on('error', () => {
       // Vendor failures must not serialize request data or interrupt business operations.
@@ -498,7 +500,6 @@ export function createObservability(
       if (!isFeatureFlag(flag)) return fallback;
       const override = flagOverrides.get(flag);
       if (override !== undefined) return override;
-      if (!hostedFlags) return fallback;
       try {
         return (
           (await posthog?.isFeatureEnabled(
