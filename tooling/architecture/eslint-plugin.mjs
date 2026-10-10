@@ -206,6 +206,13 @@ export function violation(from, to) {
     return 'Use a registered module and domain/application/infrastructure/api layer.';
   }
   if (!target) {
+    // Account security email uses the public message catalog with an explicit locale.
+    if (
+      source.name === 'identity' &&
+      source.layer === 'infrastructure' &&
+      to === 'packages/i18n/messages'
+    )
+      return null;
     if (
       (source.layer === 'api' ||
         from.endsWith('/infrastructure/learning-validation.ts') ||

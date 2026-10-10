@@ -24,8 +24,10 @@ import {
   sessionOptions,
   usePasskeySupport,
 } from '../identity/data';
+import { PasswordSettings } from './password';
 import { SectionHeading } from './section-heading';
 import { SecurityActivity, securityActivityKey } from './security-activity';
+import { SessionSettings } from './sessions';
 
 export const passkeysKey = ['private', 'passkeys'] as const;
 
@@ -68,6 +70,7 @@ export function SecuritySettings({ disabled }: { disabled: boolean }) {
         description={m.settings_security_description()}
         badge={m.settings_security_badge()}
       />
+      <PasswordSettings disabled={disabled} />
       <div className="settings-panel">
         <div className="settings-panel-heading">
           <div>
@@ -126,6 +129,7 @@ export function SecuritySettings({ disabled }: { disabled: boolean }) {
         </p>
       </div>
       <PasskeySettings disabled={disabled} />
+      <SessionSettings disabled={disabled} />
       <SecurityActivity />
       {flow ? (
         <FactorDialog

@@ -59,6 +59,8 @@ function eventLabel(event: SecurityEventResponse) {
       return m.settings_security_event_passkey_removed();
     case 'password.changed':
       return m.settings_security_event_password_changed();
+    case 'password.reset':
+      return m.settings_security_event_password_reset();
     case 'sessions.revoked':
       return event.reason === 'one'
         ? m.settings_security_event_signed_out_one()

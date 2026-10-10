@@ -1,7 +1,12 @@
 import { createHmac, randomUUID } from 'node:crypto';
 
 import type { BetterAuthPlugin } from 'better-auth';
-import { createAuthMiddleware, getIP, isAPIError } from 'better-auth/api';
+import {
+  APIError,
+  createAuthMiddleware,
+  getIP,
+  isAPIError,
+} from 'better-auth/api';
 import type { Pool } from 'pg';
 
 import type {
@@ -16,6 +21,8 @@ import {
   securityEventRetentionDays,
   signInFailureReason,
 } from '../domain/security-events.js';
+import type { AuthSettings } from './auth.js';
+import { passwordMailLocale } from './password-mail.js';
 
 type Database = Pick<Pool, 'query'>;
 
@@ -131,6 +138,7 @@ interface Snapshot {
   challengeUserId: string | null;
   /** Sessions a revocation would end, or whether a passkey to remove exists. */
   targets: number;
+  resetUserId?: string;
 }
 
 const sessionPaths = new Set([
@@ -144,6 +152,7 @@ const sessionPaths = new Set([
   '/revoke-session',
   '/revoke-sessions',
   '/revoke-other-sessions',
+  '/reset-password',
 ]);
 const trackedPaths = new Set([
   ...sessionPaths,
@@ -200,6 +209,7 @@ function bodyField(body: unknown, key: string): unknown {
 export function securityEventsPlugin(
   db: Database,
   secret: string,
+  passwordMail?: AuthSettings['passwordMail'],
 ): BetterAuthPlugin {
   const snapshots = new WeakMap<object, Snapshot>();
   const emailHash = (email: string) =>
@@ -244,6 +254,34 @@ export function securityEventsPlugin(
               challengeUserId: null,
               targets: 0,
             };
+            if (ctx.path === '/reset-password') {
+              const resetToken = bodyField(ctx.body, 'token');
+              const verification =
+                typeof resetToken === 'string'
+                  ? await ctx.context.internalAdapter.findVerificationValue(
+                      `reset-password:${resetToken}`,
+                    )
+                  : null;
+              if (verification && verification.expiresAt > new Date()) {
+                const disabled = await one(
+                  'SELECT user_id FROM account_disablements WHERE user_id=$1',
+                  [verification.value],
+                );
+                if (disabled)
+                  throw new APIError('BAD_REQUEST', {
+                    code: 'INVALID_TOKEN',
+                    message: 'Invalid or expired reset link.',
+                  });
+                snapshot.resetUserId = verification.value;
+                snapshot.targets =
+                  (
+                    await one<{ count: number }>(
+                      'SELECT count(*)::int AS count FROM sessions WHERE user_id=$1 AND expires_at>now()',
+                      [verification.value],
+                    )
+                  )?.count ?? 0;
+              }
+            }
             if (!session && ctx.path.startsWith('/two-factor/verify-')) {
               const challenge = await ctx.getSignedCookie(
                 ctx.context.createAuthCookie('two_factor').name,
@@ -268,14 +306,17 @@ export function securityEventsPlugin(
                         session.user_id,
                       ],
                     )
-                  : ctx.path.startsWith('/revoke-')
+                  : ctx.path.startsWith('/revoke-') ||
+                      (ctx.path === '/change-password' &&
+                        bodyField(ctx.body, 'revokeOtherSessions') === true)
                     ? await one<{ count: number }>(
                         `SELECT count(*)::int AS count FROM sessions WHERE user_id=$1 AND expires_at>now() AND ($2='all' OR ($2='others' AND id<>$3) OR ($2='one' AND token=$4))`,
                         [
                           session.user_id,
                           ctx.path === '/revoke-sessions'
                             ? 'all'
-                            : ctx.path === '/revoke-other-sessions'
+                            : ctx.path === '/revoke-other-sessions' ||
+                                ctx.path === '/change-password'
                               ? 'others'
                               : 'one',
                           session.id,
@@ -390,6 +431,25 @@ export function securityEventsPlugin(
               );
             }
             if (!snapshot) return;
+            if (path === '/reset-password' && !failed && snapshot.resetUserId) {
+              await record(
+                'password.reset',
+                'succeeded',
+                null,
+                snapshot.resetUserId,
+                null,
+              );
+              if (snapshot.targets)
+                await record(
+                  'sessions.revoked',
+                  'succeeded',
+                  'all',
+                  snapshot.resetUserId,
+                  null,
+                );
+
+              return;
+            }
             const session = snapshot.session;
             if (path.startsWith('/two-factor/verify-') && !session) {
               if (failed)
@@ -423,6 +483,23 @@ export function securityEventsPlugin(
                 session.userId,
                 current,
               );
+            if (path === '/change-password') {
+              await passwordMail?.changed(
+                session.userId,
+                passwordMailLocale(ctx.request),
+              );
+              if (
+                bodyField(ctx.body, 'revokeOtherSessions') === true &&
+                snapshot.targets
+              )
+                await record(
+                  'sessions.revoked',
+                  'succeeded',
+                  'others',
+                  session.userId,
+                  current,
+                );
+            }
           }),
         },
       ],

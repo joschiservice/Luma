@@ -90,6 +90,20 @@ function mockSecurity(state: SecurityState = 'off') {
           twoFactorEnabled: enabled,
         },
       });
+    if (path === '/list-sessions')
+      return state === 'unavailable'
+        ? Response.json({ message: 'Unavailable' }, { status: 503 })
+        : Response.json([
+            {
+              id: 'session',
+              token: 'preview-token',
+              current: true,
+              lastActiveAt: '2026-10-09T08:40:00Z',
+              ipAddress: '192.0.2.24',
+              browser: 'Firefox 143',
+              os: 'macOS',
+            },
+          ]);
     if (path === '/passkey/list-user-passkeys')
       return state === 'unavailable'
         ? Response.json({ message: 'Unavailable' }, { status: 503 })

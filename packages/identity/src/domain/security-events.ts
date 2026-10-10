@@ -8,6 +8,7 @@ export const securityEventTypes = [
   'passkey.added',
   'passkey.removed',
   'password.changed',
+  'password.reset',
   'sessions.revoked',
   'sessions.revoked-by-staff',
   'account.disabled',

@@ -11,6 +11,10 @@ import { eraseDueAccounts } from './infrastructure/account-deletion.js';
 import type { AuthSettings } from './infrastructure/auth.js';
 import { createResendMail } from './infrastructure/mail.js';
 import { createMailDelivery } from './infrastructure/mail-delivery.js';
+import {
+  createPasswordMail,
+  drainPasswordMail,
+} from './infrastructure/password-mail.js';
 import { createRepository } from './infrastructure/repository.js';
 import { createRolesRepository } from './infrastructure/roles.js';
 import { purgeSecurityEvents } from './infrastructure/security-events.js';
@@ -37,12 +41,16 @@ export function createIdentity(
     statement_timeout: 5000,
     idle_in_transaction_session_timeout: 10000,
   });
-  const { repository, auth } = createRepository(pool, settings);
-
-  const service = createIdentityService(repository);
   const provider =
     settings.mailProvider ??
     (settings.mail ? createResendMail(settings.mail) : undefined);
+  const { repository, auth } = createRepository(pool, {
+    ...settings,
+    ...(provider
+      ? { passwordMail: createPasswordMail(pool, settings.secret) }
+      : {}),
+  });
+  const service = createIdentityService(repository);
   const token = (tenantId: string, id: string, generation: number) =>
     createHmac('sha256', settings.secret)
       .update(`invitation:${tenantId}:${id}:${generation}`)
@@ -74,7 +82,19 @@ export function createIdentity(
         id: randomUUID,
         now: () => new Date(),
       }),
-    mailDelivery,
+    mailDelivery: {
+      /** Drains workspace and account security notices through the configured provider. */
+      async drain() {
+        await mailDelivery.drain();
+        if (provider)
+          await drainPasswordMail(
+            pool,
+            provider,
+            settings.mail?.origin ?? settings.mailOrigin ?? settings.baseURL,
+            settings.secret,
+          );
+      },
+    },
     /**
      * Applies security event retention as of `now`: clears IP addresses and user agents after
      * 90 days and deletes events after a year. Safe to run repeatedly and concurrently.

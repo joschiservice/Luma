@@ -24,6 +24,7 @@ const eventLabels: Record<SecurityEvent['type'], string> = {
   'passkey.added': 'Passkey added',
   'passkey.removed': 'Passkey removed',
   'password.changed': 'Password changed',
+  'password.reset': 'Password reset',
   'sessions.revoked': 'Sessions signed out by the customer',
   'sessions.revoked-by-staff': 'Sessions revoked by staff',
   'account.disabled': 'Account disabled by staff',

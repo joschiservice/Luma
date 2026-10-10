@@ -104,6 +104,7 @@ export const securityEventTypeSchema = z.enum([
   'passkey.added',
   'passkey.removed',
   'password.changed',
+  'password.reset',
   'sessions.revoked',
   'sessions.revoked-by-staff',
   'account.disabled',

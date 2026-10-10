@@ -17,8 +17,8 @@ The web server entry runs Paraglide's middleware around every request, which mak
 request's language available to rendering and server handlers through async local storage.
 Code that runs outside a request, such as unit tests and scripts, gets English.
 
-The language is not stored on the member's account. Email and other text produced by the
-API stays in English; see [text from the server](#text-from-the-server).
+The language is not stored on the member's account. Most email and other text produced by the
+API stays in English; account recovery and password-change notices use the initiating browser’s language; see [text from the server](#text-from-the-server).
 
 ## Writing messages
 
@@ -76,7 +76,7 @@ same change.
 Other visible text still arrives in English: provider data, issue diagnosis and decision
 explanations, workflow templates and step summaries, reads, actions and checks that apps
 describe for workflow authors, reasons an entry can't run, metric coverage notes, model
-answers, API error details and email. Error handling maps generic API error codes to
+answers, API error details and most email. Error handling maps generic API error codes to
 translated messages and keeps the server's detail for validation and conflict errors, which
 are specific to the request.
 

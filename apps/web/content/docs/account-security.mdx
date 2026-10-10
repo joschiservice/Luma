@@ -5,6 +5,18 @@ description: Add an authenticator app code to your password, keep backup codes, 
 
 Your sign-in protects every workspace you belong to, including approvals and changes to connected systems. Open **Settings → Security** to add a code step after your password, or a passkey that replaces the password. These settings belong to your account and apply in every workspace.
 
+## Change your password
+
+Under **Settings → Security → Password**, select **Change password**. Enter your current password and a new password with at least 12 characters. Select **Sign out other devices** to keep only this device signed in.
+
+With two-factor authentication on, you need to have signed in within the last 15 minutes. Otherwise, sign out and sign in again with your second factor. Luma emails you after a password change when email delivery is configured.
+
+## Review active sessions
+
+**Active sessions** shows your signed-in browsers and devices, IP address and last activity. **This session** marks your current sign-in. Activity updates at most every five minutes. Device descriptions are estimates; an IP address does not identify an exact location.
+
+Select **Sign out** for one session or **Sign out all other sessions**, then confirm. Ended sessions are rejected on their next request. Signing out this session returns you to the sign-in page.
+
 ## Turn on two-factor authentication
 
 With two-factor authentication on, Luma asks for a 6-digit code from an authenticator app after your password. Any app that supports time-based codes works, such as 1Password, Google Authenticator or Microsoft Authenticator.
@@ -51,13 +63,13 @@ To stop using codes, select **Turn off** under **Authenticator app** and enter y
 
 Luma keeps devices and IP addresses for 90 days and the activity for one year. Only you see your activity; Luma support can review it when you ask for help.
 
-If you see a sign-in you don’t recognize, remove passkeys you don’t recognize, replace your backup codes and turn on two-factor authentication if it’s off. Then ask Luma support to sign you out of all sessions.
+If you see a sign-in you don’t recognize, remove passkeys you don’t recognize, replace your backup codes and turn on two-factor authentication if it’s off. Then sign out all other sessions under **Active sessions** and change your password.
 
 ## If you lose access
 
 - **Lost your authenticator device**: sign in with a backup code or a passkey. Then turn two-factor authentication off and set it up again on your new device.
 - **Used up your backup codes**: sign in with your authenticator app or a passkey and select **New backup codes**.
-- **Forgot your password**: sign in with a passkey if you’ve added one. Luma doesn’t offer a password reset on the sign-in page.
+- **Forgot your password**: select **Forgot password?** on the sign-in page and enter your email. The emailed link expires in 15 minutes and works once. Resetting signs out every session. Your two-factor authentication stays on. If email delivery is unavailable, contact Luma support.
 - **“This account is disabled”**: Luma support has disabled your account, for example after a report that it was compromised. You can’t sign in with a password or a passkey, and none of your workspaces open. Contact your workspace owner or Luma support. Once support enables the account, you can sign in again and your workspaces and roles are as they were.
 
 Without your authenticator app, a backup code or a passkey, you can’t finish signing in. Keep at least two of them available.

@@ -11,6 +11,8 @@ const endpoints = new Set([
   'POST /revoke-other-sessions',
   'GET /list-sessions',
   'POST /change-password',
+  'POST /request-password-reset',
+  'POST /reset-password',
   'POST /two-factor/enable',
   'POST /two-factor/disable',
   'POST /two-factor/verify-totp',

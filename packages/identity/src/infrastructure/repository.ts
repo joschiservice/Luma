@@ -81,7 +81,7 @@ function normalizeDatabaseError(error: unknown): never {
 export function createRepository(pool: Pool, settings: AuthSettings) {
   const db = drizzle(pool, { schema });
   const auth = createAuth(db, settings, undefined, [
-    securityEventsPlugin(pool, settings.secret),
+    securityEventsPlugin(pool, settings.secret, settings.passwordMail),
   ]);
   const repository: IdentityRepository = {
     async getSession(credentials) {

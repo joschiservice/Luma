@@ -284,6 +284,11 @@ export function AuthForm({
               : m.identity_auth_signin_submit()}
         </Button>
       </form>
+      {!signup ? (
+        <p className="auth-switch">
+          <Link to="/forgot-password">{m.identity_auth_forgot_password()}</Link>
+        </p>
+      ) : null}
       {passkeys ? (
         <>
           <p className="auth-divider">
@@ -313,7 +318,8 @@ export function AuthForm({
   );
 }
 
-function AuthLayout({
+/** Shares the entry-page layout between sign-in and account recovery. */
+export function AuthLayout({
   title,
   lead,
   children,

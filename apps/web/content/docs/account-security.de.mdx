@@ -5,6 +5,18 @@ description: Ergänze dein Passwort um einen Code aus einer Authenticator-App, b
 
 Deine Anmeldung schützt jeden Workspace, zu dem du gehörst, einschließlich Genehmigungen und Änderungen in verbundenen Systemen. Unter **Einstellungen → Sicherheit** ergänzt du nach dem Passwort einen Code-Schritt oder fügst einen Passkey hinzu, der das Passwort ersetzt. Diese Einstellungen gehören zu deinem Konto und gelten in jedem Workspace.
 
+## Passwort ändern [#change-your-password]
+
+Wähle unter **Einstellungen → Sicherheit → Passwort** die Option **Passwort ändern**. Gib dein aktuelles Passwort und ein neues Passwort mit mindestens 12 Zeichen ein. Wähle **Andere Geräte abmelden**, wenn du nur auf diesem Gerät angemeldet bleiben möchtest.
+
+Bei eingeschalteter Zwei-Faktor-Authentifizierung musst du dich innerhalb der letzten 15 Minuten angemeldet haben. Melde dich andernfalls ab und mit deinem zweiten Faktor wieder an. Luma sendet dir nach einer Passwortänderung eine E-Mail, wenn der E-Mail-Versand eingerichtet ist.
+
+## Aktive Sitzungen prüfen [#review-active-sessions]
+
+**Aktive Sitzungen** zeigt deine angemeldeten Browser und Geräte, die IP-Adresse und die letzte Aktivität. **Diese Sitzung** markiert deine aktuelle Anmeldung. Die Aktivität wird höchstens alle fünf Minuten aktualisiert. Geräteangaben sind Schätzungen; die IP-Adresse zeigt keinen genauen Standort.
+
+Wähle **Abmelden** bei einer Sitzung oder **Alle anderen Sitzungen abmelden** und bestätige die Auswahl. Abgemeldete Sitzungen werden bei ihrer nächsten Anfrage abgewiesen. Meldest du diese Sitzung ab, kehrst du zur Anmeldeseite zurück.
+
 ## Zwei-Faktor-Authentifizierung einschalten [#turn-on-two-factor-authentication]
 
 Mit Zwei-Faktor-Authentifizierung fragt Luma nach dem Passwort nach einem 6-stelligen Code aus einer Authenticator-App. Jede App mit zeitbasierten Codes funktioniert, etwa 1Password, Google Authenticator oder Microsoft Authenticator.
@@ -51,13 +63,13 @@ Um keine Codes mehr zu verwenden, wähle unter **Authenticator-App** **Ausschalt
 
 Luma speichert Gerät und IP-Adresse 90 Tage und die Aktivität ein Jahr lang. Nur du siehst deine Aktivität; Luma-Support kann sie bei einer Supportanfrage einsehen.
 
-Siehst du eine Anmeldung, die du nicht erkennst, entferne unbekannte Passkeys, ersetze deine Backup-Codes und schalte die Zwei-Faktor-Authentifizierung ein, falls sie aus ist. Bitte dann den Luma-Support, dich von allen Sitzungen abzumelden.
+Siehst du eine Anmeldung, die du nicht erkennst, entferne unbekannte Passkeys, ersetze deine Backup-Codes und schalte die Zwei-Faktor-Authentifizierung ein, falls sie aus ist. Melde unter **Aktive Sitzungen** alle anderen Sitzungen ab und ändere dein Passwort.
 
 ## Wenn du den Zugang verlierst [#if-you-lose-access]
 
 - **Authenticator-Gerät verloren**: Melde dich mit einem Backup-Code oder Passkey an. Schalte dann die Zwei-Faktor-Authentifizierung aus und richte sie auf dem neuen Gerät neu ein.
 - **Backup-Codes aufgebraucht**: Melde dich mit deiner Authenticator-App oder einem Passkey an und wähle **Neue Backup-Codes**.
-- **Passwort vergessen**: Melde dich mit einem Passkey an, falls du einen hinzugefügt hast. Auf der Anmeldeseite bietet Luma kein Zurücksetzen des Passworts an.
+- **Passwort vergessen**: Wähle auf der Anmeldeseite **Passwort vergessen?** und gib deine E-Mail-Adresse ein. Der Link in der E-Mail läuft nach 15 Minuten ab und funktioniert einmal. Nach dem Zurücksetzen werden alle Sitzungen abgemeldet. Deine Zwei-Faktor-Authentifizierung bleibt eingeschaltet. Ist der E-Mail-Versand nicht verfügbar, wende dich an den Luma-Support.
 - **„Dieses Konto ist deaktiviert“**: Der Luma-Support hat dein Konto deaktiviert, zum Beispiel nach einem Hinweis, dass es kompromittiert wurde. Du kannst dich weder mit Passwort noch mit Passkey anmelden, und keiner deiner Workspaces lässt sich öffnen. Wende dich an einen Inhaber deines Workspace oder den Luma-Support. Sobald der Support das Konto wieder aktiviert, kannst du dich wieder anmelden; deine Workspaces und Rollen sind unverändert.
 
 Ohne Authenticator-App, Backup-Code oder Passkey kannst du die Anmeldung nicht abschließen. Halte mindestens zwei davon bereit.
