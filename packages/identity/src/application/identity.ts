@@ -7,6 +7,7 @@ import type {
   TenantContext,
 } from '../domain/context.js';
 import {
+  AccountErasedError,
   IdentityError,
   isOwner,
   makeTenantContext,
@@ -67,6 +68,8 @@ export interface IdentityTransaction {
   /** Reads the user's own name and email. */
   profile(): Promise<{ name: string; email: string } | null>;
   findMembership(organizationId: string): Promise<Membership | null>;
+  /** Reports whether the user's account was erased; their recorded work still names them. */
+  accountErased(): Promise<boolean>;
   findOrganization(organizationId: string): Promise<Organization | null>;
   createOrganization(input: {
     name: string;
@@ -76,8 +79,8 @@ export interface IdentityTransaction {
   lockOrganization(organizationId: string): Promise<void>;
   listMembers(organizationId: string): Promise<Membership[]>;
   /**
-   * Returns which of the given user IDs have a suspended membership in the workspace or a
-   * disabled account.
+   * Returns which of the given user IDs have a suspended membership in the workspace, a
+   * disabled account or an erased account.
    */
   suspendedMembers(
     organizationId: string,
@@ -172,6 +175,8 @@ export function createIdentityService(repository: IdentityRepository) {
     supportView?: SupportView,
   ) {
     const member = await tx.findMembership(organizationId);
+    // Background work recorded as an erased account pauses instead of failing.
+    if (!member && (await tx.accountErased())) throw new AccountErasedError();
     const organization = member && (await tx.findOrganization(organizationId));
     if (!member || !organization)
       throw new IdentityError(404, 'NOT_FOUND', 'Organization not found');
@@ -438,7 +443,7 @@ export function createIdentityService(repository: IdentityRepository) {
     },
     /**
      * Returns which of the given users can't act in the context's workspace: their membership is
-     * suspended or their account disabled. Callers authorize the read that referenced them; work
+     * suspended or their account disabled or erased. Callers authorize the read that referenced them; work
      * acting as them is paused and needs a new owner.
      */
     async suspendedMembers(

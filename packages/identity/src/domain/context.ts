@@ -125,6 +125,19 @@ export class AccountDisabledError extends MembershipSuspendedError {
 }
 
 /**
+ * Rejects background work acting as a person whose account was erased. It is a
+ * `MembershipSuspendedError`, so the work pauses and shows that it needs a new owner; it never
+ * continues as that person.
+ */
+export class AccountErasedError extends MembershipSuspendedError {
+  constructor() {
+    super(
+      'This account was deleted. Another member needs to take over its work.',
+    );
+  }
+}
+
+/**
  * Reports whether background work should pause and check again later instead of failing:
  * the workspace is inactive, or the member it acts as is suspended or their account disabled.
  */

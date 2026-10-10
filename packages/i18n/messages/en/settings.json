@@ -399,6 +399,8 @@
   "settings_security_event_signed_out_by_support": "Luma support signed you out of all sessions",
   "settings_security_event_account_disabled": "Luma support disabled your account and signed you out",
   "settings_security_event_account_enabled": "Luma support enabled your account again",
+  "settings_security_event_account_deletion_scheduled": "Luma support scheduled your account for deletion and signed you out",
+  "settings_security_event_account_restored": "Luma support cancelled the deletion of your account",
   "settings_security_reason_invalid_credentials": "The password was wrong.",
   "settings_security_reason_invalid_code": "The code was wrong.",
   "settings_security_reason_too_many_attempts": "Too many wrong codes were entered.",

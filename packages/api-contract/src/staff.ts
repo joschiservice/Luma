@@ -13,6 +13,7 @@ export const staffPermissionSchema = z.enum([
   'staff.view-as',
   'staff.view-as.emergency',
   'staff.accounts.manage',
+  'staff.accounts.delete',
 ]);
 
 /** Why staff disabled an account. Staff see it; the customer never does. */
@@ -23,6 +24,17 @@ export const staffAccountDisableCategorySchema = z.enum([
   'legal_request',
   'other',
 ]);
+
+/** Why staff scheduled an account for deletion; kept with the erasure receipt. */
+export const staffAccountDeletionCategorySchema = z.enum([
+  'customer_request',
+  'gdpr_erasure',
+  'abuse',
+  'inactivity',
+]);
+
+/** The request a deletion fulfils, such as a ticket ID. Must not contain personal data. */
+const staffDeletionReferenceSchema = z.string().trim().min(3).max(200);
 
 /** A suspended membership keeps its role and the account; it has no access to the workspace. */
 const staffMembershipStatusSchema = z.enum(['active', 'suspended']);
@@ -63,8 +75,11 @@ export const staffDetailSchema = z.object({
       owner: z.boolean(),
       status: staffMembershipStatusSchema,
       suspendedAt: z.string().datetime().nullable(),
-      /** Who suspended the membership: Luma staff or someone in the workspace. */
-      suspendedBy: z.enum(['staff', 'customer']).nullable(),
+      /**
+       * Who suspended the membership: Luma staff, someone in the workspace, or the account's
+       * scheduled deletion.
+       */
+      suspendedBy: z.enum(['staff', 'customer', 'account_deletion']).nullable(),
       /** The person belongs to no other workspace; banning the workspace may disable them too. */
       onlyWorkspace: z.boolean(),
       /** Luma staff disabled the person's account, so no workspace accepts them. */
@@ -127,6 +142,19 @@ export const staffAccountChangeSchema = z.object({
   commandId: z.string().uuid(),
   status: z.enum(['disabled', 'enabled']),
   /** Sessions ended by disabling; enabling ends none. */
+  revokedSessions: z.number().int().nonnegative(),
+  completedAt: z.string().datetime(),
+});
+
+/** The receipt of an account deletion command; retries return the original. */
+export const staffAccountDeletionChangeSchema = z.object({
+  commandId: z.string().uuid(),
+  deletionId: z.string().uuid(),
+  /** `erasing`: erasure without the restore window was requested; it can't be restored. */
+  status: z.enum(['scheduled', 'restored', 'erasing']),
+  /** When the account is erased. */
+  eraseAfter: z.string().datetime(),
+  /** Sessions ended by this command. */
   revokedSessions: z.number().int().nonnegative(),
   completedAt: z.string().datetime(),
 });
@@ -438,6 +466,20 @@ export const staffAccountDetailSchema = z.object({
       reason: z.string(),
       /** The staff member's current name; null when they no longer exist. */
       byName: z.string().nullable(),
+    })
+    .nullable(),
+  /** Present while the account is scheduled for deletion; it is disabled until then. */
+  deletion: z
+    .object({
+      id: z.string().uuid(),
+      scheduledAt: z.string().datetime(),
+      eraseAfter: z.string().datetime(),
+      category: staffAccountDeletionCategorySchema,
+      reference: z.string(),
+      /** The staff member's current name; null when they no longer exist. */
+      byName: z.string().nullable(),
+      /** Set when erasure without the restore window was requested; restore is then refused. */
+      eraseRequestedAt: z.string().datetime().nullable(),
     })
     .nullable(),
   security: z.object({
@@ -827,4 +869,75 @@ export const staffContract = {
       }),
     )
     .output(staffAccountChangeSchema),
+  scheduleAccountDeletion: endpoint
+    .route({
+      method: 'POST',
+      path: '/v1/staff/accounts/{userId}/deletion',
+      summary: 'Schedule a customer account for deletion',
+      description:
+        'Disables the account, ends its sessions and suspends its memberships now, and erases it permanently after 30 days unless it is restored. Refused with 409 while the person is the only owner of a workspace that isn’t closed. Uses a current account grant. Requires `staff.accounts.delete`, recent staff authentication, a category, the request reference and acknowledgement of the effect on all workspaces. The person is notified by email. Repeated command IDs return the original receipt; reusing one for another request returns 409.',
+    })
+    .meta({ errors })
+    .input(
+      z.object({
+        params: accountParams,
+        body: z
+          .object({
+            grantId: z.string().uuid(),
+            category: staffAccountDeletionCategorySchema,
+            reference: staffDeletionReferenceSchema,
+            reason: staffReasonSchema,
+            commandId: z.string().uuid(),
+            acknowledgeGlobalEffect: z.literal(true),
+          })
+          .strict(),
+      }),
+    )
+    .output(staffAccountDeletionChangeSchema),
+  restoreAccount: endpoint
+    .route({
+      method: 'POST',
+      path: '/v1/staff/accounts/{userId}/restore',
+      summary: 'Restore an account scheduled for deletion',
+      description:
+        'Cancels the scheduled deletion: the memberships it suspended become active again with their roles, and the account is enabled unless it was disabled before. Ended sessions stay ended. Refused with 409 when no deletion is scheduled or erasure was already requested. Uses a current account grant. Requires `staff.accounts.delete` and recent staff authentication. The person is notified by email. Repeated command IDs return the original receipt.',
+    })
+    .meta({ errors })
+    .input(
+      z.object({
+        params: accountParams,
+        body: z
+          .object({
+            grantId: z.string().uuid(),
+            reason: staffReasonSchema,
+            commandId: z.string().uuid(),
+          })
+          .strict(),
+      }),
+    )
+    .output(staffAccountDeletionChangeSchema),
+  eraseAccountNow: endpoint
+    .route({
+      method: 'POST',
+      path: '/v1/staff/accounts/{userId}/erasure',
+      summary: 'Erase a customer account now',
+      description:
+        'For a verified erasure request under GDPR Art. 17: skips the 30-day restore window and erases the account within minutes. It can’t be restored. Schedules the deletion first when none is scheduled, with the same owner check. Uses a current account grant. Requires `staff.accounts.delete`, recent staff authentication, the request reference and acknowledgement that erasure is permanent. Repeated command IDs return the original receipt.',
+    })
+    .meta({ errors })
+    .input(
+      z.object({
+        params: accountParams,
+        body: z
+          .object({
+            grantId: z.string().uuid(),
+            reference: staffDeletionReferenceSchema,
+            reason: staffReasonSchema,
+            commandId: z.string().uuid(),
+            acknowledgePermanent: z.literal(true),
+          })
+          .strict(),
+      }),
+    )
+    .output(staffAccountDeletionChangeSchema),
 };

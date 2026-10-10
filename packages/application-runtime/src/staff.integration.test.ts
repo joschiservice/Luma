@@ -335,6 +335,13 @@ describe.skipIf(!databaseUrl)(
           .sort();
       expect(await columns('staff_account_profile')).toEqual([
         'created_at',
+        'deletion_erase_after',
+        'deletion_erase_requested_at',
+        'deletion_id',
+        'deletion_reason_category',
+        'deletion_reference',
+        'deletion_scheduled_at',
+        'deletion_scheduled_by_name',
         'disabled_at',
         'disabled_by_name',
         'disabled_reason',

@@ -216,9 +216,11 @@ export function WorkspacePage() {
                       <div>
                         <Badge tone="warning">Suspended</Badge>
                         <p className="staff-muted">
-                          {row.suspendedBy === 'staff'
-                            ? 'By Luma support'
-                            : 'By the workspace'}
+                          {row.suspendedBy === 'account_deletion'
+                            ? 'Account scheduled for deletion'
+                            : row.suspendedBy === 'staff'
+                              ? 'By Luma support'
+                              : 'By the workspace'}
                           {row.suspendedAt
                             ? `, ${new Date(row.suspendedAt).toLocaleString()}`
                             : ''}
@@ -242,6 +244,8 @@ export function WorkspacePage() {
                           email: string;
                           owner: boolean;
                           status: 'active' | 'suspended';
+                          suspendedBy:
+                            'staff' | 'customer' | 'account_deletion' | null;
                           accountDisabled: boolean;
                         }) => (
                           <div className="staff-actions">
@@ -268,7 +272,9 @@ export function WorkspacePage() {
                                 Revoke sessions
                               </Button>
                             ) : null}
-                            {canManageMemberships ? (
+                            {/* Restoring the account brings these memberships back. */}
+                            {canManageMemberships &&
+                            row.suspendedBy !== 'account_deletion' ? (
                               <Button
                                 variant="outline"
                                 size="sm"

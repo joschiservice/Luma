@@ -138,6 +138,13 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
 
               return row ? membershipFromRow(row) : null;
             },
+            async accountErased() {
+              const result = await tx.execute(
+                sql`SELECT 1 FROM account_deletions WHERE user_id=${userId} AND status='erased'`,
+              );
+
+              return result.rows.length > 0;
+            },
             async findOrganization(organizationId) {
               const [row] = await tx
                 .select()
@@ -233,7 +240,17 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
                   ),
                 );
 
-              return rows.map((row) => row.userId);
+              const erased = await tx.execute<{ user_id: string }>(
+                sql`SELECT user_id FROM account_deletions WHERE status='erased' AND user_id IN (${sql.join(
+                  [...userIds].map((id) => sql`${id}`),
+                  sql`,`,
+                )})`,
+              );
+
+              return [
+                ...rows.map((row) => row.userId),
+                ...erased.rows.map((row) => row.user_id),
+              ];
             },
             async findRole(organizationId, roleId) {
               if (isBuiltInRole(roleId)) {

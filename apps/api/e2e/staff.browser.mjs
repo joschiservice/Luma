@@ -75,6 +75,7 @@ async function fixture(t) {
         'staff.accounts.inspect',
         'staff.memberships.manage',
         'staff.accounts.manage',
+        'staff.accounts.delete',
       ],
     },
     db.ownerUrl,
@@ -505,6 +506,170 @@ test('staff disables an account, its sign-in is refused, and enabling restores i
     'customer.account.disabled',
     'customer.account.enabled',
   ]);
+  expect(errors).toEqual([]);
+});
+
+test('staff schedules, restores and erases an account, and history shows a former member', async ({
+  resources: t,
+}) => {
+  const { page, db, customerApi, workspace, errors } = await fixture(t);
+  const member = await signup(customerApi, 'leaver');
+  await db.owner.query(
+    "INSERT INTO memberships(id,tenant_id,user_id,role,created_at) VALUES($1,$2,$3,'admin',now())",
+    [randomUUID(), workspace.id, member.userId],
+  );
+  // A change the person recorded, so Activity names them before and after erasure.
+  await db.owner.query(
+    "INSERT INTO workspace_access_events(id,tenant_id,actor_id,event_type,target_id,after_value) VALUES($1,$2::uuid,$3,'workspace.updated',$2::text,$4)",
+    [randomUUID(), workspace.id, member.userId, { name: 'Support North' }],
+  );
+  const openAccount = async (email) => {
+    await page.getByLabel('Name, email or workspace').fill(email);
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    await page.getByRole('link', { name: `Open account ${email}` }).click();
+    await page
+      .getByRole('button', { name: 'Open account access', exact: true })
+      .click();
+    await page
+      .getByRole('dialog')
+      .getByLabel('Support reason or ticket reference')
+      .fill('Deletion request, ticket SUP-7710');
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Open account access', exact: true })
+      .click();
+  };
+  const deletion = async (button, values) => {
+    await page.getByRole('button', { name: button, exact: true }).click();
+    const dialog = page.getByRole('dialog');
+    if (values.reference)
+      await dialog.getByLabel('Request reference').fill(values.reference);
+    await dialog.getByLabel(values.reasonLabel).fill(values.reason);
+    if (values.reference) await dialog.getByRole('checkbox').check();
+    await dialog
+      .getByRole('button', { name: values.submit, exact: true })
+      .click();
+  };
+
+  await signIn(page);
+  // The only owner can't be deleted until someone else owns the workspace.
+  await openAccount('customer@example.test');
+  await deletion('Schedule deletion', {
+    reference: 'SUP-7709',
+    reasonLabel: 'Reason for deleting the account',
+    reason: 'Account holder asked for deletion',
+    submit: 'Schedule deletion',
+  });
+  await expect(page.getByRole('dialog')).toContainText('only owner');
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+
+  await page.getByRole('link', { name: 'Back to directory' }).click();
+  await openAccount('leaver@example.test');
+  await deletion('Schedule deletion', {
+    reference: 'SUP-7710',
+    reasonLabel: 'Reason for deleting the account',
+    reason: 'Account holder asked for deletion',
+    submit: 'Schedule deletion',
+  });
+  await expect(page.getByRole('status')).toContainText('Deletion scheduled.');
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(page.locator('body')).toContainText('Scheduled for deletion');
+  await expect(page.locator('body')).toContainText('reference SUP-7710');
+  await expect(
+    page.getByRole('button', { name: 'Disable account', exact: true }),
+  ).toHaveCount(0);
+  await page.screenshot({
+    path: test.info().outputPath('account-deletion-scheduled.png'),
+    fullPage: true,
+    animations: 'disabled',
+  });
+  await customerApi.request('/v1/organizations', {
+    cookie: member.cookie,
+    status: 401,
+  });
+
+  await deletion('Restore account', {
+    reasonLabel: 'Reason for restoring the account',
+    reason: 'Account holder changed their mind',
+    submit: 'Restore account',
+  });
+  await expect(page.getByRole('status')).toContainText('Account restored.');
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: 'Schedule deletion', exact: true }),
+  ).toBeVisible();
+  expect(
+    (
+      await db.owner.query(
+        'SELECT role,status FROM memberships WHERE user_id=$1',
+        [member.userId],
+      )
+    ).rows,
+  ).toEqual([{ role: 'admin', status: 'active' }]);
+
+  await deletion('Erase now', {
+    reference: 'GDPR-17-0099',
+    reasonLabel: 'How the request was verified',
+    reason: 'Verified Art. 17 request from the account holder',
+    submit: 'Erase account now',
+  });
+  await expect(page.getByRole('status')).toContainText('Erasure requested.');
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(page.locator('body')).toContainText('Erasure requested');
+  // The API's erasure pass runs every minute; erase directly instead of waiting for it.
+  const { id: deletionId } = (
+    await db.owner.query(
+      "SELECT id FROM account_deletions WHERE user_id=$1 AND status='scheduled'",
+      [member.userId],
+    )
+  ).rows[0];
+  await db.owner.query('SELECT account_erase($1)', [deletionId]);
+  // Erasure also removed the account grant.
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Account unavailable', level: 1 }),
+  ).toBeVisible();
+
+  // The workspace owner sees the person's history as a former member.
+  const customerPort = await availablePort();
+  const customerOrigin = `http://127.0.0.1:${customerPort}`;
+  const customerWebApi = await startApi(t, db, customerOrigin);
+  const customerWeb = startProcess(
+    t,
+    'e2e/web-server.mjs',
+    {
+      TEST_API_ORIGIN: customerWebApi.origin,
+      TEST_WEB_PORT: String(customerPort),
+    },
+    true,
+  );
+  await customerWeb.message('listening');
+  const customerPage = await (
+    await t.newContext({
+      baseURL: customerOrigin,
+      viewport: { width: 1440, height: 900 },
+    })
+  ).newPage();
+  customerPage.on('pageerror', (error) => errors.push(error.message));
+  await customerPage.goto('/sign-in');
+  await customerPage
+    .getByLabel('Email', { exact: true })
+    .fill('customer@example.test');
+  await customerPage
+    .getByLabel('Password', { exact: true })
+    .fill('long-e2e-test-password');
+  await customerPage
+    .getByRole('button', { name: 'Sign in', exact: true })
+    .click();
+  await expect(customerPage).toHaveURL(new RegExp(workspace.id));
+  await customerPage.goto(`/app/${workspace.id}/activity`);
+  await expect(customerPage.locator('body')).toContainText('Former member');
+  await expect(customerPage.locator('body')).not.toContainText('leaver');
+  await customerPage.screenshot({
+    path: test.info().outputPath('account-erased-activity.png'),
+    fullPage: true,
+    animations: 'disabled',
+  });
   expect(errors).toEqual([]);
 });
 

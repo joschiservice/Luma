@@ -386,6 +386,16 @@ describe.skipIf(!databaseUrl)(
         member,
       ]);
       expect((await principals()).detection_worker_scopes).toEqual([member]);
+
+      // An erased account never acts again, though its recorded work keeps its ID.
+      await owner.query(
+        "INSERT INTO account_deletions(id,user_id,status,reason_category,reference,scheduled_by,erase_after,disabled_account,erased_at) VALUES($1,$2,'erased','customer_request','REF-1',$3,now(),true,now())",
+        [randomUUID(), member, randomUUID()],
+      );
+      for (const [scope, found] of Object.entries(await principals())) {
+        expect(found, scope).not.toContain(member);
+        expect(found, scope).toContain('operator');
+      }
     });
 
     it('keeps discovery restricted to the workers that use it', async () => {

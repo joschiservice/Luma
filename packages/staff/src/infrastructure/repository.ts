@@ -1,7 +1,12 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
-import type { AccountDisableCategory, SecurityEventType } from '@luma/identity';
+import type {
+  AccountDeletionCategory,
+  AccountDisableCategory,
+  SecurityEventType,
+} from '@luma/identity';
 import {
+  changeAccountDeletionForSupport,
   changeAccountForSupport,
   changeMembershipForSupport,
   decodeSecurityEventCursor,
@@ -42,6 +47,16 @@ const stateConflicts: Record<string, string> = {
     'This person’s account is disabled, so there is nothing to view.',
   'already disabled': 'This account is already disabled. Refresh the account.',
   'already enabled': 'This account is already enabled. Refresh the account.',
+  'deletion scheduled':
+    'This account is scheduled for deletion. Restore the account instead.',
+  'already scheduled':
+    'This account is already scheduled for deletion. Refresh the account.',
+  'sole owner':
+    'This person is the only owner of a workspace. Transfer ownership first, or close the workspace.',
+  'not scheduled':
+    'This account isn’t scheduled for deletion. Refresh the account.',
+  'erasure requested':
+    'Erasure of this account was requested, so it can’t be restored.',
 };
 
 /** Creates a deliberately narrow cross-owner read adapter and identity support command adapter. */
@@ -238,7 +253,7 @@ export function createStaffRepository(pool: Pool): StaffRepository {
             owner: boolean;
             status: 'active' | 'suspended';
             suspendedAt: Date | null;
-            suspendedBy: 'staff' | 'customer' | null;
+            suspendedBy: 'staff' | 'customer' | 'account_deletion' | null;
             onlyWorkspace: boolean;
             accountDisabled: boolean;
           }>(
@@ -492,8 +507,15 @@ export function createStaffRepository(pool: Pool): StaffRepository {
             disabled_reason_category: AccountDisableCategory | null;
             disabled_reason: string | null;
             disabled_by_name: string | null;
+            deletion_id: string | null;
+            deletion_scheduled_at: Date | null;
+            deletion_erase_after: Date | null;
+            deletion_reason_category: AccountDeletionCategory | null;
+            deletion_reference: string | null;
+            deletion_scheduled_by_name: string | null;
+            deletion_erase_requested_at: Date | null;
           }>(
-            'SELECT id,name,email,created_at,two_factor_enabled,passkey_count,disabled_at,disabled_reason_category,disabled_reason,disabled_by_name FROM staff_account_profile WHERE id=$1',
+            'SELECT id,name,email,created_at,two_factor_enabled,passkey_count,disabled_at,disabled_reason_category,disabled_reason,disabled_by_name,deletion_id,deletion_scheduled_at,deletion_erase_after,deletion_reason_category,deletion_reference,deletion_scheduled_by_name,deletion_erase_requested_at FROM staff_account_profile WHERE id=$1',
             [userId],
           );
           const account = profile.rows[0];
@@ -545,6 +567,24 @@ export function createStaffRepository(pool: Pool): StaffRepository {
                     category: account.disabled_reason_category,
                     reason: account.disabled_reason,
                     byName: account.disabled_by_name,
+                  }
+                : null,
+            deletion:
+              account.deletion_id &&
+              account.deletion_scheduled_at &&
+              account.deletion_erase_after &&
+              account.deletion_reason_category &&
+              account.deletion_reference
+                ? {
+                    id: account.deletion_id,
+                    scheduledAt: account.deletion_scheduled_at.toISOString(),
+                    eraseAfter: account.deletion_erase_after.toISOString(),
+                    category: account.deletion_reason_category,
+                    reference: account.deletion_reference,
+                    byName: account.deletion_scheduled_by_name,
+                    eraseRequestedAt:
+                      account.deletion_erase_requested_at?.toISOString() ??
+                      null,
                   }
                 : null,
             security: {
@@ -647,6 +687,21 @@ export function createStaffRepository(pool: Pool): StaffRepository {
           await validateAccountGrant(tx, input.userId);
 
           return changeAccountForSupport(tx, {
+            ...input,
+            requestId: context.requestId,
+          });
+        },
+      );
+    },
+    changeAccountDeletion(context, input) {
+      return transaction(
+        context,
+        input.grantId,
+        'staff.accounts.delete',
+        async (tx) => {
+          await validateAccountGrant(tx, input.userId);
+
+          return changeAccountDeletionForSupport(tx, {
             ...input,
             requestId: context.requestId,
           });

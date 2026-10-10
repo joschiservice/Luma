@@ -1,9 +1,13 @@
-import type { staffAccountDisableCategorySchema } from '@luma/api-contract/staff';
+import type {
+  staffAccountDeletionCategorySchema,
+  staffAccountDisableCategorySchema,
+} from '@luma/api-contract/staff';
 import {
   staffAccessGrantSchema,
   staffAccessHistorySchema,
   staffAccountAccessSchema,
   staffAccountChangeSchema,
+  staffAccountDeletionChangeSchema,
   staffAccountDetailSchema,
   staffAccountSecurityEventsSchema,
   staffAuditPageSchema,
@@ -292,6 +296,32 @@ export function createStaffApi(
           action === 'disable'
             ? { ...rest, acknowledgeGlobalEffect: true }
             : rest,
+        ),
+      );
+    },
+    /** Schedules, restores or immediately erases an account; retries reuse the command ID. */
+    changeAccountDeletion: async (
+      userId: string,
+      body: { grantId: string; reason: string; commandId: string } & (
+        | {
+            action: 'schedule';
+            category: z.infer<typeof staffAccountDeletionCategorySchema>;
+            reference: string;
+          }
+        | { action: 'restore' }
+        | { action: 'erase_now'; reference: string }
+      ),
+    ) => {
+      const { action, ...rest } = body;
+
+      return staffAccountDeletionChangeSchema.parse(
+        await request(
+          `${account(userId)}/${action === 'schedule' ? 'deletion' : action === 'restore' ? 'restore' : 'erasure'}`,
+          action === 'schedule'
+            ? { ...rest, acknowledgeGlobalEffect: true }
+            : action === 'erase_now'
+              ? { ...rest, acknowledgePermanent: true }
+              : rest,
         ),
       );
     },

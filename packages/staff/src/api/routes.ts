@@ -33,6 +33,9 @@ const protectedRoutes = new Set([
   'GET /v1/staff/accounts/:userId/security-events',
   'POST /v1/staff/accounts/:userId/disable',
   'POST /v1/staff/accounts/:userId/enable',
+  'POST /v1/staff/accounts/:userId/deletion',
+  'POST /v1/staff/accounts/:userId/restore',
+  'POST /v1/staff/accounts/:userId/erasure',
 ]);
 const routePermissions: Record<string, StaffPermission[]> = {
   'GET /v1/staff/session': [],
@@ -78,6 +81,18 @@ const routePermissions: Record<string, StaffPermission[]> = {
   'POST /v1/staff/accounts/:userId/enable': [
     'staff.accounts.inspect',
     'staff.accounts.manage',
+  ],
+  'POST /v1/staff/accounts/:userId/deletion': [
+    'staff.accounts.inspect',
+    'staff.accounts.delete',
+  ],
+  'POST /v1/staff/accounts/:userId/restore': [
+    'staff.accounts.inspect',
+    'staff.accounts.delete',
+  ],
+  'POST /v1/staff/accounts/:userId/erasure': [
+    'staff.accounts.inspect',
+    'staff.accounts.delete',
   ],
 };
 const publicRoutes = new Set([
@@ -431,6 +446,27 @@ export function registerStaffHttp(app: FastifyInstance, staff: StaffRuntime) {
           ...body,
           action: 'enable',
         }),
+    ),
+    scheduleAccountDeletion: os.scheduleAccountDeletion.handler(
+      async ({ context: { request }, input: { params, body } }) =>
+        await staff.service.changeAccountDeletion(
+          context(request.staffContext),
+          { ...params, ...body, action: 'schedule' },
+        ),
+    ),
+    restoreAccount: os.restoreAccount.handler(
+      async ({ context: { request }, input: { params, body } }) =>
+        await staff.service.changeAccountDeletion(
+          context(request.staffContext),
+          { ...params, ...body, action: 'restore' },
+        ),
+    ),
+    eraseAccountNow: os.eraseAccountNow.handler(
+      async ({ context: { request }, input: { params, body } }) =>
+        await staff.service.changeAccountDeletion(
+          context(request.staffContext),
+          { ...params, ...body, action: 'erase_now' },
+        ),
     ),
   });
   registerContractRoutes(app, staffContract, router);

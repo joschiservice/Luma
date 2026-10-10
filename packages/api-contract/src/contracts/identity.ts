@@ -108,6 +108,8 @@ export const securityEventTypeSchema = z.enum([
   'sessions.revoked-by-staff',
   'account.disabled',
   'account.enabled',
+  'account.deletion-scheduled',
+  'account.restored',
 ]);
 
 export const securityEventSchema = z.object({

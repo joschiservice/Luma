@@ -1,7 +1,7 @@
 # Staff access
 
 The staff console provides customer account lookup, account and workspace inspection,
-controlled session revocation, membership suspension, account disabling and read-only support views. Its identities, sessions and permissions are separate from customer
+controlled session revocation, membership suspension, account disabling and deletion, and read-only support views. Its identities, sessions and permissions are separate from customer
 workspace access. Customer Owners and Admins cannot grant staff privileges.
 
 ## Authentication and provisioning
@@ -61,7 +61,9 @@ requires both `staff.directory.read` and `staff.workspace.inspect`; opening acco
 requires `staff.directory.read` and `staff.accounts.inspect`. Global customer
 session revocation additionally requires `staff.sessions.revoke`, and suspending or
 reactivating a membership requires `staff.memberships.manage`. Disabling or enabling an account
-requires `staff.accounts.manage` together with `staff.accounts.inspect`. Starting a consented support
+requires `staff.accounts.manage` together with `staff.accounts.inspect`; scheduling, restoring
+or erasing an account requires `staff.accounts.delete` with `staff.accounts.inspect`. Grant
+`staff.accounts.delete` only to the people who handle deletion and erasure requests. Starting a consented support
 view or requesting consent requires `staff.view-as`; an emergency view requires
 `staff.view-as.emergency`. Reviewing the staff audit
 log requires `staff.audit.read`; grant it separately, to the people accountable for
@@ -191,6 +193,42 @@ only to that workspace. The workspace page marks those members **Only in this wo
 disabled accounts **Account disabled**; open each member's account page to disable them. Members
 who also belong to other workspaces keep their accounts; suspend their membership instead.
 
+## Account deletion
+
+Deletion removes an account for good: on request of the account holder, for abuse, after long
+inactivity, or for an erasure request under GDPR Art. 17. Schedule it from the account page under
+an account grant. The account is disabled at once and erased after 30 days; until then, **Restore
+account** returns it to its previous state. See [account deletion](identity.md#account-deletion)
+for enforcement and what erasure removes.
+
+All three commands require `staff.accounts.delete`, staff authentication within fifteen minutes, a
+reason and a command ID, and serialize per account with disabling. The change, receipt, staff audit
+row and, for scheduling and restore, the customer's security event and email notice commit together.
+
+- **Schedule deletion** needs a category (customer request, GDPR erasure, abuse or inactivity), the
+  request reference and an acknowledgement that every workspace is affected. Each workspace's
+  Activity shows the membership suspended by Luma support. Audited as
+  `customer.account.deletion_scheduled`.
+- **Restore account** is possible until erasure starts or erasure is requested. Audited as
+  `customer.account.restored`.
+- **Erase now** is only for a verified erasure request: it records the request reference, skips the
+  window and can't be undone. The account is erased within minutes, well inside the one-month
+  response deadline. It schedules the deletion first when none is scheduled. Audited as
+  `customer.account.erasure_requested`; the erasure itself as `customer.account.erased` without a
+  staff actor.
+- References and reasons are kept with the receipt and the staff audit after erasure, so they must
+  not contain the person's name, email or other personal data.
+- Retries and command ID reuse behave as for the other account commands. Scheduling a scheduled
+  account, or restoring one that isn't scheduled, returns 409.
+- An account that is the only active owner of a workspace that isn't closed can't be scheduled
+  (409). Transfer ownership, or close the workspace, first. Workflows that run with the person's
+  access pause and need a new owner from scheduling onward; erasure doesn't change that.
+- While a deletion is scheduled, **Disable** and **Enable** are unavailable, and the workspace page
+  shows the suspended memberships as **Account scheduled for deletion** without **Reactivate**.
+
+**Legal review.** The 30-day window, the receipt contents and the backup period must be confirmed
+before the feature is used with production accounts.
+
 ## Support view
 
 A support view shows the customer app as one member sees it, read-only, for up to thirty
@@ -241,7 +279,8 @@ details of new account-level events so they stay findable. Directory searches li
 accounts in their details but are not account entries.
 
 Entries are written only when their operation commits, so reads and commands appear only when
-they succeeded; `*.failed` events, such as failed sign-ins, record failures. Workspace, account
+they succeeded; `*.failed` events, such as failed sign-ins, record failures. Account erasure is
+recorded without a staff actor; the staff who requested it appear on the scheduling entry. Workspace, account
 and staff names come from current records and disappear when the record is deleted; the
 entry keeps the ID. Links from an entry still require a support grant or directory access.
 

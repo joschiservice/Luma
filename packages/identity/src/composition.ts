@@ -7,6 +7,7 @@ import type { MailProvider } from './application/mail.js';
 import type { AppPermissionSource } from './application/roles.js';
 import { createRolesService } from './application/roles.js';
 import { createSettingsService } from './application/settings.js';
+import { eraseDueAccounts } from './infrastructure/account-deletion.js';
 import type { AuthSettings } from './infrastructure/auth.js';
 import { createResendMail } from './infrastructure/mail.js';
 import { createMailDelivery } from './infrastructure/mail-delivery.js';
@@ -80,6 +81,11 @@ export function createIdentity(
      */
     purgeSecurityEvents: (now: Date = new Date()) =>
       purgeSecurityEvents(pool, now),
+    /**
+     * Erases accounts whose deletion is due, after their completion notice when mail is
+     * configured. Safe to run repeatedly and concurrently; an interrupted erasure is repeated.
+     */
+    eraseDueAccounts: () => eraseDueAccounts(pool, !!provider),
     trustedOrigins: settings.trustedOrigins,
     handler: auth.handler,
     baseURL: settings.baseURL,

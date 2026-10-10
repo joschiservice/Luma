@@ -399,6 +399,8 @@
   "settings_security_event_signed_out_by_support": "Der Luma-Support hat dich von allen Sitzungen abgemeldet",
   "settings_security_event_account_disabled": "Der Luma-Support hat dein Konto deaktiviert und dich abgemeldet",
   "settings_security_event_account_enabled": "Der Luma-Support hat dein Konto wieder aktiviert",
+  "settings_security_event_account_deletion_scheduled": "Der Luma-Support hat die Löschung deines Kontos geplant und dich abgemeldet",
+  "settings_security_event_account_restored": "Der Luma-Support hat die Löschung deines Kontos abgebrochen",
   "settings_security_reason_invalid_credentials": "Das Passwort war falsch.",
   "settings_security_reason_invalid_code": "Der Code war falsch.",
   "settings_security_reason_too_many_attempts": "Es wurden zu viele falsche Codes eingegeben.",
