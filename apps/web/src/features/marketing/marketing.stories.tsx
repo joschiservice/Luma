@@ -148,7 +148,6 @@ function NeedsYouScreen() {
         list={list}
         loading={false}
         offline={false}
-        live="live"
         onNext={() => {}}
         onChange={setSearch}
         onRefresh={() => {}}
