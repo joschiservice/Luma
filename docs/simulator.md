@@ -1,6 +1,6 @@
 # Commerce simulator
 
-The simulator plays a merchant's commerce systems: several Shopify stores and one JTL-Wawi ERP, the integration between them, a warehouse, carriers, customers and suppliers. Luma connects to it only through its real installed adapters, the commerce sync runner and the Shopify webhook route; it never reads simulator data any other way. The simulator also records ground truth about the incidents it causes, so it can score what Luma detected.
+The simulator plays a merchant's commerce systems: several Shopify stores and one ERP (JTL-Wawi, or Cin7 Core with `--erp cin7`), the integration between them, a warehouse, carriers, customers and suppliers. Luma connects to it only through its real installed adapters, the commerce sync runner and the Shopify webhook route; it never reads simulator data any other way. The simulator also records ground truth about the incidents it causes, so it can score what Luma detected.
 
 ## Start it
 
@@ -11,6 +11,7 @@ The simulator plays a merchant's commerce systems: several Shopify stores and on
 | `--profile`           | `large`     | Merchant profile: `test`, `small`, `mid-market` or `large`                          |
 | `--chaos`             | `realistic` | Failure preset: `calm`, `realistic`, `bad-day` or `outage-drill`                    |
 | `--seed`              | `44`        | The same profile, chaos and seed produce the same merchant                          |
+| `--erp`               | `jtl`       | The merchant's ERP: `jtl` (JTL-Wawi) or `cin7` (Cin7 Core)                          |
 | `--approval-required` | off         | Adds the synthetic shipping-method approval example                                 |
 | `--no-demo-workflows` | demo on     | Skips the [workflow demo](#workflow-demo) setup                                     |
 | `--detection`         | `demo`      | `demo` shortens stuck, hold and follow-up windows; `production` uses default timing |
@@ -30,6 +31,12 @@ A profile and seed generate a deterministic world that behaves like a real setup
 - **Suppliers:** the merchant reorders low items in JTL. Suppliers answer purchase orders, including those Luma submits, by their profile: `full`, `partial`, `delayed`, `short` or `silent`.
 
 The `test` profile holds the fixed fixtures that platform tests rely on and does nothing on its own: orders, shipments and stock change only through controls.
+
+### Cin7 Core as the ERP
+
+With `--erp cin7` the same ERP model (orders, shipments, stock, purchasing and suppliers) answers through Cin7 Core's API, and Luma connects through the read-only Cin7 app. Records keep their numeric IDs inside the simulator and appear to Luma as stable GUIDs. Warehouses are Cin7 locations. The ERP model reserves stock per item, not per warehouse, so the stock report spreads each item's reservations over its locations in configured order, up to each location's stock, and puts the rest on the first location. The simulated stock sync pushes the same per-location number to the shop that sells that warehouse, so linked stock compares like for like.
+
+Cin7 holds no credit notes here, because returns happen in the shops. Luma sends nothing to Cin7, so supplier links and stock rules work but purchase-order proposals stay unsent, and the shipping-method approval example does not apply. Cin7 allows 60 requests per minute, so the first import of the `large` profile takes hours; use `--profile small` for a quick loop.
 
 ## Time
 
@@ -80,7 +87,7 @@ The API completes the setup once records are imported and linked, retrying on ea
 
 ## Luma wiring
 
-The pilot provisions one connection per instance (`jtl`, then one per shop) with all read capabilities and the write capabilities each provider supports. The manifest `.luma/simulator/pilot.json` binds each connection to its run and instance. The transport selector checks tenant, connection, provider and target, and fails closed for unbound synthetic installations. Simulation is rejected in production.
+The pilot provisions one connection per instance (the ERP, then one per shop) with all read capabilities and the write capabilities each provider supports. The manifest `.luma/simulator/pilot.json` binds each connection to its run and instance. The transport selector checks tenant, connection, provider and target, and fails closed for unbound synthetic installations. Simulation is rejected in production.
 
 - **Sync:** the pilot API runs the real commerce sync runner with its normal backfill, incremental and reconcile schedule. Orders are imported source-local; Luma suggests cross-source links from the shop order name, and people confirm them.
 - **Webhooks:** the simulator delivers signed Shopify webhooks for every change to Luma's real change route. The pilot configures a synthetic Shopify app whose client secret is the run's webhook secret; its settings point to an `.invalid` origin that is never contacted.
@@ -97,7 +104,7 @@ The control API at `/api` requires the bearer token (`LUMA_SIMULATOR_TOKEN`), an
 
 ## Extending and testing
 
-- **Provider behavior** belongs to `@luma/simulator-shopify` and `@luma/simulator-jtl`. Shopify serves GraphQL through a schema built for the queries Luma sends, so unknown fields fail validation like the real API. Simulator compatibility does not prove live-provider compatibility.
+- **Provider behavior** belongs to `@luma/simulator-shopify`, `@luma/simulator-jtl` and `@luma/simulator-cin7`. Simulator packages depend only on simulator core, so the host composes the Cin7 account with the JTL package's ERP model. Shopify serves GraphQL through a schema built for the queries Luma sends, so unknown fields fail validation like the real API. Simulator compatibility does not prove live-provider compatibility.
 - **Merchant behavior** belongs to the simulator engine, profile data to `@luma/simulator-commerce` and failure decisions to `@luma/simulator-core`.
 - **New incident kinds** need a kind entry, a start in the engine, a recovery, and an expected case class once a detector exists. Follow the [operational scenario recipe](adding-operational-scenarios.md).
 

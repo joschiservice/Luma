@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { guid } from '@luma/simulator-cin7';
 import type { MerchantProfile } from '@luma/simulator-commerce';
 import {
   type ChaosProfile,
@@ -20,7 +21,8 @@ import {
   type ShopifyCommandResult,
 } from '@luma/simulator-shopify';
 
-import type { Instance, WorldModel } from './model.js';
+import { cin7 } from './cin7.js';
+import type { ErpInstance, Instance, WorldModel } from './model.js';
 
 export type HealthStatus =
   'healthy' | 'rate-limited' | 'unavailable' | 'unauthorized';
@@ -131,9 +133,32 @@ export function shopContext(
 
 /** An ERP context; notifications go to `events` when given. */
 export function erpContext(world: World, events: ProviderEvent[] = []) {
-  return providerContext(world, 'jtl', events) as ProviderContext<
-    Extract<Instance, { kind: 'jtl' }>['config']
-  >;
+  return providerContext(
+    world,
+    world.model.erp.name,
+    events,
+  ) as ProviderContext<ErpInstance['config']>;
+}
+
+/**
+ * An ERP sales order or item as an incident resource, identified as Luma reads it through the
+ * ERP's API, so the scorecard can find it in case evidence.
+ */
+export function erpResource(
+  world: World,
+  kind: 'salesOrder' | 'item',
+  id: string,
+  label?: string,
+) {
+  const erp = world.model.erp;
+  const cin7Record = erp.kind === 'cin7';
+
+  return {
+    instance: erp.name,
+    kind,
+    id: cin7Record ? guid(kind === 'salesOrder' ? 'sale' : 'product', id) : id,
+    label: label ?? `${cin7Record ? 'Cin7 sale' : 'JTL order'} ${id}`,
+  };
 }
 
 /** Engine events and their payloads; every scheduled transition is one of these. */
@@ -204,7 +229,7 @@ export async function handleEvents(
       world.webhook(name, event);
       continue;
     }
-    // JTL has no webhooks; stock changes feed the merchant's stock connector.
+    // The ERP sends no webhooks; stock changes feed the merchant's stock connector.
     if (
       event.topic === 'items/stock' &&
       world.model.profile.integration.stockSyncEveryMs
@@ -249,8 +274,18 @@ export async function erp(
   command: JtlCommand,
 ): Promise<JtlCommandResult> {
   const events: ProviderEvent[] = [];
-  const result = await jtl.command(erpContext(world, events), command);
-  await handleEvents(world, 'jtl', events);
+  const context = erpContext(world, events);
+  // The simulated Cin7 account runs the same ERP model behind Cin7's API.
+  const result =
+    world.model.erp.kind === 'cin7'
+      ? await cin7.command(
+          context as ProviderContext<
+            Extract<ErpInstance, { kind: 'cin7' }>['config']
+          >,
+          command,
+        )
+      : await jtl.command(context, command);
+  await handleEvents(world, world.model.erp.name, events);
   if (result.supplierEvents)
     for (const answer of result.supplierEvents)
       await schedule(world, world.now + answer.delay, 'supplier', {

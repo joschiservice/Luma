@@ -11,6 +11,7 @@ import type { PoolClient, QueryResult, QueryResultRow } from 'pg';
 export const recordTables = [
   'sim_shopify_records',
   'sim_jtl_records',
+  'sim_cin7_records',
   'sim_world_records',
 ] as const;
 

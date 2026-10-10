@@ -1,3 +1,4 @@
+import { type Cin7Config, simulatedAccountId } from '@luma/simulator-cin7';
 import {
   type Catalog,
   type CatalogProduct,
@@ -13,6 +14,7 @@ import type { ShopifyConfig } from '@luma/simulator-shopify';
 
 export type Instance =
   | { name: string; kind: 'jtl'; label: string; config: JtlConfig }
+  | { name: string; kind: 'cin7'; label: string; config: Cin7Config }
   | {
       name: string;
       kind: 'shopify';
@@ -23,6 +25,9 @@ export type Instance =
 
 /** JTL shipping methods: Standard, Express and Pickup, as in the seeded fixtures. */
 export const shippingMethods = { standard: '7', express: '8', pickup: '9' };
+
+/** The ERP instance a merchant runs; each run has exactly one. */
+export type ErpInstance = Extract<Instance, { kind: 'jtl' | 'cin7' }>;
 
 const shopifyScopes = [
   'read_orders',
@@ -39,20 +44,28 @@ const shopifyScopes = [
 
 /** Derives the provider instances a profile runs: one ERP and one store per shop. */
 export function instancesFor(profile: MerchantProfile): Instance[] {
+  const erp = {
+    warehouses: profile.warehouses.map(({ id, name }) => ({ id, name })),
+    shippingMethods: [
+      { id: shippingMethods.standard, name: 'Standard' },
+      { id: shippingMethods.express, name: 'Express' },
+      { id: shippingMethods.pickup, name: 'Pickup' },
+    ],
+  };
+
   return [
-    {
-      name: 'jtl',
-      kind: 'jtl',
-      label: 'JTL-Wawi',
-      config: {
-        warehouses: profile.warehouses.map(({ id, name }) => ({ id, name })),
-        shippingMethods: [
-          { id: shippingMethods.standard, name: 'Standard' },
-          { id: shippingMethods.express, name: 'Express' },
-          { id: shippingMethods.pickup, name: 'Pickup' },
-        ],
-      },
-    },
+    profile.erp === 'cin7'
+      ? {
+          name: 'cin7',
+          kind: 'cin7',
+          label: 'Cin7 Core',
+          config: {
+            ...erp,
+            accountId: simulatedAccountId,
+            company: profile.label,
+          },
+        }
+      : { name: 'jtl', kind: 'jtl', label: 'JTL-Wawi', config: erp },
     ...profile.shops.map((shop): Instance => ({
       name: shop.instance,
       kind: 'shopify',
@@ -82,6 +95,8 @@ export interface WorldModel {
   profile: MerchantProfile;
   catalog: Catalog;
   instances: Instance[];
+  /** The merchant's ERP instance. */
+  erp: ErpInstance;
   shops: Extract<Instance, { kind: 'shopify' }>[];
   variant(id: string): CatalogVariant;
   product(id: string): CatalogProduct;
@@ -126,10 +141,15 @@ export function worldModel(
     profile.demand.ordersPerDay *
     (profile.basket.lineWeights.reduce((sum, w, i) => sum + w * (i + 1), 0) /
       profile.basket.lineWeights.reduce((sum, w) => sum + w, 0));
+  const erp = instances.find(
+    (instance): instance is ErpInstance => instance.kind !== 'shopify',
+  );
+  if (!erp) throw new Error('A merchant runs one ERP');
   const model: WorldModel = {
     profile,
     catalog,
     instances,
+    erp,
     shops,
     variant(id) {
       const variant = byId.get(id);

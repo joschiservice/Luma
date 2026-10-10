@@ -18,6 +18,7 @@ import { jtl } from '@luma/simulator-jtl';
 import { shopify } from '@luma/simulator-shopify';
 import type { Pool, PoolClient } from 'pg';
 
+import { cin7 } from '../engine/cin7.js';
 import {
   erpContext,
   handleEvents,
@@ -38,7 +39,7 @@ import {
 export type DispatchResult =
   { kind: 'response'; response: ProviderResponse } | { kind: 'reset' };
 
-const providers = { jtl, shopify };
+const providers = { jtl, cin7, shopify };
 
 type ProviderKind = keyof typeof providers;
 
@@ -48,6 +49,15 @@ type Provider = Pick<
   'identify' | 'unauthorized' | 'drift' | 'rateLimit'
 >;
 
+/** The provider kind of a run's instance; undefined for an unknown instance. */
+function providerKind(run: RunRecord, name: string): ProviderKind | undefined {
+  if (name === (run.profile.erp ?? 'jtl')) return run.profile.erp ?? 'jtl';
+
+  return run.profile.shops.some((item) => item.instance === name)
+    ? 'shopify'
+    : undefined;
+}
+
 /** Serves one request with the provider of the instance's kind. */
 function handleWith(
   kind: ProviderKind,
@@ -56,9 +66,13 @@ function handleWith(
   events: ProviderEvent[],
   request: ProviderRequest,
 ) {
-  return kind === 'jtl'
-    ? jtl.handle(erpContext(world, events), request)
-    : shopify.handle(shopContext(world, name, events), request);
+  if (kind === 'shopify')
+    return shopify.handle(shopContext(world, name, events), request);
+  const context = erpContext(world, events);
+
+  return kind === 'cin7'
+    ? cin7.handle(context as Parameters<typeof cin7.handle>[0], request)
+    : jtl.handle(context, request);
 }
 
 const retryAfter = { 'content-type': 'application/json', 'retry-after': '1' };
@@ -304,12 +318,7 @@ export function createDispatcher(pool: Pool) {
             headers: retryAfter,
           },
         };
-      const kind =
-        name === 'jtl'
-          ? 'jtl'
-          : run.profile.shops.some((item) => item.instance === name)
-            ? 'shopify'
-            : undefined;
+      const kind = providerKind(run, name);
       if (!kind)
         throw Object.assign(new Error('Unknown provider instance'), {
           statusCode: 404,
@@ -486,7 +495,7 @@ async function countWrite(
       .update(`${request.method} ${request.url} ${request.body ?? ''}`)
       .digest('hex');
   const operation =
-    providers[name === 'jtl' ? 'jtl' : 'shopify'].identify(request).operation;
+    providers[providerKind(run, name) ?? 'shopify'].identify(request).operation;
   await client.query(
     `INSERT INTO sim_writes (run_id, instance, operation, key, keyed, count, first_at, last_at)
      VALUES ($1, $2, $3, $4, $5, 1, $6, $6)

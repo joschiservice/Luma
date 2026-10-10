@@ -182,7 +182,9 @@ export async function seedPilot(
               appId: 'LumaSyntheticPilot',
               appVersion: '1',
             }
-          : { kind: 'shopify', shop: instance.shop };
+          : instance.kind === 'cin7'
+            ? { kind: 'cin7-core', accountId: instance.accountId }
+            : { kind: 'shopify', shop: instance.shop };
       const appId = instance.kind;
       const apps = await connections.apps.list(context);
       const appState = apps.installations.find((app) => app.appId === appId);
@@ -212,20 +214,27 @@ export async function seedPilot(
                       'fulfillment.open',
                       'fulfillment.move',
                     ]
-                  : [
-                      'customers.read',
-                      'orders.shipping-method.read',
-                      'orders.shipping-method.write',
-                      'suppliers.read',
-                      'purchase-orders.read',
-                      'purchase-orders.submit',
-                    ]),
+                  : instance.kind === 'cin7'
+                    ? [
+                        'returns.read',
+                        'customers.read',
+                        'suppliers.read',
+                        'purchase-orders.read',
+                      ]
+                    : [
+                        'customers.read',
+                        'orders.shipping-method.read',
+                        'orders.shipping-method.write',
+                        'suppliers.read',
+                        'purchase-orders.read',
+                        'purchase-orders.submit',
+                      ]),
               ]
             : []),
         ],
         credentials: {
           token: 'synthetic-not-a-provider-secret',
-          challengeCode: 'synthetic',
+          ...(instance.kind === 'jtl' ? { challengeCode: 'synthetic' } : {}),
         },
       });
       manifest.connections[instance.name] = connection.id;

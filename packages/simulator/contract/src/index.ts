@@ -93,6 +93,8 @@ export const createRunSchema = z.object({
   seed: z.number().int().min(0).max(4_294_967_295).default(44),
   /** Merchant profile preset name. */
   profile: name.default('large'),
+  /** The merchant's ERP: JTL-Wawi or Cin7 Core. */
+  erp: z.enum(['jtl', 'cin7']).default('jtl'),
   /** Chaos preset name or a complete profile. */
   chaos: z.union([name, chaosProfileSchema]).default('realistic'),
   /** Runs start in real time; paused runs only change through controls. */
@@ -255,7 +257,7 @@ export interface RunSummary {
   chaos: { preset: string };
   instances: {
     name: string;
-    kind: 'shopify' | 'jtl';
+    kind: 'shopify' | 'jtl' | 'cin7';
     label: string;
     health: z.infer<typeof serviceHealthSchema>;
   }[];

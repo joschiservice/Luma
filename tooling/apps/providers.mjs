@@ -1,4 +1,5 @@
 import { createAppHost } from '@luma/app-catalog';
+import { createApp as cin7, createCin7Provider } from '@luma/app-cin7';
 import { createApp as jtl, createJtlProvider } from '@luma/app-jtl';
 import { createApp as shopify, createShopifyProvider } from '@luma/app-shopify';
 import {
@@ -7,11 +8,12 @@ import {
   createInstalledShippingMethodEffects as effects,
 } from '@luma/connections/composition';
 
-/** Composes both adapters for local simulator fixtures. */
+/** Composes every adapter for local simulator fixtures, in the order of `factories`. */
 export function fixtureProviders(options) {
   return [
     createJtlProvider({ ...options, jtlEndpoints: options.jtlEndpoints ?? [] }),
     createShopifyProvider(options),
+    createCin7Provider(options),
   ];
 }
 
@@ -31,7 +33,7 @@ export function createInstalledConnections(db, options) {
   const host = createAppHost(db, {
     ...options,
     env: options.env ?? {},
-    factories: [jtl, shopify].map((factory, index) => (context) => {
+    factories: [jtl, shopify, cin7].map((factory, index) => (context) => {
       const definition = factory(context);
 
       return {

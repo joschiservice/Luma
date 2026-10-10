@@ -1,5 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
+import { simulatedAccountId } from '@luma/simulator-cin7';
+
 /**
  * Waits until a simulator run finishes provisioning, reporting progress, and returns its
  * detail. Rejects when provisioning fails or exceeds the timeout.
@@ -37,10 +39,19 @@ export async function waitForRun(
  */
 export function simulatorInstances(run) {
   const shops = run.merchant.shops;
+  const erp = run.instances.find((instance) => instance.kind !== 'shopify');
 
   return {
+    erp: { name: erp.name, kind: erp.kind },
     instances: [
-      { name: 'jtl', kind: 'jtl', label: 'JTL' },
+      erp.kind === 'cin7'
+        ? {
+            name: erp.name,
+            kind: 'cin7',
+            label: 'Cin7',
+            accountId: simulatedAccountId,
+          }
+        : { name: erp.name, kind: 'jtl', label: 'JTL' },
       ...shops.map((shop) => ({
         name: shop.instance,
         kind: 'shopify',
@@ -57,6 +68,10 @@ export function simulatorInstances(run) {
     stock: {
       profile: run.profile.name,
       seed: run.seed,
+      // Each shop location sells one ERP warehouse's stock under Cin7, all warehouses under JTL.
+      warehouses: Object.fromEntries(
+        shops.map((shop) => [shop.instance, shop.location]),
+      ),
       locations: Object.fromEntries(
         shops.map((shop) => [
           shop.instance,

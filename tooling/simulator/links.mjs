@@ -1,5 +1,7 @@
 import { generateCatalog, merchantProfile } from '@luma/simulator-commerce';
 
+import { erpOf } from './erp.mjs';
+
 /**
  * Links the simulated merchant's most-demanded SKUs and each shop's stock location to the ERP's
  * records, as a merchant does after reviewing them. Imports keep each source's records apart
@@ -16,6 +18,7 @@ export function createStockLinks({
 }) {
   const stock = manifest.simulator?.stock;
   if (!stock) return { pass: async () => ({ linked: 0, remaining: 0 }) };
+  const erp = erpOf(manifest);
   const { variants } = generateCatalog(
     merchantProfile(stock.profile),
     stock.seed,
@@ -58,9 +61,16 @@ export function createStockLinks({
           (await link(
             context,
             'location',
-            identity('jtl', 'jtl', 'location', 'all-warehouses'),
+            identity(
+              erp.name,
+              erp.kind,
+              'location',
+              erp.location(stock.warehouses?.[shop]),
+            ),
             identity(shop, 'shopify', 'location', location),
-            'The shop location sells the stock of all ERP warehouses',
+            erp.kind === 'cin7'
+              ? 'The shop location sells the stock of its ERP warehouse'
+              : 'The shop location sells the stock of all ERP warehouses',
           ))
         )
           done.add(key);
@@ -74,7 +84,7 @@ export function createStockLinks({
           await link(
             context,
             'sku',
-            identity('jtl', 'jtl', 'sku', variant.id),
+            identity(erp.name, erp.kind, 'sku', erp.sku(variant.id)),
             identity(
               shop,
               'shopify',

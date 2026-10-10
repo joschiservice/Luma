@@ -98,6 +98,6 @@ records no supplier confirmation, and a voided purchase has no Luma status, so i
 - No writes: Cin7 has no idempotency keys and no conditional updates, so a governed write
   needs a documented non-atomic preflight and a sandbox smoke test first.
 - Webhooks need Cin7's paid Automation module and are not used; sync polls.
-- The simulator implements the endpoints and fields Luma reads. Simulator compatibility
-  does not prove live-provider compatibility; run a smoke test against a Cin7 trial account
-  before relying on a mapping change.
+- The [simulator](simulator.md#cin7-core-as-the-erp) implements the endpoints and fields
+  Luma reads. Simulator compatibility does not prove live-provider compatibility; run a
+  smoke test against a Cin7 trial account before relying on a mapping change.

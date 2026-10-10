@@ -1,11 +1,13 @@
+import { availableAt } from '@luma/simulator-cin7';
 import { keyedRandom } from '@luma/simulator-core';
-import { readItemStock } from '@luma/simulator-jtl';
+import { type ItemStock, readItemStock } from '@luma/simulator-jtl';
 import { readStock } from '@luma/simulator-shopify';
 
 import { reorderIfLow } from './fulfillment.js';
 import {
   closeIncident,
   erpContext,
+  erpResource,
   type Incident,
   instance,
   openIncident,
@@ -25,6 +27,23 @@ interface Freeze {
 
 const freezeKey = (shopName: string, variant: string) =>
   `${shopName}:${variant}`;
+
+/**
+ * The availability a shop location mirrors: JTL's total across warehouses, or what Cin7 reports
+ * at the shop's warehouse, because Cin7 integrations map one location to each shop location.
+ */
+export function mirrored(world: World, stock: ItemStock, location: string) {
+  const erp = world.model.erp;
+
+  return erp.kind === 'cin7'
+    ? availableAt(
+        stock.warehouses,
+        stock.reserved,
+        erp.config.warehouses.map((w) => w.id),
+        location,
+      )
+    : stock.available;
+}
 
 /** Marks an item for the next ERP-to-shop stock push. */
 export async function markDirty(world: World, itemId: string) {
@@ -62,7 +81,7 @@ export async function syncStock(world: World, limit = 2_000) {
         kind: 'available',
         variant: record.id,
         location: listing.location,
-        quantity: Math.max(0, erpStock.available),
+        quantity: Math.max(0, mirrored(world, erpStock, listing.location)),
       });
     }
     world.metric('stock.pushed', 1);
@@ -84,7 +103,10 @@ export async function checkFreezes(world: World) {
       variant,
       location,
     );
-    if (erpStock && shopStock?.available === Math.max(0, erpStock.available)) {
+    if (
+      erpStock &&
+      shopStock?.available === Math.max(0, mirrored(world, erpStock, location))
+    ) {
       await store.delete('freeze', frozen.id);
       await closeIncident(
         world,
@@ -131,7 +153,7 @@ export async function driftStock(
     (kind === 'oversell'
       ? random.int(10, 40)
       : (random.chance(0.5) ? 1 : -1) * random.int(3, 20));
-  const erpAvailable = Math.max(0, erpStock.available);
+  const erpAvailable = Math.max(0, mirrored(world, erpStock, location));
   // Drift must leave a visible difference, also when the ERP has nothing left.
   const quantity =
     erpAvailable + offset >= 0 && offset !== 0
@@ -148,7 +170,7 @@ export async function driftStock(
     kind,
     origin,
     instance: shopName,
-    summary: `${shopInstance.shop.name} shows ${quantity} available for ${variant.sku}; the ERP has ${erpStock.available}.`,
+    summary: `${shopInstance.shop.name} shows ${quantity} available for ${variant.sku}; the ERP has ${mirrored(world, erpStock, location)}.`,
     resources: [
       {
         instance: shopName,
@@ -162,7 +184,7 @@ export async function driftStock(
         id: `gid://shopify/Location/${location}`,
         label: shopInstance.config.locations[0]?.name ?? location,
       },
-      { instance: 'jtl', kind: 'item', id: variantId, label: variant.sku },
+      erpResource(world, 'item', variantId, variant.sku),
     ],
     detail: { variant: variantId, sku: variant.sku, location, offset },
   });
@@ -197,6 +219,9 @@ export async function recoverDrift(world: World, incident: Incident) {
     kind: 'available',
     variant,
     location: shopInstance.shop.warehouse,
-    quantity: Math.max(0, erpStock?.available ?? 0),
+    quantity: Math.max(
+      0,
+      erpStock ? mirrored(world, erpStock, shopInstance.shop.warehouse) : 0,
+    ),
   });
 }

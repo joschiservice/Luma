@@ -56,6 +56,7 @@ try {
   const { values: flags } = parseArgs({
     options: {
       profile: { type: 'string', default: 'large' },
+      erp: { type: 'string', default: 'jtl' },
       chaos: { type: 'string', default: 'realistic' },
       seed: { type: 'string', default: '44' },
       'approval-required': { type: 'boolean', default: false },
@@ -66,6 +67,8 @@ try {
   });
   if (!['demo', 'production'].includes(flags.detection))
     throw new Error('--detection must be demo or production');
+  if (!['jtl', 'cin7'].includes(flags.erp))
+    throw new Error('--erp must be jtl or cin7');
   const saved = await state(true);
   await compose(saved, [
     '--profile',
@@ -146,12 +149,13 @@ try {
   const created = !(await call('runs')).some((item) => item.id === runId);
   if (created) {
     console.log(
-      `Creating simulator run ${runId}: ${flags.profile} merchant, ${flags.chaos} failures.`,
+      `Creating simulator run ${runId}: ${flags.profile} merchant on ${flags.erp === 'cin7' ? 'Cin7 Core' : 'JTL-Wawi'}, ${flags.chaos} failures.`,
     );
     await call('runs', {
       id: runId,
       seed: Number(flags.seed),
       profile: flags.profile,
+      erp: flags.erp,
       chaos: flags.chaos,
       running: true,
     });

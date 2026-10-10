@@ -11,6 +11,7 @@ import {
   type EngineEvents,
   erp,
   erpContext,
+  erpResource,
   schedule,
   shop,
   type World,
@@ -79,7 +80,7 @@ async function pickOne(
       shippable.push({ lineId: line.id, quantity: line.open });
   }
   if (!shippable.length) {
-    world.metric('orders.backordered', 1, 'jtl');
+    world.metric('orders.backordered', 1, world.model.erp.name);
     await store.put('pick', erpOrder, pick, { updatedAt: world.now + hour });
 
     return;
@@ -108,7 +109,7 @@ async function pickOne(
   const complete = shippable.length === open.length;
   if (complete) {
     await store.delete('pick', erpOrder);
-    world.metric('orders.shipped', 1, 'jtl');
+    world.metric('orders.shipped', 1, world.model.erp.name);
   } else
     await store.put('pick', erpOrder, pick, { updatedAt: world.now + hour });
   world.metric('shipments', 1, `warehouse-${warehouse}`);
@@ -140,12 +141,7 @@ async function pickOne(
           id: `gid://shopify/Order/${pick.order}`,
           label: worldRecord.name,
         },
-        {
-          instance: 'jtl',
-          kind: 'salesOrder',
-          id: erpOrder,
-          label: `JTL order ${erpOrder}`,
-        },
+        erpResource(world, 'salesOrder', erpOrder),
       ],
       detail: { shipmentSync },
     });
@@ -473,7 +469,7 @@ export async function reorderIfLow(
   world.journal(
     'merchant-reorder',
     { itemId, quantity, purchaseOrder: result.id },
-    'jtl',
+    world.model.erp.name,
     result.id,
   );
 }
@@ -492,7 +488,7 @@ export async function supplierAnswer(
         command,
         reason: error instanceof Error ? error.message : 'Rejected',
       },
-      'jtl',
+      world.model.erp.name,
       String(command.orderId ?? ''),
     );
   }

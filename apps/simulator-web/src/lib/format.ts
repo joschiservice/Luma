@@ -141,8 +141,8 @@ export const incidentUnitLabel = (unit: 'order' | 'day') =>
   unit === 'order' ? 'per 1,000 orders' : 'per day';
 
 /** Labels a provider kind. */
-export const providerLabel = (kind: 'shopify' | 'jtl') =>
-  kind === 'shopify' ? 'Shopify' : 'JTL';
+export const providerLabel = (kind: 'shopify' | 'jtl' | 'cin7') =>
+  kind === 'shopify' ? 'Shopify' : kind === 'cin7' ? 'Cin7' : 'JTL';
 
 /** Pretty-prints JSON, falling back to the string form of values JSON cannot represent. */
 export function formatJson(value: unknown) {

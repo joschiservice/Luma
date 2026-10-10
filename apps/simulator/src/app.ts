@@ -308,7 +308,10 @@ export async function createApp(options: SimulatorOptions) {
       id: input.id,
       seed: input.seed,
       profileName: input.profile,
-      profile: merchantProfile(input.profile as keyof typeof merchantProfiles),
+      profile: {
+        ...merchantProfile(input.profile as keyof typeof merchantProfiles),
+        erp: input.erp,
+      },
       chaos: chaosFrom(input.chaos as string | ChaosProfile),
       status: 'provisioning',
       progress: { step: 'queued', done: 0, total: 1 },
@@ -402,7 +405,7 @@ export async function createApp(options: SimulatorOptions) {
             (item) => item.name === input.instance,
           );
           if (!target) throw notFound('Unknown instance');
-          if (target.kind === 'jtl')
+          if (target.kind !== 'shopify')
             await erp(
               world,
               jtlCommandSchema.parse(input.command) as JtlCommand,

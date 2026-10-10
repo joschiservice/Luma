@@ -11,6 +11,7 @@ import { readStock } from '@luma/simulator-shopify';
 import type { Pool } from 'pg';
 
 import { instancesFor, worldModel } from '../engine/model.js';
+import { mirrored } from '../engine/stock.js';
 import { erpContext, type Incident, shopContext } from '../engine/world.js';
 import { createPgStore, type RecordTable } from '../pg-store.js';
 import { currentTime, type RunRecord } from './runs.js';
@@ -348,7 +349,10 @@ export async function compareSku(
         committed: stock?.committed ?? 0,
         available: stock?.available ?? 0,
         drift:
-          stock && erp ? stock.available - Math.max(0, erp.available) : null,
+          stock && erp
+            ? stock.available -
+              Math.max(0, mirrored(world, erp, shop.shop.warehouse))
+            : null,
       });
     }
     const incidents = await world
@@ -362,7 +366,9 @@ export async function compareSku(
         variant.title === 'Default Title'
           ? product.title
           : `${product.title} · ${variant.title}`,
-      erp: erp ? { instance: 'jtl', itemId: variant.id, ...erp } : null,
+      erp: erp
+        ? { instance: world.model.erp.name, itemId: variant.id, ...erp }
+        : null,
       shops,
       incidents: incidents.items
         .filter((item) => item.data.detail.variant === variant.id)

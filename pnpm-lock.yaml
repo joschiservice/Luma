@@ -344,6 +344,9 @@ importers:
       '@luma/resolution':
         specifier: workspace:*
         version: link:packages/resolution
+      '@luma/simulator-cin7':
+        specifier: workspace:*
+        version: link:packages/simulator/cin7
       '@luma/simulator-commerce':
         specifier: workspace:*
         version: link:packages/simulator/commerce
@@ -468,6 +471,9 @@ importers:
 
   apps/simulator:
     dependencies:
+      '@luma/simulator-cin7':
+        specifier: workspace:*
+        version: link:../../packages/simulator/cin7
       '@luma/simulator-commerce':
         specifier: workspace:*
         version: link:../../packages/simulator/commerce
@@ -1757,6 +1763,16 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
+
+  packages/simulator/cin7:
+    dependencies:
+      '@luma/simulator-core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
 
   packages/simulator/commerce:
     dependencies:

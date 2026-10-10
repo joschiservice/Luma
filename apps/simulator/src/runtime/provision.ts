@@ -234,6 +234,7 @@ export async function clearRun(pool: Pool, runId: string) {
   for (const table of [
     'sim_shopify_records',
     'sim_jtl_records',
+    'sim_cin7_records',
     'sim_world_records',
     'sim_sequences',
     'sim_journal',

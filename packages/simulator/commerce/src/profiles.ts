@@ -101,6 +101,8 @@ export interface MerchantProfile {
   };
   shops: ShopProfile[];
   warehouses: WarehouseProfile[];
+  /** The merchant's ERP; JTL-Wawi when omitted. */
+  erp?: 'jtl' | 'cin7' | undefined;
   demand: {
     /** Merchant orders arrive on their own; manual runs only change through commands. */
     autonomous: boolean;

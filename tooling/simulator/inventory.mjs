@@ -4,6 +4,8 @@ import { defaultConfiguration } from '@luma/exceptions';
 import { requirePermission, requireTenant } from '@luma/identity';
 import { createInventoryMonitor } from '@luma/resolution';
 
+import { erpOf } from './erp.mjs';
+
 const ref = (externalId, scopeKey = '') => ({ externalId, scopeKey });
 
 /** Provisions the simulator's explicit SKU/location mapping and connects real inventory detection and verification. */
@@ -44,7 +46,14 @@ export async function createInventoryScenario({
     publishedAt: manifest.epoch,
     skuId,
     locationId,
-    left: side('jtl', 'jtl', scenario.erpItem, 'all-warehouses'),
+    left: side(
+      erpOf(manifest).name,
+      erpOf(manifest).kind,
+      erpOf(manifest).sku(scenario.erpItem),
+      erpOf(manifest).location(
+        manifest.simulator.stock?.warehouses?.[scenario.shop],
+      ),
+    ),
     right: side(
       scenario.shop,
       'shopify',

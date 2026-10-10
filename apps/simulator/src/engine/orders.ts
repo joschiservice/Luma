@@ -13,6 +13,7 @@ import { driftStock } from './stock.js';
 import {
   erp,
   erpContext,
+  erpResource,
   type Incident,
   instance,
   openIncident,
@@ -452,21 +453,16 @@ export async function importOrder(
   world.journal(
     'order-imported',
     { name: order.name, erpOrder: result.id },
-    'jtl',
+    world.model.erp.name,
     result.id,
   );
   if (mismatch)
     await orderIncident(world, order, {
       kind: 'shipping-method-mismatch',
-      instance: 'jtl',
+      instance: world.model.erp.name,
       summary: `${order.name} was paid as express but imported with standard shipping.`,
       resources: [
-        {
-          instance: 'jtl',
-          kind: 'salesOrder',
-          id: result.id,
-          label: `JTL order ${result.id}`,
-        },
+        erpResource(world, 'salesOrder', result.id),
         {
           instance: shopName,
           kind: 'Order',
@@ -479,15 +475,10 @@ export async function importOrder(
   if (stalled)
     await orderIncident(world, order, {
       kind: 'warehouse-stall',
-      instance: 'jtl',
+      instance: world.model.erp.name,
       summary: `The warehouse never picks ${order.name}.`,
       resources: [
-        {
-          instance: 'jtl',
-          kind: 'salesOrder',
-          id: result.id,
-          label: `JTL order ${result.id}`,
-        },
+        erpResource(world, 'salesOrder', result.id),
         {
           instance: shopName,
           kind: 'Order',

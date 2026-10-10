@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 
 import { generateCatalog, merchantProfile } from '@luma/simulator-commerce';
 
+import { erpOf } from './erp.mjs';
+
 /**
  * Workflows the demo turns on. Each starts a run when detection opens its kind of case, or when
  * an owner reports a follow-up such as an overdue supplier order.
@@ -67,7 +69,7 @@ export async function configureDemoSuppliers(call, manifest) {
   for (const supplier of demoPlan(manifest).suppliers)
     await call(`runs/${manifest.simulator.runId}/control`, {
       action: 'command',
-      instance: 'jtl',
+      instance: erpOf(manifest).name,
       command: {
         kind: 'supplier-profile',
         supplierId: supplier.id,
@@ -88,7 +90,7 @@ export function createWorkflowDemo({ application, manifest, owner }) {
     return { pass: async () => ({ workflows: 0, suppliers: 0, rules: 0 }) };
   const plan = demoPlan(manifest);
   const runId = manifest.simulator.runId;
-  const jtl = manifest.connections.jtl;
+  const erp = erpOf(manifest);
   const done = { workflows: new Set(), suppliers: new Map(), rules: new Set() };
   const conflict = (error) => [404, 409, 503].includes(error?.statusCode);
 
@@ -127,7 +129,11 @@ export function createWorkflowDemo({ application, manifest, owner }) {
         try {
           await application.commitments.linkSupplier(context, id, {
             expectedRevision: current.revision ?? 1,
-            link: { connectionId: jtl, externalId: supplier.id, scopeKey: '' },
+            link: {
+              connectionId: erp.connectionId,
+              externalId: erp.supplier(supplier.id),
+              scopeKey: '',
+            },
             confirmationHours: 4,
           });
         } catch (error) {
@@ -145,10 +151,11 @@ export function createWorkflowDemo({ application, manifest, owner }) {
       const supplierId = done.suppliers.get(variant.supplierId);
       const setup = await application.replenishment.api.setup(context, {
         q: variant.sku,
-        connectionId: jtl,
+        connectionId: erp.connectionId,
       });
       const position = setup.positions.find(
-        (item) => item.connectionId === jtl && item.sku === variant.sku,
+        (item) =>
+          item.connectionId === erp.connectionId && item.sku === variant.sku,
       );
       if (!supplierId || !position || position.available === null) continue;
       if (setup.rules.some((rule) => rule.positionId === position.positionId)) {
@@ -160,7 +167,7 @@ export function createWorkflowDemo({ application, manifest, owner }) {
         await application.replenishment.api.configure(context, {
           id: stableId(`${runId}:rule:${variant.id}`),
           positionId: position.positionId,
-          connectionId: jtl,
+          connectionId: erp.connectionId,
           supplierId,
           minimum:
             index < 2

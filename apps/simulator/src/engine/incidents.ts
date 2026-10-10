@@ -163,7 +163,7 @@ export async function injectIncident(world: World, input: InjectIncident) {
       id: input.id,
       kind,
       origin: 'injected',
-      instance: 'jtl',
+      instance: world.model.erp.name,
       summary: `${Object.keys(profiles).length} suppliers stop confirming new purchase orders.`,
       resources: [],
       detail: { profiles },

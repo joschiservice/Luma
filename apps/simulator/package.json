@@ -15,6 +15,7 @@
     "@types/pg": "catalog:"
   },
   "dependencies": {
+    "@luma/simulator-cin7": "workspace:*",
     "@luma/simulator-commerce": "workspace:*",
     "@luma/simulator-contract": "workspace:*",
     "@luma/simulator-core": "workspace:*",
