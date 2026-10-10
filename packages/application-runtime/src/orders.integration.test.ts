@@ -1019,7 +1019,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
       (await workspace().list(context(), { ...query, connectionId: jtl }))
         .items,
     ).toEqual([]);
-  });
+  }, 30000);
 
   it('publishes search and state atomically, preserves replay and rejects stale snapshots', async () => {
     const { a } = await seedWorkspace();

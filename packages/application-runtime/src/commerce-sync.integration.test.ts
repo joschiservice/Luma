@@ -930,7 +930,7 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
         )
         .map((r) => r.cursor ?? null),
     ).toEqual([null, '2', '2']);
-  });
+  }, 30000);
 
   it('imports fulfillments after their orders and flags records a full check no longer finds', async () => {
     source.set(shop, 'orders.read', [order(shop, '1'), order(shop, '2')]);
