@@ -245,7 +245,11 @@ function Target({
       {entry.account ? (
         <div>
           {entry.account.email ? (
-            <Link to="/" search={{ query: entry.account.email }}>
+            <Link
+              to="/accounts/$userId"
+              params={{ userId: entry.account.id }}
+              search={{}}
+            >
               {entry.account.name ?? entry.account.email}
             </Link>
           ) : (

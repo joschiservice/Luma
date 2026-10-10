@@ -2,7 +2,7 @@ import type { ChildProcess } from 'node:child_process';
 import { fork } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { once } from 'node:events';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 
 import {
   installedConnectionSchema,
@@ -118,22 +118,16 @@ describe.skipIf(!databaseUrl)('connections through the API CLI', () => {
       await lock.query(
         "SELECT pg_advisory_lock(hashtext('luma_test_role_setup'))",
       );
-      for (const migration of [
-        '0001_identity.sql',
-        '0004_connector_installations.sql',
-        '0023_workspace_settings.sql',
-        '0024_workspace_apps.sql',
-        '0052_authentication_factors.sql',
-        '0054_workspace_roles.sql',
-        '0055_workspace_app_scopes.sql',
-      ]) {
-        await owner.query(
-          await readFile(
-            new URL(`../migrations/${migration}`, import.meta.url),
-            'utf8',
-          ),
-        );
-      }
+      for (const migration of (
+        await readdir(new URL('../migrations/', import.meta.url))
+      ).sort())
+        if (migration.endsWith('.sql'))
+          await owner.query(
+            await readFile(
+              new URL(`../migrations/${migration}`, import.meta.url),
+              'utf8',
+            ),
+          );
     } finally {
       await lock.query(
         "SELECT pg_advisory_unlock(hashtext('luma_test_role_setup'))",

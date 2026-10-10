@@ -25,6 +25,7 @@ import {
   usePasskeySupport,
 } from '../identity/data';
 import { SectionHeading } from './section-heading';
+import { SecurityActivity, securityActivityKey } from './security-activity';
 
 export const passkeysKey = ['private', 'passkeys'] as const;
 
@@ -125,6 +126,7 @@ export function SecuritySettings({ disabled }: { disabled: boolean }) {
         </p>
       </div>
       <PasskeySettings disabled={disabled} />
+      <SecurityActivity />
       {flow ? (
         <FactorDialog
           flow={flow}
@@ -191,6 +193,7 @@ function PasskeySettings({ disabled }: { disabled: boolean }) {
     } finally {
       setPending(false);
       await client.invalidateQueries({ queryKey: passkeysKey });
+      await client.invalidateQueries({ queryKey: securityActivityKey });
     }
   }
 
@@ -361,6 +364,7 @@ function RemovePasskeyDialog({
     } finally {
       setPending(false);
       await client.invalidateQueries({ queryKey: passkeysKey });
+      await client.invalidateQueries({ queryKey: securityActivityKey });
     }
   }
 
@@ -449,6 +453,7 @@ function FactorDialog({
 
   async function finish(message: string) {
     await client.invalidateQueries({ queryKey: sessionKey });
+    await client.invalidateQueries({ queryKey: securityActivityKey });
     onClose(message);
   }
 

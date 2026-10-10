@@ -110,11 +110,13 @@ export type { ContractRoute } from './routes.js';
 export {
   membershipSchema,
   organizationSchema,
+  securityEventSchema,
   tenantContextSchema,
 } from './contracts/identity.js';
 
 export type {
   Membership,
+  SecurityEventResponse,
   TenantContextResponse,
 } from './contracts/identity.js';
 

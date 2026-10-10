@@ -1,5 +1,5 @@
 import { createHmac, randomUUID } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 
 import { buildRuntimeApp } from '@luma/application-runtime';
 import { Pool } from 'pg';
@@ -109,41 +109,23 @@ describe.skipIf(!databaseUrl)(
         await roleSetup.query(
           "SELECT pg_advisory_lock(hashtext('luma_test_role_setup'))",
         );
-        for (const migration of [
-          '0001_identity.sql',
-          '0004_connector_installations.sql',
-        ])
-          await owner.query(
-            await readFile(
-              new URL(`../migrations/${migration}`, import.meta.url),
-              'utf8',
-            ),
-          );
+        // Session and security tables depend on later migrations, so apply the full history.
+        for (const migration of (
+          await readdir(new URL('../migrations/', import.meta.url))
+        ).sort())
+          if (migration.endsWith('.sql'))
+            await owner.query(
+              await readFile(
+                new URL(`../migrations/${migration}`, import.meta.url),
+                'utf8',
+              ),
+            );
       } finally {
         await roleSetup.query(
           "SELECT pg_advisory_unlock(hashtext('luma_test_role_setup'))",
         );
         roleSetup.release();
       }
-      await owner.query(
-        await readFile(
-          new URL('../migrations/0023_workspace_settings.sql', import.meta.url),
-          'utf8',
-        ),
-      );
-      // Roles list app permissions, so app installations are part of identity's schema here.
-      for (const migration of [
-        '0024_workspace_apps.sql',
-        '0052_authentication_factors.sql',
-        '0054_workspace_roles.sql',
-        '0055_workspace_app_scopes.sql',
-      ])
-        await owner.query(
-          await readFile(
-            new URL(`../migrations/${migration}`, import.meta.url),
-            'utf8',
-          ),
-        );
       await admin.query(
         `CREATE ROLE "${login}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
       );
@@ -275,6 +257,49 @@ describe.skipIf(!databaseUrl)(
           })
         ).statusCode,
       ).toBe(404);
+    });
+    it('records session activity at most once per five minutes', async () => {
+      // The signed cookie value is "<token>.<signature>".
+      const token = decodeURIComponent(
+        bob.cookie.match(/session_token=([^;]+)/)![1]!,
+      ).split('.')[0];
+      const session = await owner.query<{ id: string; last_active_at: Date }>(
+        'SELECT id,last_active_at FROM sessions WHERE token=$1',
+        [token],
+      );
+      const { id, last_active_at: created } = session.rows[0]!;
+      expect(created).toBeInstanceOf(Date);
+      const lastActive = async () =>
+        (
+          await owner.query<{ last_active_at: Date }>(
+            'SELECT last_active_at FROM sessions WHERE id=$1',
+            [id],
+          )
+        ).rows[0]!.last_active_at.getTime();
+      const read = async () =>
+        expect(
+          (
+            await app.inject({
+              url: '/v1/organizations',
+              headers: headers(bob.cookie),
+            })
+          ).statusCode,
+        ).toBe(200);
+      const recent = new Date(Date.now() - 4 * 60_000);
+      await owner.query('UPDATE sessions SET last_active_at=$1 WHERE id=$2', [
+        recent,
+        id,
+      ]);
+      await read();
+      await read();
+      expect(await lastActive()).toBe(recent.getTime());
+      const stale = new Date(Date.now() - 6 * 60_000);
+      await owner.query('UPDATE sessions SET last_active_at=$1 WHERE id=$2', [
+        stale,
+        id,
+      ]);
+      await read();
+      expect(await lastActive()).toBeGreaterThan(Date.now() - 60_000);
     });
     it('rejects missing, forged and foreign sessions without exposing tenant existence', async () => {
       for (const cookie of ['', 'better-auth.session_token=forged']) {
@@ -850,6 +875,248 @@ describe.skipIf(!databaseUrl)(
         },
       });
       expect(signin.statusCode, signin.body).toBe(200);
+    });
+
+    describe('account security events', () => {
+      const password = 'test-password-long-enough';
+      const userAgent =
+        'Mozilla/5.0 (X11; Linux x86_64; rv:143.0) Gecko/20100101 Firefox/143.0';
+      const events = async (userId: string) =>
+        (
+          await owner.query<{
+            event_type: string;
+            outcome: string;
+            reason_code: string | null;
+            session_id: string | null;
+            request_id: string;
+            user_agent: string | null;
+          }>(
+            'SELECT event_type,outcome,reason_code,session_id,request_id,user_agent FROM account_security_events WHERE user_id=$1 ORDER BY created_at,id',
+            [userId],
+          )
+        ).rows;
+      const post = (
+        url: string,
+        cookie: string,
+        payload: Record<string, unknown>,
+      ) =>
+        app.inject({
+          method: 'POST',
+          url,
+          headers: { ...headers(cookie), 'user-agent': userAgent },
+          payload,
+        });
+      const signIn = (email: string, secret = password) =>
+        post('/auth/sign-in/email', '', { email, password: secret });
+
+      it('records password sign-ins once and answers known and unknown emails identically', async () => {
+        const erin = await signup('erin');
+        const before = (await events(erin.id)).length;
+        const success = await signIn('erin@example.test');
+        expect(success.statusCode, success.body).toBe(200);
+        const known = await signIn('erin@example.test', 'not-the-password');
+        const unknown = await signIn('nobody@example.test', 'not-the-password');
+        expect(unknown.statusCode).toBe(known.statusCode);
+        expect(unknown.json()).toEqual(known.json());
+        expect((await events(erin.id)).slice(before)).toEqual([
+          expect.objectContaining({
+            event_type: 'sign-in.password',
+            outcome: 'succeeded',
+            reason_code: null,
+            session_id: expect.any(String),
+            request_id: success.headers['x-request-id'],
+            user_agent: userAgent,
+          }),
+          expect.objectContaining({
+            event_type: 'sign-in.password',
+            outcome: 'failed',
+            reason_code: 'invalid-credentials',
+            session_id: null,
+            request_id: known.headers['x-request-id'],
+          }),
+        ]);
+        const anonymous = await owner.query(
+          'SELECT * FROM account_security_events WHERE user_id IS NULL AND request_id=$1',
+          [unknown.headers['x-request-id']],
+        );
+        expect(anonymous.rows).toEqual([
+          expect.objectContaining({
+            event_type: 'sign-in.password',
+            outcome: 'failed',
+            reason_code: 'invalid-credentials',
+            email_hash: createHmac('sha256', secret)
+              .update('account-security-email:nobody@example.test')
+              .digest('hex'),
+          }),
+        ]);
+        const stored = JSON.stringify(
+          (await owner.query('SELECT * FROM account_security_events')).rows,
+        );
+        expect(stored).not.toContain('nobody@example.test');
+        expect(stored).not.toContain('not-the-password');
+        expect(stored).not.toContain(password);
+      });
+
+      it('records factor, password and session changes exactly once, including retries', async () => {
+        const frank = await signup('frank');
+        const enabled = await post('/auth/two-factor/enable', frank.cookie, {
+          password,
+        });
+        const { totpURI } = enabled.json() as { totpURI: string };
+        const confirmed = await post(
+          '/auth/two-factor/verify-totp',
+          frank.cookie,
+          { code: totp(totpURI) },
+        );
+        expect(confirmed.statusCode, confirmed.body).toBe(200);
+        let cookie = responseCookies(confirmed);
+        const repeated = await post('/auth/two-factor/verify-totp', cookie, {
+          code: totp(totpURI),
+        });
+        expect(repeated.statusCode, repeated.body).toBe(200);
+        cookie = responseCookies(repeated) || cookie;
+        const codes = await post(
+          '/auth/two-factor/generate-backup-codes',
+          cookie,
+          { password },
+        );
+        expect(codes.statusCode, codes.body).toBe(200);
+        const { backupCodes } = codes.json() as { backupCodes: string[] };
+
+        const challenge = await signIn('frank@example.test');
+        expect(challenge.json()).toMatchObject({ twoFactorRedirect: true });
+        const pending = responseCookies(challenge);
+        expect(
+          (
+            await post('/auth/two-factor/verify-totp', pending, {
+              code: '000000',
+            })
+          ).statusCode,
+        ).toBe(401);
+        const second = await post(
+          '/auth/two-factor/verify-backup-code',
+          pending,
+          { code: backupCodes[0] },
+        );
+        expect(second.statusCode, second.body).toBe(200);
+        const other = responseCookies(second);
+
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const disabled = await post('/auth/two-factor/disable', cookie, {
+            password,
+          });
+          expect(disabled.statusCode, disabled.body).toBe(200);
+          cookie = responseCookies(disabled) || cookie;
+        }
+        for (let attempt = 0; attempt < 2; attempt++)
+          expect(
+            (await post('/auth/revoke-other-sessions', cookie, {})).statusCode,
+          ).toBe(200);
+        expect(
+          (
+            await app.inject({
+              url: '/v1/organizations',
+              headers: headers(other),
+            })
+          ).statusCode,
+        ).toBe(401);
+        const changed = await post('/auth/change-password', cookie, {
+          currentPassword: password,
+          newPassword: 'another-password-long-enough',
+        });
+        expect(changed.statusCode, changed.body).toBe(200);
+
+        expect(
+          (await events(frank.id)).map((event) => [
+            event.event_type,
+            event.outcome,
+            event.reason_code,
+          ]),
+        ).toEqual([
+          ['two-factor.enabled', 'succeeded', null],
+          ['two-factor.backup-codes-regenerated', 'succeeded', null],
+          ['sign-in.password', 'succeeded', 'second-factor-required'],
+          ['sign-in.two-factor', 'failed', 'invalid-code'],
+          ['sign-in.two-factor', 'succeeded', 'backup-code'],
+          ['two-factor.disabled', 'succeeded', null],
+          ['sessions.revoked', 'succeeded', 'others'],
+          ['password.changed', 'succeeded', null],
+        ]);
+      });
+
+      it('lists only the signed-in person’s own events, newest first, in pages', async () => {
+        const grace = await signup('grace');
+        const henry = await signup('henry');
+        await signIn('henry@example.test', 'not-the-password');
+        for (let index = 0; index < 22; index++)
+          await owner.query(
+            "INSERT INTO account_security_events(id,user_id,event_type,outcome,request_id,created_at) VALUES($1,$2,'passkey.added','succeeded','seed',now()-make_interval(mins=>$3))",
+            [randomUUID(), grace.id, index + 1],
+          );
+
+        type Page = {
+          items: {
+            id: string;
+            type: string;
+            outcome: string;
+            createdAt: string;
+          }[];
+          nextCursor: string | null;
+        };
+
+        const list = (cookie: string, cursor?: string) =>
+          app.inject({
+            url: `/v1/account/security-events${cursor ? `?cursor=${cursor}` : ''}`,
+            headers: headers(cookie),
+          });
+        const first = await list(grace.cookie);
+        expect(first.statusCode, first.body).toBe(200);
+        const page = first.json() as Page;
+        expect(page.items).toHaveLength(20);
+        expect(page.nextCursor).toEqual(expect.any(String));
+        const next = (
+          await list(grace.cookie, page.nextCursor!)
+        ).json() as Page;
+        expect(next.items).toHaveLength(2);
+        expect(next.nextCursor).toBeNull();
+        const items = [...page.items, ...next.items];
+        const times = items.map((item) => Date.parse(item.createdAt));
+        expect(times).toEqual([...times].sort((a, b) => b - a));
+        const own = await owner.query<{ id: string }>(
+          'SELECT id FROM account_security_events WHERE user_id=$1',
+          [grace.id],
+        );
+        expect(items.map((item) => item.id).sort()).toEqual(
+          own.rows.map((row) => row.id).sort(),
+        );
+        expect(((await list(henry.cookie)).json() as Page).items).toEqual([
+          expect.objectContaining({
+            type: 'sign-in.password',
+            outcome: 'failed',
+          }),
+        ]);
+        expect((await list('')).statusCode).toBe(401);
+        expect((await list(grace.cookie, 'not-a-cursor')).statusCode).toBe(422);
+      });
+
+      it('fails sign-in without a session cookie when its event cannot be recorded', async () => {
+        await owner.query(
+          "CREATE FUNCTION reject_security_event() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'event store unavailable'; END $$",
+        );
+        await owner.query(
+          'CREATE TRIGGER reject_security_event BEFORE INSERT ON account_security_events FOR EACH ROW EXECUTE FUNCTION reject_security_event()',
+        );
+        try {
+          const response = await signIn('erin@example.test');
+          expect(response.statusCode).toBe(500);
+          expect(responseCookies(response)).not.toContain('session_token=');
+        } finally {
+          await owner.query(
+            'DROP TRIGGER reject_security_event ON account_security_events',
+          );
+          await owner.query('DROP FUNCTION reject_security_event()');
+        }
+      });
     });
 
     describe('custom workspace roles', () => {

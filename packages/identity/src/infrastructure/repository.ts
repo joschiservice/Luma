@@ -13,11 +13,16 @@ import {
   isBuiltInRole,
   PermissionSet,
 } from '../domain/roles.js';
+import {
+  sessionActivityDue,
+  sessionActivityIntervalMs,
+} from '../domain/sessions.js';
 import type { MembershipRow } from './access.js';
 import { membershipFromRow, membershipSelect, storedRole } from './access.js';
 import type { AuthSettings } from './auth.js';
 import { createAuth } from './auth.js';
 import * as schema from './schema.js';
+import { listSecurityEvents, securityEventsPlugin } from './security-events.js';
 
 const organizationDto = (
   row: typeof schema.organization.$inferSelect,
@@ -74,7 +79,9 @@ function normalizeDatabaseError(error: unknown): never {
  */
 export function createRepository(pool: Pool, settings: AuthSettings) {
   const db = drizzle(pool, { schema });
-  const auth = createAuth(db, settings);
+  const auth = createAuth(db, settings, undefined, [
+    securityEventsPlugin(pool, settings.secret),
+  ]);
   const repository: IdentityRepository = {
     async getSession(credentials) {
       const session = await auth.api.getSession({
@@ -82,10 +89,18 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
         query: { disableCookieCache: true },
       });
 
-      return session
-        ? { userId: session.user.id, sessionId: session.session.id }
-        : null;
+      if (!session) return null;
+      if (sessionActivityDue(session.session.lastActiveAt, new Date()))
+        // The SQL condition keeps concurrent requests from writing more than once per interval.
+        await pool.query(
+          `UPDATE sessions SET last_active_at=now() WHERE id=$1 AND (last_active_at IS NULL OR last_active_at<=now()-make_interval(secs=>$2))`,
+          [session.session.id, sessionActivityIntervalMs / 1000],
+        );
+
+      return { userId: session.user.id, sessionId: session.session.id };
     },
+    listSecurityEvents: (userId, after, limit) =>
+      listSecurityEvents(pool, userId, after, limit),
     async withUser(userId, operation) {
       try {
         return await db.transaction(async (tx) => {

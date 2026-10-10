@@ -1,4 +1,7 @@
-import type { SupportSessionRevocation } from '@luma/identity';
+import type {
+  SecurityEventType,
+  SupportSessionRevocation,
+} from '@luma/identity';
 
 import type { StaffContext } from '../domain/access.js';
 import {
@@ -48,6 +51,57 @@ export interface WorkspaceDetail {
   }[];
 }
 
+export interface AccountAccess {
+  id: string;
+  userId: string;
+  reason: string;
+  expiresAt: string;
+}
+
+export interface AccountDetail {
+  account: { id: string; name: string; email: string; createdAt: string };
+  security: { twoFactorEnabled: boolean; passkeys: number };
+  workspacesTruncated: boolean;
+  workspaces: {
+    id: string;
+    name: string;
+    slug: string;
+    status: string;
+    dataRegion: string;
+    role: string;
+    customRoleName: string | null;
+    membershipStatus: 'active';
+    joinedAt: string;
+  }[];
+  sessionsTruncated: boolean;
+  sessions: {
+    id: string;
+    createdAt: string;
+    expiresAt: string;
+    lastActiveAt: string | null;
+    ipAddress: string | null;
+    browser: string | null;
+    os: string | null;
+  }[];
+}
+
+export interface AccountSecurityEvents {
+  items: {
+    id: string;
+    type: SecurityEventType;
+    outcome: 'succeeded' | 'failed';
+    reason: string | null;
+    createdAt: string;
+    sessionId: string | null;
+    ipAddress: string | null;
+    browser: string | null;
+    os: string | null;
+    requestId: string;
+    staffCommandId: string | null;
+  }[];
+  nextCursor: string | null;
+}
+
 export interface StaffRepository {
   directory(
     context: StaffContext,
@@ -90,6 +144,22 @@ export interface StaffRepository {
     cursor: string | null,
   ): Promise<AccessHistoryPage>;
   audit(context: StaffContext, query: AuditQuery): Promise<AuditPage>;
+  accountGrant(
+    context: StaffContext,
+    userId: string,
+    reason: string,
+  ): Promise<AccountAccess>;
+  account(
+    context: StaffContext,
+    userId: string,
+    grantId: string,
+  ): Promise<AccountDetail>;
+  accountSecurityEvents(
+    context: StaffContext,
+    userId: string,
+    grantId: string,
+    cursor: string | undefined,
+  ): Promise<AccountSecurityEvents>;
 }
 
 /** Provides bounded staff operations using explicit privileges and tenant-scoped support grants. */
@@ -151,6 +221,29 @@ export function createStaffService(repository: StaffRepository) {
       requireStaffPermission(context, 'staff.audit.read');
 
       return repository.audit(context, query);
+    },
+    /** Opens thirty minutes of account inspection for the current session and records its reason. */
+    accountGrant(context: StaffContext, userId: string, reason: string) {
+      requireStaffPermission(context, 'staff.accounts.inspect');
+
+      return repository.accountGrant(context, userId, reason);
+    },
+    /** Reads account, membership, factor and session metadata after rechecking the account grant. */
+    account(context: StaffContext, userId: string, grantId: string) {
+      requireStaffPermission(context, 'staff.accounts.inspect');
+
+      return repository.account(context, userId, grantId);
+    },
+    /** Pages through an account's security events under its account grant; each page is audited. */
+    accountSecurityEvents(
+      context: StaffContext,
+      userId: string,
+      grantId: string,
+      cursor?: string,
+    ) {
+      requireStaffPermission(context, 'staff.accounts.inspect');
+
+      return repository.accountSecurityEvents(context, userId, grantId, cursor);
     },
   };
 }

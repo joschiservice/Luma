@@ -39,6 +39,10 @@ export function identityRoutes(service?: IdentityService) {
   const os = implement(apiContract.identity).$context<HttpContext>();
 
   return os.router({
+    listSecurityEvents: os.listSecurityEvents.handler(
+      async ({ context: { request }, input: { query } }) =>
+        use().listSecurityEvents(credentials(request), query.cursor),
+    ),
     listOrganizations: os.listOrganizations.handler(
       async ({ context: { request } }) => ({
         items: await use().listOrganizations(credentials(request)),
@@ -142,6 +146,7 @@ export function registerIdentityGuards(
       );
     if (
       route === '/v1/organizations' ||
+      route === '/v1/account/security-events' ||
       route === '/v1/invitations/preview' ||
       route === '/v1/invitations/accept'
     ) {

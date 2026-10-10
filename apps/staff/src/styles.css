@@ -234,3 +234,8 @@
     display: block;
   }
 }
+
+.staff-link {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}

@@ -57,6 +57,15 @@ export const accessHistoryOptions = (workspaceId: string, grantId: string) =>
     retry: false,
   });
 
+/** Reads one customer account under its account grant; failed grants are never retried. */
+export const accountOptions = (userId: string, grantId: string) =>
+  queryOptions({
+    queryKey: ['staff', 'account', userId, grantId],
+    queryFn: ({ signal }) => staffApi.account(userId, grantId, signal),
+    enabled: grantId.length > 0,
+    retry: false,
+  });
+
 /** Staff audit filters as sent to the API; time bounds are ISO instants. */
 export interface AuditFilters {
   staff?: string | undefined;
@@ -76,6 +85,18 @@ export const auditOptions = (filters: AuditFilters, enabled: boolean) =>
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.nextCursor,
     enabled,
+    retry: false,
+  });
+
+/** Pages through an account's security events under its account grant, newest first. */
+export const accountSecurityEventsOptions = (userId: string, grantId: string) =>
+  infiniteQueryOptions({
+    queryKey: ['staff', 'account', userId, grantId, 'security-events'],
+    queryFn: ({ pageParam, signal }) =>
+      staffApi.accountSecurityEvents(userId, grantId, pageParam, signal),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    enabled: grantId.length > 0,
     retry: false,
   });
 

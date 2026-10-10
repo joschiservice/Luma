@@ -51,6 +51,7 @@ const provisioningSchema = z
         'staff.workspace.inspect',
         'staff.sessions.revoke',
         'staff.audit.read',
+        'staff.accounts.inspect',
       ]),
     ),
     operator: z.string().trim().min(1).max(200),

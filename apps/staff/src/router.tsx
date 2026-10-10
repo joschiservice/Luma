@@ -118,10 +118,22 @@ export const auditRoute = createRoute({
   component: lazyRouteComponent(() => import('./audit'), 'AuditPage'),
 });
 
+export const accountRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/accounts/$userId',
+  validateSearch: z.object({ grantId: z.uuid().optional().catch(undefined) }),
+  component: lazyRouteComponent(() => import('./account'), 'AccountPage'),
+});
+
 export const router = createRouter({
   routeTree: rootRoute.addChildren([
     loginRoute,
-    protectedRoute.addChildren([directoryRoute, workspaceRoute, auditRoute]),
+    protectedRoute.addChildren([
+      directoryRoute,
+      workspaceRoute,
+      accountRoute,
+      auditRoute,
+    ]),
   ]),
   defaultPreload: false,
 });

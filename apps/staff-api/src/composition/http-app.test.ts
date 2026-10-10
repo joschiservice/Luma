@@ -26,6 +26,9 @@ function fixture(trustedProxy: string[] = []) {
       health: unused,
       accessHistory: unused,
       audit: unused,
+      accountGrant: unused,
+      account: unused,
+      accountSecurityEvents: unused,
     },
   };
 

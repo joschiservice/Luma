@@ -1,6 +1,9 @@
 import {
   staffAccessGrantSchema,
   staffAccessHistorySchema,
+  staffAccountAccessSchema,
+  staffAccountDetailSchema,
+  staffAccountSecurityEventsSchema,
   staffAuditPageSchema,
   staffConfigSchema,
   staffDirectorySchema,
@@ -107,6 +110,7 @@ export function createStaffApi(
   }
 
   const workspace = (id: string) => `workspaces/${encodeURIComponent(id)}`;
+  const account = (id: string) => `accounts/${encodeURIComponent(id)}`;
 
   return {
     config: async (signal?: AbortSignal) =>
@@ -199,6 +203,34 @@ export function createStaffApi(
         await request(
           `${workspace(workspaceId)}/users/${encodeURIComponent(userId)}/revoke-sessions`,
           body,
+        ),
+      ),
+    grantAccount: async (userId: string, reason: string) =>
+      staffAccountAccessSchema.parse(
+        await request(`${account(userId)}/access`, { reason }),
+      ),
+    account: async (userId: string, grantId: string, signal?: AbortSignal) =>
+      staffAccountDetailSchema.parse(
+        await request(
+          `${account(userId)}?${new URLSearchParams({ grantId })}`,
+          undefined,
+          signal,
+        ),
+      ),
+    accountSecurityEvents: async (
+      userId: string,
+      grantId: string,
+      cursor: string | undefined,
+      signal?: AbortSignal,
+    ) =>
+      staffAccountSecurityEventsSchema.parse(
+        await request(
+          `${account(userId)}/security-events?${new URLSearchParams({
+            grantId,
+            ...(cursor ? { cursor } : {}),
+          })}`,
+          undefined,
+          signal,
         ),
       ),
     signIn: (email: string, password: string) =>

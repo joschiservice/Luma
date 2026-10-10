@@ -3,6 +3,7 @@ export const staffPermissions = [
   'staff.workspace.inspect',
   'staff.sessions.revoke',
   'staff.audit.read',
+  'staff.accounts.inspect',
 ] as const;
 
 export type StaffPermission = (typeof staffPermissions)[number];
@@ -18,7 +19,7 @@ export interface StaffContext {
 /** Staff errors carry a stable HTTP status without exposing database or credential details. */
 export class StaffError extends Error {
   constructor(
-    public readonly status: 401 | 403 | 404 | 409 | 503,
+    public readonly status: 400 | 401 | 403 | 404 | 409 | 503,
     message: string,
   ) {
     super(message);
