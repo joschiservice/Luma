@@ -492,6 +492,89 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       );
     }
   });
+  it('combines observation and successful-check times at the historical coverage boundary', async () => {
+    const coverage = createConnectionCoverage(createTenantDatabase(runtime));
+    const asOf = '2026-10-10T12:00:00.000Z';
+    await owner.query(
+      `UPDATE connector_installations SET document=document || $3::jsonb WHERE tenant_id=$1 AND id=$2`,
+      [
+        tenant,
+        connection,
+        {
+          permissions: ['orders.read', 'inventory.read'],
+          granted: ['orders.read', 'inventory.read'],
+        },
+      ],
+    );
+    try {
+      for (const [capability, observedAt] of [
+        ['inventory.read', '2026-10-09T12:00:00Z'],
+        ['orders.read', '2026-10-09T10:00:00Z'],
+        ['inventory.read', '2026-10-10T12:01:00Z'],
+      ]) {
+        const id = randomUUID();
+        await owner.query(
+          `INSERT INTO connector_observations(id,tenant_id,connection_id,ingest_key,document) VALUES($1,$2,$3,$4,$5)`,
+          [
+            id,
+            tenant,
+            connection,
+            id,
+            {
+              capability,
+              observation: {
+                source: { tenantId: tenant, connectionId: connection },
+                observedAt,
+              },
+            },
+          ],
+        );
+      }
+      for (const [capability, observedAt, succeeded] of [
+        ['inventory.read', '2026-10-09T10:00:00Z', true],
+        ['inventory.read', '2026-10-10T11:00:00Z', false],
+        ['orders.read', '2026-10-10T21:00:00+09:00', true],
+        ['orders.read', '2026-10-10T12:01:00Z', false],
+      ])
+        await owner.query(
+          `INSERT INTO connector_read_checks(tenant_id,connection_id,capability,observed_at,succeeded,document) VALUES($1,$2,$3,$4,$5,'{}')`,
+          [tenant, connection, capability, observedAt, succeeded],
+        );
+      const read = async (at: string) =>
+        (await coverage(context(), at)).find((item) => item.id === connection);
+      expect(await read(asOf)).toMatchObject({
+        freshness: 'fresh',
+        status: 'degraded',
+        lastObservedAt: asOf,
+        nextRefreshAt: '2026-10-10T12:00:00.001Z',
+      });
+      expect(await read('2026-10-10T11:59:59.999Z')).toMatchObject({
+        freshness: 'stale',
+        lastObservedAt: '2026-10-09T12:00:00.000Z',
+      });
+      expect(await read('2026-10-10T12:00:00.001Z')).toMatchObject({
+        freshness: 'stale',
+        lastObservedAt: asOf,
+      });
+      expect(await read('2026-10-08T12:00:00.000Z')).toMatchObject({
+        freshness: 'unobserved',
+        status: 'active',
+        lastObservedAt: null,
+      });
+      expect(await coverage(context(otherTenant), asOf)).toMatchObject([
+        { freshness: 'unobserved', status: 'active', lastObservedAt: null },
+      ]);
+    } finally {
+      await owner.query(
+        'DELETE FROM connector_read_checks WHERE tenant_id=$1',
+        [tenant],
+      );
+      await owner.query(
+        `UPDATE connector_installations SET document=document || '{"permissions":[],"granted":[]}'::jsonb WHERE tenant_id=$1`,
+        [tenant],
+      );
+    }
+  });
   it('persists empty read coverage, failures and recovery with tenant isolation', async () => {
     const db = createTenantDatabase(runtime);
     const record = createReadChecks(db);

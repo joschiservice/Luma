@@ -22,6 +22,14 @@ type PositionRow = {
 const readable = (key: string, noun: string) =>
   `CASE WHEN left(${key},10)='["source",' THEN '${noun} '||regexp_replace((${key})::jsonb->>4,'^.*/','') ELSE ${key} END`;
 
+const positionRows = `FROM inventory_projections p JOIN inventory_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
+ JOIN inventory_entities e ON e.tenant_id=p.tenant_id AND e.id=(s.document->'data'->>'skuId')::uuid
+ JOIN inventory_entities l ON l.tenant_id=p.tenant_id AND l.id=(s.document->'data'->>'locationId')::uuid`;
+const positionScope = `WHERE p.tenant_id=$1 AND s.kind='position' AND ($2::uuid IS NULL OR p.entity_id=$2)
+ AND ($3::uuid IS NULL OR s.document->'data'->>'skuId'=$3::text)
+ AND ($4::uuid IS NULL OR s.document->'data'->>'locationId'=$4::text)
+ AND ($5::uuid IS NULL OR p.entity_id>$5)`;
+
 const sourceRows = `SELECT p.entity_id AS id,
  s.document->'data'->>'skuId' AS "skuId", s.document->'data'->>'locationId' AS "locationId",
  s.document->'data'->>'unit' AS unit, e.reconciliation_key AS "skuKey",
@@ -35,18 +43,13 @@ const sourceRows = `SELECT p.entity_id AS id,
  'available',s.document->'data'->'available','incoming',NULL,
  'availabilityBasis',s.document->'data'->>'availabilityBasis','observedAt',s.document->>'observedAt',
  'sourceUpdatedAt',s.document->>'sourceUpdatedAt','deleted',s.document->'deleted') AS source
- FROM inventory_projections p JOIN inventory_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
- JOIN inventory_entities e ON e.tenant_id=p.tenant_id AND e.id=(s.document->'data'->>'skuId')::uuid
- JOIN inventory_entities l ON l.tenant_id=p.tenant_id AND l.id=(s.document->'data'->>'locationId')::uuid
+ ${positionRows}
  LEFT JOIN connector_installations c ON c.tenant_id=p.tenant_id AND c.id=p.connection_id
  LEFT JOIN LATERAL (SELECT external_id,method FROM connector_source_mappings m WHERE m.tenant_id=p.tenant_id
  AND m.connection_id=p.connection_id AND m.resource='sku' AND m.canonical_id=(s.document->'data'->>'skuId')::uuid ORDER BY external_id LIMIT 1) sku ON true
  LEFT JOIN LATERAL (SELECT external_id FROM connector_source_mappings m WHERE m.tenant_id=p.tenant_id
  AND m.connection_id=p.connection_id AND m.resource='location' AND m.canonical_id=(s.document->'data'->>'locationId')::uuid ORDER BY external_id LIMIT 1) location ON true
- WHERE p.tenant_id=$1 AND s.kind='position' AND ($2::uuid IS NULL OR p.entity_id=$2)
- AND ($3::uuid IS NULL OR s.document->'data'->>'skuId'=$3::text)
- AND ($4::uuid IS NULL OR s.document->'data'->>'locationId'=$4::text)
- AND ($5::uuid IS NULL OR p.entity_id>$5)`;
+ ${positionScope}`;
 
 /** Reads a bounded page, retaining all sources even when a search or source filter matches only one. */
 export async function readPositions(
@@ -56,9 +59,20 @@ export async function readPositions(
   after: string | null,
   id: string | null = null,
 ) {
+  const selectPageFirst = query.q === '' && query.view === 'all';
   const pattern = `%${query.q.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`;
   const result = await tx.query<PositionRow>(
-    `WITH sources AS (${sourceRows}), selected AS (
+    // Search and difference views need source facts before paging. The all view only
+    // needs position IDs; enrich its page afterwards without hiding other sources.
+    selectPageFirst
+      ? `WITH selected AS MATERIALIZED (
+    SELECT p.entity_id AS id ${positionRows} ${positionScope}
+    GROUP BY p.entity_id
+    HAVING ($6::uuid IS NULL OR bool_or(p.connection_id=$6))
+    ORDER BY id LIMIT 51
+  ), sources AS (${sourceRows} AND p.entity_id IN (SELECT id FROM selected))
+  SELECT sources.* FROM sources ORDER BY id,source->>'label',source->>'connectionId'`
+      : `WITH sources AS (${sourceRows}), selected AS (
     SELECT id FROM sources
     GROUP BY id
     HAVING ($6::text='' OR bool_or(source->>'externalSku' ILIKE $7 OR source->>'externalLocation' ILIKE $7
@@ -77,10 +91,9 @@ export async function readPositions(
       query.skuId ?? null,
       query.locationId ?? null,
       after,
-      query.q,
-      pattern,
-      query.connectionId ?? null,
-      query.view,
+      ...(selectPageFirst
+        ? [query.connectionId ?? null]
+        : [query.q, pattern, query.connectionId ?? null, query.view]),
     ],
   );
   const grouped = new Map<string, PositionRow[]>();

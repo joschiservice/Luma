@@ -148,8 +148,16 @@ it('compares mapped stock without summing sources and follows scoped related rec
 it('pages positions without duplicates and rejects a cursor for different filters', async (t) => {
   const f = await settingsFixture(t);
   const stock = await inventoryFixture(t, f);
-  for (let i = 0; i < 51; i++)
+  for (let i = 0; i < 51; i++) {
     await stock.stock({ sku: `SKU-${i + 200}`, external: `SKU-${i + 200}` });
+    if (i % 3 === 0)
+      await stock.stock({
+        connectionId: stock.erp,
+        sku: `SKU-${i + 200}`,
+        external: `erp-${i + 200}`,
+        amount: '9',
+      });
+  }
   const first = await f.request(f.member, `${f.base}/inventory`);
   expect(first.items).toHaveLength(50);
   expect(first.nextCursor).toBeTruthy();
@@ -162,6 +170,48 @@ it('pages positions without duplicates and rejects a cursor for different filter
   expect(new Set([...first.items, ...next.items].map((i) => i.id)).size).toBe(
     52,
   );
+  const positions = [...first.items, ...next.items];
+  expect(positions.map((item) => item.id)).toEqual(
+    positions.map((item) => item.id).sort(),
+  );
+  const searched = await f.request(f.member, `${f.base}/inventory?q=SKU`);
+  expect(searched.items).toEqual(first.items);
+  const searchedNext = await f.request(
+    f.member,
+    `${f.base}/inventory?q=SKU&cursor=${searched.nextCursor}`,
+  );
+  expect(searchedNext.items).toEqual(next.items);
+  const fromErp = await f.request(
+    f.member,
+    `${f.base}/inventory?connectionId=${stock.erp}`,
+  );
+  expect(fromErp.items).toEqual(
+    positions.filter((item) =>
+      item.sources.some((source) => source.connectionId === stock.erp),
+    ),
+  );
+  expect(fromErp.items).toHaveLength(18);
+  expect(fromErp.items.every((item) => item.sources.length === 2)).toBe(true);
+  expect(fromErp.nextCursor).toBeNull();
+  const last = positions.at(-1);
+  expect(
+    (
+      await f.request(
+        f.member,
+        `${f.base}/inventory?skuId=${last.skuId}&locationId=${last.locationId}`,
+      )
+    ).items,
+  ).toEqual([last]);
+  expect(
+    (await f.request(f.member, `${f.base}/inventory?view=differs`)).items,
+  ).toEqual(fromErp.items);
+  const unknown = await f.request(f.member, `${f.base}/inventory?view=unknown`);
+  expect(unknown.items).toEqual(first.items);
+  const unknownNext = await f.request(
+    f.member,
+    `${f.base}/inventory?view=unknown&cursor=${unknown.nextCursor}`,
+  );
+  expect(unknownNext.items).toEqual(next.items);
   await f.request(
     f.member,
     `${f.base}/inventory?q=SKU&cursor=${first.nextCursor}`,

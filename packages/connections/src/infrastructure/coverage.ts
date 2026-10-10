@@ -23,18 +23,19 @@ export function createConnectionCoverage(db: TenantDatabase): CoverageReader {
         FROM connector_installations i
         LEFT JOIN LATERAL (
           SELECT jsonb_agg(latest) AS observations FROM (
-            SELECT document->>'capability' AS capability,
-              max((document->'observation'->>'observedAt')::timestamptz) AS observed_at
+            SELECT capability, max(observed_at) AS observed_at
             FROM (
-              SELECT document FROM connector_observations
+              SELECT document->>'capability' AS capability,
+                (document->'observation'->>'observedAt')::timestamptz AS observed_at
+              FROM connector_observations
               WHERE tenant_id = $1 AND connection_id = i.id
               UNION ALL
-              SELECT jsonb_build_object('capability', capability, 'observation', jsonb_build_object('observedAt', observed_at))
+              SELECT capability, observed_at
               FROM connector_read_checks
               WHERE tenant_id = $1 AND connection_id = i.id AND succeeded
             ) evidence
-            WHERE (document->'observation'->>'observedAt')::timestamptz <= $2::timestamptz
-            GROUP BY document->>'capability'
+            WHERE observed_at <= $2::timestamptz
+            GROUP BY capability
           ) latest
         ) o ON true
         LEFT JOIN LATERAL (
