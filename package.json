@@ -20,6 +20,7 @@
     "storybook": "pnpm --filter @luma/ui storybook",
     "test:ui": "pnpm --filter @luma/ui test",
     "build:storybook": "turbo run build:storybook",
+    "screenshots:marketing": "pnpm --filter @luma/ui screenshots:marketing",
     "test:architecture": "node --test tooling/architecture/*.test.mjs",
     "test:style": "node --test tooling/style/*.test.mjs",
     "test:e2e": "node tooling/dev/test.mjs e2e",

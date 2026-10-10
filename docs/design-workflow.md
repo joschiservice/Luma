@@ -37,3 +37,11 @@ The brand values are working tokens. To change one:
 - Build and review component states in Storybook (`pnpm storybook`). **Foundations/Theme** shows tokens, states, domain landmarks, typography and marks; feature stories cover domain compositions in both themes and at narrow widths.
 - Stories don't exercise authentication, routing, live data or personal layouts. Review those journeys in the app, using the [synthetic pilot](pilot-environment.md) or the [simulator](simulator.md) for realistic issues, approvals and connections.
 - Figma is optional for explorations. There is no Figma library or token snapshot to keep in sync; implement and review the result in Storybook.
+
+## Website screenshots
+
+The product screenshots on the Auren website come from the **Marketing/Screenshots** stories: the real Home, Needs you and order record pages with hand-made sample data for one fictional workspace. Data that isn't in the message catalogs, such as decision titles and product names, is written in English and German so each language gets its own screenshot.
+
+`pnpm screenshots:marketing --out <website>/public/images/luma` builds Storybook, then captures every screen in both languages with a frozen clock, the workspace time zone and reduced motion, so reruns only change when the interface does. Pass `--skip-build` to reuse an existing `packages/ui/storybook-static` build. Each screen's viewport and scale produce the pixel size of its image slot on the website; change both together.
+
+When a page in these stories changes, rerun the script and review the images before committing them to the website. Keep the sample data consistent with the website's example (order 48213 on a fulfillment hold) and within what Luma does today.
