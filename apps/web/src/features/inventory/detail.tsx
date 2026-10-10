@@ -29,6 +29,7 @@ import {
 } from '../orders/presentation';
 import { recordReturnPath } from '../records/data';
 import { IdentityLinks } from '../sync/identity-links';
+import { linkMethodLabel } from '../sync/presentation';
 import { WorkflowCoverageCard } from '../workflows/coverage';
 import { type InventorySearch, stockOptions } from './data';
 import {
@@ -209,8 +210,9 @@ export function StockDetailView({
                     <strong>{source.label}</strong>
                     <small>
                       {connectionStatusLabel(source.status)} ·{' '}
-                      {source.mappingMethod ??
-                        m.inventory_link_method_unrecorded()}
+                      {source.mappingMethod
+                        ? linkMethodLabel(source.mappingMethod)
+                        : m.inventory_link_method_unrecorded()}
                     </small>
                     <small>
                       {source.externalSku

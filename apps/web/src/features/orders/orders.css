@@ -24,6 +24,10 @@
   overflow-wrap: anywhere;
 }
 
+.orders-cell-stack small time {
+  white-space: nowrap;
+}
+
 .orders-sources {
   display: flex;
   flex-wrap: wrap;
@@ -183,6 +187,46 @@
 
 .order-activity li > .orders-cell-stack {
   flex: 1;
+}
+
+/* A row that opens a related record is one link; the chevron marks it before hover. */
+.order-list a.order-row-link {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin: -6px -8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-row);
+  color: inherit;
+  font-size: inherit;
+  white-space: normal;
+  text-decoration: none;
+}
+
+.order-row-link > :first-child {
+  flex: 1;
+}
+
+.order-row-link:hover {
+  background: var(--surface-hover);
+}
+
+.order-row-link:hover strong {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.order-row-chevron {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--foreground-subtle);
+}
+
+.order-row-link:hover .order-row-chevron {
+  color: var(--foreground);
 }
 
 @media (max-width: 1000px) {

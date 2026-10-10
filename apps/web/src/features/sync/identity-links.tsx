@@ -29,7 +29,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { IdentityError } from '../identity/data';
 import { identityKey, identityOptions, requestLink } from './data';
-import { providerName, sourceId } from './presentation';
+import { linkMethodLabel, providerName, sourceId } from './presentation';
 
 export type IdentitySuggestion = IdentityDetail['suggestions'][number];
 
@@ -201,13 +201,7 @@ export function IdentityLinksView({
                 </small>
               </span>
               <Badge tone={source.revisedAt ? 'info' : 'neutral'}>
-                {source.method.startsWith('Linked')
-                  ? m.sync_links_method_linked()
-                  : source.method.startsWith('Unlinked')
-                    ? m.sync_links_method_unlinked()
-                    : source.method.startsWith('Imported')
-                      ? m.sync_links_method_imported()
-                      : m.sync_links_method_matched()}
+                {linkMethodLabel(source.method)}
               </Badge>
               {detail.canManage && detail.sources.length > 1 ? (
                 <Button

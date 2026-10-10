@@ -56,11 +56,7 @@ test('opens a return from its order, tells pending work from money returned and 
   const section = page.getByRole('region', { name: 'Returns and refunds' });
   await section.getByText('#1002-R1').waitFor();
   expect(await section.innerText()).toContain('€48.00 processing');
-  await section
-    .getByRole('listitem')
-    .filter({ hasText: '#1002-R1' })
-    .getByRole('link', { name: 'Open' })
-    .click();
+  await section.getByRole('link', { name: /#1002-R1/ }).click();
   await page.getByRole('heading', { name: '#1002-R1', level: 1 }).waitFor();
   await page.getByRole('heading', { name: 'Refund processing' }).waitFor();
   const money = page.getByRole('region', { name: 'Money' });

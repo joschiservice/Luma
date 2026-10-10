@@ -50,7 +50,7 @@
   "records_detail_source_fallback": "Connected source",
   "records_detail_data_empty": "Luma knows this record’s ID in its source but has no current data for it.",
   "records_detail_source_id": "ID in source: {id}",
-  "records_detail_link_method": "Linked by: {method}",
+  "records_detail_link_method": "Link: {method}",
   "records_detail_link_derived": "Linked through matching IDs in other sources",
   "records_detail_source_updated": "Updated in source {date}",
   "records_detail_source_updated_unknown": "Update time in source unknown",

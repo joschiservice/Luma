@@ -136,7 +136,7 @@ describe('order presentation', () => {
       { kind: 'remaining', text: '2 units still to fulfill across 1 line.' },
       {
         kind: 'overdue',
-        text: 'Past the deadline of 2026-09-19 set in the source.',
+        text: 'Overdue since 2026-09-19.',
       },
       { kind: 'issues', text: '1 issue needs you.' },
       {
@@ -163,9 +163,33 @@ describe('order presentation', () => {
       }),
       (value) => value,
     );
-    expect(summary[1]).toEqual({
+    expect(summary[0]).toEqual({
       kind: 'unknown',
       text: 'Luma can’t tell how much remains on 1 line because Shopify store doesn’t report canceled quantities. 1 of 3 units are fulfilled.',
     });
+  });
+
+  it('leaves one source’s status to the header unless nothing else needs saying', () => {
+    const remaining = orderSummary(detail({ sources: [source()] }), String);
+    expect(remaining.map((line) => line.kind)).not.toContain('state');
+
+    const settled = orderSummary(
+      detail({
+        sources: [
+          source({
+            lines: [{ ...source().lines[0]!, remainingQuantity: '0' }],
+          }),
+        ],
+        order: { ...detail().order, overdue: false },
+        issues: [],
+      }),
+      String,
+    );
+    expect(settled).toEqual([
+      {
+        kind: 'state',
+        text: 'Shopify store reports the order as open. The order is paid.',
+      },
+    ]);
   });
 });

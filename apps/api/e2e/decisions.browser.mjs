@@ -54,7 +54,9 @@ test('finds a replenishment approval in Needs you, decides it once and updates e
     name: 'Needs your attention',
   });
   await attention.getByText(title).waitFor();
-  await attention.getByRole('link', { name: 'Open Needs you' }).click();
+  await attention
+    .getByRole('link', { name: 'View all: Needs your attention' })
+    .click();
   await requester.waitForURL(`**${path}`);
   const requested = requester.getByRole('link', { name: new RegExp(title) });
   await requested.getByText('Waiting for another approver').waitFor();

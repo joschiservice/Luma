@@ -67,7 +67,8 @@ export function formatCurrency(
 
 /**
  * Formats a date and time with the given options. Without options it shows a medium date and a
- * short time, such as “8 Oct 2026, 14:05”. Pass `timeZone` to show workspace time.
+ * short time, such as “8 Oct 2026, 14:05”. Pass `timeZone` to show workspace time. Times use a
+ * 24-hour clock in every interface language unless `hourCycle` or `hour12` says otherwise.
  */
 export function formatDateTime(
   value: DateInput,
@@ -76,10 +77,13 @@ export function formatDateTime(
     timeStyle: 'short',
   },
 ) {
+  const resolved: Intl.DateTimeFormatOptions =
+    options.hour12 === undefined ? { hourCycle: 'h23', ...options } : options;
+
   return cached(
     dateFormats,
-    options,
-    (locale) => new Intl.DateTimeFormat(locale, options),
+    resolved,
+    (locale) => new Intl.DateTimeFormat(locale, resolved),
   ).format(toDate(value));
 }
 

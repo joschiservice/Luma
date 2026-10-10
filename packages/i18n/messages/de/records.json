@@ -50,7 +50,7 @@
   "records_detail_source_fallback": "Verbundene Quelle",
   "records_detail_data_empty": "Luma kennt die ID dieses Datensatzes in der Quelle, hat aber keine aktuellen Daten dazu.",
   "records_detail_source_id": "ID in der Quelle: {id}",
-  "records_detail_link_method": "Verknüpft über: {method}",
+  "records_detail_link_method": "Verknüpfung: {method}",
   "records_detail_link_derived": "Über übereinstimmende IDs in anderen Quellen verknüpft",
   "records_detail_source_updated": "In der Quelle aktualisiert {date}",
   "records_detail_source_updated_unknown": "Aktualisierungszeit in der Quelle unbekannt",

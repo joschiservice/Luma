@@ -7,12 +7,16 @@ import { type Domain, DomainIcon } from '../primitives/domain-icon';
 import { WorkspaceBreadcrumb } from './workspace-breadcrumb';
 import { WorkspacePageActions } from './workspace-page-actions';
 
-/** One labeled fact in a record summary, such as an order's total or when it was placed. */
+/**
+ * One labeled fact in a record summary, such as an order's total or when it was placed. `tone`
+ * colors a value that needs attention, such as a failed payment; leave it unset for normal values.
+ */
 export type RecordFact = {
   key: string;
   icon: LucideIcon;
   label: string;
   value: ReactNode;
+  tone?: 'warning' | 'danger' | undefined;
 };
 
 function CrumbLink({
@@ -104,13 +108,13 @@ export function RecordHeader({
           ) : null}
           {facts.length ? (
             <dl className="record-facts">
-              {facts.map(({ key, icon: Icon, label, value }) => (
+              {facts.map(({ key, icon: Icon, label, value, tone }) => (
                 <div key={key}>
                   <dt>
                     <Icon aria-hidden="true" />
                     {label}
                   </dt>
-                  <dd>{value}</dd>
+                  <dd data-tone={tone}>{value}</dd>
                 </div>
               ))}
             </dl>

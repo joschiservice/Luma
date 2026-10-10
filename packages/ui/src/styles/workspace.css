@@ -164,6 +164,14 @@
   overflow-wrap: anywhere;
 }
 
+.record-facts dd[data-tone='warning'] {
+  color: var(--state-warning-text);
+}
+
+.record-facts dd[data-tone='danger'] {
+  color: var(--state-error-text);
+}
+
 /* Record page headers share their appearance across application shells. */
 .page-header {
   display: grid;

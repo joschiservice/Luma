@@ -202,6 +202,7 @@
   "sync_links_method_linked": "Von einer Person verknüpft",
   "sync_links_method_unlinked": "Getrennt",
   "sync_links_method_imported": "Importiert",
+  "sync_links_method_automatic": "Per Regel verknüpft",
   "sync_links_method_matched": "Beim Import zugeordnet",
   "sync_links_unlink": "Trennen",
   "sync_links_link": "Verknüpfen",

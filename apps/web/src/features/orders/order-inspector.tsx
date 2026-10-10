@@ -14,6 +14,7 @@ import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { Link } from '@tanstack/react-router';
 import {
   ArrowRight,
+  ChevronRight,
   Database,
   Inbox,
   type LucideIcon,
@@ -21,6 +22,7 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
+import { linkMethodLabel } from '../sync/presentation';
 import {
   connectionStatusLabel,
   issueStateLabel,
@@ -66,22 +68,8 @@ function OrderIssues({
     <ul className="order-list">
       {issues.map((issue) => (
         <li key={issue.id}>
-          <span className="orders-cell-stack">
-            <strong>{issueKind(issue).label}</strong>
-            <small>
-              {issueStateLabel(issue.state)}
-              {' · '}
-              {issue.relationship === 'sku'
-                ? m.orders_inspector_issue_sku()
-                : issue.relationship === 'fulfillment'
-                  ? m.orders_inspector_issue_fulfillment()
-                  : m.orders_inspector_issue_order()}
-            </small>
-          </span>
-          {issue.needsYou ? (
-            <StatePill state="attention">{m.orders_flag_needs_you()}</StatePill>
-          ) : null}
           <Link
+            className="order-row-link"
             to="/app/$organizationId/exceptions/$exceptionId"
             params={{ organizationId, exceptionId: issue.id }}
             search={{
@@ -92,11 +80,25 @@ function OrderIssues({
                     ? 'needs_you'
                     : 'active',
             }}
-            aria-label={m.orders_inspector_open_issue({
-              issue: issueKind(issue).label,
-            })}
           >
-            {m.common_open()}
+            <span className="orders-cell-stack">
+              <strong>{issueKind(issue).label}</strong>
+              <small>
+                {issueStateLabel(issue.state)}
+                {' · '}
+                {issue.relationship === 'sku'
+                  ? m.orders_inspector_issue_sku()
+                  : issue.relationship === 'fulfillment'
+                    ? m.orders_inspector_issue_fulfillment()
+                    : m.orders_inspector_issue_order()}
+              </small>
+            </span>
+            {issue.needsYou ? (
+              <StatePill state="attention">
+                {m.orders_flag_needs_you()}
+              </StatePill>
+            ) : null}
+            <ChevronRight className="order-row-chevron" aria-hidden="true" />
           </Link>
         </li>
       ))}
@@ -118,28 +120,26 @@ function WorkflowRuns({
     <ul className="order-list">
       {runs.map((run) => (
         <li key={run.id}>
-          <span className="orders-cell-stack">
-            <strong>{run.name ?? run.definitionId}</strong>
-            <small>
-              {runStateLabel(run.state)}
-              {' · '}
-              {m.orders_inspector_run_version({ version: run.version })}
-              {run.createdAt ? (
-                <>
-                  {' · '}
-                  <WorkspaceDate value={run.createdAt} />
-                </>
-              ) : null}
-            </small>
-          </span>
           <Link
+            className="order-row-link"
             to="/app/$organizationId/workflows/$definitionId"
             params={{ organizationId, definitionId: run.definitionId }}
-            aria-label={m.orders_inspector_open_workflow({
-              workflow: run.name ?? run.definitionId,
-            })}
           >
-            {m.common_open()}
+            <span className="orders-cell-stack">
+              <strong>{run.name ?? run.definitionId}</strong>
+              <small>
+                {runStateLabel(run.state)}
+                {' · '}
+                {m.orders_inspector_run_version({ version: run.version })}
+                {run.createdAt ? (
+                  <>
+                    {' · '}
+                    <WorkspaceDate value={run.createdAt} />
+                  </>
+                ) : null}
+              </small>
+            </span>
+            <ChevronRight className="order-row-chevron" aria-hidden="true" />
           </Link>
         </li>
       ))}
@@ -159,20 +159,8 @@ function OrderSources({ sources }: { sources: OrderDetail['sources'] }) {
                 : source.label}
             </strong>
             <small>
-              {source.externalId
-                ? m.orders_inspector_source_id({ id: source.externalId })
-                : m.orders_inspector_source_id_missing()}
-              {' · '}
               {source.mappingMethod
-                ? source.mappingMethod.startsWith('Imported')
-                  ? m.orders_inspector_link_imported()
-                  : source.mappingMethod.startsWith('Linked')
-                    ? m.orders_inspector_link_linked()
-                    : source.mappingMethod.startsWith('Unlinked')
-                      ? m.orders_inspector_link_unlinked()
-                      : m.orders_inspector_link_confirmed({
-                          method: source.mappingMethod.replaceAll('-', ' '),
-                        })
+                ? linkMethodLabel(source.mappingMethod)
                 : m.orders_inspector_link_unrecorded()}
             </small>
             <small>

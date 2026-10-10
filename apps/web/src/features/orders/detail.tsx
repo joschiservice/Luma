@@ -4,8 +4,10 @@ import type { OrderDetail, OrderSourceFacts } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
-import { WorkspaceTimezone } from '@luma/ui/components/primitives/workspace-date';
-import { workspaceDateValue } from '@luma/ui/lib/timezone';
+import {
+  formatWorkspaceDateTime,
+  WorkspaceTimezone,
+} from '@luma/ui/components/primitives/workspace-date';
 import { onlineManager, useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import {
@@ -237,7 +239,6 @@ export function OrderDetailView({
         search={listSearch}
         returnPath={returnPath}
         detail={detail}
-        here={here}
       />
       {!detail ? (
         loading && !error ? (
@@ -254,7 +255,7 @@ export function OrderDetailView({
             >
               <ul className="order-summary">
                 {orderSummary(detail, (value) =>
-                  workspaceDateValue(new Date(value), timeZone),
+                  formatWorkspaceDateTime(value, timeZone, 'day'),
                 ).map(({ kind, text }) => {
                   const Icon = summaryIcons[kind];
 

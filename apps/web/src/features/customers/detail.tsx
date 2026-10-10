@@ -26,7 +26,6 @@ import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
 import { formatMoney } from '../orders/presentation';
 import { systemName } from '../products/presentation';
-import { sourceId } from '../sync/presentation';
 import { customerOptions } from './data';
 import { CustomerOrders } from './orders';
 import {
@@ -174,7 +173,6 @@ export function CustomerDetailView({
           item
             ? m.customers_detail_description({
                 source: detail?.source?.label ?? m.customers_source_fallback(),
-                id: sourceId(item.externalId),
               })
             : undefined
         }
@@ -319,10 +317,13 @@ export function CustomerDetailView({
             <Section title={m.customers_source_title()}>
               <dl className="customers-facts">
                 <Fact label={m.customers_fact_source()}>
-                  {detail.source?.label ?? m.customers_source_fallback()}
-                </Fact>
-                <Fact label={m.customers_fact_source_id()}>
-                  <code>{item.externalId}</code>
+                  <span
+                    title={m.customers_source_id_title({
+                      id: item.externalId,
+                    })}
+                  >
+                    {detail.source?.label ?? m.customers_source_fallback()}
+                  </span>
                 </Fact>
                 <Fact label={m.customers_fact_updated()}>
                   {item.sourceUpdatedAt ? (

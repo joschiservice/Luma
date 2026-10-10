@@ -116,7 +116,7 @@ const detail: OrderDetail = {
     {
       ...sources[0]!,
       appId: 'shopify',
-      mappingMethod: 'operator-confirmed',
+      mappingMethod: 'Linked by a person as the same record in another source',
       displayNumber: '#1001',
       status: 'open',
       paymentStatus: 'paid',
@@ -130,7 +130,7 @@ const detail: OrderDetail = {
     {
       ...sources[1]!,
       appId: 'jtl',
-      mappingMethod: 'operator-confirmed',
+      mappingMethod: 'Linked by a person as the same record in another source',
       displayNumber: 'SO-10',
       status: 'open',
       paymentStatus: 'pending',
@@ -496,9 +496,6 @@ export const OrderRecord: Story = {
     await expect(canvas.getByText('Not reported')).toBeVisible();
     await expect(
       canvas.getByRole('link', { name: /Review issue/ }),
-    ).toBeVisible();
-    await expect(
-      canvas.getByRole('button', { name: 'Copy link' }),
     ).toBeVisible();
     // The breadcrumb names the order once; Luma's internal ID stays out of the page.
     await expect(

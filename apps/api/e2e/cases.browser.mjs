@@ -632,7 +632,7 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
     .getByRole('region', { name: 'Luma is handling' })
     .getByRole('term');
   await decisions.first().waitFor();
-  // Home's decisions and headline come from the Needs you queue.
+  // Home's decisions come from the Needs you queue, in the same order.
   const authoritative = await context.request.get(
     `/api/v1/organizations/${organizationId}/decisions?limit=5`,
   );
@@ -642,10 +642,9 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
   expect(summary.sources.every((source) => source.state === 'available')).toBe(
     true,
   );
-  await page
-    .getByText(
-      new RegExp(`^${summary.counts.views.all} decisions? needs? you\\.`),
-    )
+  await decisions
+    .first()
+    .getByText(summary.items[0].title, { exact: true })
     .waitFor();
   expect(
     await page

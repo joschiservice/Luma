@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ago,
   coverageStatement,
+  linkMethodLabel,
   overallState,
   scanProgress,
   soon,
@@ -155,5 +156,27 @@ it('reports paused history without claiming it is continuing in the background',
   expect(overallState(overview)).toMatchObject({
     state: 'idle',
     title: 'History import paused',
+  });
+});
+
+describe('link methods', () => {
+  it('names each stored method in the interface language', () => {
+    expect(
+      [
+        'Imported source record with its own canonical identity',
+        'Linked by a person as the same record in another source',
+        'Re-keyed under an explicitly linked order',
+        'Unlinked by a person from another source',
+        'Automatically linked by rule 7, revision 2',
+        'Explicit simulator stock-pool mapping',
+      ].map(linkMethodLabel),
+    ).toEqual([
+      'Imported',
+      'Linked by a person',
+      'Linked by a person',
+      'Unlinked',
+      'Linked by a rule',
+      'Matched on import',
+    ]);
   });
 });
