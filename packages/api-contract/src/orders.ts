@@ -121,8 +121,21 @@ export const orderLineSchema = z.object({
   skuId: z.string().uuid().nullable(),
   skuCode: z.string().nullable(),
   title: z.string().nullable(),
-  quantity: z.string(),
-  cancelledQuantity: z.string().nullable(),
+  quantity: z
+    .string()
+    .describe('Originally ordered units, including subsequent reductions.'),
+  currentQuantity: z
+    .string()
+    .nullable()
+    .describe(
+      'Current units excluding removed and refunded units; null when not reported.',
+    ),
+  cancelledQuantity: z
+    .string()
+    .nullable()
+    .describe(
+      'Reduced units, including removals or refunds when the source reports them; null when unknown.',
+    ),
   unit: z.string(),
   fulfilledQuantity: z.string(),
   remainingQuantity: z.string().nullable(),
@@ -177,6 +190,12 @@ export const orderFulfillmentSchema = z.object({
   lines: z.array(
     z.object({
       orderLineId: z.string().uuid(),
+      remainingQuantity: z
+        .string()
+        .nullable()
+        .describe(
+          'Provider-reported outstanding work; null when not reported.',
+        ),
       quantity: z.string(),
       unit: z.string(),
     }),

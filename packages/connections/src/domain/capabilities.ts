@@ -128,8 +128,11 @@ export interface OrderSnapshot {
   lines: {
     id: ExternalId;
     sku: ExternalId | null;
+    /** Originally ordered units, including units subsequently removed. */
     quantity: Quantity;
-    /** Null when the source cannot distinguish cancellations from refunds or edits. */
+    /** Current units excluding removals and refunds; omitted or null when not reported. */
+    currentQuantity?: Quantity | null;
+    /** Reduced units, including removals or refunds; null when the source does not report them. */
     cancelledQuantity: Quantity | null;
     /** SKU text on the source line. It describes the line but never establishes SKU identity. */
     skuCode?: string | null;
@@ -159,7 +162,13 @@ export interface FulfillmentSnapshot {
     | 'cancelled'
     | 'failed'
     | 'unknown';
-  lines: { orderLine: ExternalId; quantity: Quantity }[];
+  lines: {
+    orderLine: ExternalId;
+    /** Total work (including zero after removal) or positive shipped units. */
+    quantity: Quantity;
+    /** Outstanding work reported by the provider; omitted or null when not read. */
+    remainingQuantity?: Quantity | null;
+  }[];
   lastProgressAt: string | null;
   progressBasis?: 'note_created_or_package_shipped' | 'source_updated';
   failureCode: string | null;

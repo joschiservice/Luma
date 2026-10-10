@@ -35,6 +35,7 @@ export function resolveOrderFacts(
             skuCode: line.skuCode,
             title: line.title,
             quantity: line.quantity,
+            currentQuantity: line.currentQuantity,
             unit: line.unit,
           })),
         }

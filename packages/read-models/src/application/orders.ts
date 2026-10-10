@@ -103,6 +103,7 @@ export interface OrderSourceFacts extends OrderSource {
     skuCode: string | null;
     title: string | null;
     quantity: string;
+    currentQuantity: string | null;
     cancelledQuantity: string | null;
     unit: string;
     fulfilledQuantity: string;
@@ -170,7 +171,12 @@ export interface OrderDetail {
     tracking:
       | { carrier: string | null; number: string | null; url: string | null }[]
       | null;
-    lines: { orderLineId: string; quantity: string; unit: string }[];
+    lines: {
+      orderLineId: string;
+      quantity: string;
+      unit: string;
+      remainingQuantity: string | null;
+    }[];
   }[];
   /** Returns, and refunds without a return, from every source of the order. */
   returns: ReturnListItem[];

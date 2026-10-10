@@ -23,15 +23,18 @@ export const money = z.object({
   currencyCode: z.string().regex(/^[A-Z]{3}$/),
 });
 
-export const orderLine = z.object({
-  id: gid('LineItem'),
-  quantity: count,
-  name: z.string().nullable().optional().catch(null),
-  sku: z.string().nullable().optional().catch(null),
-  variant: z
-    .object({ inventoryItem: z.object({ id: gid('InventoryItem') }) })
-    .nullable(),
-});
+export const orderLine = z
+  .object({
+    id: gid('LineItem'),
+    quantity: count,
+    currentQuantity: count,
+    name: z.string().nullable().optional().catch(null),
+    sku: z.string().nullable().optional().catch(null),
+    variant: z
+      .object({ inventoryItem: z.object({ id: gid('InventoryItem') }) })
+      .nullable(),
+  })
+  .refine((line) => line.currentQuantity <= line.quantity);
 
 export const order = z.object({
   id: gid('Order'),
@@ -132,11 +135,14 @@ export const fulfillmentOrder = z.object({
     .catch(null),
 });
 
-export const fulfillmentOrderLine = z.object({
-  id: gid('FulfillmentOrderLineItem'),
-  totalQuantity: count,
-  lineItem: z.object({ id: gid('LineItem') }),
-});
+export const fulfillmentOrderLine = z
+  .object({
+    id: gid('FulfillmentOrderLineItem'),
+    totalQuantity: count,
+    remainingQuantity: count,
+    lineItem: z.object({ id: gid('LineItem') }),
+  })
+  .refine((line) => line.remainingQuantity <= line.totalQuantity);
 
 export const fulfillment = z.object({
   id: gid('Fulfillment'),

@@ -59,6 +59,12 @@ const shopifyReads = [
 const changeTopics = [
   'ORDERS_CREATE',
   'ORDERS_UPDATED',
+  'ORDERS_EDITED',
+  'ORDERS_CANCELLED',
+  'FULFILLMENT_ORDERS_MOVED',
+  'FULFILLMENT_ORDERS_SPLIT',
+  'FULFILLMENT_ORDERS_MERGED',
+  'FULFILLMENT_ORDERS_CANCELLED',
   'ORDERS_DELETE',
   'FULFILLMENTS_CREATE',
   'FULFILLMENTS_UPDATE',
@@ -211,7 +217,22 @@ export function createShopifyOAuth(
       ...changeTopics,
       ...(config.protectedCustomerDataApproved ? customerTopics : []),
     ] as const;
+    const scopes = storedCredentials.parse(credentials).shopify?.scopes ?? [];
     for (const topic of topics) {
+      if (
+        topic.startsWith('FULFILLMENT_ORDERS_') &&
+        !scopes.some((scope) =>
+          [
+            'read_merchant_managed_fulfillment_orders',
+            'write_merchant_managed_fulfillment_orders',
+            'read_assigned_fulfillment_orders',
+            'write_assigned_fulfillment_orders',
+            'read_third_party_fulfillment_orders',
+            'write_third_party_fulfillment_orders',
+          ].includes(scope),
+        )
+      )
+        continue;
       const lifecycle =
         topic === 'APP_UNINSTALLED' || topic === 'APP_SCOPES_UPDATE';
       const url = new URL(config.callbackUrl);

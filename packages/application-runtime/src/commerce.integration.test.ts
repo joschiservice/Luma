@@ -1349,8 +1349,8 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
         version: 2,
         snapshot: {
           observationId: completed.observation.id,
-          schemaVersion: 2,
-          normalizerVersion: 'commerce/2',
+          schemaVersion: 3,
+          normalizerVersion: 'commerce/3',
           sourceUpdatedAt: null,
           data: {
             status: 'completed',
@@ -1464,6 +1464,13 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       ).toEqual(legacy);
 
       expect(
+        await services.orders.project(context(), {
+          ...legacy,
+          schemaVersion: 2,
+          normalizerVersion: 'commerce/2',
+        }),
+      ).toBe('applied');
+      expect(
         (await services.ingestion.replay(context(), jtl, 'jtl-legacy')).status,
       ).toBe('applied');
       const history = await services.orders.history(context(), id);
@@ -1472,17 +1479,18 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       ).toEqual([
         [1, 'commerce/1'],
         [2, 'commerce/2'],
+        [3, 'commerce/3'],
       ]);
       expect(
         (await services.orders.current(context(), id))[0]?.snapshot,
       ).toMatchObject({
-        schemaVersion: 2,
+        schemaVersion: 3,
         data: { total: { amount: '48', currency: 'EUR' } },
       });
       await expect(
         services.orders.project(context(), {
           ...legacy,
-          schemaVersion: 3 as never,
+          schemaVersion: 4 as never,
         }),
       ).rejects.toThrow();
     });

@@ -24,14 +24,16 @@
         "inventoryItem": {
           "id": "gid://shopify/InventoryItem/31"
         }
-      }
+      },
+      "currentQuantity": 3
     },
     {
       "id": "gid://shopify/LineItem/12",
       "quantity": 1,
       "name": " ",
       "sku": null,
-      "variant": null
+      "variant": null,
+      "currentQuantity": 1
     }
   ],
   "product": {

@@ -116,6 +116,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
       key: string;
       quantity: string;
       cancelled?: string | null;
+      current?: string | null;
       sku?: { external: string; key: string } | null;
       skuCode?: string | null;
       title?: string | null;
@@ -152,6 +153,14 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
               ? { externalId: line.sku.external, scopeKey: '' }
               : null,
             quantity: { amount: line.quantity, unit: 'each' },
+            ...(line.current === undefined
+              ? {}
+              : {
+                  currentQuantity:
+                    line.current === null
+                      ? null
+                      : { amount: line.current, unit: 'each' },
+                }),
             cancelledQuantity:
               line.cancelled === null
                 ? null
@@ -164,7 +173,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     };
     const actor = context(tenantId);
     const key = observation.observation.id;
-    await services.ingestion.ingest(actor, key, observation);
+    const ingested = await services.ingestion.ingest(actor, key, observation);
     const orderId = await services.ingestion.bind(
       actor,
       source,
@@ -199,11 +208,10 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
           'operator-confirmed',
         );
     }
-    const result = await services.ingestion.replay(
-      actor,
-      options.connectionId,
-      key,
-    );
+    const result =
+      ingested.status === 'applied'
+        ? ingested
+        : await services.ingestion.replay(actor, options.connectionId, key);
     expect(result.status).toBe('applied');
 
     return orderId;
@@ -215,7 +223,9 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     external: string;
     line: string;
     quantity: string;
-    status: 'shipped' | 'processing';
+    status: 'shipped' | 'processing' | 'completed';
+    kind?: 'fulfillment_order' | 'shipment';
+    remaining?: string;
   }) {
     const observation: CommerceObservation & {
       capability: 'fulfillment.read';
@@ -240,12 +250,21 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
         data: {
           order: { externalId: options.order, scopeKey: '' },
           status: options.status,
+          ...(options.kind ? { kind: options.kind } : {}),
           lastProgressAt: '2026-09-19T10:00:00Z',
           failureCode: null,
           lines: [
             {
               orderLine: { externalId: options.line, scopeKey: options.order },
               quantity: { amount: options.quantity, unit: 'each' },
+              ...(options.remaining === undefined
+                ? {}
+                : {
+                    remainingQuantity: {
+                      amount: options.remaining,
+                      unit: 'each',
+                    },
+                  }),
             },
           ],
         },
@@ -365,7 +384,14 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
       key: 'authority-order',
       updatedAt: '2026-09-19T10:00:00Z',
       data: {},
-      lines: [{ external: 'shop-line', key: 'shop-line', quantity: '2' }],
+      lines: [
+        {
+          external: 'shop-line',
+          key: 'shop-line',
+          quantity: '2',
+          current: '1',
+        },
+      ],
     });
     await seedOrder({
       connectionId: jtl,
@@ -391,7 +417,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     const initial = (await workspace().get(context(), id))!;
     expect(initial.authority.lines).toMatchObject({
       connectionId: shopify,
-      lines: [{ quantity: '2' }],
+      lines: [{ quantity: '2', currentQuantity: '1' }],
     });
     expect(initial.authority.lifecycle).toMatchObject({
       connectionId: shopify,
@@ -422,7 +448,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     const changed = (await workspace().get(context(), id))!;
     expect(changed.authority.lines).toMatchObject({
       connectionId: jtl,
-      lines: [{ quantity: '7' }],
+      lines: [{ quantity: '7', currentQuantity: null }],
     });
     expect(changed.authority.fulfillments).toMatchObject([
       { connectionId: jtl, status: 'shipped' },
@@ -1696,4 +1722,133 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
       );
     }
   }, 1800000);
+  it('compares current units, ignores removed SKU groups and keeps earlier snapshots immutable', async () => {
+    const source = {
+      connectionId: shopify,
+      external: 'edit-1',
+      key: 'edited',
+      updatedAt: '2026-09-19T08:00:00Z',
+      data: {},
+      lines: [
+        {
+          external: 'edit-line',
+          key: 'edit-line',
+          quantity: '2',
+          current: '2',
+          sku: { external: 'item-1', key: 'edit-sku' },
+        },
+      ],
+    };
+    const id = await seedOrder(source);
+    const before = (await services.orders.current(context(), id))[0]!.snapshot;
+    await seedOrder({
+      ...source,
+      connectionId: jtl,
+      external: 'erp-edit-1',
+      lines: [
+        {
+          external: 'erp-line',
+          key: 'erp-line',
+          quantity: '2',
+          cancelled: null,
+          sku: { external: 'erp-item', key: 'edit-sku' },
+        },
+      ],
+    });
+    expect((await workspace().get(context(), id))?.differences).toEqual([]);
+    await seedOrder({
+      ...source,
+      updatedAt: '2026-09-19T09:00:00Z',
+      lines: [{ ...source.lines[0]!, current: '1', cancelled: '1' }],
+    });
+    const edited = (await workspace().get(context(), id))!;
+    expect(
+      edited.sources.find((s) => s.connectionId === shopify)?.lines[0],
+    ).toMatchObject({
+      quantity: '2',
+      currentQuantity: '1',
+      cancelledQuantity: '1',
+      remainingQuantity: '1',
+    });
+    expect(edited.differences.map((d) => d.field)).toEqual(['lines']);
+    expect(
+      edited.sources.find((s) => s.connectionId === jtl)?.lines[0],
+    ).toMatchObject({
+      currentQuantity: null,
+      cancelledQuantity: null,
+      remainingQuantity: null,
+    });
+    expect(
+      (await services.orders.history(context(), id)).find(
+        (s) => s.observationId === before.observationId,
+      ),
+    ).toEqual(before);
+    await seedOrder({
+      ...source,
+      updatedAt: '2026-09-19T10:00:00Z',
+      lines: [{ ...source.lines[0]!, current: '0', cancelled: '2' }],
+    });
+    await seedOrder({
+      ...source,
+      connectionId: jtl,
+      external: 'erp-edit-1',
+      updatedAt: '2026-09-19T10:00:00Z',
+      lines: [],
+    });
+    expect((await workspace().get(context(), id))?.differences).toEqual([]);
+    expect(
+      (await workspace().get(context(), id))?.sources.find(
+        (s) => s.connectionId === shopify,
+      ),
+    ).toMatchObject({ open: false, fulfillment: 'not_required' });
+  });
+
+  it('counts shipment evidence once and keeps remaining units nonnegative after a refund', async () => {
+    const source = {
+      connectionId: shopify,
+      external: 'work-1',
+      key: 'work-1',
+      updatedAt: '2026-09-19T08:00:00Z',
+      data: {},
+      lines: [
+        {
+          external: 'work-line',
+          key: 'work-line',
+          quantity: '2',
+          current: '2',
+        },
+      ],
+    };
+    const id = await seedOrder(source);
+    await seedShipment({
+      connectionId: shopify,
+      order: source.external,
+      external: 'closed-work',
+      line: 'work-line',
+      quantity: '2',
+      remaining: '0',
+      status: 'completed',
+      kind: 'fulfillment_order',
+    });
+    await seedShipment({
+      connectionId: shopify,
+      order: source.external,
+      external: 'actual-shipment',
+      line: 'work-line',
+      quantity: '1',
+      status: 'shipped',
+      kind: 'shipment',
+    });
+    expect(
+      (await workspace().get(context(), id))?.sources[0]?.lines[0],
+    ).toMatchObject({ fulfilledQuantity: '1', remainingQuantity: '1' });
+    await seedOrder({
+      ...source,
+      updatedAt: '2026-09-19T11:00:00Z',
+      lines: [{ ...source.lines[0]!, current: '0', cancelled: '2' }],
+    });
+    expect(
+      (await workspace().get(context(), id))?.sources[0]?.lines[0],
+    ).toMatchObject({ fulfilledQuantity: '1', remainingQuantity: '0' });
+  });
 });

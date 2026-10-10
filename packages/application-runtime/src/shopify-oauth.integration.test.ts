@@ -115,7 +115,7 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
     await admin.end();
   });
 
-  function fixture() {
+  function fixture(options: { rejectChangeSubscriptions?: boolean } = {}) {
     let clock = new Date('2026-09-18T01:00:00Z');
     let counter = 0;
     let granted = scopes;
@@ -149,6 +149,20 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
         });
       if (query.includes('LumaLifecycleSubscriptions'))
         return Response.json({ data: { webhookSubscriptions: { nodes: [] } } });
+
+      if (
+        options.rejectChangeSubscriptions &&
+        query.includes('webhookSubscriptionCreate') &&
+        !query.includes('topic: APP_')
+      )
+        return Response.json({
+          data: {
+            webhookSubscriptionCreate: {
+              webhookSubscription: null,
+              userErrors: [{ message: 'Missing subscription access' }],
+            },
+          },
+        });
 
       return Response.json({
         data: {
@@ -528,6 +542,15 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
     expect(f.verify).not.toHaveBeenCalled();
   });
 
+  it('keeps authorization available when Shopify refuses optional change subscriptions', async () => {
+    const f = fixture({ rejectChangeSubscriptions: true });
+    expect(await f.oauth.callback(f.ctx, await f.query())).toBe('connected');
+    expect((await f.connection()).status).toBe('active');
+    expect(
+      (await f.oauth.credential(f.ctx, (await f.connection()).id)).token,
+    ).toBe('private-access-1');
+  });
+
   it('authorizes, stores encrypted credentials and blocks replay and foreign tenants', async () => {
     const f = fixture();
     const q = await f.query();
@@ -542,6 +565,20 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
     expect(await f.oauth.callback(f.ctx, q)).toBe('connected');
     const c = await f.connection();
     expect(c.status).toBe('active');
+    for (const topic of [
+      'ORDERS_EDITED',
+      'FULFILLMENT_ORDERS_MOVED',
+      'FULFILLMENT_ORDERS_SPLIT',
+      'FULFILLMENT_ORDERS_MERGED',
+      'FULFILLMENT_ORDERS_CANCELLED',
+    ])
+      expect(
+        f.transport.mock.calls.some(
+          ([url, init]) =>
+            String(url).endsWith('/graphql.json') &&
+            JSON.parse(String(init?.body)).query.includes(`topic: ${topic},`),
+        ),
+      ).toBe(true);
     expect((await f.oauth.credential(f.ctx, c.id)).token).toBe(
       'private-access-1',
     );

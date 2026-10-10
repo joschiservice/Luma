@@ -86,6 +86,12 @@ export type ShopifyCommand =
        */
       fulfillAt?: number | undefined;
     }
+  | {
+      kind: 'order-edit';
+      order: string;
+      /** New current quantities; zero removes the line, shipped units cannot be removed. */
+      lines: { lineItem: string; quantity: number }[];
+    }
   | { kind: 'paid'; order: string }
   | {
       kind: 'cancel';

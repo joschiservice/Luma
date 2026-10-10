@@ -6,7 +6,8 @@ const connection = (field: string, size: number, fields: string) =>
 
 const order =
   'id updatedAt createdAt name cancelledAt closed displayFinancialStatus currentTotalPriceSet { shopMoney { amount currencyCode } }';
-const orderLine = 'id quantity name sku variant { inventoryItem { id } }';
+const orderLine =
+  'id quantity currentQuantity name sku variant { inventoryItem { id } }';
 
 /** Order fields; the customer reference needs protected customer data access and `read_customers`. */
 export function orderSelection(customer = false) {
@@ -19,7 +20,7 @@ const level =
   'id updatedAt location { id } quantities(names: ["on_hand", "committed", "available"]) { name quantity }';
 const work =
   'id updatedAt status fulfillAt fulfillBy fulfillmentHolds { reason } assignedLocation { name location { id } } deliveryMethod { methodType presentedName }';
-const workLine = 'id totalQuantity lineItem { id }';
+const workLine = 'id totalQuantity remainingQuantity lineItem { id }';
 const shipment =
   'id updatedAt status deliveredAt inTransitAt displayStatus estimatedDeliveryAt location { id name } trackingInfo(first: 10) { company number url }';
 const shipmentLine = 'id quantity lineItem { id }';

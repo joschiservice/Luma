@@ -137,7 +137,7 @@ test('reviews source authority, safely retries an override and resolves each ord
     comparison.getByRole('columnheader', { name: 'Authoritative source' }),
   ).toBeVisible();
   await expect(
-    comparison.getByRole('row').filter({ hasText: 'Ordered items' }),
+    comparison.getByRole('row').filter({ hasText: 'Order items' }),
   ).toContainText('JTL-Wawi (override)');
   await page.screenshot({
     path: '/tmp/luma171-order-authority.png',

@@ -696,6 +696,7 @@ const line = (
   skuCode: sku,
   title: t(title),
   quantity,
+  currentQuantity: quantity,
   cancelledQuantity: '0',
   unit: 'each',
   fulfilledQuantity: fulfilled,

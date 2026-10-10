@@ -90,6 +90,7 @@ async function readFulfillments(
 
         return {
           orderLineId: String(line.orderLineId),
+          remainingQuantity: text(line.remainingQuantity),
           quantity: String(line.quantity),
           unit: String(line.unit),
         };

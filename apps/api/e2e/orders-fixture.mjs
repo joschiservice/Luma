@@ -86,7 +86,18 @@ export async function ordersFixture(t, f) {
             id: { externalId: line.external, scopeKey: external },
             sku: line.sku ? { externalId: line.sku, scopeKey: '' } : null,
             quantity: { amount: line.quantity, unit: 'each' },
-            cancelledQuantity: { amount: '0', unit: 'each' },
+            ...(line.currentQuantity === undefined
+              ? {}
+              : {
+                  currentQuantity: {
+                    amount: line.currentQuantity,
+                    unit: 'each',
+                  },
+                }),
+            cancelledQuantity: {
+              amount: line.cancelledQuantity ?? '0',
+              unit: 'each',
+            },
             skuCode: line.skuCode ?? null,
             title: line.title ?? null,
           })),
