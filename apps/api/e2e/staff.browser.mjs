@@ -71,6 +71,7 @@ async function fixture(t) {
         'staff.directory.read',
         'staff.workspace.inspect',
         'staff.sessions.revoke',
+        'staff.audit.read',
       ],
     },
     db.ownerUrl,
@@ -282,6 +283,82 @@ test('staff investigates a workspace and retries an uncertain global revocation 
   await expect(
     page.getByRole('table', { name: 'Workspace members' }),
   ).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('staff reviews the audit log by event and staff member', async ({
+  resources: t,
+}) => {
+  const { page, db, workspace, errors } = await fixture(t);
+  await signIn(page);
+  await page.getByLabel('Name, email or workspace').fill('Support North');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page.getByRole('button', { name: 'Inspect Support North' }).click();
+  await page
+    .getByLabel('Support reason or ticket reference')
+    .fill('Checking the audit trail for this ticket');
+  await page
+    .getByRole('button', { name: 'Open support access', exact: true })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: workspace.name, exact: true }),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Audit log', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Staff audit log', level: 1 }),
+  ).toBeVisible();
+  const entries = page.getByRole('table', {
+    name: 'Staff audit entries, newest first',
+  });
+  await expect(entries).toContainText('Support access opened');
+  await expect(entries).toContainText(
+    'Checking the audit trail for this ticket',
+  );
+  await expect(entries).toContainText('Signed in');
+  await page
+    .getByLabel('Staff member email or ID')
+    .fill('support@example.test');
+  await page.getByLabel('Until (inclusive)').fill('2000-01-01');
+  await page.getByLabel('From').fill('2000-01-02');
+  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await expect(
+    page.getByText('Choose an end date on or after the start.'),
+  ).toBeVisible();
+  await page.getByLabel('From').fill('');
+  await page.getByLabel('Until (inclusive)').fill('');
+  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await expect(page).toHaveURL(/staff=support%40example\.test/);
+  await expect(entries).toContainText('Support access opened');
+  await page.goto('/audit?event=staff.signed-in');
+  await expect(entries).toContainText('Signed in');
+  await expect(entries).not.toContainText('Support access opened');
+  await page.goto('/audit?event=workspace.access.opened');
+  await entries.getByRole('link', { name: 'Only this workspace' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(new RegExp(`workspace=${workspace.id}`));
+  await expect(entries).toContainText('Support North');
+  await page.screenshot({
+    path: test.info().outputPath('audit-light.png'),
+    fullPage: true,
+    animations: 'disabled',
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect
+    .poll(() =>
+      page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    )
+    .toBe(true);
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+  await expect(page.locator('html')).toHaveClass(/dark/);
+  await page.screenshot({
+    path: test.info().outputPath('audit-dark-narrow.png'),
+    fullPage: true,
+    animations: 'disabled',
+  });
+  const reads = await db.owner.query(
+    "SELECT count(*)::int AS count FROM staff_audit WHERE event='staff.audit.read'",
+  );
+  expect(reads.rows[0].count).toBeGreaterThanOrEqual(4);
   expect(errors).toEqual([]);
 });
 

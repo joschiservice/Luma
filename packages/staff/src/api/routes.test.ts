@@ -20,6 +20,10 @@ function fixture(
     workspaces: [],
   }));
   const accessHistory = vi.fn(async () => ({ events: [], nextCursor: null }));
+  const audit = vi.fn<StaffRuntime['service']['audit']>(async () => ({
+    entries: [],
+    nextCursor: null,
+  }));
   const staff: StaffRuntime = {
     settings: { publicOrigin: origin, mode },
     service: {
@@ -37,6 +41,7 @@ function fixture(
         throw new Error('Unused');
       },
       accessHistory,
+      audit,
     },
     authHandler: vi.fn(
       async () =>
@@ -76,7 +81,7 @@ function fixture(
   const app = Fastify();
   registerStaffHttp(app, staff);
 
-  return { app, staff, directory, accessHistory };
+  return { app, staff, directory, accessHistory, audit };
 }
 
 describe('staff HTTP security boundary', () => {
@@ -195,6 +200,42 @@ describe('staff HTTP security boundary', () => {
         grant,
         cursor,
       ]);
+    } finally {
+      await app.close();
+    }
+  });
+  it('requires the separate audit permission and rejects inverted time ranges', async () => {
+    const denied = fixture('local', [
+      'staff.directory.read',
+      'staff.workspace.inspect',
+      'staff.sessions.revoke',
+    ]);
+    try {
+      const response = await denied.app.inject({
+        url: '/v1/staff/audit',
+        headers: { cookie: 'staff' },
+      });
+      expect(response.statusCode).toBe(403);
+      expect(denied.audit).not.toHaveBeenCalled();
+    } finally {
+      await denied.app.close();
+    }
+    const { app, audit } = fixture('local', ['staff.audit.read']);
+    try {
+      const inverted = await app.inject({
+        url: '/v1/staff/audit?from=2026-10-09T00:00:00.000Z&to=2026-10-08T00:00:00.000Z',
+        headers: { cookie: 'staff' },
+      });
+      expect(inverted.statusCode).toBe(400);
+      const response = await app.inject({
+        url: '/v1/staff/audit?staff=support%40example.test&event=customer.sessions.revoked',
+        headers: { cookie: 'staff' },
+      });
+      expect(response.statusCode, response.body).toBe(200);
+      expect(audit.mock.calls[0]?.[1]).toEqual({
+        staff: 'support@example.test',
+        event: 'customer.sessions.revoked',
+      });
     } finally {
       await app.close();
     }

@@ -86,6 +86,18 @@ describe('staff browser API', () => {
     );
   });
 
+  it('sends only the audit filters that are set', async () => {
+    const fetcher = fetchResult({ entries: [], nextCursor: null });
+    await createStaffApi(fetcher).audit(
+      { staff: 'support@example.test', event: 'staff.signed-in' },
+      null,
+    );
+    expect(fetcher).toHaveBeenCalledWith(
+      '/api/v1/staff/audit?staff=support%40example.test&event=staff.signed-in',
+      expect.objectContaining({ method: 'GET', cache: 'no-store' }),
+    );
+  });
+
   it('rejects malformed successful responses at the contract boundary', async () => {
     await expect(
       createStaffApi(

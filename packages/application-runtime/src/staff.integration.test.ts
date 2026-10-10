@@ -807,6 +807,136 @@ describe.skipIf(!databaseUrl)(
           ).statusCode,
         ).toBe(403);
     });
+    it('lets only audit readers page filtered staff audit entries, and never modify them', async () => {
+      const denied = await app.inject({
+        url: '/v1/staff/audit',
+        headers: { cookie },
+      });
+      expect(denied.statusCode, denied.body).toBe(403);
+      await expect(
+        runtime.query(
+          'SELECT * FROM staff_audit_entries(NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,10)',
+        ),
+      ).rejects.toMatchObject({ code: '42501' });
+      for (const statement of [
+        'SELECT event FROM staff_audit',
+        'UPDATE staff_audit SET reason=NULL',
+        'DELETE FROM staff_audit',
+        'TRUNCATE staff_audit',
+      ])
+        await expect(runtime.query(statement)).rejects.toMatchObject({
+          code: '42501',
+        });
+      const staffUser = (
+        await owner.query<{ id: string }>(
+          "SELECT id FROM staff_users WHERE email='support@example.test'",
+        )
+      ).rows[0]!.id;
+      await owner.query(
+        `INSERT INTO staff_audit(staff_user_id,tenant_id,event,request_id,details,created_at)
+        SELECT CASE WHEN n%10=0 THEN $1::uuid END,CASE WHEN n%3=0 THEN $2::uuid END,
+         (ARRAY['directory.searched','workspace.inspected','workspace.health.read'])[1+n%3],'seed-'||n,'{}',
+         now()-interval '1 day'-make_interval(secs=>n)
+        FROM generate_series(1,100000) n`,
+        [staffUser, tenantB],
+      );
+      await owner.query(
+        "INSERT INTO staff_audit(event,request_id,details) VALUES('staff.sign-in.failed','seed-failed','{\"method\":\"local\"}')",
+      );
+      await owner.query('ANALYZE staff_audit');
+      await owner.query(
+        "UPDATE staff_access SET permissions=array_append(permissions,'staff.audit.read') WHERE email='support@example.test'",
+      );
+      try {
+        const read = (query: string) =>
+          app.inject({ url: `/v1/staff/audit${query}`, headers: { cookie } });
+        const started = Date.now();
+        const revocations = await read(
+          `?account=${customer}&event=customer.sessions.revoked`,
+        );
+        expect(revocations.statusCode, revocations.body).toBe(200);
+        expect(revocations.json().entries).toEqual([
+          expect.objectContaining({
+            event: 'customer.sessions.revoked',
+            outcome: 'succeeded',
+            reason: 'Customer requested all sessions to be revoked',
+            requestId: expect.any(String),
+            staff: {
+              id: staffUser,
+              name: 'Support operator',
+              email: 'support@example.test',
+            },
+            workspace: { id: tenantA, name: 'Workspace Alpha' },
+            account: {
+              id: customer,
+              name: 'Customer Alice',
+              email: 'alice@example.test',
+            },
+          }),
+        ]);
+        const byEmail = await read('?account=alice@example.test');
+        expect(
+          byEmail.json().entries.map((entry: { event: string }) => entry.event),
+        ).toContain('customer.sessions.revoked');
+        const range = new URLSearchParams({
+          staff: 'support@example.test',
+          workspace: tenantB,
+          from: new Date(Date.now() - 3 * 86_400_000).toISOString(),
+          to: new Date(Date.now() - 86_400_000).toISOString(),
+        });
+        const first = await read(`?${range}`);
+        expect(first.statusCode, first.body).toBe(200);
+        const page = first.json();
+        expect(page.entries).toHaveLength(50);
+        expect(page.nextCursor).toEqual(expect.any(String));
+        const second = await read(
+          `?${range}&cursor=${encodeURIComponent(page.nextCursor)}`,
+        );
+        const older = second.json().entries;
+        expect(older).toHaveLength(50);
+        for (const entry of [...page.entries, ...older]) {
+          expect(entry.workspace.id).toBe(tenantB);
+          expect(entry.staff.email).toBe('support@example.test');
+        }
+        expect(
+          new Set(
+            [...page.entries, ...older].map(
+              (entry: { sequence: string }) => entry.sequence,
+            ),
+          ).size,
+        ).toBe(100);
+        expect(Date.parse(older[0].createdAt)).toBeLessThanOrEqual(
+          Date.parse(page.entries.at(-1).createdAt),
+        );
+        const failed = await read('?event=staff.sign-in.failed');
+        expect(failed.json().entries[0]).toMatchObject({
+          outcome: 'failed',
+          staff: null,
+        });
+        expect(
+          (await read('?staff=nobody@example.test')).json().entries,
+        ).toEqual([]);
+        expect(Date.now() - started).toBeLessThan(5000);
+        const audited = await owner.query<{
+          details: { filters: Record<string, string>; entries: number };
+        }>(
+          "SELECT details FROM staff_audit WHERE event='staff.audit.read' AND staff_user_id=$1 ORDER BY sequence",
+          [staffUser],
+        );
+        expect(audited.rows).toHaveLength(6);
+        expect(audited.rows[0]?.details).toMatchObject({
+          filters: { account: customer, event: 'customer.sessions.revoked' },
+          entries: 1,
+        });
+      } finally {
+        await owner.query(
+          "UPDATE staff_access SET permissions=array_remove(permissions,'staff.audit.read') WHERE email='support@example.test'",
+        );
+        await owner.query(
+          "DELETE FROM staff_audit WHERE request_id LIKE 'seed-%'",
+        );
+      }
+    });
     it('expires passive polling while extending idle time only for activity before expiry', async () => {
       const session = await owner.query<{ id: string }>(
         'SELECT s.id FROM staff_sessions s JOIN staff_users u ON u.id=s.user_id WHERE u.email=$1',

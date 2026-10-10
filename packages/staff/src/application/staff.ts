@@ -5,6 +5,7 @@ import {
   requireRecentStaffSession,
   requireStaffPermission,
 } from '../domain/access.js';
+import type { AuditPage, AuditQuery } from './audit.js';
 import type { AccessHistoryPage, WorkspaceHealth } from './health.js';
 
 export interface DirectoryUser {
@@ -88,6 +89,7 @@ export interface StaffRepository {
     grantId: string,
     cursor: string | null,
   ): Promise<AccessHistoryPage>;
+  audit(context: StaffContext, query: AuditQuery): Promise<AuditPage>;
 }
 
 /** Provides bounded staff operations using explicit privileges and tenant-scoped support grants. */
@@ -143,6 +145,12 @@ export function createStaffService(repository: StaffRepository) {
       requireStaffPermission(context, 'staff.workspace.inspect');
 
       return repository.accessHistory(context, workspaceId, grantId, cursor);
+    },
+    /** Pages the staff audit log with optional filters; each read is itself audited. */
+    audit(context: StaffContext, query: AuditQuery) {
+      requireStaffPermission(context, 'staff.audit.read');
+
+      return repository.audit(context, query);
     },
   };
 }

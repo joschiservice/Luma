@@ -6,6 +6,7 @@ export const staffPermissionSchema = z.enum([
   'staff.directory.read',
   'staff.workspace.inspect',
   'staff.sessions.revoke',
+  'staff.audit.read',
 ]);
 
 export const staffWorkspaceSchema = z.object({
@@ -278,6 +279,62 @@ export const staffAccessHistorySchema = z.object({
   nextCursor: staffAccessHistoryCursorSchema.nullable(),
 });
 
+/** A staff audit position: the entry time with microseconds and its sequence number. */
+export const staffAuditCursorSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z_\d{1,19}$/);
+
+/** Optional audit filters. Staff member and account accept an ID or an exact email address. */
+export const staffAuditQuerySchema = z
+  .object({
+    staff: z.string().trim().min(1).max(320).optional(),
+    workspace: z.string().uuid().optional(),
+    account: z.string().trim().min(1).max(320).optional(),
+    event: z
+      .string()
+      .regex(/^[a-z][a-z0-9.-]{0,99}$/)
+      .optional(),
+    from: z.string().datetime().optional(),
+    to: z.string().datetime().optional(),
+    cursor: staffAuditCursorSchema.optional(),
+  })
+  .refine((query) => !query.from || !query.to || query.from < query.to, {
+    message: 'The start of the time range must be before its end.',
+    path: ['to'],
+  });
+
+export const staffAuditPageSchema = z.object({
+  entries: z.array(
+    z.object({
+      sequence: z.string().regex(/^\d{1,19}$/),
+      createdAt: z.string().datetime(),
+      event: z.string(),
+      outcome: z.enum(['succeeded', 'failed']),
+      requestId: z.string(),
+      reason: z.string().nullable(),
+      details: z.record(z.string(), z.unknown()),
+      staff: z
+        .object({
+          id: z.string().uuid(),
+          name: z.string().nullable(),
+          email: z.string().nullable(),
+        })
+        .nullable(),
+      workspace: z
+        .object({ id: z.string().uuid(), name: z.string().nullable() })
+        .nullable(),
+      account: z
+        .object({
+          id: z.string().uuid(),
+          name: z.string().nullable(),
+          email: z.string().nullable(),
+        })
+        .nullable(),
+    }),
+  ),
+  nextCursor: staffAuditCursorSchema.nullable(),
+});
+
 const workspaceParams = z.object({ workspaceId: z.string().uuid() });
 const errors = [400, 401, 403, 404, 409, 503] as const satisfies ErrorStatus[];
 
@@ -376,6 +433,17 @@ export const staffContract = {
       }),
     )
     .output(staffAccessHistorySchema),
+  audit: endpoint
+    .route({
+      method: 'GET',
+      path: '/v1/staff/audit',
+      summary: 'Review the staff audit log',
+      description:
+        'Lists staff sign-ins, searches, support grants, reads and commands, newest first, 50 per page. Filter by staff member, workspace, account, event and time range; pass `nextCursor` as `cursor` for older entries. Requires `staff.audit.read`. Each read is itself audited.',
+    })
+    .meta({ errors })
+    .input(z.object({ query: staffAuditQuerySchema }))
+    .output(staffAuditPageSchema),
   revokeSessions: endpoint
     .route({
       method: 'POST',

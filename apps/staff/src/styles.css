@@ -149,6 +149,36 @@
   font-size: 0.9375rem;
 }
 
+.staff-audit-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  align-items: start;
+  gap: 0.75rem 1rem;
+}
+
+.staff-audit-filters > .staff-actions {
+  grid-column: 1 / -1;
+}
+
+.staff-link {
+  font-size: 0.8125rem;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.staff-target {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.staff-details {
+  max-width: 28rem;
+  overflow-x: auto;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .staff-metadata {
   display: flex;
   flex-wrap: wrap;

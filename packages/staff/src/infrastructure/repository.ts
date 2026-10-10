@@ -10,6 +10,7 @@ import type {
 } from '../application/staff.js';
 import type { StaffContext, StaffPermission } from '../domain/access.js';
 import { StaffError } from '../domain/access.js';
+import { readStaffAudit } from './audit.js';
 import { readAccessHistory, readWorkspaceHealth } from './health.js';
 
 /** Creates a deliberately narrow cross-owner read adapter and identity support command adapter. */
@@ -261,6 +262,19 @@ export function createStaffRepository(pool: Pool): StaffRepository {
           return page;
         },
       );
+    },
+    audit(context, query) {
+      return transaction(context, null, 'staff.audit.read', async (tx) => {
+        const page = await readStaffAudit(tx, query);
+        const { cursor, ...filters } = query;
+        await audit(tx, context, 'staff.audit.read', null, null, {
+          filters,
+          cursor: cursor ?? null,
+          entries: page.entries.length,
+        });
+
+        return page;
+      });
     },
   };
 }

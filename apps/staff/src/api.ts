@@ -1,6 +1,7 @@
 import {
   staffAccessGrantSchema,
   staffAccessHistorySchema,
+  staffAuditPageSchema,
   staffConfigSchema,
   staffDirectorySchema,
   staffRevokeSessionsResultSchema,
@@ -164,6 +165,26 @@ export function createStaffApi(
           signal,
         ),
       ),
+    audit: async (
+      filters: {
+        staff?: string | undefined;
+        workspace?: string | undefined;
+        account?: string | undefined;
+        event?: string | undefined;
+        from?: string | undefined;
+        to?: string | undefined;
+      },
+      cursor: string | null,
+      signal?: AbortSignal,
+    ) => {
+      const query = new URLSearchParams();
+      for (const [key, value] of Object.entries({ ...filters, cursor }))
+        if (value) query.set(key, value);
+
+      return staffAuditPageSchema.parse(
+        await request(`audit?${query}`, undefined, signal),
+      );
+    },
     revokeSessions: async (
       workspaceId: string,
       userId: string,

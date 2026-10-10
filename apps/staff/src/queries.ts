@@ -57,6 +57,28 @@ export const accessHistoryOptions = (workspaceId: string, grantId: string) =>
     retry: false,
   });
 
+/** Staff audit filters as sent to the API; time bounds are ISO instants. */
+export interface AuditFilters {
+  staff?: string | undefined;
+  workspace?: string | undefined;
+  account?: string | undefined;
+  event?: string | undefined;
+  from?: string | undefined;
+  to?: string | undefined;
+}
+
+/** Pages the staff audit log, newest first. Every page read is itself audited, so it never polls. */
+export const auditOptions = (filters: AuditFilters, enabled: boolean) =>
+  infiniteQueryOptions({
+    queryKey: ['staff', 'audit', filters],
+    queryFn: ({ signal, pageParam }) =>
+      staffApi.audit(filters, pageParam, signal),
+    initialPageParam: null as string | null,
+    getNextPageParam: (page) => page.nextCursor,
+    enabled,
+    retry: false,
+  });
+
 /** Cancels in-flight reads and erases all private data before changing staff identity. */
 export async function clearPrivate(client: QueryClient) {
   await client.cancelQueries();

@@ -25,6 +25,7 @@ function fixture(trustedProxy: string[] = []) {
       revoke: unused,
       health: unused,
       accessHistory: unused,
+      audit: unused,
     },
   };
 
