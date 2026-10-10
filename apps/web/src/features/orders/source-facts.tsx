@@ -55,6 +55,15 @@ function lineColumns(
       ),
     },
     {
+      key: 'current',
+      header: m.orders_lines_column_current(),
+      numeric: true,
+      cell: (line) =>
+        line.currentQuantity === null
+          ? m.common_not_reported()
+          : formatQuantity(line.currentQuantity, line.unit),
+    },
+    {
       key: 'ordered',
       header: m.orders_lines_column_ordered(),
       numeric: true,
@@ -146,6 +155,31 @@ type ComparedFact = {
   value: (source: OrderSourceFacts) => ReactNode;
 };
 
+function comparedItems(source: OrderSourceFacts) {
+  const lines = source.lines
+    .map((line) => ({
+      ...line,
+      comparedQuantity:
+        line.currentQuantity ??
+        (line.cancelledQuantity === null
+          ? line.quantity
+          : String(Number(line.quantity) - Number(line.cancelledQuantity))),
+    }))
+    .filter((line) => Number(line.comparedQuantity) > 0);
+
+  return lines.length
+    ? formatList(
+        lines.map((line) =>
+          m.orders_comparison_item({
+            quantity: formatQuantity(line.comparedQuantity, line.unit),
+            item: line.skuCode ?? line.title ?? m.orders_lines_untitled(),
+          }),
+        ),
+        { type: 'unit' },
+      )
+    : m.common_none();
+}
+
 const comparedFacts: ComparedFact[] = [
   {
     key: 'number',
@@ -175,18 +209,7 @@ const comparedFacts: ComparedFact[] = [
     key: 'items',
     label: m.orders_comparison_items,
     field: 'lines',
-    value: (source) =>
-      source.lines.length
-        ? formatList(
-            source.lines.map((line) =>
-              m.orders_comparison_item({
-                quantity: formatQuantity(line.quantity, line.unit),
-                item: line.skuCode ?? line.title ?? m.orders_lines_untitled(),
-              }),
-            ),
-            { type: 'unit' },
-          )
-        : m.common_none(),
+    value: comparedItems,
   },
   {
     key: 'fulfillment',

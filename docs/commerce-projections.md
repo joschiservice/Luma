@@ -98,6 +98,14 @@ Optional descriptive order facts (`dueAt`, `placedAt`, source `total`, line SKU 
 title) mean the adapter reported them; absent means it did not. SKU text never
 establishes identity, and totals are never converted between currencies.
 
+Order line `quantity` keeps originally ordered units. Optional `currentQuantity` reports
+units still on the order, excluding removals and refunds; `cancelledQuantity` carries the
+reduction when known, without identifying its cause. Fulfillment lines retain total units
+and optional provider-reported `remainingQuantity`. Absent or null facts stay unknown.
+Shopify reports both quantities; JTL ERP 2.2 exposes no per-line cancellation quantity,
+so JTL cancellations stay unknown. Quantity edits create new snapshots and never rewrite
+the prior evidence. Order and fulfillment schema versions 1 and 2 remain readable.
+
 Each source has its own current snapshot. An incoming snapshot replaces it when:
 
 - it re-normalizes the current snapshot's observation, for example after a new mapping

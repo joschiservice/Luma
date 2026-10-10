@@ -27,8 +27,8 @@ export type ProjectionOutcome =
 const normalizers = {
   inventory: 'commerce/1',
   product: 'commerce/2',
-  order: 'commerce/2',
-  fulfillment: 'commerce/2',
+  order: 'commerce/3',
+  fulfillment: 'commerce/3',
   return: 'commerce/1',
   refund: 'commerce/1',
 } as const;
@@ -169,6 +169,9 @@ export function createCommerceIngestion(
             id,
             skuId,
             quantity: line.quantity.amount,
+            ...(line.currentQuantity === undefined
+              ? {}
+              : { currentQuantity: line.currentQuantity?.amount ?? null }),
             cancelledQuantity: line.cancelledQuantity?.amount ?? null,
             unit: line.quantity.unit,
             ...(line.skuCode === undefined ? {} : { skuCode: line.skuCode }),
@@ -181,7 +184,7 @@ export function createCommerceIngestion(
         owner: 'orders',
         snapshot: {
           ...provenance,
-          schemaVersion: 2,
+          schemaVersion: 3,
           normalizerVersion: normalizers.order,
           entityId,
           kind: 'order',
@@ -298,6 +301,9 @@ export function createCommerceIngestion(
           orderLineId,
           quantity: line.quantity.amount,
           unit: line.quantity.unit,
+          ...(line.remainingQuantity === undefined
+            ? {}
+            : { remainingQuantity: line.remainingQuantity?.amount ?? null }),
         });
     }
     // An unknown location does not prevent storing fulfillment facts.
@@ -335,7 +341,7 @@ export function createCommerceIngestion(
       owner: 'orders',
       snapshot: {
         ...provenance,
-        schemaVersion: 2,
+        schemaVersion: 3,
         normalizerVersion: normalizers.fulfillment,
         entityId,
         kind: 'fulfillment',

@@ -21,11 +21,11 @@ quantities come only from the selected connection, so mirrored shipments are not
 twice.
 
 - **`orders.open`:** a nondeleted order has status `open` and at least one line has positive
-  remaining quantity: ordered minus cancelled minus completed, shipped or delivered
-  fulfillment quantities. Partial fulfillment counts once. Pending, processing, failed,
+  remaining quantity: current units (or ordered minus cancelled units) minus completed,
+  shipped or delivered shipment quantities, clamped at zero. Fulfillment work is not a shipment. Partial fulfillment counts once. Pending, processing, failed,
   cancelled and deleted fulfillments do not reduce remaining work. Completed or cancelled
   orders never count, including cancellation after shipment. A newer accepted open snapshot
-  can reopen an order if work remains. Empty lines, unknown statuses and missing cancellation
+  can reopen an order if work remains. Empty lines, unknown statuses and missing current and cancellation
   quantities make the classification unknown unless another line establishes remaining work
   or fulfillment covers all units.
 - **`orders.overdue`:** an open order has a source-provided `dueAt` strictly before `asOf`.

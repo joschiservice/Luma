@@ -34,6 +34,14 @@ export const shopifyCommandSchema = z.discriminatedUnion('kind', [
       }),
     }),
   }),
+  z.object({
+    kind: z.literal('order-edit'),
+    order: id,
+    lines: z
+      .array(z.object({ lineItem: id, quantity }))
+      .min(1)
+      .max(500),
+  }),
   z.object({ kind: z.literal('paid'), order: id }),
   z.object({
     kind: z.literal('cancel'),

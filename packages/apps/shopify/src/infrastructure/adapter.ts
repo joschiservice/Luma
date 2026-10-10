@@ -641,7 +641,7 @@ export function createShopifyConnector(
               parent.id,
               'Order',
               'lineItems',
-              'id quantity name sku variant { inventoryItem { id } }',
+              'id quantity currentQuantity name sku variant { inventoryItem { id } }',
               s.orderLine,
             );
             const total = order.currentTotalPriceSet?.shopMoney;
@@ -669,7 +669,10 @@ export function createShopifyConnector(
                 id: ref(line.id, order.id),
                 sku: line.variant ? ref(line.variant.inventoryItem.id) : null,
                 quantity: quantity(line.quantity),
-                cancelledQuantity: null,
+                currentQuantity: quantity(line.currentQuantity),
+                cancelledQuantity: quantity(
+                  line.quantity - line.currentQuantity,
+                ),
                 skuCode: text(line.sku),
                 title: text(line.name),
               })),
@@ -769,7 +772,7 @@ export function createShopifyConnector(
                 operation.id,
                 'FulfillmentOrder',
                 'lineItems',
-                'id totalQuantity lineItem { id }',
+                'id totalQuantity remainingQuantity lineItem { id }',
                 s.fulfillmentOrderLine,
               );
               const holds = (operation.fulfillmentHolds ?? []).map((hold) => ({
@@ -783,6 +786,7 @@ export function createShopifyConnector(
                 lines: lines.map((line) => ({
                   orderLine: ref(line.lineItem.id, parent.id),
                   quantity: quantity(line.totalQuantity),
+                  remainingQuantity: quantity(line.remainingQuantity),
                 })),
                 lastProgressAt: operation.updatedAt,
                 progressBasis: 'source_updated',

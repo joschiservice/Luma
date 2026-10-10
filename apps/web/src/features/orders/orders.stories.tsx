@@ -103,6 +103,7 @@ const line = (
   skuCode: 'TOTE-RED',
   title: 'Canvas tote',
   quantity: '2',
+  currentQuantity: '2',
   cancelledQuantity: '0',
   unit: 'each',
   fulfilledQuantity: '1',
@@ -125,7 +126,13 @@ const detail: OrderDetail = {
       dueAt: null,
       fulfillment: 'partial',
       open: null,
-      lines: [line({ cancelledQuantity: null, remainingQuantity: null })],
+      lines: [
+        line({
+          currentQuantity: null,
+          cancelledQuantity: null,
+          remainingQuantity: null,
+        }),
+      ],
     },
     {
       ...sources[1]!,
@@ -166,6 +173,7 @@ const detail: OrderDetail = {
         {
           orderLineId: '88888888-8888-4888-8888-888888888888',
           quantity: '1',
+          remainingQuantity: null,
           unit: 'each',
         },
       ],
@@ -493,7 +501,10 @@ export const OrderRecord: Story = {
       ),
     ).toBeVisible();
     await userEvent.click(canvas.getByRole('button', { name: 'Tokyo store' }));
-    await expect(canvas.getByText('Not reported')).toBeVisible();
+    const unknownQuantities = canvas.getAllByText('Not reported');
+    await expect(unknownQuantities).toHaveLength(2);
+    for (const quantity of unknownQuantities)
+      await expect(quantity).toBeVisible();
     await expect(
       canvas.getByRole('link', { name: /Review issue/ }),
     ).toBeVisible();

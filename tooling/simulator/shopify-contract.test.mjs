@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHmac } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
@@ -6,6 +7,7 @@ import {
   createInstallationVerifier,
   createShopifyConnector,
   createShopifyRecordReader,
+  mapShopifyWebhook,
 } from '@luma/app-shopify';
 import { createCapabilityRuntime } from '@luma/connections/adapters';
 import {
@@ -434,7 +436,8 @@ test('every read capability returns complete, parsed snapshots', async () => {
         },
         sku: ref(gid('InventoryItem', '11')),
         quantity: { amount: '2', unit: 'each' },
-        cancelledQuantity: null,
+        currentQuantity: { amount: '2', unit: 'each' },
+        cancelledQuantity: { amount: '0', unit: 'each' },
         skuCode: 'TOTE-NAT',
         title: 'Canvas tote - Natural',
       },
@@ -445,13 +448,22 @@ test('every read capability returns complete, parsed snapshots', async () => {
         },
         sku: ref(gid('InventoryItem', '12')),
         quantity: { amount: '1', unit: 'each' },
-        cancelledQuantity: null,
+        currentQuantity: { amount: '1', unit: 'each' },
+        cancelledQuantity: { amount: '0', unit: 'each' },
         skuCode: 'TOTE-BLK',
         title: 'Canvas tote - Black',
       },
     ],
   });
   assert.equal(byId(orders.items, ids.cancelled.gid).data.status, 'cancelled');
+  assert.deepEqual(
+    byId(orders.items, ids.cancelled.gid).data.lines[0].currentQuantity,
+    { amount: '2', unit: 'each' },
+  );
+  assert.deepEqual(
+    byId(orders.items, ids.returned.gid).data.lines[0].cancelledQuantity,
+    { amount: '1', unit: 'each' },
+  );
   assert.equal(
     byId(orders.items, ids.returned.gid).data.paymentStatus,
     'partially_refunded',
@@ -518,6 +530,7 @@ test('every read capability returns complete, parsed snapshots', async () => {
           scopeKey: ids.held.gid,
         },
         quantity: { amount: '2', unit: 'each' },
+        remainingQuantity: { amount: '2', unit: 'each' },
       },
       {
         orderLine: {
@@ -525,6 +538,7 @@ test('every read capability returns complete, parsed snapshots', async () => {
           scopeKey: ids.held.gid,
         },
         quantity: { amount: '1', unit: 'each' },
+        remainingQuantity: { amount: '1', unit: 'each' },
       },
     ],
     lastProgressAt: held.sourceUpdatedAt,
@@ -1226,4 +1240,66 @@ test('bulk history queues at five active queries and excludes unapproved custome
   });
   assert.equal(expired.ok, false);
   assert.equal(expired.error.code, 'export_unavailable');
+});
+
+test('a signed moved hint rereads the assigned location and keeps earlier observations intact', async () => {
+  const shop = createShop();
+  await shop.run({ kind: 'seed-catalog', products: catalog });
+  const order = await shop.run({
+    kind: 'order',
+    lines: [{ variant: '11', quantity: 2, price: '24.00' }],
+    location: '1',
+    shipping: 'standard',
+    financialStatus: 'PAID',
+  });
+  const read = reads(shop);
+  const before = (await read('fulfillment.read', { order: ref(order.gid) }))
+    .items[0];
+  assert.equal(before.data.location.id.externalId, gid('Location', '1'));
+  const request = createClient({
+    shop: domain,
+    accessToken: async () => 'synthetic',
+    fetch: shop.fetch,
+  });
+  await request(
+    'mutation($id: ID!, $location: ID!) { fulfillmentOrderMove(id: $id, newLocationId: $location) { movedFulfillmentOrder { id } userErrors { message } } }',
+    { id: before.source.externalId, location: gid('Location', '2') },
+  );
+  const event = shop.events.find(
+    (event) => event.topic === 'fulfillment_orders/moved',
+  );
+  assert.ok(event);
+  const body = Buffer.from(JSON.stringify(event.payload));
+  const hint = mapShopifyWebhook({
+    tenantId,
+    connectionId,
+    expectedShop: domain,
+    shop: domain,
+    secret: 'test-secret',
+    hmac: createHmac('sha256', 'test-secret').update(body).digest('base64'),
+    eventId: 'move-1',
+    topic: event.topic,
+    body,
+  });
+  assert.deepEqual(hint.capabilities, ['orders.read', 'fulfillment.read']);
+  const refreshed = new Map();
+  for (const capability of hint.capabilities)
+    refreshed.set(
+      capability,
+      await read(
+        capability,
+        capability === 'fulfillment.read' ? { order: ref(order.gid) } : {},
+      ),
+    );
+  const moved = byId(
+    refreshed.get('fulfillment.read').items,
+    before.source.externalId,
+  );
+  assert.equal(moved.data.location.id.externalId, gid('Location', '2'));
+  assert.deepEqual(moved.data.lines[0].remainingQuantity, {
+    amount: '2',
+    unit: 'each',
+  });
+  assert.notEqual(moved.id, before.id);
+  assert.equal(before.data.location.id.externalId, gid('Location', '1'));
 });

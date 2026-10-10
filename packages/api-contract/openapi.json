@@ -72879,7 +72879,19 @@
                                   ]
                                 },
                                 "quantity": {
-                                  "type": "string"
+                                  "type": "string",
+                                  "description": "Originally ordered units, including subsequent reductions."
+                                },
+                                "currentQuantity": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Current units excluding removed and refunded units; null when not reported."
                                 },
                                 "cancelledQuantity": {
                                   "anyOf": [
@@ -72889,7 +72901,8 @@
                                     {
                                       "type": "null"
                                     }
-                                  ]
+                                  ],
+                                  "description": "Reduced units, including removals or refunds when the source reports them; null when unknown."
                                 },
                                 "unit": {
                                   "type": "string"
@@ -72914,6 +72927,7 @@
                                 "skuCode",
                                 "title",
                                 "quantity",
+                                "currentQuantity",
                                 "cancelledQuantity",
                                 "unit",
                                 "fulfilledQuantity",
@@ -73061,6 +73075,17 @@
                                   "type": "string",
                                   "format": "uuid"
                                 },
+                                "remainingQuantity": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Provider-reported outstanding work; null when not reported."
+                                },
                                 "quantity": {
                                   "type": "string"
                                 },
@@ -73068,7 +73093,12 @@
                                   "type": "string"
                                 }
                               },
-                              "required": ["orderLineId", "quantity", "unit"]
+                              "required": [
+                                "orderLineId",
+                                "remainingQuantity",
+                                "quantity",
+                                "unit"
+                              ]
                             }
                           }
                         },

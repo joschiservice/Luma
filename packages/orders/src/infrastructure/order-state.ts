@@ -36,8 +36,8 @@ export function currentOrderSources(name: string, filter = 'true') {
  *
  * - `order_line_progress`: entity_id, connection_id, position, line_id, fulfilled and
  *   remaining quantity per line. Fulfilled quantities come only from shipped, delivered or
- *   completed fulfillments of the same source observed by `asOf`. Remaining is 0 once the
- *   line is fully fulfilled and null when the source does not report cancellations.
+ *   completed shipments of the same source observed by `asOf`. Remaining uses current units
+ *   or ordered minus cancelled units, stays nonnegative and is unknown when neither is read.
  * - `order_state`: every column of `set` plus line_count, fulfillment (`no_lines`,
  *   `unfulfilled`, `partial`, `fulfilled` or `not_required`), open and overdue. Open and
  *   overdue are null when unknown.
@@ -50,12 +50,15 @@ export function orderProgress(set: string) {
  JOIN orders_projections p ON p.tenant_id=s.tenant_id AND p.entity_id=s.entity_id AND p.snapshot_id=s.id AND p.connection_id=o.connection_id
  CROSS JOIN LATERAL jsonb_array_elements(s.document->'data'->'lines') l
  WHERE s.kind='fulfillment' AND s.status IN ('completed','shipped','delivered')
+ AND s.document->'data'->>'kind' IS DISTINCT FROM 'fulfillment_order'
  AND NOT (s.document->>'deleted')::boolean AND s.observed_at <= $2
  GROUP BY s.order_id,p.connection_id,l->>'orderLineId'
 ), order_line_progress AS MATERIALIZED (
  SELECT o.entity_id,o.connection_id,l.position,l.value->>'id' AS line_id,COALESCE(f.quantity,0) AS fulfilled,
  CASE WHEN COALESCE(f.quantity,0) >= (l.value->>'quantity')::numeric THEN 0
- ELSE (l.value->>'quantity')::numeric-(l.value->>'cancelledQuantity')::numeric-COALESCE(f.quantity,0) END AS remaining
+ WHEN COALESCE(l.value->>'currentQuantity',((l.value->>'quantity')::numeric-(l.value->>'cancelledQuantity')::numeric)::text) IS NULL THEN NULL
+ ELSE GREATEST(0,COALESCE((l.value->>'currentQuantity')::numeric,
+ (l.value->>'quantity')::numeric-(l.value->>'cancelledQuantity')::numeric)-COALESCE(f.quantity,0)) END AS remaining
  FROM ${set} o JOIN orders_snapshots s ON s.tenant_id=$1 AND s.id=o.snapshot_id
  CROSS JOIN LATERAL jsonb_array_elements(s.document->'data'->'lines') WITH ORDINALITY l(value,position)
  LEFT JOIN order_fulfilled f ON f.order_id=o.entity_id AND f.connection_id=o.connection_id AND f.line_id=l.value->>'id'

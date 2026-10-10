@@ -51,6 +51,8 @@ export interface LineItemData {
   sku: string | null;
   name: string;
   quantity: number;
+  /** Missing on records stored before order edits were supported. */
+  currentQuantity?: number;
   /** Unit price in minor units. */
   price: number;
 }

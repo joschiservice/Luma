@@ -466,3 +466,135 @@ test('malformed shop responses open a sync failure that closes after a complete 
   });
   expect(f.pilot.detectionErrors).toEqual([]);
 });
+
+test('reads simulated quantity edits into new immutable snapshots and exposes current units in order detail', async (t) => {
+  const f = await setupSimulator(t);
+  const connectionId = f.manifest.connections.shopify;
+  const tenantId = f.manifest.organizationId;
+  const cookie = await operatorCookie(f);
+  await f.pilot.observe();
+  const mapped = await f.db.owner.query(
+    "SELECT canonical_id FROM connector_source_mappings WHERE tenant_id=$1 AND connection_id=$2 AND resource='order' AND external_id='gid://shopify/Order/1'",
+    [tenantId, connectionId],
+  );
+  const orderId = mapped.rows[0].canonical_id;
+  const detail = async () => {
+    const response = await f.pilot.app.inject({
+      method: 'GET',
+      url: `/v1/organizations/${tenantId}/orders/${orderId}`,
+      headers: { cookie },
+    });
+    expect(response.statusCode).toBe(200);
+
+    return response.json();
+  };
+  const original = await f.db.owner.query(
+    'SELECT s.id,s.document FROM orders_projections p JOIN orders_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id WHERE p.tenant_id=$1 AND p.entity_id=$2 AND p.connection_id=$3',
+    [tenantId, orderId, connectionId],
+  );
+  const before = original.rows[0];
+  expect((await detail()).sources[0].lines[0]).toMatchObject({
+    quantity: '2',
+    currentQuantity: '2',
+    cancelledQuantity: '0',
+  });
+  const provider = await f.call(
+    'runs/operations/records/shopify?kind=LineItem&parent=1',
+  );
+  const lineId = provider.items[0].id;
+  const hints = async () =>
+    (
+      await f.db.owner.query(
+        'SELECT capabilities FROM connector_refresh_hints WHERE tenant_id=$1 AND connection_id=$2 ORDER BY received_at,event_key',
+        [tenantId, connectionId],
+      )
+    ).rows;
+  const hintCount = (await hints()).length;
+  await f.call('runs/operations/control', {
+    action: 'advance',
+    milliseconds: 1000,
+  });
+  await f.call('runs/operations/control', {
+    action: 'command',
+    instance: 'shopify',
+    command: {
+      kind: 'order-edit',
+      order: '1',
+      lines: [{ lineItem: lineId, quantity: 1 }],
+    },
+  });
+  await until(
+    async () =>
+      (await hints())
+        .slice(hintCount)
+        .some(
+          (row) =>
+            row.capabilities.length === 2 &&
+            row.capabilities.includes('orders.read') &&
+            row.capabilities.includes('fulfillment.read'),
+        ),
+    'order edit delivered its signed reread hint',
+    20_000,
+  );
+  await f.pilot.observe();
+  const edited = await detail();
+  expect(edited.sources[0].lines[0]).toMatchObject({
+    quantity: '2',
+    currentQuantity: '1',
+    cancelledQuantity: '1',
+    remainingQuantity: '1',
+  });
+  expect(
+    edited.fulfillments.some((work) =>
+      work.lines.some(
+        (line) => line.quantity === '1' && line.remainingQuantity === '1',
+      ),
+    ),
+  ).toBe(true);
+  const current = await f.db.owner.query(
+    'SELECT snapshot_id FROM orders_projections WHERE tenant_id=$1 AND entity_id=$2 AND connection_id=$3',
+    [tenantId, orderId, connectionId],
+  );
+  expect(current.rows[0].snapshot_id).not.toBe(before.id);
+  expect(
+    (
+      await f.db.owner.query(
+        'SELECT document FROM orders_snapshots WHERE tenant_id=$1 AND id=$2',
+        [tenantId, before.id],
+      )
+    ).rows[0].document,
+  ).toEqual(before.document);
+  await f.call('runs/operations/control', {
+    action: 'advance',
+    milliseconds: 1000,
+  });
+  await f.call('runs/operations/control', {
+    action: 'command',
+    instance: 'shopify',
+    command: {
+      kind: 'order-edit',
+      order: '1',
+      lines: [{ lineItem: lineId, quantity: 0 }],
+    },
+  });
+  await until(
+    async () => (await hints()).length > hintCount + 2,
+    'line removal delivered refresh hints',
+    20_000,
+  );
+  await f.pilot.observe();
+  const removed = await detail();
+  expect(
+    removed.fulfillments.some((work) =>
+      work.lines.some(
+        (line) => line.quantity === '0' && line.remainingQuantity === '0',
+      ),
+    ),
+  ).toBe(true);
+  expect(removed.sources[0].lines[0]).toMatchObject({
+    quantity: '2',
+    currentQuantity: '0',
+    cancelledQuantity: '2',
+    remainingQuantity: '0',
+  });
+});

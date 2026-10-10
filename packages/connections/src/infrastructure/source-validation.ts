@@ -47,6 +47,9 @@ export const sourceSchema = external
   .strict();
 
 const quantity = z.object({ amount: positive, unit }).strict();
+const remainingQuantity = z
+  .object({ amount: decimal.refine((s) => !s.startsWith('-')), unit })
+  .strict();
 
 const money = z
   .object({ amount: decimal, currency: z.string().regex(/^[A-Z]{3}$/) })
@@ -261,6 +264,7 @@ export const commerceSchema = z.discriminatedUnion('capability', [
                   id: external,
                   sku: external.nullable(),
                   quantity,
+                  currentQuantity: remainingQuantity.nullable().optional(),
                   cancelledQuantity: z
                     .object({ amount: decimal, unit })
                     .strict()
@@ -271,11 +275,15 @@ export const commerceSchema = z.discriminatedUnion('capability', [
                 .strict()
                 .refine(
                   (v) =>
-                    v.cancelledQuantity === null ||
-                    (v.cancelledQuantity.unit === v.quantity.unit &&
-                      !v.cancelledQuantity.amount.startsWith('-') &&
-                      units(v.cancelledQuantity.amount) <=
-                        units(v.quantity.amount)),
+                    (v.currentQuantity == null ||
+                      (v.currentQuantity.unit === v.quantity.unit &&
+                        units(v.currentQuantity.amount) <=
+                          units(v.quantity.amount))) &&
+                    (v.cancelledQuantity === null ||
+                      (v.cancelledQuantity.unit === v.quantity.unit &&
+                        !v.cancelledQuantity.amount.startsWith('-') &&
+                        units(v.cancelledQuantity.amount) <=
+                          units(v.quantity.amount))),
                 ),
             ),
           })
@@ -325,7 +333,20 @@ export const commerceSchema = z.discriminatedUnion('capability', [
               'unknown',
             ]),
             lines: z.array(
-              z.object({ orderLine: external, quantity }).strict(),
+              z
+                .object({
+                  orderLine: external,
+                  quantity: remainingQuantity,
+                  remainingQuantity: remainingQuantity.nullable().optional(),
+                })
+                .strict()
+                .refine(
+                  (line) =>
+                    line.remainingQuantity == null ||
+                    (line.remainingQuantity.unit === line.quantity.unit &&
+                      units(line.remainingQuantity.amount) <=
+                        units(line.quantity.amount)),
+                ),
             ),
             lastProgressAt: timestamp.nullable(),
             progressBasis: z
@@ -334,7 +355,12 @@ export const commerceSchema = z.discriminatedUnion('capability', [
             failureCode: z.string().nullable(),
             ...fulfillmentFacts,
           })
-          .strict(),
+          .strict()
+          .refine(
+            (data) =>
+              data.kind === 'fulfillment_order' ||
+              data.lines.every((line) => units(line.quantity.amount) > 0n),
+          ),
       ),
     })
     .strict(),

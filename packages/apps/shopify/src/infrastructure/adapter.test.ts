@@ -208,7 +208,7 @@ describe('Shopify read capabilities', () => {
         items: [
           {
             source: { provider: 'shopify', externalId: commerce.order.id },
-            adapterVersion: 'shopify/4',
+            adapterVersion: 'shopify/5',
             data: {
               paymentStatus: 'paid',
               placedAt: '2026-09-14T08:30:00Z',
@@ -217,7 +217,8 @@ describe('Shopify read capabilities', () => {
                 {
                   sku: ref(commerce.inventoryItem.id),
                   quantity: { amount: '3' },
-                  cancelledQuantity: null,
+                  currentQuantity: { amount: '3' },
+                  cancelledQuantity: { amount: '0' },
                   skuCode: 'MUG-Blue',
                   title: 'Blue mug',
                 },
@@ -460,15 +461,16 @@ describe('Shopify read capabilities', () => {
     ).toMatchObject({ ok: true });
   });
   it.each([
-    ['IN_PROGRESS', 1, 'processing'],
-    ['CLOSED', 0, 'completed'],
+    ['IN_PROGRESS', 1, 3, 'processing'],
+    ['CLOSED', 0, 3, 'completed'],
+    ['CANCELLED', 0, 0, 'cancelled'],
   ])(
     'retains total quantity for %s work and accepts it for ingestion',
-    async (status, remaining, expected) => {
+    async (status, remaining, total, expected) => {
       const f = fixture();
       f.data.work[0]!.status = status;
       f.data.workLines[0]!.remainingQuantity = Number(remaining);
-      f.data.workLines[0]!.totalQuantity = 3;
+      f.data.workLines[0]!.totalQuantity = Number(total);
       const result = await f.read('fulfillment.read');
       expect(result).toMatchObject({
         ok: true,
@@ -477,7 +479,12 @@ describe('Shopify read capabilities', () => {
             {
               data: {
                 status: expected,
-                lines: [{ quantity: { amount: '3' } }],
+                lines: [
+                  {
+                    quantity: { amount: String(total) },
+                    remainingQuantity: { amount: String(remaining) },
+                  },
+                ],
               },
             },
             {
@@ -822,6 +829,63 @@ describe('Shopify failures', () => {
   });
 });
 
+describe('Shopify edited order lines', () => {
+  it.each([1, 0])(
+    'retains original units and reads %s current units',
+    async (current) => {
+      const f = fixture();
+      f.data.orderLines[0]!.quantity = 2;
+      f.data.orderLines[0]!.currentQuantity = current;
+      const result = await f.read('orders.read');
+      expect(result).toMatchObject({
+        ok: true,
+        value: {
+          items: [
+            {
+              data: {
+                lines: [
+                  {
+                    quantity: { amount: '2' },
+                    currentQuantity: { amount: String(current) },
+                    cancelledQuantity: { amount: String(2 - current) },
+                  },
+                  {},
+                ],
+              },
+            },
+          ],
+        },
+      });
+      if (!result.ok) throw new Error('Expected order read');
+      expect(() =>
+        commerceSchema.parse({
+          capability: 'orders.read',
+          observation: {
+            ...result.value.items[0],
+            source: {
+              ...result.value.items[0]!.source,
+              tenantId: '00000000-0000-4000-8000-000000000001',
+              connectionId: '00000000-0000-4000-8000-000000000002',
+            },
+          },
+        }),
+      ).not.toThrow();
+    },
+  );
+  it.each([-1, 4, null])(
+    'rejects invalid current quantity %s',
+    async (current) => {
+      const f = fixture();
+      Object.assign(f.data.orderLines[0]!, { currentQuantity: current });
+      expect(await f.read('orders.read')).toMatchObject({
+        ok: false,
+        error: { code: 'invalid_response' },
+      });
+      expect(f.recordObservations).not.toHaveBeenCalled();
+    },
+  );
+});
+
 describe('Shopify webhook refresh hints', () => {
   const body = Buffer.from(
     '{"id":9007199254740993,"email":"private@example.com"}',
@@ -853,6 +917,18 @@ describe('Shopify webhook refresh hints', () => {
     ).not.toBe(event?.eventKey);
     expect(mapShopifyWebhook({ ...options, topic: 'unknown' })).toBeNull();
     expect(mapShopifyWebhook({ ...options, topic: 'constructor' })).toBeNull();
+  });
+  it.each([
+    'orders/edited',
+    'fulfillment_orders/moved',
+    'fulfillment_orders/split',
+    'fulfillment_orders/merged',
+    'fulfillment_orders/cancelled',
+  ])('rereads orders and fulfillment work after %s', (topic) => {
+    const event = mapShopifyWebhook({ ...options, topic });
+    expect(event?.capabilities).toEqual(['orders.read', 'fulfillment.read']);
+    expect(event?.eventKey).not.toBe(mapShopifyWebhook(options)?.eventKey);
+    expect(event).toEqual(mapShopifyWebhook({ ...options, topic }));
   });
   it('rejects bad signatures, modified payloads and wrong shops', () => {
     expect(() => mapShopifyWebhook({ ...options, hmac: '' })).toThrow(

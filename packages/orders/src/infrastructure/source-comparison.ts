@@ -1,5 +1,6 @@
 // "Differs by source": two or more current, non-removed sources disagree on a known status,
-// payment status, total or per-SKU ordered quantity. Unknown values never count, and display
+// payment status, total or per-SKU current quantity. Reported ordered units are the fallback
+// when reductions are unknown. Unknown values never count, and display
 // numbers and dates are not compared because systems number and time the same order
 // independently. The list and the detail both use this definition.
 
@@ -22,8 +23,8 @@ export function sourceComparison(sources: string, entities: string) {
  CASE WHEN jsonb_typeof(s.document->'data'->'total')='object'
   THEN trim_scale((s.document->'data'->'total'->>'amount')::numeric)::text||' '||(s.document->'data'->'total'->>'currency') END AS total,
  (SELECT COALESCE(string_agg(k||':'||trim_scale(q)::text,',' ORDER BY (k||':'||trim_scale(q)::text) COLLATE "C"),'')
-  FROM (SELECT COALESCE(l->>'skuId','unmapped') AS k,sum((l->>'quantity')::numeric) AS q
-  FROM jsonb_array_elements(s.document->'data'->'lines') l GROUP BY 1) lines) AS lines
+  FROM (SELECT COALESCE(l->>'skuId','unmapped') AS k,sum(COALESCE((l->>'currentQuantity')::numeric,(l->>'quantity')::numeric-(l->>'cancelledQuantity')::numeric,(l->>'quantity')::numeric)) AS q
+  FROM jsonb_array_elements(s.document->'data'->'lines') l GROUP BY 1) lines WHERE q>0) AS lines
  FROM ${sources} o JOIN orders_snapshots s ON s.tenant_id=$1 AND s.id=o.snapshot_id
  WHERE NOT o.deleted AND o.entity_id IN (SELECT entity_id FROM compared_orders)
 ), source_differences AS MATERIALIZED (
