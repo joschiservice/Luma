@@ -18,6 +18,55 @@ const backupCodes = Array.from(
   (_, index) => `k7q${index}m-x2p${index}d`,
 );
 
+const event = {
+  reason: null,
+  ipAddress: '192.0.2.24',
+  browser: 'Firefox 143',
+  os: 'macOS',
+  currentSession: false,
+  bySupport: false,
+};
+const securityEvents = [
+  {
+    ...event,
+    id: '00000000-0000-4000-8000-000000000001',
+    type: 'sign-in.password',
+    outcome: 'succeeded',
+    createdAt: '2026-10-09T08:40:00Z',
+    currentSession: true,
+  },
+  {
+    ...event,
+    id: '00000000-0000-4000-8000-000000000002',
+    type: 'sign-in.password',
+    outcome: 'failed',
+    reason: 'invalid-credentials',
+    createdAt: '2026-10-08T21:05:00Z',
+    ipAddress: '203.0.113.7',
+    browser: 'Chrome 141',
+    os: 'Windows',
+  },
+  {
+    ...event,
+    id: '00000000-0000-4000-8000-000000000003',
+    type: 'passkey.added',
+    outcome: 'succeeded',
+    createdAt: '2026-10-02T15:40:00Z',
+  },
+  {
+    ...event,
+    id: '00000000-0000-4000-8000-000000000004',
+    type: 'sessions.revoked-by-staff',
+    outcome: 'succeeded',
+    reason: 'all',
+    createdAt: '2026-06-30T10:00:00Z',
+    ipAddress: null,
+    browser: null,
+    os: null,
+    bySupport: true,
+  },
+];
+
 /** Answers the auth routes Settings → Security reads, without leaving the preview. */
 function mockSecurity(state: SecurityState = 'off') {
   const original = globalThis.fetch;
@@ -62,6 +111,11 @@ function mockSecurity(state: SecurityState = 'off') {
                 ]
               : [],
           );
+    if (path === '/api/v1/account/security-events')
+      return Response.json({
+        items: state === 'off' ? [] : securityEvents,
+        nextCursor: null,
+      });
     if (path === '/two-factor/enable')
       return Response.json({ method: 'totp', totpURI, backupCodes });
     if (path === '/two-factor/verify-totp') {
@@ -144,6 +198,13 @@ export const Enabled: Story = {
     await expect(
       canvas.getByRole('button', { name: 'Remove Work laptop' }),
     ).toBeEnabled();
+    const activity = await canvas.findByRole('list', {
+      name: 'Security activity',
+    });
+    await expect(
+      within(activity).getByText('Password sign-in failed'),
+    ).toBeVisible();
+    await expect(within(activity).getByText('This session')).toBeVisible();
   },
 };
 

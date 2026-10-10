@@ -33,6 +33,7 @@ export const session = pgTable('sessions', {
   ipAddress: text('ip_address'),
   userAgent: text('user_agent'),
   activeOrganizationId: uuid('active_organization_id'),
+  lastActiveAt: time('last_active_at'),
 });
 
 export const account = pgTable('accounts', {

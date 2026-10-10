@@ -1,4 +1,8 @@
-import { type QueryClient, queryOptions } from '@tanstack/react-query';
+import {
+  infiniteQueryOptions,
+  type QueryClient,
+  queryOptions,
+} from '@tanstack/react-query';
 
 import { staffActivity } from './activity';
 import { staffApi, StaffApiError } from './api';
@@ -27,6 +31,71 @@ export const workspaceOptions = (workspaceId: string, grantId: string) =>
   queryOptions({
     queryKey: ['staff', 'workspace', workspaceId, grantId],
     queryFn: ({ signal }) => staffApi.workspace(workspaceId, grantId, signal),
+    enabled: grantId.length > 0,
+    retry: false,
+  });
+
+/** Reads workspace health under the support grant. Each read is audited, so it refreshes once a minute. */
+export const healthOptions = (workspaceId: string, grantId: string) =>
+  queryOptions({
+    queryKey: ['staff', 'workspace', workspaceId, grantId, 'health'],
+    queryFn: ({ signal }) => staffApi.health(workspaceId, grantId, signal),
+    enabled: grantId.length > 0,
+    retry: false,
+    refetchInterval: 60_000,
+  });
+
+/** Pages access changes, newest first, under the support grant. Older pages load on request. */
+export const accessHistoryOptions = (workspaceId: string, grantId: string) =>
+  infiniteQueryOptions({
+    queryKey: ['staff', 'workspace', workspaceId, grantId, 'access-history'],
+    queryFn: ({ signal, pageParam }) =>
+      staffApi.accessHistory(workspaceId, grantId, pageParam, signal),
+    initialPageParam: null as string | null,
+    getNextPageParam: (page) => page.nextCursor,
+    enabled: grantId.length > 0,
+    retry: false,
+  });
+
+/** Reads one customer account under its account grant; failed grants are never retried. */
+export const accountOptions = (userId: string, grantId: string) =>
+  queryOptions({
+    queryKey: ['staff', 'account', userId, grantId],
+    queryFn: ({ signal }) => staffApi.account(userId, grantId, signal),
+    enabled: grantId.length > 0,
+    retry: false,
+  });
+
+/** Staff audit filters as sent to the API; time bounds are ISO instants. */
+export interface AuditFilters {
+  staff?: string | undefined;
+  workspace?: string | undefined;
+  account?: string | undefined;
+  event?: string | undefined;
+  from?: string | undefined;
+  to?: string | undefined;
+}
+
+/** Pages the staff audit log, newest first. Every page read is itself audited, so it never polls. */
+export const auditOptions = (filters: AuditFilters, enabled: boolean) =>
+  infiniteQueryOptions({
+    queryKey: ['staff', 'audit', filters],
+    queryFn: ({ signal, pageParam }) =>
+      staffApi.audit(filters, pageParam, signal),
+    initialPageParam: null as string | null,
+    getNextPageParam: (page) => page.nextCursor,
+    enabled,
+    retry: false,
+  });
+
+/** Pages through an account's security events under its account grant, newest first. */
+export const accountSecurityEventsOptions = (userId: string, grantId: string) =>
+  infiniteQueryOptions({
+    queryKey: ['staff', 'account', userId, grantId, 'security-events'],
+    queryFn: ({ pageParam, signal }) =>
+      staffApi.accountSecurityEvents(userId, grantId, pageParam, signal),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
     enabled: grantId.length > 0,
     retry: false,
   });

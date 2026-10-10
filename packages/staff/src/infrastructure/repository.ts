@@ -1,15 +1,25 @@
 import { randomUUID } from 'node:crypto';
 
-import { revokeCustomerSessionsForSupport } from '@luma/identity';
+import type { SecurityEventType } from '@luma/identity';
+import {
+  decodeSecurityEventCursor,
+  describeUserAgent,
+  encodeSecurityEventCursor,
+  revokeCustomerSessionsForSupport,
+} from '@luma/identity';
 import type { Pool, PoolClient } from 'pg';
 
 import type {
+  AccountDetail,
+  AccountSecurityEvents,
   DirectoryUser,
   DirectoryWorkspace,
   StaffRepository,
 } from '../application/staff.js';
 import type { StaffContext, StaffPermission } from '../domain/access.js';
 import { StaffError } from '../domain/access.js';
+import { readStaffAudit } from './audit.js';
+import { readAccessHistory, readWorkspaceHealth } from './health.js';
 
 /** Creates a deliberately narrow cross-owner read adapter and identity support command adapter. */
 export function createStaffRepository(pool: Pool): StaffRepository {
@@ -87,6 +97,18 @@ export function createStaffRepository(pool: Pool): StaffRepository {
       throw new StaffError(
         403,
         'Workspace support access has expired or is unavailable.',
+      );
+  }
+
+  async function validateAccountGrant(tx: PoolClient, userId: string) {
+    const result = await tx.query<{ allowed: boolean }>(
+      'SELECT staff_has_account_access($1) AS allowed',
+      [userId],
+    );
+    if (!result.rows[0]?.allowed)
+      throw new StaffError(
+        403,
+        'Account support access has expired or is unavailable.',
       );
   }
 
@@ -221,6 +243,235 @@ export function createStaffRepository(pool: Pool): StaffRepository {
             ...input,
             requestId: context.requestId,
           });
+        },
+      );
+    },
+    health(context, workspaceId, grantId) {
+      return transaction(
+        context,
+        grantId,
+        'staff.workspace.inspect',
+        async (tx) => {
+          await validateGrant(tx, workspaceId);
+          const health = await readWorkspaceHealth(tx, workspaceId);
+          await audit(tx, context, 'workspace.health.read', workspaceId, null, {
+            grantId,
+          });
+
+          return health;
+        },
+      );
+    },
+    accessHistory(context, workspaceId, grantId, cursor) {
+      return transaction(
+        context,
+        grantId,
+        'staff.workspace.inspect',
+        async (tx) => {
+          await validateGrant(tx, workspaceId);
+          const page = await readAccessHistory(tx, workspaceId, cursor);
+          await audit(
+            tx,
+            context,
+            'workspace.access-history.read',
+            workspaceId,
+            null,
+            { grantId, cursor, events: page.events.length },
+          );
+
+          return page;
+        },
+      );
+    },
+    audit(context, query) {
+      return transaction(context, null, 'staff.audit.read', async (tx) => {
+        const page = await readStaffAudit(tx, query);
+        const { cursor, ...filters } = query;
+        await audit(tx, context, 'staff.audit.read', null, null, {
+          filters,
+          cursor: cursor ?? null,
+          entries: page.entries.length,
+        });
+
+        return page;
+      });
+    },
+    accountGrant(context, userId, reason) {
+      return transaction(
+        context,
+        null,
+        'staff.accounts.inspect',
+        async (tx) => {
+          const account = await tx.query('SELECT id FROM users WHERE id=$1', [
+            userId,
+          ]);
+          if (!account.rowCount)
+            throw new StaffError(404, 'Customer account unavailable.');
+          const id = randomUUID();
+          const result = await tx.query<{ expiresAt: Date }>(
+            'INSERT INTO staff_account_grants(id,staff_user_id,staff_session_id,user_id,reason,expires_at) VALUES($1,$2,$3,$4,$5,now()+interval \'30 minutes\') RETURNING expires_at AS "expiresAt"',
+            [id, context.userId, context.sessionId, userId, reason],
+          );
+          await audit(tx, context, 'account.access.opened', null, reason, {
+            grantId: id,
+            userId,
+          });
+
+          return {
+            id,
+            userId,
+            reason,
+            expiresAt: result.rows[0]!.expiresAt.toISOString(),
+          };
+        },
+      );
+    },
+    account(context, userId, grantId) {
+      return transaction(
+        context,
+        grantId,
+        'staff.accounts.inspect',
+        async (tx): Promise<AccountDetail> => {
+          await validateAccountGrant(tx, userId);
+          const profile = await tx.query<{
+            id: string;
+            name: string;
+            email: string;
+            created_at: Date;
+            two_factor_enabled: boolean;
+            passkey_count: number;
+          }>(
+            'SELECT id,name,email,created_at,two_factor_enabled,passkey_count FROM staff_account_profile WHERE id=$1',
+            [userId],
+          );
+          const account = profile.rows[0];
+          if (!account)
+            throw new StaffError(404, 'Customer account unavailable.');
+          const workspaces = await tx.query<{
+            id: string;
+            name: string;
+            slug: string;
+            status: string;
+            data_region: string;
+            role: string;
+            custom_role_name: string | null;
+            joined_at: Date;
+          }>(
+            'SELECT id,name,slug,status,data_region,role,custom_role_name,joined_at FROM staff_account_workspaces WHERE user_id=$1 ORDER BY lower(name),id LIMIT 101',
+            [userId],
+          );
+          const sessions = await tx.query<{
+            id: string;
+            created_at: Date;
+            expires_at: Date;
+            last_active_at: Date | null;
+            ip_address: string | null;
+            user_agent: string | null;
+          }>(
+            'SELECT id,created_at,expires_at,last_active_at,ip_address,user_agent FROM staff_account_sessions WHERE user_id=$1 ORDER BY coalesce(last_active_at,created_at) DESC,id LIMIT 101',
+            [userId],
+          );
+          await audit(tx, context, 'account.inspected', null, null, {
+            grantId,
+            userId,
+          });
+
+          return {
+            account: {
+              id: account.id,
+              name: account.name,
+              email: account.email,
+              createdAt: account.created_at.toISOString(),
+            },
+            security: {
+              twoFactorEnabled: account.two_factor_enabled,
+              passkeys: account.passkey_count,
+            },
+            workspacesTruncated: workspaces.rows.length > 100,
+            workspaces: workspaces.rows.slice(0, 100).map((row) => ({
+              id: row.id,
+              name: row.name,
+              slug: row.slug,
+              status: row.status,
+              dataRegion: row.data_region,
+              role: row.role,
+              customRoleName: row.custom_role_name,
+              // Memberships have no suspension state yet; every stored membership is active.
+              membershipStatus: 'active' as const,
+              joinedAt: row.joined_at.toISOString(),
+            })),
+            sessionsTruncated: sessions.rows.length > 100,
+            sessions: sessions.rows.slice(0, 100).map((row) => ({
+              id: row.id,
+              createdAt: row.created_at.toISOString(),
+              expiresAt: row.expires_at.toISOString(),
+              lastActiveAt: row.last_active_at?.toISOString() ?? null,
+              ipAddress: row.ip_address,
+              ...describeUserAgent(row.user_agent),
+            })),
+          };
+        },
+      );
+    },
+    accountSecurityEvents(context, userId, grantId, cursor) {
+      const after = cursor ? decodeSecurityEventCursor(cursor) : null;
+      if (cursor && !after)
+        throw new StaffError(400, 'The page position is invalid.');
+      const pageSize = 25;
+
+      return transaction(
+        context,
+        grantId,
+        'staff.accounts.inspect',
+        async (tx): Promise<AccountSecurityEvents> => {
+          await validateAccountGrant(tx, userId);
+          const result = await tx.query<{
+            id: string;
+            event_type: SecurityEventType;
+            outcome: 'succeeded' | 'failed';
+            reason_code: string | null;
+            session_id: string | null;
+            ip_address: string | null;
+            user_agent: string | null;
+            request_id: string;
+            staff_command_id: string | null;
+            created_at: Date;
+          }>(
+            'SELECT id,event_type,outcome,reason_code,session_id,ip_address,user_agent,request_id,staff_command_id,created_at FROM staff_account_security_events WHERE user_id=$1 AND ($2::timestamptz IS NULL OR (created_at,id)<($2::timestamptz,$3::uuid)) ORDER BY created_at DESC,id DESC LIMIT $4',
+            [userId, after?.createdAt ?? null, after?.id ?? null, pageSize + 1],
+          );
+          const rows = result.rows.slice(0, pageSize);
+          await audit(
+            tx,
+            context,
+            'account.security-events.inspected',
+            null,
+            null,
+            { grantId, userId, events: rows.length, firstPage: !after },
+          );
+          const last = rows.at(-1);
+
+          return {
+            items: rows.map((row) => ({
+              id: row.id,
+              type: row.event_type,
+              outcome: row.outcome,
+              reason: row.reason_code,
+              createdAt: row.created_at.toISOString(),
+              sessionId: row.session_id,
+              ipAddress: row.ip_address,
+              ...describeUserAgent(row.user_agent),
+              requestId: row.request_id,
+              staffCommandId: row.staff_command_id,
+            })),
+            nextCursor:
+              result.rows.length > pageSize && last
+                ? encodeSecurityEventCursor({
+                    createdAt: last.created_at,
+                    id: last.id,
+                  })
+                : null,
+          };
         },
       );
     },

@@ -211,8 +211,19 @@ export async function buildRuntimeApp(
         .catch(() => app.log.error('Email delivery pass failed'));
     }, 5000);
     deliveryTimer.unref();
+    // Retention runs a minute after start, so frequent restarts don't skip it, then hourly.
+    const purge = () =>
+      void identity
+        .purgeSecurityEvents()
+        .catch(() => app.log.error('Security event retention pass failed'));
+    const retentionStart = setTimeout(purge, 60_000);
+    const retentionTimer = setInterval(purge, 60 * 60_000);
+    retentionStart.unref();
+    retentionTimer.unref();
     resources.add(async () => {
       clearInterval(deliveryTimer);
+      clearTimeout(retentionStart);
+      clearInterval(retentionTimer);
       await identity.mailDelivery.drain();
     });
     app.addHook('onClose', resources.close);

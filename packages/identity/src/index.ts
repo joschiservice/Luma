@@ -5,6 +5,7 @@ export {
   makeTenantContext,
   requirePermission,
   requireTenant,
+  WorkspaceInactiveError,
 } from './domain/context.js';
 
 export type {
@@ -35,6 +36,23 @@ export {
 } from './domain/roles.js';
 
 export type { BuiltInRoleKey, RoleReference } from './domain/roles.js';
+
+export { describeUserAgent } from './domain/sessions.js';
+
+export {
+  decodeSecurityEventCursor,
+  encodeSecurityEventCursor,
+  securityEventNetworkRetentionDays,
+  securityEventRetentionDays,
+} from './domain/security-events.js';
+
+export type {
+  SecurityEventOutcome,
+  SecurityEventReason,
+  SecurityEventType,
+} from './domain/security-events.js';
+
+export type { DeviceDescription } from './domain/sessions.js';
 
 export type { Credentials, IdentityService } from './application/identity.js';
 

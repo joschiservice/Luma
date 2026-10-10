@@ -21,6 +21,12 @@ const protectedRoutes = new Set([
   'POST /v1/staff/workspaces/:workspaceId/access',
   'GET /v1/staff/workspaces/:workspaceId',
   'POST /v1/staff/workspaces/:workspaceId/users/:userId/revoke-sessions',
+  'GET /v1/staff/workspaces/:workspaceId/health',
+  'GET /v1/staff/workspaces/:workspaceId/access-history',
+  'GET /v1/staff/audit',
+  'POST /v1/staff/accounts/:userId/access',
+  'GET /v1/staff/accounts/:userId',
+  'GET /v1/staff/accounts/:userId/security-events',
 ]);
 const routePermissions: Record<string, StaffPermission[]> = {
   'GET /v1/staff/session': [],
@@ -34,6 +40,17 @@ const routePermissions: Record<string, StaffPermission[]> = {
     'staff.workspace.inspect',
     'staff.sessions.revoke',
   ],
+  'GET /v1/staff/workspaces/:workspaceId/health': ['staff.workspace.inspect'],
+  'GET /v1/staff/workspaces/:workspaceId/access-history': [
+    'staff.workspace.inspect',
+  ],
+  'GET /v1/staff/audit': ['staff.audit.read'],
+  'POST /v1/staff/accounts/:userId/access': [
+    'staff.accounts.inspect',
+    'staff.directory.read',
+  ],
+  'GET /v1/staff/accounts/:userId': ['staff.accounts.inspect'],
+  'GET /v1/staff/accounts/:userId/security-events': ['staff.accounts.inspect'],
 };
 const publicRoutes = new Set([
   'GET /health',
@@ -104,15 +121,17 @@ export function registerStaffHttp(app: FastifyInstance, staff: StaffRuntime) {
     if (error instanceof StaffError)
       return reply.status(error.status).send({
         code:
-          error.status === 401
-            ? 'UNAUTHENTICATED'
-            : error.status === 403
-              ? 'FORBIDDEN'
-              : error.status === 404
-                ? 'NOT_FOUND'
-                : error.status === 409
-                  ? 'CONFLICT'
-                  : 'SERVICE_UNAVAILABLE',
+          error.status === 400
+            ? 'VALIDATION_ERROR'
+            : error.status === 401
+              ? 'UNAUTHENTICATED'
+              : error.status === 403
+                ? 'FORBIDDEN'
+                : error.status === 404
+                  ? 'NOT_FOUND'
+                  : error.status === 409
+                    ? 'CONFLICT'
+                    : 'SERVICE_UNAVAILABLE',
         message: error.message,
         requestId: request.id,
       });
@@ -291,6 +310,52 @@ export function registerStaffHttp(app: FastifyInstance, staff: StaffRuntime) {
           ...params,
           ...body,
         }),
+    ),
+    health: os.health.handler(
+      async ({ context: { request }, input: { params, query } }) =>
+        await staff.service.health(
+          context(request.staffContext),
+          params.workspaceId,
+          query.grantId,
+        ),
+    ),
+    accessHistory: os.accessHistory.handler(
+      async ({ context: { request }, input: { params, query } }) =>
+        await staff.service.accessHistory(
+          context(request.staffContext),
+          params.workspaceId,
+          query.grantId,
+          query.cursor ?? null,
+        ),
+    ),
+    audit: os.audit.handler(
+      async ({ context: { request }, input: { query } }) =>
+        await staff.service.audit(context(request.staffContext), query),
+    ),
+    grantAccountAccess: os.grantAccountAccess.handler(
+      async ({ context: { request }, input: { params, body } }) =>
+        await staff.service.accountGrant(
+          context(request.staffContext),
+          params.userId,
+          body.reason,
+        ),
+    ),
+    account: os.account.handler(
+      async ({ context: { request }, input: { params, query } }) =>
+        await staff.service.account(
+          context(request.staffContext),
+          params.userId,
+          query.grantId,
+        ),
+    ),
+    accountSecurityEvents: os.accountSecurityEvents.handler(
+      async ({ context: { request }, input: { params, query } }) =>
+        await staff.service.accountSecurityEvents(
+          context(request.staffContext),
+          params.userId,
+          query.grantId,
+          query.cursor,
+        ),
     ),
   });
   registerContractRoutes(app, staffContract, router);

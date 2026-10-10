@@ -169,7 +169,7 @@ export const workflowRunViewSchema = playbookRunViewSchema
   .extend({
     activationId: z.string().uuid().nullable(),
     triggerState: z
-      .enum(['scheduled', 'awaiting_admission', 'cancelled'])
+      .enum(['scheduled', 'awaiting_admission', 'cancelled', 'skipped'])
       .optional(),
     triggerEvidence: z
       .object({ sourceId: text, occurredAt: z.string().datetime() })

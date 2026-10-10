@@ -45,6 +45,37 @@ export const tenantContextSchema = z.object({
   allAppPermissions: z.boolean(),
 });
 
+export const securityEventTypeSchema = z.enum([
+  'sign-in.password',
+  'sign-in.passkey',
+  'sign-in.two-factor',
+  'two-factor.enabled',
+  'two-factor.disabled',
+  'two-factor.backup-codes-regenerated',
+  'passkey.added',
+  'passkey.removed',
+  'password.changed',
+  'sessions.revoked',
+  'sessions.revoked-by-staff',
+]);
+
+export const securityEventSchema = z.object({
+  id: z.string().uuid(),
+  type: securityEventTypeSchema,
+  outcome: z.enum(['succeeded', 'failed']),
+  /** Failure category, factor used, or revocation scope. Never a submitted value. */
+  reason: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  /** Cleared after 90 days, like the user agent the browser and system come from. */
+  ipAddress: z.string().nullable(),
+  browser: z.string().nullable(),
+  os: z.string().nullable(),
+  currentSession: z.boolean(),
+  bySupport: z.boolean(),
+});
+
+export type SecurityEventResponse = z.infer<typeof securityEventSchema>;
+
 export type Membership = z.infer<typeof membershipSchema>;
 
 export type TenantContextResponse = z.infer<typeof tenantContextSchema>;
@@ -59,6 +90,26 @@ const commandHeaders = z.object({
 });
 
 export const identityContract = {
+  listSecurityEvents: endpoint
+    .route({
+      method: 'GET',
+      path: '/v1/account/security-events',
+      summary: 'List your recent security activity',
+      description:
+        'Returns sign-ins, failed sign-in attempts and security changes for your own account, newest first, 20 per page. Events are kept for one year; IP addresses and devices for 90 days.',
+    })
+    .meta({ errors: [...errors, 422] })
+    .input(
+      z.object({
+        query: z.object({ cursor: z.string().max(200).optional() }),
+      }),
+    )
+    .output(
+      z.object({
+        items: z.array(securityEventSchema),
+        nextCursor: z.string().nullable(),
+      }),
+    ),
   listOrganizations: endpoint
     .route({
       method: 'GET',

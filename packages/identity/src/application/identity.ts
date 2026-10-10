@@ -12,6 +12,15 @@ import {
   requireTenant,
 } from '../domain/context.js';
 import type { PermissionSet, RoleReference } from '../domain/roles.js';
+import type {
+  SecurityEvent,
+  SecurityEventCursor,
+} from '../domain/security-events.js';
+import {
+  decodeSecurityEventCursor,
+  encodeSecurityEventCursor,
+} from '../domain/security-events.js';
+import { describeUserAgent } from '../domain/sessions.js';
 
 export type Credentials = Readonly<Record<string, string>>;
 
@@ -105,6 +114,12 @@ export function memberDto(member: Membership): MemberDto {
 
 export interface IdentityRepository {
   getSession(credentials: Credentials): Promise<SessionIdentity | null>;
+  /** Reads one account's security events, newest first, after an optional position. */
+  listSecurityEvents(
+    userId: string,
+    after: SecurityEventCursor | null,
+    limit: number,
+  ): Promise<SecurityEvent[]>;
   withUser<T>(
     userId: string,
     operation: (tx: IdentityTransaction) => Promise<T>,
@@ -181,6 +196,47 @@ export function createIdentityService(repository: IdentityRepository) {
           context.requestId,
         ),
       );
+    },
+    /**
+     * Lists the signed-in person's own security events, 20 per page, newest first. The account
+     * comes from the session, never from the caller. Rejects malformed cursors with 422.
+     */
+    async listSecurityEvents(credentials: Credentials, cursor?: string) {
+      const session = await authenticate(credentials);
+      const after = cursor ? decodeSecurityEventCursor(cursor) : null;
+      if (cursor && !after)
+        throw new IdentityError(
+          422,
+          'VALIDATION_ERROR',
+          'The page position is invalid. Reload the list.',
+        );
+      const pageSize = 20;
+      const events = await repository.listSecurityEvents(
+        session.userId,
+        after,
+        pageSize + 1,
+      );
+      const page = events.slice(0, pageSize);
+      const last = page.at(-1);
+
+      return {
+        items: page.map((event) => ({
+          id: event.id,
+          type: event.type,
+          outcome: event.outcome,
+          reason: event.reason,
+          createdAt: event.createdAt.toISOString(),
+          ipAddress: event.ipAddress,
+          ...describeUserAgent(event.userAgent),
+          currentSession:
+            event.sessionId !== null && event.sessionId === session.sessionId,
+          bySupport: event.staffCommandId !== null,
+        })),
+        nextCursor:
+          events.length > pageSize && last
+            ? encodeSecurityEventCursor(last)
+            : null,
+      };
     },
     async listOrganizations(credentials: Credentials) {
       const session = await authenticate(credentials);

@@ -1,10 +1,16 @@
 import {
   staffAccessGrantSchema,
+  staffAccessHistorySchema,
+  staffAccountAccessSchema,
+  staffAccountDetailSchema,
+  staffAccountSecurityEventsSchema,
+  staffAuditPageSchema,
   staffConfigSchema,
   staffDirectorySchema,
   staffRevokeSessionsResultSchema,
   staffSessionSchema,
   staffWorkspaceDetailSchema,
+  staffWorkspaceHealthSchema,
 } from '@luma/api-contract/staff';
 
 import { staffActivity } from './activity';
@@ -104,6 +110,7 @@ export function createStaffApi(
   }
 
   const workspace = (id: string) => `workspaces/${encodeURIComponent(id)}`;
+  const account = (id: string) => `accounts/${encodeURIComponent(id)}`;
 
   return {
     config: async (signal?: AbortSignal) =>
@@ -134,6 +141,54 @@ export function createStaffApi(
           signal,
         ),
       ),
+    health: async (
+      workspaceId: string,
+      grantId: string,
+      signal?: AbortSignal,
+    ) =>
+      staffWorkspaceHealthSchema.parse(
+        await request(
+          `${workspace(workspaceId)}/health?${new URLSearchParams({ grantId })}`,
+          undefined,
+          signal,
+        ),
+      ),
+    accessHistory: async (
+      workspaceId: string,
+      grantId: string,
+      cursor: string | null,
+      signal?: AbortSignal,
+    ) =>
+      staffAccessHistorySchema.parse(
+        await request(
+          `${workspace(workspaceId)}/access-history?${new URLSearchParams({
+            grantId,
+            ...(cursor ? { cursor } : {}),
+          })}`,
+          undefined,
+          signal,
+        ),
+      ),
+    audit: async (
+      filters: {
+        staff?: string | undefined;
+        workspace?: string | undefined;
+        account?: string | undefined;
+        event?: string | undefined;
+        from?: string | undefined;
+        to?: string | undefined;
+      },
+      cursor: string | null,
+      signal?: AbortSignal,
+    ) => {
+      const query = new URLSearchParams();
+      for (const [key, value] of Object.entries({ ...filters, cursor }))
+        if (value) query.set(key, value);
+
+      return staffAuditPageSchema.parse(
+        await request(`audit?${query}`, undefined, signal),
+      );
+    },
     revokeSessions: async (
       workspaceId: string,
       userId: string,
@@ -148,6 +203,34 @@ export function createStaffApi(
         await request(
           `${workspace(workspaceId)}/users/${encodeURIComponent(userId)}/revoke-sessions`,
           body,
+        ),
+      ),
+    grantAccount: async (userId: string, reason: string) =>
+      staffAccountAccessSchema.parse(
+        await request(`${account(userId)}/access`, { reason }),
+      ),
+    account: async (userId: string, grantId: string, signal?: AbortSignal) =>
+      staffAccountDetailSchema.parse(
+        await request(
+          `${account(userId)}?${new URLSearchParams({ grantId })}`,
+          undefined,
+          signal,
+        ),
+      ),
+    accountSecurityEvents: async (
+      userId: string,
+      grantId: string,
+      cursor: string | undefined,
+      signal?: AbortSignal,
+    ) =>
+      staffAccountSecurityEventsSchema.parse(
+        await request(
+          `${account(userId)}/security-events?${new URLSearchParams({
+            grantId,
+            ...(cursor ? { cursor } : {}),
+          })}`,
+          undefined,
+          signal,
         ),
       ),
     signIn: (email: string, password: string) =>

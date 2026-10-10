@@ -93,10 +93,47 @@ export const workspaceRoute = createRoute({
   component: lazyRouteComponent(() => import('./workspace'), 'WorkspacePage'),
 });
 
+const day = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .optional()
+  .catch(undefined);
+const filter = z.string().trim().max(320).optional().catch(undefined);
+
+export const auditRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/audit',
+  validateSearch: z.object({
+    staff: filter,
+    workspace: z.uuid().optional().catch(undefined),
+    account: filter,
+    event: z
+      .string()
+      .regex(/^[a-z][a-z0-9.-]{0,99}$/)
+      .optional()
+      .catch(undefined),
+    from: day,
+    to: day,
+  }),
+  component: lazyRouteComponent(() => import('./audit'), 'AuditPage'),
+});
+
+export const accountRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/accounts/$userId',
+  validateSearch: z.object({ grantId: z.uuid().optional().catch(undefined) }),
+  component: lazyRouteComponent(() => import('./account'), 'AccountPage'),
+});
+
 export const router = createRouter({
   routeTree: rootRoute.addChildren([
     loginRoute,
-    protectedRoute.addChildren([directoryRoute, workspaceRoute]),
+    protectedRoute.addChildren([
+      directoryRoute,
+      workspaceRoute,
+      accountRoute,
+      auditRoute,
+    ]),
   ]),
   defaultPreload: false,
 });
@@ -163,6 +200,14 @@ function StaffShell() {
           >
             Directory
           </Link>
+          {session.data.permissions.includes('staff.audit.read') ? (
+            <Link
+              to="/audit"
+              className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+            >
+              Audit log
+            </Link>
+          ) : null}
         </div>
         <div className="staff-actions">
           <span className="staff-muted">{session.data.user.email}</span>

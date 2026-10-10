@@ -71,6 +71,8 @@ async function fixture(t) {
         'staff.directory.read',
         'staff.workspace.inspect',
         'staff.sessions.revoke',
+        'staff.audit.read',
+        'staff.accounts.inspect',
       ],
     },
     db.ownerUrl,
@@ -107,6 +109,55 @@ async function fixture(t) {
   };
 }
 
+/** Adds a failing sync stream and 51 access changes; owner triggers are off for these rows. */
+async function seedHealth(db, tenantId, userId) {
+  const connection = randomUUID();
+  const seed = await db.owner.connect();
+  try {
+    await seed.query('BEGIN');
+    await seed.query('SET LOCAL session_replication_role=replica');
+    await seed.query(
+      'INSERT INTO connector_installations(tenant_id,id,version,document,secret) VALUES($1,$2,1,$3,$4)',
+      [
+        tenantId,
+        connection,
+        {
+          id: connection,
+          tenantId,
+          version: 1,
+          provider: 'shopify',
+          status: 'degraded',
+          credentialVersion: 2,
+          granted: ['orders.read'],
+        },
+        'private-credential-secret',
+      ],
+    );
+    await seed.query(
+      `INSERT INTO commerce_sync_streams(tenant_id,id,connection_id,record_type,principal_id,phase,attempts,error_code,error_message,error_at,failing_since)
+      VALUES($1,$2,$3,'orders',$4,'incremental',4,'authentication','The provider rejected the connection credentials.',now(),now()-interval '2 hours')`,
+      [tenantId, randomUUID(), connection, userId],
+    );
+    await seed.query(
+      `INSERT INTO workspace_access_events(id,tenant_id,actor_id,event_type,target_id,before_value,after_value,created_at)
+      SELECT gen_random_uuid(),$1,$2,'member.update',$3,$4,$5,now()-make_interval(mins=>n) FROM generate_series(1,51) n`,
+      [
+        tenantId,
+        userId,
+        randomUUID(),
+        { userId, roleName: 'Member' },
+        { userId, roleName: 'Admin' },
+      ],
+    );
+    await seed.query('COMMIT');
+  } catch (error) {
+    await seed.query('ROLLBACK');
+    throw error;
+  } finally {
+    seed.release();
+  }
+}
+
 async function signIn(page) {
   await page.goto('/');
   await expect(
@@ -129,6 +180,7 @@ test('staff investigates a workspace and retries an uncertain global revocation 
 }) => {
   const { page, db, customerApi, customer, workspace, errors } =
     await fixture(t);
+  await seedHealth(db, workspace.id, customer.userId);
   await signIn(page);
   await page.getByLabel('Name, email or workspace').fill('Support North');
   await page.getByRole('button', { name: 'Search', exact: true }).click();
@@ -145,6 +197,29 @@ test('staff investigates a workspace and retries an uncertain global revocation 
   await expect(
     page.getByRole('table', { name: 'Workspace members' }),
   ).toContainText('customer');
+  const streams = page.getByRole('table', { name: 'Sync streams' });
+  await expect(streams).toContainText('Failing');
+  await expect(streams).toContainText('authentication');
+  await expect(page.locator('body')).not.toContainText(
+    'private-credential-secret',
+  );
+  const history = page.getByRole('table', {
+    name: 'Workspace access changes, newest first',
+  });
+  await expect(history.getByRole('row')).toHaveCount(51);
+  await expect(history).toContainText('Member role changed');
+  await page.getByRole('button', { name: 'Load older changes' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(history.getByRole('row')).toHaveCount(52);
+  await expect(
+    page.getByText('This is the oldest recorded access change.'),
+  ).toBeVisible();
+  const reads = await db.owner.query(
+    "SELECT count(*) FILTER (WHERE event='workspace.health.read')::int AS health,count(*) FILTER (WHERE event='workspace.access-history.read')::int AS history FROM staff_audit WHERE tenant_id=$1",
+    [workspace.id],
+  );
+  expect(reads.rows[0].health).toBeGreaterThanOrEqual(1);
+  expect(reads.rows[0].history).toBeGreaterThanOrEqual(2);
   await page.screenshot({
     path: test.info().outputPath('workspace-light.png'),
     fullPage: true,
@@ -209,6 +284,157 @@ test('staff investigates a workspace and retries an uncertain global revocation 
   await expect(
     page.getByRole('table', { name: 'Workspace members' }),
   ).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('staff reviews the audit log by event and staff member', async ({
+  resources: t,
+}) => {
+  const { page, db, workspace, errors } = await fixture(t);
+  await signIn(page);
+  await page.getByLabel('Name, email or workspace').fill('Support North');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page.getByRole('button', { name: 'Inspect Support North' }).click();
+  await page
+    .getByLabel('Support reason or ticket reference')
+    .fill('Checking the audit trail for this ticket');
+  await page
+    .getByRole('button', { name: 'Open support access', exact: true })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: workspace.name, exact: true }),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Audit log', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Staff audit log', level: 1 }),
+  ).toBeVisible();
+  const entries = page.getByRole('table', {
+    name: 'Staff audit entries, newest first',
+  });
+  await expect(entries).toContainText('Support access opened');
+  await expect(entries).toContainText(
+    'Checking the audit trail for this ticket',
+  );
+  await expect(entries).toContainText('Signed in');
+  await page
+    .getByLabel('Staff member email or ID')
+    .fill('support@example.test');
+  await page.getByLabel('Until (inclusive)').fill('2000-01-01');
+  await page.getByLabel('From').fill('2000-01-02');
+  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await expect(
+    page.getByText('Choose an end date on or after the start.'),
+  ).toBeVisible();
+  await page.getByLabel('From').fill('');
+  await page.getByLabel('Until (inclusive)').fill('');
+  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await expect(page).toHaveURL(/staff=support%40example\.test/);
+  await expect(entries).toContainText('Support access opened');
+  await page.goto('/audit?event=staff.signed-in');
+  await expect(entries).toContainText('Signed in');
+  await expect(entries).not.toContainText('Support access opened');
+  await page.goto('/audit?event=workspace.access.opened');
+  await entries.getByRole('link', { name: 'Only this workspace' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(new RegExp(`workspace=${workspace.id}`));
+  await expect(entries).toContainText('Support North');
+  await page.screenshot({
+    path: test.info().outputPath('audit-light.png'),
+    fullPage: true,
+    animations: 'disabled',
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect
+    .poll(() =>
+      page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    )
+    .toBe(true);
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+  await expect(page.locator('html')).toHaveClass(/dark/);
+  await page.screenshot({
+    path: test.info().outputPath('audit-dark-narrow.png'),
+    fullPage: true,
+    animations: 'disabled',
+  });
+  const reads = await db.owner.query(
+    "SELECT count(*)::int AS count FROM staff_audit WHERE event='staff.audit.read'",
+  );
+  expect(reads.rows[0].count).toBeGreaterThanOrEqual(4);
+  expect(errors).toEqual([]);
+});
+
+test('staff opens a customer account and follows a workspace into its own support access', async ({
+  resources: t,
+}) => {
+  const { page, db, customer, workspace, errors } = await fixture(t);
+  await signIn(page);
+  await page.getByLabel('Name, email or workspace').fill('customer@example');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page
+    .getByRole('link', { name: 'Open account customer@example.test' })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'Account support access' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('table', { name: 'Account workspaces' }),
+  ).toHaveCount(0);
+  await page
+    .getByRole('button', { name: 'Open account access', exact: true })
+    .click();
+  const dialog = page.getByRole('dialog');
+  await dialog
+    .getByLabel('Support reason or ticket reference')
+    .fill('Investigating a customer sign-in ticket');
+  await dialog
+    .getByRole('button', { name: 'Open account access', exact: true })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'customer', exact: true, level: 1 }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('table', { name: 'Account workspaces' }),
+  ).toContainText(workspace.name);
+  await expect(
+    page.getByRole('table', { name: 'Account workspaces' }),
+  ).toContainText('Owner');
+  // The header row and the session created at sign-up.
+  await expect(
+    page
+      .getByRole('table', { name: 'Active customer sessions' })
+      .getByRole('row'),
+  ).toHaveCount(2);
+  await expect(
+    page.getByRole('heading', { name: 'No security activity' }),
+  ).toBeVisible();
+  const audit = await db.owner.query(
+    "SELECT event,details->>'userId' AS \"userId\" FROM staff_audit WHERE event LIKE 'account.%' ORDER BY event",
+  );
+  expect(audit.rows).toEqual([
+    { event: 'account.access.opened', userId: customer.userId },
+    { event: 'account.inspected', userId: customer.userId },
+    { event: 'account.security-events.inspected', userId: customer.userId },
+  ]);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expect
+    .poll(() =>
+      page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    )
+    .toBe(true);
+  await page.screenshot({
+    path: test.info().outputPath('account-dark-narrow.png'),
+    fullPage: true,
+    animations: 'disabled',
+  });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.getByRole('link', { name: workspace.name, exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Workspace support access' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Open support access', exact: true }),
+  ).toBeVisible();
   expect(errors).toEqual([]);
 });
 

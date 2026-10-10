@@ -34,9 +34,10 @@ Inject the clock for reproducible replay.
 
 ## Scheduled detection
 
-The commerce sync process runs the detection worker once a minute. For each workspace
-with an active sync it acts as the person the sync runs as. Stored state selects
-candidates; fresh provider reads decide:
+The commerce sync process runs the detection worker once a minute. For each active
+workspace with an active sync it acts as the person the sync runs as; suspended and closed
+workspaces are skipped without a failure. Stored state selects candidates; fresh provider
+reads decide:
 
 - **Sync failure:** every orders, fulfillment, product and stock stream with failed pages
   is evaluated with its first failure time, latest error code and whether five attempts

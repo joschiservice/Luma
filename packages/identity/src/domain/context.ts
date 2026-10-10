@@ -65,8 +65,19 @@ export class IdentityError extends Error {
 }
 
 /**
+ * Rejects a member's suspended or closed workspace. Callers see the same not-found response as
+ * for a missing workspace; background work treats it as paused and checks again later.
+ */
+export class WorkspaceInactiveError extends IdentityError {
+  constructor() {
+    super(404, 'NOT_FOUND', 'Organization not found');
+  }
+}
+
+/**
  * Creates an immutable context for a matching membership in an active EU organization;
- * rejects inaccessible or unsupported organizations.
+ * rejects inaccessible or unsupported organizations. A suspended or closed organization
+ * raises `WorkspaceInactiveError`.
  */
 export function makeTenantContext(
   session: SessionIdentity,
@@ -76,10 +87,10 @@ export function makeTenantContext(
 ): TenantContext {
   if (
     member.userId !== session.userId ||
-    member.organizationId !== organization.id ||
-    organization.status !== 'active'
+    member.organizationId !== organization.id
   )
     throw new IdentityError(404, 'NOT_FOUND', 'Organization not found');
+  if (organization.status !== 'active') throw new WorkspaceInactiveError();
   if (organization.dataRegion !== 'EU')
     throw new IdentityError(
       503,

@@ -1,7 +1,7 @@
 # Staff access
 
-The staff console provides customer account lookup, workspace inspection and controlled
-session revocation. Its identities, sessions and permissions are separate from customer
+The staff console provides customer account lookup, account and workspace inspection and
+controlled session revocation. Its identities, sessions and permissions are separate from customer
 workspace access. Customer Owners and Admins cannot grant staff privileges.
 
 ## Authentication and provisioning
@@ -56,9 +56,12 @@ Google sessions retain the verified subject from their sign-in. A session withou
 matching subject is rejected, including an old callback that finishes after rebinding.
 Sessions also recheck admission on every request. The administrator operation records
 its operator, reason and resulting grant atomically; the running
-staff credentials cannot perform it. Opening support grants
-requires both `staff.directory.read` and `staff.workspace.inspect`. Global customer
-session revocation additionally requires `staff.sessions.revoke`.
+staff credentials cannot perform it. Opening workspace support grants
+requires both `staff.directory.read` and `staff.workspace.inspect`; opening account grants
+requires `staff.directory.read` and `staff.accounts.inspect`. Global customer
+session revocation additionally requires `staff.sessions.revoke`. Reviewing the staff audit
+log requires `staff.audit.read`; grant it separately, to the people accountable for
+reviewing support work, not as part of a support role.
 
 Configure Google's OAuth client as an internal Workspace application and register
 `https://<staff-host>/api/auth/callback/google` as its exact authorized redirect URI.
@@ -79,13 +82,32 @@ Use `pnpm dev:staff` to run the staff surface against this checkout's database.
 ## Authority and evidence
 
 Staff permission keys belong to a separate catalog. Never add them to the customer catalog:
-its built-in Owner and Admin roles automatically receive every core permission.
+its built-in Owner and Admin roles automatically receive every core permission. The
+`staff_access` permission check lists the same keys, so a new key needs a migration that
+redefines it with the complete list.
 
 Directory access exposes bounded user/workspace metadata. Customer detail requires a
 workspace support grant with a reason, bound to the current staff identity and session,
 and valid for thirty minutes. Grants are checked again on every read and command. Database
 policies preserve workspace boundaries without inserting artificial customer memberships.
 Inspection can support suspended workspaces; it grants no commerce execution authority.
+
+Account detail requires an account support grant for one customer account, with the same
+reason, staff session binding and thirty-minute limit. It shows the person's workspaces and
+roles, whether two-factor authentication is on, how many passkeys are registered, and active
+sessions with their IP address, approximate browser and operating system, and last activity.
+It never returns credentials, factor secrets or passkey credential IDs. An account grant opens
+no workspace: workspace detail and session revocation still need a workspace grant. Restricted
+views expose only the listed columns, and only under a current account grant. Opening a grant
+is audited as `account.access.opened` and each read as `account.inspected`. IP addresses and
+user agents come from the customer's requests; treat them as hints, not proof of device or
+location.
+
+The account page also pages through the account's
+[security events](identity.md#security-events), 25 at a time, under the same grant. Each page
+is audited as `account.security-events.inspected`. Email hashes for unknown-email failures are
+not exposed. Events older than 90 days have no IP address or user agent, and events older
+than a year are gone. Staff session revocations appear with their command ID.
 
 Staff sessions have an eight-hour absolute lifetime and a thirty-minute idle limit.
 Passive polling does not extend the idle deadline. Only browser interaction reported on
@@ -107,6 +129,58 @@ are withheld until authentication audit writes succeed. Staff runtime credential
 cannot update or delete the support audit log, grant
 staff privileges, or directly delete customer sessions. Provider credentials and commerce
 payloads are not included in the support response or general telemetry.
+
+## Staff audit review and retention
+
+Staff with `staff.audit.read` can page the audit log in the console, newest first, filtered
+by staff member, workspace, account, event and time range. Each read is recorded as
+`staff.audit.read` with its filters. The runtime still has only INSERT on `staff_audit`; reads
+go through `staff_audit_entries`, owned by the separate `luma_staff_audit` role, which rechecks
+the permission. Filters use plain indexed columns. The account filter matches entries whose
+details carry a `userId`, stored as the generated `account_id` column; record `userId` in the
+details of new account-level events so they stay findable. Directory searches list matching
+accounts in their details but are not account entries.
+
+Entries are written only when their operation commits, so reads and commands appear only when
+they succeeded; `*.failed` events, such as failed sign-ins, record failures. Workspace, account
+and staff names come from current records and disappear when the record is deleted; the
+entry keeps the ID. Links from an entry still require a support grant or directory access.
+
+The staff audit is accountability evidence and is retained long-term. Nothing deletes or
+updates its rows automatically, and workspace or account deletion must leave them in place:
+entries hold workspace and account IDs without foreign keys. Staff identities that appear in
+the audit stay in `staff_users`; revoke admission instead of deleting them.
+
+## Workspace health and access history
+
+Under a support grant, the workspace page also shows health and access history. Health
+covers sync streams and runs, connection versions, lifecycle changes and latest read checks,
+actions with an unknown outcome or failure, workflow steps that need review, case and approval
+counts, failed workspace mail, installed apps and workspace settings. Access history lists
+member, invitation, role, policy and workspace changes with names from the workspace's people
+records; people without a record appear as unknown with a short ID.
+
+These reads expose metadata, codes and counts only. The staff runtime reads them through
+`staff_health_*` and `staff_access_history` views owned by `luma_staff_views`; it has no grant on
+the source tables. Keep it that way: the restricted-role test allowlists every customer column
+the runtime can select and rejects payload-like view columns. Never project connection targets
+or secrets, read-check documents (successful checks contain provider observations), action
+parameters, step values, invitation addresses or other before/after values. Sync error messages
+are Luma's fixed text for an error code, capped in length; review any new free-text column for
+provider text and personal data before exposing it.
+
+Row security on every source table limits the view owner to the workspace of the caller's
+current grant, evaluated once per statement. That policy applies before caller-supplied
+conditions, so the views need not be security barriers and ordered reads use tenant indexes.
+Every list holds the 20 most recent entries and marks truncation; action, mail and admission
+counts stop at 1,000. Access history pages hold 50 events, keyed by event time and ID. Each
+health read and history page is audited as `workspace.health.read` or
+`workspace.access-history.read`. The page refreshes health once a minute and history only on
+request, because every read writes audit evidence.
+
+Health is diagnostic evidence, not a verdict: a quiet health view does not establish that an
+issue is resolved. Actions with an unknown outcome may have changed the provider and need
+verification, not a repeat.
 
 ## Deployment boundary
 
