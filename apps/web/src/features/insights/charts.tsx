@@ -2,7 +2,7 @@ import './insights.css';
 
 import type { InsightChart } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
-import { Button } from '@luma/ui/components/primitives/button';
+import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { Select } from '@luma/ui/components/primitives/select';
 import { WorkspaceTimezone } from '@luma/ui/components/primitives/workspace-date';
 import {
@@ -11,7 +11,6 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { RefreshCw } from 'lucide-react';
 import { useContext, useEffect, useId } from 'react';
 
 import { connectionsOptions } from '../connections/data';
@@ -139,18 +138,15 @@ export function OperationalCharts({
               })
             }
           />
-          <Button
-            variant="outline"
-            size="sm"
+          <RefreshButton
+            size="icon-sm"
+            label={m.insights_refresh_charts()}
             onClick={() =>
               void client.invalidateQueries({
                 queryKey: insightsKey(organizationId),
               })
             }
-          >
-            <RefreshCw size={14} />
-            {m.insights_refresh_charts()}
-          </Button>
+          />
         </div>
       </header>
       <div className="insights-grid">

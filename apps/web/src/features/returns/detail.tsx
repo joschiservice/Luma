@@ -518,9 +518,11 @@ export function ReturnDetailView({
         title={item ? returnLabel(item) : m.returns_detail_title_fallback()}
         back={from ? <Link to={from} /> : undefined}
         actions={
-          <RefreshButton refreshing={refreshing} onClick={refresh}>
-            {m.returns_detail_refresh()}
-          </RefreshButton>
+          <RefreshButton
+            refreshing={refreshing}
+            onClick={refresh}
+            label={m.returns_detail_refresh()}
+          />
         }
         status={
           item ? (

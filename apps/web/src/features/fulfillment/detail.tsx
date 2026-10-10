@@ -483,9 +483,11 @@ export function FulfillmentDetailView({
         title={item ? orderLabel(item) : m.fulfillment_detail_title_fallback()}
         back={from ? <Link to={from} /> : undefined}
         actions={
-          <RefreshButton refreshing={refreshing} onClick={refresh}>
-            {m.fulfillment_detail_refresh()}
-          </RefreshButton>
+          <RefreshButton
+            refreshing={refreshing}
+            onClick={refresh}
+            label={m.fulfillment_detail_refresh()}
+          />
         }
         status={
           <>

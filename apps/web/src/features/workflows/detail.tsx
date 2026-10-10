@@ -13,6 +13,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@luma/ui/components/primitives/dialog';
+import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { Select } from '@luma/ui/components/primitives/select';
 import { RecordHeader } from '@luma/ui/components/workspace/record-header';
 import { SectionWorkspace } from '@luma/ui/components/workspace/section-workspace';
@@ -23,7 +24,6 @@ import {
   useParams,
   useSearch,
 } from '@tanstack/react-router';
-import { RefreshCw } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 
 import { SignInRedirect } from '../identity/common';
@@ -275,13 +275,10 @@ export function WorkflowDetailView({
       />
       <div className="workflow-action-bar">
         <ReadinessPills readiness={detail.summary.readiness} />
-        <Button
-          variant="ghost"
-          aria-label={m.workflows_detail_refresh_label()}
+        <RefreshButton
+          label={m.workflows_detail_refresh_label()}
           onClick={() => void refresh()}
-        >
-          <RefreshCw size={14} aria-hidden="true" /> {m.common_refresh()}
-        </Button>
+        />
         <div className="workflow-version-controls">
           {detail.canManage &&
           !DomainControls &&

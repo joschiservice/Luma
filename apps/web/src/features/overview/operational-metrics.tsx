@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@luma/ui/components/primitives/dialog';
+import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { quantityUnit } from '@luma/ui/lib/units';
 import { Link } from '@tanstack/react-router';
@@ -30,7 +31,6 @@ import {
   CircleAlert,
   ClipboardList,
   Plug,
-  RefreshCw,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
 
@@ -215,19 +215,17 @@ export function OperationalMetrics({
                       ? m.overview_live_updating()
                       : m.overview_live_connecting()}
           </Badge>
-          <Button
-            variant="outline"
-            size="sm"
+          <RefreshButton
+            size="icon-sm"
+            label={m.overview_refresh_summary()}
+            refreshing={live.isFetching}
             onClick={refresh}
             disabled={
               live.isPaused ||
               connection === 'denied' ||
               connection === 'offline'
             }
-          >
-            <RefreshCw size={14} aria-hidden="true" />
-            {m.overview_refresh_summary()}
-          </Button>
+          />
         </div>
       </header>
       {unavailable ? (

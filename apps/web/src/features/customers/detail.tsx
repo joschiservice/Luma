@@ -179,9 +179,11 @@ export function CustomerDetailView({
             : undefined
         }
         actions={
-          <RefreshButton refreshing={refreshing} onClick={refresh}>
-            {m.customers_detail_refresh()}
-          </RefreshButton>
+          <RefreshButton
+            refreshing={refreshing}
+            onClick={refresh}
+            label={m.customers_detail_refresh()}
+          />
         }
       />
       {offline ? (

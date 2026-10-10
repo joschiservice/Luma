@@ -150,9 +150,11 @@ export function StockDetailView({
         title={position?.sku ?? m.inventory_detail_title_fallback()}
         back={back ? <Link to={back} /> : undefined}
         actions={
-          <RefreshButton refreshing={refreshing} onClick={refresh}>
-            {m.inventory_detail_refresh()}
-          </RefreshButton>
+          <RefreshButton
+            refreshing={refreshing}
+            onClick={refresh}
+            label={m.inventory_detail_refresh()}
+          />
         }
         status={position ? <StockState position={position} /> : null}
         description={

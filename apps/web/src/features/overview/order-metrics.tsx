@@ -18,16 +18,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@luma/ui/components/primitives/dialog';
+import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { useSlowRequest } from '@luma/ui/lib/use-slow-request';
 import { Link, useLocation } from '@tanstack/react-router';
-import {
-  ArrowRight,
-  Clock3,
-  ListChecks,
-  PackageOpen,
-  RefreshCw,
-} from 'lucide-react';
+import { ArrowRight, Clock3, ListChecks, PackageOpen } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 import {
@@ -117,16 +112,14 @@ function LiveOrderMetrics({
           <h2 id="order-metrics-title">{m.overview_orders_title()}</h2>
           <p>{m.overview_orders_description()}</p>
         </div>
-        <Button
-          variant="outline"
+        <RefreshButton
+          label={m.overview_orders_refresh()}
+          refreshing={live.isFetching}
           onClick={refresh}
           disabled={
             live.isPaused || connection === 'offline' || connection === 'denied'
           }
-        >
-          <RefreshCw size={14} aria-hidden="true" />
-          {m.overview_orders_refresh()}
-        </Button>
+        />
       </header>
       <div
         className="order-metrics-provenance"

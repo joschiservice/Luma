@@ -238,13 +238,7 @@ export function PurchaseOrderRecordView({
                   : m.procurement_detail_check_updates()}
               </Button>
             ) : null}
-            <RefreshButton
-              variant="ghost"
-              refreshing={refreshing}
-              onClick={reload}
-            >
-              {m.common_refresh()}
-            </RefreshButton>
+            <RefreshButton refreshing={refreshing} onClick={reload} />
           </>
         }
         status={

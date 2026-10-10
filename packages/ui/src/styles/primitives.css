@@ -17,6 +17,32 @@
   transition: opacity var(--duration-fast) var(--ease-standard);
 }
 
+/* Tooltips name icon-only controls; they invert the surface so they read apart from popovers. */
+.lu-tooltip {
+  display: grid;
+  max-width: 260px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: var(--foreground);
+  color: var(--background);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  box-shadow: var(--shadow-popover);
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+.lu-tooltip[data-starting-style],
+.lu-tooltip[data-ending-style] {
+  opacity: 0;
+}
+
+.lu-tooltip-detail {
+  font-weight: 400;
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Menus fade in but close at once, so a choice never lingers on screen. */
 .lu-popover[data-starting-style] {
   opacity: 0;
@@ -1398,7 +1424,8 @@
     min-height: 44px;
   }
 
-  [data-slot='button'][data-size='icon'] {
+  [data-slot='button'][data-size='icon'],
+  [data-slot='button'][data-size='icon-sm'] {
     min-width: 44px;
   }
 

@@ -38,6 +38,7 @@ import {
 } from '@luma/ui/components/primitives/dropdown-menu';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { Progress } from '@luma/ui/components/primitives/progress';
+import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { StateDot, StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { PageTitle } from '@luma/ui/components/workspace/page-header';
@@ -188,19 +189,11 @@ export function SyncView({
       <PageTitle
         title={m.sync_page_title()}
         actions={
-          <Button
-            variant="outline"
+          <RefreshButton
+            label={m.sync_refresh_label()}
+            refreshing={refreshing}
             onClick={refresh}
-            disabled={refreshing}
-            aria-label={m.sync_refresh_label()}
-          >
-            <RefreshCw
-              size={14}
-              aria-hidden="true"
-              className={refreshing ? 'sync-spin' : undefined}
-            />
-            {m.common_refresh()}
-          </Button>
+          />
         }
       />
       {offline ? <Alert role="status">{m.common_offline()}</Alert> : null}

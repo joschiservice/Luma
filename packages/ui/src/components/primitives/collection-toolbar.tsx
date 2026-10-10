@@ -1,16 +1,8 @@
 import { formatNumber } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
-import {
-  ArrowDownUp,
-  ListFilter,
-  Plus,
-  RefreshCw,
-  Search,
-  X,
-} from 'lucide-react';
+import { ArrowDownUp, ListFilter, Plus, Search, X } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 
-import { useSlowRequest } from '../../lib/use-slow-request';
 import { cn } from '../../lib/utils';
 import { Badge } from './badge';
 import { Button } from './button';
@@ -36,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from './dropdown-menu';
 import { Input } from './input';
+import { RefreshButton } from './refresh-button';
 import { ResponsivePopover } from './responsive-popover';
 import { Tabs, TabsList, TabsTrigger } from './tabs';
 
@@ -178,23 +171,13 @@ export function CollectionToolbar({
   const clearable = !!search?.value || appliedCount > 0;
   const openChange = (key: string) => (next: boolean) =>
     setOpen(next ? key : null);
-  const refreshName = refreshLabel ?? m.common_refresh();
-  const slow = useSlowRequest(refreshing);
-
   const refresh = (
-    <Button
-      variant="ghost"
+    <RefreshButton
       className="collection-toolbar-refresh"
-      aria-label={refreshName}
-      title={refreshName}
+      label={refreshLabel ?? m.common_refresh()}
+      refreshing={refreshing}
       onClick={onRefresh}
-    >
-      <RefreshCw
-        aria-hidden="true"
-        className={slow ? 'animate-spin motion-reduce:animate-none' : ''}
-      />
-      {m.common_refresh()}
-    </Button>
+    />
   );
 
   // After a change removes the focused control, focus the filter's pill when it is visible, else
