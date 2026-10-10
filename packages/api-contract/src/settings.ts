@@ -45,6 +45,35 @@ export const settingsSnapshotSchema = z.object({
     .nullable(),
 });
 
+/** How long a workspace allows Luma support access: 24 hours, 3 days or 7 days. */
+export const supportAccessDurationSchema = z.union([
+  z.literal(24),
+  z.literal(72),
+  z.literal(168),
+]);
+
+export const supportAccessRequestSchema = z.object({
+  id: z.string().uuid(),
+  /** Why Luma support asks for access, written by the support team. */
+  reason: z.string(),
+  durationHours: supportAccessDurationSchema,
+  requestedAt: z.string().datetime(),
+  /** The request lapses unanswered after this time. */
+  expiresAt: z.string().datetime(),
+});
+
+export const supportAccessSchema = z.object({
+  /** When Luma support access ends; null when it isn't allowed. */
+  allowedUntil: z.string().datetime().nullable(),
+  /** When access was last allowed or revoked; null when it never was. */
+  changedAt: z.string().datetime().nullable(),
+  revision: z.number().int().nonnegative(),
+  /** Pending requests from Luma support; at most one. */
+  requests: z.array(supportAccessRequestSchema),
+});
+
+export type SupportAccess = z.infer<typeof supportAccessSchema>;
+
 export type WorkspaceSettings = z.infer<typeof workspaceSettingsSchema>;
 
 export type NotificationPreferences = z.infer<

@@ -54,6 +54,12 @@ function fixture(
       accountGrant,
       account,
       accountSecurityEvents: account,
+      startSupportView: async () => {
+        throw new Error('Unused');
+      },
+      requestSupportAccess: async () => {
+        throw new Error('Unused');
+      },
     },
     authHandler: vi.fn(
       async () =>

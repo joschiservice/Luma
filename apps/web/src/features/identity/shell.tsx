@@ -28,6 +28,7 @@ import { settingsOptions } from '../settings/data';
 import { Failure, Pending } from './common';
 import { contextOptions, organizationsOptions, sessionOptions } from './data';
 import { NoAccess, usePermissions } from './permissions';
+import { SupportViewBanner, useEndSupportView } from './support-view';
 import {
   destinationFor,
   type WorkspaceDestination,
@@ -190,6 +191,8 @@ function TenantShell({ organizationId }: { organizationId: string }) {
     refetchInterval: false,
   });
   const session = client.getQueryData(sessionOptions().queryKey);
+  const supportView = session?.supportView ?? null;
+  const { end: endView } = useEndSupportView();
   const assistantOpen = useAssistantOpen();
   useGoShortcuts(organizationId);
   useAssistantShortcut();
@@ -229,8 +232,17 @@ function TenantShell({ organizationId }: { organizationId: string }) {
               />
             ),
           }))}
-          createLink={<Link to="/app/workspaces/new" />}
+          createLink={
+            supportView ? undefined : <Link to="/app/workspaces/new" />
+          }
         />
+      }
+      banner={
+        supportView ? (
+          <WorkspaceTimezone value={settings.data?.workspace.timezone ?? 'UTC'}>
+            <SupportViewBanner view={supportView} />
+          </WorkspaceTimezone>
+        ) : null
       }
       search={<WorkspaceSearch organizationId={organizationId} />}
       navigation={(close) => (
@@ -279,6 +291,14 @@ function TenantShell({ organizationId }: { organizationId: string }) {
             />
           }
           docsLink={<a href="/docs" target="_blank" rel="noreferrer" />}
+          exit={
+            supportView
+              ? {
+                  label: m.identity_support_view_end(),
+                  onSelect: () => void endView(),
+                }
+              : undefined
+          }
         />
       }
     >

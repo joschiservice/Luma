@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { createAppHost } from '@luma/app-catalog';
 import type {
   ConnectionsConfig,
@@ -12,7 +14,7 @@ import {
 } from '@luma/connections/composition';
 import type { IdentityService, TenantContext } from '@luma/identity';
 import { createIdentity } from '@luma/identity/composition';
-import { registerIdentityHttp } from '@luma/identity/http';
+import { registerIdentityHttp, requestIsReadOnly } from '@luma/identity/http';
 import type { Observability } from '@luma/platform';
 import {
   createModelGateway,
@@ -62,7 +64,10 @@ export async function buildRuntimeApp(
       : undefined;
   const resources = createResourceScope();
   try {
-    const identity = createIdentity(settings);
+    const identity = createIdentity({
+      ...settings,
+      readOnly: requestIsReadOnly,
+    });
     resources.add(identity.close);
     const casePool = new Pool({
       connectionString: settings.databaseUrl,
@@ -70,6 +75,9 @@ export async function buildRuntimeApp(
       statement_timeout: 5000,
     });
     resources.add(() => casePool.end());
+    // Support views restrict their requests to reads; these transactions then refuse writes.
+    const tenantDatabase = () =>
+      createTenantDatabase(casePool, { readOnly: requestIsReadOnly });
     const configured =
       typeof connections === 'function'
         ? connections(identity.service)
@@ -81,7 +89,7 @@ export async function buildRuntimeApp(
     const installedConnections =
       configured && 'registry' in configured
         ? configured
-        : createAppHost(createTenantDatabase(casePool), {
+        : createAppHost(tenantDatabase(), {
             ...(connections && typeof connections !== 'function'
               ? connections
               : {}),
@@ -90,7 +98,7 @@ export async function buildRuntimeApp(
           });
     if (connections && typeof connections !== 'function') {
       stockRefresh = createStockRefreshService({
-        database: createTenantDatabase(casePool),
+        database: tenantDatabase(),
         capabilities: createInstalledRuntime({
           installations: installedConnections.connections,
           providers: installedConnections.registry.providers(),
@@ -110,11 +118,9 @@ export async function buildRuntimeApp(
 
     // Sync status only needs public connection summaries, so it stays available without a
     // credential keyring.
-    const installations = createInstallationRepository(
-      createTenantDatabase(casePool),
-    );
+    const installations = createInstallationRepository(tenantDatabase());
     const sync = createCommerceSyncService(
-      createTenantDatabase(casePool),
+      tenantDatabase(),
       identity.service,
       connectionService ?? {
         list: (context) => installations.list(context.tenantId),
@@ -136,7 +142,7 @@ export async function buildRuntimeApp(
       : undefined;
     if (processClient) resources.add(processClient.close);
     const application = createApplicationServices({
-      database: createTenantDatabase(casePool),
+      database: tenantDatabase(),
       identity: identity.service,
       execution: processClient
         ? { kind: 'enabled', effects: { resolve: async () => null } }
@@ -220,10 +226,18 @@ export async function buildRuntimeApp(
     const retentionTimer = setInterval(purge, 60 * 60_000);
     retentionStart.unref();
     retentionTimer.unref();
+    // Support views nobody uses again still need their end recorded and owners told.
+    const supportViewTimer = setInterval(() => {
+      void identity.service
+        .sweepSupportViews(`support-view-sweep:${randomUUID()}`)
+        .catch(() => app.log.error('Support view sweep failed'));
+    }, 60_000);
+    supportViewTimer.unref();
     resources.add(async () => {
       clearInterval(deliveryTimer);
       clearTimeout(retentionStart);
       clearInterval(retentionTimer);
+      clearInterval(supportViewTimer);
       await identity.mailDelivery.drain();
     });
     app.addHook('onClose', resources.close);

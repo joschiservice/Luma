@@ -14,7 +14,7 @@ export function registerRecordRoutes(
   server.post(
     '/v1/organizations/:organizationId/apps/shopify/records',
     // The record service checks the record kind's read permission and the app's scope.
-    { config: { access: { access: 'member' } } },
+    { config: { access: { access: 'member' }, readOnly: true } },
     async (request, reply) => {
       reply.header('cache-control', 'no-store');
       if (!request.tenantContext)

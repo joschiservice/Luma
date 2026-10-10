@@ -124,6 +124,15 @@ export const permissionCatalog = [
     introduced,
   },
   {
+    key: 'support_access.manage',
+    group: 'access',
+    label: 'Manage Luma support access',
+    description:
+      'Allow or revoke read-only access for Luma support, and approve or decline their requests.',
+    consequential: true,
+    introduced: '2026-10-10',
+  },
+  {
     key: 'orders.read',
     group: 'records',
     label: 'View orders',

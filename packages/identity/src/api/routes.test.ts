@@ -8,6 +8,7 @@ import type {
   IdentityTransaction,
 } from '../application/identity.js';
 import { createIdentityService } from '../application/identity.js';
+import type { SupportViewCredentials } from '../application/support-view.js';
 import type { Membership, Organization } from '../domain/context.js';
 import { IdentityError } from '../domain/context.js';
 import type { BuiltInRoleKey } from '../domain/roles.js';
@@ -76,6 +77,9 @@ function fixture() {
     saveMemberCommand: vi.fn<IdentityTransaction['saveMemberCommand']>(),
     auditMember: vi.fn<IdentityTransaction['auditMember']>(),
     listOrganizations: vi.fn<IdentityTransaction['listOrganizations']>(),
+    profile: vi
+      .fn<IdentityTransaction['profile']>()
+      .mockResolvedValue({ name: 'Owner', email: 'owner@example.test' }),
     createOrganization: vi.fn<IdentityTransaction['createOrganization']>(),
     findMembership: vi
       .fn<IdentityTransaction['findMembership']>()
@@ -121,8 +125,25 @@ function fixture() {
       userId: owner.userId,
       sessionId: '66666666-6666-4666-8666-666666666666',
     });
+  const supportViews = {
+    token: (credentials: Readonly<Record<string, string>>) =>
+      /support=([A-Za-z0-9_-]{43})/.exec(credentials.cookie ?? '')?.[1] ?? null,
+    cookie: (token: string | null) => `support=${token ?? ''}`,
+    resolve: vi.fn<SupportViewCredentials['resolve']>().mockResolvedValue({
+      state: 'active',
+      id: viewId,
+      tenantId: organization.id,
+      userId: owner.userId,
+      mode: 'consent',
+      expiresAt: '2026-10-10T12:30:00.000Z',
+    }),
+    redeem: vi.fn<SupportViewCredentials['redeem']>(),
+    end: vi.fn<SupportViewCredentials['end']>(),
+    sweep: vi.fn<SupportViewCredentials['sweep']>(),
+  } satisfies SupportViewCredentials;
   const service = createIdentityService({
     getSession,
+    supportViews,
     listSecurityEvents: async () => [],
     withUser: async (_userId, operation) => operation(tx),
   });
@@ -136,8 +157,148 @@ function fixture() {
   });
   registerContractRoutes(app, apiContract.identity, identityRoutes(service));
 
-  return { app, tx, getSession, service };
+  return { app, tx, getSession, service, supportViews };
 }
+
+const viewId = '77777777-7777-4777-8777-777777777777';
+
+const supportHeaders = {
+  origin,
+  cookie: `session=test; support=${'a'.repeat(43)}`,
+};
+
+it('resolves a support view as the viewed member, read-only, and records the read once allowed', async () => {
+  const { app, getSession, supportViews } = fixture();
+  const response = await app.inject({
+    url: `${base}/context?ignored=1`,
+    headers: supportHeaders,
+  });
+  expect(response.statusCode).toBe(200);
+  expect(response.json()).toMatchObject({
+    actor: { id: owner.userId, sessionId: viewId },
+    supportView: { id: viewId, mode: 'consent' },
+  });
+  expect(getSession).not.toHaveBeenCalled();
+  expect(supportViews.resolve.mock.calls).toEqual([
+    ['a'.repeat(43), organization.id, null, expect.any(String)],
+    ['a'.repeat(43), organization.id, `${base}/context`, expect.any(String)],
+  ]);
+});
+
+it.each([
+  {
+    method: 'POST' as const,
+    path: '/members',
+    payload: { userId: member.userId, roleId: 'member' },
+  },
+  { method: 'PATCH' as const, path: `/members/${member.id}`, payload: {} },
+  { method: 'DELETE' as const, path: `/members/${member.id}` },
+])(
+  'refuses $method in a support view before resolving access',
+  async ({ method, path, ...body }) => {
+    const { app, tx, supportViews } = fixture();
+    const response = await app.inject({
+      method,
+      url: `${base}${path}`,
+      headers: supportHeaders,
+      ...body,
+    });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ code: 'READ_ONLY' });
+    expect(supportViews.resolve).not.toHaveBeenCalled();
+    expect(tx.lockOrganization).not.toHaveBeenCalled();
+  },
+);
+
+it('does not record a read the viewed member may not make', async () => {
+  const { app, tx, supportViews } = fixture();
+  tx.findMembership.mockResolvedValue(member);
+  supportViews.resolve.mockResolvedValue({
+    state: 'active',
+    id: viewId,
+    tenantId: organization.id,
+    userId: member.userId,
+    mode: 'consent',
+    expiresAt: '2026-10-10T12:30:00.000Z',
+  });
+  app.get(
+    '/v1/organizations/:organizationId/restricted',
+    { config: { access: { permission: 'members.manage' } } },
+    async () => ({ ok: true }),
+  );
+  const response = await app.inject({
+    url: `${base}/restricted`,
+    headers: supportHeaders,
+  });
+  expect(response.statusCode).toBe(403);
+  expect(supportViews.resolve).toHaveBeenCalledExactlyOnceWith(
+    'a'.repeat(43),
+    organization.id,
+    null,
+    expect.any(String),
+  );
+});
+
+it('rejects an ended support view without falling back to the customer session', async () => {
+  const { app, getSession, supportViews } = fixture();
+  supportViews.resolve.mockResolvedValue({
+    state: 'ended',
+    reason: 'consent_revoked',
+    tenantId: organization.id,
+  });
+  const response = await app.inject({
+    url: `${base}/members`,
+    headers: supportHeaders,
+  });
+  expect(response.statusCode).toBe(401);
+  expect(getSession).not.toHaveBeenCalled();
+});
+
+it('refuses personal account routes and lists only the viewed workspace in a support view', async () => {
+  const { app, tx } = fixture();
+  tx.listOrganizations.mockResolvedValue([
+    { ...organization, membershipStatus: 'active' },
+    {
+      ...organization,
+      id: '88888888-8888-4888-8888-888888888888',
+      membershipStatus: 'active',
+    },
+  ]);
+  const security = await app.inject({
+    url: '/v1/account/security-events',
+    headers: supportHeaders,
+  });
+  expect(security.statusCode).toBe(403);
+  expect(security.json()).toEqual({ code: 'READ_ONLY' });
+  const create = await app.inject({
+    method: 'POST',
+    url: '/v1/organizations',
+    headers: supportHeaders,
+    payload: { name: 'New', slug: 'new' },
+  });
+  expect(create.statusCode).toBe(403);
+  const list = await app.inject({
+    url: '/v1/organizations',
+    headers: supportHeaders,
+  });
+  expect(list.statusCode).toBe(200);
+  expect(list.json().items.map((item: { id: string }) => item.id)).toEqual([
+    organization.id,
+  ]);
+});
+
+it('ignores a support cookie for another workspace', async () => {
+  const { app, supportViews } = fixture();
+  supportViews.resolve.mockResolvedValue({
+    state: 'other',
+    tenantId: '88888888-8888-4888-8888-888888888888',
+  });
+  const response = await app.inject({
+    url: `${base}/context`,
+    headers: supportHeaders,
+  });
+  expect(response.statusCode).toBe(404);
+});
 
 it.each(['context', 'members'])(
   'resolves identity once for the %s read',

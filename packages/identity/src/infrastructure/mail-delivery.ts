@@ -1,4 +1,4 @@
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 
 import type { MailProvider } from '../application/mail.js';
 import { builtInRoles, isBuiltInRole } from '../domain/roles.js';
@@ -8,13 +8,85 @@ import { workspaceTransaction } from './settings.js';
 
 interface Delivery {
   id: string;
-  kind: 'invitation' | 'test' | 'issues' | 'connections';
+  kind:
+    | 'invitation'
+    | 'test'
+    | 'issues'
+    | 'connections'
+    | 'support_view_started'
+    | 'support_view_ended'
+    | 'support_access_requested';
   user_id: string | null;
   invitation_id: string | null;
   generation: number | null;
   target_id: string | null;
   attempts: number;
   first_attempt_at: Date | null;
+}
+
+const formatTime = (value: Date) =>
+  `${value.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+
+/**
+ * Builds a Luma support notice for an owner who is still an active owner. Views name the member
+ * shown and when the view started and ends; requests carry the reason support gave.
+ */
+async function supportMail(
+  tx: PoolClient,
+  tenantId: string,
+  message: Delivery,
+  origin: string,
+) {
+  const owner = (
+    await tx.query<{ email: string }>(
+      "SELECT u.email FROM memberships m JOIN users u ON u.id=m.user_id WHERE m.tenant_id=$1 AND m.user_id=$2 AND m.role='owner' AND m.status='active'",
+      [tenantId, message.user_id],
+    )
+  ).rows[0];
+  if (!owner) return null;
+  const activity = `${origin}/app/${tenantId}/activity`;
+  if (message.kind === 'support_access_requested') {
+    const request = (
+      await tx.query<{ reason: string; duration_hours: number }>(
+        "SELECT reason,duration_hours FROM workspace_support_access_requests WHERE tenant_id=$1 AND id=$2 AND status='pending' AND expires_at>now()",
+        [tenantId, message.target_id],
+      )
+    ).rows[0];
+    if (!request) return null;
+
+    return {
+      to: owner.email,
+      subject: 'Luma support asks for read-only access',
+      text: `Luma support asks for read-only access to your workspace for ${request.duration_hours / 24 === 1 ? '24 hours' : `${request.duration_hours / 24} days`}.\n\nTheir reason: ${request.reason}\n\nApprove or decline the request: ${origin}/app/${tenantId}/settings/support`,
+    };
+  }
+  const view = (
+    await tx.query<{
+      name: string | null;
+      mode: 'consent' | 'emergency';
+      created_at: Date;
+      expires_at: Date;
+      ended_at: Date | null;
+    }>(
+      `SELECT p.name,v.mode,v.created_at,v.expires_at,v.ended_at FROM support_view_sessions v
+      LEFT JOIN workspace_people p ON p.tenant_id=v.tenant_id AND p.user_id=v.user_id WHERE v.tenant_id=$1 AND v.id=$2`,
+      [tenantId, message.target_id],
+    )
+  ).rows[0];
+  if (!view) return null;
+  const member = view.name ?? 'a member';
+  if (message.kind === 'support_view_started')
+    return {
+      to: owner.email,
+      subject: 'Luma support started a read-only view of your workspace',
+      text: `Luma support started a read-only view of your workspace as ${member} at ${formatTime(view.created_at)}. It ends by ${formatTime(view.expires_at)}. Support can’t change anything in this view.\n\nSee every page they viewed in Activity: ${activity}\n\nEnd support access at any time: ${origin}/app/${tenantId}/settings/support`,
+    };
+
+  return {
+    to: owner.email,
+    subject: 'Luma support used emergency access to your workspace',
+    text: `Luma support viewed your workspace read-only as ${member} without prior approval, for a security or legal reason, from ${formatTime(view.created_at)} to ${formatTime(view.ended_at ?? view.expires_at)}. Support couldn’t change anything.\n\nSee every page they viewed in Activity: ${activity}`,
+  };
 }
 
 /** Drains durable messages with membership checks, bounded retries and stable provider keys. */
@@ -131,6 +203,15 @@ export function createMailDelivery(
               to = allowed ? invite.email : undefined;
               subject = 'You’re invited to a Luma workspace';
               text = `You have been invited with the ${roleName} role. Sign in with this email address to review and accept the invitation. This link expires in seven days.\n\n${origin}/app/invitations/${tenantId}/${message.invitation_id}#${token(tenantId, message.invitation_id!, message.generation!)}`;
+            } else if (
+              message.kind === 'support_view_started' ||
+              message.kind === 'support_view_ended' ||
+              message.kind === 'support_access_requested'
+            ) {
+              const mail = await supportMail(tx, tenantId, message, origin);
+              to = mail?.to;
+              subject = mail?.subject ?? subject;
+              text = mail?.text ?? text;
             } else {
               const recipient = (
                 await tx.query<{

@@ -13,7 +13,11 @@ import {
   isBuiltInRole,
   PermissionSet,
 } from '../domain/roles.js';
-import type { SettingsSnapshot, WorkspaceLayout } from '../domain/settings.js';
+import type {
+  SettingsSnapshot,
+  SupportAccess,
+  WorkspaceLayout,
+} from '../domain/settings.js';
 import type { MembershipRow } from './access.js';
 import {
   membershipFromRow,
@@ -22,30 +26,35 @@ import {
   storedRole,
 } from './access.js';
 
-/** Runs a serialized workspace transaction, installing only transaction-local identity context. */
+/**
+ * Runs a serialized workspace transaction, installing only transaction-local identity context.
+ * With `readOnly` it is `READ ONLY` and takes no locks.
+ */
 export async function workspaceTransaction<T>(
   pool: Pool,
   tenantId: string,
   userId: string,
-  operation: (tx: PoolClient) => Promise<T>,
+  operation: (tx: PoolClient, readOnly: boolean) => Promise<T>,
+  readOnly = false,
 ): Promise<T> {
   const tx = await pool.connect();
   try {
-    await tx.query('BEGIN');
+    await tx.query(readOnly ? 'BEGIN READ ONLY' : 'BEGIN');
     await tx.query(
       "SELECT set_config('app.tenant_id',$1,true),set_config('app.user_id',$2,true)",
       [tenantId, userId],
     );
-    await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
-      `exceptions:${tenantId}`,
-    ]);
+    if (!readOnly)
+      await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+        `exceptions:${tenantId}`,
+      ]);
     const org = await tx.query(
-      "SELECT id FROM organizations WHERE id=$1 AND status='active' AND data_region='EU' FOR UPDATE",
+      `SELECT id FROM organizations WHERE id=$1 AND status='active' AND data_region='EU'${readOnly ? '' : ' FOR UPDATE'}`,
       [tenantId],
     );
     if (!org.rowCount)
       throw new IdentityError(404, 'NOT_FOUND', 'Workspace not found');
-    const result = await operation(tx);
+    const result = await operation(tx, readOnly);
     await tx.query('COMMIT');
 
     return result;
@@ -61,6 +70,7 @@ function transaction(
   tx: PoolClient,
   tenantId: string,
   deliveryAvailable: boolean,
+  readOnly: boolean,
 ): SettingsTransaction {
   const invitationSelect = `SELECT i.id,i.email,i.role,i.custom_role_id AS "customRoleId",r.name AS "roleName",
     r.revision AS "roleRevision",r.archived_at IS NOT NULL AS "roleArchived",
@@ -229,7 +239,7 @@ function transaction(
           document: Omit<WorkspaceLayout, 'revision'>;
           revision: number;
         }>(
-          'SELECT document,revision FROM workspace_layouts WHERE tenant_id=$1 AND user_id=$2 FOR UPDATE',
+          `SELECT document,revision FROM workspace_layouts WHERE tenant_id=$1 AND user_id=$2${readOnly ? '' : ' FOR UPDATE'}`,
           [tenantId, userId],
         )
       ).rows[0];
@@ -266,6 +276,72 @@ function transaction(
           JSON.stringify(before),
           JSON.stringify(after),
         ],
+      );
+    },
+    async supportAccess() {
+      const row = (
+        await tx.query<{
+          allowedUntil: Date | null;
+          changedAt: Date;
+          revision: number;
+        }>(
+          'SELECT allowed_until AS "allowedUntil",changed_at AS "changedAt",revision FROM workspace_support_access WHERE tenant_id=$1',
+          [tenantId],
+        )
+      ).rows[0];
+      const requests = await tx.query<{
+        id: string;
+        reason: string;
+        durationHours: 24 | 72 | 168;
+        requestedAt: Date;
+        expiresAt: Date;
+      }>(
+        `SELECT id,reason,duration_hours AS "durationHours",requested_at AS "requestedAt",expires_at AS "expiresAt"
+        FROM workspace_support_access_requests WHERE tenant_id=$1 AND status='pending' AND expires_at>now() ORDER BY requested_at DESC LIMIT 5`,
+        [tenantId],
+      );
+      const allowedUntil =
+        row?.allowedUntil && row.allowedUntil.getTime() > Date.now()
+          ? row.allowedUntil.toISOString()
+          : null;
+
+      return {
+        allowedUntil,
+        changedAt: row?.changedAt.toISOString() ?? null,
+        revision: row?.revision ?? 0,
+        requests: requests.rows.map((request) => ({
+          ...request,
+          requestedAt: request.requestedAt.toISOString(),
+          expiresAt: request.expiresAt.toISOString(),
+        })),
+      } satisfies SupportAccess;
+    },
+    async saveSupportAccess(value, actorId) {
+      await tx.query(
+        `INSERT INTO workspace_support_access(tenant_id,allowed_until,changed_by,changed_at,revision) VALUES($1,$2,$3,now(),$4)
+        ON CONFLICT(tenant_id) DO UPDATE SET allowed_until=$2,changed_by=$3,changed_at=now(),revision=$4`,
+        [tenantId, value.allowedUntil, actorId, value.revision],
+      );
+    },
+    async supportAccessRequest(id) {
+      return (
+        (
+          await tx.query<{
+            id: string;
+            durationHours: 24 | 72 | 168;
+            pending: boolean;
+          }>(
+            `SELECT id,duration_hours AS "durationHours",status='pending' AND expires_at>now() AS pending
+            FROM workspace_support_access_requests WHERE tenant_id=$1 AND id=$2`,
+            [tenantId, id],
+          )
+        ).rows[0] ?? null
+      );
+    },
+    async decideSupportAccessRequest(id, status, actorId) {
+      await tx.query(
+        'UPDATE workspace_support_access_requests SET status=$3,decided_by=$4,decided_at=now() WHERE tenant_id=$1 AND id=$2',
+        [tenantId, id, status, actorId],
       );
     },
     async pendingInvitation(email) {
@@ -376,15 +452,26 @@ function transaction(
   };
 }
 
-/** Creates tenant-scoped settings storage on the identity pool. */
+/**
+ * Creates tenant-scoped settings storage on the identity pool. While `readOnly` reports true,
+ * as in a support view, transactions are read-only and take no locks.
+ */
 export function createSettingsRepository(
   pool: Pool,
   deliveryAvailable: boolean,
+  readOnly: () => boolean = () => false,
 ): SettingsRepository {
   return {
     transaction: (tenantId, userId, operation) =>
-      workspaceTransaction(pool, tenantId, userId, (tx) =>
-        operation(transaction(tx, tenantId, deliveryAvailable)),
+      workspaceTransaction(
+        pool,
+        tenantId,
+        userId,
+        (tx, readOnlyTransaction) =>
+          operation(
+            transaction(tx, tenantId, deliveryAvailable, readOnlyTransaction),
+          ),
+        readOnly(),
       ),
   };
 }

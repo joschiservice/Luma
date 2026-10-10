@@ -2,6 +2,7 @@ import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
   IdentityError,
+  requireChangesAllowed,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
@@ -172,6 +173,8 @@ export function createAssistant(deps: {
 
   async function authorize(context: TenantContext) {
     const fresh = await member(context);
+    // Questions go to a model and its tool calls run as the member; support views only read.
+    requireChangesAllowed(fresh);
     requirePermission(fresh, 'assistant.use');
 
     return fresh;
@@ -211,6 +214,12 @@ export function createAssistant(deps: {
       context: TenantContext,
     ): Promise<AssistantAvailability & { reads: RecordKind[] }> {
       const fresh = await member(context);
+      if (fresh.supportView)
+        return {
+          available: false,
+          reason: 'Ask Luma isn’t available in a Luma support view.',
+          reads: [],
+        };
       if (!hasPermission(fresh, 'assistant.use'))
         return {
           available: false,

@@ -27,6 +27,8 @@ type WorkspaceLayoutProps = {
   search?: ReactNode;
   context?: ReactNode;
   help?: ReactNode;
+  /** A notice above the top bar on every page, such as the support view banner. */
+  banner?: ReactNode;
   /** A panel docked beside the page, shown while `assistantOpen` is true. */
   assistant?: ReactNode;
   assistantOpen?: boolean;
@@ -46,6 +48,7 @@ export function WorkspaceLayout({
   search,
   context,
   help,
+  banner,
   assistant,
   assistantOpen = false,
   children,
@@ -117,6 +120,7 @@ export function WorkspaceLayout({
               <div className="sidebar-bottom">{accountMenu}</div>
             </aside>
             <div className="desk-body">
+              {banner}
               <header className="desk-header">
                 <div className="mobile-nav">
                   <Dialog open={open} onOpenChange={setOpen}>

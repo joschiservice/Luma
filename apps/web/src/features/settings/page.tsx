@@ -19,6 +19,7 @@ import {
   IdCard,
   KeyRound,
   LayoutDashboard,
+  LifeBuoy,
   LockKeyhole,
   Mail,
   Palette,
@@ -40,6 +41,7 @@ import { AppearanceSettings, HomeSidebarSettings } from './personal';
 import { RolesSettings } from './roles';
 import { SectionHeading } from './section-heading';
 import { SecuritySettings } from './security';
+import { SupportAccessSettings } from './support-access';
 import { TeamSettings } from './team';
 
 export const settingsSections = [
@@ -66,6 +68,12 @@ export const settingsSections = [
     label: m.settings_section_approvals,
     group: m.settings_group_workspace,
     Icon: ShieldCheck,
+  },
+  {
+    id: 'support',
+    label: m.settings_section_support,
+    group: m.settings_group_workspace,
+    Icon: LifeBuoy,
   },
   {
     id: 'security',
@@ -108,6 +116,7 @@ export function SettingsPage({
   const query = useQuery(settingsOptions(organizationId));
   const access = useQuery(contextOptions(organizationId));
   const permissions = usePermissions(organizationId);
+  const supportView = !!access.data?.supportView;
   const error = access.error ?? query.error;
   if (error instanceof IdentityError && [401, 403, 404].includes(error.status))
     return <Failure error={error} retry={() => void query.refetch()} />;
@@ -120,6 +129,7 @@ export function SettingsPage({
       data={query.data}
       can={permissions.can}
       actorId={access.data?.actor.id ?? ''}
+      supportView={supportView}
       loading={query.isPending}
       error={error ? m.settings_load_failed() : undefined}
       retry={() => void query.refetch()}
@@ -135,6 +145,7 @@ export function SettingsView({
   data,
   can,
   actorId,
+  supportView = false,
   loading,
   error,
   retry,
@@ -146,6 +157,8 @@ export function SettingsView({
   /** Whether the signed-in person holds a permission. */
   can: (permission: string) => boolean;
   actorId: string;
+  /** In a Luma support view, personal security settings aren't offered. */
+  supportView?: boolean | undefined;
   loading?: boolean | undefined;
   error?: string | undefined;
   retry: () => void;
@@ -156,7 +169,9 @@ export function SettingsView({
       ? 'workspace.settings.manage'
       : section === 'approvals'
         ? 'workspace.approval_policy.manage'
-        : null;
+        : section === 'support'
+          ? 'support_access.manage'
+          : null;
 
   return (
     <div className="settings-page">
@@ -165,12 +180,14 @@ export function SettingsView({
         <SectionNavigation
           className="settings-navigation"
           aria-label={m.settings_navigation_label()}
-          items={settingsSections.map(({ id, label, group, Icon }) => ({
-            value: id,
-            label: label(),
-            group: group(),
-            icon: <Icon size={16} />,
-          }))}
+          items={settingsSections
+            .filter(({ id }) => !(supportView && id === 'security'))
+            .map(({ id, label, group, Icon }) => ({
+              value: id,
+              label: label(),
+              group: group(),
+              icon: <Icon size={16} />,
+            }))}
           value={section}
           renderItem={(item, className) => (
             <Link
@@ -243,8 +260,20 @@ export function SettingsView({
                   disabled={!can('workspace.approval_policy.manage') || !online}
                 />
               ) : null}
-              {section === 'security' ? (
+              {section === 'security' && supportView ? (
+                <Alert tone="neutral">
+                  {m.settings_security_support_view()}
+                </Alert>
+              ) : null}
+              {section === 'security' && !supportView ? (
                 <SecuritySettings disabled={!online} />
+              ) : null}
+              {section === 'support' && can('support_access.manage') ? (
+                <SupportAccessSettings
+                  key={`${organizationId}:support`}
+                  organizationId={organizationId}
+                  disabled={!online}
+                />
               ) : null}
               {section === 'appearance' ? <AppearanceSettings /> : null}
               {section === 'home' ? (

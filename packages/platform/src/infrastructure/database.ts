@@ -5,9 +5,13 @@ import { measure } from '../application/performance.js';
 
 /**
  * Runs operations in transactions with a transaction-local tenant setting; commits on
- * success and rolls back on failure.
+ * success and rolls back on failure. While `readOnly` reports true, for example in a request
+ * restricted to reads, every transaction is `READ ONLY`.
  */
-export function createTenantDatabase(pool: Pool): TenantDatabase {
+export function createTenantDatabase(
+  pool: Pool,
+  settings: { readOnly?: () => boolean } = {},
+): TenantDatabase {
   return {
     async transaction(tenantId, operation, options) {
       return measure('db.transaction', async () => {
@@ -16,7 +20,9 @@ export function createTenantDatabase(pool: Pool): TenantDatabase {
           await client.query(
             options?.readOnlySnapshot
               ? 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY'
-              : 'BEGIN',
+              : settings.readOnly?.()
+                ? 'BEGIN READ ONLY'
+                : 'BEGIN',
           );
           await client.query("SELECT set_config('app.tenant_id', $1, true)", [
             tenantId,

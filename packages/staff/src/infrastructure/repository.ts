@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
 import type { SecurityEventType } from '@luma/identity';
 import {
@@ -21,6 +21,23 @@ import type { StaffContext, StaffPermission } from '../domain/access.js';
 import { StaffError } from '../domain/access.js';
 import { readStaffAudit } from './audit.js';
 import { readAccessHistory, readWorkspaceHealth } from './health.js';
+
+// State conflicts raised by support functions, by their exception message.
+const stateConflicts: Record<string, string> = {
+  'last active owner':
+    'This person is the workspace’s only active owner. Acknowledge that the workspace will have no active owner.',
+  'already suspended':
+    'This membership is already suspended. Refresh the workspace.',
+  'already active': 'This membership is already active. Refresh the workspace.',
+  'consent required':
+    'This workspace doesn’t allow Luma support access. Request access, or ask an owner to allow it.',
+  'member suspended':
+    'This person’s access to the workspace is suspended, so there is nothing to view.',
+  'workspace inactive':
+    'This workspace is suspended or closed, so it can’t be viewed.',
+  'request pending': 'A request is already waiting for the workspace’s answer.',
+  'access allowed': 'The workspace already allows support access.',
+};
 
 /** Creates a deliberately narrow cross-owner read adapter and identity support command adapter. */
 export function createStaffRepository(pool: Pool): StaffRepository {
@@ -60,14 +77,13 @@ export function createStaffRepository(pool: Pool): StaffRepository {
           );
         if (error.code === 'P0002')
           throw new StaffError(404, 'Customer membership unavailable.');
+        if (error.code === '22023')
+          throw new StaffError(400, 'Check the reason and details.');
         if (error.code === '55000' && 'message' in error)
           throw new StaffError(
             409,
-            error.message === 'last active owner'
-              ? 'This person is the workspace’s only active owner. Acknowledge that the workspace will have no active owner.'
-              : error.message === 'already suspended'
-                ? 'This membership is already suspended. Refresh the workspace.'
-                : 'This membership is already active. Refresh the workspace.',
+            stateConflicts[String(error.message)] ??
+              'The workspace changed. Refresh it.',
           );
       }
       throw error;
@@ -226,6 +242,18 @@ export function createStaffRepository(pool: Pool): StaffRepository {
             'SELECT id,provider,status,last_sync_at FROM staff_connection_summary WHERE tenant_id=$1 ORDER BY id LIMIT 101',
             [workspaceId],
           );
+          const supportAccess = await tx.query<{
+            status: {
+              allowedUntil: string | null;
+              request: {
+                id: string;
+                durationHours: 24 | 72 | 168;
+                requestedAt: string;
+                expiresAt: string;
+              } | null;
+            };
+          }>('SELECT support_access_status($1) AS status', [workspaceId]);
+          const access = supportAccess.rows[0]!.status;
           await audit(tx, context, 'workspace.inspected', workspaceId, null, {
             grantId,
           });
@@ -244,6 +272,20 @@ export function createStaffRepository(pool: Pool): StaffRepository {
               status: row.status,
               lastSyncAt: row.last_sync_at?.toISOString() ?? null,
             })),
+            supportAccess: {
+              allowedUntil: access.allowedUntil
+                ? new Date(access.allowedUntil).toISOString()
+                : null,
+              request: access.request
+                ? {
+                    ...access.request,
+                    requestedAt: new Date(
+                      access.request.requestedAt,
+                    ).toISOString(),
+                    expiresAt: new Date(access.request.expiresAt).toISOString(),
+                  }
+                : null,
+            },
           };
         },
       );
@@ -312,6 +354,68 @@ export function createStaffRepository(pool: Pool): StaffRepository {
           );
 
           return page;
+        },
+      );
+    },
+    startSupportView(context, input) {
+      const token = randomBytes(32).toString('base64url');
+
+      return transaction(
+        context,
+        input.grantId,
+        input.mode === 'consent' ? 'staff.view-as' : 'staff.view-as.emergency',
+        async (tx) => {
+          await validateGrant(tx, input.workspaceId);
+          const result = await tx.query<{
+            view: { id: string; expiresAt: string; handoffExpiresAt: string };
+          }>('SELECT support_view_start($1,$2,$3,$4,$5,$6,$7,$8) AS view', [
+            input.workspaceId,
+            input.userId,
+            input.mode,
+            input.reason,
+            input.mode === 'emergency' ? input.category : null,
+            input.mode === 'emergency' ? input.reference : null,
+            createHash('sha256').update(token).digest('hex'),
+            context.requestId,
+          ]);
+          const view = result.rows[0]!.view;
+
+          return {
+            id: view.id,
+            expiresAt: new Date(view.expiresAt).toISOString(),
+            handoffExpiresAt: new Date(view.handoffExpiresAt).toISOString(),
+            token,
+          };
+        },
+      );
+    },
+    requestSupportAccess(context, input) {
+      return transaction(
+        context,
+        input.grantId,
+        'staff.view-as',
+        async (tx) => {
+          await validateGrant(tx, input.workspaceId);
+          const result = await tx.query<{
+            request: {
+              id: string;
+              durationHours: 24 | 72 | 168;
+              requestedAt: string;
+              expiresAt: string;
+            };
+          }>('SELECT support_access_request($1,$2,$3,$4) AS request', [
+            input.workspaceId,
+            input.reason,
+            input.durationHours,
+            context.requestId,
+          ]);
+          const request = result.rows[0]!.request;
+
+          return {
+            ...request,
+            requestedAt: new Date(request.requestedAt).toISOString(),
+            expiresAt: new Date(request.expiresAt).toISOString(),
+          };
         },
       );
     },

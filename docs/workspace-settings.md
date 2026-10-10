@@ -9,6 +9,7 @@ Workspace settings cover the workspace name and timezone, team access, custom ro
 - `workspace.approval_policy.manage` changes the approval preference.
 - `members.manage` invites, reassigns and removes people. Only owners grant or revoke ownership, and nobody can assign a role with permissions they do not hold. The [membership rules](identity.md#membership-rules) apply.
 - `roles.manage` creates, edits and archives custom roles and reads role history.
+- `support_access.manage` allows and revokes Luma support access and answers support requests.
 
 Sections a role cannot change say which permission they need. Team and role mutations recheck authority under the organization row lock, including concurrent last-owner changes. Access, role and policy changes are appended to `workspace_access_events` with actor, timestamp and bounded before/after values.
 
@@ -73,3 +74,12 @@ Changing the preference increments the policy revision, and decisions and approv
 Each member stores their own Home modules and sidebar pins per workspace; layouts are never shared. A `home` of `null` means the default Home. Saving replaces the whole layout at the revision last read, and a stale revision returns 409 so the client reloads. Each module appears at most once, pins are limited to 12, and a pin's path is relative to the workspace root, such as `exceptions?view=active`. Unknown module IDs from older layouts are dropped on read.
 
 Theme and default sidebar width are device preferences stored in the browser, not in the layout.
+
+## Luma support access
+
+Support access lets Luma staff open read-only views of the workspace as a member; see
+[staff access](staff.md#support-view). Allowing sets an end time 24, 72 or 168 hours from now and
+replaces an earlier one; revoking clears it and ends open views on their next request. Approving
+a request allows the requested duration from now, or keeps a later end time. Each is a command
+with a receipt and a `revision`, recorded as a `support_access.*` access event. Staff can't change
+consent from a support view, because every write is refused there.

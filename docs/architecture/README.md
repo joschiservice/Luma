@@ -19,6 +19,7 @@ decisions.
 | [008](008-workspace-read-models.md)               | Workspace read models                                      | Accepted                           |
 | [009](009-permissions-and-roles.md)               | Permission catalog and workspace roles                     | Accepted                           |
 | [010](010-orpc-http-contracts.md)                 | HTTP contracts with oRPC and one Zod version               | Accepted                           |
+| [011](011-support-view.md)                        | Read-only support view                                     | Accepted                           |
 
 ## Baseline
 

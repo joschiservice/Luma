@@ -55,3 +55,23 @@ export interface SettingsSnapshot {
   deliveryAvailable: boolean;
   lastTest: { id: string; state: DeliveryState } | null;
 }
+
+/** How long Luma support access lasts once allowed, in hours. */
+export type SupportAccessDuration = 24 | 72 | 168;
+
+/** A pending request from Luma support to allow access. */
+export interface SupportAccessRequest {
+  id: string;
+  reason: string;
+  durationHours: SupportAccessDuration;
+  requestedAt: string;
+  expiresAt: string;
+}
+
+/** Whether, and until when, Luma support may open read-only views of the workspace. */
+export interface SupportAccess {
+  allowedUntil: string | null;
+  changedAt: string | null;
+  revision: number;
+  requests: SupportAccessRequest[];
+}

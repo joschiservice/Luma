@@ -29,6 +29,8 @@
   "permissions_members_manage_description": "Personen einladen, ihre Rolle ändern und ihren Zugriff entfernen. Personen können nur Rollen zuweisen, deren Berechtigungen sie selbst haben.",
   "permissions_roles_manage_label": "Rollen verwalten",
   "permissions_roles_manage_description": "Eigene Rollen erstellen, bearbeiten und archivieren sowie ihren Änderungsverlauf ansehen. Personen können nur Berechtigungen vergeben, die sie selbst haben.",
+  "permissions_support_access_manage_label": "Luma-Support-Zugriff verwalten",
+  "permissions_support_access_manage_description": "Lesezugriff für den Luma-Support erlauben oder entziehen und seine Anfragen annehmen oder ablehnen.",
   "permissions_orders_read_label": "Bestellungen ansehen",
   "permissions_orders_read_description": "Bestellungen mit Positionen, Zahlungen und Verknüpfungen zu den Quellsystemen ansehen.",
   "permissions_fulfillment_read_label": "Fulfillment ansehen",

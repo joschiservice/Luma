@@ -248,6 +248,7 @@ export async function environment(saved, workflows = false, observing = false) {
     STAFF_DATABASE_URL: database('luma_staff', saved.staffPassword),
     STAFF_AUTH_SECRET: saved.staffAuthSecret,
     STAFF_PUBLIC_ORIGIN: `http://localhost:${saved.staffWebPort}`,
+    STAFF_CUSTOMER_ORIGIN: localOrigin,
     STAFF_AUTH_MODE: 'local',
     STAFF_API_HOST: '127.0.0.1',
     STAFF_API_PORT: String(saved.staffApiPort),

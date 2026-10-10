@@ -3,6 +3,7 @@ import type {
   MembershipStatus,
   Organization,
   SessionIdentity,
+  SupportView,
   TenantContext,
 } from '../domain/context.js';
 import {
@@ -22,6 +23,7 @@ import {
   encodeSecurityEventCursor,
 } from '../domain/security-events.js';
 import { describeUserAgent } from '../domain/sessions.js';
+import type { SupportViewCredentials } from './support-view.js';
 
 export type Credentials = Readonly<Record<string, string>>;
 
@@ -62,6 +64,8 @@ export interface IdentityTransaction {
   } | null>;
   /** Lists the user's workspaces, including those where their membership is suspended. */
   listOrganizations(): Promise<OrganizationAccess[]>;
+  /** Reads the user's own name and email. */
+  profile(): Promise<{ name: string; email: string } | null>;
   findMembership(organizationId: string): Promise<Membership | null>;
   findOrganization(organizationId: string): Promise<Organization | null>;
   createOrganization(input: {
@@ -128,6 +132,8 @@ export function memberDto(member: Membership): MemberDto {
 
 export interface IdentityRepository {
   getSession(credentials: Credentials): Promise<SessionIdentity | null>;
+  /** Support view credentials; see ADR-011. */
+  supportViews: SupportViewCredentials;
   /** Reads one account's security events, newest first, after an optional position. */
   listSecurityEvents(
     userId: string,
@@ -160,13 +166,43 @@ export function createIdentityService(repository: IdentityRepository) {
     session: SessionIdentity,
     organizationId: string,
     requestId: string,
+    supportView?: SupportView,
   ) {
     const member = await tx.findMembership(organizationId);
     const organization = member && (await tx.findOrganization(organizationId));
     if (!member || !organization)
       throw new IdentityError(404, 'NOT_FOUND', 'Organization not found');
 
-    return makeTenantContext(session, organization, member, requestId);
+    return makeTenantContext(
+      session,
+      organization,
+      member,
+      requestId,
+      supportView,
+    );
+  }
+
+  const supportViewEnded = () =>
+    new IdentityError(401, 'UNAUTHENTICATED', 'The Luma support view ended.');
+
+  /** Checks the view a support token names; throws 401 once it has ended. */
+  async function activeSupportView(
+    token: string,
+    organizationId: string | null,
+    readPath: string | null,
+    requestId: string,
+  ) {
+    const view = await repository.supportViews.resolve(
+      token,
+      organizationId,
+      readPath,
+      requestId,
+    );
+    if (view.state === 'other')
+      throw new IdentityError(404, 'NOT_FOUND', 'Organization not found');
+    if (view.state !== 'active') throw supportViewEnded();
+
+    return view;
   }
 
   async function withTenant<T>(
@@ -199,6 +235,7 @@ export function createIdentityService(repository: IdentityRepository) {
         ),
       );
     },
+    /** Resolves the actor's current membership again; a support view stays a support view. */
     async refreshContext(context: TenantContext) {
       requireTenant(context, context.tenantId);
 
@@ -208,9 +245,75 @@ export function createIdentityService(repository: IdentityRepository) {
           { userId: context.actor.id, sessionId: context.actor.sessionId },
           context.tenantId,
           context.requestId,
+          context.supportView,
         ),
       );
     },
+    /** Reports whether the credentials carry a support view token, valid or not. */
+    hasSupportView(credentials: Credentials) {
+      return repository.supportViews.token(credentials) !== null;
+    },
+    /**
+     * Describes the support view the credentials name, for the banner. Inactive when there is
+     * none or it ended; ending is recorded by the check itself.
+     */
+    async supportView(credentials: Credentials, requestId: string) {
+      const token = repository.supportViews.token(credentials);
+      const view = token
+        ? await repository.supportViews.resolve(token, null, null, requestId)
+        : null;
+      if (!view || view.state !== 'active')
+        return {
+          active: false as const,
+          endReason: view && view.state === 'ended' ? view.reason : null,
+        };
+      const details = await repository.withUser(view.userId, async (tx) => ({
+        organization: await tx.findOrganization(view.tenantId),
+        profile: await tx.profile(),
+      }));
+      if (!details.organization || !details.profile)
+        return { active: false as const, endReason: null };
+
+      return {
+        active: true as const,
+        id: view.id,
+        mode: view.mode,
+        expiresAt: new Date(view.expiresAt).toISOString(),
+        workspace: {
+          id: details.organization.id,
+          name: details.organization.name,
+        },
+        member: { id: view.userId, ...details.profile },
+      };
+    },
+    /**
+     * Exchanges a single-use handoff from the staff console for a support view token. Throws 404
+     * when the link was used, expired or the view can no longer start.
+     */
+    async redeemSupportView(handoff: string, requestId: string) {
+      const view = await repository.supportViews.redeem(handoff, requestId);
+      if (!view)
+        throw new IdentityError(
+          404,
+          'NOT_FOUND',
+          'This support link was already used or has expired. Start the view again from the staff console.',
+        );
+
+      return {
+        workspaceId: view.tenantId,
+        cookie: repository.supportViews.cookie(view.token),
+      };
+    },
+    /** Ends the support view the credentials name and returns the cookie that clears it. */
+    async endSupportView(credentials: Credentials, requestId: string) {
+      const token = repository.supportViews.token(credentials);
+      if (token) await repository.supportViews.end(token, requestId);
+
+      return repository.supportViews.cookie(null);
+    },
+    /** Records the end of open support views that are no longer valid. */
+    sweepSupportViews: (requestId: string) =>
+      repository.supportViews.sweep(requestId),
     /**
      * Lists the signed-in person's own security events, 20 per page, newest first. The account
      * comes from the session, never from the caller. Rejects malformed cursors with 422.
@@ -252,7 +355,16 @@ export function createIdentityService(repository: IdentityRepository) {
             : null,
       };
     },
-    async listOrganizations(credentials: Credentials) {
+    /** Lists the signed-in person's workspaces; a support view lists only its workspace. */
+    async listOrganizations(credentials: Credentials, requestId: string) {
+      const token = repository.supportViews.token(credentials);
+      if (token) {
+        const view = await activeSupportView(token, null, null, requestId);
+
+        return (
+          await repository.withUser(view.userId, (tx) => tx.listOrganizations())
+        ).filter((organization) => organization.id === view.tenantId);
+      }
       const session = await authenticate(credentials);
 
       return repository.withUser(session.userId, (tx) =>
@@ -279,11 +391,42 @@ export function createIdentityService(repository: IdentityRepository) {
         tx.createOrganization({ name: input.name, slug: input.slug }),
       );
     },
+    /**
+     * Resolves the caller's access to a workspace from the current session and membership.
+     * With `supportView`, a support view token takes precedence over a customer session and
+     * yields a read-only context for the viewed member; `read` records the first read of a path.
+     * Without it, only a customer session is accepted.
+     */
     async resolveTenant(
       credentials: Credentials,
       organizationId: string,
       requestId: string,
+      options: { supportView?: { read: string | null } } = {},
     ) {
+      const support = options.supportView;
+      const token = support ? repository.supportViews.token(credentials) : null;
+      if (support && token) {
+        const view = await activeSupportView(
+          token,
+          organizationId,
+          support.read,
+          requestId,
+        );
+
+        return repository.withUser(view.userId, (tx) =>
+          resolve(
+            tx,
+            { userId: view.userId, sessionId: view.id },
+            organizationId,
+            requestId,
+            {
+              id: view.id,
+              mode: view.mode,
+              expiresAt: new Date(view.expiresAt).toISOString(),
+            },
+          ),
+        );
+      }
       const session = await authenticate(credentials);
 
       return repository.withUser(session.userId, (tx) =>

@@ -239,3 +239,15 @@
   text-decoration: underline;
   text-underline-offset: 0.2em;
 }
+
+.staff-choices {
+  display: grid;
+  gap: 0.5rem;
+  border: 0;
+  padding: 0;
+}
+
+.staff-choices legend {
+  margin-bottom: 0.25rem;
+  font-weight: 500;
+}

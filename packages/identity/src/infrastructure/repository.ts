@@ -23,6 +23,7 @@ import type { AuthSettings } from './auth.js';
 import { createAuth } from './auth.js';
 import * as schema from './schema.js';
 import { listSecurityEvents, securityEventsPlugin } from './security-events.js';
+import { createSupportViewCredentials } from './support-view.js';
 
 const organizationDto = (
   row: typeof schema.organization.$inferSelect,
@@ -99,6 +100,7 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
 
       return { userId: session.user.id, sessionId: session.session.id };
     },
+    supportViews: createSupportViewCredentials(pool, settings),
     listSecurityEvents: (userId, after, limit) =>
       listSecurityEvents(pool, userId, after, limit),
     async withUser(userId, operation) {
@@ -158,6 +160,14 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
                     ? ('active' as const)
                     : ('suspended' as const),
               }));
+            },
+            async profile() {
+              const [row] = await tx
+                .select({ name: schema.user.name, email: schema.user.email })
+                .from(schema.user)
+                .where(eq(schema.user.id, userId));
+
+              return row ?? null;
             },
             async createOrganization(input) {
               const id = randomUUID();

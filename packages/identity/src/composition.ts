@@ -25,6 +25,8 @@ export function createIdentity(
     mail?: { apiKey: string; from: string; origin: string };
     mailProvider?: MailProvider;
     mailOrigin?: string;
+    /** Reports whether the current request may only read, as in a support view. */
+    readOnly?: () => boolean;
   },
 ) {
   const pool = new Pool({
@@ -45,7 +47,7 @@ export function createIdentity(
       .update(`invitation:${tenantId}:${id}:${generation}`)
       .digest('hex');
   const workspaceSettings = createSettingsService({
-    repository: createSettingsRepository(pool, !!provider),
+    repository: createSettingsRepository(pool, !!provider, settings.readOnly),
     identity: service,
     deliveryAvailable: !!provider,
     now: () => new Date(),

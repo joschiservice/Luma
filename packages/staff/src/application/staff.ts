@@ -8,6 +8,7 @@ import type { StaffContext } from '../domain/access.js';
 import {
   requireRecentStaffSession,
   requireStaffPermission,
+  StaffError,
 } from '../domain/access.js';
 import type { AuditPage, AuditQuery } from './audit.js';
 import type { AccessHistoryPage, WorkspaceHealth } from './health.js';
@@ -54,7 +55,34 @@ export interface WorkspaceDetail {
     status: string;
     lastSyncAt: string | null;
   }[];
+  supportAccess: {
+    allowedUntil: string | null;
+    request: SupportAccessRequest | null;
+  };
 }
+
+/** A pending request asking the workspace to allow support views. */
+export interface SupportAccessRequest {
+  id: string;
+  durationHours: 24 | 72 | 168;
+  requestedAt: string;
+  expiresAt: string;
+}
+
+/** Starts a read-only support view as one member of a workspace. */
+export type SupportViewInput = {
+  workspaceId: string;
+  userId: string;
+  grantId: string;
+  reason: string;
+} & (
+  | { mode: 'consent' }
+  | {
+      mode: 'emergency';
+      category: 'security_incident' | 'legal_request';
+      reference: string;
+    }
+);
 
 export interface AccountAccess {
   id: string;
@@ -163,6 +191,25 @@ export interface StaffRepository {
     cursor: string | null,
   ): Promise<AccessHistoryPage>;
   audit(context: StaffContext, query: AuditQuery): Promise<AuditPage>;
+  /** Starts a view and returns the single-use handoff token for the customer app. */
+  startSupportView(
+    context: StaffContext,
+    input: SupportViewInput,
+  ): Promise<{
+    id: string;
+    expiresAt: string;
+    handoffExpiresAt: string;
+    token: string;
+  }>;
+  requestSupportAccess(
+    context: StaffContext,
+    input: {
+      workspaceId: string;
+      grantId: string;
+      reason: string;
+      durationHours: 24 | 72 | 168;
+    },
+  ): Promise<SupportAccessRequest>;
   accountGrant(
     context: StaffContext,
     userId: string,
@@ -181,8 +228,14 @@ export interface StaffRepository {
   ): Promise<AccountSecurityEvents>;
 }
 
-/** Provides bounded staff operations using explicit privileges and tenant-scoped support grants. */
-export function createStaffService(repository: StaffRepository) {
+/**
+ * Provides bounded staff operations using explicit privileges and tenant-scoped support grants.
+ * Support views open on `customerOrigin`; without it they can't start.
+ */
+export function createStaffService(
+  repository: StaffRepository,
+  options: { customerOrigin?: string | undefined } = {},
+) {
   return {
     /** Searches minimal directory metadata; every successful search is audited. */
     directory(context: StaffContext, query: string) {
@@ -244,6 +297,46 @@ export function createStaffService(repository: StaffRepository) {
       requireStaffPermission(context, 'staff.workspace.inspect');
 
       return repository.accessHistory(context, workspaceId, grantId, cursor);
+    },
+    /**
+     * Starts a read-only support view as one member, for up to thirty minutes, and returns the
+     * customer app link with its single-use token. Consented views need `staff.view-as`;
+     * emergency views need `staff.view-as.emergency` and a sign-in within fifteen minutes.
+     */
+    async startSupportView(context: StaffContext, input: SupportViewInput) {
+      requireStaffPermission(
+        context,
+        input.mode === 'consent' ? 'staff.view-as' : 'staff.view-as.emergency',
+      );
+      if (input.mode === 'emergency') requireRecentStaffSession(context);
+      if (!options.customerOrigin)
+        throw new StaffError(
+          503,
+          'Support views aren’t set up on this server. Configure the customer app origin.',
+        );
+      const view = await repository.startSupportView(context, input);
+
+      return {
+        id: view.id,
+        expiresAt: view.expiresAt,
+        handoffExpiresAt: view.handoffExpiresAt,
+        // The fragment stays in the browser: it isn't sent to servers or in Referer headers.
+        url: `${options.customerOrigin}/support-view#token=${view.token}`,
+      };
+    },
+    /** Asks the workspace's owners to allow support views; one request can be pending. */
+    requestSupportAccess(
+      context: StaffContext,
+      input: {
+        workspaceId: string;
+        grantId: string;
+        reason: string;
+        durationHours: 24 | 72 | 168;
+      },
+    ) {
+      requireStaffPermission(context, 'staff.view-as');
+
+      return repository.requestSupportAccess(context, input);
     },
     /** Pages the staff audit log with optional filters; each read is itself audited. */
     audit(context: StaffContext, query: AuditQuery) {

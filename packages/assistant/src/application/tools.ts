@@ -1,5 +1,9 @@
 import type { Permission, TenantContext } from '@luma/identity';
-import { hasPermission, IdentityError } from '@luma/identity';
+import {
+  hasPermission,
+  IdentityError,
+  requireChangesAllowed,
+} from '@luma/identity';
 import type { JsonValue, ModelTool } from '@luma/platform';
 
 import {
@@ -123,12 +127,14 @@ export function createToolRegistry(
     /**
      * Runs one call with a context the caller has just refreshed. Calls to tools the context
      * may not use are refused without reading. Authorization failures from reads are rethrown so
-     * the whole answer stops; other failures become results the model can explain.
+     * the whole answer stops; other failures become results the model can explain. Throws in a
+     * support view: tool calls never run for Luma staff.
      */
     async execute(
       context: TenantContext,
       call: { name: string; arguments: JsonValue },
     ): Promise<ToolExecution> {
+      requireChangesAllowed(context);
       const tool = byName.get(call.name);
       if (!tool)
         return result(call.name, call.name, 'failed', {

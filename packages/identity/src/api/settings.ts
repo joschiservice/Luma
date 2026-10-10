@@ -90,6 +90,26 @@ export function settingsRoutes(service?: SettingsService) {
           body,
         ),
     ),
+    supportAccess: os.supportAccess.handler(
+      async ({ context: { request } }) =>
+        await use().supportAccess(context(request)),
+    ),
+    allowSupportAccess: os.allowSupportAccess.handler(
+      async ({ context: { request }, input: { body } }) =>
+        await use().allowSupportAccess(context(request), body),
+    ),
+    revokeSupportAccess: os.revokeSupportAccess.handler(
+      async ({ context: { request }, input: { body } }) =>
+        await use().revokeSupportAccess(context(request), body),
+    ),
+    decideSupportAccessRequest: os.decideSupportAccessRequest.handler(
+      async ({ context: { request }, input: { params, body } }) =>
+        await use().decideSupportAccessRequest(
+          context(request),
+          params.requestId,
+          body,
+        ),
+    ),
     previewInvitation: os.previewInvitation.handler(
       async ({ context: { request }, input: { body } }) =>
         await use().previewInvitation(credentials(request), body),

@@ -43,6 +43,7 @@ export const metricsContract = {
     .meta({
       access: requires('insights.read'),
       errors: [400, 401, 404, 422, 503],
+      readOnly: true,
     })
     .input(
       z.object({
@@ -59,7 +60,11 @@ export const metricsContract = {
       description:
         'Reads up to four parts, each an order (v1) or operational (v2) metric query, with the same rules as those endpoints, and returns them in request order. A part that fails carries its own status and error; the other parts are unaffected. Each part returns its first page of records; read later pages through the part’s own query endpoint. nextRefreshAt is the earliest boundary across the parts that were read.',
     })
-    .meta({ access: requires('insights.read'), errors: [400, 401, 404] })
+    .meta({
+      access: requires('insights.read'),
+      errors: [400, 401, 404],
+      readOnly: true,
+    })
     .input(
       z.object({
         params: organizationParamsSchema,
@@ -89,6 +94,7 @@ export const metricsContract = {
     .meta({
       access: requires('insights.read'),
       errors: [400, 401, 404, 422, 503],
+      readOnly: true,
     })
     .input(
       z.object({ params: organizationParamsSchema, body: metricRequestSchema }),

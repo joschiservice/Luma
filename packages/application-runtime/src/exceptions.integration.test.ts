@@ -461,6 +461,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         {
           shadow,
           identity: {
+            hasSupportView: () => false,
             resolveTenant: async () => context(),
           } as unknown as IdentityService,
         },
@@ -910,6 +911,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         {
           learning: reopened,
           identity: {
+            hasSupportView: () => false,
             resolveTenant: async () => context(),
           } as unknown as IdentityService,
         },
@@ -956,6 +958,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       {
         operations: service,
         identity: {
+          hasSupportView: () => false,
           resolveTenant: async (_credentials: unknown, id: string) =>
             context(id),
         } as unknown as IdentityService,
@@ -1139,6 +1142,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       {
         cases: services.cases,
         identity: {
+          hasSupportView: () => false,
           resolveTenant: async () => context(),
         } as unknown as IdentityService,
       },
@@ -1217,6 +1221,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         {
           cases: services.cases,
           identity: {
+            hasSupportView: () => false,
             resolveTenant: async () => context(),
           } as unknown as IdentityService,
         },
@@ -1274,7 +1279,10 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       {},
       {
         cases: services.cases,
-        identity: { resolveTenant } as unknown as IdentityService,
+        identity: {
+          resolveTenant,
+          hasSupportView: () => false,
+        } as unknown as IdentityService,
       },
     );
     try {
@@ -2048,7 +2056,10 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       {},
       {
         desk: f.desk,
-        identity: { resolveTenant } as unknown as IdentityService,
+        identity: {
+          resolveTenant,
+          hasSupportView: () => false,
+        } as unknown as IdentityService,
         trustedOrigins: ['http://fixture.test'],
         eventSettings: { intervalMs: 20, lifetimeMs: 2000 },
       },

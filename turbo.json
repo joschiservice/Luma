@@ -75,6 +75,7 @@
         "STAFF_DATABASE_URL",
         "STAFF_AUTH_SECRET",
         "STAFF_PUBLIC_ORIGIN",
+        "STAFF_CUSTOMER_ORIGIN",
         "STAFF_AUTH_MODE",
         "STAFF_API_HOST",
         "STAFF_API_PORT",

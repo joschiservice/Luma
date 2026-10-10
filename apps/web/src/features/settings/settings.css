@@ -1346,3 +1346,49 @@
     animation: none;
   }
 }
+
+/* Luma support */
+.settings-support-allow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 14px 18px;
+}
+
+.settings-support-allow label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.settings-support-allow [data-slot='select-trigger'] {
+  width: 12rem;
+}
+
+.settings-support-request {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+}
+
+.settings-support-request + .settings-support-request {
+  border-top: 1px solid var(--line);
+}
+
+.settings-support-request p {
+  margin-block: 4px;
+  overflow-wrap: anywhere;
+}
+
+.settings-support-request span {
+  color: var(--foreground-muted);
+  font-size: 12.5px;
+}
+
+.settings-support-request-actions {
+  display: flex;
+  gap: 8px;
+}

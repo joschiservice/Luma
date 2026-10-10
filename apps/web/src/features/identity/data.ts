@@ -100,15 +100,45 @@ const privateOptions = {
   refetchOnWindowFocus: 'always',
 } as const;
 
+// Set when a Luma support view this tab held ended, so the next sign-in redirect explains it.
+const supportViewEndedKey = 'luma.supportViewEnded';
+
+/** Returns, and forgets, why a support view in this tab ended since the last check. */
+export function takeEndedSupportView() {
+  const reason = sessionStorage.getItem(supportViewEndedKey);
+  sessionStorage.removeItem(supportViewEndedKey);
+
+  return reason;
+}
+
+/** Reports whether this tab's support view ended and the next page should say so. */
+export function supportViewJustEnded() {
+  return sessionStorage.getItem(supportViewEndedKey) !== null;
+}
+
+/** Remembers that this tab's support view ended, for the page shown next. */
+export function rememberEndedSupportView(reason: string) {
+  sessionStorage.setItem(supportViewEndedKey, reason);
+}
+
 /**
  * Reads the current session without retaining unused private data; returns null when signed
- * out.
+ * out. A Luma support view takes precedence over a customer session, as on the server, and
+ * presents the viewed member as the signed-in person.
  */
 export const sessionOptions = () =>
   queryOptions({
     ...privateOptions,
     queryKey: sessionKey,
     queryFn: async ({ signal }) => {
+      const view = await api.identity.supportView(undefined, { signal });
+      if (view.active)
+        return {
+          sessionId: `support-view:${view.id}`,
+          user: { ...view.member, twoFactorEnabled: false },
+          supportView: view,
+        };
+      if (view.endReason) rememberEndedSupportView(view.endReason);
       const result = await auth.getSession({
         fetchOptions: { signal, cache: 'no-store' },
       });
@@ -124,10 +154,21 @@ export const sessionOptions = () =>
               email: result.data.user.email,
               twoFactorEnabled: result.data.user.twoFactorEnabled === true,
             },
+            supportView: null,
           }
         : null;
     },
   });
+
+/** Opens the support view a staff console link's single-use token names. */
+export function redeemSupportView(token: string) {
+  return api.identity.redeemSupportView({ body: { token } });
+}
+
+/** Ends this browser's support view and clears its cookie. */
+export function endSupportView() {
+  return api.identity.endSupportView();
+}
 
 /** Loads the current user's organizations with immediate staleness and no automatic retries. */
 export const organizationsOptions = () =>

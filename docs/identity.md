@@ -100,6 +100,30 @@ Better Auth's `invitations` table remains because its organization plugin requir
 
 RLS prevents omitted filters; it does not protect against a compromised backend that sets arbitrary context. Credential and session tables are the regional bootstrap exception in [ADR-003](architecture/003-tenant-isolation-and-data-residency.md). Domain packages add their own scoped repositories, composite foreign keys, runtime roles and forced RLS policies.
 
+### Support views
+
+A support view lets Luma staff see a workspace as one member, read-only
+([ADR-011](architecture/011-support-view.md), [staff access](staff.md#support-view)). Its cookie
+selects the view instead of a customer session for tenant routes, the workspace list and live
+streams; `resolveTenant` accepts it only when called with `supportView`, which the request guard
+and stream rechecks do. The context's actor is the member, with their current role and
+permissions, and `context.supportView` is set; `refreshContext` keeps it.
+
+- The guard refuses every route other than `GET` and `HEAD` with 403 `READ_ONLY` before
+  resolving access, unless the contract or route config declares `readOnly: true`. Declare it
+  only for routes that read with a request body, such as metric queries. `GET` routes must not
+  write.
+- The rest of the request is restricted to reads: identity's settings transactions, and the
+  API's tenant databases (`createTenantDatabase` with `readOnly: requestIsReadOnly`), open
+  `READ ONLY`; settings reads then take no locks. Wire the same check into any new tenant
+  database the API creates.
+- Execution, policy evaluation, approvals and Ask Luma call `requireChangesAllowed` and refuse a
+  support context themselves.
+- Account routes (security events, invitations, workspace creation) refuse a support cookie;
+  the workspace list returns only the viewed workspace. Personal security settings and
+  credential setup aren't reachable.
+- A view that ended returns 401; `GET /v1/support-view` then reports why and clears the cookie.
+
 ## Browser sessions
 
 Sessions record when they were last used. Resolving a session for a protected API request

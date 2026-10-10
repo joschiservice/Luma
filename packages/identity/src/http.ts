@@ -9,6 +9,12 @@ export type { HttpContext } from './api/contract-routes.js';
 
 export { identityRoutes, registerIdentityGuards } from './api/routes.js';
 
+export {
+  requestIsReadOnly,
+  restrictRequestToReads,
+  runInRequestScope,
+} from './api/request-scope.js';
+
 /** Registers authentication endpoints on the owning HTTP server. */
 export function registerIdentityHttp(
   app: FastifyInstance,

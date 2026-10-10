@@ -3,7 +3,7 @@ title: Manage workspace settings
 description: Change the workspace name and time zone, invite and manage your team, set approval rules, and choose your notifications, language and layout.
 ---
 
-**Settings** has two groups. **Workspace** settings are shared by everyone in the workspace: **Workspace**, **Team**, **Roles** and **Approvals**. **Personal** settings apply only to you: **Security**, **Notifications**, **Language & appearance** and **Home & sidebar**. Press **G** then **S** to open Settings.
+**Settings** has two groups. **Workspace** settings are shared by everyone in the workspace: **Workspace**, **Team**, **Roles**, **Approvals** and **Luma support**. **Personal** settings apply only to you: **Security**, **Notifications**, **Language & appearance** and **Home & sidebar**. Press **G** then **S** to open Settings.
 
 Everyone can view the workspace sections. If your role can’t change one, it says which permission you need.
 
@@ -66,6 +66,18 @@ If every owner’s access is suspended, **Team** says that the workspace has no 
 Either way, **Always applies** lists what never changes: approvals Luma always requires and actions it never allows, each person’s current permissions checked again before a change runs, and approval by someone other than the requester followed by a fresh check of the outcome. This setting can only make the rules stricter.
 
 People whose role includes **Approve or reject changes** can approve. When you change this setting, reviews that are already open must be refreshed before their changes can run.
+
+## Luma support
+
+**Luma support** decides whether Luma support can look into a problem by seeing this workspace as one of your members. Changing it needs **Manage Luma support access**.
+
+- Choose how long to allow access, **24 hours**, **3 days** or **7 days**, and select **Allow access**. **Set new end time** replaces the current end time.
+- **Revoke access** ends it now, including any view that is open.
+- When Luma support asks for access, the request appears here with their reason. **Approve** allows access for the requested time; **Decline** refuses it. Owners also get an email about the request.
+
+A support view is read-only: support sees exactly what that member sees, and Luma refuses every change. Each view ends after 30 minutes. Owners get an email when a view starts, and **Activity** shows every view, each page it opened, and when it ended, by **Luma support**.
+
+For a security incident or legal request, Luma support can open a view without your approval. Owners get an email when it ends, and it appears in **Activity**.
 
 ## Security
 

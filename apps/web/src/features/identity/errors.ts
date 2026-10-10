@@ -43,6 +43,7 @@ export function requestErrorMessage(error: unknown, fallback?: string) {
   if (status === 401 || code === 'UNAUTHENTICATED')
     return m.identity_error_unauthenticated();
   if (code === 'ACCESS_SUSPENDED') return m.identity_error_access_suspended();
+  if (code === 'READ_ONLY') return m.identity_error_read_only();
   if (status === 403 || code === 'FORBIDDEN')
     return m.identity_error_forbidden();
   if (status === 404 || code === 'NOT_FOUND')

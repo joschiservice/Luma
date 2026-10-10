@@ -38,7 +38,9 @@ export function createStaff(settings: StaffSettings) {
 
   return {
     settings,
-    service: createStaffService(createStaffRepository(pool)),
+    service: createStaffService(createStaffRepository(pool), {
+      customerOrigin: settings.customerOrigin,
+    }),
     authHandler: createAuditedStaffAuthHandler(auth, pool),
     /** Resolves current staff authority and bounded session lifetime. Only explicit browser activity advances the idle timestamp. */
     async resolveSession(

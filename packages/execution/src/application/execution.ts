@@ -2,7 +2,12 @@ import type { AuditEntry, AuditLog } from '@luma/audit';
 import type { EffectRegistry, VerificationResult } from '@luma/connections';
 import { ConnectorError } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
-import { hasPermission, IdentityError, requireTenant } from '@luma/identity';
+import {
+  hasPermission,
+  IdentityError,
+  requireChangesAllowed,
+  requireTenant,
+} from '@luma/identity';
 import type {
   PolicyDecision,
   PolicyService,
@@ -289,6 +294,7 @@ export function createExecutionService(deps: ExecutionDependencies) {
     ): Promise<ExecutionResult> {
       const { action, hash } = deps.parse(input);
       requireTenant(context, action.tenantId);
+      requireChangesAllowed(context);
       context = await deps.refreshContext(context);
       requireTenant(context, action.tenantId);
       // Only user provenance can be authenticated by the current identity context.
@@ -529,6 +535,7 @@ export function createExecutionService(deps: ExecutionDependencies) {
       proposalId: string,
     ): Promise<ExecutionResult> {
       requireTenant(context, context.tenantId);
+      requireChangesAllowed(context);
       context = await deps.refreshContext(context);
       const record = await deps.repository.get(context.tenantId, proposalId);
       requireReader(context, record ?? undefined);

@@ -5,8 +5,9 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 import type { IdentityService } from '../application/identity.js';
 import type { TenantContext } from '../domain/context.js';
-import { IdentityError } from '../domain/context.js';
+import { IdentityError, ReadOnlyAccessError } from '../domain/context.js';
 import type { HttpContext } from './contract-routes.js';
+import { restrictRequestToReads, runInRequestScope } from './request-scope.js';
 
 /** Extracts the cookie and authorization headers used to resolve a request's session. */
 export function credentials(request: FastifyRequest) {
@@ -39,13 +40,43 @@ export function identityRoutes(service?: IdentityService) {
   const os = implement(apiContract.identity).$context<HttpContext>();
 
   return os.router({
+    supportView: os.supportView.handler(
+      async ({ context: { request, reply } }) => {
+        const state = await use().supportView(credentials(request), request.id);
+        // A view that ended no longer selects anything; drop its cookie.
+        if (!state.active && use().hasSupportView(credentials(request)))
+          reply.header(
+            'set-cookie',
+            await use().endSupportView(credentials(request), request.id),
+          );
+
+        return state;
+      },
+    ),
+    redeemSupportView: os.redeemSupportView.handler(
+      async ({ context: { request, reply }, input: { body } }) => {
+        const view = await use().redeemSupportView(body.token, request.id);
+        reply.header('set-cookie', view.cookie);
+        reply.header('referrer-policy', 'no-referrer');
+
+        return { workspaceId: view.workspaceId };
+      },
+    ),
+    endSupportView: os.endSupportView.handler(
+      async ({ context: { request, reply } }) => {
+        reply.header(
+          'set-cookie',
+          await use().endSupportView(credentials(request), request.id),
+        );
+      },
+    ),
     listSecurityEvents: os.listSecurityEvents.handler(
       async ({ context: { request }, input: { query } }) =>
         use().listSecurityEvents(credentials(request), query.cursor),
     ),
     listOrganizations: os.listOrganizations.handler(
       async ({ context: { request } }) => ({
-        items: await use().listOrganizations(credentials(request)),
+        items: await use().listOrganizations(credentials(request), request.id),
       }),
     ),
     createOrganization: os.createOrganization.handler(
@@ -62,6 +93,7 @@ export function identityRoutes(service?: IdentityService) {
         actor: context.actor,
         permissions: [...context.permissions],
         allAppPermissions: context.permissions.allAppPermissions,
+        supportView: context.supportView ?? null,
       };
     }),
     listMembers: os.listMembers.handler(async ({ context: { request } }) => ({
@@ -111,21 +143,41 @@ const publicRoutes = new Set([
   'POST /auth/*',
 ]);
 
-/** Registers session, organization, and origin guards before protected route handlers run. */
+// Support view handlers read the support cookie themselves; mutations still need a trusted Origin.
+const supportViewRoutes = new Set([
+  'GET /v1/support-view',
+  'POST /v1/support-view/redeem',
+  'POST /v1/support-view/end',
+]);
+
+// Routes for the signed-in account rather than one workspace.
+const accountRoutes = new Set([
+  '/v1/organizations',
+  '/v1/account/security-events',
+  '/v1/invitations/preview',
+  '/v1/invitations/accept',
+]);
+
+/**
+ * Registers session, organization, and origin guards before protected route handlers run. In a
+ * support view, routes other than `GET`, `HEAD` and those declaring `readOnly` are refused before
+ * access is resolved, and the rest of the request is restricted to reads.
+ */
 export function registerIdentityGuards(
   app: FastifyInstance,
   service?: IdentityService,
   trustedOrigins: readonly string[] = [],
 ) {
   app.decorateRequest('tenantContext', null);
+  // Every request gets a scope that a support view can restrict to reads.
+  app.addHook('onRequest', (_request, _reply, done) => runInRequestScope(done));
   app.addHook('preHandler', async (request) => {
     const route = request.routeOptions.url;
+    const key = `${request.method === 'HEAD' ? 'GET' : request.method} ${route}`;
     if (
       !route ||
       request.routeOptions.config.authentication === 'app' ||
-      publicRoutes.has(
-        `${request.method === 'HEAD' ? 'GET' : request.method} ${route}`,
-      )
+      publicRoutes.has(key)
     )
       return;
     if (!service)
@@ -144,12 +196,17 @@ export function registerIdentityGuards(
         'FORBIDDEN',
         'A trusted Origin header is required',
       );
-    if (
-      route === '/v1/organizations' ||
-      route === '/v1/account/security-events' ||
-      route === '/v1/invitations/preview' ||
-      route === '/v1/invitations/accept'
-    ) {
+    if (supportViewRoutes.has(key)) return;
+    const supportView = service.hasSupportView(credentials(request));
+    if (accountRoutes.has(route)) {
+      // The support view lists only its own workspace; other account routes are personal.
+      if (supportView && key === 'GET /v1/organizations') return;
+      if (supportView)
+        throw new IdentityError(
+          403,
+          'READ_ONLY',
+          'This isn’t available in a Luma support view.',
+        );
       await service.authenticate(credentials(request));
 
       return;
@@ -162,14 +219,34 @@ export function registerIdentityGuards(
       )
     )
       throw new IdentityError(404, 'NOT_FOUND', 'Organization not found');
+    if (supportView && !readsOnly(request)) throw new ReadOnlyAccessError();
     const context = await service.resolveTenant(
       credentials(request),
       params.organizationId,
       request.id,
+      { supportView: { read: null } },
     );
     request.tenantContext = context;
+    if (context.supportView) restrictRequestToReads();
     authorizeRoute(context, routeAccess(request));
+    // Record the read only once it is allowed, so the evidence lists what staff actually saw.
+    if (context.supportView)
+      await service.resolveTenant(
+        credentials(request),
+        params.organizationId,
+        request.id,
+        { supportView: { read: request.url.split('?')[0] ?? route } },
+      );
   });
+}
+
+/** Reports whether a route only reads: `GET`, `HEAD`, or declared `readOnly`. */
+function readsOnly(request: FastifyRequest) {
+  return (
+    request.method === 'GET' ||
+    request.method === 'HEAD' ||
+    request.routeOptions.config.readOnly === true
+  );
 }
 
 /** Reads the access a tenant route declares in its contract metadata or route config. */
@@ -208,6 +285,8 @@ declare module 'fastify' {
     authentication?: 'app';
     /** Who may call a tenant route; contract routes copy it from their metadata. */
     access?: import('@luma/api-contract').RouteAccess;
+    /** A route with a request body that only reads; support views may call it. */
+    readOnly?: true;
   }
 
   interface FastifyRequest {

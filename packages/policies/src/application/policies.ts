@@ -2,6 +2,7 @@ import type { TenantContext } from '@luma/identity';
 import {
   IdentityError,
   isAppPermission,
+  requireChangesAllowed,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
@@ -112,6 +113,7 @@ export function createPolicyService(deps: PolicyDependencies) {
     ) {
       return measure('policy.evaluate', async () => {
         requireTenant(context, action.tenantId);
+        requireChangesAllowed(context);
         const fresh = await deps.refreshContext(context);
         requireTenant(fresh, action.tenantId);
         if (fresh.actor.id !== context.actor.id)
@@ -174,6 +176,7 @@ export function createPolicyService(deps: PolicyDependencies) {
       expiresAt: string,
     ) {
       requireTenant(context, context.tenantId);
+      requireChangesAllowed(context);
       const fresh = await deps.refreshContext(context);
       requireTenant(fresh, context.tenantId);
       requirePermission(fresh, 'decisions.respond');

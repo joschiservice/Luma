@@ -7,7 +7,12 @@ import {
   requires,
 } from '../common.js';
 import { saveWorkspaceLayoutSchema, workspaceLayoutSchema } from '../layout.js';
-import { invitationSchema, settingsSnapshotSchema } from '../settings.js';
+import {
+  invitationSchema,
+  settingsSnapshotSchema,
+  supportAccessDurationSchema,
+  supportAccessSchema,
+} from '../settings.js';
 
 const path = '/v1/organizations/{organizationId}/settings';
 const command = z.object({ commandId: z.string().uuid() });
@@ -229,6 +234,88 @@ export const settingsContract = {
       }),
     )
     .output(invitationSchema),
+  supportAccess: endpoint
+    .route({
+      method: 'GET',
+      path: `${path}/support-access`,
+      summary: 'Read Luma support access',
+      description:
+        'Returns until when Luma support may open read-only views of this workspace, and pending requests from Luma support.',
+    })
+    .meta({
+      access: requires('support_access.manage'),
+      errors: [401, 403, 404, 503],
+    })
+    .input(z.object({ params: organizationParamsSchema }))
+    .output(supportAccessSchema),
+  allowSupportAccess: endpoint
+    .route({
+      method: 'PUT',
+      path: `${path}/support-access`,
+      summary: 'Allow Luma support access',
+      description:
+        'Lets Luma support open read-only views of this workspace as a member, for 24, 72 or 168 hours from now. Replaces an earlier end time. Views can’t change anything, and each one appears in Activity.',
+    })
+    .meta({
+      access: requires('support_access.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(
+      z.object({
+        params: organizationParamsSchema,
+        body: command
+          .extend({
+            revision: z.number().int().nonnegative(),
+            durationHours: supportAccessDurationSchema,
+          })
+          .strict(),
+      }),
+    )
+    .output(supportAccessSchema),
+  revokeSupportAccess: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/support-access/revoke`,
+      summary: 'Revoke Luma support access',
+      description:
+        'Ends support access now. Open support views end on their next request.',
+    })
+    .meta({
+      access: requires('support_access.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(
+      z.object({
+        params: organizationParamsSchema,
+        body: command
+          .extend({ revision: z.number().int().nonnegative() })
+          .strict(),
+      }),
+    )
+    .output(supportAccessSchema),
+  decideSupportAccessRequest: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/support-access/requests/{requestId}`,
+      summary: 'Approve or decline a Luma support access request',
+      description:
+        'Approving allows support access for the requested duration from now, or keeps a later end time. A request that lapsed or was answered returns 409.',
+    })
+    .meta({
+      access: requires('support_access.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(
+      z.object({
+        params: organizationParamsSchema.extend({
+          requestId: z.string().uuid(),
+        }),
+        body: command
+          .extend({ decision: z.enum(['approve', 'decline']) })
+          .strict(),
+      }),
+    )
+    .output(supportAccessSchema),
   previewInvitation: endpoint
     .route({
       method: 'POST',

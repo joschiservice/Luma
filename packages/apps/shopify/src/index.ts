@@ -316,7 +316,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
       registerRecoveryRoutes(server, recovery);
       server.post(
         '/v1/organizations/:organizationId/apps/shopify/record-connections',
-        { config: { access: { access: 'member' } } },
+        { config: { access: { access: 'member' }, readOnly: true } },
         async (request, reply) => {
           reply.header('cache-control', 'no-store');
           if (!request.tenantContext)

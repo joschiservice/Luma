@@ -10,6 +10,8 @@ import {
   staffMembershipChangeSchema,
   staffRevokeSessionsResultSchema,
   staffSessionSchema,
+  staffSupportAccessRequestSchema,
+  staffSupportViewSchema,
   staffWorkspaceDetailSchema,
   staffWorkspaceHealthSchema,
 } from '@luma/api-contract/staff';
@@ -238,6 +240,34 @@ export function createStaffApi(
       staffMembershipChangeSchema.parse(
         await request(
           `${workspace(workspaceId)}/users/${encodeURIComponent(userId)}/${action}-membership`,
+          body,
+        ),
+      ),
+    startSupportView: async (
+      workspaceId: string,
+      userId: string,
+      body: { grantId: string; reason: string } & (
+        | { mode: 'consent' }
+        | {
+            mode: 'emergency';
+            category: 'security_incident' | 'legal_request';
+            reference: string;
+          }
+      ),
+    ) =>
+      staffSupportViewSchema.parse(
+        await request(
+          `${workspace(workspaceId)}/users/${encodeURIComponent(userId)}/support-view`,
+          body,
+        ),
+      ),
+    requestSupportAccess: async (
+      workspaceId: string,
+      body: { grantId: string; reason: string; durationHours: 24 | 72 | 168 },
+    ) =>
+      staffSupportAccessRequestSchema.parse(
+        await request(
+          `${workspace(workspaceId)}/support-access-requests`,
           body,
         ),
       ),

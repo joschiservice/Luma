@@ -5,6 +5,8 @@ export {
   makeTenantContext,
   MembershipSuspendedError,
   pausesBackgroundWork,
+  ReadOnlyAccessError,
+  requireChangesAllowed,
   requirePermission,
   requireTenant,
   WorkspaceInactiveError,
@@ -14,6 +16,8 @@ export type {
   Membership,
   Organization,
   SessionIdentity,
+  SupportView,
+  SupportViewMode,
   TenantContext,
 } from './domain/context.js';
 

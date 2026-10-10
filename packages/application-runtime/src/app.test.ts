@@ -230,6 +230,11 @@ function fixture() {
     listMembers: vi.fn(),
     suspendedMembers: vi.fn(),
     changeMember: vi.fn(),
+    hasSupportView: vi.fn(() => false),
+    supportView: vi.fn(),
+    redeemSupportView: vi.fn(),
+    endSupportView: vi.fn(),
+    sweepSupportViews: vi.fn(),
     resolveTenant: vi.fn(async (credentials, tenantId, requestId) => {
       if (!credentials.cookie)
         throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');

@@ -111,12 +111,14 @@ export {
   membershipSchema,
   organizationSchema,
   securityEventSchema,
+  supportViewStateSchema,
   tenantContextSchema,
 } from './contracts/identity.js';
 
 export type {
   Membership,
   SecurityEventResponse,
+  SupportViewState,
   TenantContextResponse,
 } from './contracts/identity.js';
 

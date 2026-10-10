@@ -13,6 +13,7 @@ export const apiErrorSchema = z.object({
     'UNAUTHENTICATED',
     'FORBIDDEN',
     'ACCESS_SUSPENDED',
+    'READ_ONLY',
     'NOT_FOUND',
     'CONFLICT',
     'REGION_UNAVAILABLE',
@@ -57,6 +58,11 @@ export type ErrorStatus = 400 | 401 | 403 | 404 | 409 | 422 | 429 | 503;
 export interface RouteMeta {
   access?: RouteAccess;
   errors?: readonly ErrorStatus[];
+  /**
+   * Marks a route with a request body that only reads, so read-only support views may call it.
+   * `GET` routes are reads already; every other route is refused in a support view.
+   */
+  readOnly?: true;
 }
 
 /**

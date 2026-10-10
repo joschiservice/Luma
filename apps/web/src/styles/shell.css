@@ -685,6 +685,23 @@
   margin-bottom: 16px;
 }
 
+/* Support view: a permanent notice above the top bar on every workspace page. */
+.support-view-banner {
+  flex-shrink: 0;
+  padding: 8px 10px 0;
+}
+
+.support-view-banner [data-slot='alert-description'] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+
+.support-view-banner [data-slot='alert-description'] > button {
+  margin-inline-start: auto;
+}
+
 /* Command menu */
 .command-palette[data-slot='dialog-content'] {
   top: min(15vh, 128px);

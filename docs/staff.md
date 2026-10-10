@@ -1,7 +1,7 @@
 # Staff access
 
 The staff console provides customer account lookup, account and workspace inspection,
-controlled session revocation and membership suspension. Its identities, sessions and permissions are separate from customer
+controlled session revocation, membership suspension and read-only support views. Its identities, sessions and permissions are separate from customer
 workspace access. Customer Owners and Admins cannot grant staff privileges.
 
 ## Authentication and provisioning
@@ -60,7 +60,9 @@ staff credentials cannot perform it. Opening workspace support grants
 requires both `staff.directory.read` and `staff.workspace.inspect`; opening account grants
 requires `staff.directory.read` and `staff.accounts.inspect`. Global customer
 session revocation additionally requires `staff.sessions.revoke`, and suspending or
-reactivating a membership requires `staff.memberships.manage`. Reviewing the staff audit
+reactivating a membership requires `staff.memberships.manage`. Starting a consented support
+view or requesting consent requires `staff.view-as`; an emergency view requires
+`staff.view-as.emergency`. Reviewing the staff audit
 log requires `staff.audit.read`; grant it separately, to the people accountable for
 reviewing support work, not as part of a support role.
 
@@ -160,6 +162,44 @@ with the customer's own membership changes. The membership change, its receipt, 
   the staff reason is stored on the membership but never returned to customers.
 - Workflows acting as the person pause and show that they need a new owner. Sync streams they
   ran block until someone resumes them; reactivation doesn't unblock them.
+
+## Support view
+
+A support view shows the customer app as one member sees it, read-only, for up to thirty
+minutes. [ADR-011](architecture/011-support-view.md) records the design. Start it from the
+workspace page under a workspace grant, with a reason; the target must be an active member.
+
+- **Consent.** `staff.view-as` needs the workspace's current consent, which people with
+  `support_access.manage` give in Settings › Luma support for 24 hours, 3 days or 7 days. Without
+  consent, staff can request it with a reason and duration; owners are emailed and approve or
+  decline in the app. One request can be pending; it lapses after seven days.
+- **Emergency.** `staff.view-as.emergency` starts a view without consent for a security incident
+  or legal request. It needs a category, a reference and a staff sign-in within fifteen minutes.
+  Grant it separately from support roles.
+- **Handoff.** Starting returns a customer app link with a single-use token in the URL fragment,
+  valid for two minutes. The customer API exchanges it for its own cookie (`<auth cookie
+prefix>.support_view`, `__Host-` over HTTPS, HttpOnly, `SameSite=Strict`). Only token hashes
+  are stored. Starting another view ends the session's open views.
+- **Checks on every request.** `support_view_resolve` ends the view when its thirty minutes
+  pass, the staff member loses admission, the permission or their staff session, or a consented
+  view's consent ends. Staff idle limits don't apply while viewing. Revoking consent therefore
+  ends open views on their next request; a minute-by-minute sweep in the customer API records
+  the end of views nobody uses again.
+- **Read-only.** See [context and isolation](identity.md#support-views) for what the customer
+  API refuses.
+- **Evidence.** `view-as.started`, `view-as.read` and `view-as.ended` go to `staff_audit`, with
+  the reason, emergency category and reference on the start. The customer's Activity gets
+  `support_view.started` (or `support_view.emergency_started`), `support_view.read` and
+  `support_view.ended` by Luma support, plus consent changes and requests. Reads are sampled:
+  the first allowed read of each API path in a view is recorded, so repeated or live reads of a
+  path appear once; every distinct record path appears. Owners are emailed when a consented
+  view starts and when an emergency view ends.
+
+The view tables are owned by `luma_support_view` and reachable only through its functions: the
+staff runtime may start views, request consent and read consent status; the customer runtime may
+redeem, resolve, end and sweep. Neither can read tokens, staff identities or the view rows
+directly. Set `STAFF_CUSTOMER_ORIGIN` to the customer app's exact origin; without it views can't
+start.
 
 ## Staff audit review and retention
 

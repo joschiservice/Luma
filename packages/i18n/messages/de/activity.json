@@ -146,5 +146,14 @@
   "activity_change_order_cancel": "Bestellung stornieren",
   "activity_change_purchase_order": "Lieferantenbestellung erstellen",
   "activity_change_refund": "Erstattung erstellen",
-  "activity_change_fulfillment_retry": "Fulfillment erneut versuchen"
+  "activity_change_fulfillment_retry": "Fulfillment erneut versuchen",
+  "activity_action_support_view_started": "Support-Ansicht, nur lesend, gestartet",
+  "activity_action_support_view_emergency_started": "Notfall-Support-Ansicht, nur lesend, gestartet",
+  "activity_action_support_view_read": "Support-Ansicht hat eine Seite geöffnet",
+  "activity_action_support_view_ended": "Support-Ansicht beendet",
+  "activity_action_support_access_allowed": "Support-Zugriff erlaubt",
+  "activity_action_support_access_revoked": "Support-Zugriff entzogen",
+  "activity_action_support_access_requested": "Support-Zugriff angefragt",
+  "activity_action_support_access_request_approved": "Anfrage für Support-Zugriff angenommen",
+  "activity_action_support_access_request_declined": "Anfrage für Support-Zugriff abgelehnt"
 }

@@ -23,6 +23,8 @@ const protectedRoutes = new Set([
   'POST /v1/staff/workspaces/:workspaceId/users/:userId/revoke-sessions',
   'POST /v1/staff/workspaces/:workspaceId/users/:userId/suspend-membership',
   'POST /v1/staff/workspaces/:workspaceId/users/:userId/reactivate-membership',
+  'POST /v1/staff/workspaces/:workspaceId/users/:userId/support-view',
+  'POST /v1/staff/workspaces/:workspaceId/support-access-requests',
   'GET /v1/staff/workspaces/:workspaceId/health',
   'GET /v1/staff/workspaces/:workspaceId/access-history',
   'GET /v1/staff/audit',
@@ -48,6 +50,14 @@ const routePermissions: Record<string, StaffPermission[]> = {
   ],
   'POST /v1/staff/workspaces/:workspaceId/users/:userId/reactivate-membership':
     ['staff.workspace.inspect', 'staff.memberships.manage'],
+  // The service requires `staff.view-as` or the emergency permission, by mode.
+  'POST /v1/staff/workspaces/:workspaceId/users/:userId/support-view': [
+    'staff.workspace.inspect',
+  ],
+  'POST /v1/staff/workspaces/:workspaceId/support-access-requests': [
+    'staff.workspace.inspect',
+    'staff.view-as',
+  ],
   'GET /v1/staff/workspaces/:workspaceId/health': ['staff.workspace.inspect'],
   'GET /v1/staff/workspaces/:workspaceId/access-history': [
     'staff.workspace.inspect',
@@ -335,6 +345,20 @@ export function registerStaffHttp(app: FastifyInstance, staff: StaffRuntime) {
           action: 'reactivate',
           acknowledgeLastOwner: false,
         }),
+    ),
+    startSupportView: os.startSupportView.handler(
+      async ({ context: { request }, input: { params, body } }) =>
+        await staff.service.startSupportView(context(request.staffContext), {
+          ...params,
+          ...body,
+        }),
+    ),
+    requestSupportAccess: os.requestSupportAccess.handler(
+      async ({ context: { request }, input: { params, body } }) =>
+        await staff.service.requestSupportAccess(
+          context(request.staffContext),
+          { ...params, ...body },
+        ),
     ),
     health: os.health.handler(
       async ({ context: { request }, input: { params, query } }) =>

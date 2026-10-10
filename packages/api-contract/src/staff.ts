@@ -10,6 +10,8 @@ export const staffPermissionSchema = z.enum([
   'staff.audit.read',
   'staff.accounts.inspect',
   'staff.memberships.manage',
+  'staff.view-as',
+  'staff.view-as.emergency',
 ]);
 
 /** A suspended membership keeps its role and the account; it has no access to the workspace. */
@@ -63,6 +65,18 @@ export const staffDetailSchema = z.object({
       lastSyncAt: z.string().datetime().nullable(),
     }),
   ),
+  /** Whether the workspace allows read-only support views, and a pending request for it. */
+  supportAccess: z.object({
+    allowedUntil: z.string().datetime().nullable(),
+    request: z
+      .object({
+        id: z.string().uuid(),
+        durationHours: z.union([z.literal(24), z.literal(72), z.literal(168)]),
+        requestedAt: z.string().datetime(),
+        expiresAt: z.string().datetime(),
+      })
+      .nullable(),
+  }),
 });
 
 export const staffReasonSchema = z.string().trim().min(10).max(500);
@@ -102,6 +116,28 @@ export const staffMembershipChangeSchema = z.object({
   /** Whether the suspension left the workspace without an active owner. */
   lastActiveOwner: z.boolean(),
   completedAt: z.string().datetime(),
+});
+
+/** Emergency support views need one of these reasons and an external reference. */
+export const staffEmergencyCategorySchema = z.enum([
+  'security_incident',
+  'legal_request',
+]);
+
+/** A started support view: open `url` in a new tab within two minutes. */
+export const staffSupportViewSchema = z.object({
+  id: z.string().uuid(),
+  expiresAt: z.string().datetime(),
+  /** The customer app with a single-use token in the fragment; valid until `handoffExpiresAt`. */
+  url: z.string().url(),
+  handoffExpiresAt: z.string().datetime(),
+});
+
+export const staffSupportAccessRequestSchema = z.object({
+  id: z.string().uuid(),
+  durationHours: z.union([z.literal(24), z.literal(72), z.literal(168)]),
+  requestedAt: z.string().datetime(),
+  expiresAt: z.string().datetime(),
 });
 
 const timestamp = z.string().datetime();
@@ -599,6 +635,67 @@ export const staffContract = {
       }),
     )
     .output(staffMembershipChangeSchema),
+  startSupportView: endpoint
+    .route({
+      method: 'POST',
+      path: '/v1/staff/workspaces/{workspaceId}/users/{userId}/support-view',
+      successStatus: 201,
+      summary: 'Start a read-only support view as a member',
+      description:
+        'Opens the customer app as this member for up to thirty minutes. The view refuses every change and appears in the workspace’s Activity. `consent` needs `staff.view-as` and the workspace’s current consent. `emergency` needs `staff.view-as.emergency`, a category, a reference and recent staff authentication; owners are emailed when it ends. Starting a view ends this session’s other views. Requires a current workspace grant.',
+    })
+    .meta({ errors })
+    .input(
+      z.object({
+        params: workspaceParams.extend({ userId: z.string().uuid() }),
+        body: z.discriminatedUnion('mode', [
+          z
+            .object({
+              mode: z.literal('consent'),
+              grantId: z.string().uuid(),
+              reason: staffReasonSchema,
+            })
+            .strict(),
+          z
+            .object({
+              mode: z.literal('emergency'),
+              grantId: z.string().uuid(),
+              reason: staffReasonSchema,
+              category: staffEmergencyCategorySchema,
+              reference: z.string().trim().min(3).max(200),
+            })
+            .strict(),
+        ]),
+      }),
+    )
+    .output(staffSupportViewSchema),
+  requestSupportAccess: endpoint
+    .route({
+      method: 'POST',
+      path: '/v1/staff/workspaces/{workspaceId}/support-access-requests',
+      successStatus: 201,
+      summary: 'Ask a workspace to allow support access',
+      description:
+        'Asks the workspace’s owners and admins to allow read-only support views for 24, 72 or 168 hours. Owners are emailed; the reason is shown to them. One request can be pending; it lapses after seven days. Requires `staff.view-as` and a current workspace grant.',
+    })
+    .meta({ errors })
+    .input(
+      z.object({
+        params: workspaceParams,
+        body: z
+          .object({
+            grantId: z.string().uuid(),
+            reason: staffReasonSchema,
+            durationHours: z.union([
+              z.literal(24),
+              z.literal(72),
+              z.literal(168),
+            ]),
+          })
+          .strict(),
+      }),
+    )
+    .output(staffSupportAccessRequestSchema),
   grantAccountAccess: endpoint
     .route({
       method: 'POST',

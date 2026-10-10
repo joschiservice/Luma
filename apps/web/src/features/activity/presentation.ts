@@ -104,6 +104,18 @@ export const activityLabels: Record<string, Label> = {
   'member.remove': m.activity_action_member_removed,
   'member.suspended': m.activity_action_member_suspended,
   'member.reactivated': m.activity_action_member_reactivated,
+  'support_view.started': m.activity_action_support_view_started,
+  'support_view.emergency_started':
+    m.activity_action_support_view_emergency_started,
+  'support_view.read': m.activity_action_support_view_read,
+  'support_view.ended': m.activity_action_support_view_ended,
+  'support_access.allowed': m.activity_action_support_access_allowed,
+  'support_access.revoked': m.activity_action_support_access_revoked,
+  'support_access.requested': m.activity_action_support_access_requested,
+  'support_access.request_approved':
+    m.activity_action_support_access_request_approved,
+  'support_access.request_declined':
+    m.activity_action_support_access_request_declined,
   'invitation.created': m.activity_action_invitation_created,
   'invitation.accepted': m.activity_action_invitation_accepted,
   'invitation.revoked': m.activity_action_invitation_revoked,

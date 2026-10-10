@@ -7,7 +7,7 @@ import { z } from 'zod';
 import type { ActivityStore } from '../../application/activity.js';
 import type { ActivityEvent, ActivityQuery } from '../../domain/activity.js';
 import { activityOutcomeRules } from '../../domain/activity-outcome.js';
-import { actorSql, personSql } from './actors.js';
+import { actorSql, personSql, uuidPattern } from './actors.js';
 
 const coverage =
   'Recorded decisions, execution, verification, issue resolutions and procurement changes. People who can view restricted activity also see connection changes and changes to members, invitations, roles and workspace settings. Older unrecorded changes and legacy playbook activation history are unavailable. Execution mode is shown only when recorded.';
@@ -25,7 +25,8 @@ const outcomeSql =
   " ELSE 'recorded' END";
 
 // Access events carry bounded role, member and invitation values. Summaries name the role or
-// setting that changed; e-mail addresses, permission lists and invitation secrets stay out.
+// setting that changed, the member a support view showed, or the path it read; e-mail
+// addresses, permission lists and invitation secrets stay out.
 const accessRole = (value: string) =>
   `COALESCE(${value}->>'roleName',CASE WHEN jsonb_typeof(${value}->'role')='string' THEN ${value}->>'role' END)`;
 const accessSummarySql = `CASE
@@ -35,6 +36,8 @@ const accessSummarySql = `CASE
   WHEN event_type LIKE 'member.%' OR event_type LIKE 'invitation.%' THEN COALESCE(${accessRole('after_value')},${accessRole('before_value')})
   WHEN event_type='policy.updated' THEN CASE after_value->>'required' WHEN 'true' THEN 'Approval always required' WHEN 'false' THEN 'Approval follows the workspace policy' END
   WHEN event_type='workspace.updated' THEN after_value->>'name'
+  WHEN event_type='support_view.read' THEN after_value->>'path'
+  WHEN event_type LIKE 'support_view.%' THEN subject.subject_name
 END`;
 
 /**
@@ -56,6 +59,9 @@ const accessEventsSql = `SELECT x.created_at AS sort_at,x.sort_id,
         person.actor_name,person.actor_email,person.actor_member
         FROM workspace_access_events e
         ${personSql('person', 'e.tenant_id', 'e.actor_id::text')}
+        LEFT JOIN LATERAL (SELECT name AS subject_name FROM workspace_people WHERE tenant_id=e.tenant_id
+          AND e.event_type LIKE 'support_view.%'
+          AND user_id=CASE WHEN e.after_value->>'userId' ~ ${uuidPattern} THEN (e.after_value->>'userId')::uuid END) subject ON true
         WHERE $4::boolean AND e.tenant_id=$1 AND e.created_at>=$2::timestamptz AND e.created_at<$3::timestamptz
         AND $7::text IS NULL AND $8::uuid IS NULL AND $13::text[] IS NULL
         AND ($9::text IS NULL OR $9::text='access') AND ($10::text IS NULL OR $10::text='recorded')

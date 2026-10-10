@@ -53,6 +53,8 @@ const provisioningSchema = z
         'staff.audit.read',
         'staff.accounts.inspect',
         'staff.memberships.manage',
+        'staff.view-as',
+        'staff.view-as.emergency',
       ]),
     ),
     operator: z.string().trim().min(1).max(200),
@@ -88,6 +90,8 @@ const settingsSchema = z
     databaseUrl: databaseUrlSchema,
     secret: z.string().min(32),
     publicOrigin: z.string().url(),
+    /** The customer app's origin, where support views open. Without it, views can't start. */
+    customerOrigin: z.string().url().optional(),
     mode: z.enum(['local', 'google']),
     host: z.string(),
     port: z.coerce.number<number>().int().min(1).max(65535),
@@ -165,6 +169,21 @@ const settingsSchema = z
         code: 'custom',
         message: 'Google staff authentication requires HTTPS.',
       });
+    if (settings.customerOrigin !== undefined) {
+      const customer = URL.parse(settings.customerOrigin);
+      if (
+        !customer ||
+        customer.origin !== settings.customerOrigin ||
+        customer.origin === url.origin ||
+        (settings.mode === 'google' && customer.protocol !== 'https:') ||
+        (settings.mode === 'local' && !loopback(customer.hostname))
+      )
+        context.addIssue({
+          code: 'custom',
+          message:
+            'The customer origin must be an exact origin, separate from the staff origin, using HTTPS with Google authentication or loopback locally.',
+        });
+    }
     if (
       settings.mode === 'google' &&
       settings.environment === 'production' &&
@@ -187,6 +206,7 @@ export function readStaffSettings(
     databaseUrl: env.STAFF_DATABASE_URL,
     secret: env.STAFF_AUTH_SECRET,
     publicOrigin: env.STAFF_PUBLIC_ORIGIN,
+    customerOrigin: env.STAFF_CUSTOMER_ORIGIN?.trim() || undefined,
     mode: env.STAFF_AUTH_MODE,
     host: env.STAFF_API_HOST ?? '127.0.0.1',
     port: env.STAFF_API_PORT,

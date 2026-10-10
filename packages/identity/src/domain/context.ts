@@ -34,6 +34,16 @@ export interface SessionIdentity {
 }
 const resolvedContext: unique symbol = Symbol('resolvedTenantContext');
 
+/** How Luma staff were allowed to open a support view: workspace consent or emergency access. */
+export type SupportViewMode = 'consent' | 'emergency';
+
+/** A read-only support view: Luma staff see the workspace as one member. */
+export interface SupportView {
+  id: string;
+  mode: SupportViewMode;
+  expiresAt: string;
+}
+
 export interface TenantContext {
   readonly [resolvedContext]: true;
   readonly tenantId: string;
@@ -49,6 +59,11 @@ export interface TenantContext {
   /** What the actor may do, resolved from the current membership with the context. */
   readonly permissions: PermissionSet;
   readonly requestId: string;
+  /**
+   * Present when Luma staff view the workspace as the actor. The actor's permissions decide what
+   * they see; every change is refused.
+   */
+  readonly supportView?: Readonly<SupportView>;
 }
 
 export class IdentityError extends Error {
@@ -59,6 +74,7 @@ export class IdentityError extends Error {
       | 'UNAUTHENTICATED'
       | 'FORBIDDEN'
       | 'ACCESS_SUSPENDED'
+      | 'READ_ONLY'
       | 'NOT_FOUND'
       | 'CONFLICT'
       | 'REGION_UNAVAILABLE'
@@ -112,15 +128,36 @@ export function requireActiveMembership(member: Membership): void {
 }
 
 /**
+ * Refuses a change in a support view. The guard already refuses routes that change data; services
+ * that execute actions, approve or call models check again.
+ */
+export class ReadOnlyAccessError extends IdentityError {
+  constructor() {
+    super(
+      403,
+      'READ_ONLY',
+      'Luma support is viewing this workspace read-only. Nothing was changed.',
+    );
+  }
+}
+
+/** Throws `ReadOnlyAccessError` when the context is a support view. */
+export function requireChangesAllowed(context: TenantContext): void {
+  if (context.supportView) throw new ReadOnlyAccessError();
+}
+
+/**
  * Creates an immutable context for a matching, active membership in an active EU organization;
  * rejects inaccessible or unsupported organizations. A suspended or closed organization
  * raises `WorkspaceInactiveError`, and a suspended membership `MembershipSuspendedError`.
+ * `supportView` marks a read-only context for Luma staff viewing the workspace as the member.
  */
 export function makeTenantContext(
   session: SessionIdentity,
   organization: Organization,
   member: Membership,
   requestId: string,
+  supportView?: SupportView,
 ): TenantContext {
   if (
     member.userId !== session.userId ||
@@ -150,6 +187,7 @@ export function makeTenantContext(
     }),
     permissions: member.permissions,
     requestId,
+    ...(supportView ? { supportView: Object.freeze({ ...supportView }) } : {}),
   });
 }
 

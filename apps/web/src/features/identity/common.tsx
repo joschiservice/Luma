@@ -6,7 +6,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { type ReactNode, useEffect } from 'react';
 
-import { clearPrivate, IdentityError, returnPath } from './data';
+import {
+  clearPrivate,
+  IdentityError,
+  returnPath,
+  supportViewJustEnded,
+} from './data';
 import { retainInvitationToken } from './invitation-return';
 
 /** Renders the Luma lockup linked to the public home page. */
@@ -65,11 +70,14 @@ export function SignInRedirect() {
   const href = useLocation({ select: (location) => location.href });
   useEffect(() => {
     void clearPrivate(client).then(() =>
-      navigate({
-        to: '/sign-in',
-        search: { returnTo: returnPath(retainInvitationToken(href)) },
-        replace: true,
-      }),
+      // A support view that just ended explains itself instead of asking staff to sign in.
+      supportViewJustEnded()
+        ? navigate({ to: '/support-view', replace: true })
+        : navigate({
+            to: '/sign-in',
+            search: { returnTo: returnPath(retainInvitationToken(href)) },
+            replace: true,
+          }),
     );
   }, [client, href, navigate]);
 

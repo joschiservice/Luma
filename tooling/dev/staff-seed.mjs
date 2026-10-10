@@ -26,6 +26,8 @@ export async function seedStaff(
         'staff.audit.read',
         'staff.accounts.inspect',
         'staff.memberships.manage',
+        'staff.view-as',
+        'staff.view-as.emergency',
       ],
     },
     migrationUrl,

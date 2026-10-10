@@ -78,6 +78,8 @@ function mockSecurity(state: SecurityState = 'off') {
     );
     if (!url.pathname.startsWith('/api/')) return original(input, init);
     const path = url.pathname.replace('/api/auth', '');
+    if (path === '/api/v1/support-view')
+      return Response.json({ active: false, endReason: null });
     if (path === '/get-session')
       return Response.json({
         session: { id: 'session', userId: 'user', expiresAt: '2026-11-01' },

@@ -9,6 +9,8 @@ import type { PermissionSet, RoleReference } from '../domain/roles.js';
 import type {
   NotificationPreferences,
   SettingsSnapshot,
+  SupportAccess,
+  SupportAccessDuration,
   WorkspaceInvitation,
   WorkspaceLayout,
   WorkspaceSettings,
@@ -53,6 +55,22 @@ export interface SettingsTransaction {
     target: string,
     before: unknown,
     after: unknown,
+  ): Promise<void>;
+  /** Reads support access and pending requests; lapsed access reads as not allowed. */
+  supportAccess(): Promise<SupportAccess>;
+  saveSupportAccess(
+    value: { allowedUntil: string | null; revision: number },
+    actorId: string,
+  ): Promise<void>;
+  supportAccessRequest(id: string): Promise<{
+    id: string;
+    durationHours: SupportAccessDuration;
+    pending: boolean;
+  } | null>;
+  decideSupportAccessRequest(
+    id: string,
+    status: 'approved' | 'declined',
+    actorId: string,
   ): Promise<void>;
   invitations(): Promise<InvitationRecord[]>;
   pendingInvitation(email: string): Promise<boolean>;
@@ -139,7 +157,7 @@ export function createSettingsService(deps: SettingsDependencies) {
   async function command<T>(
     context: TenantContext,
     permission: Permission | null,
-    input: { commandId: string; invitationId?: string },
+    input: { commandId: string; invitationId?: string; requestId?: string },
     kind: string,
     operation: (tx: SettingsTransaction, actor: Membership) => Promise<T>,
   ): Promise<T> {
@@ -376,6 +394,139 @@ export function createSettingsService(deps: SettingsDependencies) {
 
         return tx.snapshot(context.actor.id);
       });
+    },
+    /** Reads until when Luma support may open read-only views, and pending requests. */
+    supportAccess: (context: TenantContext) =>
+      authorized(context, 'support_access.manage', (tx) => tx.supportAccess()),
+    /**
+     * Allows Luma support access for `durationHours` from now, replacing an earlier end time, if
+     * the reviewed revision is still current.
+     */
+    allowSupportAccess(
+      context: TenantContext,
+      input: {
+        commandId: string;
+        revision: number;
+        durationHours: SupportAccessDuration;
+      },
+    ) {
+      return command(
+        context,
+        'support_access.manage',
+        input,
+        'support_access.allow',
+        async (tx) => {
+          const before = await tx.supportAccess();
+          if (before.revision !== input.revision)
+            conflict('Support access changed. Refresh before saving.');
+          const allowedUntil = new Date(
+            deps.now().getTime() + input.durationHours * 3600000,
+          ).toISOString();
+          await tx.saveSupportAccess(
+            { allowedUntil, revision: before.revision + 1 },
+            context.actor.id,
+          );
+          await tx.audit(
+            context.actor.id,
+            'support_access.allowed',
+            context.tenantId,
+            { allowedUntil: before.allowedUntil },
+            { allowedUntil, durationHours: input.durationHours },
+          );
+
+          return tx.supportAccess();
+        },
+      );
+    },
+    /** Ends Luma support access now; open support views end on their next request. */
+    revokeSupportAccess(
+      context: TenantContext,
+      input: { commandId: string; revision: number },
+    ) {
+      return command(
+        context,
+        'support_access.manage',
+        input,
+        'support_access.revoke',
+        async (tx) => {
+          const before = await tx.supportAccess();
+          if (before.revision !== input.revision)
+            conflict('Support access changed. Refresh before saving.');
+          if (before.allowedUntil) {
+            await tx.saveSupportAccess(
+              { allowedUntil: null, revision: before.revision + 1 },
+              context.actor.id,
+            );
+            await tx.audit(
+              context.actor.id,
+              'support_access.revoked',
+              context.tenantId,
+              { allowedUntil: before.allowedUntil },
+              { allowedUntil: null },
+            );
+          }
+
+          return tx.supportAccess();
+        },
+      );
+    },
+    /**
+     * Approves or declines a pending request from Luma support. Approval allows access for the
+     * requested duration from now, or keeps a later end time.
+     */
+    decideSupportAccessRequest(
+      context: TenantContext,
+      requestId: string,
+      input: { commandId: string; decision: 'approve' | 'decline' },
+    ) {
+      return command(
+        context,
+        'support_access.manage',
+        { ...input, requestId },
+        'support_access.decide',
+        async (tx) => {
+          const request = await tx.supportAccessRequest(requestId);
+          if (!request?.pending)
+            conflict(
+              'This request was already answered or has lapsed. Refresh the page.',
+            );
+          await tx.decideSupportAccessRequest(
+            requestId,
+            input.decision === 'approve' ? 'approved' : 'declined',
+            context.actor.id,
+          );
+          const before = await tx.supportAccess();
+          let allowedUntil = before.allowedUntil;
+          if (input.decision === 'approve') {
+            const requested = new Date(
+              deps.now().getTime() + request.durationHours * 3600000,
+            ).toISOString();
+            allowedUntil =
+              before.allowedUntil && before.allowedUntil > requested
+                ? before.allowedUntil
+                : requested;
+            await tx.saveSupportAccess(
+              { allowedUntil, revision: before.revision + 1 },
+              context.actor.id,
+            );
+          }
+          await tx.audit(
+            context.actor.id,
+            input.decision === 'approve'
+              ? 'support_access.request_approved'
+              : 'support_access.request_declined',
+            requestId,
+            { allowedUntil: before.allowedUntil, status: 'pending' },
+            {
+              allowedUntil,
+              durationHours: request.durationHours,
+              status: input.decision === 'approve' ? 'approved' : 'declined',
+            },
+          );
+
+          return tx.supportAccess();
+        },
+      );
     },
     /** Lists invitations without their acceptance credentials. */
     invitations: (context: TenantContext) =>

@@ -1738,6 +1738,7 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
         metrics,
         trustedOrigins: ['http://localhost:3000'],
         identity: {
+          hasSupportView: () => false,
           resolveTenant: async (_credentials: unknown, id: string) =>
             context(id),
         } as unknown as IdentityService,

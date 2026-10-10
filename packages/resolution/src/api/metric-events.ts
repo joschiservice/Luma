@@ -159,12 +159,14 @@ export function registerMetricEvents(
                   : {},
                 organizationId,
                 request.id,
+                { supportView: { read: null } },
               );
             });
             if (closed) return;
             if (
               !fresh ||
               fresh.actor.id !== context.actor.id ||
+              fresh.supportView?.id !== context.supportView?.id ||
               fresh.tenantId !== organizationId
             )
               throw new Error('Access changed');

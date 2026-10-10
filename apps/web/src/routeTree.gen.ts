@@ -15,6 +15,7 @@ import { Route as DocsSearchRouteImport } from './routes/docs-search'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignOutRouteImport } from './routes/sign-out'
 import { Route as SignUpRouteImport } from './routes/sign-up'
+import { Route as SupportViewRouteImport } from './routes/support-view'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AppOrganizationIdRouteImport } from './routes/app.$organizationId'
 import { Route as DocsIndexRouteImport } from './routes/docs.index'
@@ -89,6 +90,11 @@ const SignOutRoute = SignOutRouteImport.update({
 const SignUpRoute = SignUpRouteImport.update({
   id: '/sign-up',
   path: '/sign-up',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SupportViewRoute = SupportViewRouteImport.update({
+  id: '/support-view',
+  path: '/support-view',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppIndexRoute = AppIndexRouteImport.update({
@@ -361,6 +367,7 @@ export interface FileRoutesByFullPath {
   '/sign-in': typeof SignInRoute
   '/sign-out': typeof SignOutRoute
   '/sign-up': typeof SignUpRoute
+  '/support-view': typeof SupportViewRoute
   '/app/$organizationId': typeof AppOrganizationIdRouteWithChildren
   '/docs/$': typeof DocsSplatRoute
   '/app/': typeof AppIndexRoute
@@ -413,6 +420,7 @@ export interface FileRoutesByTo {
   '/sign-in': typeof SignInRoute
   '/sign-out': typeof SignOutRoute
   '/sign-up': typeof SignUpRoute
+  '/support-view': typeof SupportViewRoute
   '/app/$organizationId': typeof AppOrganizationIdRouteWithChildren
   '/docs/$': typeof DocsSplatRoute
   '/app': typeof AppIndexRoute
@@ -467,6 +475,7 @@ export interface FileRoutesById {
   '/sign-in': typeof SignInRoute
   '/sign-out': typeof SignOutRoute
   '/sign-up': typeof SignUpRoute
+  '/support-view': typeof SupportViewRoute
   '/app/$organizationId': typeof AppOrganizationIdRouteWithChildren
   '/docs/$': typeof DocsSplatRoute
   '/app/': typeof AppIndexRoute
@@ -522,6 +531,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/sign-out'
     | '/sign-up'
+    | '/support-view'
     | '/app/$organizationId'
     | '/docs/$'
     | '/app/'
@@ -574,6 +584,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/sign-out'
     | '/sign-up'
+    | '/support-view'
     | '/app/$organizationId'
     | '/docs/$'
     | '/app'
@@ -627,6 +638,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/sign-out'
     | '/sign-up'
+    | '/support-view'
     | '/app/$organizationId'
     | '/docs/$'
     | '/app/'
@@ -681,6 +693,7 @@ export interface RootRouteChildren {
   SignInRoute: typeof SignInRoute
   SignOutRoute: typeof SignOutRoute
   SignUpRoute: typeof SignUpRoute
+  SupportViewRoute: typeof SupportViewRoute
   DocsSplatRoute: typeof DocsSplatRoute
   DocsIndexRoute: typeof DocsIndexRoute
 }
@@ -727,6 +740,13 @@ declare module '@tanstack/react-router' {
       path: '/sign-up'
       fullPath: '/sign-up'
       preLoaderRoute: typeof SignUpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/support-view': {
+      id: '/support-view'
+      path: '/support-view'
+      fullPath: '/support-view'
+      preLoaderRoute: typeof SupportViewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app/': {
@@ -1185,6 +1205,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignInRoute: SignInRoute,
   SignOutRoute: SignOutRoute,
   SignUpRoute: SignUpRoute,
+  SupportViewRoute: SupportViewRoute,
   DocsSplatRoute: DocsSplatRoute,
   DocsIndexRoute: DocsIndexRoute,
 }

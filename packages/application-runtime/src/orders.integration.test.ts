@@ -852,6 +852,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
         orders: workspace(),
         trustedOrigins: ['http://localhost:3000'],
         identity: {
+          hasSupportView: () => false,
           resolveTenant: async (_credentials: unknown, id: string) =>
             context(id),
         } as unknown as IdentityService,

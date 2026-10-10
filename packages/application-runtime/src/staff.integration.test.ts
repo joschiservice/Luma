@@ -723,7 +723,9 @@ describe.skipIf(!databaseUrl)(
             'operator',
           ]),
         ).toEqual(new Set([bob]));
-        expect(await identity.service.listOrganizations(credentials)).toEqual([
+        expect(
+          await identity.service.listOrganizations(credentials, 'list'),
+        ).toEqual([
           expect.objectContaining({
             id: tenantA,
             membershipStatus: 'suspended',

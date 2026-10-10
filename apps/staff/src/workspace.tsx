@@ -14,6 +14,11 @@ import { Failure, Loading } from './feedback';
 import { WorkspaceHealth } from './health';
 import { sessionOptions, workspaceOptions } from './queries';
 import { workspaceRoute } from './router';
+import {
+  SupportAccessRequestDialog,
+  SupportAccessStatus,
+  SupportViewDialog,
+} from './support-view';
 
 /** Inspects current workspace records under a server-validated support access grant. */
 export function WorkspacePage() {
@@ -29,6 +34,12 @@ export function WorkspacePage() {
     userId: string;
     email: string;
   } | null>(null);
+  const [viewAs, setViewAs] = useState<{
+    userId: string;
+    name: string;
+    email: string;
+  } | null>(null);
+  const [askAccess, setAskAccess] = useState(false);
   const [membership, setMembership] = useState<{
     userId: string;
     email: string;
@@ -41,6 +52,11 @@ export function WorkspacePage() {
     session.data?.permissions.includes('staff.sessions.revoke') ?? false;
   const canManageMemberships =
     session.data?.permissions.includes('staff.memberships.manage') ?? false;
+  const canViewAs =
+    session.data?.permissions.includes('staff.view-as') ?? false;
+  const canEmergencyView =
+    session.data?.permissions.includes('staff.view-as.emergency') ?? false;
+  const consented = !!detail.data?.supportAccess.allowedUntil;
   const activeOwners =
     detail.data?.members.filter(
       (member) => member.owner && member.status === 'active',
@@ -119,6 +135,13 @@ export function WorkspacePage() {
           {detail.isFetching ? (
             <Loading>Refreshing workspace records…</Loading>
           ) : null}
+          {canViewAs || canEmergencyView ? (
+            <SupportAccessStatus
+              access={detail.data.supportAccess}
+              canRequest={canViewAs}
+              onRequest={() => setAskAccess(true)}
+            />
+          ) : null}
           <section
             className="staff-section"
             aria-labelledby="workspace-members"
@@ -175,18 +198,33 @@ export function WorkspacePage() {
                       <Badge>Active</Badge>
                     ),
                 },
-                ...(canRevoke || canManageMemberships
+                ...(canRevoke ||
+                canManageMemberships ||
+                canViewAs ||
+                canEmergencyView
                   ? [
                       {
                         key: 'actions',
                         header: 'Account actions',
                         cell: (row: {
                           userId: string;
+                          name: string;
                           email: string;
                           owner: boolean;
                           status: 'active' | 'suspended';
                         }) => (
                           <div className="staff-actions">
+                            {(canViewAs && consented) || canEmergencyView ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={row.status !== 'active'}
+                                onClick={() => setViewAs(row)}
+                                aria-label={`View as ${row.email}`}
+                              >
+                                View as
+                              </Button>
+                            ) : null}
                             {canRevoke ? (
                               <Button
                                 variant="outline"
@@ -303,6 +341,25 @@ export function WorkspacePage() {
           action={membership.action}
           soleOwner={membership.soleOwner}
           onClose={() => setMembership(null)}
+        />
+      ) : null}
+      {viewAs && detail.isSuccess ? (
+        <SupportViewDialog
+          key={viewAs.userId}
+          workspaceId={workspaceId}
+          grantId={grantId}
+          member={viewAs}
+          consented={consented}
+          canConsent={canViewAs}
+          canEmergency={canEmergencyView}
+          onClose={() => setViewAs(null)}
+        />
+      ) : null}
+      {askAccess && canViewAs && detail.isSuccess ? (
+        <SupportAccessRequestDialog
+          workspaceId={workspaceId}
+          grantId={grantId}
+          onClose={() => setAskAccess(false)}
         />
       ) : null}
       {target && canRevoke && detail.isSuccess ? (

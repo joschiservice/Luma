@@ -214,9 +214,11 @@ export function registerDeskEvents(
               request.headers.cookie ? { cookie: request.headers.cookie } : {},
               organizationId,
               request.id,
+              { supportView: { read: null } },
             );
             if (
               context.actor.id !== s.context.actor.id ||
+              context.supportView?.id !== s.context.supportView?.id ||
               context.tenantId !== organizationId
             )
               throw new Error('Scope changed');

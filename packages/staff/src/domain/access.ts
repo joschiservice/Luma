@@ -5,6 +5,8 @@ export const staffPermissions = [
   'staff.audit.read',
   'staff.accounts.inspect',
   'staff.memberships.manage',
+  'staff.view-as',
+  'staff.view-as.emergency',
 ] as const;
 
 export type StaffPermission = (typeof staffPermissions)[number];

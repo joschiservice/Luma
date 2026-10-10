@@ -30,6 +30,8 @@ function fixture(trustedProxy: string[] = []) {
       accountGrant: unused,
       account: unused,
       accountSecurityEvents: unused,
+      startSupportView: unused,
+      requestSupportAccess: unused,
     },
   };
 

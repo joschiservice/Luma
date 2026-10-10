@@ -52,7 +52,47 @@ export const tenantContextSchema = z.object({
   permissions: z.array(z.string()),
   /** True for Owner and Admin, which also hold every installed app's permissions. */
   allAppPermissions: z.boolean(),
+  /** Present when Luma support views the workspace as this member; every change is refused. */
+  supportView: z
+    .object({
+      id: z.string().uuid(),
+      mode: z.enum(['consent', 'emergency']),
+      expiresAt: z.string().datetime(),
+    })
+    .nullable()
+    .optional(),
 });
+
+export const supportViewEndReasonSchema = z.enum([
+  'ended',
+  'expired',
+  'consent_revoked',
+  'staff_access_revoked',
+  'replaced',
+]);
+
+/** The support view this browser holds, if any. */
+export const supportViewStateSchema = z.discriminatedUnion('active', [
+  z.object({
+    active: z.literal(false),
+    /** Why the view this browser held ended, when it just ended. */
+    endReason: supportViewEndReasonSchema.nullable(),
+  }),
+  z.object({
+    active: z.literal(true),
+    id: z.string().uuid(),
+    mode: z.enum(['consent', 'emergency']),
+    expiresAt: z.string().datetime(),
+    workspace: z.object({ id: z.string().uuid(), name: z.string() }),
+    member: z.object({
+      id: z.string().uuid(),
+      name: z.string(),
+      email: z.string(),
+    }),
+  }),
+]);
+
+export type SupportViewState = z.infer<typeof supportViewStateSchema>;
 
 export const securityEventTypeSchema = z.enum([
   'sign-in.password',
@@ -99,6 +139,44 @@ const commandHeaders = z.object({
 });
 
 export const identityContract = {
+  supportView: endpoint
+    .route({
+      method: 'GET',
+      path: '/v1/support-view',
+      summary: 'Read the Luma support view in this browser',
+      description:
+        'Returns the read-only support view this browser holds: the workspace, the member it shows and when it ends. Inactive when there is none or it ended, with the reason it just ended.',
+    })
+    .meta({ errors: [503] })
+    .output(supportViewStateSchema),
+  redeemSupportView: endpoint
+    .route({
+      method: 'POST',
+      path: '/v1/support-view/redeem',
+      summary: 'Open a Luma support view',
+      description:
+        'Exchanges the single-use token from a staff console link, within two minutes, for a support view cookie. While the cookie is present, workspace routes show the viewed member’s access read-only and refuse every change.',
+    })
+    .meta({ errors: [403, 404, 503] })
+    .input(
+      z.object({
+        body: z
+          .object({ token: z.string().regex(/^[A-Za-z0-9_-]{43}$/) })
+          .strict(),
+      }),
+    )
+    .output(z.object({ workspaceId: z.string().uuid() })),
+  endSupportView: endpoint
+    .route({
+      method: 'POST',
+      path: '/v1/support-view/end',
+      successStatus: 204,
+      summary: 'End the Luma support view',
+      description:
+        'Ends the support view this browser holds, records its end and clears its cookie.',
+    })
+    .meta({ errors: [403, 503] })
+    .output(z.void()),
   listSecurityEvents: endpoint
     .route({
       method: 'GET',

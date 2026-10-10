@@ -26,7 +26,8 @@ export function initialsOf(name: string, fallback = 'W') {
 
 /**
  * Shows the current workspace and lets people switch to another one or create a new
- * workspace. Each choice supplies its own link so the host keeps routing control.
+ * workspace. Each choice supplies its own link so the host keeps routing control. Without
+ * `createLink`, creating a workspace isn't offered.
  */
 export function WorkspaceSwitcher({
   workspace,
@@ -37,7 +38,7 @@ export function WorkspaceSwitcher({
   workspace: string;
   workspaceId: string;
   workspaces: WorkspaceChoice[];
-  createLink: ReactElement;
+  createLink?: ReactElement | undefined;
 }) {
   return (
     <Menu.Root>
@@ -94,11 +95,15 @@ export function WorkspaceSwitcher({
                 ))}
               </div>
             </Menu.Group>
-            <Menu.Separator className="workspace-menu-separator" />
-            <Menu.Item render={createLink} className="lu-menu-item">
-              <Plus size={15} aria-hidden="true" />
-              {m.ui_workspace_create()}
-            </Menu.Item>
+            {createLink ? (
+              <>
+                <Menu.Separator className="workspace-menu-separator" />
+                <Menu.Item render={createLink} className="lu-menu-item">
+                  <Plus size={15} aria-hidden="true" />
+                  {m.ui_workspace_create()}
+                </Menu.Item>
+              </>
+            ) : null}
           </Menu.Popup>
         </Menu.Positioner>
       </Menu.Portal>

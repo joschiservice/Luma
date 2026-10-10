@@ -28,7 +28,7 @@ const themes = [
  * Shows the signed-in person with their appearance, language, settings, documentation and
  * sign-out actions. The host stores the theme and supplies the navigation links. Choosing
  * another language stores it in a cookie and reloads the page, so server-rendered text and
- * formatting switch together.
+ * formatting switch together. `exit` replaces sign-out, for example to end a support view.
  */
 export function WorkspaceAccountMenu({
   name,
@@ -37,6 +37,7 @@ export function WorkspaceAccountMenu({
   onThemeChange,
   settingsLink,
   docsLink,
+  exit,
 }: {
   name: string;
   email?: string | undefined;
@@ -44,6 +45,7 @@ export function WorkspaceAccountMenu({
   onThemeChange: (theme: ThemeChoice) => void;
   settingsLink: ReactElement;
   docsLink: ReactElement;
+  exit?: { label: string; onSelect: () => void } | undefined;
 }) {
   return (
     <Menu.Root>
@@ -135,10 +137,20 @@ export function WorkspaceAccountMenu({
               {m.ui_account_documentation()}
             </Menu.Item>
             <Menu.Separator className="workspace-menu-separator" />
-            <Menu.Item render={<a href="/sign-out" />} className="lu-menu-item">
-              <LogOut size={15} aria-hidden="true" />
-              {m.ui_account_sign_out()}
-            </Menu.Item>
+            {exit ? (
+              <Menu.Item onClick={exit.onSelect} className="lu-menu-item">
+                <LogOut size={15} aria-hidden="true" />
+                {exit.label}
+              </Menu.Item>
+            ) : (
+              <Menu.Item
+                render={<a href="/sign-out" />}
+                className="lu-menu-item"
+              >
+                <LogOut size={15} aria-hidden="true" />
+                {m.ui_account_sign_out()}
+              </Menu.Item>
+            )}
           </Menu.Popup>
         </Menu.Positioner>
       </Menu.Portal>

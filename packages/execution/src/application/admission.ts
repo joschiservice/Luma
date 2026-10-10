@@ -1,5 +1,5 @@
 import type { TenantContext } from '@luma/identity';
-import { requireTenant } from '@luma/identity';
+import { requireChangesAllowed, requireTenant } from '@luma/identity';
 import type { ProposedAction } from '@luma/policies';
 import { currentPolicyVersion } from '@luma/policies';
 
@@ -86,6 +86,7 @@ export function createActionAdmission(deps: AdmissionDependencies) {
       const reference = deps.parseReference(input);
       // Execution checks the capability's permission, or actions.execute, against a fresh
       // context at policy evaluation and again before dispatch.
+      requireChangesAllowed(context);
       const fresh = await deps.refreshContext(context);
       requireTenant(fresh, context.tenantId);
       if (fresh.actor.id !== context.actor.id)
