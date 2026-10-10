@@ -60,11 +60,11 @@ test('previews and enables SKU and order rules, disables linking and keeps narro
   await page.getByRole('button', { name: 'Add linking rule' }).click();
   await page.getByRole('combobox', { name: 'Record type' }).click();
   await page
-    .getByRole('option', { name: 'Orders: JTL reference to Shopify' })
+    .getByRole('option', { name: 'Orders: ERP reference to Shopify' })
     .click();
   await page.getByRole('combobox', { name: 'Shopify store' }).click();
   await page.getByRole('option', { name: 'Tokyo store' }).click();
-  await page.getByRole('combobox', { name: 'JTL connection' }).click();
+  await page.getByRole('combobox', { name: 'ERP connection' }).click();
   await page.getByRole('option', { name: 'JTL-Wawi' }).click();
   await page.getByRole('button', { name: 'Preview matches' }).click();
   await expect(
@@ -99,7 +99,7 @@ test('previews and enables SKU and order rules, disables linking and keeps narro
   ).toBe(true);
   await page.getByRole('button', { name: 'Enable automatic linking' }).click();
   await expect(
-    page.getByText('JTL order reference', { exact: true }),
+    page.getByText('ERP order reference', { exact: true }),
   ).toBeVisible();
   expect(errors).toEqual([]);
 });

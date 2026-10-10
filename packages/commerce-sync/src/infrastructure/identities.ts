@@ -157,7 +157,7 @@ export function createIdentityReader(db: TenantDatabase): IdentityReader {
     );
 }
 
-/** Suggests only a JTL marketplace reference matching a Shopify order number in this tenant. */
+/** Suggests only an ERP order's marketplace reference matching a Shopify order number in this tenant. */
 async function readOrderIdentity(
   tx: SqlTransaction,
   tenantId: string,
@@ -176,8 +176,8 @@ async function readOrderIdentity(
          OR (other.external_order_key IS NOT NULL AND other.external_order_key=mine.display_number_key))
      JOIN connector_installations b ON b.tenant_id=other.tenant_id AND b.id=other.connection_id
      WHERE mine.tenant_id=$1 AND mine.entity_id=$2 AND NOT mine.deleted AND NOT other.deleted
-       AND ((COALESCE(a.document->>'provider',a.document->'target'->>'kind')='jtl' AND COALESCE(b.document->>'provider',b.document->'target'->>'kind')='shopify' AND mine.external_order_key=other.display_number_key)
-         OR (COALESCE(a.document->>'provider',a.document->'target'->>'kind')='shopify' AND COALESCE(b.document->>'provider',b.document->'target'->>'kind')='jtl' AND other.external_order_key=mine.display_number_key))
+       AND ((COALESCE(a.document->>'provider',a.document->'target'->>'kind')<>'shopify' AND COALESCE(b.document->>'provider',b.document->'target'->>'kind')='shopify' AND mine.external_order_key=other.display_number_key)
+         OR (COALESCE(a.document->>'provider',a.document->'target'->>'kind')='shopify' AND COALESCE(b.document->>'provider',b.document->'target'->>'kind')<>'shopify' AND other.external_order_key=mine.display_number_key))
        AND NOT EXISTS (SELECT 1 FROM connector_source_mappings x JOIN connector_source_mappings y
          ON y.tenant_id=x.tenant_id AND y.connection_id=x.connection_id AND y.resource='order' AND y.canonical_id=other.entity_id
          WHERE x.tenant_id=$1 AND x.resource='order' AND x.canonical_id=$2)
@@ -202,7 +202,7 @@ async function readOrderIdentity(
     suggestions: candidates.map((candidate) => ({
       id: candidate.id,
       label: label('order', '', others.get(candidate.id) ?? []),
-      reason: `JTL external order number “${candidate.number}” matches Shopify`,
+      reason: `ERP external order number “${candidate.number}” matches Shopify`,
       sources: others.get(candidate.id) ?? [],
     })),
   };

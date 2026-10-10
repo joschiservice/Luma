@@ -66,17 +66,17 @@ Ohne **Importe verwalten** kannst du jeden Abgleich verfolgen, aber nicht änder
 
 ## Automatisches Verknüpfen [#automatic-linking]
 
-Luma hält Datensätze aus verschiedenen Quellen getrennt, bis jemand sie verknüpft. Wenn dein Shop und dein ERP dieselben SKU-Codes verwenden oder JTL-Wawi bei jeder Bestellung die Shopify-Bestellnummer speichert, kann eine Verknüpfungsregel das für dich übernehmen.
+Luma hält Datensätze aus verschiedenen Quellen getrennt, bis jemand sie verknüpft. Wenn dein Shop und dein ERP dieselben SKU-Codes verwenden oder dein ERP (JTL-Wawi oder Cin7 Core) bei jeder Bestellung die Shopify-Bestellnummer speichert, kann eine Verknüpfungsregel das für dich übernehmen.
 
 Wenn deine Rolle **Importe verwalten** enthält:
 
 1. Gehe in **Datenabgleich** zu **Automatisches Verknüpfen** und wähle **Verknüpfungsregel hinzufügen**.
-2. Wähle unter **Datensatztyp** entweder **SKUs: eindeutiger Code** oder **Bestellungen: JTL-Referenz zu Shopify**.
-3. Wähle die beiden Verbindungen. Wähle bei Bestellungen den Shopify-Shop, dessen Bestellnummern JTL-Wawi speichert.
+2. Wähle unter **Datensatztyp** entweder **SKUs: eindeutiger Code** oder **Bestellungen: ERP-Referenz zu Shopify**.
+3. Wähle die beiden Verbindungen. Wähle bei Bestellungen den Shopify-Shop, dessen Bestellnummern dein ERP speichert.
 4. Wähle **Treffer anzeigen**. Luma zeigt, wie viele Treffer es verknüpfen kann und warum es andere überspringt. Öffne bei einem Beispiel **Erster Datensatz** und **Anderer Datensatz**, um beide zu vergleichen.
 5. Wähle **Automatisches Verknüpfen aktivieren**. Die Regel verknüpft die aktuellen Treffer und künftig auch neue.
 
-Luma verknüpft nur eindeutige Treffer. SKU-Codes werden unabhängig von Groß- und Kleinschreibung und Leerzeichen am Anfang oder Ende abgeglichen. Jeder Code muss in jeder Verbindung zu genau einer SKU gehören, mit derselben Einheit. Eine Bestellung passt nur, wenn ihre externe Bestellreferenz in JTL-Wawi genau einer Bestellnummer im Shopify-Shop entspricht. Ähnliche Daten, Beträge, Namen oder E-Mail-Adressen reichen nie aus. Mehrdeutige und widersprüchliche Treffer sowie von Hand getrennte Datensätze überspringt Luma; verknüpfe diese selbst, wenn du deine Entscheidung änderst. Verknüpfte Datensätze behalten ihre eigenen Mengen, Preise und Bestellstatus.
+Luma verknüpft nur eindeutige Treffer. SKU-Codes werden unabhängig von Groß- und Kleinschreibung und Leerzeichen am Anfang oder Ende abgeglichen. Jeder Code muss in jeder Verbindung zu genau einer SKU gehören, mit derselben Einheit. Eine Bestellung passt nur, wenn ihre externe Bestellreferenz im ERP genau einer Bestellnummer im Shopify-Shop entspricht. Cin7 Core meldet die Referenz nur für Aufträge aus einem Verkaufskanal. Ähnliche Daten, Beträge, Namen oder E-Mail-Adressen reichen nie aus. Mehrdeutige und widersprüchliche Treffer sowie von Hand getrennte Datensätze überspringt Luma; verknüpfe diese selbst, wenn du deine Entscheidung änderst. Verknüpfte Datensätze behalten ihre eigenen Mengen, Preise und Bestellstatus.
 
 Eine Regel zeigt **Wartet auf Daten**, bis Luma beide Verbindungen vollständig und innerhalb des letzten Tages erfolgreich gelesen hat. Jede Regel zeigt, wie viele Verknüpfungen sie angewendet hat und wann Luma zuletzt geprüft hat. Eine Regel läuft mit dem Zugriff der Person, die sie aktiviert hat. Verliert diese Person **Importe verwalten**, zeigt die Regel **Zugriff erforderlich**, bis jemand mit dieser Berechtigung **Vorschau und aktivieren** wählt. **Deaktivieren** stoppt neue Verknüpfungen und behält die bestehenden. Um einen einzelnen Datensatz zu trennen, wähle im Bereich **Verknüpfte Quellen** die Option **Trennen**.
 

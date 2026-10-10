@@ -131,14 +131,15 @@ full read.
 SKU, location and order links are requested through the API and applied by the runner
 with the requester's current permissions, because only the worker login may write
 projections. Suggestions come from equal normalized SKU codes in other connections. Order
-suggestions require a JTL external marketplace order number matching a Shopify order
-number; dates and totals support review but never establish identity. Multiple candidates
+suggestions require an ERP order's (JTL, Cin7) external marketplace order number matching
+a Shopify order number; dates and totals support review but never establish identity. Multiple candidates
 stay visible and require review.
 
 Automatic linking is opt-in for a selected connection pair and record type. SKU rules
 match a nonempty code after lowercasing and trimming surrounding spaces; each connection
-must identify exactly one SKU with that code, with equal known units. Order rules match a
-JTL external marketplace reference to the order number in one selected Shopify store.
+must identify exactly one SKU with that code, with equal known units. Order rules match an
+ERP order's external marketplace reference to the order number in one selected Shopify
+store; any non-Shopify connection can be the ERP side.
 Order references preserve case and ignore surrounding spaces and `#`. Automatic
 order rules skip records already linked outside their selected connection pair. Dates, totals and
 customer details never establish identity. Source products and fulfillment operations

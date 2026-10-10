@@ -309,7 +309,7 @@ function RuleEditor({
       .filter(
         (connection) =>
           kind === 'sku' ||
-          connection.provider === (side === 'target' ? 'shopify' : 'jtl'),
+          (side === 'target') === (connection.provider === 'shopify'),
       )
       .map((connection) => ({
         value: connection.connectionId,
@@ -394,7 +394,7 @@ function RuleEditor({
         <Select
           aria-label={
             kind === 'order'
-              ? m.sync_autolink_jtl_connection()
+              ? m.sync_autolink_erp_connection()
               : m.sync_autolink_source_connection()
           }
           disabled={!!existing || busy}
@@ -402,7 +402,7 @@ function RuleEditor({
           options={options('source')}
           placeholder={
             kind === 'order'
-              ? m.sync_autolink_jtl_connection()
+              ? m.sync_autolink_erp_connection()
               : m.sync_autolink_source_connection()
           }
           onValueChange={(value) => {

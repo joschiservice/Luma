@@ -68,7 +68,7 @@ function Preview({
           {
             id: otherId,
             label: 'SO-10',
-            reason: 'JTL external order number “#1001” matches Shopify',
+            reason: 'ERP external order number “#1001” matches Shopify',
             sources: [sources[1]!],
           },
           ...(state === 'ambiguous'
@@ -76,7 +76,7 @@ function Preview({
                 {
                   id: '88888888-8888-4888-8888-888888888888',
                   label: 'SO-11',
-                  reason: 'JTL external order number “#1001” matches Shopify',
+                  reason: 'ERP external order number “#1001” matches Shopify',
                   sources: [
                     {
                       ...sources[1]!,

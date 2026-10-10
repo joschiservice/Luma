@@ -28,7 +28,7 @@ export const syncContract = {
       path: '/v1/organizations/{organizationId}/sync/automatic-links',
       summary: 'Review automatic linking rules',
       description:
-        'Lists connection-pair rules for SKU codes and JTL references to Shopify orders, with their last check, total links and any reason they are waiting or blocked.',
+        'Lists connection-pair rules for SKU codes and ERP order references to Shopify orders, with their last check, total links and any reason they are waiting or blocked.',
     })
     .meta({ access: anyMember, errors: [401, 403, 404, 503] })
     .input(z.object({ params: organizationParamsSchema }))
@@ -55,7 +55,7 @@ export const syncContract = {
       path: '/v1/organizations/{organizationId}/sync/automatic-links',
       summary: 'Configure automatic linking',
       description:
-        'Requires Manage imports. Creates a rule with revision zero, or enables or disables an existing rule using its current revision. Each save is audited and enabled rules run with the caller’s current access. Disabling stops future links and keeps existing links. SKU rules require unique normalized codes and compatible units; order rules match an explicit JTL external order number to one selected Shopify store. Every application rechecks current evidence and preserves mapping history.',
+        'Requires Manage imports. Creates a rule with revision zero, or enables or disables an existing rule using its current revision. Each save is audited and enabled rules run with the caller’s current access. Disabling stops future links and keeps existing links. SKU rules require unique normalized codes and compatible units; order rules match an ERP order’s explicit external order number, as JTL and Cin7 report it, to one selected Shopify store. Every application rechecks current evidence and preserves mapping history.',
     })
     .meta({
       access: requires('sync.manage'),
@@ -103,7 +103,7 @@ export const syncContract = {
       path: '/v1/organizations/{organizationId}/identities/{kind}/{entityId}',
       summary: 'Inspect linked source records',
       description:
-        'Lists the source records that represent one SKU, location or order, how each was linked, and possible matches in other sources. Suggestions share a SKU code or a JTL marketplace order reference. Configured automatic linking rules may apply unambiguous matches; other suggestions require review.',
+        'Lists the source records that represent one SKU, location or order, how each was linked, and possible matches in other sources. Suggestions share a SKU code or an ERP order’s marketplace order reference. Configured automatic linking rules may apply unambiguous matches; other suggestions require review.',
     })
     .meta({ access: anyMember, errors: [401, 403, 404, 503] })
     .input(

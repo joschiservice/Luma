@@ -87,7 +87,7 @@ export function autoLinkEvidence(rule: AutoLinkRule, key: string) {
   return {
     method: `Automatically linked by rule ${rule.id}, revision ${rule.revision}`,
     reason:
-      `Automatic ${rule.kind === 'sku' ? 'SKU code' : 'JTL order reference'} match “${key}” under rule ${rule.id}, revision ${rule.revision}`.slice(
+      `Automatic ${rule.kind === 'sku' ? 'SKU code' : 'ERP order reference'} match “${key}” under rule ${rule.id}, revision ${rule.revision}`.slice(
         0,
         2000,
       ),

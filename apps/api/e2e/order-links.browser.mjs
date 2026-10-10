@@ -78,7 +78,7 @@ test('reviews imported order sources, links them, follows an old URL and unlinks
     panel.getByRole('heading', { name: 'Possibly the same order' }),
   ).toBeVisible();
   await expect(
-    panel.getByText('JTL external order number “#1001” matches Shopify', {
+    panel.getByText('ERP external order number “#1001” matches Shopify', {
       exact: false,
     }),
   ).toBeVisible();

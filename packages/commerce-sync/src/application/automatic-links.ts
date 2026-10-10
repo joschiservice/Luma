@@ -58,14 +58,15 @@ export function createAutoLinkService(deps: {
         'CONFLICT',
         'Choose two different connections',
       );
+    // ERPs such as JTL and Cin7 report the marketplace order number; stores report their own.
     if (
       pair.kind === 'order' &&
-      (target.provider !== 'shopify' || source.provider !== 'jtl')
+      (target.provider !== 'shopify' || source.provider === 'shopify')
     )
       throw new IdentityError(
         422,
         'CONFLICT',
-        'Order rules match a JTL reference to an order in one Shopify store',
+        'Order rules match an ERP order’s marketplace reference to an order in one Shopify store',
       );
   }
 
