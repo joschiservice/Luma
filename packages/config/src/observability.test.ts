@@ -26,6 +26,24 @@ describe('observability configuration', () => {
       LANGFUSE_BASE_URL: 'https://us.cloud.langfuse.com',
     },
     { POSTHOG_API_KEY: 'key', POSTHOG_HOST: 'https://us.i.posthog.com' },
+    { POSTHOG_SECRET_KEY: 'phs_secret' },
+    {
+      OBSERVABILITY_TENANT_HASH_KEY: 'a'.repeat(32),
+      POSTHOG_API_KEY: 'phc_project',
+      POSTHOG_SECRET_KEY: 'phc_project',
+    },
+    { FEATURE_FLAG_OVERRIDES: 'observability-test' },
+    { FEATURE_FLAG_OVERRIDES: 'observability-test=yes' },
+    { FEATURE_FLAG_OVERRIDES: 'Customer Email=true' },
+    {
+      FEATURE_FLAG_OVERRIDES:
+        'observability-test=true,observability-test=false',
+    },
+    { FEATURE_FLAG_OVERRIDES: 'observability-test=true=false' },
+    {
+      OBSERVABILITY_ENVIRONMENT: 'production',
+      FEATURE_FLAG_OVERRIDES: 'observability-test=true',
+    },
   ])('rejects unsafe or partial settings: %j', (settings) => {
     expect(() => readObservabilityConfig(settings)).toThrow();
   });
@@ -39,10 +57,23 @@ describe('observability configuration', () => {
       LANGFUSE_PUBLIC_KEY: 'public',
       LANGFUSE_SECRET_KEY: 'secret',
       POSTHOG_API_KEY: 'key',
+      POSTHOG_SECRET_KEY: 'phs_secret',
     });
     expect(config.langfuse?.baseUrl).toBe('https://cloud.langfuse.com');
-    expect(config.posthog?.host).toBe('https://eu.i.posthog.com');
+    expect(config.posthog).toEqual({
+      apiKey: 'key',
+      host: 'https://eu.i.posthog.com',
+      secretKey: 'phs_secret',
+    });
     expect(config.sampleRate).toBe(0.2);
+  });
+  it('reads development flag overrides, also in local diagnostics', () => {
+    expect(
+      readObservabilityConfig({
+        LUMA_LOCAL_OTLP_ENDPOINT: 'http://127.0.0.1:4318',
+        FEATURE_FLAG_OVERRIDES: ' observability-test=true, constructor=false ',
+      }).featureFlagOverrides,
+    ).toEqual({ 'observability-test': true, constructor: false });
   });
 });
 

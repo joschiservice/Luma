@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-node';
 import type { Event } from '@sentry/node';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 
 import { createObservability } from './observability.js';
 
@@ -327,4 +327,134 @@ it('names background failures by their operation message', async () => {
   expect(events[0]?.transaction).toBe('Sync pass failed; retrying.');
   expect(events[0]?.exception?.values?.[0]?.value).toBe('Provider timed out');
   expect(events[0]).not.toHaveProperty('request');
+});
+
+it('applies allowed flag overrides without PostHog and rejects unknown ones', async () => {
+  const telemetry = createObservability({
+    environment: 'test',
+    release: 'test',
+    sampleRate: 0,
+    featureFlagOverrides: { 'observability-test': true },
+  });
+  const root = telemetry.request(randomUUID());
+  expect(await telemetry.flag(root.context, 'observability-test')).toBe(true);
+  root.end();
+  await telemetry.shutdown();
+
+  expect(() =>
+    createObservability({
+      environment: 'test',
+      release: 'test',
+      sampleRate: 0,
+      featureFlagOverrides: { 'unlisted-flag': true },
+    }),
+  ).toThrow('unlisted-flag');
+});
+
+function locallyEvaluated(
+  status: number,
+  environment: 'development' | 'staging' = 'staging',
+) {
+  const urls: string[] = [];
+  const definitions = {
+    flags: [
+      {
+        id: 1,
+        key: 'observability-test',
+        active: true,
+        filters: { groups: [{ properties: [], rollout_percentage: 100 }] },
+      },
+    ],
+    group_type_mapping: {},
+    cohorts: {},
+  };
+  const telemetry = createObservability(
+    {
+      environment,
+      release: 'test',
+      sampleRate: 0,
+      posthog: {
+        apiKey: 'phc_project',
+        host: 'https://eu.i.posthog.com',
+        secretKey: 'phs_secret',
+      },
+    },
+    {
+      posthogFetch: async (url) => {
+        urls.push(url);
+
+        return {
+          status,
+          text: async () => JSON.stringify(definitions),
+          json: async () => definitions,
+          headers: { get: () => null },
+        };
+      },
+    },
+  );
+
+  return { telemetry, urls };
+}
+
+/** Only the definitions poll may reach PostHog: no remote evaluation and no flag events. */
+function onlyDefinitionPolls(urls: string[]) {
+  return urls.every((url) =>
+    url.startsWith('https://eu.i.posthog.com/flags/definitions?'),
+  );
+}
+
+it('evaluates flags from polled definitions without per-check PostHog calls', async () => {
+  const { telemetry, urls } = locallyEvaluated(200);
+  const root = telemetry.request(randomUUID());
+  await vi.waitFor(async () =>
+    expect(await telemetry.flag(root.context, 'observability-test')).toBe(true),
+  );
+  root.end();
+  await telemetry.shutdown();
+  expect(onlyDefinitionPolls(urls)).toBe(true);
+});
+
+it('returns the fallback without calling PostHog when definitions are unavailable', async () => {
+  const { telemetry, urls } = locallyEvaluated(503);
+  const root = telemetry.request(randomUUID());
+  await vi.waitFor(() => expect(urls).toHaveLength(1));
+  expect(await telemetry.flag(root.context, 'observability-test')).toBe(false);
+  expect(await telemetry.flag(root.context, 'observability-test', true)).toBe(
+    true,
+  );
+  root.end();
+  await telemetry.shutdown();
+  expect(onlyDefinitionPolls(urls)).toBe(true);
+});
+
+it('never asks PostHog for flags in development or test', async () => {
+  const { telemetry, urls } = locallyEvaluated(200, 'development');
+  const root = telemetry.request(randomUUID());
+  expect(await telemetry.flag(root.context, 'observability-test')).toBe(false);
+  expect(await telemetry.flag(root.context, 'observability-test', true)).toBe(
+    true,
+  );
+  root.end();
+  await telemetry.shutdown();
+  expect(urls).toEqual([]);
+
+  const posthog = {
+    capture: vi.fn(),
+    isFeatureEnabled: vi.fn().mockResolvedValue(true),
+    shutdown: vi.fn().mockResolvedValue(undefined),
+  };
+  const remote = createObservability(
+    {
+      environment: 'test',
+      release: 'test',
+      sampleRate: 0,
+      posthog: { apiKey: 'phc_project', host: 'https://eu.i.posthog.com' },
+    },
+    { posthog },
+  );
+  const request = remote.request(randomUUID());
+  expect(await remote.flag(request.context, 'observability-test')).toBe(false);
+  request.end();
+  await remote.shutdown();
+  expect(posthog.isFeatureEnabled).not.toHaveBeenCalled();
 });

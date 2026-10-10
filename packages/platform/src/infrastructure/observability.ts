@@ -22,17 +22,20 @@ import {
   SentrySpanProcessor,
   wrapSamplingDecision,
 } from '@sentry/opentelemetry';
+import type { PostHogOptions } from 'posthog-node';
 import { PostHog } from 'posthog-node';
 
 import type { ErrorDetails } from '../application/error-details.js';
 import { describeError } from '../application/error-details.js';
 import type {
   ActivityFailureContext,
+  FeatureFlag,
   Observability,
   Observation,
   Operation,
   TraceContext,
 } from '../application/observability.js';
+import { featureFlags } from '../application/observability.js';
 import { redactHttpFailure } from './redaction.js';
 
 // This adapter accepts only deployment settings; it does not read ambient environment.
@@ -45,7 +48,8 @@ export interface TelemetrySettings {
   local?: { endpoint: string; profilesEndpoint?: string };
   sentryDsn?: string;
   langfuse?: { publicKey: string; secretKey: string; baseUrl: string };
-  posthog?: { apiKey: string; host: string };
+  posthog?: { apiKey: string; host: string; secretKey?: string };
+  featureFlagOverrides?: Readonly<Record<string, boolean>>;
 }
 
 const uuid =
@@ -59,7 +63,11 @@ const operations: Record<Operation, string> = {
   'tool.execute': 'tool',
 };
 
-/** Explicit context keeps concurrent requests and background work isolated. */
+/**
+ * Explicit context keeps concurrent requests and background work isolated. Flags are evaluated
+ * by PostHog only in staging and production. Throws when a flag override names a flag outside
+ * the allowlist.
+ */
 export function createObservability(
   settings: TelemetrySettings,
   testing: {
@@ -69,8 +77,20 @@ export function createObservability(
       Parameters<typeof Sentry.init>[0]
     >['transport'];
     posthog?: Pick<PostHog, 'capture' | 'isFeatureEnabled' | 'shutdown'>;
+    posthogFetch?: PostHogOptions['fetch'];
   } = {},
 ): Observability {
+  // Development and test never ask PostHog for flags; they use overrides or the fallback.
+  const hostedFlags =
+    settings.environment === 'staging' || settings.environment === 'production';
+  const flagOverrides = new Map<string, boolean>();
+  for (const [flag, enabled] of Object.entries(
+    settings.featureFlagOverrides ?? {},
+  )) {
+    if (!isFeatureFlag(flag))
+      throw new Error(`Feature flag override ${flag} is not an allowed flag`);
+    flagOverrides.set(flag, enabled);
+  }
   const approvedModels = new Set([
     'test-model',
     ...(settings.approvedModels ?? []).filter((model) =>
@@ -221,10 +241,20 @@ export function createObservability(
     (settings.posthog
       ? new PostHog(settings.posthog.apiKey, {
           host: settings.posthog.host,
+          ...(testing.posthogFetch ? { fetch: testing.posthogFetch } : {}),
           disableGeoip: true,
           requestTimeout: 3000,
           fetchRetryCount: 0,
           enableExceptionAutocapture: false,
+          sendFeatureFlagEvent: false,
+          // Polled definitions keep flag checks off the request path; flags they cannot
+          // resolve return the caller's fallback instead of calling PostHog.
+          ...(hostedFlags && settings.posthog.secretKey
+            ? {
+                secretKey: settings.posthog.secretKey,
+                strictLocalEvaluation: true,
+              }
+            : {}),
         })
       : undefined);
   if (posthog instanceof PostHog)
@@ -465,7 +495,10 @@ export function createObservability(
       }
     },
     async flag(context, flag, fallback = false) {
-      if (flag !== 'observability-test') return fallback;
+      if (!isFeatureFlag(flag)) return fallback;
+      const override = flagOverrides.get(flag);
+      if (override !== undefined) return override;
+      if (!hostedFlags) return fallback;
       try {
         return (
           (await posthog?.isFeatureEnabled(
@@ -490,6 +523,10 @@ export function createObservability(
   };
 
   return api;
+}
+
+function isFeatureFlag(value: string): value is FeatureFlag {
+  return (featureFlags as readonly string[]).includes(value);
 }
 
 interface FailureData {
