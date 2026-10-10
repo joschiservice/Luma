@@ -8,7 +8,7 @@ import type {
   DecisionReason,
   DecisionView,
 } from '@luma/api-contract';
-import { formatDateTime, formatList, formatNumber } from '@luma/i18n/format';
+import { formatList, formatNumber } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { rich } from '@luma/i18n/rich';
 import { CaseNotice } from '@luma/ui/components/issues/case-investigation';
@@ -27,7 +27,10 @@ import {
   TabsList,
   TabsTrigger,
 } from '@luma/ui/components/primitives/tabs';
-import { WorkspaceTimezone } from '@luma/ui/components/primitives/workspace-date';
+import {
+  formatWorkspaceInstant,
+  WorkspaceTimezone,
+} from '@luma/ui/components/primitives/workspace-date';
 import {
   onlineManager,
   useMutation,
@@ -154,11 +157,7 @@ function DecisionRow({
         <StatePill state={status.state}>{status.label}</StatePill>
         <span
           className="case-row-time"
-          title={formatDateTime(item.requestedAt, {
-            dateStyle: 'medium',
-            timeStyle: 'short',
-            timeZone,
-          })}
+          title={formatWorkspaceInstant(item.requestedAt, timeZone)}
         >
           <time dateTime={item.requestedAt}>
             {elapsed(item.requestedAt, now)}

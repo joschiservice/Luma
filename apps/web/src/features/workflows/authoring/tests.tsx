@@ -7,7 +7,7 @@ import type {
   WorkflowDraft,
   WorkflowDraftContent,
 } from '@luma/api-contract';
-import { formatDateTime, formatList, formatNumber } from '@luma/i18n/format';
+import { formatList, formatNumber } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
@@ -15,9 +15,13 @@ import { Button } from '@luma/ui/components/primitives/button';
 import { Card } from '@luma/ui/components/primitives/card';
 import { Input } from '@luma/ui/components/primitives/input';
 import { Select } from '@luma/ui/components/primitives/select';
+import {
+  formatWorkspaceDateTime,
+  WorkspaceTimezone,
+} from '@luma/ui/components/primitives/workspace-date';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Play, Plus, Trash2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 
 import { IdentityError } from '../../identity/data';
 import { workflowError } from '../data';
@@ -452,6 +456,7 @@ function TestCaseEditor({
   run(testCase: DraftTestCase): void;
   save(testCase: DraftTestCase): void;
 }) {
+  const timeZone = useContext(WorkspaceTimezone);
   const [testCase, setTestCase] = useState(initial);
   const examples = useQuery(
     draftTestExamplesOptions(organizationId, draft.id, draft.revision),
@@ -530,7 +535,7 @@ function TestCaseEditor({
               ...(examples.data?.runs ?? []).map((item) => ({
                 value: `run:${item.runId}`,
                 label: m.authoring_test_prefill_run({
-                  time: formatDateTime(item.createdAt),
+                  time: formatWorkspaceDateTime(item.createdAt, timeZone),
                 }),
               })),
               ...(examples.data?.scenarios ?? []).map((item) => ({

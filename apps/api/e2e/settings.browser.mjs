@@ -81,10 +81,9 @@ test('manages workspace preferences and the complete invitation journey on deskt
   });
   const overview = await context.newPage();
   await overview.goto(`/app/${f.org.id}/home`);
-  // Workspace dates show the zone's short name, such as "8 Oct 2026, 15:39 GMT+9".
+  // Workspace times leave the zone out and name it in the title, such as "… 15:39:02 GMT+9".
   await overview
-    .locator('time')
-    .filter({ hasText: /GMT\+9|JST/ })
+    .locator('time[title*="GMT+9"], time[title*="JST"]')
     .first()
     .waitFor();
   await overview.close();

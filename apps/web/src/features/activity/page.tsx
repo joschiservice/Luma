@@ -6,7 +6,7 @@ import {
   type ActivityPage as Page,
   activityTypes,
 } from '@luma/api-contract';
-import { formatDateTime, formatList } from '@luma/i18n/format';
+import { formatList } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
@@ -18,6 +18,7 @@ import {
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { StateDot, StatePill } from '@luma/ui/components/primitives/state';
 import {
+  formatWorkspaceDateTime,
   WorkspaceDate,
   WorkspaceTimezone,
 } from '@luma/ui/components/primitives/workspace-date';
@@ -86,11 +87,7 @@ const detail = (
 
 /** Formats a recorded instant in workspace time with seconds, as audit detail needs them. */
 const instant = (value: string, timeZone: string) =>
-  formatDateTime(value, {
-    dateStyle: 'medium',
-    timeStyle: 'medium',
-    timeZone,
-  });
+  formatWorkspaceDateTime(value, timeZone, 'second');
 const subscribe = (changed: () => void) => onlineManager.subscribe(changed);
 const snapshot = () => onlineManager.isOnline();
 const serverSnapshot = () => true;

@@ -3,15 +3,13 @@ import type {
   AssistantCitation,
   AssistantStep,
 } from '@luma/api-contract';
-import {
-  formatDate,
-  formatDateTime,
-  formatList,
-  formatTime,
-} from '@luma/i18n/format';
+import { formatDate, formatList, formatTime } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
-import { WorkspaceTimezone } from '@luma/ui/components/primitives/workspace-date';
+import {
+  formatWorkspaceInstant,
+  WorkspaceTimezone,
+} from '@luma/ui/components/primitives/workspace-date';
 import { Link } from '@tanstack/react-router';
 import {
   ChevronRight,
@@ -117,7 +115,7 @@ function useReadTime() {
         day.format(at) === day.format(new Date())
           ? formatTime(at, { timeZone, hour: '2-digit', minute: '2-digit' })
           : formatDate(at, { timeZone, day: 'numeric', month: 'short' }),
-      full: `${formatDateTime(at, { timeZone, dateStyle: 'medium', timeStyle: 'short' })} ${timeZone}`,
+      full: formatWorkspaceInstant(at, timeZone),
     };
   };
 }

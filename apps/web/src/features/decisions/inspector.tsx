@@ -1,5 +1,4 @@
 import type { DecisionItem } from '@luma/api-contract';
-import { formatDateTime } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { rich } from '@luma/i18n/rich';
 import { CaseNotice } from '@luma/ui/components/issues/case-investigation';
@@ -10,6 +9,7 @@ import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { PersonPicker } from '@luma/ui/components/primitives/person-picker';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import {
+  formatWorkspaceDateTime,
   WorkspaceDate,
   WorkspaceTimezone,
 } from '@luma/ui/components/primitives/workspace-date';
@@ -60,11 +60,7 @@ export function DecisionDeadline({
         left <= 0 ? 'expired' : left <= 30 * 60_000 ? 'soon' : undefined
       }
       title={m.decisions_deadline_title({
-        time: formatDateTime(deadline, {
-          dateStyle: 'medium',
-          timeStyle: 'short',
-          timeZone,
-        }),
+        time: formatWorkspaceDateTime(deadline, timeZone),
       })}
     >
       <Clock size={13} aria-hidden="true" />
