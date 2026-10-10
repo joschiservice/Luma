@@ -26,7 +26,10 @@ export type CommerceData =
       lines: {
         id: string;
         skuId: string | null;
+        /** Originally ordered units, retained after reductions. */
         quantity: string;
+        /** Current units excluding removals and refunds; absent or null when unknown. */
+        currentQuantity?: string | null;
         cancelledQuantity: string | null;
         unit: string;
         /** Source SKU text. Descriptive only; `skuId` carries the mapped identity. */
@@ -40,7 +43,13 @@ export type CommerceData =
       status: string;
       lastProgressAt: string | null;
       failureCode: string | null;
-      lines: { orderLineId: string; quantity: string; unit: string }[];
+      lines: {
+        orderLineId: string;
+        quantity: string;
+        unit: string;
+        /** Provider-reported outstanding work; absent or null when unknown. */
+        remainingQuantity?: string | null;
+      }[];
       /** Fulfillment work or a shipment; absent means the adapter did not say. */
       kind?: 'fulfillment_order' | 'shipment' | null;
       /** Holds stopping the work; absent means the adapter does not read holds. */
@@ -63,12 +72,10 @@ export type CommerceData =
 
 export interface CanonicalSnapshot {
   /**
-   * Document schema version. Order snapshots are written as 2 and may carry `dueAt`,
-   * `placedAt`, `total` and line `skuCode`/`title`. Fulfillment snapshots are written as 2
-   * and may carry kind, holds, location, dates, method, tracking and delivery state. Stored
-   * version 1 documents of both kinds remain readable. Return and refund snapshots use 1.
+   * Order and fulfillment snapshots use version 3 for current and remaining line quantities.
+   * Stored versions 1 and 2 remain readable. Return and refund snapshots use version 1.
    */
-  schemaVersion: 1 | 2;
+  schemaVersion: 1 | 2 | 3;
   entityId: string;
   kind: EntityKind;
   connectionId: string;

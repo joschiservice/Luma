@@ -367,9 +367,8 @@ export const AutosaveSaved: Story = {
     const canvas = within(canvasElement);
     const name = await canvas.findByLabelText('Name');
     await userEvent.type(name, ' now');
-    await waitFor(
-      () => expect(canvas.getByText('All changes saved')).toBeVisible(),
-      { timeout: 4000 },
+    await waitFor(() =>
+      expect(canvas.getByText('All changes saved')).toBeVisible(),
     );
     await userEvent.click(canvas.getByRole('button', { name: 'Undo' }));
     await expect(name).toHaveValue('Check restock need now'.slice(0, -1));
@@ -384,8 +383,6 @@ export const SaveConflict: Story = {
     await expect(
       await canvas.findByText(
         /Someone else saved this draft while you were editing/,
-        {},
-        { timeout: 4000 },
       ),
     ).toBeVisible();
     await expect(

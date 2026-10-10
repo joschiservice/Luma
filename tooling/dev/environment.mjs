@@ -275,6 +275,7 @@ export async function environment(saved, workflows = false, observing = false) {
     for (const key of [
       'SENTRY_DSN',
       'POSTHOG_API_KEY',
+      'POSTHOG_SECRET_KEY',
       'LANGFUSE_PUBLIC_KEY',
       'LANGFUSE_SECRET_KEY',
     ])

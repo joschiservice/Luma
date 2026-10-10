@@ -399,6 +399,7 @@ const resolvers: Record<string, TypeResolvers> = {
   Mutation: mutationResolvers,
   Order: orderResolvers,
   LineItem: on<LineItemData>({
+    currentQuantity: (line) => line.data.currentQuantity ?? line.data.quantity,
     variant: (line, _args, context) =>
       load(context, 'ProductVariant', line.data.variant),
   }),

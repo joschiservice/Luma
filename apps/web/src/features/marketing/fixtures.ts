@@ -696,6 +696,7 @@ const line = (
   skuCode: sku,
   title: t(title),
   quantity,
+  currentQuantity: quantity,
   cancelledQuantity: '0',
   unit: 'each',
   fulfilledQuantity: fulfilled,
@@ -745,6 +746,30 @@ export function orderDetail(): OrderDetail {
   };
 
   return {
+    authority: {
+      revision: 0,
+      groups: (
+        [
+          'order_lines',
+          'order_lifecycle',
+          'order_fulfillment',
+          'order_tracking',
+        ] as const
+      ).map((group) => ({
+        group,
+        state: 'resolved',
+        basis: 'default',
+        connectionId:
+          group === 'order_lines' || group === 'order_lifecycle' ? shop : erp,
+        overrideConnectionId: null,
+        candidateIds: [],
+        eligibleIds: [shop, erp],
+      })),
+      lines: null,
+      lifecycle: null,
+      fulfillments: [],
+      tracking: [],
+    },
     order: {
       id: orderId,
       displayNumber: '#48213',

@@ -32,6 +32,7 @@ const source = (
       skuCode: 'TOTE',
       title: 'Canvas tote',
       quantity: '3',
+      currentQuantity: '3',
       cancelledQuantity: '0',
       unit: 'each',
       fulfilledQuantity: '1',
@@ -154,6 +155,7 @@ describe('order presentation', () => {
             lines: [
               {
                 ...source().lines[0]!,
+                currentQuantity: null,
                 cancelledQuantity: null,
                 remainingQuantity: null,
               },
@@ -165,7 +167,7 @@ describe('order presentation', () => {
     );
     expect(summary[0]).toEqual({
       kind: 'unknown',
-      text: 'Luma can’t tell how much remains on 1 line because Shopify store doesn’t report canceled quantities. 1 of 3 units are fulfilled.',
+      text: 'Luma can’t tell how much remains on 1 line because Shopify store doesn’t report current or reduced quantities. 1 of 3 units are fulfilled.',
     });
   });
 

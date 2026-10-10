@@ -7,7 +7,10 @@ import {
   createWorkspaceAssistant,
 } from '@luma/assistant/composition';
 import type { CommerceObservation } from '@luma/connections';
-import { createConnectionCoverage } from '@luma/connections/composition';
+import {
+  createConnectionCoverage,
+  createSourceAuthority,
+} from '@luma/connections/composition';
 import {
   orderAttentionForOrders,
   orderAttentionQuery,
@@ -85,6 +88,17 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
       },
       createActivityStore,
       async (value) => value,
+      (db) =>
+        createSourceAuthority(
+          db,
+          (provider) =>
+            provider === 'jtl'
+              ? 'erp'
+              : provider === 'shopify'
+                ? 'storefront'
+                : null,
+          async (value) => value,
+        ),
       () => clock,
     );
   }
@@ -102,6 +116,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
       key: string;
       quantity: string;
       cancelled?: string | null;
+      current?: string | null;
       sku?: { external: string; key: string } | null;
       skuCode?: string | null;
       title?: string | null;
@@ -138,6 +153,14 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
               ? { externalId: line.sku.external, scopeKey: '' }
               : null,
             quantity: { amount: line.quantity, unit: 'each' },
+            ...(line.current === undefined
+              ? {}
+              : {
+                  currentQuantity:
+                    line.current === null
+                      ? null
+                      : { amount: line.current, unit: 'each' },
+                }),
             cancelledQuantity:
               line.cancelled === null
                 ? null
@@ -150,7 +173,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     };
     const actor = context(tenantId);
     const key = observation.observation.id;
-    await services.ingestion.ingest(actor, key, observation);
+    const ingested = await services.ingestion.ingest(actor, key, observation);
     const orderId = await services.ingestion.bind(
       actor,
       source,
@@ -185,11 +208,10 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
           'operator-confirmed',
         );
     }
-    const result = await services.ingestion.replay(
-      actor,
-      options.connectionId,
-      key,
-    );
+    const result =
+      ingested.status === 'applied'
+        ? ingested
+        : await services.ingestion.replay(actor, options.connectionId, key);
     expect(result.status).toBe('applied');
 
     return orderId;
@@ -201,7 +223,9 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     external: string;
     line: string;
     quantity: string;
-    status: 'shipped' | 'processing';
+    status: 'shipped' | 'processing' | 'completed';
+    kind?: 'fulfillment_order' | 'shipment';
+    remaining?: string;
   }) {
     const observation: CommerceObservation & {
       capability: 'fulfillment.read';
@@ -226,12 +250,21 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
         data: {
           order: { externalId: options.order, scopeKey: '' },
           status: options.status,
+          ...(options.kind ? { kind: options.kind } : {}),
           lastProgressAt: '2026-09-19T10:00:00Z',
           failureCode: null,
           lines: [
             {
               orderLine: { externalId: options.line, scopeKey: options.order },
               quantity: { amount: options.quantity, unit: 'each' },
+              ...(options.remaining === undefined
+                ? {}
+                : {
+                    remainingQuantity: {
+                      amount: options.remaining,
+                      unit: 'each',
+                    },
+                  }),
             },
           ],
         },
@@ -317,8 +350,8 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
             appInstallationVersion: 1,
             target: { kind },
             label,
-            permissions: [],
-            granted: [],
+            permissions: ['orders.read', 'fulfillment.read', 'inventory.read'],
+            granted: ['orders.read', 'fulfillment.read', 'inventory.read'],
           },
           'encrypted-fixture',
         ],
@@ -340,8 +373,138 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
   beforeEach(async () => {
     clock = new Date('2026-09-20T12:00:00Z');
     await owner.query(
-      'TRUNCATE connector_observations,connector_source_mappings,orders_entities,inventory_entities,exceptions,playbook_definitions CASCADE',
+      'TRUNCATE connector_authority_settings,connector_authority_events,connector_observations,connector_source_mappings,orders_entities,inventory_entities,exceptions,playbook_definitions CASCADE',
     );
+  });
+
+  it('resolves order fact groups independently and audits overrides without rewriting source evidence', async () => {
+    const id = await seedOrder({
+      connectionId: shopify,
+      external: 'shop-order',
+      key: 'authority-order',
+      updatedAt: '2026-09-19T10:00:00Z',
+      data: {},
+      lines: [
+        {
+          external: 'shop-line',
+          key: 'shop-line',
+          quantity: '2',
+          current: '1',
+        },
+      ],
+    });
+    await seedOrder({
+      connectionId: jtl,
+      external: 'erp-order',
+      key: 'authority-order',
+      updatedAt: '2026-09-20T10:00:00Z',
+      data: { status: 'completed' },
+      lines: [{ external: 'erp-line', key: 'erp-line', quantity: '7' }],
+    });
+    await seedShipment({
+      connectionId: jtl,
+      order: 'erp-order',
+      external: 'shipment',
+      line: 'erp-line',
+      quantity: '7',
+      status: 'shipped',
+    });
+    const settings = createSourceAuthority(
+      createTenantDatabase(reader),
+      (provider) => (provider === 'jtl' ? 'erp' : 'storefront'),
+      async (value) => value,
+    );
+    const initial = (await workspace().get(context(), id))!;
+    expect(initial.authority.lines).toMatchObject({
+      connectionId: shopify,
+      lines: [{ quantity: '2', currentQuantity: '1' }],
+    });
+    expect(initial.authority.lifecycle).toMatchObject({
+      connectionId: shopify,
+      status: 'open',
+    });
+    expect(initial.authority.fulfillments).toMatchObject([
+      { connectionId: jtl, status: 'shipped' },
+    ]);
+    const before = (
+      await owner.query(
+        'SELECT id,document FROM orders_snapshots WHERE tenant_id=$1 ORDER BY id',
+        [tenant],
+      )
+    ).rows;
+    const command = {
+      commandId: randomUUID(),
+      revision: 0,
+      group: 'order_lines' as const,
+      connectionId: jtl,
+    };
+    const event = await settings.change(context(), command);
+    expect(event).toMatchObject({
+      actorId: 'operator',
+      previousConnectionId: null,
+      connectionId: jtl,
+      revision: 1,
+    });
+    const changed = (await workspace().get(context(), id))!;
+    expect(changed.authority.lines).toMatchObject({
+      connectionId: jtl,
+      lines: [{ quantity: '7', currentQuantity: null }],
+    });
+    expect(changed.authority.fulfillments).toMatchObject([
+      { connectionId: jtl, status: 'shipped' },
+    ]);
+    expect(changed.sources).toEqual(initial.sources);
+    expect(
+      (
+        await owner.query(
+          'SELECT id,document FROM orders_snapshots WHERE tenant_id=$1 ORDER BY id',
+          [tenant],
+        )
+      ).rows,
+    ).toEqual(before);
+    expect(await settings.change(context(), command)).toEqual(event);
+    expect(await settings.history(context())).toEqual([event]);
+    await expect(
+      settings.change(context(), { ...command, commandId: randomUUID() }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    await expect(
+      settings.change(context(), { ...command, group: 'order_lifecycle' }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    await expect(
+      settings.change(context(), {
+        ...command,
+        commandId: randomUUID(),
+        revision: 1,
+        connectionId: foreign,
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(await settings.history(context(otherTenant))).toEqual([]);
+    const concurrent = await Promise.allSettled([
+      settings.change(context(), {
+        ...command,
+        revision: 1,
+        commandId: randomUUID(),
+        connectionId: null,
+      }),
+      settings.change(context(), {
+        ...command,
+        revision: 1,
+        commandId: randomUUID(),
+        connectionId: shopify,
+      }),
+    ]);
+    expect(
+      concurrent.filter((item) => item.status === 'fulfilled'),
+    ).toHaveLength(1);
+    expect(await settings.history(context())).toHaveLength(2);
+    await createTenantDatabase(reader).transaction(tenant, async (tx) => {
+      await expect(
+        tx.query(
+          'UPDATE connector_authority_events SET revision=99 WHERE tenant_id=$1',
+          [tenant],
+        ),
+      ).rejects.toMatchObject({ code: '42501' });
+    });
   });
 
   async function seedWorkspace() {
@@ -1363,6 +1526,17 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
       },
       createActivityStore,
       async (value) => value,
+      (db) =>
+        createSourceAuthority(
+          db,
+          (provider) =>
+            provider === 'jtl'
+              ? 'erp'
+              : provider === 'shopify'
+                ? 'storefront'
+                : null,
+          async (value) => value,
+        ),
       () => clock,
     );
     const orders = workspace();
@@ -1548,4 +1722,133 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
       );
     }
   }, 1800000);
+  it('compares current units, ignores removed SKU groups and keeps earlier snapshots immutable', async () => {
+    const source = {
+      connectionId: shopify,
+      external: 'edit-1',
+      key: 'edited',
+      updatedAt: '2026-09-19T08:00:00Z',
+      data: {},
+      lines: [
+        {
+          external: 'edit-line',
+          key: 'edit-line',
+          quantity: '2',
+          current: '2',
+          sku: { external: 'item-1', key: 'edit-sku' },
+        },
+      ],
+    };
+    const id = await seedOrder(source);
+    const before = (await services.orders.current(context(), id))[0]!.snapshot;
+    await seedOrder({
+      ...source,
+      connectionId: jtl,
+      external: 'erp-edit-1',
+      lines: [
+        {
+          external: 'erp-line',
+          key: 'erp-line',
+          quantity: '2',
+          cancelled: null,
+          sku: { external: 'erp-item', key: 'edit-sku' },
+        },
+      ],
+    });
+    expect((await workspace().get(context(), id))?.differences).toEqual([]);
+    await seedOrder({
+      ...source,
+      updatedAt: '2026-09-19T09:00:00Z',
+      lines: [{ ...source.lines[0]!, current: '1', cancelled: '1' }],
+    });
+    const edited = (await workspace().get(context(), id))!;
+    expect(
+      edited.sources.find((s) => s.connectionId === shopify)?.lines[0],
+    ).toMatchObject({
+      quantity: '2',
+      currentQuantity: '1',
+      cancelledQuantity: '1',
+      remainingQuantity: '1',
+    });
+    expect(edited.differences.map((d) => d.field)).toEqual(['lines']);
+    expect(
+      edited.sources.find((s) => s.connectionId === jtl)?.lines[0],
+    ).toMatchObject({
+      currentQuantity: null,
+      cancelledQuantity: null,
+      remainingQuantity: null,
+    });
+    expect(
+      (await services.orders.history(context(), id)).find(
+        (s) => s.observationId === before.observationId,
+      ),
+    ).toEqual(before);
+    await seedOrder({
+      ...source,
+      updatedAt: '2026-09-19T10:00:00Z',
+      lines: [{ ...source.lines[0]!, current: '0', cancelled: '2' }],
+    });
+    await seedOrder({
+      ...source,
+      connectionId: jtl,
+      external: 'erp-edit-1',
+      updatedAt: '2026-09-19T10:00:00Z',
+      lines: [],
+    });
+    expect((await workspace().get(context(), id))?.differences).toEqual([]);
+    expect(
+      (await workspace().get(context(), id))?.sources.find(
+        (s) => s.connectionId === shopify,
+      ),
+    ).toMatchObject({ open: false, fulfillment: 'not_required' });
+  });
+
+  it('counts shipment evidence once and keeps remaining units nonnegative after a refund', async () => {
+    const source = {
+      connectionId: shopify,
+      external: 'work-1',
+      key: 'work-1',
+      updatedAt: '2026-09-19T08:00:00Z',
+      data: {},
+      lines: [
+        {
+          external: 'work-line',
+          key: 'work-line',
+          quantity: '2',
+          current: '2',
+        },
+      ],
+    };
+    const id = await seedOrder(source);
+    await seedShipment({
+      connectionId: shopify,
+      order: source.external,
+      external: 'closed-work',
+      line: 'work-line',
+      quantity: '2',
+      remaining: '0',
+      status: 'completed',
+      kind: 'fulfillment_order',
+    });
+    await seedShipment({
+      connectionId: shopify,
+      order: source.external,
+      external: 'actual-shipment',
+      line: 'work-line',
+      quantity: '1',
+      status: 'shipped',
+      kind: 'shipment',
+    });
+    expect(
+      (await workspace().get(context(), id))?.sources[0]?.lines[0],
+    ).toMatchObject({ fulfilledQuantity: '1', remainingQuantity: '1' });
+    await seedOrder({
+      ...source,
+      updatedAt: '2026-09-19T11:00:00Z',
+      lines: [{ ...source.lines[0]!, current: '0', cancelled: '2' }],
+    });
+    expect(
+      (await workspace().get(context(), id))?.sources[0]?.lines[0],
+    ).toMatchObject({ fulfilledQuantity: '1', remainingQuantity: '0' });
+  });
 });

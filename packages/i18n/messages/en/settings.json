@@ -464,5 +464,11 @@
   "settings_security_sessions_others": "Sign out all other sessions",
   "settings_security_sessions_confirm": "The selected sessions will be signed out on their next request. Signing out this session returns you to sign-in.",
   "settings_security_sessions_revoke_failed": "Sign-out could not be confirmed. Refresh the list before retrying.",
-  "settings_security_sessions_revoked": "Sessions signed out."
+  "settings_security_sessions_revoked": "Sessions signed out.",
+  "settings_section_authority": "Source authority",
+  "settings_authority_description": "Choose which connection supplies each order fact and inventory quantity. Defaults use connection categories. Unknown or conflicting authority prevents automatic corrections. Changes are recorded and apply to the next detection run.",
+  "settings_authority_fact": "Fact group",
+  "settings_authority_override": "Workspace override",
+  "settings_authority_default": "Use category default",
+  "settings_authority_unavailable": "{source} (unavailable)"
 }

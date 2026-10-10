@@ -862,6 +862,7 @@ type FulfillmentOrderLineItem implements Node {
 }
 
 type LineItem implements Node {
+  currentQuantity: Int!
   id: ID!
   name: String!
   quantity: Int!

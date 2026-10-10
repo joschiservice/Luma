@@ -46,12 +46,23 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Opens the picker and waits until the popup's search field has focus. Typing before focus
+ * moves would send the keys to the trigger, which happens when a busy browser renders slowly.
+ */
+async function openPicker(canvasElement: HTMLElement) {
+  await userEvent.click(within(canvasElement).getByRole('combobox'));
+  await waitFor(() =>
+    expect(
+      within(document.body).getByRole('combobox', { name: 'Search people' }),
+    ).toHaveFocus(),
+  );
+}
+
 export const Default: Story = {
   play: async ({ args, canvasElement }) => {
     const page = within(document.body);
-    await userEvent.click(
-      within(canvasElement).getByRole('combobox', { name: 'Assign to…' }),
-    );
+    await openPicker(canvasElement);
     const list = await page.findByRole('listbox', {
       name: 'Assign to a member',
     });
@@ -78,7 +89,7 @@ export const Default: Story = {
 export const SearchByEmail: Story = {
   play: async ({ args, canvasElement }) => {
     const page = within(document.body);
-    await userEvent.click(within(canvasElement).getByRole('combobox'));
+    await openPicker(canvasElement);
     await userEvent.keyboard('mira@');
     const option = await page.findByRole('option', { name: /^You/ });
     await userEvent.click(option);
@@ -89,7 +100,7 @@ export const SearchByEmail: Story = {
 export const NoMatches: Story = {
   play: async ({ canvasElement }) => {
     const page = within(document.body);
-    await userEvent.click(within(canvasElement).getByRole('combobox'));
+    await openPicker(canvasElement);
     await userEvent.keyboard('nobody here');
     await expect(
       await page.findByText('No people match your search'),

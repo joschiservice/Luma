@@ -1,6 +1,7 @@
 import type {
   ConnectorFailure,
   ExternalId,
+  FactAuthority,
   FulfillmentSnapshot,
   InventorySnapshot,
   Observation,
@@ -27,6 +28,12 @@ export interface InventoryMapping {
   right: { source: SourceIdentity; sku: ExternalId; location: ExternalId };
   authority: 'left' | 'right' | null;
   sellingSource: 'left' | 'right';
+  /** Authority used for this evaluation, retained beside mapping evidence. */
+  sourceAuthority?: {
+    revision: number;
+    stock: FactAuthority;
+    selling: FactAuthority;
+  };
 }
 
 export interface FulfillmentMapping {
@@ -137,6 +144,17 @@ export function inventoryRequest(
     complete:
       input.complete && left.kind === 'snapshot' && right.kind === 'snapshot',
     projectionCurrent: input.projectionCurrent,
+    ...(mapping.sourceAuthority
+      ? {
+          authorityState:
+            mapping.authority !== null
+              ? ('resolved' as const)
+              : mapping.sourceAuthority.stock.state === 'conflicting' ||
+                  mapping.sourceAuthority.selling.state === 'conflicting'
+                ? ('conflicting' as const)
+                : ('unknown' as const),
+        }
+      : {}),
     authority: mapping.authority,
     sellingSource: mapping.sellingSource,
     tolerance: configuration.inventoryTolerance,

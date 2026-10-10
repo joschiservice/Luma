@@ -367,10 +367,10 @@ export async function refundReturn(
     })
   ).filter((line) => line.data.quantity > line.data.refundedQuantity);
   if (!lines.length) throw new Error('Nothing left to refund');
-  const prices = new Map(
+  const orderLines = new Map(
     (
       await all<LineItemData>(context, { kind: 'LineItem', parent: order.id })
-    ).map((line) => [line.id, line.data.price]),
+    ).map((line) => [line.id, line]),
   );
   const sale = (
     await all<OrderTransactionData>(context, {
@@ -386,7 +386,7 @@ export async function refundReturn(
   const records = [];
   for (const line of lines) {
     const quantity = line.data.quantity - line.data.refundedQuantity;
-    amount += quantity * (prices.get(line.data.lineItem) ?? 0);
+    amount += quantity * (orderLines.get(line.data.lineItem)?.data.price ?? 0);
     records.push(
       insert(
         context,
@@ -402,11 +402,22 @@ export async function refundReturn(
         { parent: id },
       ),
     );
-    if (status !== 'FAILURE')
+    if (status !== 'FAILURE') {
       await save(context, 'ReturnLineItem', line.id, {
         ...line.data,
         refundedQuantity: line.data.quantity,
       });
+      const original = orderLines.get(line.data.lineItem);
+      if (original) {
+        original.data = {
+          ...original.data,
+          currentQuantity:
+            (original.data.currentQuantity ?? original.data.quantity) -
+            quantity,
+        };
+        await save(context, 'LineItem', original.id, original.data);
+      }
+    }
   }
   await context.store.putMany([
     insert(

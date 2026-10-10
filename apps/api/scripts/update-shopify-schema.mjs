@@ -62,6 +62,7 @@ const fields = {
   ],
   BulkOperation: [
     'id',
+    'createdAt',
     'query',
     'status',
     'errorCode',
@@ -100,7 +101,7 @@ const fields = {
     'refunds',
     'events',
   ],
-  LineItem: ['id', 'name', 'quantity', 'sku', 'variant'],
+  LineItem: ['id', 'name', 'quantity', 'currentQuantity', 'sku', 'variant'],
   Product: [
     'id',
     'updatedAt',

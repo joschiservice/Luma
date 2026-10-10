@@ -1,3 +1,4 @@
+import type { FactAuthority } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
 import type { ActivityActor } from '@luma/resolution';
 
@@ -102,6 +103,7 @@ export interface OrderSourceFacts extends OrderSource {
     skuCode: string | null;
     title: string | null;
     quantity: string;
+    currentQuantity: string | null;
     cancelledQuantity: string | null;
     unit: string;
     fulfilledQuantity: string;
@@ -114,6 +116,41 @@ export type OrderDetailSection =
   'fulfillments' | 'returns' | 'issues' | 'workflows' | 'activity';
 
 export interface OrderDetail {
+  /** Live source authority and resolved facts; null means no authoritative source report. */
+  authority: {
+    revision: number;
+    groups: FactAuthority[];
+    lines: {
+      connectionId: string;
+      lines: Omit<
+        OrderSourceFacts['lines'][number],
+        'fulfilledQuantity' | 'remainingQuantity' | 'cancelledQuantity'
+      >[];
+    } | null;
+    lifecycle: {
+      connectionId: string;
+      status: string;
+      cancelledQuantities: {
+        lineId: string;
+        quantity: string | null;
+        unit: string;
+      }[];
+    } | null;
+    fulfillments: OrderDetail['fulfillments'] | null;
+    tracking:
+      | {
+          fulfillmentId: string;
+          connectionId: string;
+          tracking:
+            | {
+                carrier: string | null;
+                number: string | null;
+                url: string | null;
+              }[]
+            | null;
+        }[]
+      | null;
+  };
   /** Retired URL identity, when this read resolved to the current order. */
   redirectedFrom?: string | null;
   order: OrderListItem;
@@ -129,7 +166,17 @@ export interface OrderDetail {
     deleted: boolean;
     observedAt: string;
     sourceUpdatedAt: string | null;
-    lines: { orderLineId: string; quantity: string; unit: string }[];
+    location: { locationId: string | null; name: string | null } | null;
+    /** Null distinguishes unread tracking from a reported empty list. */
+    tracking:
+      | { carrier: string | null; number: string | null; url: string | null }[]
+      | null;
+    lines: {
+      orderLineId: string;
+      quantity: string;
+      unit: string;
+      remainingQuantity: string | null;
+    }[];
   }[];
   /** Returns, and refunds without a return, from every source of the order. */
   returns: ReturnListItem[];

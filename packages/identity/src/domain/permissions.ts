@@ -92,7 +92,8 @@ export const permissionCatalog = [
     key: 'workspace.settings.manage',
     group: 'workspace',
     label: 'Edit workspace settings',
-    description: 'Change the workspace name and display time zone.',
+    description:
+      'Change the workspace name, display time zone and authoritative sources.',
     consequential: false,
     introduced,
   },

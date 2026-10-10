@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 
-import { describe, expect, it } from 'vitest';
+import { builtInMembership, makeTenantContext } from '@luma/identity';
+import { describe, expect, it, vi } from 'vitest';
 
+import { createDiagnosisService } from '../application/diagnosis.js';
 import type { DiagnosisInput } from '../domain/diagnosis.js';
 import { diagnose } from '../domain/diagnosis.js';
 import { identity } from '../domain/evaluate.js';
@@ -162,4 +164,56 @@ describe('deterministic evidence-grounded diagnoses', () => {
     ).rejects.toThrow('timed out');
     expect(signal?.aborted).toBe(true);
   });
+});
+
+it('withholds changed-authority recommendations without rewriting the stored diagnosis', async () => {
+  const input = snapshot('inventory_mismatch');
+  const document = diagnose(input, corpus.now);
+  const original = structuredClone(document);
+  const tenantId = input.input.facts.tenantId;
+  const context = makeTenantContext(
+    { userId: 'operator', sessionId: 'session' },
+    {
+      id: tenantId,
+      name: 'Store',
+      slug: 'store',
+      dataRegion: 'EU',
+      status: 'active',
+    },
+    builtInMembership(
+      { id: 'member', organizationId: tenantId, userId: 'operator' },
+      'owner',
+    ),
+    'request',
+  );
+  let current = true;
+  const complete = vi.fn(async () => true);
+  const service = createDiagnosisService(
+    {
+      current: async () => ({ snapshot: input, document, resolved: false }),
+      history: async () => [document],
+      complete,
+    },
+    () => new Date(corpus.now),
+    {
+      id: (value) => value,
+      parse: (value) => value,
+      selection: selectionSchema,
+      trace: (requestId) => ({ requestId, traceId: 'trace', spanId: 'span' }),
+      bounded: (work) => work(new AbortController().signal),
+    },
+    { authorityCurrent: async () => current },
+  );
+  expect((await service.get(context, input.exceptionId))?.superseded).toBe(
+    false,
+  );
+  current = false;
+  expect(await service.get(context, input.exceptionId)).toMatchObject({
+    superseded: true,
+    status: 'insufficient_evidence',
+    reason: 'source_authority_changed',
+    nextSteps: [],
+  });
+  expect(document).toEqual(original);
+  expect(complete).not.toHaveBeenCalled();
 });

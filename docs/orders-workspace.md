@@ -20,13 +20,13 @@ the snapshot with the newest source update time, then the newest observation, th
 selection the order metrics use. A connection filter restricts both the selection and the
 matches to that source.
 
-| Concept           | Rule                                                                                                                                                                                                                          |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Outstanding       | `orders.open` v1: an open, current order with a line whose ordered quantity minus cancelled and same-source fulfilled quantity is above zero. A line without a reported cancelled quantity is unknown unless fully fulfilled. |
-| Overdue           | `orders.overdue` v1: outstanding and past the source `dueAt`.                                                                                                                                                                 |
-| Needs you         | `orders.attention` v1: linked to an unresolved issue with approval, manual intervention or uncertainty attention.                                                                                                             |
-| Differs by source | Two or more current, non-removed sources disagree on a known status, payment status, total or per-SKU ordered quantity. Unknown values, display numbers and dates are not compared.                                           |
-| Fulfillment state | Fulfilled, partial, unfulfilled or not required (every unit cancelled), from shipped, delivered or completed fulfillments of the same source. Mirrored work in another system is never added.                                 |
+| Concept           | Rule                                                                                                                                                                                                                                                    |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Outstanding       | `orders.open` v1: an open, current order with a line whose current quantity (or ordered minus cancelled quantity) minus same-source shipped quantity is above zero. A line without current or cancelled quantities is unknown unless fully fulfilled.   |
+| Overdue           | `orders.overdue` v1: outstanding and past the source `dueAt`.                                                                                                                                                                                           |
+| Needs you         | `orders.attention` v1: linked to an unresolved issue with approval, manual intervention or uncertainty attention.                                                                                                                                       |
+| Differs by source | Two or more current, non-removed sources disagree on a known status, payment status, total or per-SKU current quantity, falling back to reported ordered units when reductions are unknown. Unknown values, display numbers and dates are not compared. |
+| Fulfillment state | Fulfilled, partial, unfulfilled or not required (every unit removed), from shipped, delivered or completed shipments of the same source. Fulfillment work is not counted as a second shipment. Mirrored work in another system is never added.          |
 
 Each rule has one SQL definition, shared by the list, the detail and the
 [order metrics](operational-metrics.md). Order state comes from Orders; needs-you comes
@@ -50,6 +50,14 @@ that option does not invalidate a cursor.
 
 ### Detail
 
+Detail resolves lines and quantities, lifecycle and cancellations, fulfillment and location,
+and tracking independently through the workspace authority reader in the same database
+snapshot. The comparison labels each group's authoritative connection or shows unknown or
+conflicting authority. Missing or removed reports from the selected authority yield null
+facts, never another source's values. Unread tracking remains null. The default line view
+uses line authority when that source reports the order; people can still inspect other
+sources. Payment, totals and display metadata have no authority rule in this initial model.
+
 The detail read returns every source's facts and differences, fulfillments with source IDs,
 up to 100 snapshots of the order and its fulfillments, linked issues and workflow runs, and
 the latest 25 activity events from the past year. Activity uses the same visibility rules as
@@ -69,7 +77,10 @@ from the Shopify app's live read.
 ## Source facts and live context
 
 Adapters populate optional canonical facts: `placedAt`, `total` and line `skuCode` and
-`title`. Snapshots without them keep working and gain them with the next source update.
+`title`, along with current order units and remaining fulfillment work. Snapshots without
+them keep working and gain them with the next source update. Current units and original
+ordered units stay separate; source comparisons use current units when reported and
+ignore fully removed SKU groups. Outstanding units are never negative after refunds.
 Returns and refunds are order children (see [Returns workspace](returns-workspace.md)).
 Customer and payment transaction details are not stored. For those, the web app mounts the
 owning app's `record` UI slot per source connection (see [workspace apps](apps.md)). The

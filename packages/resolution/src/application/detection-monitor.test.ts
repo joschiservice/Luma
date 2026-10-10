@@ -1,10 +1,13 @@
 import type {
+  AuthorityConnection,
+  AuthorityOverrides,
   CapabilityRequest,
   FulfillmentSnapshot,
   InventorySnapshot,
   Observation,
   ReadCapability,
 } from '@luma/connections';
+import { authorityGroups, resolveAuthority } from '@luma/connections';
 import type { DetectionRequest, Incident } from '@luma/exceptions';
 import { defaultConfiguration, evaluateException } from '@luma/exceptions';
 import type { TenantContext } from '@luma/identity';
@@ -138,6 +141,7 @@ function exceptionService(
 
 function fixture(
   overrides: {
+    authorityOverrides?: AuthorityOverrides;
     streams?: SyncStreamState[];
     positions?: StockPosition[];
     work?: FulfillmentWork[];
@@ -146,6 +150,8 @@ function fixture(
   } = {},
 ) {
   const state = {
+    authorityOverrides: overrides.authorityOverrides ?? {},
+    authorityRevision: 0,
     streams: overrides.streams ?? [],
     positions: overrides.positions ?? [],
     work: overrides.work ?? [],
@@ -276,8 +282,40 @@ function fixture(
     exceptions,
     diagnose,
     project,
-    category: (provider) =>
-      provider === 'jtl' ? 'erp' : provider === 'shopify' ? 'storefront' : null,
+    authority: {
+      read: async () => {
+        const sourceConnections: AuthorityConnection[] = [
+          ...new Map(
+            state.positions
+              .flatMap((position) => position.sources)
+              .map((source) => [source.connectionId, source]),
+          ).values(),
+        ].map((source) => ({
+          id: source.connectionId,
+          label: source.provider,
+          category:
+            source.provider === 'jtl'
+              ? 'erp'
+              : source.provider === 'shopify'
+                ? 'storefront'
+                : null,
+          available: true,
+          capabilities: ['inventory.read'],
+        }));
+
+        return {
+          revision: state.authorityRevision,
+          connections: sourceConnections,
+          groups: authorityGroups.map((group) =>
+            resolveAuthority(
+              group,
+              sourceConnections,
+              state.authorityOverrides,
+            ),
+          ),
+        };
+      },
+    },
     configuration: defaultConfiguration,
     hash: (value) => value,
     now: () => now,
@@ -464,10 +502,11 @@ describe('detection monitor', () => {
     expect(f.exceptions.incidents[0]!.state).toBe('detected');
   });
 
-  it('compares each storefront with the ERP from fresh reads and confirms the projection', async () => {
+  it('compares the selected selling source with the ERP from fresh reads and confirms the projection', async () => {
     const linked = position();
     const f = fixture({
       positions: [linked],
+      authorityOverrides: { inventory_selling: connections.at },
       stock: {
         [connections.erp]: '12',
         [connections.de]: '12',
@@ -485,7 +524,7 @@ describe('detection monitor', () => {
       expect.arrayContaining([
         expect.objectContaining({
           connectionIds: [connections.erp, connections.de],
-          authority: 'left',
+          authority: null,
           sellingSource: 'right',
         }),
         expect.objectContaining({
@@ -508,6 +547,47 @@ describe('detection monitor', () => {
     await f.monitor.tick(context);
 
     expect(f.exceptions.incidents[0]!.state).toBe('resolved');
+  });
+
+  it('defers conflicting authority, applies overrides on the next pass and keeps prior evidence intact', async () => {
+    const f = fixture({
+      positions: [position()],
+      stock: {
+        [connections.erp]: '4',
+        [connections.de]: '12',
+        [connections.at]: '12',
+      },
+    });
+    await f.monitor.tick(context);
+    expect(f.exceptions.incidents).toHaveLength(0);
+    expect(
+      f.exceptions.ingested.every(
+        (request) =>
+          evaluateException(
+            request.input,
+            now.toISOString(),
+            defaultConfiguration.thresholds,
+          ).decision === 'defer',
+      ),
+    ).toBe(true);
+    const previous = structuredClone(f.exceptions.ingested);
+    f.state.authorityOverrides = { inventory_selling: connections.de };
+    f.state.authorityRevision = 1;
+    await f.monitor.tick(context);
+    expect(f.exceptions.incidents).toHaveLength(1);
+    expect(f.exceptions.ingested.slice(0, previous.length)).toEqual(previous);
+    expect(f.exceptions.ingested.at(-2)!.evidence.at(-1)!.facts).toMatchObject({
+      sourceAuthority: { revision: 1 },
+    });
+    const incident = f.exceptions.incidents[0]!;
+    f.state.authorityOverrides.inventory_stock = connections.other;
+    f.state.authorityRevision = 2;
+    await f.monitor.tick(context);
+    expect(await f.monitor.verifier.evaluate(context, incident)).toMatchObject({
+      outcome: 'inconclusive',
+      authoritative: false,
+    });
+    expect(incident.state).toBe('detected');
   });
 
   it('opens a stuck fulfillment from a fresh read and closes it when the work ships', async () => {

@@ -9,9 +9,11 @@ Credentials go in the API and worker `.env` files; see `apps/api/.env.example`. 
 - Only EU ingestion hosts are accepted: Sentry `o<org>.ingest.de.sentry.io`, `https://cloud.langfuse.com` and `https://eu.i.posthog.com`. There is no cross-region fallback. Operators must also verify each project's processing location, access and retention under [ADR-003](architecture/003-tenant-isolation-and-data-residency.md), and set retention before enabling customer traffic.
 - `OBSERVABILITY_TENANT_HASH_KEY`, a random secret of at least 32 characters, is required whenever any exporter is enabled.
 - Both Langfuse keys are required together; a partial pair fails startup.
+- PostHog receives product events and evaluates flags only in staging and production. Development and test never contact it, even when its keys are set.
+- `POSTHOG_SECRET_KEY`, a project secret key (`phs_`) or personal API key (`phx_`), enables [local flag evaluation](#feature-flags) and requires `POSTHOG_API_KEY`. Keep it out of public configuration; the project key (`phc_`) is rejected.
 - `OBSERVABILITY_SAMPLE_RATE` samples traces; all spans of a trace share the decision. Errors and explicit product events are not sampled.
 
-The runtime initializes identity and telemetry before accepting requests. Closing the server flushes spans, shuts down processors, then drains analytics and Sentry. Network timeouts are bounded. A failed flag evaluation returns the caller's fallback (false by default), and analytics failures never fail a request. Flags never replace authorization checks.
+The runtime initializes identity and telemetry before accepting requests. Closing the server flushes spans, shuts down processors, then drains analytics and Sentry. Network timeouts are bounded, and analytics failures never fail a request.
 
 ## Correlation and tenant context
 
@@ -25,7 +27,20 @@ The runtime initializes identity and telemetry before accepting requests. Closin
 
 The API binds telemetry to `request.tenantContext` only after the identity guard succeeds, and handlers pass `request.observation.context` to application services. Background work calls `forTenant(context, authorizedTenantId, 'EU')` after reauthorizing. Exports carry an environment-specific HMAC as `tenant_ref`, never raw organization or user IDs; the pseudonym is still restricted metadata. Never derive tenant context from a header, body or analytics ID. Trace context grants no authority: reauthorize any persisted workflow envelope before resuming it.
 
-Span names, product event names, flag keys and model names are explicit allowlists. Extend them in code review; never use customer content as a name. Tenant flag evaluation uses `tenant_ref`; anonymous evaluation uses the action or request ID.
+Span names, product event names, flag keys and model names are explicit allowlists. Extend them in code review; never use customer content as a name.
+
+## Feature flags
+
+Flags are server-side release toggles evaluated through `Observability.flag`. The browser has no flag SDK; expose a flag's effect to the web app through the API.
+
+- Add the key to `featureFlags` in `@luma/platform` before creating the flag in PostHog. Unlisted keys always return the fallback.
+- Evaluation uses `tenant_ref` as the distinct ID, so a percentage rollout keeps each workspace on one side. Without a tenant, it uses the action or request ID. The only property sent is `environment`.
+- In development and test a flag returns its override or the fallback, and no definitions are polled. To try a flag or product event against PostHog locally, run with `OBSERVABILITY_ENVIRONMENT=staging` and a non-production project.
+- In staging and production with `POSTHOG_SECRET_KEY`, the server polls flag definitions every 30 seconds and evaluates in process; checks never call PostHog. The fallback applies until the first poll succeeds, while polling fails, and for flags PostHog cannot evaluate locally, such as static cohorts or experience continuity. Without the key, each check calls PostHog with a 3-second timeout. Use local evaluation in staging and production.
+- A failed or unavailable evaluation returns the caller's fallback, `false` by default. Choose the fallback that is safe while PostHog is unreachable.
+- `FEATURE_FLAG_OVERRIDES=observability-test=true,…` fixes flag values with or without PostHog, for development, the pilot, simulators and tests. Startup fails for unlisted keys, duplicates, or any environment other than development and test.
+
+Flags never decide authorization, policy admission or approval. Keep tenant entitlements and execution controls in their owning domain, where they are scoped and audited. Temporal workflow code cannot evaluate flags: evaluate in an activity or before starting the workflow and pass the value as input, so replays see the same value. Change workflow code with Temporal versioning, not flags.
 
 ## Data policy
 

@@ -103,6 +103,7 @@ const line = (
   skuCode: 'TOTE-RED',
   title: 'Canvas tote',
   quantity: '2',
+  currentQuantity: '2',
   cancelledQuantity: '0',
   unit: 'each',
   fulfilledQuantity: '1',
@@ -111,6 +112,32 @@ const line = (
 });
 
 const detail: OrderDetail = {
+  authority: {
+    revision: 0,
+    groups: [
+      'order_lines',
+      'order_lifecycle',
+      'order_fulfillment',
+      'order_tracking',
+    ].map((group) => ({
+      group: group as
+        | 'order_lines'
+        | 'order_lifecycle'
+        | 'order_fulfillment'
+        | 'order_tracking',
+      state: 'resolved',
+      basis: 'default',
+      connectionId:
+        group === 'order_lines' || group === 'order_lifecycle' ? shop : erp,
+      overrideConnectionId: null,
+      candidateIds: [],
+      eligibleIds: [shop, erp],
+    })),
+    lines: null,
+    lifecycle: null,
+    fulfillments: [],
+    tracking: [],
+  },
   order: list.items[0]!,
   sources: [
     {
@@ -125,7 +152,13 @@ const detail: OrderDetail = {
       dueAt: null,
       fulfillment: 'partial',
       open: null,
-      lines: [line({ cancelledQuantity: null, remainingQuantity: null })],
+      lines: [
+        line({
+          currentQuantity: null,
+          cancelledQuantity: null,
+          remainingQuantity: null,
+        }),
+      ],
     },
     {
       ...sources[1]!,
@@ -157,6 +190,8 @@ const detail: OrderDetail = {
       connectionId: shop,
       externalId: 'gid://shopify/Fulfillment/51',
       status: 'shipped',
+      location: null,
+      tracking: null,
       lastProgressAt: '2026-09-27T10:00:00.000Z',
       failureCode: null,
       deleted: false,
@@ -166,6 +201,7 @@ const detail: OrderDetail = {
         {
           orderLineId: '88888888-8888-4888-8888-888888888888',
           quantity: '1',
+          remainingQuantity: null,
           unit: 'each',
         },
       ],
@@ -493,7 +529,15 @@ export const OrderRecord: Story = {
       ),
     ).toBeVisible();
     await userEvent.click(canvas.getByRole('button', { name: 'Tokyo store' }));
-    await expect(canvas.getByText('Not reported')).toBeVisible();
+    const lines = within(
+      canvas.getByRole('table', {
+        name: 'Lines reported by Tokyo store',
+      }),
+    );
+    const unknownQuantities = lines.getAllByText('Not reported');
+    await expect(unknownQuantities).toHaveLength(2);
+    for (const quantity of unknownQuantities)
+      await expect(quantity).toBeVisible();
     await expect(
       canvas.getByRole('link', { name: /Review issue/ }),
     ).toBeVisible();

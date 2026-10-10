@@ -8,7 +8,7 @@ import {
   RouterProvider,
 } from '@tanstack/react-router';
 import { useState } from 'react';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import appStyles from '../../styles.css?inline';
 import { CaseShadow } from './case';
@@ -81,6 +81,26 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Picks an option from a select and waits for its popup to close. A closing popup stays mounted
+ * without pointer events, so the next select could otherwise find its options instead.
+ */
+async function choose(
+  canvas: ReturnType<typeof within>,
+  label: string,
+  option: string,
+) {
+  await userEvent.click(await canvas.findByRole('combobox', { name: label }));
+  await userEvent.click(
+    await within(document.body).findByRole('option', { name: option }),
+  );
+  await waitFor(() =>
+    expect(
+      within(document.body).queryByRole('listbox'),
+    ).not.toBeInTheDocument(),
+  );
+}
+
 export const Case: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -132,28 +152,9 @@ export const RetryEvaluation: Story = {
 export const RecordReview: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(
-      await canvas.findByRole('combobox', { name: 'Was a change needed?' }),
-    );
-    await userEvent.click(
-      await within(document.body).findByRole('option', { name: 'Yes' }),
-    );
-    await userEvent.click(
-      canvas.getByRole('combobox', {
-        name: 'Should this Workflow handle this issue?',
-      }),
-    );
-    await userEvent.click(
-      await within(document.body).findByRole('option', { name: 'Yes' }),
-    );
-    await userEvent.click(
-      canvas.getByRole('combobox', { name: 'What did your team do?' }),
-    );
-    await userEvent.click(
-      await within(document.body).findByRole('option', {
-        name: 'Made the proposed change',
-      }),
-    );
+    await choose(canvas, 'Was a change needed?', 'Yes');
+    await choose(canvas, 'Should this Workflow handle this issue?', 'Yes');
+    await choose(canvas, 'What did your team do?', 'Made the proposed change');
     await userEvent.click(await canvas.findByRole('checkbox'));
     await userEvent.click(canvas.getByRole('button', { name: 'Save review' }));
     await expect(
@@ -223,21 +224,9 @@ export const AlternativeAction: Story = {
       'Was a change needed?',
       'Should this Workflow handle this issue?',
     ]) {
-      await userEvent.click(
-        await canvas.findByRole('combobox', { name: label }),
-      );
-      await userEvent.click(
-        await within(document.body).findByRole('option', { name: 'Yes' }),
-      );
+      await choose(canvas, label, 'Yes');
     }
-    await userEvent.click(
-      canvas.getByRole('combobox', { name: 'What did your team do?' }),
-    );
-    await userEvent.click(
-      await within(document.body).findByRole('option', {
-        name: 'Made a different change',
-      }),
-    );
+    await choose(canvas, 'What did your team do?', 'Made a different change');
     await userEvent.type(
       canvas.getByLabelText('Change type'),
       'orders.shipping-method.write',
@@ -281,12 +270,7 @@ export const RetryReview: Story = {
       'Was a change needed?',
       'Should this Workflow handle this issue?',
     ]) {
-      await userEvent.click(
-        await canvas.findByRole('combobox', { name: label }),
-      );
-      await userEvent.click(
-        await within(document.body).findByRole('option', { name: 'Yes' }),
-      );
+      await choose(canvas, label, 'Yes');
     }
     await userEvent.click(await canvas.findByRole('checkbox'));
     await userEvent.click(canvas.getByRole('button', { name: 'Save review' }));
@@ -319,10 +303,7 @@ export const EvidenceSelection: Story = {
       'Was a change needed?',
       'Should this Workflow handle this issue?',
     ]) {
-      await userEvent.click(canvas.getByRole('combobox', { name: label }));
-      await userEvent.click(
-        await within(document.body).findByRole('option', { name: 'Yes' }),
-      );
+      await choose(canvas, label, 'Yes');
     }
     const trigger = canvas.getByRole('button', {
       name: 'View all 45 evidence records',
@@ -334,12 +315,7 @@ export const EvidenceSelection: Story = {
     await expect(canvas.getAllByRole('checkbox')).toHaveLength(20);
     await userEvent.click(canvas.getByRole('button', { name: 'Next' }));
     await userEvent.click(canvas.getAllByRole('checkbox')[0]!);
-    await userEvent.click(canvas.getByRole('combobox', { name: 'Selection' }));
-    await userEvent.click(
-      await within(document.body).findByRole('option', {
-        name: 'Selected',
-      }),
-    );
+    await choose(canvas, 'Selection', 'Selected');
     await expect(canvas.getAllByRole('checkbox')).toHaveLength(2);
     for (const checkbox of canvas.getAllByRole('checkbox'))
       await expect(checkbox).toBeChecked();

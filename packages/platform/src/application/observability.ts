@@ -8,7 +8,10 @@ export type Operation =
 export type ProductEvent =
   'connector_provider_viewed' | 'observability_test_completed';
 
-export type FeatureFlag = 'observability-test';
+/** Flag keys that may be evaluated; add a key here before creating it in PostHog. */
+export const featureFlags = ['observability-test'] as const;
+
+export type FeatureFlag = (typeof featureFlags)[number];
 
 /** Correlation is diagnostic metadata, never proof of tenant access. */
 export interface TraceContext {
@@ -87,7 +90,15 @@ export interface Observability {
    * diagnostics, to the log stream.
    */
   captureActivityError(error: unknown, context: ActivityFailureContext): void;
+  /** Sends a product event to PostHog in staging and production; elsewhere it does nothing. */
   capture(context: TraceContext, event: ProductEvent): void;
+  /**
+   * Evaluates a release flag for the context's tenant, or its action or request when no tenant
+   * is bound. A configured override wins. Development and test never ask PostHog and return
+   * `fallback`; staging and production also return it when PostHog is unconfigured, unreachable,
+   * has not loaded definitions yet or does not know the flag. Never use a flag as an
+   * authorization, policy or approval decision.
+   */
   flag(
     context: TraceContext,
     flag: FeatureFlag,

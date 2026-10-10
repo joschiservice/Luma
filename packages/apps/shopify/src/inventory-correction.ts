@@ -41,7 +41,10 @@ export function createShopifyInventoryCorrection(
   installations: InstallationService,
   fetch?: typeof globalThis.fetch,
 ) {
-  const query = createCorrectionQuery(context.database);
+  const query = createCorrectionQuery(
+    context.database,
+    context.sourceAuthority,
+  );
   const operation = {
     app: 'shopify',
     permission: 'shopify:inventory_corrections.apply',

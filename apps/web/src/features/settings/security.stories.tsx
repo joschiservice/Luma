@@ -198,9 +198,7 @@ export const NotSetUp: Story = {
     ).toBeVisible();
     await userEvent.type(page.getByLabelText('Authentication code'), '123456');
     await userEvent.click(page.getByRole('button', { name: 'Turn on' }));
-    await expect(
-      await canvas.findByText('On', {}, { timeout: 5000 }),
-    ).toBeVisible();
+    await expect(await canvas.findByText('On')).toBeVisible();
   },
 };
 

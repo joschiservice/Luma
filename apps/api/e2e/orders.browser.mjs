@@ -30,6 +30,8 @@ test('finds an order by number or SKU, explains it and pages a historical import
         skuCode: 'TOTE-RED',
         title: 'Canvas tote',
         quantity: '2',
+        currentQuantity: '1',
+        cancelledQuantity: '1',
       },
     ],
   });
@@ -198,9 +200,44 @@ test('finds an order by number or SKU, explains it and pages a historical import
     .waitFor();
   await page.getByRole('cell', { name: '2', exact: true }).first().waitFor();
   await page.getByText('Canvas tote').first().waitFor();
+  await expect(
+    page.getByRole('columnheader', { name: 'Current', exact: true }),
+  ).toBeVisible();
+  const editedLine = page
+    .getByRole('row')
+    .filter({ hasText: 'Canvas tote' })
+    .first();
+  await expect(editedLine.getByRole('cell').nth(0)).toHaveText('1');
+  await expect(editedLine.getByRole('cell').nth(1)).toHaveText('2');
+  await expect(editedLine.getByRole('cell').nth(2)).toHaveText('1');
+  const comparisonTable = page.getByRole('table').filter({
+    has: page.getByRole('columnheader', { name: 'Field', exact: true }),
+  });
+  const comparisonHeaders = await comparisonTable
+    .getByRole('columnheader')
+    .allTextContents();
+  const comparedItems = comparisonTable
+    .getByRole('row')
+    .filter({ hasText: 'Order items' });
+  for (const [source, quantity] of [
+    ['Tokyo store', '1 × TOTE-RED'],
+    ['JTL-Wawi', '2 × TOTE-RED'],
+  ])
+    await expect(
+      comparedItems
+        .getByRole('cell')
+        .nth(comparisonHeaders.indexOf(source) - 1),
+    ).toHaveText(quantity);
   const detailUrl = page.url();
   await page.screenshot({
     path: '/tmp/luma98-order-desktop.png',
+    fullPage: true,
+  });
+
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expect(page.locator('html')).toHaveClass(/dark/);
+  await page.screenshot({
+    path: '/tmp/luma170-order-dark.png',
     fullPage: true,
   });
 

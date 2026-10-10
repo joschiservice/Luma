@@ -1,4 +1,5 @@
 import type {
+  AuthorityReader,
   ConnectionProvider,
   InstalledConnection,
   SecretCipher,
@@ -146,6 +147,8 @@ export interface AppOperation {
 
 export interface AppFactoryContext {
   database: TenantDatabase;
+  /** Shared workspace source authority; absent hosts must withhold authority-dependent writes. */
+  sourceAuthority?: AuthorityReader;
   cipher: SecretCipher;
   /** Refreshes membership before authorizing an app operation. */
   refreshContext(context: TenantContext): Promise<TenantContext>;

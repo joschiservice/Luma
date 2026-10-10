@@ -64,7 +64,31 @@ Fulfillments are source-specific operations: never merge JTL and Shopify operati
 
 ### Source snapshots and authority
 
-Orders and inventory each own `entity_snapshots` and `projection_sources` tables within their own SQL namespace; these are not shared tables exposed through platform.
+The implemented authority model is owned by Connections. Each workspace can override order
+lines and quantities, lifecycle and cancellation, fulfillment and location, tracking,
+inventory quantities and selling source independently. Category defaults prefer a
+storefront for order lines and lifecycle and an ERP for fulfillment and tracking, falling
+back to the other category only when no eligible preferred source exists. Inventory keeps
+ERP stock and storefront selling defaults. More than one eligible connection in the
+preferred category is conflicting; no eligible connection or an unavailable override is
+unknown. Settings permission is required to change an override. Changes are revision-checked,
+retry-safe and audited with actor and before/after connections in the same transaction.
+
+Detection, diagnosis, proposals and order detail consume the same live authority reader.
+Inventory comparisons with unknown or conflicting workspace authority are inconclusive;
+historical normalized inputs without workspace authority metadata keep their original
+observational rule behavior. An authority change takes effect on the next read without
+rewriting observations, projections or previous evaluation evidence. Diagnosis reads
+with changed authority are superseded and carry no actionable next steps. Source-specific
+snapshots remain the evidence; the selected display source in order lists is not authority.
+
+The versioned publication design below remains designed, not implemented: required
+manifests, complete version activation and persisted per-entity field-group projection
+pointers are deferred. The workspace revision identifies current override configuration;
+it does not activate an ADR authority version. Payment and financial authority are outside
+the implemented fact groups. A shipping-system category will be added with its connector.
+
+The publication design gives Orders and Inventory their own `entity_snapshots` and `projection_sources` tables within their SQL namespaces, rather than shared tables exposed through platform.
 
 - Immutable `entity_snapshots`: `entity_kind text`, `entity_id uuid`, `connection_id uuid`, `observation_id uuid`, `normalizer_version text`, `snapshot jsonb`, `source_revision text?`, `source_updated_at timestamptz?`, `observed_at timestamptz`, plus tenant/ID/created time. Unique `(tenant_id, entity_kind, entity_id, observation_id, normalizer_version)`. Snapshot has a versioned owner-defined canonical schema, including explicit known/unknown fields. Index `(tenant_id, entity_kind, entity_id, connection_id, observed_at)`.
 - Mutable `projection_sources`: `entity_kind text`, `entity_id uuid`, `field_group text`, `snapshot_id uuid`, `authority_policy_version text`. Unique `(tenant_id, entity_kind, entity_id, field_group)`. Snapshot is a same-owner FK; owner validates matching entity. Field groups initially identity, lifecycle, payment, quantities and tracking as applicable. These rows identify exactly which snapshot supplied the current fields.

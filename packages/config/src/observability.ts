@@ -6,12 +6,14 @@ export interface ObservabilityConfig {
   local?: { endpoint: string; profilesEndpoint?: string };
   sentryDsn?: string;
   langfuse?: { publicKey: string; secretKey: string; baseUrl: string };
-  posthog?: { apiKey: string; host: string };
+  posthog?: { apiKey: string; host: string; secretKey?: string };
+  /** Development and test values that replace flag evaluation, keyed by flag. */
+  featureFlagOverrides?: Readonly<Record<string, boolean>>;
 }
 
 /**
  * Reads telemetry settings and validates EU export destinations; enabled exports require a
- * tenant hash key.
+ * tenant hash key. Feature flag overrides are accepted only in development and test.
  */
 export function readObservabilityConfig(
   env: Readonly<Record<string, string | undefined>>,
@@ -30,6 +32,11 @@ export function readObservabilityConfig(
     release,
     sampleRate: Number(rate),
   };
+  if (env.FEATURE_FLAG_OVERRIDES) {
+    if (environment !== 'development' && environment !== 'test')
+      throw new Error('FEATURE_FLAG_OVERRIDES requires development or test');
+    config.featureFlagOverrides = flagOverrides(env.FEATURE_FLAG_OVERRIDES);
+  }
   if (env.LUMA_LOCAL_OTLP_ENDPOINT) {
     if (environment !== 'development' && environment !== 'test')
       throw new Error('Local telemetry requires development or test');
@@ -86,11 +93,21 @@ export function readObservabilityConfig(
       baseUrl,
     };
   }
+  if (env.POSTHOG_SECRET_KEY && !env.POSTHOG_API_KEY)
+    throw new Error('POSTHOG_SECRET_KEY requires POSTHOG_API_KEY');
   if (env.POSTHOG_API_KEY) {
     const host = env.POSTHOG_HOST ?? 'https://eu.i.posthog.com';
     if (host !== 'https://eu.i.posthog.com')
       throw new Error('POSTHOG_HOST must use EU PostHog ingestion');
     config.posthog = { apiKey: env.POSTHOG_API_KEY, host };
+    if (env.POSTHOG_SECRET_KEY) {
+      // The project key (phc_) is public; local evaluation needs a server-only key.
+      if (!/^ph[sx]_[A-Za-z0-9_-]+$/.test(env.POSTHOG_SECRET_KEY))
+        throw new Error(
+          'POSTHOG_SECRET_KEY must be a project secret (phs_) or personal (phx_) key',
+        );
+      config.posthog.secretKey = env.POSTHOG_SECRET_KEY;
+    }
   }
   if (
     (config.sentryDsn || config.langfuse || config.posthog) &&
@@ -101,6 +118,25 @@ export function readObservabilityConfig(
     );
 
   return config;
+}
+
+function flagOverrides(value: string): Record<string, boolean> {
+  const overrides: Record<string, boolean> = {};
+  for (const entry of value.split(',')) {
+    const [key = '', enabled, extra] = entry.trim().split('=');
+    if (
+      !/^[a-z0-9][a-z0-9-]{0,63}$/.test(key) ||
+      (enabled !== 'true' && enabled !== 'false') ||
+      extra !== undefined ||
+      Object.hasOwn(overrides, key)
+    )
+      throw new Error(
+        'FEATURE_FLAG_OVERRIDES must list unique flag=true|false entries',
+      );
+    overrides[key] = enabled === 'true';
+  }
+
+  return overrides;
 }
 
 function localEndpoint(value: string): string {

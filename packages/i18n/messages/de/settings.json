@@ -464,5 +464,11 @@
   "settings_security_sessions_others": "Alle anderen Sitzungen abmelden",
   "settings_security_sessions_confirm": "Die ausgewählten Sitzungen werden bei ihrer nächsten Anfrage abgemeldet. Meldest du diese Sitzung ab, kehrst du zur Anmeldung zurück.",
   "settings_security_sessions_revoke_failed": "Die Abmeldung konnte nicht bestätigt werden. Aktualisiere die Liste, bevor du es erneut versuchst.",
-  "settings_security_sessions_revoked": "Sitzungen abgemeldet."
+  "settings_security_sessions_revoked": "Sitzungen abgemeldet.",
+  "settings_section_authority": "Maßgebliche Quellen",
+  "settings_authority_description": "Wähle, welche Verbindung die einzelnen Bestellangaben und Bestandsmengen liefert. Standards folgen den Verbindungskategorien. Bei unbekannter oder widersprüchlicher Zuordnung sind automatische Korrekturen gesperrt. Änderungen werden protokolliert und gelten beim nächsten Erkennungslauf.",
+  "settings_authority_fact": "Angabengruppe",
+  "settings_authority_override": "Workspace-Anpassung",
+  "settings_authority_default": "Kategorienstandard verwenden",
+  "settings_authority_unavailable": "{source} (nicht verfügbar)"
 }

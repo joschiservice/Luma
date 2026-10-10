@@ -11,6 +11,7 @@ const units = (s: string) => {
 };
 
 const positive = decimal.refine((s) => !s.startsWith('-') && units(s) > 0n);
+const count = decimal.refine((s) => !s.startsWith('-'));
 
 const timestamp = z.string().datetime({ offset: true });
 
@@ -39,6 +40,7 @@ const line = z
     id: uuid,
     skuId: uuid.nullable(),
     quantity: positive,
+    currentQuantity: count.nullable().optional(),
     cancelledQuantity: decimal.nullable(),
     unit,
     skuCode: text.nullable().optional(),
@@ -47,9 +49,11 @@ const line = z
   .strict()
   .refine(
     (v) =>
-      v.cancelledQuantity === null ||
-      (!v.cancelledQuantity.startsWith('-') &&
-        units(v.cancelledQuantity) <= units(v.quantity)),
+      (v.currentQuantity == null ||
+        units(v.currentQuantity) <= units(v.quantity)) &&
+      (v.cancelledQuantity === null ||
+        (!v.cancelledQuantity.startsWith('-') &&
+          units(v.cancelledQuantity) <= units(v.quantity))),
   );
 
 const order = z
@@ -92,7 +96,21 @@ const fulfillment = z
     lastProgressAt: timestamp.nullable(),
     failureCode: z.string().nullable(),
     lines: z
-      .array(z.object({ orderLineId: uuid, quantity: positive, unit }).strict())
+      .array(
+        z
+          .object({
+            orderLineId: uuid,
+            quantity: count,
+            unit,
+            remainingQuantity: count.nullable().optional(),
+          })
+          .strict()
+          .refine(
+            (line) =>
+              line.remainingQuantity == null ||
+              units(line.remainingQuantity) <= units(line.quantity),
+          ),
+      )
       .refine((v) => new Set(v.map((l) => l.orderLineId)).size === v.length),
     kind: z.enum(['fulfillment_order', 'shipment']).nullable().optional(),
     holds: z
@@ -168,9 +186,12 @@ const fulfillment = z
       .nullable()
       .optional(),
   })
-  .strict();
-
-const count = decimal.refine((s) => !s.startsWith('-'));
+  .strict()
+  .refine(
+    (data) =>
+      data.kind === 'fulfillment_order' ||
+      data.lines.every((line) => units(line.quantity) > 0n),
+  );
 
 const returnRecord = z
   .object({
@@ -246,21 +267,20 @@ const refundRecord = z
   })
   .strict();
 
-// Order snapshots use version 2 since they may carry dueAt, placedAt, total and line SKU
-// text and title. Fulfillment snapshots use version 2 since they may carry kind, holds,
-// location, dates, method, tracking and delivery state. Version 1 documents stay valid.
+// Version 3 adds current order units and remaining fulfillment work. Stored versions 1
+// and 2 stay valid; absent quantity facts stay unknown.
 // Return and refund snapshots use version 1.
 export const snapshotSchema = z.union([
   base
     .extend({
-      schemaVersion: z.union([z.literal(1), z.literal(2)]),
+      schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3)]),
       kind: z.literal('order'),
       data: order,
     })
     .strict(),
   base
     .extend({
-      schemaVersion: z.union([z.literal(1), z.literal(2)]),
+      schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3)]),
       kind: z.literal('fulfillment'),
       data: fulfillment,
     })

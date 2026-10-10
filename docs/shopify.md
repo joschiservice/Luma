@@ -41,10 +41,11 @@ cursors, malformed fields, GraphQL partial errors or failed child requests rejec
 whole page, and more than 1,000 continuation pages in one nested collection rejects the
 scan rather than truncating it. No read emits inferred tombstones.
 
-- **Orders:** original ordered quantities. `cancelledQuantity` is null because refunds and
-  removals do not establish cancelled units. Deleted or custom variants have no SKU
-  identity. Unknown financial statuses stay `unknown`; malformed descriptive fields become
-  null without rejecting the order.
+- **Orders:** `quantity` retains originally ordered units; `currentQuantity` excludes
+  refunded and removed units. `cancelledQuantity` is their difference, a reduction fact
+  rather than proof of cancellation or its cause. A fully removed line stays with zero
+  current units. Deleted or custom variants have no SKU identity. Unknown financial
+  statuses stay `unknown`; malformed descriptive fields become null without rejecting the order.
 - **Products:** per variant, the inventory-item SKU identity, variant title (none for
   `Default Title`), price in shop currency and barcode. SKU text preserves case and is
   never identity.
@@ -54,8 +55,9 @@ scan rather than truncating it. No read emits inferred tombstones.
   account-wide.
 - **Fulfillment work vs shipments:** each FulfillmentOrder is outstanding work
   (`fulfillment_order`), each Fulfillment a separate `shipment`. Work line quantities are
-  the total work; shipment line quantities support split shipments. An on-hold order
-  without a readable hold reason reports one `other` hold.
+  the total work, alongside provider-reported `remainingQuantity`. Zero work quantities
+  remain explicit after removals; shipment line quantities support split shipments.
+  An on-hold order without a readable hold reason reports one `other` hold.
 - **Returns and refunds:** a returns page checks one page of orders cheaply and reads
   returns and refunds only for orders that have them, emitting returns before the refunds
   that refer to them. Units received count every disposition except `MISSING`. Return
@@ -88,6 +90,14 @@ shop, and deduplicated by tenant, connection, topic and event ID. They only prod
 refresh hints for [commerce sync](commerce-sync.md#change-notifications); partial webhook
 fields are never projected, and missing fields never mean deletion. Persist the hint
 before acknowledging.
+
+Order edits and fulfillment-order moves, splits, merges and cancellations refresh both
+orders and fulfillment work. `orders/edited` uses `read_orders`; the fulfillment-order
+topics require a merchant-managed, assigned or third-party fulfillment-order read grant.
+Luma already requests the merchant-managed and third-party grants. Authorization skips
+these subscriptions when the grants are missing, while connection health reports missing
+fulfillment access. Existing connections must reconnect to register the new subscriptions;
+scheduled reads continue to cover changes in streams they can read.
 
 Emitted queries are validated against an offline snapshot of the versioned Admin schema.
 When changing `API_VERSION`, regenerate it with

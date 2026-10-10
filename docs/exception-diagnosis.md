@@ -51,6 +51,10 @@ evidence; restoring an earlier configuration creates a new investigation. Public
 compares the revision under the detection lock.
 
 Inventory and fulfillment recommendations expire with their oldest required observation.
+Workspace inventory authority is rechecked on diagnosis reads. A changed override revision
+or source selection marks the result insufficient and superseded, with no next steps;
+the stored diagnosis and evidence stay intact.
+
 Expired results read as insufficient and superseded, with no actionable next steps, until
 detection ingests current observations; historic facts stay readable. Read failures retry
 on the same revision, and a persisted retry-after prevents early retries. Optional model

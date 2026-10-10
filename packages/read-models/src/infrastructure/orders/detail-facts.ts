@@ -83,6 +83,7 @@ export async function readSourceFacts(
           skuCode: text(line.skuCode),
           title: text(line.title),
           quantity: String(line.quantity),
+          currentQuantity: text(line.currentQuantity),
           cancelledQuantity: text(line.cancelledQuantity),
           unit: String(line.unit),
           fulfilledQuantity: progress?.fulfilled ?? '0',

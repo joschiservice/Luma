@@ -250,7 +250,11 @@ export async function createDefaultExceptionWorker(
       execution: { kind: 'enabled', effects: { resolve: async () => null } },
       replenishmentTransport: processClient,
       ...(host
-        ? { workflowSources: host.registry.workflowSources(), refreshStock }
+        ? {
+            workflowSources: host.registry.workflowSources(),
+            providerCatalog: host.providerCatalog,
+            refreshStock,
+          }
         : {}),
     });
     const runtime = createExceptionWorkflowRuntime(

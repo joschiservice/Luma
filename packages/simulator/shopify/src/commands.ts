@@ -1,4 +1,5 @@
 import { readLevel, writeLevel } from './inventory.js';
+import { editOrder } from './order-edits.js';
 import { cancelOrder, createOrder, holdOrder, markPaid } from './orders.js';
 import {
   all,
@@ -58,6 +59,8 @@ export function command(
       return createCustomer(context, value.customer);
     case 'order':
       return createOrder(context, value);
+    case 'order-edit':
+      return editOrder(context, value);
     case 'paid':
       return markPaid(context, value);
     case 'cancel':

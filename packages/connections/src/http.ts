@@ -12,3 +12,5 @@ export function createConnectors(
 }
 
 export { connectionRoutes } from './api/installations.js';
+
+export { sourceAuthorityRoutes } from './api/authority.js';

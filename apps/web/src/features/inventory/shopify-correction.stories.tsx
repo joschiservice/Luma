@@ -193,6 +193,12 @@ const meta = {
   title: 'Inventory/Shopify stock correction',
   component: Preview,
   parameters: { layout: 'fullscreen' },
+  // Import the lazily loaded app module first so Vite's compile time stays out of play waits.
+  loaders: [
+    async () => {
+      await load?.();
+    },
+  ],
 } satisfies Meta<typeof Preview>;
 
 export default meta;
@@ -202,9 +208,7 @@ type Story = StoryObj<typeof meta>;
 export const Review: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(
-      canvas.findByText('24 → 18 available', {}, { timeout: 10_000 }),
-    ).resolves.toBeVisible();
+    await expect(canvas.findByText('24 → 18 available')).resolves.toBeVisible();
     await userEvent.click(
       await canvas.findByRole('button', {
         name: 'Review correction',

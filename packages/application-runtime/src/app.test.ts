@@ -200,8 +200,9 @@ it('protects newly registered routes when no identity service is configured', as
   await app.close();
 });
 
+// Staging evaluates flags through the PostHog mock; development and test never call it.
 const settings = {
-  environment: 'test' as const,
+  environment: 'staging' as const,
   release: 'test',
   sampleRate: 1,
   tenantHashKey: 'a'.repeat(32),

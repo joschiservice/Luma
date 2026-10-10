@@ -162,6 +162,7 @@ export async function createOrder(
             ? title
             : `${title} - ${variant.title}`,
         quantity: line.quantity,
+        currentQuantity: line.quantity,
         price: minorUnits(line.price),
       },
     });
@@ -416,7 +417,9 @@ export async function cancelOrder(
         { parent: order.id, key: refund },
       ),
     );
-    for (const line of lines)
+    for (const line of lines.filter(
+      (line) => (line.data.currentQuantity ?? line.data.quantity) > 0,
+    ))
       records.push(
         insert(
           context,
@@ -425,7 +428,7 @@ export async function cancelOrder(
           {
             refund,
             lineItem: line.id,
-            quantity: line.data.quantity,
+            quantity: line.data.currentQuantity ?? line.data.quantity,
             restockType: 'CANCEL',
             restocked: true,
           } satisfies RefundLineItemData,
@@ -433,6 +436,13 @@ export async function cancelOrder(
         ),
       );
   }
+  if (paid)
+    for (const line of lines)
+      records.push({
+        ...line,
+        updatedAt: context.now,
+        data: { ...line.data, currentQuantity: 0 },
+      });
   await context.store.putMany(records);
   await touchOrder(context, order, {
     ...order.data,
