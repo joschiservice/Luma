@@ -407,13 +407,14 @@ export async function readAccessHistory(
   workspaceId: string,
   cursor: string | null,
 ): Promise<AccessHistoryPage> {
-  const columns = `id,event_type,target_id,actor_id,actor_name,actor_member,subject_id,subject_name,subject_member,summary,created_at,cursor`;
+  const columns = `id,event_type,target_id,actor_id,actor_kind,actor_name,actor_member,subject_id,subject_name,subject_member,summary,created_at,cursor`;
   const position = cursor?.split('_');
   const result = await tx.query<{
     id: string;
     event_type: string;
     target_id: string;
     actor_id: string;
+    actor_kind: 'member' | 'staff';
     actor_name: string | null;
     actor_member: boolean | null;
     subject_id: string | null;
@@ -436,7 +437,11 @@ export async function readAccessHistory(
       id: row.id,
       type: row.event_type,
       targetId: row.target_id,
-      actor: person(row.actor_id, row.actor_name, row.actor_member),
+      // Staff changes record the nil UUID; the staff audit names the operator.
+      actor:
+        row.actor_kind === 'staff'
+          ? person(row.actor_id, 'Luma support', null)
+          : person(row.actor_id, row.actor_name, row.actor_member),
       subject: row.subject_id
         ? person(row.subject_id, row.subject_name, row.subject_member)
         : null,

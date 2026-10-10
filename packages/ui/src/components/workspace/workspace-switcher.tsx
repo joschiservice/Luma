@@ -3,7 +3,13 @@ import { m } from '@luma/i18n/messages';
 import { Check, ChevronsUpDown, Plus } from 'lucide-react';
 import type { ReactElement } from 'react';
 
-export type WorkspaceChoice = { id: string; name: string; link: ReactElement };
+/** A workspace to switch to. `status` is a short label, such as why it can't be used. */
+export type WorkspaceChoice = {
+  id: string;
+  name: string;
+  link: ReactElement;
+  status?: string;
+};
 
 /** Returns up to two initials for a workspace or person, for avatar tiles. */
 export function initialsOf(name: string, fallback = 'W') {
@@ -72,6 +78,11 @@ export function WorkspaceSwitcher({
                       {initialsOf(choice.name).slice(0, 1)}
                     </span>
                     <span className="workspace-menu-name">{choice.name}</span>
+                    {choice.status ? (
+                      <span className="workspace-menu-status">
+                        {choice.status}
+                      </span>
+                    ) : null}
                     {choice.id === workspaceId ? (
                       <Check
                         className="workspace-menu-check"

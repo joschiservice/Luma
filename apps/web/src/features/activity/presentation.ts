@@ -102,6 +102,8 @@ export const activityLabels: Record<string, Label> = {
   'member.add': m.activity_action_member_added,
   'member.update': m.activity_action_member_changed,
   'member.remove': m.activity_action_member_removed,
+  'member.suspended': m.activity_action_member_suspended,
+  'member.reactivated': m.activity_action_member_reactivated,
   'invitation.created': m.activity_action_invitation_created,
   'invitation.accepted': m.activity_action_invitation_accepted,
   'invitation.revoked': m.activity_action_invitation_revoked,

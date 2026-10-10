@@ -19,7 +19,14 @@ The bridge exposes only email sign-up (passwords of at least 12 characters), sig
 ## Membership rules
 
 - `members.manage` adds, reassigns and removes members. Only owners grant or revoke ownership. Nobody can assign a role, or change a member, with permissions the actor does not hold.
-- The last owner cannot be removed or demoted.
+- The last active owner cannot be removed or demoted. Suspended owners don't count.
+- A membership is `active` or `suspended`. Suspension keeps the role, the account and the
+  person's other workspaces; reactivation restores the same role. Luma staff suspend and
+  reactivate memberships ([staff access](staff.md#membership-suspension)); the runtime role
+  cannot change membership status. The membership records when, by whom (staff or customer) and
+  why it was suspended.
+- A suspended member can't act through the workspace's settings or role commands, receives no
+  workspace mail, and can't rejoin through an invitation, because they are still a member.
 - Membership mutations serialize on the organization row and recheck the acting membership after acquiring the lock.
 - `workspace_people` keeps each workspace's current and former members for attribution.
   Triggers on memberships and user profiles maintain it, so no code path can skip it. Removal,
@@ -64,6 +71,7 @@ A path ID selects a tenant; it does not grant access. Each request reads the cur
 | ------------------------------------------------ | -------- |
 | Not a member, or the organization does not exist | 404      |
 | Organization suspended or closed                 | 404      |
+| Membership suspended (`ACCESS_SUSPENDED`)        | 403      |
 | Member without the required permission           | 403      |
 | Organization placed in another region            | 503      |
 | Provisioning in an unavailable region (US, APAC) | 422      |
@@ -72,6 +80,17 @@ For a member, a suspended or closed organization raises `WorkspaceInactiveError`
 `IdentityError` subclass. Callers see the same response; background work uses the subclass
 to pause instead of failing or blocking. Cross-tenant worker discovery returns active
 organizations only.
+
+A suspended membership raises `MembershipSuspendedError`, a 403 with the `ACCESS_SUSPENDED`
+code; the member already knows the workspace exists. The workspace list still includes the
+workspace with `membershipStatus: 'suspended'`, and the web app shows it as **Access suspended**.
+Every request resolves the membership again, so the next request is rejected; live streams
+recheck access every five seconds and close. Background work treats the error like an inactive
+workspace (`pausesBackgroundWork`): discovery skips work acting as a suspended member, workflow
+runs pause at their next activity, and they continue after reactivation. A sync stream whose
+principal is suspended blocks as `principal_unavailable` until someone resumes it with their own
+access. `suspendedMembers` tells other owners which recorded principals are suspended, so they
+can show work that needs a new owner.
 
 The context carries an audit identity: user, initiating user, session, membership, role reference, tenant, region and server request ID, plus the role's effective permissions, resolved in the same membership statement. There is no long-lived permission cache. It never contains passwords or session tokens. It is evidence metadata, not an audit log; each audit producer writes its own evidence through the audit package.
 

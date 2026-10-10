@@ -1,5 +1,6 @@
 import type {
   Membership,
+  MembershipStatus,
   Organization,
   SessionIdentity,
   TenantContext,
@@ -59,7 +60,8 @@ export interface IdentityTransaction {
     permissions: PermissionSet;
     archived: boolean;
   } | null>;
-  listOrganizations(): Promise<Organization[]>;
+  /** Lists the user's workspaces, including those where their membership is suspended. */
+  listOrganizations(): Promise<OrganizationAccess[]>;
   findMembership(organizationId: string): Promise<Membership | null>;
   findOrganization(organizationId: string): Promise<Organization | null>;
   createOrganization(input: {
@@ -69,6 +71,11 @@ export interface IdentityTransaction {
   selectTenant(organizationId: string): Promise<void>;
   lockOrganization(organizationId: string): Promise<void>;
   listMembers(organizationId: string): Promise<Membership[]>;
+  /** Returns which of the given user IDs have a suspended membership in the workspace. */
+  suspendedMembers(
+    organizationId: string,
+    userIds: readonly string[],
+  ): Promise<string[]>;
   addMember(
     organizationId: string,
     userId: string,
@@ -82,6 +89,11 @@ export interface IdentityTransaction {
   removeMember(organizationId: string, memberId: string): Promise<void>;
 }
 
+/** A workspace with the signed-in person's membership status in it. */
+export type OrganizationAccess = Organization & {
+  membershipStatus: MembershipStatus;
+};
+
 /** A membership as returned to API callers, without its permission set. */
 export interface MemberDto {
   id: string;
@@ -90,6 +102,7 @@ export interface MemberDto {
   name?: string | undefined;
   email?: string | undefined;
   role: RoleReference;
+  status: MembershipStatus;
 }
 
 /** The bounded membership values recorded in access events. */
@@ -109,6 +122,7 @@ export function memberDto(member: Membership): MemberDto {
     ...(member.name !== undefined ? { name: member.name } : {}),
     ...(member.email !== undefined ? { email: member.email } : {}),
     role: member.role,
+    status: member.status ?? 'active',
   };
 }
 
@@ -276,6 +290,27 @@ export function createIdentityService(repository: IdentityRepository) {
         resolve(tx, session, organizationId, requestId),
       );
     },
+    /**
+     * Returns which of the given users have a suspended membership in the context's workspace.
+     * Callers authorize the read that referenced them; work acting as them is paused.
+     */
+    async suspendedMembers(
+      context: TenantContext,
+      userIds: readonly string[],
+    ): Promise<ReadonlySet<string>> {
+      // Recorded principals may be names or service IDs; only user IDs can be members.
+      const ids = [...new Set(userIds)].filter((id) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          id,
+        ),
+      );
+      if (!ids.length) return new Set();
+
+      return withTenant(
+        context,
+        async (tx) => new Set(await tx.suspendedMembers(context.tenantId, ids)),
+      );
+    },
     /** Lists members with their roles; any member may read the team. */
     listMembers(context: TenantContext) {
       return withTenant(context, async (tx) =>
@@ -284,8 +319,9 @@ export function createIdentityService(repository: IdentityRepository) {
     },
     /**
      * Adds, reassigns or removes a member under the organization lock. Requires
-     * `members.manage`; only owners change ownership, the last owner stays, and nobody else can
-     * assign a role or change a member whose permissions exceed their own.
+     * `members.manage`; only owners change ownership, the last active owner stays, and nobody
+     * else can assign a role or change a member whose permissions exceed their own. Suspended
+     * owners don't count as active owners.
      */
     changeMember(
       initialContext: TenantContext,
@@ -364,8 +400,11 @@ export function createIdentityService(repository: IdentityRepository) {
           );
         if (
           target?.role.key === 'owner' &&
+          target.status !== 'suspended' &&
           next?.reference.key !== 'owner' &&
-          members.filter((m) => m.role.key === 'owner').length === 1
+          members.filter(
+            (m) => m.role.key === 'owner' && m.status !== 'suspended',
+          ).length === 1
         )
           throw new IdentityError(
             409,

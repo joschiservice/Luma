@@ -1,7 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
 import type { IdentityService } from '@luma/identity';
-import { WorkspaceInactiveError } from '@luma/identity';
+import { pausesBackgroundWork } from '@luma/identity';
 import {
   createProcessWorker,
   type TemporalSettings,
@@ -57,7 +57,8 @@ export async function createReplenishmentWorker(
           tenant_id: string;
           principal_id: string;
         }>('SELECT * FROM replenishment_worker_scopes()');
-        // A workspace suspended after discovery is skipped quietly; discovery omits it next time.
+        // A workspace or member suspended after discovery is skipped quietly; discovery omits it
+        // next time.
         for (const scope of scopes.rows) {
           if (stop.signal.aborted) break;
           try {
@@ -69,7 +70,7 @@ export async function createReplenishmentWorker(
               ),
             );
           } catch (error) {
-            if (error instanceof WorkspaceInactiveError) continue;
+            if (pausesBackgroundWork(error)) continue;
             console.error(
               'Replenishment check could not complete; retrying.',
               error,
@@ -92,7 +93,7 @@ export async function createReplenishmentWorker(
                 ),
               );
             } catch (error) {
-              if (error instanceof WorkspaceInactiveError) continue;
+              if (pausesBackgroundWork(error)) continue;
               console.error(
                 'Case workflow starts could not complete; retrying.',
                 error,
@@ -118,7 +119,7 @@ export async function createReplenishmentWorker(
                 scope.definition_id,
               );
             } catch (error) {
-              if (error instanceof WorkspaceInactiveError) continue;
+              if (pausesBackgroundWork(error)) continue;
               console.error(
                 'Code workflow start could not complete; retrying.',
               );

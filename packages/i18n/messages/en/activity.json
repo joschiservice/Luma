@@ -134,6 +134,8 @@
   "activity_action_member_added": "Member added",
   "activity_action_member_changed": "Member role changed",
   "activity_action_member_removed": "Member removed",
+  "activity_action_member_suspended": "Member suspended",
+  "activity_action_member_reactivated": "Member reactivated",
   "activity_action_invitation_created": "Invitation sent",
   "activity_action_invitation_accepted": "Invitation accepted",
   "activity_action_invitation_revoked": "Invitation withdrawn",

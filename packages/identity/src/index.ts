@@ -3,6 +3,8 @@ export {
   hasPermission,
   IdentityError,
   makeTenantContext,
+  MembershipSuspendedError,
+  pausesBackgroundWork,
   requirePermission,
   requireTenant,
   WorkspaceInactiveError,
@@ -66,9 +68,13 @@ export type {
 
 export type { MailProvider } from './application/mail.js';
 
-export { revokeCustomerSessionsForSupport } from './application/support.js';
+export {
+  changeMembershipForSupport,
+  revokeCustomerSessionsForSupport,
+} from './application/support.js';
 
 export type {
   IdentitySupportTransaction,
+  SupportMembershipChange,
   SupportSessionRevocation,
 } from './application/support.js';

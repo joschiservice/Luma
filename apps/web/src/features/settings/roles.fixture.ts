@@ -239,6 +239,7 @@ const member = (
       builtIn: role.builtIn,
       revision: role.revision,
     },
+    status: 'active',
   };
 };
 

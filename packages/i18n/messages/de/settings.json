@@ -116,6 +116,8 @@
   "settings_team_loading": "Team wird geladen…",
   "settings_team_member_fallback": "Workspace-Mitglied",
   "settings_team_you": "Du",
+  "settings_team_member_suspended": "Zugriff gesperrt",
+  "settings_team_no_active_owner": "Dieser Workspace hat keinen aktiven Inhaber. Der Zugriff aller Inhaber ist gesperrt, daher kann niemand die Inhaberschaft ändern. Wende dich an den Luma-Support, um sie zu übertragen.",
   "settings_team_role_link": "Ansehen, was die Rolle {role} erlaubt",
   "settings_team_manage_member": "{name} verwalten",
   "settings_team_manage_unnamed": "Mitglied verwalten",

@@ -1,4 +1,5 @@
 import { m } from '@luma/i18n/messages';
+import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
 import { Input } from '@luma/ui/components/primitives/input';
 import { useForm } from '@tanstack/react-form';
@@ -16,8 +17,8 @@ import {
 } from './data';
 
 /**
- * Lists accessible workspaces; entry mode opens the sole workspace or routes an empty list
- * to creation.
+ * Lists the person's workspaces, marking those where their access is suspended. Entry mode
+ * opens the sole workspace when it's accessible, or routes an empty list to creation.
  */
 export function WorkspaceList({ entry = false }: { entry?: boolean }) {
   const query = useQuery(organizationsOptions());
@@ -26,7 +27,11 @@ export function WorkspaceList({ entry = false }: { entry?: boolean }) {
   if (query.isPending || query.isFetching) return <Pending />;
   if (entry && query.data.length === 0)
     return <Navigate to="/app/workspaces/new" replace />;
-  if (entry && query.data.length === 1)
+  if (
+    entry &&
+    query.data.length === 1 &&
+    query.data[0]!.membershipStatus === 'active'
+  )
     return (
       <Navigate
         to="/app/$organizationId/home"
@@ -52,6 +57,11 @@ export function WorkspaceList({ entry = false }: { entry?: boolean }) {
                     {org.name.trim().slice(0, 1).toUpperCase()}
                   </span>
                   <span className="workspace-list-name">{org.name}</span>
+                  {org.membershipStatus === 'suspended' ? (
+                    <Badge tone="warning">
+                      {m.identity_workspaces_suspended()}
+                    </Badge>
+                  ) : null}
                   <ChevronRight size={16} aria-hidden="true" />
                 </Link>
               </li>

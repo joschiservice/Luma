@@ -11,7 +11,7 @@ import {
  * Selects memberships with their role and, for custom roles, granted permissions in one
  * statement. Callers append the `WHERE` clause on `m`.
  */
-export const membershipSelect = `SELECT m.id,m.tenant_id AS "organizationId",m.user_id AS "userId",m.role,
+export const membershipSelect = `SELECT m.id,m.tenant_id AS "organizationId",m.user_id AS "userId",m.role,m.status,
   m.custom_role_id AS "customRoleId",r.name AS "roleName",r.revision AS "roleRevision",
   CASE WHEN m.custom_role_id IS NULL THEN NULL ELSE ARRAY(SELECT p.permission FROM workspace_role_permissions p
     WHERE p.tenant_id=m.tenant_id AND p.role_id=m.custom_role_id ORDER BY p.permission) END AS permissions
@@ -22,6 +22,7 @@ export type MembershipRow = {
   organizationId: string;
   userId: string;
   role: string;
+  status: string;
   customRoleId: string | null;
   roleName: string | null;
   roleRevision: number | null;
@@ -57,6 +58,8 @@ export function membershipFromRow(row: MembershipRow): Membership {
     organizationId: row.organizationId,
     userId: row.userId,
     role,
+    // Unknown states fail closed as suspended.
+    status: row.status === 'active' ? 'active' : 'suspended',
     permissions: PermissionSet.forRole(role, row.permissions ?? []),
   };
 }

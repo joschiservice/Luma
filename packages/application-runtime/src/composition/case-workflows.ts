@@ -79,7 +79,10 @@ export function caseReader(
  */
 export function createCaseWorkflowServices(options: {
   database: TenantDatabase;
-  identity: Pick<IdentityService, 'refreshContext' | 'resolveWorkflowContext'>;
+  identity: Pick<
+    IdentityService,
+    'refreshContext' | 'resolveWorkflowContext' | 'suspendedMembers'
+  >;
   exceptions: Pick<DetectionService, 'list' | 'get' | 'evidence'>;
   policies: Pick<PolicyService, 'approvalRequirement' | 'currentVersion'>;
   sources?: CaseWorkflowAdapter[];

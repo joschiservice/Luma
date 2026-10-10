@@ -92,9 +92,16 @@ export function TeamSettings({
   const pendingCount = outstanding?.filter(
     (invitation) => invitation.status === 'pending',
   ).length;
+  // Suspended owners can't manage the workspace, so only active owners count.
   const owners =
-    members.data?.filter((member) => isOwnerRole(member.role)).length ?? 0;
-  const lastOwner = isOwnerRole(selected?.role) && owners === 1;
+    members.data?.filter(
+      (member) => isOwnerRole(member.role) && member.status === 'active',
+    ).length ?? 0;
+  const lastOwner =
+    isOwnerRole(selected?.role) &&
+    selected?.status === 'active' &&
+    owners === 1;
+  const noActiveOwner = !!members.data?.length && owners === 0;
   const fullRole = (id: string) => active.find((role) => role.id === id);
   // Changing someone needs their current role, and the new one, within your own permissions.
   const changeable = (member: Membership) => {
@@ -190,6 +197,9 @@ export function TeamSettings({
       {!deliveryAvailable && manage ? (
         <Alert tone="warning">{m.settings_team_delivery_unavailable()}</Alert>
       ) : null}
+      {noActiveOwner ? (
+        <Alert tone="warning">{m.settings_team_no_active_owner()}</Alert>
+      ) : null}
       {error ? (
         <Alert tone="danger">
           {m.settings_team_load_failed()}{' '}
@@ -232,6 +242,11 @@ export function TeamSettings({
                   m.settings_team_member_fallback()}{' '}
                 {member.userId === actorId ? (
                   <small>{m.settings_team_you()}</small>
+                ) : null}
+                {member.status === 'suspended' ? (
+                  <Badge tone="warning">
+                    {m.settings_team_member_suspended()}
+                  </Badge>
                 ) : null}
               </strong>
               <span>{member.email ?? member.userId}</span>

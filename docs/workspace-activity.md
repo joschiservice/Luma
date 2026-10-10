@@ -30,7 +30,9 @@ People resolve through `workspace_people`, the workspace's own record of current
 members; Activity never reads the global users table, so a person who belongs only to another
 workspace stays unnamed. Former members keep the name recorded when they left and lose their
 email; a user ID with no recorded name reads as a former member rather than as an empty actor.
-Detection and verification events without an actor, and the nil UUID, read as Luma. Services
+Detection and verification events without an actor, and the nil UUID, read as Luma. Access
+changes made by Luma staff record the nil UUID with `actor_kind='staff'` and read as Luma support;
+the staff identity stays in the staff audit. Services
 and connectors keep their recorded identifier. Workflow runs act for the person who activated
 them, so an event correlated with a run names both that person and the workflow.
 

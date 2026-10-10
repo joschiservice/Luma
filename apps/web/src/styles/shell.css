@@ -375,6 +375,12 @@
   font-size: 10px;
 }
 
+.workspace-menu-status {
+  flex: none;
+  color: var(--foreground-muted);
+  font-size: 12px;
+}
+
 .workspace-menu-name,
 .account-menu-grow {
   flex: 1;

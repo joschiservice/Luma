@@ -10,7 +10,8 @@ export const uuidPattern =
  * from `row`'s actor_name, actor_email and actor_member columns. Former members keep the name
  * recorded when they left; a user without one is still a former member. Email is shown only
  * for current members. Luma records events without an actor that `luma` matches, and the nil
- * UUID stands for Luma where an actor is required.
+ * UUID stands for Luma where an actor is required. Rows that `support` matches were recorded by
+ * Luma staff; they carry no personal ID.
  */
 export const actorSql = (actor: {
   row: string;
@@ -18,12 +19,13 @@ export const actorSql = (actor: {
   id: string;
   luma: string;
   workflow: string;
+  support?: string;
 }) => `jsonb_build_object(
-      'kind',CASE WHEN ${actor.row}.actor_member THEN 'member'
+      'kind',CASE ${actor.support ? `WHEN ${actor.support} THEN 'support' ` : ''}WHEN ${actor.row}.actor_member THEN 'member'
         WHEN (${actor.id} IS NULL AND ${actor.luma}) OR ${actor.id}='00000000-0000-0000-0000-000000000000' THEN 'luma'
         WHEN ${actor.row}.actor_name IS NOT NULL OR (${actor.kind}='user' AND ${actor.id} IS NOT NULL) THEN 'former_member'
         WHEN ${actor.id} IS NOT NULL THEN 'service' ELSE 'unrecorded' END,
-      'id',left(${actor.id},300),
+      'id',${actor.support ? `CASE WHEN ${actor.support} THEN NULL ELSE left(${actor.id},300) END` : `left(${actor.id},300)`},
       'name',left(COALESCE(${actor.row}.actor_name,CASE WHEN ${actor.kind}<>'user' THEN ${actor.id} END),200),
       'email',left(${actor.row}.actor_email,320),'workflow',${actor.workflow})`;
 

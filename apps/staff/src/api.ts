@@ -7,6 +7,7 @@ import {
   staffAuditPageSchema,
   staffConfigSchema,
   staffDirectorySchema,
+  staffMembershipChangeSchema,
   staffRevokeSessionsResultSchema,
   staffSessionSchema,
   staffWorkspaceDetailSchema,
@@ -47,6 +48,23 @@ function failureMessage(status: number, path: string) {
     return 'The request could not be accepted. Check the fields and try again.';
 
   return 'The staff service could not complete this request. Try again.';
+}
+
+// Conflicts explain which state blocked the command; the staff API writes these messages.
+async function conflictMessage(response: Response) {
+  try {
+    const body: unknown = await response.json();
+
+    return body &&
+      typeof body === 'object' &&
+      'message' in body &&
+      typeof body.message === 'string' &&
+      body.message.length <= 300
+      ? body.message
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -96,7 +114,8 @@ export function createStaffApi(
     }
     if (!response.ok)
       throw new StaffApiError(
-        failureMessage(response.status, path),
+        (response.status === 409 ? await conflictMessage(response) : null) ??
+          failureMessage(response.status, path),
         response.status,
       );
     try {
@@ -202,6 +221,23 @@ export function createStaffApi(
       staffRevokeSessionsResultSchema.parse(
         await request(
           `${workspace(workspaceId)}/users/${encodeURIComponent(userId)}/revoke-sessions`,
+          body,
+        ),
+      ),
+    changeMembership: async (
+      workspaceId: string,
+      userId: string,
+      action: 'suspend' | 'reactivate',
+      body: {
+        grantId: string;
+        reason: string;
+        commandId: string;
+        acknowledgeLastOwner?: boolean;
+      },
+    ) =>
+      staffMembershipChangeSchema.parse(
+        await request(
+          `${workspace(workspaceId)}/users/${encodeURIComponent(userId)}/${action}-membership`,
           body,
         ),
       ),

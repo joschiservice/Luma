@@ -3,7 +3,7 @@ import type {
   SessionIdentity,
   TenantContext,
 } from '../domain/context.js';
-import { IdentityError } from '../domain/context.js';
+import { IdentityError, requireActiveMembership } from '../domain/context.js';
 import type { Permission } from '../domain/permissions.js';
 import type { PermissionSet, RoleReference } from '../domain/roles.js';
 import type {
@@ -123,6 +123,7 @@ export function createSettingsService(deps: SettingsDependencies) {
         const actor = await tx.member(context.actor.id);
         if (!actor)
           throw new IdentityError(404, 'NOT_FOUND', 'Workspace not found');
+        requireActiveMembership(actor);
         if (permission && !actor.permissions.has(permission))
           throw new IdentityError(
             403,

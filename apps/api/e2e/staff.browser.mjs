@@ -73,6 +73,7 @@ async function fixture(t) {
         'staff.sessions.revoke',
         'staff.audit.read',
         'staff.accounts.inspect',
+        'staff.memberships.manage',
       ],
     },
     db.ownerUrl,
@@ -284,6 +285,98 @@ test('staff investigates a workspace and retries an uncertain global revocation 
   await expect(
     page.getByRole('table', { name: 'Workspace members' }),
   ).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('staff suspends the only active owner after acknowledgement and reactivates the same role', async ({
+  resources: t,
+}) => {
+  const { page, db, customerApi, customer, workspace, errors } =
+    await fixture(t);
+  await signIn(page);
+  await page.getByLabel('Name, email or workspace').fill('Support North');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page.getByRole('button', { name: 'Inspect Support North' }).click();
+  await page
+    .getByLabel('Support reason or ticket reference')
+    .fill('Owner departed, customer asked for removal');
+  await page
+    .getByRole('button', { name: 'Open support access', exact: true })
+    .click();
+  const members = page.getByRole('table', { name: 'Workspace members' });
+  await expect(members).toContainText('Active');
+  await page
+    .getByRole('button', {
+      name: 'Suspend membership for customer@example.test',
+    })
+    .click();
+  await page
+    .getByLabel('Reason for suspending access')
+    .fill('Departed employee, owner unreachable');
+  const submit = page.getByRole('button', {
+    name: 'Suspend membership',
+    exact: true,
+  });
+  await expect(submit).toBeDisabled();
+  await page.getByRole('checkbox').check();
+  await submit.click();
+  await expect(page.getByRole('status')).toContainText(
+    'The workspace has no active owner',
+  );
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(members).toContainText('Suspended');
+  await expect(members).toContainText('By Luma support');
+  await expect(page.locator('body')).toContainText(
+    'This workspace has no active owner.',
+  );
+  const rejected = await customerApi.request(
+    `/v1/organizations/${workspace.id}/context`,
+    { cookie: customer.cookie, status: 403 },
+  );
+  expect(rejected.body.code).toBe('ACCESS_SUSPENDED');
+  const listed = await customerApi.request('/v1/organizations', {
+    cookie: customer.cookie,
+  });
+  expect(listed.body.items).toEqual([
+    expect.objectContaining({
+      id: workspace.id,
+      membershipStatus: 'suspended',
+    }),
+  ]);
+  await page.screenshot({
+    path: test.info().outputPath('membership-suspended.png'),
+    fullPage: true,
+    animations: 'disabled',
+  });
+
+  await page
+    .getByRole('button', {
+      name: 'Reactivate membership for customer@example.test',
+    })
+    .click();
+  await page
+    .getByLabel('Reason for reactivating access')
+    .fill('Ownership confirmed with the customer');
+  await page
+    .getByRole('button', { name: 'Reactivate membership', exact: true })
+    .click();
+  await expect(page.getByRole('status')).toContainText(
+    'Membership reactivated',
+  );
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(members).not.toContainText('Suspended');
+  const context = await customerApi.request(
+    `/v1/organizations/${workspace.id}/context`,
+    { cookie: customer.cookie },
+  );
+  expect(context.body.actor.role.key).toBe('owner');
+  const audit = await db.owner.query(
+    "SELECT event FROM staff_audit WHERE event LIKE 'customer.membership.%' ORDER BY sequence",
+  );
+  expect(audit.rows.map((row) => row.event)).toEqual([
+    'customer.membership.suspended',
+    'customer.membership.reactivated',
+  ]);
   expect(errors).toEqual([]);
 });
 

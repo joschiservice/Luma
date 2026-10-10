@@ -11,6 +11,8 @@ const eventLabels: Record<string, string> = {
   'member.add': 'Member added',
   'member.update': 'Member role changed',
   'member.remove': 'Member removed',
+  'member.suspended': 'Member suspended',
+  'member.reactivated': 'Member reactivated',
   'invitation.created': 'Invitation sent',
   'invitation.accepted': 'Invitation accepted',
   'invitation.revoked': 'Invitation revoked',

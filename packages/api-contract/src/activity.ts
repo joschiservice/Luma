@@ -47,6 +47,7 @@ export const activityActorKinds = [
   'member',
   'former_member',
   'luma',
+  'support',
   'service',
   'unrecorded',
 ] as const;
@@ -54,7 +55,7 @@ export const activityActorKinds = [
 /**
  * Who recorded an event. Former members keep the name recorded when they left, which may be
  * missing. Email is present only for current members. Luma records detection and verification
- * itself. `workflow` names the workflow whose run acted on the person's behalf.
+ * itself; `support` is Luma staff acting on the workspace, without a personal ID. `workflow` names the workflow whose run acted on the person's behalf.
  */
 export const activityActorSchema = z.object({
   kind: z.enum(activityActorKinds),

@@ -52,6 +52,7 @@ const provisioningSchema = z
         'staff.sessions.revoke',
         'staff.audit.read',
         'staff.accounts.inspect',
+        'staff.memberships.manage',
       ]),
     ),
     operator: z.string().trim().min(1).max(200),

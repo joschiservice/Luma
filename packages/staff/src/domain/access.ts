@@ -4,6 +4,7 @@ export const staffPermissions = [
   'staff.sessions.revoke',
   'staff.audit.read',
   'staff.accounts.inspect',
+  'staff.memberships.manage',
 ] as const;
 
 export type StaffPermission = (typeof staffPermissions)[number];
@@ -35,7 +36,7 @@ export function requireStaffPermission(
     throw new StaffError(403, 'Staff permission required.');
 }
 
-/** Sensitive global account actions require authentication within the last fifteen minutes. */
+/** Commands that change customer access require authentication within the last fifteen minutes. */
 export function requireRecentStaffSession(
   context: StaffContext,
   now = new Date(),
@@ -44,8 +45,5 @@ export function requireRecentStaffSession(
     context.sessionCreatedAt.getTime() > now.getTime() ||
     now.getTime() - context.sessionCreatedAt.getTime() > 15 * 60_000
   )
-    throw new StaffError(
-      403,
-      'Sign in again before revoking customer sessions.',
-    );
+    throw new StaffError(403, 'Sign in again before changing customer access.');
 }

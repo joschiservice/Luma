@@ -21,6 +21,8 @@ const protectedRoutes = new Set([
   'POST /v1/staff/workspaces/:workspaceId/access',
   'GET /v1/staff/workspaces/:workspaceId',
   'POST /v1/staff/workspaces/:workspaceId/users/:userId/revoke-sessions',
+  'POST /v1/staff/workspaces/:workspaceId/users/:userId/suspend-membership',
+  'POST /v1/staff/workspaces/:workspaceId/users/:userId/reactivate-membership',
   'GET /v1/staff/workspaces/:workspaceId/health',
   'GET /v1/staff/workspaces/:workspaceId/access-history',
   'GET /v1/staff/audit',
@@ -40,6 +42,12 @@ const routePermissions: Record<string, StaffPermission[]> = {
     'staff.workspace.inspect',
     'staff.sessions.revoke',
   ],
+  'POST /v1/staff/workspaces/:workspaceId/users/:userId/suspend-membership': [
+    'staff.workspace.inspect',
+    'staff.memberships.manage',
+  ],
+  'POST /v1/staff/workspaces/:workspaceId/users/:userId/reactivate-membership':
+    ['staff.workspace.inspect', 'staff.memberships.manage'],
   'GET /v1/staff/workspaces/:workspaceId/health': ['staff.workspace.inspect'],
   'GET /v1/staff/workspaces/:workspaceId/access-history': [
     'staff.workspace.inspect',
@@ -309,6 +317,23 @@ export function registerStaffHttp(app: FastifyInstance, staff: StaffRuntime) {
         await staff.service.revoke(context(request.staffContext), {
           ...params,
           ...body,
+        }),
+    ),
+    suspendMembership: os.suspendMembership.handler(
+      async ({ context: { request }, input: { params, body } }) =>
+        await staff.service.changeMembership(context(request.staffContext), {
+          ...params,
+          ...body,
+          action: 'suspend',
+        }),
+    ),
+    reactivateMembership: os.reactivateMembership.handler(
+      async ({ context: { request }, input: { params, body } }) =>
+        await staff.service.changeMembership(context(request.staffContext), {
+          ...params,
+          ...body,
+          action: 'reactivate',
+          acknowledgeLastOwner: false,
         }),
     ),
     health: os.health.handler(

@@ -1,5 +1,6 @@
 import type {
   SecurityEventType,
+  SupportMembershipChange,
   SupportSessionRevocation,
 } from '@luma/identity';
 
@@ -42,6 +43,10 @@ export interface WorkspaceDetail {
     name: string;
     email: string;
     role: string;
+    owner: boolean;
+    status: 'active' | 'suspended';
+    suspendedAt: string | null;
+    suspendedBy: 'staff' | 'customer' | null;
   }[];
   connections: {
     id: string;
@@ -70,7 +75,7 @@ export interface AccountDetail {
     dataRegion: string;
     role: string;
     customRoleName: string | null;
-    membershipStatus: 'active';
+    membershipStatus: 'active' | 'suspended';
     joinedAt: string;
   }[];
   sessionsTruncated: boolean;
@@ -100,6 +105,16 @@ export interface AccountSecurityEvents {
     staffCommandId: string | null;
   }[];
   nextCursor: string | null;
+}
+
+export interface MembershipChangeInput {
+  workspaceId: string;
+  userId: string;
+  grantId: string;
+  action: 'suspend' | 'reactivate';
+  reason: string;
+  commandId: string;
+  acknowledgeLastOwner: boolean;
 }
 
 export interface StaffRepository {
@@ -132,6 +147,10 @@ export interface StaffRepository {
       commandId: string;
     },
   ): Promise<SupportSessionRevocation>;
+  changeMembership(
+    context: StaffContext,
+    input: MembershipChangeInput,
+  ): Promise<SupportMembershipChange>;
   health(
     context: StaffContext,
     workspaceId: string,
@@ -198,6 +217,16 @@ export function createStaffService(repository: StaffRepository) {
       requireRecentStaffSession(context);
 
       return repository.revoke(context, input);
+    },
+    /**
+     * Suspends or reactivates one workspace membership through identity's atomic audited
+     * command. The account and its other workspaces are unaffected.
+     */
+    changeMembership(context: StaffContext, input: MembershipChangeInput) {
+      requireStaffPermission(context, 'staff.memberships.manage');
+      requireRecentStaffSession(context);
+
+      return repository.changeMembership(context, input);
     },
     /** Reads bounded health metadata after rechecking the support grant; each read is audited. */
     health(context: StaffContext, workspaceId: string, grantId: string) {

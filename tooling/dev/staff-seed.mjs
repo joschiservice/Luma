@@ -25,6 +25,7 @@ export async function seedStaff(
         'staff.sessions.revoke',
         'staff.audit.read',
         'staff.accounts.inspect',
+        'staff.memberships.manage',
       ],
     },
     migrationUrl,

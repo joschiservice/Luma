@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { SecurityEventType } from '@luma/identity';
 import {
+  changeMembershipForSupport,
   decodeSecurityEventCursor,
   describeUserAgent,
   encodeSecurityEventCursor,
@@ -59,6 +60,15 @@ export function createStaffRepository(pool: Pool): StaffRepository {
           );
         if (error.code === 'P0002')
           throw new StaffError(404, 'Customer membership unavailable.');
+        if (error.code === '55000' && 'message' in error)
+          throw new StaffError(
+            409,
+            error.message === 'last active owner'
+              ? 'This person is the workspace’s only active owner. Acknowledge that the workspace will have no active owner.'
+              : error.message === 'already suspended'
+                ? 'This membership is already suspended. Refresh the workspace.'
+                : 'This membership is already active. Refresh the workspace.',
+          );
       }
       throw error;
     } finally {
@@ -199,8 +209,12 @@ export function createStaffRepository(pool: Pool): StaffRepository {
             name: string;
             email: string;
             role: string;
+            owner: boolean;
+            status: 'active' | 'suspended';
+            suspendedAt: Date | null;
+            suspendedBy: 'staff' | 'customer' | null;
           }>(
-            'SELECT m.id,m.user_id AS "userId",u.name,u.email,m.role FROM memberships m JOIN users u ON u.id=m.user_id WHERE m.tenant_id=$1 ORDER BY u.name LIMIT 101',
+            'SELECT m.id,m.user_id AS "userId",u.name,u.email,m.role,m.role=\'owner\' AS owner,m.status,m.suspended_at AS "suspendedAt",m.suspended_by_kind AS "suspendedBy" FROM memberships m JOIN users u ON u.id=m.user_id WHERE m.tenant_id=$1 ORDER BY u.name LIMIT 101',
             [workspaceId],
           );
           const connections = await tx.query<{
@@ -220,7 +234,10 @@ export function createStaffRepository(pool: Pool): StaffRepository {
             membersTruncated: members.rows.length > 100,
             connectionsTruncated: connections.rows.length > 100,
             workspace: workspace.rows[0],
-            members: members.rows.slice(0, 100),
+            members: members.rows.slice(0, 100).map((row) => ({
+              ...row,
+              suspendedAt: row.suspendedAt?.toISOString() ?? null,
+            })),
             connections: connections.rows.slice(0, 100).map((row) => ({
               id: row.id,
               provider: row.provider,
@@ -240,6 +257,21 @@ export function createStaffRepository(pool: Pool): StaffRepository {
           await validateGrant(tx, input.workspaceId);
 
           return revokeCustomerSessionsForSupport(tx, {
+            ...input,
+            requestId: context.requestId,
+          });
+        },
+      );
+    },
+    changeMembership(context, input) {
+      return transaction(
+        context,
+        input.grantId,
+        'staff.memberships.manage',
+        async (tx) => {
+          await validateGrant(tx, input.workspaceId);
+
+          return changeMembershipForSupport(tx, {
             ...input,
             requestId: context.requestId,
           });
@@ -356,8 +388,9 @@ export function createStaffRepository(pool: Pool): StaffRepository {
             role: string;
             custom_role_name: string | null;
             joined_at: Date;
+            membership_status: 'active' | 'suspended';
           }>(
-            'SELECT id,name,slug,status,data_region,role,custom_role_name,joined_at FROM staff_account_workspaces WHERE user_id=$1 ORDER BY lower(name),id LIMIT 101',
+            'SELECT id,name,slug,status,data_region,role,custom_role_name,joined_at,membership_status FROM staff_account_workspaces WHERE user_id=$1 ORDER BY lower(name),id LIMIT 101',
             [userId],
           );
           const sessions = await tx.query<{
@@ -396,8 +429,7 @@ export function createStaffRepository(pool: Pool): StaffRepository {
               dataRegion: row.data_region,
               role: row.role,
               customRoleName: row.custom_role_name,
-              // Memberships have no suspension state yet; every stored membership is active.
-              membershipStatus: 'active' as const,
+              membershipStatus: row.membership_status,
               joinedAt: row.joined_at.toISOString(),
             })),
             sessionsTruncated: sessions.rows.length > 100,

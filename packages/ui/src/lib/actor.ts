@@ -2,7 +2,7 @@ import type { ActivityActor } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 
 /**
- * Names who recorded an event: a person's name, a former member, Luma or a service. A workflow
+ * Names who recorded an event: a person's name, a former member, Luma, Luma support or a service. A workflow
  * run is named together with the person it acted for. Email is added only with `email`, and
  * only current members have one.
  */
@@ -22,6 +22,9 @@ export function actorLabel(
       break;
     case 'luma':
       label = m.common_actor_luma();
+      break;
+    case 'support':
+      label = m.common_actor_support();
       break;
     case 'service':
       label = m.common_actor_service({ name: actor.name ?? actor.id ?? '' });

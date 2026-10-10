@@ -15,6 +15,7 @@
               "VALIDATION_ERROR",
               "UNAUTHENTICATED",
               "FORBIDDEN",
+              "ACCESS_SUSPENDED",
               "NOT_FOUND",
               "CONFLICT",
               "REGION_UNAVAILABLE",
@@ -2093,6 +2094,7 @@
                                   "member",
                                   "former_member",
                                   "luma",
+                                  "support",
                                   "service",
                                   "unrecorded"
                                 ],
@@ -10343,6 +10345,7 @@
                               "member",
                               "former_member",
                               "luma",
+                              "support",
                               "service",
                               "unrecorded"
                             ],
@@ -11055,6 +11058,7 @@
                               "member",
                               "former_member",
                               "luma",
+                              "support",
                               "service",
                               "unrecorded"
                             ],
@@ -48263,6 +48267,7 @@
                               "member",
                               "former_member",
                               "luma",
+                              "support",
                               "service",
                               "unrecorded"
                             ],
@@ -48764,6 +48769,7 @@
                               "member",
                               "former_member",
                               "luma",
+                              "support",
                               "service",
                               "unrecorded"
                             ],
@@ -49789,6 +49795,7 @@
                               "member",
                               "former_member",
                               "luma",
+                              "support",
                               "service",
                               "unrecorded"
                             ],
@@ -50314,6 +50321,7 @@
                                   "member",
                                   "former_member",
                                   "luma",
+                                  "support",
                                   "service",
                                   "unrecorded"
                                 ],
@@ -51473,6 +51481,7 @@
                               "member",
                               "former_member",
                               "luma",
+                              "support",
                               "service",
                               "unrecorded"
                             ],
@@ -57291,6 +57300,7 @@
       "get": {
         "operationId": "identity.listOrganizations",
         "summary": "List your organizations",
+        "description": "Includes workspaces where your membership is suspended. Their `membershipStatus` is `suspended`, and their tenant routes return 403 until the membership is reactivated.",
         "tags": ["identity"],
         "responses": {
           "200": {
@@ -57322,6 +57332,10 @@
                           "status": {
                             "enum": ["active", "suspended", "closed"],
                             "type": "string"
+                          },
+                          "membershipStatus": {
+                            "enum": ["active", "suspended"],
+                            "type": "string"
                           }
                         },
                         "required": [
@@ -57329,7 +57343,8 @@
                           "name",
                           "slug",
                           "dataRegion",
-                          "status"
+                          "status",
+                          "membershipStatus"
                         ]
                       }
                     }
@@ -57890,9 +57905,19 @@
                               "builtIn",
                               "revision"
                             ]
+                          },
+                          "status": {
+                            "enum": ["active", "suspended"],
+                            "type": "string"
                           }
                         },
-                        "required": ["id", "organizationId", "userId", "role"]
+                        "required": [
+                          "id",
+                          "organizationId",
+                          "userId",
+                          "role",
+                          "status"
+                        ]
                       }
                     }
                   },
@@ -58089,9 +58114,19 @@
                         }
                       },
                       "required": ["id", "key", "name", "builtIn", "revision"]
+                    },
+                    "status": {
+                      "enum": ["active", "suspended"],
+                      "type": "string"
                     }
                   },
-                  "required": ["id", "organizationId", "userId", "role"]
+                  "required": [
+                    "id",
+                    "organizationId",
+                    "userId",
+                    "role",
+                    "status"
+                  ]
                 }
               }
             }
@@ -58193,7 +58228,7 @@
       "patch": {
         "operationId": "identity.updateMember",
         "summary": "Change a member role",
-        "description": "Requires `members.manage`. Only owners change ownership; others can only assign roles, and change members, whose permissions they hold. The last owner cannot be demoted.",
+        "description": "Requires `members.manage`. Only owners change ownership; others can only assign roles, and change members, whose permissions they hold. The last active owner cannot be demoted.",
         "tags": ["identity"],
         "parameters": [
           {
@@ -58291,9 +58326,19 @@
                         }
                       },
                       "required": ["id", "key", "name", "builtIn", "revision"]
+                    },
+                    "status": {
+                      "enum": ["active", "suspended"],
+                      "type": "string"
                     }
                   },
-                  "required": ["id", "organizationId", "userId", "role"]
+                  "required": [
+                    "id",
+                    "organizationId",
+                    "userId",
+                    "role",
+                    "status"
+                  ]
                 }
               }
             }
@@ -58393,7 +58438,7 @@
       "delete": {
         "operationId": "identity.removeMember",
         "summary": "Remove an organization member",
-        "description": "The last owner cannot be removed or demoted.",
+        "description": "The last active owner cannot be removed or demoted.",
         "tags": ["identity"],
         "parameters": [
           {
@@ -67962,6 +68007,7 @@
                                       "member",
                                       "former_member",
                                       "luma",
+                                      "support",
                                       "service",
                                       "unrecorded"
                                     ],
@@ -72273,6 +72319,7 @@
                                       "member",
                                       "former_member",
                                       "luma",
+                                      "support",
                                       "service",
                                       "unrecorded"
                                     ],

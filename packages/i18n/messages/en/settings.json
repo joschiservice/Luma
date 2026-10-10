@@ -116,6 +116,8 @@
   "settings_team_loading": "Loading team…",
   "settings_team_member_fallback": "Workspace member",
   "settings_team_you": "You",
+  "settings_team_member_suspended": "Access suspended",
+  "settings_team_no_active_owner": "This workspace has no active owner. Every owner’s access is suspended, so nobody can change ownership. Contact Luma support to transfer ownership.",
   "settings_team_role_link": "See what the {role} role allows",
   "settings_team_manage_member": "Manage {name}",
   "settings_team_manage_unnamed": "Manage member",

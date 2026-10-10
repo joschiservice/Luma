@@ -12,6 +12,7 @@ export const apiErrorSchema = z.object({
     'VALIDATION_ERROR',
     'UNAUTHENTICATED',
     'FORBIDDEN',
+    'ACCESS_SUSPENDED',
     'NOT_FOUND',
     'CONFLICT',
     'REGION_UNAVAILABLE',

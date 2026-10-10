@@ -1,5 +1,5 @@
 import type { Membership, TenantContext } from '../domain/context.js';
-import { IdentityError } from '../domain/context.js';
+import { IdentityError, requireActiveMembership } from '../domain/context.js';
 import type { PermissionDefinition } from '../domain/permissions.js';
 import {
   appPermissionGroupDescription,
@@ -126,6 +126,7 @@ export function createRolesService(deps: {
         const actor = await tx.member(context.actor.id);
         if (!actor)
           throw new IdentityError(404, 'NOT_FOUND', 'Workspace not found');
+        requireActiveMembership(actor);
         if (manage && !actor.permissions.has('roles.manage'))
           forbidden(
             'Your role does not allow managing roles. Ask a workspace admin for access.',

@@ -46,13 +46,13 @@ const accessEventsSql = `SELECT x.created_at AS sort_at,x.sort_id,
       to_char(x.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS at,
       jsonb_build_object('id',x.sort_id,'recordedAt',to_char(x.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
       'occurredAt',to_char(x.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
-      'actor',${actorSql({ row: 'x', kind: "'user'", id: 'x.actor_id::text', luma: 'false', workflow: 'NULL' })},
+      'actor',${actorSql({ row: 'x', kind: "'user'", id: 'x.actor_id::text', luma: 'false', workflow: 'NULL', support: "x.actor_kind='staff'" })},
       'action',left(x.event_type,160),'type','access','outcome','recorded','exceptionId',NULL,'proposalId',NULL,
       'attemptId',NULL,'connectionId',NULL,'connections','[]'::jsonb,'system',NULL,'resource',left(x.target_id,300),
       'playbookId',NULL,'mode','unrecorded','executionState',NULL,'verificationPhase',NULL,'failureCode',NULL,
       'summary',left(x.summary,300),'dispatch',NULL,'verification',NULL,'evidenceRefs','[]'::jsonb) AS item
       FROM (
-        SELECT e.id,e.created_at,e.actor_id,e.event_type,e.target_id,'access:'||e.id::text AS sort_id,${accessSummarySql} AS summary,
+        SELECT e.id,e.created_at,e.actor_id,e.actor_kind,e.event_type,e.target_id,'access:'||e.id::text AS sort_id,${accessSummarySql} AS summary,
         person.actor_name,person.actor_email,person.actor_member
         FROM workspace_access_events e
         ${personSql('person', 'e.tenant_id', 'e.actor_id::text')}

@@ -354,6 +354,7 @@ describe.skipIf(!databaseUrl)(
         'data_region',
         'id',
         'joined_at',
+        'membership_status',
         'name',
         'role',
         'slug',
@@ -627,6 +628,232 @@ describe.skipIf(!databaseUrl)(
         },
       ]);
     });
+    it('suspends and reactivates one membership with receipts, evidence and last-owner acknowledgement', async () => {
+      const bob = (
+        await owner.query<{ id: string }>(
+          "SELECT id FROM users WHERE email='bob@example.test'",
+        )
+      ).rows[0]!.id;
+      await owner.query(
+        "INSERT INTO memberships(id,tenant_id,user_id,role,created_at) VALUES($1,$2,$3,'admin',now())",
+        [randomUUID(), tenantA, bob],
+      );
+      const credentials = { cookie: customerCookie };
+      expect(
+        (await identity.service.resolveTenant(credentials, tenantA, 'before'))
+          .actor.role.key,
+      ).toBe('admin');
+      const membershipUrl = (user: string, action: string) =>
+        `/v1/staff/workspaces/${tenantA}/users/${user}/${action}-membership`;
+      const change = (
+        user: string,
+        action: 'suspend' | 'reactivate',
+        payload: Record<string, unknown>,
+      ) =>
+        app.inject({
+          method: 'POST',
+          url: membershipUrl(user, action),
+          headers: { cookie, origin },
+          payload: { grantId, ...payload },
+        });
+      const suspension = {
+        reason: 'Departed employee, owner unreachable, ticket 4411',
+        commandId: randomUUID(),
+      };
+      expect((await change(bob, 'suspend', suspension)).statusCode).toBe(403);
+
+      await owner.query(
+        "UPDATE staff_access SET permissions=ARRAY['staff.directory.read','staff.workspace.inspect','staff.sessions.revoke','staff.accounts.inspect','staff.memberships.manage'] WHERE email='support@example.test'",
+      );
+      try {
+        const suspended = await change(bob, 'suspend', suspension);
+        expect(suspended.statusCode, suspended.body).toBe(200);
+        expect(suspended.json()).toMatchObject({
+          commandId: suspension.commandId,
+          status: 'suspended',
+          lastActiveOwner: false,
+        });
+        // An exact retry returns the original receipt; other requests can't reuse the ID.
+        expect((await change(bob, 'suspend', suspension)).json()).toEqual(
+          suspended.json(),
+        );
+        for (const reuse of [
+          change(bob, 'suspend', {
+            ...suspension,
+            reason: 'A different reason for the same command',
+          }),
+          change(bob, 'reactivate', suspension),
+          change(customer, 'suspend', suspension),
+        ])
+          expect((await reuse).statusCode).toBe(409);
+        const revoked = (
+          await owner.query<{ command_id: string }>(
+            'SELECT command_id FROM identity_support_commands LIMIT 1',
+          )
+        ).rows[0]!.command_id;
+        expect(
+          (await change(bob, 'suspend', { ...suspension, commandId: revoked }))
+            .statusCode,
+        ).toBe(409);
+        expect(
+          (
+            await change(bob, 'suspend', {
+              ...suspension,
+              commandId: randomUUID(),
+            })
+          ).json().message,
+        ).toMatch(/already suspended/);
+
+        // The member is rejected on the next request; the account and its listing remain.
+        await expect(
+          identity.service.resolveTenant(credentials, tenantA, 'suspended'),
+        ).rejects.toMatchObject({ statusCode: 403, code: 'ACCESS_SUSPENDED' });
+        await expect(
+          identity.service.resolveWorkflowContext(bob, tenantA, 'workflow'),
+        ).rejects.toMatchObject({ code: 'ACCESS_SUSPENDED' });
+        const ownerContext = await identity.service.resolveWorkflowContext(
+          customer,
+          tenantA,
+          'owner-read',
+        );
+        expect(
+          await identity.service.suspendedMembers(ownerContext, [
+            bob,
+            customer,
+            'operator',
+          ]),
+        ).toEqual(new Set([bob]));
+        expect(await identity.service.listOrganizations(credentials)).toEqual([
+          expect.objectContaining({
+            id: tenantA,
+            membershipStatus: 'suspended',
+          }),
+        ]);
+        const detail = await app.inject({
+          url: `/v1/staff/workspaces/${tenantA}?grantId=${grantId}`,
+          headers: { cookie },
+        });
+        expect(
+          detail
+            .json()
+            .members.find((m: { userId: string }) => m.userId === bob),
+        ).toMatchObject({
+          status: 'suspended',
+          suspendedBy: 'staff',
+          suspendedAt: expect.any(String),
+        });
+        const events = await owner.query(
+          "SELECT actor_id,actor_kind,event_type,target_id,before_value,after_value FROM workspace_access_events WHERE tenant_id=$1 AND event_type LIKE 'member.%' ORDER BY created_at",
+          [tenantA],
+        );
+        expect(events.rows).toEqual([
+          {
+            actor_id: '00000000-0000-0000-0000-000000000000',
+            actor_kind: 'staff',
+            event_type: 'member.suspended',
+            target_id: expect.any(String),
+            before_value: expect.objectContaining({
+              userId: bob,
+              roleId: 'admin',
+              roleName: 'Admin',
+              status: 'active',
+            }),
+            after_value: expect.objectContaining({ status: 'suspended' }),
+          },
+        ]);
+        const audit = await owner.query(
+          "SELECT tenant_id,reason,details FROM staff_audit WHERE event='customer.membership.suspended'",
+        );
+        expect(audit.rows).toEqual([
+          {
+            tenant_id: tenantA,
+            reason: suspension.reason,
+            details: expect.objectContaining({
+              commandId: suspension.commandId,
+              userId: bob,
+              lastActiveOwner: false,
+            }),
+          },
+        ]);
+
+        // The only active owner needs an explicit acknowledgement.
+        const owners = {
+          reason: 'Customer asked for urgent removal of this owner',
+          commandId: randomUUID(),
+        };
+        const refused = await change(customer, 'suspend', owners);
+        expect(refused.statusCode).toBe(409);
+        expect(refused.json().message).toMatch(/only active owner/);
+        const acknowledged = await change(customer, 'suspend', {
+          ...owners,
+          commandId: randomUUID(),
+          acknowledgeLastOwner: true,
+        });
+        expect(acknowledged.statusCode, acknowledged.body).toBe(200);
+        expect(acknowledged.json().lastActiveOwner).toBe(true);
+
+        // Reactivation restores the same role.
+        const reactivated = await change(bob, 'reactivate', {
+          reason: 'Access dispute resolved with the workspace',
+          commandId: randomUUID(),
+        });
+        expect(reactivated.statusCode, reactivated.body).toBe(200);
+        expect(reactivated.json().status).toBe('active');
+        expect(
+          (await identity.service.resolveTenant(credentials, tenantA, 'after'))
+            .actor.role.key,
+        ).toBe('admin');
+        expect(
+          (
+            await change(customer, 'reactivate', {
+              reason: 'Owner access restored after verification',
+              commandId: randomUUID(),
+            })
+          ).statusCode,
+        ).toBe(200);
+        expect(
+          (
+            await owner.query(
+              "SELECT event FROM staff_audit WHERE event LIKE 'customer.membership.%' ORDER BY sequence",
+            )
+          ).rows.map((row) => row.event),
+        ).toEqual([
+          'customer.membership.suspended',
+          'customer.membership.suspended',
+          'customer.membership.reactivated',
+          'customer.membership.reactivated',
+        ]);
+        const history = await app.inject({
+          url: `/v1/staff/workspaces/${tenantA}/access-history?grantId=${grantId}`,
+          headers: { cookie },
+        });
+        expect(history.json().events[0]).toMatchObject({
+          type: 'member.reactivated',
+          actor: { name: 'Luma support', member: null },
+        });
+        // Another workspace's grant can't change this membership.
+        const other = await app.inject({
+          method: 'POST',
+          url: `/v1/staff/workspaces/${tenantB}/users/${bob}/suspend-membership`,
+          headers: { cookie, origin },
+          payload: { ...suspension, grantId, commandId: randomUUID() },
+        });
+        expect(other.statusCode).toBe(403);
+      } finally {
+        await owner.query(
+          "UPDATE staff_access SET permissions=ARRAY['staff.directory.read','staff.workspace.inspect','staff.sessions.revoke','staff.accounts.inspect'] WHERE email='support@example.test'",
+        );
+        await owner.query(
+          'DELETE FROM memberships WHERE tenant_id=$1 AND user_id=$2',
+          [tenantA, bob],
+        );
+        // Later access history assertions count their own seeded events.
+        await owner.query(
+          "DELETE FROM workspace_access_events WHERE tenant_id=$1 AND actor_kind='staff'",
+          [tenantA],
+        );
+      }
+    });
     it('pages an account’s security events under an account grant and audits each page', async () => {
       const url = `/v1/staff/accounts/${customer}/security-events`;
       const opened = await app.inject({
@@ -704,6 +931,9 @@ describe.skipIf(!databaseUrl)(
       ).toEqual([
         'memberships.id',
         'memberships.role',
+        'memberships.status',
+        'memberships.suspended_at',
+        'memberships.suspended_by_kind',
         'memberships.tenant_id',
         'memberships.user_id',
         'organizations.data_region',

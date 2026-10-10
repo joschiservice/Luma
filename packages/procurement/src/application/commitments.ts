@@ -9,6 +9,7 @@ import {
   hasPermission,
   IdentityError,
   isAppPermission,
+  MembershipSuspendedError,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
@@ -1584,11 +1585,19 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         unavailable('Sending orders is unavailable on this server.');
       if (!['uncertain', 'submitting'].includes(submission!.state))
         return submissionView(context, submission!);
-      const principal = await deps.principal(
-        submission!.requestedBy,
-        context.tenantId,
-        `submission-check:${submissionId}`,
-      );
+      const principal = await deps
+        .principal(
+          submission!.requestedBy,
+          context.tenantId,
+          `submission-check:${submissionId}`,
+        )
+        .catch((error: unknown) => {
+          if (error instanceof MembershipSuspendedError)
+            conflict(
+              'The person who requested this order has suspended access to this workspace. Luma checks it after their access is restored.',
+            );
+          throw error;
+        });
       const execution = await deps.admission!.reconcile(principal, submission!);
       await settle(principal, submissionId, execution);
 

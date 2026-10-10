@@ -227,7 +227,9 @@ export function createCaseWorkflows(deps: {
   };
   catalog: Pick<WorkflowCatalogStore, 'publish'>;
   cases: CaseReader;
-  identity: Pick<IdentityService, 'refreshContext' | 'resolveWorkflowContext'>;
+  identity: Pick<IdentityService, 'refreshContext' | 'resolveWorkflowContext'> &
+    /** Without it, a suspended owner isn't reported; their runs still pause. */
+    Partial<Pick<IdentityService, 'suspendedMembers'>>;
   policies: Pick<PolicyService, 'approvalRequirement' | 'currentVersion'>;
   audit: { append(entry: WorkflowAuditEntry): Promise<void> };
   transport?: CaseRunTransport;
@@ -401,6 +403,10 @@ export function createCaseWorkflows(deps: {
       ]);
     const mine = activations.filter((item) => item.definitionId === id);
     const active = mine.find((item) => item.active);
+    const ownerSuspended =
+      !!active &&
+      !!(await deps.identity.suspendedMembers?.(context, [active.principalId]))
+        ?.size;
     const cases =
       open?.filter((item) => item.issueType === version.context.kind).length ??
       0;
@@ -421,6 +427,18 @@ export function createCaseWorkflows(deps: {
               },
             },
           ]),
+      ...(ownerSuspended
+        ? [
+            {
+              code: 'owner_suspended',
+              severity: 'blocking' as const,
+              message:
+                'This workflow needs a new owner. It runs with the access of the person who turned it on, and their access to this workspace is suspended, so its runs are paused. Turn it off and on again to run it with your access, or wait until their access is restored.',
+              scope: null,
+              repair: null,
+            },
+          ]
+        : []),
       ...requirements
         .filter((item) => !item.met)
         .map((item) => ({

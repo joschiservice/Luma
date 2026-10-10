@@ -4,7 +4,7 @@ import { createAppHost } from '@luma/app-catalog';
 import type { ConnectionsConfig } from '@luma/config';
 import { createInstalledPurchaseOrderRuntime } from '@luma/connections/composition';
 import type { IdentityService } from '@luma/identity';
-import { WorkspaceInactiveError } from '@luma/identity';
+import { pausesBackgroundWork } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 import { createFailureLog } from '@luma/platform';
 import type { Pool } from 'pg';
@@ -74,7 +74,7 @@ export function createSupplierFollowUpWorker(options: {
         );
       } catch (error) {
         // Suspended between discovery and this check; discovery skips it from the next pass.
-        if (error instanceof WorkspaceInactiveError) continue;
+        if (pausesBackgroundWork(error)) continue;
         log('Supplier follow-up failed for a workspace; retrying.', error);
       }
     }

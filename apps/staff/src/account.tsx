@@ -165,7 +165,12 @@ export function AccountPage() {
                 {
                   key: 'membership',
                   header: 'Membership',
-                  cell: () => <Badge>Active</Badge>,
+                  cell: (row) =>
+                    row.membershipStatus === 'suspended' ? (
+                      <Badge tone="warning">Suspended</Badge>
+                    ) : (
+                      <Badge>Active</Badge>
+                    ),
                 },
                 {
                   key: 'status',

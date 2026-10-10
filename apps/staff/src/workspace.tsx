@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 
-import { AccessDialog, RevokeSessionsDialog } from './access';
+import { AccessDialog, MembershipDialog, RevokeSessionsDialog } from './access';
 import { AccessHistory } from './access-history';
 import { Failure, Loading } from './feedback';
 import { WorkspaceHealth } from './health';
@@ -29,10 +29,23 @@ export function WorkspacePage() {
     userId: string;
     email: string;
   } | null>(null);
+  const [membership, setMembership] = useState<{
+    userId: string;
+    email: string;
+    action: 'suspend' | 'reactivate';
+    soleOwner: boolean;
+  } | null>(null);
   const canInspect =
     session.data?.permissions.includes('staff.workspace.inspect') ?? false;
   const canRevoke =
     session.data?.permissions.includes('staff.sessions.revoke') ?? false;
+  const canManageMemberships =
+    session.data?.permissions.includes('staff.memberships.manage') ?? false;
+  const activeOwners =
+    detail.data?.members.filter(
+      (member) => member.owner && member.status === 'active',
+    ).length ?? 0;
+  const membersTruncated = detail.data?.membersTruncated ?? false;
 
   return (
     <>
@@ -87,6 +100,16 @@ export function WorkspacePage() {
             <span>Data region: {detail.data.workspace.dataRegion}</span>
             <span>Slug: {detail.data.workspace.slug}</span>
           </div>
+          {activeOwners === 0 &&
+          detail.data.members.length &&
+          !membersTruncated ? (
+            <Alert tone="warning">
+              <AlertDescription>
+                This workspace has no active owner. Its owners’ access is
+                suspended, so nobody in the workspace can change ownership.
+              </AlertDescription>
+            </Alert>
+          ) : null}
           <Alert>
             <AlertDescription>
               Support access is time-limited. Connection status and last sync
@@ -132,20 +155,76 @@ export function WorkspacePage() {
                   hideOnNarrow: true,
                   cell: (row) => row.role,
                 },
-                ...(canRevoke
+                {
+                  key: 'status',
+                  header: 'Membership',
+                  cell: (row) =>
+                    row.status === 'suspended' ? (
+                      <div>
+                        <Badge tone="warning">Suspended</Badge>
+                        <p className="staff-muted">
+                          {row.suspendedBy === 'staff'
+                            ? 'By Luma support'
+                            : 'By the workspace'}
+                          {row.suspendedAt
+                            ? `, ${new Date(row.suspendedAt).toLocaleString()}`
+                            : ''}
+                        </p>
+                      </div>
+                    ) : (
+                      <Badge>Active</Badge>
+                    ),
+                },
+                ...(canRevoke || canManageMemberships
                   ? [
                       {
                         key: 'actions',
                         header: 'Account actions',
-                        cell: (row: { userId: string; email: string }) => (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setTarget(row)}
-                            aria-label={`Revoke sessions for ${row.email}`}
-                          >
-                            Revoke sessions
-                          </Button>
+                        cell: (row: {
+                          userId: string;
+                          email: string;
+                          owner: boolean;
+                          status: 'active' | 'suspended';
+                        }) => (
+                          <div className="staff-actions">
+                            {canRevoke ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setTarget(row)}
+                                aria-label={`Revoke sessions for ${row.email}`}
+                              >
+                                Revoke sessions
+                              </Button>
+                            ) : null}
+                            {canManageMemberships ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  setMembership({
+                                    userId: row.userId,
+                                    email: row.email,
+                                    action:
+                                      row.status === 'active'
+                                        ? 'suspend'
+                                        : 'reactivate',
+                                    // A truncated list can't rule out other owners;
+                                    // asking for the acknowledgement then is harmless.
+                                    soleOwner:
+                                      row.owner &&
+                                      row.status === 'active' &&
+                                      (activeOwners === 1 || membersTruncated),
+                                  })
+                                }
+                                aria-label={`${row.status === 'active' ? 'Suspend' : 'Reactivate'} membership for ${row.email}`}
+                              >
+                                {row.status === 'active'
+                                  ? 'Suspend'
+                                  : 'Reactivate'}
+                              </Button>
+                            ) : null}
+                          </div>
                         ),
                       },
                     ]
@@ -213,6 +292,17 @@ export function WorkspacePage() {
           workspaceId={workspaceId}
           name={detail.data?.workspace.name ?? 'workspace'}
           onClose={() => setRequestAccess(false)}
+        />
+      ) : null}
+      {membership && canManageMemberships && detail.isSuccess ? (
+        <MembershipDialog
+          key={`${membership.userId}:${membership.action}`}
+          workspaceId={workspaceId}
+          grantId={grantId}
+          member={membership}
+          action={membership.action}
+          soleOwner={membership.soleOwner}
+          onClose={() => setMembership(null)}
         />
       ) : null}
       {target && canRevoke && detail.isSuccess ? (

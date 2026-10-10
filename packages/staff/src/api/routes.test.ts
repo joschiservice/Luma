@@ -43,6 +43,9 @@ function fixture(
       revoke: async () => {
         throw new Error('Unused');
       },
+      changeMembership: async () => {
+        throw new Error('Unused');
+      },
       health: async () => {
         throw new Error('Unused');
       },

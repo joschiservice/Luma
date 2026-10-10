@@ -9,7 +9,11 @@ export const staffPermissionSchema = z.enum([
   'staff.sessions.revoke',
   'staff.audit.read',
   'staff.accounts.inspect',
+  'staff.memberships.manage',
 ]);
+
+/** A suspended membership keeps its role and the account; it has no access to the workspace. */
+const staffMembershipStatusSchema = z.enum(['active', 'suspended']);
 
 export const staffWorkspaceSchema = z.object({
   id: z.string().uuid(),
@@ -43,6 +47,12 @@ export const staffDetailSchema = z.object({
       name: z.string(),
       email: z.string(),
       role: z.string(),
+      /** Holds the Owner role, active or suspended. */
+      owner: z.boolean(),
+      status: staffMembershipStatusSchema,
+      suspendedAt: z.string().datetime().nullable(),
+      /** Who suspended the membership: Luma staff or someone in the workspace. */
+      suspendedBy: z.enum(['staff', 'customer']).nullable(),
     }),
   ),
   connections: z.array(
@@ -81,6 +91,16 @@ export const staffWorkspaceDetailSchema = staffDetailSchema;
 export const staffRevokeSessionsResultSchema = z.object({
   commandId: z.string().uuid(),
   revokedSessions: z.number().int().nonnegative(),
+  completedAt: z.string().datetime(),
+});
+
+/** The receipt of a membership suspension or reactivation; retries return the original. */
+export const staffMembershipChangeSchema = z.object({
+  commandId: z.string().uuid(),
+  membershipId: z.string().uuid(),
+  status: staffMembershipStatusSchema,
+  /** Whether the suspension left the workspace without an active owner. */
+  lastActiveOwner: z.boolean(),
   completedAt: z.string().datetime(),
 });
 
@@ -365,7 +385,7 @@ export const staffAccountDetailSchema = z.object({
       dataRegion: z.string(),
       role: z.string(),
       customRoleName: z.string().nullable(),
-      membershipStatus: z.enum(['active']),
+      membershipStatus: staffMembershipStatusSchema,
       joinedAt: z.string().datetime(),
     }),
   ),
@@ -534,6 +554,51 @@ export const staffContract = {
       }),
     )
     .output(staffRevokeSessionsResultSchema),
+  suspendMembership: endpoint
+    .route({
+      method: 'POST',
+      path: '/v1/staff/workspaces/{workspaceId}/users/{userId}/suspend-membership',
+      summary: 'Suspend a workspace membership',
+      description:
+        'Removes the person’s access to this workspace only. The account, its other workspaces and the membership’s role are kept. Workflows acting as the person pause. Suspending the only active owner requires `acknowledgeLastOwner`. Requires `staff.memberships.manage` and recent staff authentication. Repeated command IDs return the original receipt; reusing one for another request returns 409.',
+    })
+    .meta({ errors })
+    .input(
+      z.object({
+        params: workspaceParams.extend({ userId: z.string().uuid() }),
+        body: z
+          .object({
+            grantId: z.string().uuid(),
+            reason: staffReasonSchema,
+            commandId: z.string().uuid(),
+            acknowledgeLastOwner: z.boolean().default(false),
+          })
+          .strict(),
+      }),
+    )
+    .output(staffMembershipChangeSchema),
+  reactivateMembership: endpoint
+    .route({
+      method: 'POST',
+      path: '/v1/staff/workspaces/{workspaceId}/users/{userId}/reactivate-membership',
+      summary: 'Reactivate a suspended workspace membership',
+      description:
+        'Restores access with the role the membership had. Paused workflows acting as the person continue. Requires `staff.memberships.manage` and recent staff authentication. Repeated command IDs return the original receipt; reusing one for another request returns 409.',
+    })
+    .meta({ errors })
+    .input(
+      z.object({
+        params: workspaceParams.extend({ userId: z.string().uuid() }),
+        body: z
+          .object({
+            grantId: z.string().uuid(),
+            reason: staffReasonSchema,
+            commandId: z.string().uuid(),
+          })
+          .strict(),
+      }),
+    )
+    .output(staffMembershipChangeSchema),
   grantAccountAccess: endpoint
     .route({
       method: 'POST',

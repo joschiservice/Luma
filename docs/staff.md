@@ -1,7 +1,7 @@
 # Staff access
 
-The staff console provides customer account lookup, account and workspace inspection and
-controlled session revocation. Its identities, sessions and permissions are separate from customer
+The staff console provides customer account lookup, account and workspace inspection,
+controlled session revocation and membership suspension. Its identities, sessions and permissions are separate from customer
 workspace access. Customer Owners and Admins cannot grant staff privileges.
 
 ## Authentication and provisioning
@@ -59,7 +59,8 @@ its operator, reason and resulting grant atomically; the running
 staff credentials cannot perform it. Opening workspace support grants
 requires both `staff.directory.read` and `staff.workspace.inspect`; opening account grants
 requires `staff.directory.read` and `staff.accounts.inspect`. Global customer
-session revocation additionally requires `staff.sessions.revoke`. Reviewing the staff audit
+session revocation additionally requires `staff.sessions.revoke`, and suspending or
+reactivating a membership requires `staff.memberships.manage`. Reviewing the staff audit
 log requires `staff.audit.read`; grant it separately, to the people accountable for
 reviewing support work, not as part of a support role.
 
@@ -129,6 +130,36 @@ are withheld until authentication audit writes succeed. Staff runtime credential
 cannot update or delete the support audit log, grant
 staff privileges, or directly delete customer sessions. Provider credentials and commerce
 payloads are not included in the support response or general telemetry.
+
+## Membership suspension
+
+Suspension removes one person's access to one workspace without deleting the membership:
+their role, account, sessions and other workspaces stay. Use it for a departed employee whose
+owner is unreachable, disputed access or an urgent removal request. Reactivation restores the
+same role. The person is rejected on their next request; see
+[context and isolation](identity.md#context-and-isolation) for what they see and how
+background work pauses.
+
+Suspend and reactivate from the workspace page under a workspace grant. Both commands require
+`staff.memberships.manage`, staff authentication within fifteen minutes, a reason and a
+command ID. `identity_support_change_membership`, owned by `luma_identity_support`, checks the
+permission, grant, session age and region under the organization row lock, so it serializes
+with the customer's own membership changes. The membership change, its receipt, a
+`workspace_access_events` entry and the `customer.membership.suspended` or
+`customer.membership.reactivated` staff audit row commit together.
+
+- An exact retry returns the original receipt. Another request, actor or payload with the same
+  command ID returns 409, including an ID already used for session revocation.
+- Suspending a suspended membership, or reactivating an active one, returns 409.
+- Suspending the only active owner returns 409 unless the request acknowledges it. The
+  workspace then has no active owner: its Team settings and the staff workspace page say so,
+  and nobody in the workspace can change ownership until staff transfer it or reactivate the
+  owner.
+- The customer's Activity shows the change by Luma support. The access event records the nil
+  UUID with `actor_kind='staff'`; the staff identity and reason stay in the staff audit, and
+  the staff reason is stored on the membership but never returned to customers.
+- Workflows acting as the person pause and show that they need a new owner. Sync streams they
+  ran block until someone resumes them; reactivation doesn't unblock them.
 
 ## Staff audit review and retention
 

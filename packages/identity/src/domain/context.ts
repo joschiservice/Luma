@@ -12,6 +12,9 @@ export interface Organization {
   status: 'active' | 'suspended' | 'closed';
 }
 
+/** A suspended membership keeps its role but resolves no tenant context until reactivated. */
+export type MembershipStatus = 'active' | 'suspended';
+
 export interface Membership {
   name?: string;
   email?: string;
@@ -19,6 +22,8 @@ export interface Membership {
   organizationId: string;
   userId: string;
   role: RoleReference;
+  /** Stored memberships always carry it; trusted fixtures may omit it for an active member. */
+  status?: MembershipStatus;
   /** Effective grants of the role; resolved with the membership. */
   permissions: PermissionSet;
 }
@@ -53,6 +58,7 @@ export class IdentityError extends Error {
       | 'VALIDATION_ERROR'
       | 'UNAUTHENTICATED'
       | 'FORBIDDEN'
+      | 'ACCESS_SUSPENDED'
       | 'NOT_FOUND'
       | 'CONFLICT'
       | 'REGION_UNAVAILABLE'
@@ -75,9 +81,40 @@ export class WorkspaceInactiveError extends IdentityError {
 }
 
 /**
- * Creates an immutable context for a matching membership in an active EU organization;
+ * Rejects a suspended membership. The member knows the workspace exists, so callers see 403
+ * with the `ACCESS_SUSPENDED` code.
+ * Background work acting as the member pauses and checks again later instead of failing.
+ */
+export class MembershipSuspendedError extends IdentityError {
+  constructor() {
+    super(
+      403,
+      'ACCESS_SUSPENDED',
+      'Your access to this workspace is suspended. Contact a workspace owner or Luma support.',
+    );
+  }
+}
+
+/**
+ * Reports whether background work should pause and check again later instead of failing:
+ * the workspace is inactive, or the member it acts as is suspended.
+ */
+export function pausesBackgroundWork(error: unknown): boolean {
+  return (
+    error instanceof WorkspaceInactiveError ||
+    error instanceof MembershipSuspendedError
+  );
+}
+
+/** Throws `MembershipSuspendedError` unless the membership is active. */
+export function requireActiveMembership(member: Membership): void {
+  if (member.status === 'suspended') throw new MembershipSuspendedError();
+}
+
+/**
+ * Creates an immutable context for a matching, active membership in an active EU organization;
  * rejects inaccessible or unsupported organizations. A suspended or closed organization
- * raises `WorkspaceInactiveError`.
+ * raises `WorkspaceInactiveError`, and a suspended membership `MembershipSuspendedError`.
  */
 export function makeTenantContext(
   session: SessionIdentity,
@@ -91,6 +128,7 @@ export function makeTenantContext(
   )
     throw new IdentityError(404, 'NOT_FOUND', 'Organization not found');
   if (organization.status !== 'active') throw new WorkspaceInactiveError();
+  requireActiveMembership(member);
   if (organization.dataRegion !== 'EU')
     throw new IdentityError(
       503,

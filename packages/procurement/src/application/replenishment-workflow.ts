@@ -53,6 +53,7 @@ import {
   ruleState,
   type StockReason,
   stockReasonMessage,
+  suspendedOwnerReadiness,
 } from '../domain/replenishment-readiness.js';
 import type { ProcurementService } from './procurement.js';
 import type {
@@ -149,7 +150,9 @@ export function createReplenishmentService(deps: {
   effects: EffectRegistry;
   audit: AuditLog;
   parseRule(input: unknown): ReplenishmentRuleInput;
-  identity: Pick<IdentityService, 'refreshContext' | 'resolveWorkflowContext'>;
+  identity: Pick<IdentityService, 'refreshContext' | 'resolveWorkflowContext'> &
+    /** Without it, rules owned by a suspended member aren't reported; they still pause. */
+    Partial<Pick<IdentityService, 'suspendedMembers'>>;
   procurement: ProcurementService;
   safety: {
     execution: ActionAdmission;
@@ -510,6 +513,37 @@ export function createReplenishmentService(deps: {
     repair: { label: 'Add a supplier', destination: 'suppliers' },
   };
 
+  /** Reports active rules whose owner's access is suspended; their checks are paused. */
+  async function ownerIssues(
+    context: TenantContext,
+    active: ReplenishmentActivation[],
+    scope: string | null = null,
+  ): Promise<ReadinessIssue[]> {
+    const suspended = await deps.identity.suspendedMembers?.(
+      context,
+      active.map((rule) => rule.principalId),
+    );
+    const issue = suspendedOwnerReadiness(
+      active.filter((rule) => suspended?.has(rule.principalId)).length,
+      active.length,
+      scope !== null,
+    );
+
+    return issue
+      ? [
+          {
+            code: 'owner_suspended',
+            ...issue,
+            scope,
+            repair: {
+              label: 'Review the stock rules',
+              destination: 'workflow_rules',
+            },
+          },
+        ]
+      : [];
+  }
+
   /** Groups unusable stock by reason. It blocks when no covered position has usable stock. */
   function stockIssues(
     active: ReplenishmentActivation[],
@@ -593,7 +627,10 @@ export function createReplenishmentService(deps: {
           },
         });
     }
-    issues.push(...stockIssues(active, facts.stocks, now));
+    issues.push(
+      ...(await ownerIssues(context, active)),
+      ...stockIssues(active, facts.stocks, now),
+    );
     const [single] = facts.waiting;
 
     return assessReadiness({
@@ -1026,6 +1063,7 @@ export function createReplenishmentService(deps: {
                   recordId: positionId,
                 },
         });
+      if (active) issues.push(...(await ownerIssues(context, [active], sku)));
       if (!active && !suppliers.items.length) issues.push(supplierIssue);
       const pending = waiting.filter((item) => item.positionId === positionId);
       const history = recent.filter((run) => run.positionId === positionId);

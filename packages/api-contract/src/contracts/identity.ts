@@ -18,6 +18,9 @@ export const organizationSchema = z.object({
   status: z.enum(['active', 'suspended', 'closed']),
 });
 
+/** A suspended membership keeps its role but has no access to the workspace until reactivated. */
+export const membershipStatusSchema = z.enum(['active', 'suspended']);
+
 export const membershipSchema = z.object({
   name: z.string().optional(),
   email: z.string().optional(),
@@ -25,6 +28,12 @@ export const membershipSchema = z.object({
   organizationId: z.string().uuid(),
   userId: z.string().uuid(),
   role: roleReferenceSchema,
+  status: membershipStatusSchema,
+});
+
+/** A workspace in the signed-in person's list, with their membership status in it. */
+export const organizationAccessSchema = organizationSchema.extend({
+  membershipStatus: membershipStatusSchema,
 });
 
 export const tenantContextSchema = z.object({
@@ -115,9 +124,11 @@ export const identityContract = {
       method: 'GET',
       path: '/v1/organizations',
       summary: 'List your organizations',
+      description:
+        'Includes workspaces where your membership is suspended. Their `membershipStatus` is `suspended`, and their tenant routes return 403 until the membership is reactivated.',
     })
     .meta({ errors })
-    .output(z.object({ items: z.array(organizationSchema) })),
+    .output(z.object({ items: z.array(organizationAccessSchema) })),
   createOrganization: endpoint
     .route({
       method: 'POST',
@@ -190,7 +201,7 @@ export const identityContract = {
       path: '/v1/organizations/{organizationId}/members/{memberId}',
       summary: 'Change a member role',
       description:
-        'Requires `members.manage`. Only owners change ownership; others can only assign roles, and change members, whose permissions they hold. The last owner cannot be demoted.',
+        'Requires `members.manage`. Only owners change ownership; others can only assign roles, and change members, whose permissions they hold. The last active owner cannot be demoted.',
     })
     .meta({ access: requires('members.manage'), errors })
     .input(
@@ -207,7 +218,7 @@ export const identityContract = {
       path: '/v1/organizations/{organizationId}/members/{memberId}',
       successStatus: 204,
       summary: 'Remove an organization member',
-      description: 'The last owner cannot be removed or demoted.',
+      description: 'The last active owner cannot be removed or demoted.',
     })
     .meta({ access: requires('members.manage'), errors })
     .input(z.object({ params: memberParamsSchema, headers: commandHeaders }))

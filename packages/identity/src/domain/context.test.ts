@@ -4,6 +4,8 @@ import {
   hasPermission,
   IdentityError,
   makeTenantContext,
+  MembershipSuspendedError,
+  pausesBackgroundWork,
   requirePermission,
   requireTenant,
   WorkspaceInactiveError,
@@ -114,3 +116,45 @@ it.each(['suspended', 'closed'] as const)(
     expect(resolve('other')).not.toThrow(WorkspaceInactiveError);
   },
 );
+
+it('rejects a suspended membership with its own code and keeps its role for reactivation', () => {
+  const role = builtInReference('admin');
+  const member = {
+    id: 'm',
+    organizationId: 't',
+    userId: 'u',
+    role,
+    permissions: PermissionSet.forRole(role),
+  };
+  const resolve = (status: 'active' | 'suspended') => () =>
+    makeTenantContext(
+      { userId: 'u', sessionId: 's' },
+      organization,
+      { ...member, status },
+      'request',
+    );
+
+  expect(resolve('suspended')).toThrow(MembershipSuspendedError);
+  expect(resolve('suspended')).toThrow(
+    expect.objectContaining({ statusCode: 403, code: 'ACCESS_SUSPENDED' }),
+  );
+  expect(resolve('active')().actor.role).toEqual(role);
+  // An inactive workspace takes precedence, so background work pauses either way.
+  expect(() =>
+    makeTenantContext(
+      { userId: 'u', sessionId: 's' },
+      { ...organization, status: 'suspended' },
+      { ...member, status: 'suspended' },
+      'request',
+    ),
+  ).toThrow(WorkspaceInactiveError);
+});
+
+it('pauses background work only for an inactive workspace or a suspended member', () => {
+  expect(pausesBackgroundWork(new WorkspaceInactiveError())).toBe(true);
+  expect(pausesBackgroundWork(new MembershipSuspendedError())).toBe(true);
+  expect(
+    pausesBackgroundWork(new IdentityError(404, 'NOT_FOUND', 'Removed')),
+  ).toBe(false);
+  expect(pausesBackgroundWork(new Error('Unavailable'))).toBe(false);
+});

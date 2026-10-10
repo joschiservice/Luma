@@ -88,24 +88,30 @@ export function Failure({
   retry: () => void;
 }) {
   const status = error instanceof IdentityError ? error.status : 503;
+  const suspended =
+    error instanceof IdentityError && error.code === 'ACCESS_SUSPENDED';
   if (status === 401) return <SignInRedirect />;
 
   return (
     <EntryFrame>
       <section className="status-panel">
         <h1>
-          {status === 404
-            ? m.identity_failure_not_found_title()
-            : status === 403
-              ? m.identity_failure_forbidden_title()
-              : m.identity_failure_unavailable_title()}
+          {suspended
+            ? m.identity_failure_suspended_title()
+            : status === 404
+              ? m.identity_failure_not_found_title()
+              : status === 403
+                ? m.identity_failure_forbidden_title()
+                : m.identity_failure_unavailable_title()}
         </h1>
         <p>
-          {status === 404
-            ? m.identity_failure_not_found_body()
-            : status === 403
-              ? m.identity_failure_forbidden_body()
-              : m.identity_failure_unavailable_body()}
+          {suspended
+            ? m.identity_failure_suspended_body()
+            : status === 404
+              ? m.identity_failure_not_found_body()
+              : status === 403
+                ? m.identity_failure_forbidden_body()
+                : m.identity_failure_unavailable_body()}
         </p>
         <div className="status-actions">
           {status !== 403 && status !== 404 ? (

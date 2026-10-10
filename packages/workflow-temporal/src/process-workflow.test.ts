@@ -194,43 +194,47 @@ it('replays a multi-step process without redispatching its capability action', a
   }
 }, 60_000);
 
-it('pauses a run while its workspace is suspended without repeating completed steps', async () => {
-  const env = await TestWorkflowEnvironment.createTimeSkipping();
-  const { version, run, recorded, action, activities } = fixture();
-  const suspended = ApplicationFailure.nonRetryable(
-    'Workspace is not active',
-    'WorkspaceInactive',
-  );
-  action.mockRejectedValueOnce(suspended).mockRejectedValueOnce(suspended);
-  const bundle = await bundleWorkflowCode({ workflowsPath: workflowPath() });
-  const taskQueue = randomUUID();
-  const worker = await Worker.create({
-    connection: env.nativeConnection,
-    taskQueue,
-    workflowBundle: bundle,
-    activities,
-  });
-  try {
-    await worker.runUntil(async () => {
-      const handle = await env.client.workflow.start('processWorkflow', {
-        workflowId: randomUUID(),
-        taskQueue,
-        args: [run, version],
-      });
-      expect(await handle.result()).toMatchObject({
-        state: 'verified',
-        stepId: 'end',
-      });
-      await Worker.runReplayHistory(
-        { workflowBundle: bundle },
-        await handle.fetchHistory(),
-      );
+it.each([
+  ['its workspace', 'WorkspaceInactive'],
+  ['the member it acts as', 'MembershipSuspended'],
+])(
+  'pauses a run while %s is suspended without repeating completed steps',
+  async (_name, type) => {
+    const env = await TestWorkflowEnvironment.createTimeSkipping();
+    const { version, run, recorded, action, activities } = fixture();
+    const suspended = ApplicationFailure.nonRetryable('Suspended', type);
+    action.mockRejectedValueOnce(suspended).mockRejectedValueOnce(suspended);
+    const bundle = await bundleWorkflowCode({ workflowsPath: workflowPath() });
+    const taskQueue = randomUUID();
+    const worker = await Worker.create({
+      connection: env.nativeConnection,
+      taskQueue,
+      workflowBundle: bundle,
+      activities,
     });
-    // Both rejected attempts ran no effect; the action runs once after reactivation.
-    expect(action).toHaveBeenCalledTimes(3);
-    expect(activities.code).toHaveBeenCalledTimes(1);
-    expect(recorded).toEqual(version.steps.map((step) => step.id));
-  } finally {
-    await env.teardown();
-  }
-}, 60_000);
+    try {
+      await worker.runUntil(async () => {
+        const handle = await env.client.workflow.start('processWorkflow', {
+          workflowId: randomUUID(),
+          taskQueue,
+          args: [run, version],
+        });
+        expect(await handle.result()).toMatchObject({
+          state: 'verified',
+          stepId: 'end',
+        });
+        await Worker.runReplayHistory(
+          { workflowBundle: bundle },
+          await handle.fetchHistory(),
+        );
+      });
+      // Both rejected attempts ran no effect; the action runs once after reactivation.
+      expect(action).toHaveBeenCalledTimes(3);
+      expect(activities.code).toHaveBeenCalledTimes(1);
+      expect(recorded).toEqual(version.steps.map((step) => step.id));
+    } finally {
+      await env.teardown();
+    }
+  },
+  60_000,
+);

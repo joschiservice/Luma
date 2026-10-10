@@ -455,3 +455,52 @@ test('preserves workspace drafts during session revalidation and clears them on 
   await heading(page, 'Sign in to Luma');
   expect(await name.count()).toBe(0);
 });
+
+test('shows a suspended membership as Access suspended until it is reactivated', async ({
+  resources: t,
+}) => {
+  const { db, page, errors } = await fixture(t);
+  await register(page);
+  const kept = await createWorkspace(page, 'Kept access');
+  await page.goto('/app/workspaces/new');
+  const suspended = await createWorkspace(page, 'Suspended access');
+  const setStatus = (status) =>
+    db.owner.query(
+      status === 'suspended'
+        ? "UPDATE memberships SET status='suspended',suspended_at=now(),suspended_by_kind='staff',suspended_by=gen_random_uuid(),suspension_reason='Browser journey suspension' WHERE tenant_id=$1"
+        : "UPDATE memberships SET status='active',suspended_at=NULL,suspended_by_kind=NULL,suspended_by=NULL,suspension_reason=NULL WHERE tenant_id=$1",
+      [suspended],
+    );
+
+  // The open workspace rejects the next read and explains why.
+  await setStatus('suspended');
+  await page.reload();
+  await heading(page, 'Access suspended');
+  await expect(page.locator('body')).toContainText(
+    'Your account and your other workspaces aren’t affected.',
+  );
+  await page.getByRole('link', { name: 'Choose a workspace' }).click();
+  await heading(page, 'Choose a workspace');
+  const entry = page.getByRole('link', { name: /Suspended access/ });
+  await expect(entry).toContainText('Access suspended');
+  await expect(
+    page.getByRole('link', { name: 'Kept access', exact: true }),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Kept access', exact: true }).click();
+  await heading(page, 'Needs your attention');
+  expect(new URL(page.url()).pathname.split('/')[2]).toBe(kept);
+  await page
+    .getByRole('button', { name: 'Kept access. Switch workspace' })
+    .click();
+  await expect(
+    page.getByRole('menuitem', { name: /Suspended access/ }),
+  ).toContainText('Access suspended');
+  await page.keyboard.press('Escape');
+
+  // Reactivation restores the same workspace and role.
+  await setStatus('active');
+  await page.goto(`/app/${suspended}/settings/team`);
+  await expect(page.getByText('Owner', { exact: true }).first()).toBeVisible();
+  await expect(page.locator('body')).not.toContainText('Access suspended');
+  expect(errors).toEqual([]);
+});

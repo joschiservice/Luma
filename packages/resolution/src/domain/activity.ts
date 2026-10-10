@@ -43,7 +43,8 @@ export interface ActivityQuery {
  * recorded identifier as the name. `workflow` names the workflow whose run acted for a person.
  */
 export interface ActivityActor {
-  kind: 'member' | 'former_member' | 'luma' | 'service' | 'unrecorded';
+  kind:
+    'member' | 'former_member' | 'luma' | 'support' | 'service' | 'unrecorded';
   id: string | null;
   name: string | null;
   email: string | null;

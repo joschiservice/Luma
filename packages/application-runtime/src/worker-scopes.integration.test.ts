@@ -213,6 +213,81 @@ describe.skipIf(!databaseUrl)(
       return id;
     }
 
+    /** Gives the active workspace due work acting as `principal` instead of the operator. */
+    async function workAs(tenant: string, principal: string) {
+      const client = await owner.connect();
+      try {
+        await client.query("SET session_replication_role='replica'");
+        await client.query(
+          `INSERT INTO commerce_sync_streams(tenant_id,id,connection_id,record_type,principal_id,phase,due_at,created_at)
+          VALUES($1,$2,$3,'orders',$4,'backfill',now(),now()-interval '1 day')`,
+          [tenant, randomUUID(), randomUUID(), principal],
+        );
+        const replenishment = randomUUID();
+        const position = randomUUID();
+        await client.query(
+          'INSERT INTO replenishment_activations(tenant_id,id,position_id,principal_id,document,created_at) VALUES($1,$2,$3,$4,$5,now())',
+          [
+            tenant,
+            replenishment,
+            position,
+            principal,
+            { id: replenishment, positionId: position, principalId: principal },
+          ],
+        );
+        const activation = randomUUID();
+        await client.query(
+          "INSERT INTO workflow_case_activations(tenant_id,id,definition_id,principal_id,document,created_at) VALUES($1,$2,'member-case-workflow',$3,$4,now())",
+          [
+            tenant,
+            activation,
+            principal,
+            {
+              id: activation,
+              definitionId: 'member-case-workflow',
+              principalId: principal,
+            },
+          ],
+        );
+        const submission = randomUUID();
+        const order = randomUUID();
+        await client.query(
+          "INSERT INTO procurement_submissions(tenant_id,id,purchase_order_id,connection_id,state,principal_id,document,created_at) VALUES($1,$2,$3,$4,'approved',$5,$6,now())",
+          [
+            tenant,
+            submission,
+            order,
+            randomUUID(),
+            principal,
+            { id: submission, tenantId: tenant, purchaseOrderId: order },
+          ],
+        );
+        const run = randomUUID();
+        await client.query(
+          `INSERT INTO workflow_trigger_runs(tenant_id,id,definition_id,version,version_digest,dedupe_key,request_digest,document,state)
+          VALUES($1,$2::uuid,'compute','1',$3,$2::text,'r',$4,'awaiting_admission')`,
+          [
+            tenant,
+            run,
+            digest('compute'),
+            {
+              tenantId: tenant,
+              id: run,
+              definitionId: 'compute',
+              version: '1',
+              versionDigest: digest('compute'),
+              requestDigest: 'r',
+              trigger: { kind: 'manual' },
+              actor: { kind: 'user', id: principal },
+            },
+          ],
+        );
+      } finally {
+        await client.query("SET session_replication_role='origin'");
+        client.release();
+      }
+    }
+
     async function startState(tenant: string, id: string) {
       return (
         await owner.query<{ state: string; triggered_at: Date | null }>(
@@ -238,6 +313,66 @@ describe.skipIf(!databaseUrl)(
         expect(found.has(workspaces.closed)).toBe(false);
       },
     );
+
+    it('skips work acting as a suspended member until the membership is reactivated', async () => {
+      const member = randomUUID();
+      await owner.query(
+        "INSERT INTO users(id,name,email,email_verified,created_at,updated_at) VALUES($1,'Suspended principal',$2,true,now(),now())",
+        [member, `${member}@example.test`],
+      );
+      await owner.query(
+        "INSERT INTO memberships(id,tenant_id,user_id,role,created_at) VALUES($1,$2,$3,'admin',now())",
+        [randomUUID(), workspaces.active, member],
+      );
+      await workAs(workspaces.active, member);
+      const principals = async () =>
+        Object.fromEntries(
+          await Promise.all(
+            scopeFunctions
+              .filter(
+                (scope) =>
+                  scope !== 'commerce_sync_scopes' &&
+                  scope !== 'commerce_auto_link_scopes',
+              )
+              .map(async (scope) => [
+                scope,
+                (
+                  await worker.query<{
+                    tenant_id: string;
+                    principal_id: string;
+                  }>(
+                    `SELECT tenant_id,principal_id FROM ${scope}() WHERE tenant_id=$1`,
+                    [workspaces.active],
+                  )
+                ).rows.map((row) => row.principal_id),
+              ]),
+          ),
+        );
+
+      // The member's stream is the workspace's oldest, so detection runs as them while active.
+      expect(await principals()).toEqual({
+        detection_worker_scopes: [member],
+        replenishment_worker_scopes: expect.arrayContaining([member]),
+        case_workflow_worker_scopes: expect.arrayContaining([member]),
+        code_process_worker_scopes: expect.arrayContaining([member]),
+        procurement_submission_scopes: expect.arrayContaining([member]),
+      });
+      await owner.query(
+        "UPDATE memberships SET status='suspended',suspended_at=now(),suspended_by_kind='customer',suspended_by=$2 WHERE tenant_id=$1 AND user_id=$2",
+        [workspaces.active, member],
+      );
+      const suspended = await principals();
+      for (const [scope, found] of Object.entries(suspended)) {
+        expect(found, scope).not.toContain(member);
+        expect(found, scope).toContain('operator');
+      }
+
+      await owner.query(
+        "UPDATE memberships SET status='active',suspended_at=NULL,suspended_by_kind=NULL,suspended_by=NULL WHERE tenant_id=$1 AND user_id=$2",
+        [workspaces.active, member],
+      );
+      expect((await principals()).detection_worker_scopes).toEqual([member]);
+    });
 
     it('keeps discovery restricted to the workers that use it', async () => {
       const definitions = await owner.query<{

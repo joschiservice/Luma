@@ -81,7 +81,8 @@ export interface WorkflowCatalogStore {
 
 /** A person named by a recorded user ID, as Activity names them. */
 export interface WorkflowPerson {
-  kind: 'member' | 'former_member' | 'luma' | 'service' | 'unrecorded';
+  kind:
+    'member' | 'former_member' | 'luma' | 'support' | 'service' | 'unrecorded';
   id: string | null;
   name: string | null;
   email: string | null;

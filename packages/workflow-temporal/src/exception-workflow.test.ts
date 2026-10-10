@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 
-import { IdentityError, WorkspaceInactiveError } from '@luma/identity';
+import {
+  IdentityError,
+  MembershipSuspendedError,
+  WorkspaceInactiveError,
+} from '@luma/identity';
 import type {
   ExceptionActivities,
   ExceptionWorkflowInput,
@@ -451,27 +455,33 @@ it.each([
   },
 );
 
-it('reports a suspended workspace to the workflow without logging a failure', async () => {
-  const writeLog = vi.fn();
-  const captureActivityError = vi.fn();
-  const environment = new MockActivityEnvironment(
-    { workflowExecution: { workflowId: 'workflow', runId: 'run' } },
-    { logger: new DefaultLogger('WARN', writeLog) },
-  );
-  const activities = fixture();
-  activities.detect.mockRejectedValue(new WorkspaceInactiveError());
-  const wrapped = temporalActivities(activities, captureActivityError);
+it.each([
+  ['workspace', new WorkspaceInactiveError(), 'WorkspaceInactive'],
+  ['acting member', new MembershipSuspendedError(), 'MembershipSuspended'],
+])(
+  'reports a suspended %s to the workflow without logging a failure',
+  async (_name, error, type) => {
+    const writeLog = vi.fn();
+    const captureActivityError = vi.fn();
+    const environment = new MockActivityEnvironment(
+      { workflowExecution: { workflowId: 'workflow', runId: 'run' } },
+      { logger: new DefaultLogger('WARN', writeLog) },
+    );
+    const activities = fixture();
+    activities.detect.mockRejectedValue(error);
+    const wrapped = temporalActivities(activities, captureActivityError);
 
-  await expect(environment.run(wrapped.detect, input)).rejects.toMatchObject({
-    type: 'WorkspaceInactive',
-    nonRetryable: true,
-    cause: undefined,
-  });
-  expect(writeLog).not.toHaveBeenCalledWith(
-    expect.objectContaining({ level: 'ERROR' }),
-  );
-  expect(captureActivityError).not.toHaveBeenCalled();
-});
+    await expect(environment.run(wrapped.detect, input)).rejects.toMatchObject({
+      type,
+      nonRetryable: true,
+      cause: undefined,
+    });
+    expect(writeLog).not.toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'ERROR' }),
+    );
+    expect(captureActivityError).not.toHaveBeenCalled();
+  },
+);
 
 it('pauses while the workspace is suspended and continues after reactivation', async (t) => {
   const clock = await TestWorkflowEnvironment.createTimeSkipping();

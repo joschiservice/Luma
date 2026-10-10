@@ -19,6 +19,29 @@ export function stockReasonMessage(reason: StockReason): string {
   }
 }
 
+/**
+ * Describes active rules whose owner's access is suspended. They don't run until someone sets
+ * them up again or the access is restored. Blocks when every active rule is affected; `single`
+ * describes one position's rule. Returns null when no rule is affected.
+ */
+export function suspendedOwnerReadiness(
+  affected: number,
+  active: number,
+  single = false,
+): { severity: 'blocking' | 'degrading'; message: string } | null {
+  if (!affected) return null;
+  const subject = single
+    ? 'This rule needs'
+    : affected === 1
+      ? '1 stock rule needs'
+      : `${affected} stock rules need`;
+
+  return {
+    severity: affected === active ? 'blocking' : 'degrading',
+    message: `${subject} a new owner. Rules run with the access of the person who set them up, and their access to this workspace is suspended, so Luma doesn’t check them. Set them up again to run them with your access, or wait until the access is restored.`,
+  };
+}
+
 /** Whether one rule's stock can support a decision now. Revoked rules never run. */
 export interface RuleState {
   state: 'ready' | 'blocked' | 'revoked';

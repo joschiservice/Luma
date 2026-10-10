@@ -113,6 +113,9 @@ admission still applies policy approval to every action.
 - A suspended or closed workspace pauses its runs at the next activity, with the same
   bounded waits as [exception workflows](exception-workflows.md#authority-retries-and-recovery).
   Background starts and monitors skip the workspace until it is active again.
+- Runs act as their principal, so a suspended principal pauses them the same way, and
+  discovery skips the principal's activations, starts and submissions until the membership is
+  reactivated. Removal is different: a removed principal's runs fail authorization.
 - All process runs (replenishment, case, follow-up and computation workflows) share the
   `<taskQueue>-procurement` queue despite its name. Its client and worker must use the same
   queue, and the worker needs the adapter for every read, action and verification it can
@@ -170,6 +173,11 @@ covers and what should happen next.
   runs that ended without acting are neither verified nor unresolved.
 - `nextAction` picks the first blocking issue, then waiting decisions, partial coverage,
   setup and the latest unresolved run.
+- `owner_suspended` means the workflow needs a new owner: the person whose access its runs
+  use is suspended, so they pause. A case workflow blocks; replenishment degrades until every
+  active rule is affected. Turning the workflow on again, or setting the rule up again, runs it
+  with the new person's access. Runs already started keep their principal and continue only
+  after reactivation.
 
 Each owner computes its own readiness facts. The record-scoped coverage endpoint returns
 the same readiness for one record, and 404 outside the workspace.

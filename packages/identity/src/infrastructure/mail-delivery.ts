@@ -121,6 +121,7 @@ export function createMailDelivery(
                 invite &&
                 inviter &&
                 (invite.role !== 'custom' || invite.roleName) &&
+                inviter.status === 'active' &&
                 membershipFromRow(inviter).permissions.has('members.manage');
               const roleName =
                 invite?.roleName ??
@@ -138,7 +139,7 @@ export function createMailDelivery(
                   connections: boolean;
                 }>(
                   `SELECT u.email,COALESCE(p.issues,false) AS issues,COALESCE(p.connections,false) AS connections FROM memberships m JOIN users u ON u.id=m.user_id
-              LEFT JOIN notification_preferences p ON p.tenant_id=m.tenant_id AND p.user_id=m.user_id WHERE m.tenant_id=$1 AND m.user_id=$2`,
+              LEFT JOIN notification_preferences p ON p.tenant_id=m.tenant_id AND p.user_id=m.user_id WHERE m.tenant_id=$1 AND m.user_id=$2 AND m.status='active'`,
                   [tenantId, message.user_id],
                 )
               ).rows[0];

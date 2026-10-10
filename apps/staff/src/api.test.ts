@@ -76,6 +76,48 @@ describe('staff browser API', () => {
     );
   });
 
+  it('sends membership commands with their command ID and shows the server’s conflict reason', async () => {
+    const completedAt = '2026-10-10T12:00:00.000Z';
+    const fetcher = fetchResult({
+      commandId,
+      membershipId: userId,
+      status: 'suspended',
+      lastActiveOwner: true,
+      completedAt,
+    });
+    const body = {
+      grantId,
+      commandId,
+      reason: 'Departed employee, owner unreachable',
+      acknowledgeLastOwner: true,
+    };
+    await createStaffApi(fetcher).changeMembership(
+      workspaceId,
+      userId,
+      'suspend',
+      body,
+    );
+    expect(fetcher).toHaveBeenCalledWith(
+      `/api/v1/staff/workspaces/${workspaceId}/users/${userId}/suspend-membership`,
+      expect.objectContaining({ method: 'POST', body: JSON.stringify(body) }),
+    );
+    const conflict = fetchResult(
+      { code: 'CONFLICT', message: 'This membership is already active.' },
+      409,
+    );
+    await expect(
+      createStaffApi(conflict).changeMembership(
+        workspaceId,
+        userId,
+        'reactivate',
+        { grantId, commandId, reason: 'Access dispute resolved' },
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+      message: 'This membership is already active.',
+    });
+  });
+
   it('passes the access history cursor and grant without retaining them elsewhere', async () => {
     const cursor = `2026-10-09T08:00:00.123456Z_${grantId}`;
     const fetcher = fetchResult({ events: [], nextCursor: null });

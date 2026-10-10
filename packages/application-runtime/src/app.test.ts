@@ -228,6 +228,7 @@ function fixture() {
     listOrganizations: vi.fn(),
     createOrganization: vi.fn(),
     listMembers: vi.fn(),
+    suspendedMembers: vi.fn(),
     changeMember: vi.fn(),
     resolveTenant: vi.fn(async (credentials, tenantId, requestId) => {
       if (!credentials.cookie)

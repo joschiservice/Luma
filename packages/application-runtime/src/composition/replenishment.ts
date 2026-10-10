@@ -32,7 +32,10 @@ export type { ReplenishmentTransport } from '@luma/procurement';
 /** Wires procurement workflow use cases to tenant persistence and shared execution services. */
 export function createReplenishmentRuntime(deps: {
   db: TenantDatabase;
-  identity: Pick<IdentityService, 'refreshContext' | 'resolveWorkflowContext'>;
+  identity: Pick<
+    IdentityService,
+    'refreshContext' | 'resolveWorkflowContext' | 'suspendedMembers'
+  >;
   procurement: ProcurementService;
   safety: ReturnType<typeof createSafetyServices>;
   transport?: ReplenishmentTransport;

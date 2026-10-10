@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { APIError } from 'better-auth/api';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import type { Pool } from 'pg';
 
@@ -140,7 +140,10 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
             },
             async listOrganizations() {
               const rows = await tx
-                .select({ organization: schema.organization })
+                .select({
+                  organization: schema.organization,
+                  status: schema.member.status,
+                })
                 .from(schema.member)
                 .innerJoin(
                   schema.organization,
@@ -148,7 +151,13 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
                 )
                 .where(eq(schema.member.userId, userId));
 
-              return rows.map((row) => organizationDto(row.organization));
+              return rows.map((row) => ({
+                ...organizationDto(row.organization),
+                membershipStatus:
+                  row.status === 'active'
+                    ? ('active' as const)
+                    : ('suspended' as const),
+              }));
             },
             async createOrganization(input) {
               const id = randomUUID();
@@ -192,6 +201,20 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
                 name: row.name,
                 email: row.email,
               }));
+            },
+            async suspendedMembers(organizationId, userIds) {
+              const rows = await tx
+                .select({ userId: schema.member.userId })
+                .from(schema.member)
+                .where(
+                  and(
+                    eq(schema.member.organizationId, organizationId),
+                    eq(schema.member.status, 'suspended'),
+                    inArray(schema.member.userId, [...userIds]),
+                  ),
+                );
+
+              return rows.map((row) => row.userId);
             },
             async findRole(organizationId, roleId) {
               if (isBuiltInRole(roleId)) {

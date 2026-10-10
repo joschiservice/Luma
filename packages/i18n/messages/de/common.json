@@ -58,6 +58,7 @@
   "common_empty_value": "—",
   "common_actor_not_recorded": "Akteur nicht erfasst",
   "common_actor_luma": "Luma",
+  "common_actor_support": "Luma-Support",
   "common_actor_former_member": "Ehemaliges Mitglied",
   "common_actor_former_member_named": "{name} (ehemaliges Mitglied)",
   "common_actor_service": "Dienst {name}",

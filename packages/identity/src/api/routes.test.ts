@@ -52,6 +52,7 @@ const dto = ({ id, organizationId, userId, role }: Membership) => ({
   organizationId,
   userId,
   role,
+  status: 'active',
 });
 
 const origin = 'http://localhost:3001';
@@ -67,6 +68,9 @@ afterEach(async () => {
 });
 
 function fixture() {
+  const listMembers = vi
+    .fn<IdentityTransaction['listMembers']>()
+    .mockResolvedValue([owner, member]);
   const tx = {
     memberCommand: vi.fn<IdentityTransaction['memberCommand']>(),
     saveMemberCommand: vi.fn<IdentityTransaction['saveMemberCommand']>(),
@@ -81,9 +85,17 @@ function fixture() {
       .mockResolvedValue(organization),
     selectTenant: vi.fn<IdentityTransaction['selectTenant']>(),
     lockOrganization: vi.fn<IdentityTransaction['lockOrganization']>(),
-    listMembers: vi
-      .fn<IdentityTransaction['listMembers']>()
-      .mockResolvedValue([owner, member]),
+    listMembers,
+    suspendedMembers: vi
+      .fn<IdentityTransaction['suspendedMembers']>()
+      .mockImplementation(async (_organizationId, userIds) =>
+        (await listMembers(organization.id))
+          .filter(
+            (item) =>
+              item.status === 'suspended' && userIds.includes(item.userId),
+          )
+          .map((item) => item.userId),
+      ),
     addMember: vi
       .fn<IdentityTransaction['addMember']>()
       .mockResolvedValue(member),
@@ -195,7 +207,7 @@ it.each([
   },
 );
 
-it.each(['revoked', 'demoted', 'suspended'] as const)(
+it.each(['revoked', 'demoted', 'suspended', 'member-suspended'] as const)(
   'rejects mutations when access is %s while waiting for the lock',
   async (change) => {
     const { app, tx } = fixture();
@@ -208,6 +220,8 @@ it.each(['revoked', 'demoted', 'suspended'] as const)(
           ...organization,
           status: 'suspended',
         });
+      if (change === 'member-suspended')
+        tx.findMembership.mockResolvedValue({ ...owner, status: 'suspended' });
     });
     const response = await app.inject({
       method: 'PATCH',
@@ -215,10 +229,70 @@ it.each(['revoked', 'demoted', 'suspended'] as const)(
       headers,
       payload: { roleId: 'admin' },
     });
-    expect(response.statusCode).toBe(change === 'demoted' ? 403 : 404);
+    expect(response.statusCode).toBe(
+      change === 'demoted' || change === 'member-suspended' ? 403 : 404,
+    );
     expect(tx.updateMember).not.toHaveBeenCalled();
   },
 );
+
+it('rejects a suspended member on the next request and lists the workspace as suspended', async () => {
+  const { app, tx } = fixture();
+  tx.findMembership.mockResolvedValue({ ...owner, status: 'suspended' });
+  tx.listOrganizations.mockResolvedValue([
+    { ...organization, membershipStatus: 'suspended' },
+  ]);
+  const response = await app.inject({ url: `${base}/context`, headers });
+  expect(response.statusCode).toBe(403);
+  expect(response.json()).toEqual({ code: 'ACCESS_SUSPENDED' });
+  const list = await app.inject({ url: '/v1/organizations', headers });
+  expect(list.json().items).toEqual([
+    { ...organization, membershipStatus: 'suspended' },
+  ]);
+});
+
+it('keeps the last active owner when another owner is suspended', async () => {
+  const { app, tx, service } = fixture();
+  const suspendedOwner: Membership = {
+    ...owner,
+    id: '99999999-9999-4999-8999-999999999999',
+    userId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    status: 'suspended',
+  };
+  tx.listMembers.mockResolvedValue([owner, suspendedOwner, member]);
+  const demote = await app.inject({
+    method: 'PATCH',
+    url: `${base}/members/${owner.id}`,
+    headers,
+    payload: { roleId: 'admin' },
+  });
+  expect(demote.statusCode).toBe(409);
+  expect(tx.updateMember).not.toHaveBeenCalled();
+  // The suspended owner can be demoted; the active owner remains.
+  const other = await app.inject({
+    method: 'PATCH',
+    url: `${base}/members/${suspendedOwner.id}`,
+    headers,
+    payload: { roleId: 'admin' },
+  });
+  expect(other.statusCode).toBe(200);
+  const context = await service.resolveWorkflowContext(
+    owner.userId,
+    organization.id,
+    'suspended-read',
+  );
+  expect(
+    await service.suspendedMembers(context, [
+      owner.userId,
+      suspendedOwner.userId,
+      'operator',
+    ]),
+  ).toEqual(new Set([suspendedOwner.userId]));
+  expect(tx.suspendedMembers).toHaveBeenLastCalledWith(organization.id, [
+    owner.userId,
+    suspendedOwner.userId,
+  ]);
+});
 
 it('rehydrates workflow identity from current membership without a serialized session', async () => {
   const { service, tx, getSession } = fixture();

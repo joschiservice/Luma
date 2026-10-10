@@ -116,6 +116,8 @@ function fixture(
     transport?: boolean;
     requirementMet?: boolean;
     maxOpenRuns?: number;
+    /** People whose membership is suspended. */
+    suspended?: string[];
   } = {},
 ) {
   const activations: CaseActivation[] = [];
@@ -253,6 +255,8 @@ function fixture(
     identity: {
       refreshContext: async (value) => value,
       resolveWorkflowContext: async (actorId) => context(actorId),
+      suspendedMembers: async (_context, ids) =>
+        new Set(ids.filter((id) => options.suspended?.includes(id))),
     },
     policies: {
       currentVersion: async () => 'policy-1',
@@ -473,6 +477,26 @@ describe('case workflows', () => {
         adapters: [{ ...f.adapter, version: signalVersion }],
       }),
     ).toThrow('event trigger and signal inputs');
+  });
+
+  it('needs a new owner while the person who turned it on is suspended', async () => {
+    const f = fixture({ cases: [signal('a')], suspended: ['operator'] });
+    await f.turnOn();
+
+    const detail = await f.workflows.detail(context('admin'), 'test-case');
+    expect(detail.summary.readiness).toMatchObject({
+      enablement: 'enabled',
+      state: 'blocked',
+      issues: [expect.objectContaining({ code: 'owner_suspended' })],
+    });
+    expect(detail.summary.blockers[0]).toContain('needs a new owner');
+
+    const restored = fixture({ cases: [signal('a')] });
+    await restored.turnOn();
+    expect(
+      (await restored.workflows.detail(context('admin'), 'test-case')).summary
+        .readiness.issues,
+    ).toEqual([]);
   });
 
   it('shows an unreadable source as unknown and keeps other workflows starting', async () => {
