@@ -9,6 +9,8 @@ export interface OrderStateQueries {
   sourceSelectionOrder: string;
   /** SQL predicate for a source_differences row aliased d. */
   anyDifference: string;
+  /** Read-time comparison state for an orders_list row with the supplied SQL alias. */
+  comparisonState(alias: string): string;
   /** Compares known source facts for the entity_id values in the named relation. */
   sourceComparison(sources: string, entities: string): string;
   /** Returns a CTE named `name` with every current order snapshot, one row per source. */

@@ -693,6 +693,7 @@ const line = (
 ): OrderDetail['sources'][number]['lines'][number] => ({
   id,
   skuId: id,
+  comparisonKey: id,
   skuCode: sku,
   title: t(title),
   quantity,
@@ -784,6 +785,7 @@ export function orderDetail(): OrderDetail {
       dueAt: minutesAgo(3 * 60),
       issueIds: [holdIssue],
       differs: false,
+      comparisonState: 'matching',
       sources: [shopSource, erpSource],
       observedAt: minutesAgo(1),
       sourceUpdatedAt: minutesAgo(26 * 60),

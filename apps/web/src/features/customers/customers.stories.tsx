@@ -121,6 +121,7 @@ const orders: OrderList = {
       dueAt: null,
       issueIds: ['55555555-5555-4555-8555-555555555501'],
       differs: false,
+      comparisonState: 'matching',
       // Linked across sources, the order appears once with both sources.
       sources: [
         {
@@ -163,6 +164,7 @@ const orders: OrderList = {
       dueAt: null,
       issueIds: [],
       differs: false,
+      comparisonState: 'matching',
       sources: [
         {
           connectionId: tokyo,

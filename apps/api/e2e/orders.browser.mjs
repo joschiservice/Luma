@@ -195,8 +195,9 @@ test('finds an order by number or SKU, explains it and pages a historical import
   await page.getByRole('heading', { name: 'Current state' }).waitFor();
   await page
     .getByText(
-      'Payment differs between sources: “Paid” in Tokyo store and “Payment pending” in JTL-Wawi.',
+      'The comparison needs fresh, complete reads and unambiguous line mappings. Unknown values do not prove a difference.',
     )
+    .first()
     .waitFor();
   await page.getByRole('cell', { name: '2', exact: true }).first().waitFor();
   await page.getByText('Canvas tote').first().waitFor();
@@ -210,8 +211,8 @@ test('finds an order by number or SKU, explains it and pages a historical import
   await expect(editedLine.getByRole('cell').nth(0)).toHaveText('1');
   await expect(editedLine.getByRole('cell').nth(1)).toHaveText('2');
   await expect(editedLine.getByRole('cell').nth(2)).toHaveText('1');
-  const comparisonTable = page.getByRole('table').filter({
-    has: page.getByRole('columnheader', { name: 'Field', exact: true }),
+  const comparisonTable = page.getByRole('table', {
+    name: 'Facts reported by each source',
   });
   const comparisonHeaders = await comparisonTable
     .getByRole('columnheader')

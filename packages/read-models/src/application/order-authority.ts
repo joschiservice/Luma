@@ -32,6 +32,7 @@ export function resolveOrderFacts(
           lines: lines.lines.map((line) => ({
             id: line.id,
             skuId: line.skuId,
+            comparisonKey: line.comparisonKey,
             skuCode: line.skuCode,
             title: line.title,
             quantity: line.quantity,

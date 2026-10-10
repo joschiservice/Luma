@@ -1,39 +1,36 @@
-// "Differs by source": two or more current, non-removed sources disagree on a known status,
-// payment status, total or per-SKU current quantity. Reported ordered units are the fallback
-// when reductions are unknown. Unknown values never count, and display
-// numbers and dates are not compared because systems number and time the same order
-// independently. The list and the detail both use this definition.
+import { orderComparisonPolicy } from '../domain/source-comparison.js';
 
-/**
- * Returns the `source_values` and `source_differences` CTEs for the orders in `entities`.
- * `sources` must be shaped like `currentOrderSources` and contain every current source of
- * those orders. Orders with fewer than two non-removed sources cannot differ and are left out.
- *
- * - `source_values`: comparable values per non-removed source; null means unknown.
- * - `source_differences`: one row per compared order with a flag per field.
- */
-export function sourceComparison(sources: string, entities: string) {
-  return `compared_orders AS MATERIALIZED (
- SELECT entity_id FROM ${sources}
- WHERE NOT deleted AND entity_id IN (SELECT entity_id FROM ${entities})
- GROUP BY entity_id HAVING count(*)>1
-), source_values AS MATERIALIZED (
- SELECT o.entity_id,o.connection_id,NULLIF(o.status,'unknown') AS status,
- NULLIF(o.payment_status,'unknown') AS payment_status,
- CASE WHEN jsonb_typeof(s.document->'data'->'total')='object'
-  THEN trim_scale((s.document->'data'->'total'->>'amount')::numeric)::text||' '||(s.document->'data'->'total'->>'currency') END AS total,
- (SELECT COALESCE(string_agg(k||':'||trim_scale(q)::text,',' ORDER BY (k||':'||trim_scale(q)::text) COLLATE "C"),'')
-  FROM (SELECT COALESCE(l->>'skuId','unmapped') AS k,sum(COALESCE((l->>'currentQuantity')::numeric,(l->>'quantity')::numeric-(l->>'cancelledQuantity')::numeric,(l->>'quantity')::numeric)) AS q
-  FROM jsonb_array_elements(s.document->'data'->'lines') l GROUP BY 1) lines WHERE q>0) AS lines
- FROM ${sources} o JOIN orders_snapshots s ON s.tenant_id=$1 AND s.id=o.snapshot_id
- WHERE NOT o.deleted AND o.entity_id IN (SELECT entity_id FROM compared_orders)
-), source_differences AS MATERIALIZED (
- SELECT entity_id,count(DISTINCT status)>1 AS status,count(DISTINCT payment_status)>1 AS payment_status,
- count(DISTINCT total)>1 AS total,count(DISTINCT lines)>1 AS lines
- FROM source_values GROUP BY entity_id
-)`;
+function incompleteReadSql(alias: string) {
+  return `EXISTS (SELECT 1 FROM orders_list source
+    CROSS JOIN (VALUES ('orders.read'),('fulfillment.read')) capability(name)
+    JOIN LATERAL (SELECT observed_at,succeeded,document FROM connector_read_checks
+      WHERE tenant_id=$1 AND connection_id=source.connection_id AND capability=capability.name AND observed_at<=$2
+      ORDER BY observed_at DESC,id DESC LIMIT 1) latest ON true
+    WHERE source.tenant_id=$1 AND source.entity_id=${alias}.entity_id AND NOT source.deleted
+      AND latest.observed_at>=${alias}.comparison_read_at
+      AND (NOT latest.succeeded OR latest.document->'value'->>'completeness' IS DISTINCT FROM 'complete'
+        OR latest.document->'value'->>'nextCursor' IS NOT NULL))`;
 }
 
-/** SQL condition that is true when a `source_differences` row `d` reports any difference. */
-export const anyDifference =
-  '(d.status OR d.payment_status OR d.total OR d.lines)';
+/** Read-time state over maintained comparisons. Future and stale evidence never confirms a difference. */
+export function comparisonStateSql(alias: string) {
+  return `CASE WHEN ${alias}.comparison_raw='inconclusive' THEN 'inconclusive'
+    WHEN ${alias}.comparison_read_at IS NULL THEN 'matching'
+    WHEN ${alias}.comparison_latest_read_at>$2 OR ${alias}.comparison_read_at<$2::timestamptz-interval '${orderComparisonPolicy.freshnessSeconds} seconds' THEN 'inconclusive'
+    WHEN ${incompleteReadSql(alias)} THEN 'inconclusive'
+    WHEN ${alias}.comparison_raw='matching' THEN 'matching'
+    WHEN ${alias}.comparison_read_at>=${alias}.comparison_confirm_after THEN 'confirmed' ELSE 'pending' END`;
+}
+
+/** Reads bounded owner-maintained comparison evidence for the requested canonical orders. */
+export function sourceComparison(_sources: string, entities: string) {
+  return `source_differences AS MATERIALIZED (
+    SELECT DISTINCT ON(o.entity_id) o.entity_id,${comparisonStateSql('o')} AS state,o.comparison_differences AS differences,
+      jsonb_build_object('raw',o.comparison_raw,'readAt',o.comparison_read_at,'latestReadAt',o.comparison_latest_read_at,'confirmAfter',o.comparison_confirm_after) AS timing,${incompleteReadSql('o')} AS incomplete
+    FROM orders_list o WHERE o.tenant_id=$1 AND o.entity_id IN (SELECT entity_id FROM ${entities})
+    ORDER BY o.entity_id,o.selected DESC,o.connection_id
+  )`;
+}
+
+/** SQL condition that only admits freshly confirmed differences to the differs flag and filter. */
+export const anyDifference = "d.state='confirmed'";

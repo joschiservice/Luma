@@ -1,3 +1,4 @@
+import { orderComparisonState } from '@luma/orders';
 import type { SqlTransaction } from '@luma/platform';
 
 import type {
@@ -19,8 +20,14 @@ type SourceRow = {
   overdue: boolean | null;
   selected: boolean;
   progress: { fulfilled: string; remaining: string | null }[];
-  values: Record<string, string | null> | null;
-  differences: Record<string, boolean> | null;
+  incomplete: boolean | null;
+  timing: {
+    raw: 'matching' | 'different' | 'inconclusive';
+    readAt: string | null;
+    latestReadAt: string | null;
+    confirmAfter: string | null;
+  } | null;
+  differences: Omit<OrderDifference, 'authority'>[];
 };
 
 // $1 tenant, $2 as-of time, $3 order ID.
@@ -33,10 +40,9 @@ SELECT o.connection_id AS "connectionId",s.document,ci.document AS connection,
  COALESCE((SELECT jsonb_agg(jsonb_build_object('fulfilled',trim_scale(lp.fulfilled)::text,
   'remaining',trim_scale(lp.remaining)::text) ORDER BY lp.position) FROM order_line_progress lp
   WHERE lp.entity_id=o.entity_id AND lp.connection_id=o.connection_id),'[]'::jsonb) AS progress,
- to_jsonb(v)-'entity_id'-'connection_id' AS "values",to_jsonb(d)-'entity_id' AS differences
+ d.timing,d.incomplete,COALESCE(d.differences,'[]'::jsonb) AS differences
 FROM order_state o
 JOIN orders_snapshots s ON s.tenant_id=$1 AND s.id=o.snapshot_id
-LEFT JOIN source_values v ON v.entity_id=o.entity_id AND v.connection_id=o.connection_id
 LEFT JOIN source_differences d ON d.entity_id=o.entity_id
 LEFT JOIN connector_installations ci ON ci.tenant_id=$1 AND ci.id=o.connection_id
 LEFT JOIN LATERAL (SELECT mapping.external_id,COALESCE(revision.method,mapping.method) AS method
@@ -46,13 +52,6 @@ LEFT JOIN LATERAL (SELECT mapping.external_id,COALESCE(revision.method,mapping.m
  ORDER BY mapping.created_at,mapping.id LIMIT 1) m ON true
 ORDER BY o.connection_id`;
 }
-
-const comparedFields: [OrderDifference['field'], string][] = [
-  ['status', 'status'],
-  ['paymentStatus', 'payment_status'],
-  ['total', 'total'],
-  ['lines', 'lines'],
-];
 
 /**
  * Reads every current source of one order with its state, line progress and differences, and
@@ -80,6 +79,7 @@ export async function readSourceFacts(
         return {
           id: String(line.id),
           skuId: text(line.skuId),
+          comparisonKey: null as string | null,
           skuCode: text(line.skuCode),
           title: text(line.title),
           quantity: String(line.quantity),
@@ -115,21 +115,42 @@ export async function readSourceFacts(
       lines,
     };
   });
-  const flags = rows[0]!.differences ?? {};
-  const compared = rows.filter((row) => row.values);
-  const differences: OrderDetail['differences'] = comparedFields
-    .filter(([, column]) => flags[column] === true)
-    .map(([field, column]) => ({
-      field,
-      values: compared.map((row) => ({
-        connectionId: row.connectionId,
-        value: row.values![column] ?? null,
-      })),
-    }));
+  const lineConnections = new Map<string, Set<string>>();
+  for (const source of sources)
+    for (const line of source.lines) {
+      const seen = lineConnections.get(line.id) ?? new Set<string>();
+      seen.add(source.connectionId);
+      lineConnections.set(line.id, seen);
+    }
+  for (const source of sources) {
+    const skuCounts = new Map<string, number>();
+    for (const line of source.lines)
+      if (line.skuId)
+        skuCounts.set(line.skuId, (skuCounts.get(line.skuId) ?? 0) + 1);
+    for (const line of source.lines)
+      line.comparisonKey =
+        (lineConnections.get(line.id)?.size ?? 0) > 1
+          ? line.id
+          : line.skuId && skuCounts.get(line.skuId) === 1
+            ? line.skuId
+            : null;
+  }
+  const differences = rows[0]!.differences;
+  const timing = rows[0]!.timing;
+  const comparisonState: OrderDetail['order']['comparisonState'] = timing
+    ? orderComparisonState(
+        rows[0]!.incomplete ? 'inconclusive' : timing.raw,
+        timing.readAt,
+        timing.latestReadAt,
+        timing.confirmAfter,
+        asOf,
+      )
+    : 'inconclusive';
 
   return {
     sources,
     differences,
+    comparisonState,
     overdue: rows.find((row) => row.selected)?.overdue ?? null,
   };
 }

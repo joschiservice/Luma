@@ -117,7 +117,7 @@ SELECT o.entity_id AS id,o.display_number AS "displayNumber",o.placed_at AS "pla
  (SELECT document->'data'->'total' FROM orders_snapshots WHERE tenant_id=$1 AND id=o.snapshot_id) AS total,o.status,o.payment_status AS "paymentStatus",o.fulfillment,
  o.line_count AS "lineCount",o.open,o.overdue,o.due_at AS "dueAt",
  CASE WHEN o.deleted THEN '{}'::uuid[] ELSE COALESCE(a.issue_ids,'{}'::uuid[]) END AS "issueIds",
- COALESCE(${anyDifference},false) AS differs,src.sources,o.observed_at AS "observedAt",o.source_updated_at AS "sourceUpdatedAt",
+ COALESCE(${anyDifference},false) AS differs,COALESCE(d.state,'inconclusive') AS "comparisonState",src.sources,o.observed_at AS "observedAt",o.source_updated_at AS "sourceUpdatedAt",
  o.sort_rank AS "sortRank",o.sort_key AS "sortKey"
 FROM rows o
 LEFT JOIN attention a ON a.order_id=o.entity_id

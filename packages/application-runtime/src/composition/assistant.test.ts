@@ -72,6 +72,7 @@ function orderItem(id: string, number: string) {
     dueAt: null,
     issueIds: [],
     differs: false,
+    comparisonState: 'matching' as const,
     sources: [
       {
         connectionId: '44444444-4444-4444-8444-444444444444',

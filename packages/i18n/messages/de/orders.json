@@ -259,5 +259,18 @@
   "orders_authority_not_configured": "Keine Quellenregel für diese Angabe",
   "orders_comparison_location": "Standort",
   "orders_comparison_cancelled": "Stornierte Mengen",
-  "orders_lines_column_current": "Aktuell"
+  "orders_lines_column_current": "Aktuell",
+  "orders_comparison_pending": "Übertragung ausstehend",
+  "orders_comparison_confirmed": "Bestätigte Abweichung",
+  "orders_comparison_inconclusive": "Nicht eindeutig",
+  "orders_comparison_matching": "Bekannte Angaben stimmen überein",
+  "orders_comparison_pending_description": "Abweichungen bleiben ausstehend, bis jede Quelle nach dem Übertragungszeitraum von 15 Minuten erneut gelesen wurde.",
+  "orders_comparison_inconclusive_description": "Der Vergleich benötigt aktuelle, vollständige Daten und eindeutige Positionszuordnungen. Unbekannte Werte belegen keine Abweichung.",
+  "orders_comparison_lines_caption": "Geschäftszustand je zugeordneter Bestellposition",
+  "orders_comparison_line": "Bestellposition",
+  "orders_comparison_unmapped": "Positionszuordnung unklar",
+  "orders_comparison_read_at": "Von Luma gelesen",
+  "orders_comparison_overfulfillment": "Mehr versendet als aktuelle Menge",
+  "orders_comparison_unit": "Einheit",
+  "orders_summary_overfulfillment": "{source} meldet {value} versendete Einheiten über der aktuellen Menge."
 }

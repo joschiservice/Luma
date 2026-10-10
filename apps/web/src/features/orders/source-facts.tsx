@@ -17,6 +17,7 @@ import { GitCompareArrows, ListOrdered } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { authorityLabel } from './authority';
+import { LineComparison } from './line-comparison';
 import { OrderSection } from './order-section';
 import {
   formatMoney,
@@ -215,18 +216,20 @@ const comparedFacts: ComparedFact[] = [
   {
     key: 'items',
     label: m.orders_comparison_items,
-    field: 'lines',
+    field: 'currentQuantity',
     authority: 'order_lines',
     value: comparedItems,
   },
   {
     key: 'fulfillment',
     authority: 'order_fulfillment',
+    field: 'fulfillment',
     label: m.orders_comparison_fulfillment,
     value: (source) => fulfillmentLabel(source),
   },
   {
     key: 'location',
+    field: 'location',
     label: m.orders_comparison_location,
     authority: 'order_fulfillment',
     value: (source, detail) => {
@@ -264,6 +267,7 @@ const comparedFacts: ComparedFact[] = [
   },
   {
     key: 'cancellation',
+    field: 'cancelledQuantity',
     label: m.orders_comparison_cancelled,
     authority: 'order_lifecycle',
     value: (source) =>
@@ -311,6 +315,13 @@ const comparedFacts: ComparedFact[] = [
 /** Compares the facts each source reports side by side and marks the fields that differ. */
 export function SourceComparison({ detail }: { detail: OrderDetail }) {
   const differs = new Set<string>(detail.differences.map((item) => item.field));
+  const stateLabels = {
+    matching: m.orders_comparison_matching,
+    pending: m.orders_comparison_pending,
+    confirmed: m.orders_comparison_confirmed,
+    inconclusive: m.orders_comparison_inconclusive,
+  };
+  const stateLabel = stateLabels[detail.order.comparisonState];
   const columns: DataTableColumn<ComparedFact>[] = [
     {
       key: 'field',
@@ -319,7 +330,15 @@ export function SourceComparison({ detail }: { detail: OrderDetail }) {
         <span className="order-comparison-field">
           {fact.label()}
           {fact.field && differs.has(fact.field) ? (
-            <Badge tone="warning">{m.orders_comparison_differs()}</Badge>
+            <Badge
+              tone={
+                detail.order.comparisonState === 'confirmed'
+                  ? 'warning'
+                  : 'neutral'
+              }
+            >
+              {stateLabel()}
+            </Badge>
           ) : null}
         </span>
       ),
@@ -351,13 +370,33 @@ export function SourceComparison({ detail }: { detail: OrderDetail }) {
 
   return (
     <OrderSection title={m.orders_comparison_title()} icon={GitCompareArrows}>
+      <p className="order-note" role="status">
+        {stateLabel()}
+      </p>
+      {detail.order.comparisonState === 'pending' ? (
+        <p className="order-note">
+          {m.orders_comparison_pending_description()}
+        </p>
+      ) : detail.order.comparisonState === 'inconclusive' ? (
+        <p className="order-note">
+          {m.orders_comparison_inconclusive_description()}
+        </p>
+      ) : null}
       <DataTable
         caption={m.orders_comparison_caption()}
         columns={columns}
-        rows={comparedFacts}
+        rows={[
+          ...comparedFacts,
+          {
+            key: 'read-at',
+            label: m.orders_comparison_read_at,
+            value: (source) => <WorkspaceDate value={source.observedAt} />,
+          },
+        ]}
         rowKey={(fact) => fact.key}
         density="compact"
       />
+      <LineComparison detail={detail} />
     </OrderSection>
   );
 }
