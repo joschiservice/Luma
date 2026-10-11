@@ -159,8 +159,13 @@ export function SourceAuthoritySettings({
     mutationFn: (body: AuthorityChange) =>
       settingsApi.sourceAuthority.change({ params: { organizationId }, body }),
     retry: false,
-    onSettled: async () => {
-      await client.invalidateQueries({
+    onSuccess: () =>
+      client.invalidateQueries({
+        queryKey: ['private', 'organization', organizationId],
+      }),
+    // Recovery does not wait for fresh data; a retry keeps the command's identity.
+    onError: () => {
+      void client.invalidateQueries({
         queryKey: ['private', 'organization', organizationId],
       });
     },

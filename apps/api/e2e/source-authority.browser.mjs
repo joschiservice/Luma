@@ -81,11 +81,31 @@ test('reviews source authority, safely retries an override and resolves each ord
   });
   await input.fill('JTL');
   await page.getByRole('option', { name: 'JTL-Wawi', exact: true }).click();
+  // The reload that follows the lost response stays held until the retry: recovery must not
+  // wait for it.
+  let lost = false;
+  let releaseReload = () => {};
+  const reload = new Promise((resolve) => {
+    releaseReload = resolve;
+  });
+  /** @param {import('@playwright/test').Route} route */
+  const holdReload = async (route) => {
+    const request = route.request();
+    if (
+      lost &&
+      request.method() === 'GET' &&
+      ['fetch', 'xhr'].includes(request.resourceType())
+    )
+      await reload;
+    await route.fallback();
+  };
+  await page.route('**/*', holdReload);
   await page.route(
     '**/source-authority',
     async (route) => {
       if (route.request().method() === 'POST') {
         await route.fetch();
+        lost = true;
         await route.abort('failed');
       } else await route.continue();
     },
@@ -98,6 +118,8 @@ test('reviews source authority, safely retries an override and resolves each ord
   await page
     .getByRole('button', { name: 'Check status and retry', exact: true })
     .click();
+  releaseReload();
+  await page.unroute('**/*', holdReload);
   await expect(row).toContainText('JTL-Wawi (override)');
   await expect(page.getByText('Changes saved.', { exact: true })).toBeVisible();
   const history = await f.request(f.owner, `${path}/history`);
