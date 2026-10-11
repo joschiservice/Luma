@@ -46,6 +46,7 @@ describe('provider installation verification', () => {
     expect(await verify(connection, credentials)).toEqual([
       'products.read',
       'inventory.read',
+      'returns.exchange.options.read',
     ]);
     expect(fetch.mock.calls[0]?.[1]).toMatchObject({ redirect: 'error' });
     fetch.mockResolvedValueOnce(

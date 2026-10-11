@@ -30,6 +30,7 @@ export interface OrderData {
   displayFinancialStatus:
     | 'PENDING'
     | 'AUTHORIZED'
+    | 'PARTIALLY_PAID'
     | 'PAID'
     | 'PARTIALLY_REFUNDED'
     | 'REFUNDED'
@@ -116,10 +117,23 @@ export interface ReturnLineItemData {
   lineItem: string;
   quantity: number;
   refundedQuantity: number;
+  processedQuantity?: number;
   returnReasonNote?: string | null;
   reason: string;
   /** Value of the returned units in minor units. */
   amount: number;
+}
+
+/** A requested replacement; inventory and fulfillment start only when the return is processed. */
+export interface ExchangeLineItemData {
+  return: string;
+  order: string;
+  variant: string;
+  quantity: number;
+  processedQuantity: number;
+  /** Price fixed by the native request, in minor units. */
+  price: number;
+  lineItems: string[];
 }
 
 export interface ReverseFulfillmentOrderData {

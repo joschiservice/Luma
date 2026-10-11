@@ -124,3 +124,25 @@ was paid. Review both results and their read times. An old check needs a new rea
 the result to the customer. Once an action was sent, receipt, inspection and the proposal stay fixed;
 you can still hand the case to another owner. Wawi stock settlement is available in the simulator;
 your live connection must support the action before it can be used.
+
+## Coordinate an exchange
+
+Record receipt and inspection, then propose **Exchange**. In **Exchange**, choose a replacement
+that is explicitly mapped to Shopify and Wawi and enter its quantity. Request replacement approval.
+Someone else approves the exact request. Reported available stock is not a reservation.
+
+After the request is independently verified, request processing approval. Luma checks availability
+again and uses Shopify's current financial quote. The replacement fulfillment and the price difference
+have separate progress. A requested charge is pending until successful payment is independently read.
+Use **Check source** after payment, then request payment hold release approval. Other holds remain.
+An exchange refund difference is also pending until its payment succeeds.
+
+If stock becomes unavailable, the case owner chooses **Wait for this item**, **Choose a different item**
+or **Choose a refund**. Luma never chooses automatically. A different item or refund needs cancellation
+approval and fresh cancellation proof first. After cancellation, choose the different replacement or
+continue to the separately approved refund settlement. This preserves the approved resale stock units.
+A processed exchange needs an owned handoff instead of another replacement request.
+
+Arrange and verify the Wawi replacement allocation before shipping. The Shopify replacement request
+does not prove an ERP reservation. Settle returned stock separately and review both systems before
+confirming that the case is complete.

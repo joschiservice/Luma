@@ -309,6 +309,8 @@ const messaging = [
   'packages/i18n/messages/*/{gmail,messaging}.json',
 ];
 const returnCases = [
+  'packages/application-runtime/src/composition/return-exchanges.ts',
+  'packages/api-contract/src/return-exchanges.ts',
   'apps/api/e2e/return-settlement-fixture.mjs',
   'packages/application-runtime/migrations/0088_return_settlement.sql',
   'packages/application-runtime/src/composition/return-settlement.ts',
@@ -900,6 +902,22 @@ export const journeyAreas = {
     ...commerce,
     ...webShell,
     ...webReturns,
+  ],
+  'return-exchange.browser.mjs': [
+    ...simulator,
+    ...returns,
+    ...returnCases,
+    ...decisions,
+    ...commerce,
+    ...webShell,
+    ...webReturns,
+  ],
+  'return-exchange.e2e.mjs': [
+    ...simulator,
+    ...returns,
+    ...returnCases,
+    ...decisions,
+    ...commerce,
   ],
   'return-settlement.e2e.mjs': [
     ...simulator,

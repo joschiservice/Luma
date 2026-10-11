@@ -92,6 +92,8 @@ const mutationCapabilities: Record<string, string> = {
   refundCreate: 'returns.refund',
   returnCreate: 'returns.create',
   returnApproveRequest: 'returns.create',
+  returnProcess: 'returns.exchange.process',
+  returnCancel: 'returns.exchange.cancel',
   inventorySetQuantities: 'inventory.available.reconcile',
   fulfillmentOrderReleaseHold: 'fulfillment.hold.release',
   fulfillmentOrderOpen: 'fulfillment.open',
@@ -100,6 +102,19 @@ const mutationCapabilities: Record<string, string> = {
 };
 
 const namedCapabilities: Record<string, string> = {
+  LumaExchangeChoices: 'returns.exchange.options.read',
+  LumaExchangeVariant: 'returns.exchange.quote.read',
+  LumaExchangeOrder: 'returns.exchange.proof.read',
+  LumaExchangeFinancial: 'returns.exchange.quote.read',
+  LumaExchangePayments: 'returns.exchange.proof.read',
+  LumaExchangeFulfillment: 'returns.exchange.proof.read',
+  LumaExchangeEvenProof: 'returns.exchange.proof.read',
+  LumaExchangeRefundProof: 'returns.exchange.proof.read',
+  LumaExchangeReturnable: 'returns.exchange.quote.read',
+  LumaExchangeRequest: 'returns.exchange.request',
+  LumaExchangeProcess: 'returns.exchange.process',
+  LumaExchangeCancel: 'returns.exchange.cancel',
+  LumaExchangeRelease: 'returns.exchange.release',
   LumaReturnRefundQuote: 'returns.settlement.quote.read',
   LumaReturnRefundProof: 'returns.settlement.proof.read',
   LumaReturnRefundDetail: 'returns.settlement.proof.read',
@@ -133,6 +148,9 @@ const readCapabilities: [string, string[]][] = [
 
 /** Classifies an operation as the Luma capability it serves. */
 function capability(operation: OperationDefinitionNode) {
+  const name = operation.name?.value ?? '';
+  if (name === 'LumaExchangeRequest' || name === 'LumaExchangeRelease')
+    return namedCapabilities[name] ?? 'unknown';
   if (operation.operation === 'mutation') {
     const [field] = operation.selectionSet.selections;
 
@@ -140,7 +158,6 @@ function capability(operation: OperationDefinitionNode) {
       ? (mutationCapabilities[field.name.value] ?? 'unknown')
       : 'unknown';
   }
-  const name = operation.name?.value ?? '';
   if (name.startsWith('LumaRecord')) return 'records.read';
   const named = namedCapabilities[name];
   if (named) return named;

@@ -118,6 +118,9 @@ export function createJtlConnector(
       | MessageReadCapability
       | 'returns.options.read'
       | 'returns.created.read'
+      | 'returns.exchange.options.read'
+      | 'returns.exchange.quote.read'
+      | 'returns.exchange.proof.read'
       | 'returns.settlement.quote.read'
       | 'returns.settlement.proof.read'
     >,

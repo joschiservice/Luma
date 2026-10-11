@@ -8,11 +8,13 @@ import type { FastifyRequest } from 'fastify';
 
 import type { ReturnActions } from '../application/return-actions.js';
 import type { ReturnCases } from '../application/return-cases.js';
+import type { ReturnExchanges } from '../application/return-exchanges.js';
 
 /** Registers tenant-authenticated return case reads and permission-gated changes. */
 export function returnCaseRoutes(
   service?: ReturnCases,
   actions?: ReturnActions,
+  exchanges?: ReturnExchanges,
 ) {
   function use(request: FastifyRequest) {
     if (!request.tenantContext)
@@ -41,7 +43,89 @@ export function returnCaseRoutes(
     return { context: current.context, service: actions };
   }
 
+  function exchange(request: FastifyRequest) {
+    const current = use(request);
+    if (!exchanges)
+      throw new IdentityError(
+        503,
+        'SERVICE_UNAVAILABLE',
+        'Exchange coordination unavailable',
+      );
+
+    return { context: current.context, service: exchanges };
+  }
+
   return os.router({
+    exchanges: os.exchanges.handler(({ context: { request }, input }) => {
+      const s = exchange(request);
+
+      return s.service.list(s.context, input.params.caseId);
+    }),
+    requestExchange: os.requestExchange.handler(
+      ({ context: { request }, input }) => {
+        const s = exchange(request);
+
+        return s.service.request(s.context, input.params.caseId, {
+          id: input.body.id,
+          operationId: input.body.operationId,
+          kind: input.body.kind,
+          ...(input.body.replacementId
+            ? { replacementId: input.body.replacementId }
+            : {}),
+          ...(input.body.quantity ? { quantity: input.body.quantity } : {}),
+        });
+      },
+    ),
+    chooseExchange: os.chooseExchange.handler(
+      ({ context: { request }, input }) => {
+        const s = exchange(request);
+
+        return s.service.choose(s.context, input.params.caseId, input.body);
+      },
+    ),
+    refundExchange: os.refundExchange.handler(
+      ({ context: { request }, input }) => {
+        const s = exchange(request);
+
+        return s.service.fallbackRefund(
+          s.context,
+          input.params.caseId,
+          input.body.revision,
+        );
+      },
+    ),
+    decideExchange: os.decideExchange.handler(
+      ({ context: { request }, input }) => {
+        const s = exchange(request);
+
+        return s.service.decide(
+          s.context,
+          input.params.caseId,
+          input.params.actionId,
+          input.body,
+        );
+      },
+    ),
+    sendExchange: os.sendExchange.handler(({ context: { request }, input }) => {
+      const s = exchange(request);
+
+      return s.service.send(
+        s.context,
+        input.params.caseId,
+        input.params.actionId,
+      );
+    }),
+    checkExchange: os.checkExchange.handler(
+      ({ context: { request }, input }) => {
+        const s = exchange(request);
+
+        return s.service.check(
+          s.context,
+          input.params.caseId,
+          input.params.actionId,
+        );
+      },
+    ),
     actions: os.actions.handler(({ context: { request }, input }) => {
       const s = settlement(request);
 

@@ -6,7 +6,7 @@ import { setupSimulator } from './simulator-fixture.mjs';
 /** Creates a reviewed Shopify/Wawi return with two received units and one approved resale unit. */
 export async function settlementFixture(
   t,
-  { origin = 'http://127.0.0.1:3000' } = {},
+  { origin = 'http://127.0.0.1:3000', resolution = 'refund' } = {},
 ) {
   const f = await setupSimulator(t, { origin });
   const org = f.manifest.organizationId,
@@ -178,7 +178,7 @@ export async function settlementFixture(
   detail = await request(`${path}/proposal`, {
     commandId: randomUUID(),
     expectedRevision: detail.case.revision,
-    kind: 'refund',
+    kind: resolution,
     lines: lines.map((l) => ({ orderLineId: l.orderLineId, restock: 1 })),
     evidence,
   });

@@ -113,3 +113,9 @@ export type {
   ReturnSettlementQuote,
   ReturnSettlementWrite,
 } from './domain/return-settlement.js';
+
+export type {
+  ReturnExchangePlan,
+  ReturnExchangeRead,
+  ReturnExchangeProof,
+} from './domain/return-exchanges.js';

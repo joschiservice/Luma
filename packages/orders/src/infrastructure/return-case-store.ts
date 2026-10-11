@@ -193,23 +193,38 @@ export function createReturnCaseStore(
               ],
             );
           },
-          saveCase: async (value) =>
-            (
-              await tx.query(
-                `UPDATE orders_return_cases SET state=$3,revision=$4,document=$5,updated_at=$6
+          saveCase: async (value) => {
+            const changed =
+              (
+                await tx.query(
+                  `UPDATE orders_return_cases SET state=$3,revision=$4,document=$5,updated_at=$6
                  WHERE tenant_id=$1 AND id=$2 AND revision=$4-1
-                  AND (NOT EXISTS(SELECT 1 FROM orders_return_actions a WHERE a.tenant_id=$1 AND a.case_id=$2 AND a.sent)
+                  AND ((NOT EXISTS(SELECT 1 FROM orders_return_actions a WHERE a.tenant_id=$1 AND a.case_id=$2 AND a.sent)
+                    AND NOT EXISTS(SELECT 1 FROM orders_return_exchange_steps e WHERE e.tenant_id=$1 AND e.case_id=$2 AND e.sent))
                     OR (state=$3 AND document->'receipt'=$5::jsonb->'receipt' AND document->'inspection'=$5::jsonb->'inspection' AND document->'proposal'=$5::jsonb->'proposal'))`,
+                  [
+                    tenantId,
+                    value.id,
+                    value.state,
+                    value.revision,
+                    value,
+                    value.updatedAt,
+                  ],
+                )
+              ).rowCount === 1;
+            if (changed)
+              await tx.query(
+                "UPDATE orders_return_exchanges SET document=document || jsonb_build_object('ownerId',$3::text,'revision',(document->>'revision')::int+1,'updatedAt',$4::text) WHERE tenant_id=$1 AND case_id=$2 AND document->>'ownerId' IS DISTINCT FROM $3",
                 [
                   tenantId,
                   value.id,
-                  value.state,
-                  value.revision,
-                  value,
+                  value.assigneeId ?? value.openedBy,
                   value.updatedAt,
                 ],
-              )
-            ).rowCount === 1,
+              );
+
+            return changed;
+          },
           events: (caseId) =>
             documents<ReturnCaseEvent>(
               'SELECT document FROM orders_return_case_events WHERE tenant_id=$1 AND case_id=$2 ORDER BY occurred_at,revision,id',

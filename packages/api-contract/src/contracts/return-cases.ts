@@ -20,6 +20,13 @@ import {
   returnCaseListSchema,
   returnCreationOptionsSchema,
 } from '../return-cases.js';
+import {
+  exchangeChoiceInputSchema,
+  exchangeRequestSchema,
+  exchangeStepSchema,
+  returnExchangeSchema,
+  returnExchangesSchema,
+} from '../return-exchanges.js';
 
 const path = '/v1/organizations/{organizationId}';
 
@@ -62,6 +69,88 @@ function caseCommand<T extends z.ZodTypeAny>(
 const actionParams = caseParams.extend({ actionId: z.string().uuid() });
 
 export const returnCasesContract = {
+  exchanges: endpoint
+    .route({
+      method: 'GET',
+      path: `${path}/return-cases/{caseId}/exchange`,
+      summary: 'Read tracked return exchange',
+      description:
+        'Reads the operation, independent fulfillment and payment proof, and explicitly mapped replacement choices.',
+    })
+    .meta({ access: requires('returns.read'), errors: [401, 403, 404, 503] })
+    .input(z.object({ params: caseParams }))
+    .output(returnExchangesSchema),
+  requestExchange: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-cases/{caseId}/exchange/steps`,
+      summary: 'Request exchange step approval',
+      description:
+        'Freezes one native request, process, cancellation or payment hold release for independent approval. All attempts retain the same case operation. Uncertain sent writes are checked without redispatch.',
+    })
+    .meta(writes)
+    .input(z.object({ params: caseParams, body: exchangeRequestSchema }))
+    .output(exchangeStepSchema),
+  chooseExchange: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-cases/{caseId}/exchange/choice`,
+      summary: 'Choose how to handle replacement availability',
+      description:
+        'Records wait, different item or refund with an owner. The choice does not send a provider write. A different item or refund requires independently approved and freshly verified cancellation first.',
+    })
+    .meta(writes)
+    .input(z.object({ params: caseParams, body: exchangeChoiceInputSchema }))
+    .output(returnExchangeSchema),
+  refundExchange: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-cases/{caseId}/exchange/refund`,
+      summary: 'Hand off a cancelled exchange to refund',
+      description:
+        'After fresh cancellation proof, changes the proposal to refund while preserving physical inspection and restock quantities. Refunding remains a separately approved settlement.',
+    })
+    .meta(writes)
+    .input(
+      z.object({
+        params: caseParams,
+        body: z.object({ revision: z.number().int().positive() }).strict(),
+      }),
+    )
+    .output(z.object({ caseId: z.string().uuid() })),
+  decideExchange: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-cases/{caseId}/exchange/steps/{actionId}/decision`,
+      summary: 'Approve an exact exchange step',
+      description:
+        'A current independent approver responds to the frozen step. Execution uses the requester’s rechecked authority.',
+    })
+    .meta(writes)
+    .input(z.object({ params: actionParams, body: decideReturnCreationSchema }))
+    .output(exchangeStepSchema),
+  sendExchange: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-cases/{caseId}/exchange/steps/{actionId}/send`,
+      summary: 'Send an approved exchange step',
+      description:
+        'Resumes the same durable execution identity. A sent uncertain effect is reconciled without creating a second replacement.',
+    })
+    .meta(writes)
+    .input(z.object({ params: actionParams, body: empty }))
+    .output(exchangeStepSchema),
+  checkExchange: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-cases/{caseId}/exchange/steps/{actionId}/check`,
+      summary: 'Verify exchange fulfillment and payment',
+      description:
+        'Independently reads the exact native replacement, fulfillment and financial outcome. Provider acceptance does not prove payment or case closure.',
+    })
+    .meta(writes)
+    .input(z.object({ params: actionParams, body: empty }))
+    .output(exchangeStepSchema),
   actions: endpoint
     .route({
       method: 'GET',

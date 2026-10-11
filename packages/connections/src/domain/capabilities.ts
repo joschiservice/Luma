@@ -1,6 +1,11 @@
 import type { ConnectorFailure } from '@luma/connector-core';
 
 import type {
+  ReturnExchangeProof,
+  ReturnExchangeQuoted,
+  ReturnExchangeRead,
+} from './return-exchanges.js';
+import type {
   ReturnSettlementPlan,
   ReturnSettlementProof,
   ReturnSettlementQuote,
@@ -698,6 +703,51 @@ interface CapabilityContract {
   'returns.refund': { input: ReturnSettlementWrite; output: WriteReceipt };
   /** Adds only the approved resale units to the selected warehouse. */
   'returns.restock': { input: ReturnSettlementWrite; output: WriteReceipt };
+  /** Quotes one exchange step from native store state; available inventory is not a reservation. */
+  'returns.exchange.quote.read': {
+    input: ReturnExchangeRead;
+    output: ReturnExchangeQuoted;
+  };
+  /** Reads bounded, explicitly mapped storefront variant choices and current reported availability. */
+  'returns.exchange.options.read': {
+    input: { inventoryItems: ExternalId[] };
+    output: {
+      choices: {
+        inventoryItem: ExternalId;
+        variantId: string;
+        name: string;
+        available: number | null;
+      }[];
+      observedAt: string;
+      evidenceRefs: string[];
+      complete: boolean;
+    };
+  };
+  /** Independently reconciles the operation's native return, replacement fulfillment and money. */
+  'returns.exchange.proof.read': {
+    input: ReturnExchangeRead;
+    output: ReturnExchangeProof;
+  };
+  /** Records the replacement request through a native unprocessed Shopify return. */
+  'returns.exchange.request': {
+    input: ReturnExchangeRead;
+    output: WriteReceipt;
+  };
+  /** Processes the exact native exchange and financial difference once. */
+  'returns.exchange.process': {
+    input: ReturnExchangeRead;
+    output: WriteReceipt;
+  };
+  /** Cancels an unprocessed exchange intent before an operator changes the replacement or chooses a refund. */
+  'returns.exchange.cancel': {
+    input: ReturnExchangeRead;
+    output: WriteReceipt;
+  };
+  /** Releases only the exchange's payment hold after fresh independent payment proof. */
+  'returns.exchange.release': {
+    input: ReturnExchangeRead;
+    output: WriteReceipt;
+  };
   /** Returns and refunds per order; the observation resource is `return` or `refund`. */
   'returns.read': {
     input: PageQuery & { order?: ExternalId };

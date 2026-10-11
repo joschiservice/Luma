@@ -1,4 +1,8 @@
-import type { ReturnActionList, ReturnCaseDetail } from '@luma/api-contract';
+import type {
+  ReturnActionList,
+  ReturnCaseDetail,
+  ReturnExchangesView,
+} from '@luma/api-contract';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -12,6 +16,7 @@ import { expect, userEvent, within } from 'storybook/test';
 
 import appStyles from '../../styles.css?inline';
 import { ReturnCaseView } from './case';
+import { ReturnExchange } from './case-exchange';
 import { ReturnSettlement } from './case-settlement';
 import { detail as sourceDetail } from './returns-fixtures';
 
@@ -317,14 +322,162 @@ const details: Record<string, ReturnCaseDetail> = {
   cancelled,
 };
 
+function exchange(
+  state: 'approval' | 'pending' | 'paid' | 'failed' | 'unavailable' | 'stale',
+): ReturnExchangesView {
+  const now = new Date().toISOString(),
+    proofAt = state === 'stale' ? '2026-01-01T00:00:00Z' : now,
+    root = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    attempt = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const replacement = {
+    skuId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    mappingIds: [root, attempt],
+    inventoryItem: {
+      externalId: 'gid://shopify/InventoryItem/11',
+      scopeKey: '',
+    },
+    variantId: 'gid://shopify/ProductVariant/11',
+    wawiConnectionId: open.order.connection.id,
+    item: { externalId: '10', scopeKey: '' },
+    quantity: 1,
+  };
+  const request = {
+    kind: 'request' as const,
+    marker: `luma-ex:${root}:${attempt}`,
+    order: { externalId: 'gid://shopify/Order/1', scopeKey: '' },
+    lines: [
+      {
+        orderLineId: open.lines[0]!.orderLineId,
+        source: {
+          externalId: 'gid://shopify/LineItem/2',
+          scopeKey: 'gid://shopify/Order/1',
+        },
+        quantity: 1,
+        reason: 'OTHER',
+      },
+    ],
+    replacement,
+  };
+  const financial = {
+    kind: 'charge' as const,
+    amount: '5.00',
+    currency: 'EUR',
+    transactions: [],
+    priorSuccessfulTransactionIds: ['gid://shopify/OrderTransaction/3'],
+  };
+  const process = {
+    kind: 'process' as const,
+    marker: request.marker,
+    order: request.order,
+    returnId: 'gid://shopify/Return/4',
+    returnLines: [{ id: 'gid://shopify/ReturnLineItem/5', quantity: 1 }],
+    exchangeLine: { id: 'gid://shopify/ExchangeLineItem/6', quantity: 1 },
+    replacement,
+    financial,
+  };
+
+  return {
+    available: true,
+    asOf: now,
+    choices: [
+      {
+        ...replacement,
+        id: 'choice',
+        label: 'Linen shirt, replacement size L',
+        available: state === 'unavailable' ? 0 : 4,
+      },
+    ],
+    choiceStatus: 'ready',
+    operation: {
+      id: root,
+      tenantId: org,
+      caseId: open.case.id,
+      connectionId: open.order.connection.id,
+      startedBy: alex.id,
+      startedAt: now,
+      ownerId: sam.id,
+      revision: 2,
+      choice:
+        state === 'unavailable' ? { kind: 'wait', by: alex.id, at: now } : null,
+      currentAttemptId: attempt,
+      replacementName: 'Linen shirt, replacement size L',
+      request,
+      availability:
+        state === 'unavailable'
+          ? { available: false, observedAt: now, evidenceRefs: [root] }
+          : null,
+      processingStarted: state !== 'unavailable',
+      updatedAt: now,
+    },
+    steps: [
+      {
+        id: attempt,
+        actionId: attempt,
+        operationId: root,
+        tenantId: org,
+        caseId: open.case.id,
+        connectionId: open.order.connection.id,
+        plan: state === 'unavailable' ? request : process,
+        caseDigest: 'digest',
+        requestDigest: 'digest',
+        quote: { observedAt: now, evidenceRefs: [root] },
+        requestedBy: alex.id,
+        requestedAt: now,
+        expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+        decisionId: root,
+        decidedBy: null,
+        decidedAt: null,
+        state: state === 'approval' ? 'approval_required' : 'verified',
+        sent: state !== 'approval',
+        proof:
+          state === 'approval'
+            ? null
+            : {
+                outcome: 'passed',
+                observedAt: proofAt,
+                evidenceRefs: [root],
+                returnId: process.returnId,
+                processLines: {
+                  returnLines: process.returnLines,
+                  exchangeLine: process.exchangeLine,
+                },
+                fulfillmentOrderId:
+                  state === 'unavailable'
+                    ? null
+                    : 'gid://shopify/FulfillmentOrder/7',
+                paymentHoldId:
+                  state === 'paid' ? null : 'gid://shopify/FulfillmentHold/8',
+                fulfillmentReady: state === 'paid',
+                payment:
+                  state === 'paid'
+                    ? 'paid'
+                    : state === 'failed'
+                      ? 'failed'
+                      : 'pending',
+                financial,
+              },
+        failure: null,
+        updatedAt: now,
+        canApprove: state === 'approval',
+        canSend: false,
+        canCheck: state !== 'approval',
+        observeOnly: false,
+      },
+    ],
+  };
+}
+
 function Preview({
   state = 'open',
   evidence,
   settlementState,
+  exchangeState,
 }: {
   state?: string;
   evidence?: 'fresh' | 'stale' | 'loading' | 'unavailable';
   settlementState?: 'pending' | 'failed' | 'stale' | 'approval' | 'unavailable';
+  exchangeState?:
+    'approval' | 'pending' | 'paid' | 'failed' | 'unavailable' | 'stale';
 }) {
   const [client] = useState(() => new QueryClient());
   const [router] = useState(() =>
@@ -336,12 +489,48 @@ function Preview({
             <style>{appStyles}</style>
             <ReturnCaseView
               organizationId={org}
-              detail={details[state]}
+              detail={
+                exchangeState
+                  ? {
+                      ...proposed,
+                      order: {
+                        ...proposed.order,
+                        connection: {
+                          ...proposed.order.connection,
+                          label: 'Shopify',
+                          provider: 'shopify',
+                        },
+                      },
+                      proposal: { ...proposed.proposal!, kind: 'exchange' },
+                    }
+                  : details[state]
+              }
               settlementStarted={
-                !!settlementState && settlementState !== 'approval'
+                (!!settlementState && settlementState !== 'approval') ||
+                (!!exchangeState && exchangeState !== 'approval')
               }
               settlement={
-                settlementState ? (
+                exchangeState ? (
+                  <ReturnExchange
+                    organizationId={org}
+                    detail={{
+                      ...proposed,
+                      order: {
+                        ...proposed.order,
+                        connection: {
+                          ...proposed.order.connection,
+                          label: 'Shopify',
+                          provider: 'shopify',
+                        },
+                      },
+                      proposal: { ...proposed.proposal!, kind: 'exchange' },
+                    }}
+                    data={exchange(exchangeState)}
+                    loading={false}
+                    unavailable={false}
+                    retry={() => {}}
+                  />
+                ) : settlementState ? (
                   <ReturnSettlement
                     organizationId={org}
                     detail={proposed}
@@ -571,4 +760,38 @@ export const SettlementDark: Story = {
 export const SettlementNarrow: Story = {
   args: { state: 'proposed', settlementState: 'pending' },
   globals: { viewport: { value: 'mobile1', isRotated: false } },
+};
+
+export const ExchangeApproval: Story = {
+  args: { state: 'proposed', exchangeState: 'approval' },
+};
+
+export const ExchangePaymentPending: Story = {
+  args: { state: 'proposed', exchangeState: 'pending' },
+};
+
+export const ExchangePaymentPaid: Story = {
+  args: { state: 'proposed', exchangeState: 'paid' },
+};
+
+export const ExchangePaymentFailed: Story = {
+  args: { state: 'proposed', exchangeState: 'failed' },
+};
+
+export const ExchangeUnavailable: Story = {
+  args: { state: 'proposed', exchangeState: 'unavailable' },
+};
+
+export const ExchangeStale: Story = {
+  args: { state: 'proposed', exchangeState: 'stale' },
+};
+
+export const ExchangeNarrow: Story = {
+  args: { state: 'proposed', exchangeState: 'pending' },
+  parameters: { viewport: { value: 'mobile1' } },
+};
+
+export const ExchangeDark: Story = {
+  args: { state: 'proposed', exchangeState: 'pending' },
+  globals: { theme: 'dark' },
 };

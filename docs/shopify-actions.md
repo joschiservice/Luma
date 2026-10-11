@@ -128,3 +128,21 @@ Proof independently scans at most 100 refund identities, then 20 lines and 20 tr
 uniqueness or completeness is unknown. It requires exactly one machine operation marker, the approved
 lines and successful payment transactions in the approved currency. Notes unrelated to the marker
 are discarded. Pending or failed payment remains explicit and never triggers another refund.
+
+### Case exchanges
+
+Exchange reads require order, returns, product and inventory access. Native request, process and
+cancellation need `write_returns`; payment hold release also needs the applicable fulfillment write
+scope. Every write uses `shopify:returns.manage` and its own independent high-risk approval.
+
+`returnCreate` includes an exchange line and explicitly sets the transitional `unprocessed` flag.
+Request approval must not also process the replacement. `returnProcess` uses exact processable return
+and exchange line IDs and Shopify's suggested financial transfer. Refund differences use original
+captured parent transactions with over-refunding disabled. Processing does not restock returned goods.
+
+These mutations have no claimed provider idempotency guarantee. Each line retains the exact marker
+`luma-ex:<operation UUID>:<attempt UUID>`. One-shot dispatch and permanent sent fencing survive restart;
+independent reads verify the marker, quantities, native processed lines and exactly one corresponding
+fulfillment. Payment verification remains separate. Cancellation is limited to the exact unprocessed
+intent; hold release removes only its independently observed awaiting-payment hold. Truncated source
+collections, changed mappings, unexpected transactions and unavailable reads leave work unverified.

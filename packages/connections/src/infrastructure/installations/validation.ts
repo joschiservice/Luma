@@ -25,6 +25,13 @@ const installationPermissions = z.enum([
   'returns.create',
   'returns.refund',
   'returns.restock',
+  'returns.exchange.options.read',
+  'returns.exchange.quote.read',
+  'returns.exchange.proof.read',
+  'returns.exchange.request',
+  'returns.exchange.process',
+  'returns.exchange.cancel',
+  'returns.exchange.release',
   'returns.settlement.quote.read',
   'returns.settlement.proof.read',
 ]);

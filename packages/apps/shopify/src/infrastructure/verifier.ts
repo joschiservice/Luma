@@ -65,6 +65,24 @@ export function createInstallationVerifier(options: {
       granted.push('returns.options.read', 'returns.created.read');
     if (has('orders') && scopes.has('write_returns'))
       granted.push('returns.create');
+    if (has('products') && has('inventory'))
+      granted.push('returns.exchange.options.read');
+    if (has('orders') && has('returns') && has('products') && has('inventory'))
+      granted.push(
+        'returns.exchange.quote.read',
+        'returns.exchange.proof.read',
+      );
+    if (
+      has('orders') &&
+      has('products') &&
+      has('inventory') &&
+      scopes.has('write_returns')
+    )
+      granted.push(
+        'returns.exchange.request',
+        'returns.exchange.process',
+        'returns.exchange.cancel',
+      );
     if (
       has('orders') &&
       [
@@ -83,6 +101,7 @@ export function createInstallationVerifier(options: {
       ].some((scope) => scopes.has(scope))
     ) {
       granted.push(
+        'returns.exchange.release',
         'fulfillment.hold.release',
         'fulfillment.open',
         'fulfillment.move',

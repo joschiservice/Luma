@@ -56,7 +56,7 @@ function fixture() {
                 {
                   amountSet,
                   gateway: 'shopify_payments',
-                  kind: 'REFUND',
+                  kind: 'SUGGESTED_REFUND',
                   parentTransaction: { id: parent },
                 },
               ],

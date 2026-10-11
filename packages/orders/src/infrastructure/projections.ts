@@ -721,6 +721,25 @@ async function refresh(
           AND other.source_return_id=m.canonical_id AND other.state='open' AND other.id<>c.id)`,
       [tenantId, orderId],
     );
+    await tx.query(
+      `UPDATE orders_return_cases c SET source_return_id=m.canonical_id,
+      revision=c.revision+1,updated_at=now(),document=c.document || jsonb_build_object(
+        'sourceReturnId',m.canonical_id,'revision',c.revision+1,'updatedAt',to_char(now() AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
+      FROM orders_return_exchanges x JOIN orders_return_exchange_steps s
+        ON s.tenant_id=x.tenant_id AND s.operation_id=x.id AND s.id=(x.document->>'currentAttemptId')::uuid AND s.kind='request' AND s.state='verified'
+      JOIN connector_source_mappings m ON m.tenant_id=s.tenant_id AND m.connection_id=(s.document->>'connectionId')::uuid
+        AND m.resource='return' AND m.external_id=s.document->'proof'->>'returnId' AND m.scope_key=''
+      JOIN orders_returns imported ON imported.tenant_id=m.tenant_id AND imported.connection_id=m.connection_id
+        AND imported.entity_id=m.canonical_id AND imported.order_id=$2 AND NOT imported.deleted AND imported.status NOT IN ('cancelled','declined')
+      WHERE c.tenant_id=$1 AND c.order_id=$2 AND c.state='open' AND x.tenant_id=c.tenant_id AND x.case_id=c.id
+        AND x.document->'choice'='null'::jsonb AND c.source_return_id IS DISTINCT FROM m.canonical_id
+        AND (c.source_return_id IS NULL OR EXISTS(SELECT 1 FROM orders_return_exchange_steps cancelled JOIN connector_source_mappings old
+          ON old.tenant_id=cancelled.tenant_id AND old.connection_id=(cancelled.document->>'connectionId')::uuid AND old.resource='return'
+          AND old.external_id=cancelled.document->'proof'->>'returnId' AND old.canonical_id=c.source_return_id
+          WHERE cancelled.tenant_id=c.tenant_id AND cancelled.case_id=c.id AND cancelled.kind='cancel' AND cancelled.state='verified'))
+        AND NOT EXISTS(SELECT 1 FROM orders_return_cases other WHERE other.tenant_id=c.tenant_id AND other.source_return_id=m.canonical_id AND other.state='open' AND other.id<>c.id)`,
+      [tenantId, orderId],
+    );
   }
   const listed = values.filter((value) => !returns(value));
   const orders = listed.filter((value) => value.data.type === 'order');

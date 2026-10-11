@@ -9,3 +9,9 @@ export {
   returnSettlementProofSchema,
   returnSettlementQuotedSchema,
 } from './infrastructure/return-settlement-contracts.js';
+
+export {
+  returnExchangeReadSchema,
+  returnExchangeQuotedSchema,
+  returnExchangeProofSchema,
+} from './infrastructure/return-exchange-contracts.js';

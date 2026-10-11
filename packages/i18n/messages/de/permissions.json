@@ -116,7 +116,7 @@
   "permissions_gmail_messages_send_label": "Aus Gmail senden",
   "permissions_gmail_messages_send_description": "Antworten aus verbundenen Gmail-Postfächern senden und Antworten anderer freigeben.",
   "permissions_shopify_returns_manage_label": "Shopify-Retouren verwalten",
-  "permissions_shopify_returns_manage_description": "Fordere eine Freigabe für Shopify-Retouren und Erstattungen an.",
+  "permissions_shopify_returns_manage_description": "Genehmigung für Shopify-Retouren, Erstattungen und Umtausch anfordern.",
   "permissions_jtl_returns_restock_label": "Geprüfte Retouren einlagern",
   "permissions_jtl_returns_restock_description": "Fordere eine Freigabe an und lagere nur geprüfte, wiederverkaufbare Einheiten in einem Wawi-Lager ein."
 }

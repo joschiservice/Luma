@@ -7,6 +7,12 @@ import {
 
 import { type Args, text, texts } from './connections.js';
 import type { RequestContext } from './context.js';
+import {
+  attachExchangeInput,
+  cancelExchange,
+  processExchange,
+  validateExchangeInput,
+} from './exchanges.js';
 import { moveWork, openWork, releaseHolds, touchOrder } from './fulfillment.js';
 import { available, writeLevel } from './inventory.js';
 import {
@@ -329,6 +335,7 @@ async function returnMutation(
         })
       ).id;
     } else {
+      const exchanges = await validateExchangeInput(context, input);
       const order = parseGid(text(input, 'orderId'), 'Order');
       if (
         !order ||
@@ -382,6 +389,7 @@ async function returnMutation(
           returnReasonNote: notes.get(line.data.lineItem) ?? null,
         });
       await approveReturn(context.shop, { order: order.id, returnId: id });
+      await attachExchangeInput(context, id, exchanges);
     }
     context.committed = true;
     context.loader.clear();
@@ -417,6 +425,8 @@ export const mutationResolvers: TypeResolvers = {
     returnMutation(context, args.returnInput, false),
   returnApproveRequest: (_source, args, context) =>
     returnMutation(context, args.input, true),
+  returnProcess: (_source, args, context) => processExchange(context, args),
+  returnCancel: (_source, args, context) => cancelExchange(context, args),
   inventorySetQuantities: (_source, args, context, info) =>
     setQuantities(context, args, info),
   fulfillmentOrderReleaseHold: (_source, args, context) =>

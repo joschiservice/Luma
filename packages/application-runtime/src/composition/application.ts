@@ -32,9 +32,11 @@ import {
   createOrderMetricReader,
   createReturnActionService,
   createReturnCaseService,
+  createReturnExchangeService,
   orderStateQueries,
   type ReturnActions,
   type ReturnCases,
+  type ReturnExchanges,
 } from '@luma/orders/composition';
 import type {
   ModelGateway,
@@ -138,6 +140,11 @@ import {
   createReturnSystem,
 } from './return-cases.js';
 import {
+  createReturnExchangeAdmission,
+  createReturnExchangeEffects,
+  createReturnExchangeSystem,
+} from './return-exchanges.js';
+import {
   createReturnSettlementAdmission,
   createReturnSettlementEffects,
   createReturnSettlementSystem,
@@ -180,6 +187,7 @@ export interface ApplicationServices {
   commitments: SupplierCommitments;
   returnCases: ReturnCases;
   returnActions: ReturnActions;
+  returnExchanges: ReturnExchanges;
   library: ReturnType<typeof createPersistentPlaybookLibrary>;
   messaging: ReturnType<typeof createMessaging>;
   http: {
@@ -211,6 +219,7 @@ export interface ApplicationServices {
     returns: ReturnType<typeof createReturnWorkspace>;
     returnCases: ReturnCases;
     returnActions: ReturnActions;
+    returnExchanges: ReturnExchanges;
     customers: ReturnType<typeof createCustomerWorkspace>;
     orders: ReturnType<typeof createOrderWorkspace>;
     sales: ReturnType<typeof createSalesRuntime>;
@@ -366,6 +375,13 @@ export function createApplicationServices(
           () => returnActions,
         )
       : { resolve: async () => null };
+  const exchangeEffects =
+    options.execution.kind === 'enabled' && options.returns
+      ? createReturnExchangeEffects(
+          options.returns.runtime,
+          () => returnExchanges,
+        )
+      : { resolve: async () => null };
   const combinedEffects: EffectRegistry = {
     resolve: async (context, intent) =>
       (await procurementEffects.resolve(context, intent)) ??
@@ -373,6 +389,7 @@ export function createApplicationServices(
       (await replyEffects.resolve(context, intent)) ??
       (await returnCreationEffects.resolve(context, intent)) ??
       (await settlementEffects.resolve(context, intent)) ??
+      (await exchangeEffects.resolve(context, intent)) ??
       effects.resolve(context, intent),
   };
   const resolutionEligible = createAdmissionEligibility(detection.diagnoses);
@@ -386,9 +403,11 @@ export function createApplicationServices(
             ? returnCases.eligible(context, step)
             : step.subject?.kind === 'return_case_settlement'
               ? returnActions.eligible(context, step)
-              : step.subject
-                ? replenishment.eligible(context, step)
-                : resolutionEligible(context, step),
+              : step.subject?.kind === 'return_case_exchange'
+                ? returnExchanges.eligible(context, step)
+                : step.subject
+                  ? replenishment.eligible(context, step)
+                  : resolutionEligible(context, step),
   });
   const commitments: SupplierCommitments = createSupplierCommitmentService(
     database,
@@ -510,6 +529,21 @@ export function createApplicationServices(
     refreshContext: identity.refreshContext,
     principal: identity.resolveWorkflowContext,
   });
+  const returnExchanges = createReturnExchangeService(
+    database,
+    createAuditLog,
+    {
+      system: options.returns
+        ? createReturnExchangeSystem(options.returns.runtime)
+        : null,
+      admission:
+        options.execution.kind === 'enabled' && options.returns
+          ? createReturnExchangeAdmission(safety, combinedEffects)
+          : null,
+      refreshContext: identity.refreshContext,
+      principal: identity.resolveWorkflowContext,
+    },
+  );
   const desk = createDeskServices(
     database,
     identity,
@@ -809,6 +843,7 @@ export function createApplicationServices(
     commitments,
     returnCases,
     returnActions,
+    returnExchanges,
     detection,
     safety,
     desk,
@@ -860,6 +895,7 @@ export function createApplicationServices(
       returns,
       returnCases,
       returnActions,
+      returnExchanges,
       customers: createCustomerWorkspace(database),
       records: createRecordExplorer(database, hiddenOrderSources),
       orders,

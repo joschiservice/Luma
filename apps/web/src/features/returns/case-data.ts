@@ -182,3 +182,35 @@ export function settlementCommands(organizationId: string, caseId: string) {
       api.checkAction({ params: { ...params, actionId }, body: {} }),
   };
 }
+
+/** Polls independently observed exchange state while the case is visible. */
+export function returnExchangeOptions(organizationId: string, caseId: string) {
+  return queryOptions({
+    ...privateQueryDefaults,
+    queryKey: [...returnCaseKey(organizationId), caseId, 'exchange'],
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: 'always',
+    queryFn: ({ signal }) =>
+      api.exchanges({ params: { organizationId, caseId } }, { signal }),
+  });
+}
+
+/** Commands preserve the operation and exact step identities across uncertain responses. */
+export function exchangeCommands(organizationId: string, caseId: string) {
+  const params = { organizationId, caseId };
+
+  return {
+    request: (body: Body<'requestExchange'>) =>
+      api.requestExchange({ params, body }),
+    choose: (body: Body<'chooseExchange'>) =>
+      api.chooseExchange({ params, body }),
+    refund: (revision: number) =>
+      api.refundExchange({ params, body: { revision } }),
+    decide: (actionId: string, body: Body<'decideExchange'>) =>
+      api.decideExchange({ params: { ...params, actionId }, body }),
+    send: (actionId: string) =>
+      api.sendExchange({ params: { ...params, actionId }, body: {} }),
+    check: (actionId: string) =>
+      api.checkExchange({ params: { ...params, actionId }, body: {} }),
+  };
+}

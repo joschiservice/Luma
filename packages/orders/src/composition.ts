@@ -9,8 +9,10 @@ import {
   createReturnCases,
   type ReturnCaseDependencies,
 } from './application/return-cases.js';
+import { createReturnExchanges } from './application/return-exchanges.js';
 import { createReturnActionStore } from './infrastructure/return-action-store.js';
 import { createReturnCaseStore } from './infrastructure/return-case-store.js';
+import { createReturnExchangeStore } from './infrastructure/return-exchange-store.js';
 
 export { createCommerceProjections } from './infrastructure/projections.js';
 
@@ -87,3 +89,28 @@ export type {
   ReturnSettlementSystem,
   ReturnSettlementAdmission,
 } from './application/return-actions.js';
+
+/** Composes exchange coordination with tenant-owned persistence and independently governed source effects. */
+export function createReturnExchangeService(
+  db: TenantDatabase,
+  audit: (db: TenantDatabase) => AuditLog,
+  deps: Omit<
+    Parameters<typeof createReturnExchanges>[0],
+    'store' | 'cases' | 'digest' | 'uuid' | 'now'
+  >,
+) {
+  return createReturnExchanges({
+    ...deps,
+    store: createReturnExchangeStore(db, audit),
+    cases: createReturnCaseStore(db, audit),
+    digest,
+    uuid: nameUuid,
+    now: () => new Date(),
+  });
+}
+
+export type {
+  ReturnExchanges,
+  ReturnExchangeSystem,
+  ReturnExchangeAdmission,
+} from './application/return-exchanges.js';

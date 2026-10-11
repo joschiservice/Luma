@@ -176,7 +176,7 @@ export function createShopifySettlementCapabilities(
               z.object({
                 amountSet: bag,
                 gateway: z.string(),
-                kind: z.literal('REFUND'),
+                kind: z.literal('SUGGESTED_REFUND'),
                 parentTransaction: z.object({ id: gid('OrderTransaction') }),
               }),
             )

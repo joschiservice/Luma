@@ -35,6 +35,7 @@ import {
   readSelection,
 } from './read-selections.js';
 import { createShopifyReturnCapabilities } from './return-actions.js';
+import { createShopifyExchangeCapabilities } from './return-exchanges.js';
 import { createShopifySettlementCapabilities } from './return-settlement.js';
 import * as s from './schemas.js';
 
@@ -256,6 +257,9 @@ export function createShopifyConnector(
       | MessageReadCapability
       | 'returns.options.read'
       | 'returns.created.read'
+      | 'returns.exchange.options.read'
+      | 'returns.exchange.quote.read'
+      | 'returns.exchange.proof.read'
       | 'returns.settlement.quote.read'
       | 'returns.settlement.proof.read'
     >,
@@ -1247,6 +1251,7 @@ export function createShopifyConnector(
     capabilities: {
       ...createShopifyReturnCapabilities(options),
       ...createShopifySettlementCapabilities(options),
+      ...createShopifyExchangeCapabilities(options),
       'orders.read': handler('orders.read'),
       'products.read': handler('products.read'),
       'inventory.read': handler('inventory.read'),

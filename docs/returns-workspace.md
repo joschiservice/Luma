@@ -178,3 +178,28 @@ requires the other steps; neither accepted mutation nor one verified step closes
 Settlement proof older than five minutes is shown as stale. Unavailable reads retain the last proof
 and ask for another check. Wawi settlement writes are currently granted only in the installed
 simulator. A live installation needs its stock write capability verified before it can be granted.
+
+### Exchanges
+
+A reviewed exchange credits only received units. The replacement needs explicit canonical SKU
+mappings to Shopify's inventory item and Wawi's item. Shopify availability and Wawi's reported
+all-warehouse availability are read independently; neither is a reservation. Luma first requests
+an unprocessed native exchange, then asks separately for approval to process its exact lines and
+native financial outcome. A source return without a compatible replacement intent needs an owned
+handoff; Luma does not invent an API to add exchange lines to an existing return.
+
+One case operation retains the replacement requests, approval steps and availability choices.
+After processing could have been sent, its permanent slot prevents a second replacement fulfillment.
+A lost response is reconciled through the exact machine marker and native processed lines, not by
+sending another request. An independently read fulfillment can be prepared while its price difference
+is still pending or failed. Charges require new successful captured transactions for the approved
+amount and currency and a zero outstanding balance. Refund differences require successful native
+return-refund transactions for the approved amount. Only the exact payment hold can be released,
+through a separate approval after fresh payment proof; unrelated holds remain in place.
+
+When stock changes, the case owner explicitly chooses wait, a different item or a refund. A different
+item or refund first requires governed cancellation of the pristine source intent and independent
+cancellation proof. A processed or uncertain processing attempt cannot be replaced this way. Refund
+handoff preserves inspected resale stock quantities and still requires separate refund approval.
+Wawi allocation remains owned work: native Shopify intent is not proof of an ERP reservation or
+replacement order. Neither prepared fulfillment nor a paid difference alone closes the case.

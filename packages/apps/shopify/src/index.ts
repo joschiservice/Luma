@@ -104,6 +104,17 @@ export function createShopifyProvider(
         connectionId: id,
         shop: target.shop,
         accessToken: async () => {
+          if (
+            capability.startsWith('returns.exchange.') &&
+            !capability.endsWith('.read')
+          )
+            for (const read of [
+              'orders.read',
+              'returns.exchange.quote.read',
+              'returns.exchange.proof.read',
+              'returns.exchange.options.read',
+            ] as const)
+              await runtime.installations.credential(context, id, read);
           if (capability === 'returns.refund')
             for (const read of [
               'orders.read',
@@ -208,7 +219,8 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         {
           key: 'shopify:returns.manage',
           label: 'Manage Shopify returns',
-          description: 'Request approval for Shopify returns and refunds.',
+          description:
+            'Request approval for Shopify returns, refunds and exchanges.',
           consequential: true,
         },
         {

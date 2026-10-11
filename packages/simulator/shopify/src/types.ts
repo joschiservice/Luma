@@ -97,6 +97,7 @@ export type ShopifyCommand =
       lines: { lineItem: string; quantity: number }[];
     }
   | { kind: 'paid'; order: string }
+  | { kind: 'exchange-pay'; order: string }
   | {
       kind: 'cancel';
       order: string;

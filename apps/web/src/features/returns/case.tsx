@@ -42,6 +42,7 @@ import {
   returnCaseError,
   returnCaseKey,
   returnCaseOptions,
+  returnExchangeOptions,
   returnSettlementOptions,
 } from './case-data';
 import {
@@ -51,6 +52,7 @@ import {
   ProposalDialog,
   ReceiptDialog,
 } from './case-dialogs';
+import { ReturnExchange } from './case-exchange';
 import {
   caseStageDescriptions,
   caseStageLabels,
@@ -82,6 +84,10 @@ export function ReturnCasePage() {
     ...returnSettlementOptions(organizationId, caseId),
     enabled: !!query.data,
   });
+  const exchanges = useQuery({
+    ...returnExchangeOptions(organizationId, caseId),
+    enabled: !!query.data,
+  });
   const members = useQuery({
     ...membersOptions(organizationId),
     enabled: !!query.data?.canManage,
@@ -106,22 +112,36 @@ export function ReturnCasePage() {
       sourceUnavailable={!!sourceId && source.isError}
       settlement={
         query.data ? (
-          <ReturnSettlement
-            organizationId={organizationId}
-            detail={query.data}
-            data={settlements.data}
-            loading={settlements.isPending}
-            unavailable={settlements.isError}
-            retry={() => void settlements.refetch()}
-          />
+          <>
+            <ReturnExchange
+              organizationId={organizationId}
+              detail={query.data}
+              data={exchanges.data}
+              loading={exchanges.isPending}
+              unavailable={exchanges.isError}
+              retry={() => void exchanges.refetch()}
+            />
+            <ReturnSettlement
+              organizationId={organizationId}
+              detail={query.data}
+              data={settlements.data}
+              loading={settlements.isPending}
+              unavailable={settlements.isError}
+              retry={() => void settlements.refetch()}
+            />
+          </>
         ) : null
       }
-      settlementStarted={settlements.data?.items.some((a) => a.sent) ?? false}
+      settlementStarted={
+        (settlements.data?.items.some((a) => a.sent) ?? false) ||
+        (exchanges.data?.steps.some((a) => a.sent) ?? false)
+      }
       loading={query.isPending}
       refreshing={query.isFetching}
       refresh={() => {
         void query.refetch();
         void settlements.refetch();
+        void exchanges.refetch();
         if (sourceId) void source.refetch();
       }}
       people={(members.data ?? []).map((member) => ({

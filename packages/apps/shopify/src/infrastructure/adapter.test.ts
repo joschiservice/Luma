@@ -197,9 +197,18 @@ describe('Shopify read capabilities', () => {
       'returns.options.read',
       'returns.created.read',
       'returns.create',
+
       'returns.settlement.quote.read',
       'returns.settlement.proof.read',
       'returns.refund',
+      'returns.exchange.options.read',
+      'returns.exchange.quote.read',
+      'returns.exchange.proof.read',
+      'returns.exchange.request',
+      'returns.exchange.process',
+      'returns.exchange.cancel',
+      'returns.exchange.release',
+
       'orders.read',
       'products.read',
       'inventory.read',

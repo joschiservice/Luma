@@ -127,3 +127,28 @@ neue Abfrage, bevor Sie das Ergebnis dem Kunden bestätigen. Nach dem Versand ei
 Wareneingang, Prüfung und Vorschlag fest. Die Zuständigkeit kann weiterhin wechseln. Die
 Wawi-Bestandsabwicklung ist im Simulator verfügbar. Ihre Live-Verbindung muss die Aktion unterstützen,
 bevor sie verwendet werden kann.
+
+## Einen Umtausch koordinieren
+
+Erfasse Wareneingang und Prüfung und schlage **Umtausch** vor. Wähle im Bereich **Umtausch** einen
+explizit Shopify und Wawi zugeordneten Ersatzartikel und dessen Menge. Fordere die Genehmigung der
+Ersatzanfrage an. Eine andere Person genehmigt die genaue Anfrage. Gemeldeter verfügbarer Bestand
+ist keine Reservierung.
+
+Nach unabhängiger Bestätigung der Anfrage fordere die Genehmigung zur Verarbeitung an. Luma prüft
+die Verfügbarkeit erneut und verwendet den aktuellen finanziellen Vorschlag von Shopify. Ersatzversand
+und Preisunterschied haben getrennte Fortschritte. Eine angeforderte zusätzliche Zahlung bleibt
+unbestätigt, bis eine erfolgreiche Zahlung unabhängig gelesen wurde. Prüfe danach die Quelle und
+fordere die Genehmigung zur Freigabe der Zahlungssperre an. Andere Sperren bleiben bestehen. Auch
+eine Erstattung des Preisunterschieds bleibt bis zur erfolgreichen Zahlung ausstehend.
+
+Bei fehlendem Ersatzbestand entscheidet die fallverantwortliche Person zwischen **Auf diesen Artikel
+warten**, **Anderen Artikel wählen** und **Erstattung wählen**. Luma wählt nicht automatisch. Ein
+anderer Artikel oder eine Erstattung benötigt zuerst eine genehmigte Stornierung und deren aktuelle
+Bestätigung. Wähle anschließend den anderen Ersatz oder gehe zur separat genehmigten Erstattung
+über. Bereits genehmigte verkaufsfähige Bestandsmengen bleiben erhalten. Ein verarbeiteter Umtausch
+benötigt eine zuständige Person zur Klärung statt einer weiteren Ersatzanfrage.
+
+Veranlasse und prüfe die Ersatzzuordnung in Wawi vor dem Versand. Die Shopify-Anfrage bestätigt
+keine ERP-Reservierung. Wickle Retourenbestand separat ab und prüfe beide Systeme, bevor du den
+Fall als abgeschlossen bestätigst.

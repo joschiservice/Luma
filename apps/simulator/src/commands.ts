@@ -43,6 +43,7 @@ export const shopifyCommandSchema = z.discriminatedUnion('kind', [
       .max(500),
   }),
   z.object({ kind: z.literal('paid'), order: id }),
+  z.object({ kind: z.literal('exchange-pay'), order: id }),
   z.object({
     kind: z.literal('cancel'),
     order: id,

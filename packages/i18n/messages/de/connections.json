@@ -67,5 +67,12 @@
   "connections_capability_returns_quote": "Erstattungs- und Einlagerungswerte lesen",
   "connections_capability_returns_proof": "Erstattung und Einlagerung prüfen",
   "connections_capability_returns_refund": "Eingegangene Retoureneinheiten erstatten",
-  "connections_capability_returns_restock": "Geprüfte Retoureneinheiten einlagern"
+  "connections_capability_returns_restock": "Geprüfte Retoureneinheiten einlagern",
+  "connections_capability_exchange_options": "Ersatzartikel lesen",
+  "connections_capability_exchange_quote": "Native Umtauschangebote lesen",
+  "connections_capability_exchange_proof": "Ersatzversand und Zahlung prüfen",
+  "connections_capability_exchange_request": "Ersatzartikel anfragen",
+  "connections_capability_exchange_process": "Umtausch verarbeiten",
+  "connections_capability_exchange_cancel": "Unverarbeiteten Umtausch stornieren",
+  "connections_capability_exchange_release": "Bezahlten Umtausch freigeben"
 }

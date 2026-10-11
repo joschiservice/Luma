@@ -42,7 +42,11 @@ import type {
   Replies,
 } from '@luma/messaging';
 import { messagingRoutes } from '@luma/messaging/http';
-import type { ReturnActions, ReturnCases } from '@luma/orders/composition';
+import type {
+  ReturnActions,
+  ReturnCases,
+  ReturnExchanges,
+} from '@luma/orders/composition';
 import { returnCaseRoutes } from '@luma/orders/http';
 import type { ModelGateway, Observability, Observation } from '@luma/platform';
 import { describeError } from '@luma/platform';
@@ -155,6 +159,7 @@ export interface AppDependencies {
   returns?: ReturnWorkspace;
   returnCases?: ReturnCases;
   returnActions?: ReturnActions;
+  returnExchanges?: ReturnExchanges;
   customers?: CustomerWorkspace;
   orders?: OrderWorkspace;
   sales?: SalesService;
@@ -450,6 +455,7 @@ export function buildApp(
       returnCases: returnCaseRoutes(
         dependencies.returnCases,
         dependencies.returnActions,
+        dependencies.returnExchanges,
       ),
       customers: customerRoutes(dependencies.customers),
       sync: syncRoutes(dependencies.sync),

@@ -115,7 +115,7 @@ export async function suggestedRefund(
         __typename: 'SuggestedOrderTransaction',
         amountSet: moneyBag(part, order.data.currency),
         gateway: sale.data.gateway,
-        kind: 'REFUND',
+        kind: 'SUGGESTED_REFUND',
         parentTransaction: sale,
       });
       remaining -= part;
