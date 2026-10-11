@@ -58,11 +58,30 @@ test('manages workspace preferences and the complete invitation journey on deskt
   await timezone.fill('Tokyo');
   await page.getByRole('option', { name: 'Asia/Tokyo', exact: true }).click();
   // Lose a committed response; the original command must reconcile without a second write.
+  // The reload that follows stays held until the retry: recovery must not wait for it.
+  let lost = false;
+  let releaseReload = () => {};
+  const reload = new Promise((resolve) => {
+    releaseReload = resolve;
+  });
+  /** @param {import('@playwright/test').Route} route */
+  const holdReload = async (route) => {
+    const request = route.request();
+    if (
+      lost &&
+      request.method() === 'GET' &&
+      ['fetch', 'xhr'].includes(request.resourceType())
+    )
+      await reload;
+    await route.fallback();
+  };
+  await page.route('**/*', holdReload);
   await page.route(
     '**/settings/workspace',
     async (route) => {
       if (route.request().method() === 'PATCH') {
         await route.fetch();
+        lost = true;
         await route.abort('failed');
       } else await route.continue();
     },
@@ -70,6 +89,8 @@ test('manages workspace preferences and the complete invitation journey on deskt
   );
   await page.getByRole('button', { name: 'Save changes', exact: true }).click();
   await page.getByRole('button', { name: 'Check status and retry' }).click();
+  releaseReload();
+  await page.unroute('**/*', holdReload);
   await page.getByText('Changes saved.', { exact: true }).waitFor();
   await page.reload();
   expect(await page.getByLabel('Workspace name').inputValue()).toBe(

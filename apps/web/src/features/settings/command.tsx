@@ -51,18 +51,21 @@ export function useSettingsCommand(organizationId: string) {
     setMessage('');
     try {
       await operation(command.id);
-      setMessage(success);
-      await refresh();
     } catch (error) {
       setError(error);
       if (!(error instanceof IdentityError) || error.status >= 500) {
         uncertain.current = command;
         setNeedsCheck(true);
       }
-      await refresh();
-    } finally {
       setPending(false);
+      // Recovery does not wait for fresh data; a retry keeps the command's identity.
+      void refresh();
+
+      return;
     }
+    setMessage(success);
+    await refresh();
+    setPending(false);
   }
 
   async function reconcile() {
