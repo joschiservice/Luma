@@ -75,7 +75,7 @@ Some workflows start on their own when Luma detects an issue:
 - **Release an overdue fulfillment hold** starts when a Shopify order stays on a fraud-review or manual hold for too long. It proposes releasing the hold and confirms in Shopify that it’s gone. Payment, address and stock holds go to a person, because their cause has to be fixed first.
 - **Check a failing connection** starts when reads from a connection keep failing or a system stopped accepting Luma. Lost access goes to a person straight away, and the issue offers to reconnect. Otherwise it waits 15 minutes, checks again, and hands the issue over only if reads still fail. It changes nothing.
 
-Every change waits in [Needs you](/docs/needs-you) for approval from another person who can approve changes. A proposal stays open for four hours. Right before acting, Luma reads stock again: if the change is still the same, it goes ahead; if it would differ, Luma prepares one new proposal in the same Needs you item. A rejected change, a change Luma can’t make safely or an unclear result hands the issue to a person. Nothing is retried without you.
+Every change waits in [Needs you](/docs/needs-you) for approval under your [workspace rules](/docs/workspace-settings#approvals). A proposal stays open for four hours. Right before acting, Luma reads stock again: if the change is still the same, it goes ahead; if it would differ, Luma prepares one new proposal in the same Needs you item. A rejected change, a change Luma can’t make safely or an unclear result hands the issue to a person. Nothing is retried without you.
 
 ## Workflows that follow up
 

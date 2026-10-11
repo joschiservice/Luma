@@ -20,9 +20,11 @@ import { approvalRequirement, evaluatePolicy } from '../domain/evaluate.js';
 
 export interface PolicyRepository {
   /** Reads the current workspace approval requirement and its revision. */
-  workspacePolicy(
-    tenantId: string,
-  ): Promise<{ revision: number; required: boolean }>;
+  workspacePolicy(tenantId: string): Promise<{
+    revision: number;
+    required: boolean;
+    requireIndependentApproval: boolean;
+  }>;
   pending(tenantId: string): Promise<PolicyEvidence[]>;
   delivered(tenantId: string, id: string): Promise<void>;
   saveDecision(decision: PolicyDecision): Promise<void>;
@@ -50,10 +52,14 @@ export interface PolicyDependencies {
  * decision evidence.
  */
 export function createPolicyService(deps: PolicyDependencies) {
-  const version = async (tenantId: string) =>
-    workspacePolicyVersion(
-      (await deps.repository.workspacePolicy(tenantId)).revision,
+  const version = async (tenantId: string) => {
+    const workspace = await deps.repository.workspacePolicy(tenantId);
+
+    return workspacePolicyVersion(
+      workspace.revision,
+      workspace.requireIndependentApproval,
     );
+  };
 
   async function flush(tenantId: string) {
     for (const evidence of await deps.repository.pending(tenantId)) {
@@ -79,10 +85,21 @@ export function createPolicyService(deps: PolicyDependencies) {
         decision.policyVersion,
       );
 
-      return { ...decision, approval };
+      const workspace = await deps.repository.workspacePolicy(context.tenantId);
+
+      return {
+        ...decision,
+        approval,
+        requireIndependentApproval: workspace.requireIndependentApproval,
+      };
     },
     /** Reads the effective policy version for a fresh admission check. */
     currentVersion: version,
+    /** Reads whether a different person must approve under the effective workspace rule. */
+    async requiresIndependentApproval(tenantId: string) {
+      return (await deps.repository.workspacePolicy(tenantId))
+        .requireIndependentApproval;
+    },
     /**
      * States whether every proposal for an action needs a person under the current workspace
      * policy. It reads policy only; admission still evaluates each proposal.
@@ -121,7 +138,10 @@ export function createPolicyService(deps: PolicyDependencies) {
         const workspace = await deps.repository.workspacePolicy(
           context.tenantId,
         );
-        const policyVersion = workspacePolicyVersion(workspace.revision);
+        const policyVersion = workspacePolicyVersion(
+          workspace.revision,
+          workspace.requireIndependentApproval,
+        );
         const now = deps.now();
         const approval = await deps.repository.findApproval(
           context.tenantId,
@@ -137,6 +157,7 @@ export function createPolicyService(deps: PolicyDependencies) {
           now.getTime(),
           approval,
           workspace.required,
+          workspace.requireIndependentApproval,
         );
         const decision: PolicyDecision = {
           id: deps.id(),
@@ -180,7 +201,11 @@ export function createPolicyService(deps: PolicyDependencies) {
       const fresh = await deps.refreshContext(context);
       requireTenant(fresh, context.tenantId);
       requirePermission(fresh, 'decisions.respond');
-      const policyVersion = await version(context.tenantId);
+      const workspace = await deps.repository.workspacePolicy(context.tenantId);
+      const policyVersion = workspacePolicyVersion(
+        workspace.revision,
+        workspace.requireIndependentApproval,
+      );
       const decision = await deps.repository.findDecision(
         context.tenantId,
         decisionId,
@@ -197,8 +222,15 @@ export function createPolicyService(deps: PolicyDependencies) {
           'CONFLICT',
           'Approval policy changed. Refresh the review.',
         );
-      if (fresh.actor.id === decision.actorId)
-        throw new Error('A different approver is required');
+      if (
+        workspace.requireIndependentApproval &&
+        fresh.actor.id === decision.actorId
+      )
+        throw new IdentityError(
+          403,
+          'FORBIDDEN',
+          'A different approver is required.',
+        );
       // Capabilities with their own app permission need it to approve, too.
       if (decision.permission && isAppPermission(decision.permission))
         requirePermission(fresh, decision.permission);

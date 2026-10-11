@@ -7795,7 +7795,7 @@
       "get": {
         "operationId": "workflows.replenishmentReview",
         "summary": "Review a replenishment run",
-        "description": "Returns recorded stock, supplier, policy decision, current purchase-order status and independent verification. Only someone other than the requester with `procurement.manage` and `decisions.respond` can respond to a pending proposal.",
+        "description": "Returns recorded stock, supplier, policy decision, current purchase-order status and independent verification. Responding to a pending proposal requires `procurement.manage` and `decisions.respond` and follows the workspace independent approval setting.",
         "tags": ["workflows"],
         "parameters": [
           {
@@ -8119,7 +8119,7 @@
       "post": {
         "operationId": "workflows.decideReplenishment",
         "summary": "Approve or reject a replenishment proposal",
-        "description": "Requires `procurement.manage` and `decisions.respond`. Someone other than the requester decides on the exact proposal. Current stock, activation and policy are checked again before creating the order.",
+        "description": "Requires `procurement.manage` and `decisions.respond`. The approver decides on the exact proposal under the workspace independent approval setting. Current stock, activation and policy are checked again before creating the order.",
         "tags": ["workflows"],
         "parameters": [
           {
@@ -12929,7 +12929,7 @@
       "post": {
         "operationId": "workflows.activateCase",
         "summary": "Turn on a case workflow",
-        "description": "Requires `workflows.publish`. Lets a built-in workflow start a run for each new case of its issue type. Runs act as the caller; every change still needs policy approval by someone else who can approve changes. Review the exact version digest and policy version. Reuse the same ID and body after an uncertain response. A second active activation returns 409.",
+        "description": "Requires `workflows.publish`. Lets a built-in workflow start a run for each new case of its issue type. Runs act as the caller; every change still needs policy approval under the workspace rules. Review the exact version digest and policy version. Reuse the same ID and body after an uncertain response. A second active activation returns 409.",
         "tags": ["workflows"],
         "parameters": [
           {
@@ -41652,7 +41652,7 @@
       "post": {
         "operationId": "procurement.decideSubmission",
         "summary": "Approve or reject sending an order",
-        "description": "Requires `procurement.manage` and `decisions.respond`, plus any app permission the purchasing capability declares. Someone other than the requester approves or rejects the exact submission. Approval dispatches it as the requester after their membership, the order and the supplier link are checked again.",
+        "description": "Requires `procurement.manage` and `decisions.respond`, plus any app permission the purchasing capability declares. An authorized person approves or rejects the exact submission under the workspace independent approval setting. Approval dispatches it as the requester after their membership, the order and the supplier link are checked again.",
         "tags": ["procurement"],
         "parameters": [
           {
@@ -59215,6 +59215,14 @@
                         "alwaysRequireApproval": {
                           "type": "boolean"
                         },
+                        "requireIndependentApproval": {
+                          "type": "boolean"
+                        },
+                        "activeMemberCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
                         "policyRevision": {
                           "type": "integer",
                           "minimum": -9007199254740991,
@@ -59232,6 +59240,8 @@
                         "timezone",
                         "revision",
                         "alwaysRequireApproval",
+                        "requireIndependentApproval",
+                        "activeMemberCount",
                         "policyRevision",
                         "writeMode"
                       ]
@@ -59461,6 +59471,14 @@
                         "alwaysRequireApproval": {
                           "type": "boolean"
                         },
+                        "requireIndependentApproval": {
+                          "type": "boolean"
+                        },
+                        "activeMemberCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
                         "policyRevision": {
                           "type": "integer",
                           "minimum": -9007199254740991,
@@ -59478,6 +59496,8 @@
                         "timezone",
                         "revision",
                         "alwaysRequireApproval",
+                        "requireIndependentApproval",
+                        "activeMemberCount",
                         "policyRevision",
                         "writeMode"
                       ]
@@ -59702,6 +59722,14 @@
                         "alwaysRequireApproval": {
                           "type": "boolean"
                         },
+                        "requireIndependentApproval": {
+                          "type": "boolean"
+                        },
+                        "activeMemberCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
                         "policyRevision": {
                           "type": "integer",
                           "minimum": -9007199254740991,
@@ -59719,6 +59747,8 @@
                         "timezone",
                         "revision",
                         "alwaysRequireApproval",
+                        "requireIndependentApproval",
+                        "activeMemberCount",
                         "policyRevision",
                         "writeMode"
                       ]
@@ -59871,8 +59901,8 @@
     "/v1/organizations/{organizationId}/settings/approvals": {
       "patch": {
         "operationId": "settings.updateApprovals",
-        "summary": "Require independent approval for otherwise permitted changes",
-        "description": "Requires `workspace.approval_policy.manage`. This preference can only strengthen approval requirements. Platform denials and required approvals always apply. Changing this preference invalidates previous policy reviews.",
+        "summary": "Set when approval is needed and who may approve",
+        "description": "Requires `workspace.approval_policy.manage`. Always requiring approval includes low-risk changes. Independent approval requires a different person; it is off while fewer than two members have access. Platform denials and required reviews still apply. Changes invalidate previous policy reviews.",
         "tags": ["settings"],
         "parameters": [
           {
@@ -59902,6 +59932,9 @@
                     "maximum": 9007199254740991
                   },
                   "alwaysRequireApproval": {
+                    "type": "boolean"
+                  },
+                  "requireIndependentApproval": {
                     "type": "boolean"
                   }
                 },
@@ -59942,6 +59975,14 @@
                         "alwaysRequireApproval": {
                           "type": "boolean"
                         },
+                        "requireIndependentApproval": {
+                          "type": "boolean"
+                        },
+                        "activeMemberCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
                         "policyRevision": {
                           "type": "integer",
                           "minimum": -9007199254740991,
@@ -59959,6 +60000,8 @@
                         "timezone",
                         "revision",
                         "alwaysRequireApproval",
+                        "requireIndependentApproval",
+                        "activeMemberCount",
                         "policyRevision",
                         "writeMode"
                       ]
@@ -60184,6 +60227,14 @@
                         "alwaysRequireApproval": {
                           "type": "boolean"
                         },
+                        "requireIndependentApproval": {
+                          "type": "boolean"
+                        },
+                        "activeMemberCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
                         "policyRevision": {
                           "type": "integer",
                           "minimum": -9007199254740991,
@@ -60201,6 +60252,8 @@
                         "timezone",
                         "revision",
                         "alwaysRequireApproval",
+                        "requireIndependentApproval",
+                        "activeMemberCount",
                         "policyRevision",
                         "writeMode"
                       ]
@@ -60867,6 +60920,14 @@
                         "alwaysRequireApproval": {
                           "type": "boolean"
                         },
+                        "requireIndependentApproval": {
+                          "type": "boolean"
+                        },
+                        "activeMemberCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
                         "policyRevision": {
                           "type": "integer",
                           "minimum": -9007199254740991,
@@ -60884,6 +60945,8 @@
                         "timezone",
                         "revision",
                         "alwaysRequireApproval",
+                        "requireIndependentApproval",
+                        "activeMemberCount",
                         "policyRevision",
                         "writeMode"
                       ]
@@ -83368,7 +83431,7 @@
       "post": {
         "operationId": "decisions.assign",
         "summary": "Assign a decision",
-        "description": "Take, hand over or release a decision in the Needs you queue. Taking an unassigned decision or releasing your own needs permission to take decisions; assigning any decision to a current member needs permission to assign decisions. Send the `revision` from the item’s assignment (0 when unassigned); a changed assignment returns 409. The decision must currently need a person. Assigning does not grant approval authority: the owner still checks permissions and requires an approver different from the requester.",
+        "description": "Take, hand over or release a decision in the Needs you queue. Taking an unassigned decision or releasing your own needs permission to take decisions; assigning any decision to a current member needs permission to assign decisions. Send the `revision` from the item’s assignment (0 when unassigned); a changed assignment returns 409. The decision must currently need a person. Assigning does not grant approval authority: the owner still checks permissions and applies the workspace’s independent approval setting.",
         "tags": ["decisions"],
         "parameters": [
           {

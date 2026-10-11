@@ -58,14 +58,15 @@ If every owner’s access is suspended, **Team** says that the workspace has no 
 
 ## Approvals
 
-**Approvals** decides when a change needs a second person before Luma makes it. Changing it needs **Manage approval rules**.
+**Approvals** decides when changes need review and who may approve them. Changing these settings needs **Manage approval rules**.
 
-- **Standard approval rules**: low-risk changes that people are permitted to make go ahead. Higher-risk changes need approval from someone else.
-- **Always require approval**: every change people are otherwise permitted to make needs approval from someone else, including low-risk changes.
+- **Standard approval rules**: low-risk changes that people are permitted to make go ahead. Higher-risk changes need approval.
+- **Always require approval**: every otherwise permitted change needs approval, including low-risk changes.
+- **Require approval from another person**: when on, requesters cannot approve their own changes. When off, a requester with **Approve or reject changes** can approve their own changes.
 
-Either way, **Always applies** lists what never changes: approvals Luma always requires and actions it never allows, each person’s current permissions checked again before a change runs, and approval by someone other than the requester followed by a fresh check of the outcome. This setting can only make the rules stricter.
+Requiring another person is off while only one active member has workspace access. Pending invitations, suspended members and disabled accounts do not count. When another member gains access, the team preference applies again; it starts on unless you have turned it off.
 
-People whose role includes **Approve or reject changes** can approve. When you change this setting, reviews that are already open must be refreshed before their changes can run.
+Permissions, required reviews and a fresh check of the outcome still apply. Changing either setting, or gaining or losing the second active member, means open reviews must be refreshed before their changes can run.
 
 ## Luma support
 

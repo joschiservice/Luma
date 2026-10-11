@@ -325,17 +325,18 @@ export function createReplenishmentService(deps: {
     return run;
   }
 
-  // Approval needs someone who can manage procurement other than the principal who started the
-  // run, while the rule is active and the proposal's evidence is still valid.
+  // A response needs procurement authority, an active rule and fresh evidence. The workspace
+  // decides whether the responder must differ from the principal who started the run.
   const respondable = (
     context: TenantContext,
     run: { actor: { id: string } },
     rule: ReplenishmentActivation,
     validUntil: string | undefined,
+    requireIndependentApproval: boolean,
   ) =>
     rule.active &&
     hasPermission(context, 'procurement.manage') &&
-    context.actor.id !== run.actor.id &&
+    (!requireIndependentApproval || context.actor.id !== run.actor.id) &&
     !!validUntil &&
     Date.parse(validUntil) > Date.now();
 
@@ -358,12 +359,13 @@ export function createReplenishmentService(deps: {
   ): Promise<ReplenishmentDecision[]> {
     const existing = await runs.pending(context, definitionId);
     if (!existing.length) return [];
-    const [evidence, rules] = await Promise.all([
+    const [evidence, rules, requireIndependentApproval] = await Promise.all([
       steps.list(
         context,
         existing.map((r) => r.id),
       ),
       store.list(context),
+      deps.safety.policies.requiresIndependentApproval(context.tenantId),
     ]);
     const items: ReplenishmentDecision[] = [];
     for (const run of existing) {
@@ -421,6 +423,7 @@ export function createReplenishmentService(deps: {
           run,
           rule,
           binding.action.preconditions.validUntil,
+          requireIndependentApproval,
         ),
       });
     }
@@ -1301,6 +1304,7 @@ export function createReplenishmentService(deps: {
             run,
             rule,
             binding?.action.preconditions.validUntil,
+            decision.requireIndependentApproval,
           ),
       };
     },

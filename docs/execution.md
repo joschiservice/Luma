@@ -71,8 +71,8 @@ current preconditions. Missing capabilities or false preconditions deny; registr
 stop execution.
 
 Low-risk actions run without approval. Medium or high risk, from the proposal or the
-adapter metadata, needs approval by a different person with `decisions.respond` (and the
-capability's app permission, if any). Responses are `approved` or `rejected`, expire within
+adapter metadata, needs approval with `decisions.respond` (and the
+capability's app permission, if any). The [workspace approval preference](workspace-settings.md#approval-preference) controls whether the approver must be a different person. Independent approval is off while fewer than two active members have access; an explicit response is still required. Responses are `approved` or `rejected`, expire within
 24 hours, and the first response wins. Grants bind tenant, proposal hash, requester and
 policy version. Rejection and expiry never authorize an effect and cannot be overwritten; a
 new proposal is needed. A rejection stays binding after its expiry and if adapter risk is

@@ -123,6 +123,7 @@ export interface SubmissionAdmission {
   ): Promise<
     | (PolicyDecision & {
         approval?: { outcome: 'approved' | 'rejected'; approverId: string };
+        requireIndependentApproval?: boolean;
       })
     | null
   >;
@@ -465,9 +466,10 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
     const messages: Record<Submission['state'], string> = {
       not_executed:
         'Observe-only. Would run when writes are enabled. Nothing was sent.',
-      approval_required: requester
-        ? 'Waiting for someone else who can approve changes to approve sending this order.'
-        : 'Check the supplier, lines and requested date before approving. Luma places the order in the purchasing system right after approval.',
+      approval_required:
+        requester && decision?.requireIndependentApproval !== false
+          ? 'Waiting for someone else who can approve changes to approve sending this order.'
+          : 'Check the supplier, lines and requested date before approving. Luma places the order in the purchasing system right after approval.',
       approved: 'Approved. Luma is placing the order in the purchasing system.',
       rejected: 'Sending was rejected. Nothing was sent.',
       expired: 'The approval request expired. Nothing was sent.',
@@ -489,7 +491,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         !observeOnly &&
         !expired &&
         approver &&
-        !requester &&
+        (!requester || decision?.requireIndependentApproval === false) &&
         submission.state === 'approval_required' &&
         !decision?.approval,
       canSend:

@@ -185,13 +185,15 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
               : expired
                 ? 'This preview expired. Refresh inventory details and review a new action.'
                 : rejected
-                  ? 'Someone else who can approve changes rejected this action.'
+                  ? 'A person with approval permission rejected this action.'
                   : decision?.outcome === 'denied'
                     ? 'This action is no longer eligible. Refresh inventory details.'
                     : state === 'approval_required'
                       ? decision?.approval?.outcome === 'approved'
                         ? 'Approved. The requester can run the action after a fresh eligibility check.'
-                        : 'Someone else who can approve changes must approve this exact action.'
+                        : decision?.requireIndependentApproval === false
+                          ? 'Review and approve this exact action before running it.'
+                          : 'Someone else who can approve changes must approve this exact action.'
                       : 'Review the exact change. Shopify eligibility is checked again before dispatch.';
 
     return {
@@ -243,7 +245,8 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
         !policyChanged &&
         state === 'approval_required' &&
         !decision?.approval &&
-        context.actor.id !== run.action.proposedBy.id,
+        (decision?.requireIndependentApproval === false ||
+          context.actor.id !== run.action.proposedBy.id),
     };
   }
 

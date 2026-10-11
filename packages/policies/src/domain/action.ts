@@ -73,9 +73,15 @@ export type PolicyEvidence =
   | { type: 'policy.evaluated'; document: PolicyDecision }
   | { type: 'approval.responded'; document: Approval };
 
-/** Binds policy decisions to the platform version and workspace approval revision. */
-export function workspacePolicyVersion(revision: number): string {
-  return revision === 0
-    ? currentPolicyVersion
-    : `${currentPolicyVersion}:workspace:${revision}`;
+/** Binds decisions to the platform version, workspace revision and effective independent approval rule. */
+export function workspacePolicyVersion(
+  revision: number,
+  requireIndependentApproval = true,
+): string {
+  const version =
+    revision === 0
+      ? currentPolicyVersion
+      : `${currentPolicyVersion}:workspace:${revision}`;
+
+  return requireIndependentApproval ? version : `${version}:self-approval`;
 }

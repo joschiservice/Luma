@@ -158,7 +158,8 @@ function transaction(
       const org = (
         await tx.query<SettingsSnapshot['workspace']>(
           `SELECT o.name,o.slug,o.write_mode AS "writeMode",o.data_region AS "dataRegion",COALESCE(s.timezone,'UTC') AS timezone,
-        COALESCE(s.revision,0) AS revision,COALESCE(s.always_require_approval,false) AS "alwaysRequireApproval",COALESCE(s.policy_revision,0) AS "policyRevision"
+        COALESCE(s.revision,0) AS revision,COALESCE(s.always_require_approval,false) AS "alwaysRequireApproval",COALESCE(s.policy_revision,0) AS "policyRevision",
+        COALESCE(s.require_independent_approval,true) AS "requireIndependentApproval",workspace_active_member_count() AS "activeMemberCount"
         FROM organizations o LEFT JOIN workspace_settings s ON s.tenant_id=o.id WHERE o.id=$1`,
           [tenantId],
         )
@@ -211,14 +212,15 @@ function transaction(
         [tenantId, value.name, value.writeMode],
       );
       await tx.query(
-        `INSERT INTO workspace_settings(tenant_id,timezone,revision,always_require_approval,policy_revision) VALUES($1,$2,$3,$4,$5)
-        ON CONFLICT(tenant_id) DO UPDATE SET timezone=$2,revision=$3,always_require_approval=$4,policy_revision=$5`,
+        `INSERT INTO workspace_settings(tenant_id,timezone,revision,always_require_approval,policy_revision,require_independent_approval) VALUES($1,$2,$3,$4,$5,$6)
+        ON CONFLICT(tenant_id) DO UPDATE SET timezone=$2,revision=$3,always_require_approval=$4,policy_revision=$5,require_independent_approval=$6`,
         [
           tenantId,
           value.timezone,
           value.revision,
           value.alwaysRequireApproval,
           value.policyRevision,
+          value.requireIndependentApproval,
         ],
       );
     },

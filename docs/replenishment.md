@@ -42,7 +42,7 @@ again. Stock reads for admission remain independent and fresh.
 ## Approval and admission
 
 The risk threshold makes larger proposals high risk; smaller drafts keep Procurement's
-medium-risk floor. Both therefore need a different person with `decisions.respond`. The
+medium-risk floor. Both therefore need approval with `decisions.respond`, following the [workspace independent approval setting](workspace-settings.md#approval-preference). The
 workflow never lowers capability risk or treats a workflow decision as execution authority.
 
 Action Admission binds the proposal to the run, action step, subject reference and exact

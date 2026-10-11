@@ -112,9 +112,9 @@ export const settingsContract = {
     .route({
       method: 'PATCH',
       path: `${path}/approvals`,
-      summary: 'Require independent approval for otherwise permitted changes',
+      summary: 'Set when approval is needed and who may approve',
       description:
-        'Requires `workspace.approval_policy.manage`. This preference can only strengthen approval requirements. Platform denials and required approvals always apply. Changing this preference invalidates previous policy reviews.',
+        'Requires `workspace.approval_policy.manage`. Always requiring approval includes low-risk changes. Independent approval requires a different person; it is off while fewer than two members have access. Platform denials and required reviews still apply. Changes invalidate previous policy reviews.',
     })
     .meta({
       access: requires('workspace.approval_policy.manage'),
@@ -127,6 +127,7 @@ export const settingsContract = {
           .extend({
             revision: z.number().int().nonnegative(),
             alwaysRequireApproval: z.boolean(),
+            requireIndependentApproval: z.boolean().optional(),
           })
           .strict(),
       }),

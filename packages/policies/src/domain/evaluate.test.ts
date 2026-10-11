@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { ProposedAction } from './action.js';
+import type { Approval, ProposedAction } from './action.js';
 import { approvalRequirement, evaluatePolicy } from './evaluate.js';
 
 const risks = ['low', 'medium', 'high'] as const;
@@ -85,4 +85,79 @@ describe('evaluatePolicy', () => {
       evaluate(['jtl:purchase_orders.submit'], 'jtl:purchase_orders.submit'),
     ).toEqual({ outcome: 'allowed', reason: 'authorized' });
   });
+});
+
+it('requires a review and accepts self-approval only when the independent rule is off', () => {
+  const capability = {
+    available: true,
+    minimumRisk: 'high' as const,
+    permission: 'actions.execute',
+  };
+  const access = new Set(['actions.execute']);
+  const approval: Approval = {
+    id: 'approval',
+    decisionId: 'decision',
+    correlationId: 'request',
+    tenantId: 'tenant',
+    proposalId: 'proposal',
+    actionHash: 'hash',
+    policyVersion: 'version',
+    requesterId: 'owner',
+    approverId: 'owner',
+    outcome: 'approved',
+    createdAt: '2026-10-03T08:00:00.000Z',
+    expiresAt: '2026-10-03T08:05:00.000Z',
+  };
+  expect(
+    evaluatePolicy(
+      action('high'),
+      capability,
+      access,
+      'owner',
+      now,
+      null,
+      false,
+      false,
+    ).outcome,
+  ).toBe('approval_required');
+  expect(
+    evaluatePolicy(action('high'), capability, access, 'owner', now, approval)
+      .outcome,
+  ).toBe('approval_required');
+  expect(
+    evaluatePolicy(
+      action('high'),
+      capability,
+      access,
+      'owner',
+      now,
+      approval,
+      false,
+      false,
+    ).outcome,
+  ).toBe('allowed');
+  expect(
+    evaluatePolicy(
+      action('high'),
+      capability,
+      new Set(),
+      'owner',
+      now,
+      approval,
+      false,
+      false,
+    ).reason,
+  ).toBe('permission_denied');
+  expect(
+    evaluatePolicy(
+      action('high'),
+      capability,
+      access,
+      'owner',
+      now,
+      { ...approval, outcome: 'rejected' },
+      false,
+      false,
+    ).reason,
+  ).toBe('approval_rejected');
 });

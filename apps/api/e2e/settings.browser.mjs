@@ -121,6 +121,25 @@ test('manages workspace preferences and the complete invitation journey on deskt
       .getByRole('switch', { name: 'Always require approval' })
       .getAttribute('aria-checked'),
   ).toBe('true');
+  const independent = page.getByRole('switch', {
+    name: 'Require approval from another person',
+    exact: true,
+  });
+  await expect(independent).toBeChecked();
+  await independent.focus();
+  await page.keyboard.press('Space');
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: 'Save changes', exact: true }),
+  ).toBeDisabled();
+  await page.reload();
+  await expect(independent).not.toBeChecked();
+  // Restore the team preference; a solo workspace should override it without losing it.
+  await independent.click();
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: 'Save changes', exact: true }),
+  ).toBeDisabled();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({
     path: '/tmp/luma63-approvals-mobile.png',
@@ -186,5 +205,27 @@ test('manages workspace preferences and the complete invitation journey on deskt
     path: '/tmp/luma63-team-desktop.png',
     fullPage: true,
   });
+  await f.request(
+    f.owner,
+    `${f.base}/members/${f.membership.id}`,
+    'DELETE',
+    undefined,
+    204,
+  );
+  await page.goto(`/app/${f.org.id}/settings/approvals`);
+  await expect(independent).toBeDisabled();
+  await expect(independent).not.toBeChecked();
+  await expect(
+    page.getByText(
+      'Off while only one member has workspace access, so you can approve your own changes.',
+      { exact: false },
+    ),
+  ).toBeVisible();
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(independent).toBeVisible();
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= 390),
+  ).toBe(true);
   expect(errors).toEqual([]);
 });

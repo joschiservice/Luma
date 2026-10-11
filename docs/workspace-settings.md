@@ -89,9 +89,11 @@ previous and new mode. Connection overrides can only make this rule stricter. Se
 
 ## Approval preference
 
-The workspace approval preference can only strengthen platform policy: when on, even otherwise allowed low-risk changes need independent approval by someone else with `decisions.respond`. Turning it off restores platform rules. Capability restrictions, denial, verification and action admission stay mandatory either way.
+Always requiring approval adds a review to otherwise allowed low-risk changes. Turning it off restores risk-based review requirements. A separate preference controls whether an approver with `decisions.respond` must differ from the requester. It defaults on for teams and is automatically off while fewer than two active members have access; pending invitations, suspended memberships and disabled accounts do not count. The stored team preference applies again when another member gains access. Required reviews, capability restrictions, denials, verification and action admission stay mandatory.
 
-Changing the preference increments the policy revision, and decisions and approvals bind to that revision:
+Both preferences use the policy revision, command receipts and before/after audit evidence. The effective policy version also includes whether independent approval applies, so a membership change that toggles the rule invalidates earlier reviews and approval grants.
+
+Changing either preference increments the policy revision, and decisions and approvals bind to that revision:
 
 - Reviews made under an old revision lose their decision controls and show a refresh notice. Old approvals do not carry forward.
 - Admission re-evaluates policy, the reservation fence checks the current revision, and dispatch checks it again after audit persistence.

@@ -143,6 +143,18 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         "INSERT INTO organizations(id,name,slug,created_at,write_mode) VALUES($1::uuid,'Fixture',$1::uuid::text,now(),'writes_enabled')",
         [id],
       );
+    // Policy reads real membership counts even though this fixture mocks principal refresh.
+    for (const name of ['Requester', 'Approver']) {
+      const userId = randomUUID();
+      await owner.query(
+        'INSERT INTO users(id,name,email,created_at,updated_at) VALUES($1,$2,$3,now(),now())',
+        [userId, name, `${userId}@example.test`],
+      );
+      await owner.query(
+        "INSERT INTO memberships(id,tenant_id,user_id,role,created_at) VALUES($1,$2,$3,'owner',now())",
+        [randomUUID(), tenantId, userId],
+      );
+    }
     const password = randomUUID();
     await admin.query(
       `CREATE ROLE "${name}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
@@ -377,24 +389,26 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         candidate.actionHash,
         { available: true, minimumRisk: 'high', permission: 'actions.execute' },
       );
-      await owner.query(
-        `INSERT INTO executed_actions(id,tenant_id,proposal_id,idempotency_key,action_hash,state,document) VALUES($1,$2,$3,$4,$5,'unknown',$6)`,
-        [
-          randomUUID(),
-          tenantId,
-          action.id,
-          `v0:${action.id}`,
-          candidate.actionHash,
-          {
+      await createTenantDatabase(owner).transaction(tenantId, (tx) =>
+        tx.query(
+          `INSERT INTO executed_actions(id,tenant_id,proposal_id,idempotency_key,action_hash,state,document) VALUES($1,$2,$3,$4,$5,'unknown',$6)`,
+          [
+            randomUUID(),
             tenantId,
-            proposalId: action.id,
-            state: 'unknown',
-            attempt: {
-              policyDecisionId: admission.id,
-              startedAt: new Date(now.getTime() - 301_000).toISOString(),
+            action.id,
+            `v0:${action.id}`,
+            candidate.actionHash,
+            {
+              tenantId,
+              proposalId: action.id,
+              state: 'unknown',
+              attempt: {
+                policyDecisionId: admission.id,
+                startedAt: new Date(now.getTime() - 301_000).toISOString(),
+              },
             },
-          },
-        ],
+          ],
+        ),
       );
       const verificationId = randomUUID();
       await owner.query(

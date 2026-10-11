@@ -25,6 +25,7 @@ export function evaluatePolicy(
   now: number,
   approval: Approval | null = null,
   alwaysRequireApproval = false,
+  requireIndependentApproval = true,
 ): Pick<PolicyDecision, 'outcome' | 'reason'> {
   let outcome: PolicyDecision['outcome'] = 'allowed';
   let reason: PolicyDecision['reason'] = 'authorized';
@@ -52,6 +53,7 @@ export function evaluatePolicy(
     const bound =
       approval &&
       approval.requesterId === actorId &&
+      (!requireIndependentApproval || approval.approverId !== actorId) &&
       Date.parse(approval.expiresAt) > now;
     if (!bound || approval.outcome !== 'approved') {
       outcome = 'approval_required';

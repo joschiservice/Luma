@@ -343,6 +343,7 @@ export function createSettingsService(deps: SettingsDependencies) {
         commandId: string;
         revision: number;
         alwaysRequireApproval: boolean;
+        requireIndependentApproval?: boolean | undefined;
       },
     ) {
       return command(
@@ -354,10 +355,17 @@ export function createSettingsService(deps: SettingsDependencies) {
           const before = (await tx.snapshot(context.actor.id)).workspace;
           if (before.policyRevision !== input.revision)
             conflict('Approval settings changed. Refresh before saving.');
-          if (before.alwaysRequireApproval !== input.alwaysRequireApproval) {
+          const independent =
+            input.requireIndependentApproval ??
+            before.requireIndependentApproval;
+          if (
+            before.alwaysRequireApproval !== input.alwaysRequireApproval ||
+            before.requireIndependentApproval !== independent
+          ) {
             const after = {
               ...before,
               alwaysRequireApproval: input.alwaysRequireApproval,
+              requireIndependentApproval: independent,
               policyRevision: before.policyRevision + 1,
             };
             await tx.saveWorkspace(after);
@@ -367,10 +375,12 @@ export function createSettingsService(deps: SettingsDependencies) {
               context.tenantId,
               {
                 required: before.alwaysRequireApproval,
+                requireIndependentApproval: before.requireIndependentApproval,
                 version: before.policyRevision,
               },
               {
                 required: after.alwaysRequireApproval,
+                requireIndependentApproval: after.requireIndependentApproval,
                 version: after.policyRevision,
               },
             );

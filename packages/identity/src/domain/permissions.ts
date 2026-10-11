@@ -111,7 +111,7 @@ export const permissionCatalog = [
     group: 'workspace',
     label: 'Manage approval rules',
     description:
-      'Decide whether every allowed change needs approval from a second person.',
+      'Choose when changes need approval and whether another person must approve.',
     consequential: true,
     introduced,
   },

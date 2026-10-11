@@ -571,9 +571,13 @@ function ApprovalsForm({
 }) {
   const [draft, setDraft] = useState<{
     required: boolean;
+    independent: boolean;
     revision: number;
   } | null>(null);
   const required = draft?.required ?? data.workspace.alwaysRequireApproval;
+  const multipleMembers = data.workspace.activeMemberCount > 1;
+  const independent =
+    draft?.independent ?? data.workspace.requireIndependentApproval;
   const command = useSettingsCommand(organizationId);
   const approverPermission = usePermissionLabel(
     organizationId,
@@ -616,6 +620,7 @@ function ApprovalsForm({
                 commandId,
                 revision: draft?.revision ?? data.workspace.policyRevision,
                 alwaysRequireApproval: required,
+                requireIndependentApproval: independent,
               },
             });
             setDraft(null);
@@ -631,6 +636,24 @@ function ApprovalsForm({
             change={(value) =>
               setDraft({
                 required: value,
+                independent,
+                revision: draft?.revision ?? data.workspace.policyRevision,
+              })
+            }
+          />
+          <PreferenceRow
+            title={m.settings_approvals_independent_title()}
+            description={
+              multipleMembers
+                ? m.settings_approvals_independent_description()
+                : m.settings_approvals_solo_description()
+            }
+            checked={multipleMembers && independent}
+            disabled={disabled || command.locked || !multipleMembers}
+            change={(value) =>
+              setDraft({
+                required,
+                independent: value,
                 revision: draft?.revision ?? data.workspace.policyRevision,
               })
             }
@@ -657,7 +680,8 @@ function ApprovalsForm({
           disabled={
             disabled ||
             command.locked ||
-            required === data.workspace.alwaysRequireApproval
+            (required === data.workspace.alwaysRequireApproval &&
+              independent === data.workspace.requireIndependentApproval)
           }
           pending={command.pending}
         />

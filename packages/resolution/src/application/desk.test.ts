@@ -45,14 +45,14 @@ function snapshot(): DeskSnapshot {
   };
 }
 
-function desk(fresh: TenantContext) {
+function desk(fresh: TenantContext, overrides: Partial<DeskSnapshot> = {}) {
   const opened: string[] = [];
   const store: DeskStore = {
     withCase: (_context, id, _write, operation) => {
       opened.push(id);
 
       return operation({
-        snapshot: snapshot(),
+        snapshot: { ...snapshot(), ...overrides },
         receipt: async () => null,
         respond: vi.fn(),
         save: vi.fn(),
@@ -141,4 +141,34 @@ describe('Case desk permissions', () => {
       expect(opened).toEqual([]);
     },
   );
+});
+
+it('offers the requester a review only when independent approval is off', async () => {
+  const context = testContext({
+    userId: 'requester',
+    permissions: ['issues.read', 'decisions.respond'],
+  });
+  expect(
+    (await desk(context).service.review(context, 'case')).permittedDecisions,
+  ).toEqual([]);
+  expect(
+    (
+      await desk(context, { requireIndependentApproval: false }).service.review(
+        context,
+        'case',
+      )
+    ).permittedDecisions,
+  ).toEqual(['reject', 'approve']);
+  const reader = testContext({
+    userId: 'requester',
+    permissions: ['issues.read'],
+  });
+  expect(
+    (
+      await desk(reader, { requireIndependentApproval: false }).service.review(
+        reader,
+        'case',
+      )
+    ).permittedDecisions,
+  ).toEqual([]);
 });
