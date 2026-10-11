@@ -220,7 +220,8 @@ test('opens an imported customer from an order, lists their imported orders and 
   expect(await page.getByText('71@example.test', { exact: true }).count()).toBe(
     0,
   );
-  expect(page.url()).not.toContain('72');
+  // Only the query string could carry search text; ports and IDs may contain the digits.
+  expect(decodeURIComponent(new URL(page.url()).search)).not.toContain('72@');
   await page.screenshot({
     path: '/tmp/luma-customers-list.png',
     fullPage: true,
