@@ -82,7 +82,7 @@ export async function refreshOrderList(
     FROM orders_list o JOIN orders_snapshots s ON s.tenant_id=o.tenant_id AND s.id=o.snapshot_id
     CROSS JOIN LATERAL (SELECT o.display_number AS value UNION SELECT l->>'skuCode'
       FROM jsonb_array_elements(s.document->'data'->'lines') l) v
-    WHERE o.tenant_id=$1 AND o.entity_id=ANY($2::uuid[]) AND v.value IS NOT NULL AND v.value<>''`;
+    WHERE o.tenant_id=$1 AND o.entity_id=ANY($2::uuid[]) AND NOT o.deleted AND v.value IS NOT NULL AND v.value<>''`;
   // Shared SKU text is indexed once per tenant, rather than once per order. Sort dictionary
   // inserts consistently so concurrent orders sharing several values cannot deadlock.
   await tx.query(
@@ -114,7 +114,7 @@ export async function refreshOrderList(
     SELECT DISTINCT o.tenant_id,(l->>'skuId')::uuid,o.entity_id,o.connection_id
     FROM orders_list o JOIN orders_snapshots s ON s.tenant_id=o.tenant_id AND s.id=o.snapshot_id
     CROSS JOIN LATERAL jsonb_array_elements(s.document->'data'->'lines') l
-    WHERE o.tenant_id=$1 AND o.entity_id=ANY($2::uuid[]) AND l->>'skuId' IS NOT NULL`,
+    WHERE o.tenant_id=$1 AND o.entity_id=ANY($2::uuid[]) AND NOT o.deleted AND l->>'skuId' IS NOT NULL`,
     [tenant, ids],
   );
 }

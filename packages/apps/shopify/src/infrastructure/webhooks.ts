@@ -3,7 +3,8 @@ import { createHash } from 'node:crypto';
 import type { ReadCapability } from '@luma/connections';
 import { fail, verifyWebhook } from '@luma/connector-shopify';
 
-const topics: Record<string, ReadCapability[]> = {
+/** Supported change subscriptions and the authoritative reads each delivery refreshes. */
+export const shopifyChangeTopics: Record<string, ReadCapability[]> = {
   'order_transactions/create': ['orders.read'],
   'orders/paid': ['orders.read'],
   'refunds/create': ['orders.read', 'returns.read'],
@@ -23,6 +24,12 @@ const topics: Record<string, ReadCapability[]> = {
   'fulfillment_holds/released': ['fulfillment.read'],
   'inventory_items/update': ['inventory.read', 'products.read'],
   'locations/update': ['inventory.read'],
+  'locations/create': ['inventory.read'],
+  'locations/delete': ['inventory.read'],
+  'locations/activate': ['inventory.read'],
+  'locations/deactivate': ['inventory.read'],
+  'inventory_items/create': ['inventory.read', 'products.read'],
+  'inventory_items/delete': ['inventory.read', 'products.read'],
   'orders/create': ['orders.read', 'fulfillment.read'],
   'orders/edited': ['orders.read', 'fulfillment.read'],
   'orders/updated': ['orders.read', 'fulfillment.read', 'returns.read'],
@@ -70,8 +77,8 @@ export function mapShopifyWebhook(options: {
   )
     fail('authentication');
   verifyWebhook(options);
-  const capabilities = Object.hasOwn(topics, options.topic)
-    ? topics[options.topic]
+  const capabilities = Object.hasOwn(shopifyChangeTopics, options.topic)
+    ? shopifyChangeTopics[options.topic]
     : undefined;
   if (!capabilities) return null;
 
@@ -90,4 +97,48 @@ export function mapShopifyWebhook(options: {
       .digest('hex'),
     capabilities: [...capabilities],
   };
+}
+
+/** Actual grants required by the pinned Shopify webhook schema; write grants imply reads. */
+export function canSubscribe(
+  topic: string,
+  scopes: string[],
+  customerApproved: boolean,
+) {
+  const has = (read: string) =>
+    scopes.includes(read) || scopes.includes(read.replace(/^read_/, 'write_'));
+  if (topic.startsWith('customers/'))
+    return customerApproved && has('read_customers');
+  if (
+    topic.startsWith('fulfillment_orders/') ||
+    topic.startsWith('fulfillment_holds/')
+  )
+    return [
+      'read_merchant_managed_fulfillment_orders',
+      'read_assigned_fulfillment_orders',
+      'read_third_party_fulfillment_orders',
+    ].some(has);
+  if (topic.startsWith('inventory_levels/')) return has('read_inventory');
+  if (topic.startsWith('inventory_items/'))
+    return has('read_inventory') || has('read_products');
+  if (topic.startsWith('locations/')) return has('read_locations');
+  if (topic.startsWith('products/')) return has('read_products');
+  if (
+    [
+      'returns/approve',
+      'returns/cancel',
+      'returns/close',
+      'returns/reopen',
+    ].includes(topic)
+  )
+    return has('read_returns') || has('read_orders');
+  if (
+    topic.startsWith('returns/') ||
+    topic.startsWith('reverse_fulfillment_orders/')
+  )
+    return has('read_returns');
+  if (topic.startsWith('fulfillments/'))
+    return has('read_orders') || has('read_fulfillments');
+
+  return has('read_orders');
 }

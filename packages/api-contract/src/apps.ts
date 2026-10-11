@@ -56,3 +56,20 @@ export const workspaceAppStateSchema = workspaceAppSchema.extend({
 });
 
 export type AppManifest = z.infer<typeof appManifestSchema>;
+
+/** Shopify approval, grant and webhook evidence without credentials or webhook payloads. */
+export const shopifyAccessSchema = z.object({
+  customerDataApproved: z.boolean(),
+  allOrdersApproved: z.boolean(),
+  requestedScopes: z.array(z.string()),
+  grantedScopes: z.array(z.string()).nullable(),
+  missingScopes: z.array(z.string()),
+  subscriptions: z.array(
+    z.object({
+      topic: z.string(),
+      status: z.enum(['registered', 'missing', 'failed', 'unavailable']),
+      checkedAt: z.string().datetime().nullable(),
+      lastReceivedAt: z.string().datetime().nullable(),
+    }),
+  ),
+});

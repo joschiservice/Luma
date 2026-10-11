@@ -20,7 +20,7 @@ const facts = (
  SELECT DISTINCT ON (entity_id) * FROM order_sources WHERE ($3::uuid IS NULL OR connection_id=$3)
  ORDER BY entity_id,${sourceSelectionOrder}
 ), scoped AS MATERIALIZED (
- SELECT * FROM selected WHERE ($4::timestamptz IS NULL OR source_updated_at >= $4)
+ SELECT * FROM selected WHERE NOT deleted AND ($4::timestamptz IS NULL OR source_updated_at >= $4)
  AND ($5::timestamptz IS NULL OR source_updated_at < $5)
 ), ${orderProgress('scoped')}, order_attention AS MATERIALIZED (${attention}
 ), attention AS MATERIALIZED (

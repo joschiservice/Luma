@@ -21,7 +21,14 @@ export function stream(patch: Partial<SyncStreamView> = {}): SyncStreamView {
     paused: false,
     blocked: null,
     scan: null,
-    records: { total: 0, current: 0, pending: 0, failed: 0, missing: 0 },
+    records: {
+      total: 0,
+      current: 0,
+      pending: 0,
+      failed: 0,
+      retired: 0,
+      missing: 0,
+    },
     problems: [],
     coverage: {
       oldest: null,
@@ -50,6 +57,7 @@ const counted = (
   pending: 0,
   failed: 0,
   missing: 0,
+  retired: 0,
   ...patch,
 });
 

@@ -143,7 +143,7 @@
   "sync_note_waiting": "Warten auf zugehörige Datensätze: {records}. Luma importiert sie, sobald diese vorliegen.",
   "sync_note_failed": "Import nicht möglich: {records}.",
   "sync_note_failed_reasons": "Import nicht möglich: {records}. Grund: {reasons}.",
-  "sync_note_missing": "Bei der letzten vollständigen Prüfung nicht gefunden: {records}. Luma behält sie. Prüfe, ob sie in der Quelle gelöscht wurden.",
+  "sync_note_missing": "Bei der letzten vollständigen Prüfung nicht gefunden: {records}. Eine Löschung ist unbestätigt; aktuelle Daten bleiben bis zur unabhängigen Bestätigung erhalten.",
   "sync_runs_title": "Letzte Abgleichsläufe",
   "sync_run_kind_backfill": "Verlaufsimport",
   "sync_run_kind_incremental": "Änderungsabgleich",
@@ -280,5 +280,6 @@
   "sync_autolink_enable": "Automatisches Verknüpfen aktivieren",
   "sync_autolink_error_role": "Deine Rolle enthält nicht mehr die Berechtigung „Importe verwalten“.",
   "sync_autolink_error_conflict": "Diese Regel wurde geändert oder existiert bereits. Schließe diesen Dialog und lade die Seite neu, bevor du es erneut versuchst.",
-  "sync_autolink_error_save": "Luma konnte das automatische Verknüpfen nicht aktualisieren. Versuch es erneut."
+  "sync_autolink_error_save": "Luma konnte das automatische Verknüpfen nicht aktualisieren. Versuch es erneut.",
+  "sync_note_retired": "Löschung oder Trennung bestätigt: {records}. Aktuelle Ansichten schließen diese Quelldaten aus; ihre Nachweise bleiben erhalten."
 }

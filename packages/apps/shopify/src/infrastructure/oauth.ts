@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
+import { shopifyAccessSchema } from '@luma/api-contract';
 import {
   ConnectorError,
   type InstallationCredentials,
@@ -25,7 +26,11 @@ import { z } from 'zod';
 
 import type { ShopifyAppConfig as ShopifyConfig } from '../application/oauth.js';
 import { storedCredentials } from './installation-validation.js';
-import { mapShopifyWebhook } from './webhooks.js';
+import {
+  canSubscribe,
+  mapShopifyWebhook,
+  shopifyChangeTopics,
+} from './webhooks.js';
 
 const invalid = () =>
   new IdentityError(
@@ -54,37 +59,6 @@ const shopifyReads = [
   'inventory.read',
   'fulfillment.read',
 ] as const;
-
-// Record changes schedule fresh reads; periodic scans recover any missed delivery.
-const changeTopics = [
-  'ORDERS_CREATE',
-  'ORDERS_UPDATED',
-  'ORDERS_EDITED',
-  'ORDERS_CANCELLED',
-  'FULFILLMENT_ORDERS_MOVED',
-  'FULFILLMENT_ORDERS_SPLIT',
-  'FULFILLMENT_ORDERS_MERGED',
-  'FULFILLMENT_ORDERS_CANCELLED',
-  'ORDERS_DELETE',
-  'FULFILLMENTS_CREATE',
-  'FULFILLMENTS_UPDATE',
-  'PRODUCTS_CREATE',
-  'PRODUCTS_UPDATE',
-  'PRODUCTS_DELETE',
-  'INVENTORY_LEVELS_UPDATE',
-  'REFUNDS_CREATE',
-  'RETURNS_REQUEST',
-  'RETURNS_APPROVE',
-  'RETURNS_DECLINE',
-  'RETURNS_UPDATE',
-  'RETURNS_PROCESS',
-  'RETURNS_CLOSE',
-  'RETURNS_CANCEL',
-  'RETURNS_REOPEN',
-  'REVERSE_FULFILLMENT_ORDERS_DISPOSE',
-] as const;
-
-const customerTopics = ['CUSTOMERS_CREATE', 'CUSTOMERS_UPDATE'] as const;
 
 /** Identifies an OAuth application within its configured environment. */
 const appBinding = (config: ShopifyConfig) =>
@@ -204,6 +178,7 @@ export function createShopifyOAuth(
   async function registerLifecycleWebhooks(
     connection: InstalledConnection,
     credentials: InstallationCredentials,
+    tx: SqlTransaction,
   ) {
     if (connection.target.kind !== 'shopify') throw invalid();
     const request = createClient({
@@ -214,25 +189,43 @@ export function createShopifyOAuth(
     const topics = [
       'APP_UNINSTALLED',
       'APP_SCOPES_UPDATE',
-      ...changeTopics,
-      ...(config.protectedCustomerDataApproved ? customerTopics : []),
-    ] as const;
+      ...Object.keys(shopifyChangeTopics).map((topic) =>
+        topic.replaceAll('/', '_').toUpperCase(),
+      ),
+    ];
     const scopes = storedCredentials.parse(credentials).shopify?.scopes ?? [];
     for (const topic of topics) {
-      if (
-        topic.startsWith('FULFILLMENT_ORDERS_') &&
-        !scopes.some((scope) =>
+      const changeTopic = Object.keys(shopifyChangeTopics).find(
+        (value) => value.replaceAll('/', '_').toUpperCase() === topic,
+      );
+      const saveHealth = async (
+        status: 'registered' | 'failed' | 'unavailable',
+      ) => {
+        if (!changeTopic) return;
+        await tx.query(
+          `INSERT INTO shopify_change_subscriptions(tenant_id,connection_id,topic,status,checked_at)
+          VALUES($1,$2,$3,$4,$5) ON CONFLICT(tenant_id,connection_id,topic)
+          DO UPDATE SET status=EXCLUDED.status,checked_at=EXCLUDED.checked_at`,
           [
-            'read_merchant_managed_fulfillment_orders',
-            'write_merchant_managed_fulfillment_orders',
-            'read_assigned_fulfillment_orders',
-            'write_assigned_fulfillment_orders',
-            'read_third_party_fulfillment_orders',
-            'write_third_party_fulfillment_orders',
-          ].includes(scope),
+            connection.tenantId,
+            connection.id,
+            changeTopic,
+            status,
+            now().toISOString(),
+          ],
+        );
+      };
+      if (
+        changeTopic &&
+        !canSubscribe(
+          changeTopic,
+          scopes,
+          !!config.protectedCustomerDataApproved,
         )
-      )
+      ) {
+        await saveHealth('unavailable');
         continue;
+      }
       const lifecycle =
         topic === 'APP_UNINSTALLED' || topic === 'APP_SCOPES_UPDATE';
       const url = new URL(config.callbackUrl);
@@ -250,16 +243,18 @@ export function createShopifyOAuth(
             }),
           }),
           await request(
-            `query LumaLifecycleSubscriptions { webhookSubscriptions(first: 100, topics: [${topic}]) { nodes { uri } } }`,
-            {},
+            `query LumaLifecycleSubscriptions($uri: String!) { webhookSubscriptions(first: 100, topics: [${topic}], uri: $uri) { nodes { uri } } }`,
+            { uri: url.href },
           ),
         );
         if (
           subscriptions.webhookSubscriptions.nodes.some(
             (s) => s.uri === url.href,
           )
-        )
+        ) {
+          await saveHealth('registered');
           continue;
+        }
         const result = parse(
           z.object({
             webhookSubscriptionCreate: z.object({
@@ -277,9 +272,11 @@ export function createShopifyOAuth(
           result.webhookSubscriptionCreate.userErrors.length
         )
           throw unavailable();
+        await saveHealth('registered');
       } catch (error) {
         // Change notifications only speed up sync; scheduled reads still cover their records.
         if (lifecycle) throw error;
+        await saveHealth('failed');
       }
     }
   }
@@ -310,6 +307,12 @@ export function createShopifyOAuth(
       const fresh = await deps.refreshContext(context);
       const installationVersion = await deps.requireInstalled?.(fresh);
       let scopes: string[] | null = null;
+      let subscriptions: {
+        topic: string;
+        status: string;
+        checkedAt: string | null;
+        lastReceivedAt: string | null;
+      }[] = [];
       if (connectionId) {
         const record = await repository.get(fresh.tenantId, connectionId);
         if (
@@ -332,7 +335,99 @@ export function createShopifyOAuth(
         }
       }
 
-      return {
+      if (connectionId) {
+        let installed: Set<string> | null = null;
+        const record = await repository.get(fresh.tenantId, connectionId);
+        if (record?.secret && record.connection.status === 'active') {
+          try {
+            const credentials = await this.credential(fresh, connectionId);
+            const request = createClient({
+              shop: record.connection.target.shop!,
+              accessToken: async () => credentials.token,
+              ...(deps.fetch ? { fetch: deps.fetch } : {}),
+            });
+            const url = new URL(config.callbackUrl);
+            url.pathname = `/api/v1/shopify/changes/${fresh.tenantId}/${connectionId}`;
+            installed = new Set<string>();
+            let cursor: string | null = null;
+            const seen = new Set<string>();
+            do {
+              const page: {
+                webhookSubscriptions: {
+                  nodes: { topic: string; uri: string }[];
+                  pageInfo: { hasNextPage: boolean; endCursor: string | null };
+                };
+              } = parse(
+                z.object({
+                  webhookSubscriptions: z.object({
+                    nodes: z.array(
+                      z.object({ topic: z.string(), uri: z.string() }),
+                    ),
+                    pageInfo: z.object({
+                      hasNextPage: z.boolean(),
+                      endCursor: z.string().nullable(),
+                    }),
+                  }),
+                }),
+                await request(
+                  'query LumaSubscriptionHealth($uri: String!, $after: String) { webhookSubscriptions(first: 100, after: $after, uri: $uri) { nodes { topic uri } pageInfo { hasNextPage endCursor } } }',
+                  { uri: url.href, after: cursor },
+                ),
+              );
+              for (const node of page.webhookSubscriptions.nodes)
+                if (node.uri === url.href) installed.add(node.topic);
+              cursor = page.webhookSubscriptions.pageInfo.hasNextPage
+                ? page.webhookSubscriptions.pageInfo.endCursor
+                : null;
+              if (
+                page.webhookSubscriptions.pageInfo.hasNextPage &&
+                (!cursor || seen.has(cursor) || seen.size >= 100)
+              )
+                throw unavailable();
+              if (cursor) seen.add(cursor);
+            } while (cursor);
+          } catch {
+            installed = null;
+          }
+        }
+        const health = await db.transaction(fresh.tenantId, (tx) =>
+          tx.query<{
+            topic: string;
+            status: string;
+            checked_at: Date;
+            last_received_at: Date | null;
+          }>(
+            'SELECT topic,status,checked_at,last_received_at FROM shopify_change_subscriptions WHERE tenant_id=$1 AND connection_id=$2 ORDER BY topic',
+            [fresh.tenantId, connectionId],
+          ),
+        );
+        subscriptions = Object.keys(shopifyChangeTopics).map((topic) => {
+          const row = health.rows.find((row) => row.topic === topic);
+
+          return {
+            topic,
+            status:
+              !canSubscribe(
+                topic,
+                scopes ?? [],
+                !!config.protectedCustomerDataApproved,
+              ) || !installed
+                ? 'unavailable'
+                : installed.has(topic.replaceAll('/', '_').toUpperCase())
+                  ? 'registered'
+                  : row?.status === 'failed'
+                    ? 'failed'
+                    : 'missing',
+            checkedAt: installed
+              ? now().toISOString()
+              : (row?.checked_at.toISOString() ?? null),
+            lastReceivedAt: row?.last_received_at?.toISOString() ?? null,
+          };
+        });
+      }
+
+      return shopifyAccessSchema.parse({
+        subscriptions,
         customerDataApproved: config.protectedCustomerDataApproved === true,
         allOrdersApproved: config.allOrdersApproved === true,
         requestedScopes,
@@ -340,7 +435,7 @@ export function createShopifyOAuth(
         missingScopes: connectionId
           ? requestedScopes.filter((scope) => !scopes?.includes(scope))
           : [],
-      };
+      });
     },
     async start(context: TenantContext, input: unknown) {
       const fresh = await deps.refreshContext(context);
@@ -484,7 +579,7 @@ export function createShopifyOAuth(
         };
         // Persist degraded credentials too, so a scope failure has a recoverable connection.
         try {
-          await registerLifecycleWebhooks(connection, credentials);
+          await registerLifecycleWebhooks(connection, credentials, tx);
           if (
             shopifyScopes.every((scope) =>
               credentials.shopify!.scopes.includes(scope),
@@ -630,9 +725,25 @@ export function createShopifyOAuth(
       if (!hint) return;
       await db.transaction(tenantId, async (tx) => {
         await tx.query(
-          `INSERT INTO connector_refresh_hints(tenant_id,connection_id,event_key,capabilities)
-          VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
-          [tenantId, id, hint.eventKey, hint.capabilities],
+          `INSERT INTO shopify_change_subscriptions(tenant_id,connection_id,topic,status,checked_at,last_received_at) VALUES($1,$2,$3,'missing',$4,$4) ON CONFLICT(tenant_id,connection_id,topic) DO UPDATE SET last_received_at=EXCLUDED.last_received_at`,
+          [tenantId, id, topic, now().toISOString()],
+        );
+        await tx.query(
+          `INSERT INTO connector_refresh_hints(tenant_id,connection_id,event_key,capabilities,reconcile)
+          VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`,
+          [
+            tenantId,
+            id,
+            hint.eventKey,
+            hint.capabilities,
+            [
+              'orders/delete',
+              'products/delete',
+              'inventory_items/delete',
+              'inventory_levels/disconnect',
+              'locations/delete',
+            ].includes(topic),
+          ],
         );
       });
     },

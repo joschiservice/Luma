@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 
+import { createShopifyConnector } from '@luma/app-shopify';
 import { createCommerceServices } from '@luma/application-runtime';
 import { createAutomaticLinkStore } from '@luma/application-runtime/sync';
 import {
@@ -21,6 +22,7 @@ import type {
   Observation,
   ReadCapability,
 } from '@luma/connections';
+import { createCapabilityRuntime } from '@luma/connections/adapters';
 import {
   createReadChecks,
   createSourceAuthority,
@@ -47,6 +49,8 @@ import {
   createRecordExplorer,
 } from '@luma/read-models/composition';
 import { createActivityStore } from '@luma/resolution/composition';
+import { createMemoryStore } from '@luma/simulator-core';
+import { shopify, type ShopifyConfig } from '@luma/simulator-shopify';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -567,6 +571,250 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
       refreshContext: async (value) => value,
     });
   });
+
+  it('confirms missed Shopify deletions through simulator reads, preserves history and restores reappearing facts', async () => {
+    const store = createMemoryStore();
+    const config: ShopifyConfig = {
+      shop: 'fixture.myshopify.com',
+      name: 'Fixture',
+      currency: 'EUR',
+      orderPrefix: 'T',
+      locations: [{ id: '1', name: 'Warehouse' }],
+      scopes: [
+        'read_orders',
+        'read_all_orders',
+        'read_products',
+        'read_inventory',
+      ],
+    };
+    const simulated = {
+      store,
+      config,
+      instance: 'shop',
+      now: Date.now(),
+      wallTime: Date.now(),
+      indexLagMs: 0,
+      notify: () => undefined,
+    };
+    await shopify.command(simulated, {
+      kind: 'seed-catalog',
+      products: [
+        {
+          id: '10',
+          title: 'Tote',
+          vendor: 'Fixture',
+          productType: 'Bag',
+          published: true,
+          variants: [
+            {
+              id: '11',
+              sku: 'TOTE',
+              title: 'Default Title',
+              price: '10.00',
+              barcode: null,
+              stock: { '1': 5 },
+            },
+          ],
+        },
+      ],
+    });
+    const created = await shopify.command(simulated, {
+      kind: 'order',
+      lines: [{ variant: '11', quantity: 1, price: '10.00' }],
+      location: '1',
+      shipping: 'standard',
+      financialStatus: 'PAID',
+    });
+    const orderRecord = await store.get('Order', created.id);
+    const product = await store.get('Product', '10');
+    const level = (await store.page({ kind: 'InventoryLevel', limit: 10 }))
+      .items[0]!;
+    const connector = createShopifyConnector({
+      tenantId: tenant,
+      connectionId: shop,
+      shop: config.shop,
+      accessToken: async () => 'synthetic',
+      recordObservations: async () => undefined,
+      fetch: async (url, init) => {
+        const response = await shopify.handle(simulated, {
+          url: String(url),
+          method: 'POST',
+          headers: Object.fromEntries(new Headers(init?.headers)),
+          body: String(init?.body),
+        });
+
+        return Response.json(response.body, {
+          status: response.status,
+          headers: response.headers,
+        });
+      },
+    });
+    const actual = createCapabilityRuntime({
+      resolve: async () => connector,
+      record: async () => undefined,
+    });
+    await owner.query(
+      `UPDATE connector_installations SET document=jsonb_set(jsonb_set(document,'{granted}',$3::jsonb),'{permissions}',$3::jsonb) WHERE tenant_id=$1 AND id=$2`,
+      [
+        tenant,
+        shop,
+        JSON.stringify(['orders.read', 'products.read', 'inventory.read']),
+      ],
+    );
+    runner = createSyncRunner({
+      store: createSyncStore(db),
+      reader: {
+        discover: async (ctx, id) =>
+          (await actual.discover(ctx, id)).map((item) => ({
+            ...item,
+            ...(item.filters
+              ? {
+                  filters: item.filters.filter(
+                    (filter) => filter !== 'historyImport',
+                  ),
+                }
+              : {}),
+          })),
+        read: actual.read,
+      },
+      ingestion: services.ingestion,
+      customers: createCustomerProfiles(db),
+      recordRead: createReadChecks(db),
+      resolveContext: async () => context(),
+      digest: (value) => createHash('sha256').update(value).digest('hex'),
+    });
+    await owner.query(
+      `UPDATE connector_installations SET secret=NULL,document=jsonb_set(document,'{status}','"disconnected"') WHERE tenant_id=$1 AND id=$2`,
+      [tenant, erp],
+    );
+    await drain();
+    const snapshots = async () =>
+      (
+        await owner.query<{ kind: string; deleted: boolean }>(
+          `SELECT s.kind,(s.document->>'deleted')::boolean AS deleted FROM inventory_projections p JOIN inventory_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id WHERE p.tenant_id=$1 ORDER BY s.kind`,
+          [tenant],
+        )
+      ).rows;
+    expect(await snapshots()).toEqual([
+      { kind: 'position', deleted: false },
+      { kind: 'product', deleted: false },
+    ]);
+    const before = await owner.query(
+      'SELECT count(*)::int AS count FROM connector_source_mappings WHERE tenant_id=$1',
+      [tenant],
+    );
+    expect(
+      (
+        await createOrderMetricReader(db, orderAttentionQuery)(context(), {
+          asOf: new Date().toISOString(),
+          scope: {},
+          limit: 50,
+        })
+      ).population,
+    ).toBe(1);
+    await store.delete('Order', created.id);
+    await store.delete('Product', '10');
+    await store.delete('InventoryLevel', level.id);
+    for (const type of ['orders', 'products', 'inventory'] as const)
+      await service.command(context(), (await stream(type))!.id, 'reconcile');
+    await drain();
+    // The full scan establishes missing; its next due page independently confirms it.
+    await due();
+    await drain();
+    expect(await snapshots()).toEqual([
+      { kind: 'position', deleted: true },
+      { kind: 'product', deleted: true },
+    ]);
+    expect(
+      (
+        await owner.query(
+          'SELECT status FROM commerce_sync_items WHERE tenant_id=$1 AND connection_id=$2 ORDER BY record_type',
+          [tenant, shop],
+        )
+      ).rows,
+    ).toEqual([
+      { status: 'retired' },
+      { status: 'retired' },
+      { status: 'retired' },
+    ]);
+    expect(
+      (
+        await owner.query(
+          'SELECT count(*)::int AS count FROM connector_source_mappings WHERE tenant_id=$1',
+          [tenant],
+        )
+      ).rows,
+    ).toEqual(before.rows);
+    expect(
+      (
+        await owner.query(
+          'SELECT count(*)::int AS count FROM inventory_snapshots WHERE tenant_id=$1',
+          [tenant],
+        )
+      ).rows[0]?.count,
+    ).toBe(4);
+    expect(
+      (
+        await owner.query(
+          'SELECT count(*)::int AS count FROM inventory_product_skus WHERE tenant_id=$1',
+          [tenant],
+        )
+      ).rows[0]?.count,
+    ).toBe(0);
+    await due();
+    await drain();
+    expect(
+      (
+        await owner.query(
+          'SELECT count(*)::int AS count FROM inventory_snapshots WHERE tenant_id=$1',
+          [tenant],
+        )
+      ).rows[0]?.count,
+    ).toBe(4);
+    expect(
+      (
+        await createOrderMetricReader(db, orderAttentionQuery)(context(), {
+          asOf: new Date().toISOString(),
+          scope: {},
+          limit: 50,
+        })
+      ).population,
+    ).toBe(0);
+    expect(
+      (
+        await owner.query(
+          `SELECT count(*)::int AS count FROM orders_list WHERE tenant_id=$1 AND NOT deleted`,
+          [tenant],
+        )
+      ).rows[0]?.count,
+    ).toBe(0);
+    expect(
+      (
+        await owner.query(
+          `SELECT count(*)::int AS count FROM orders_snapshots WHERE tenant_id=$1 AND kind='order'`,
+          [tenant],
+        )
+      ).rows[0]?.count,
+    ).toBe(2);
+    await store.put('Order', created.id, orderRecord!.data, orderRecord!);
+    await store.put('Product', '10', product!.data, product!);
+    await store.put('InventoryLevel', level.id, level.data, level);
+    for (const type of ['orders', 'products', 'inventory'] as const)
+      await service.command(context(), (await stream(type))!.id, 'reconcile');
+    await drain();
+    expect(await snapshots()).toEqual([
+      { kind: 'position', deleted: false },
+      { kind: 'product', deleted: false },
+    ]);
+    expect(
+      (
+        await owner.query(
+          'SELECT count(*)::int AS count FROM connector_source_mappings WHERE tenant_id=$1',
+          [tenant],
+        )
+      ).rows,
+    ).toEqual(before.rows);
+  }, 30_000);
 
   it('admits independent connections concurrently and enforces connection leases across runners', async () => {
     const store = createSyncStore(db);

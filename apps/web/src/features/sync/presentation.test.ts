@@ -30,6 +30,7 @@ describe('coverageStatement', () => {
             pending: 0,
             failed: 0,
             missing: 0,
+            retired: 0,
           },
         }),
       ),
@@ -49,7 +50,14 @@ describe('coverageStatement', () => {
       coverageStatement(
         'products',
         stream({
-          records: { total: 1, current: 1, pending: 0, failed: 0, missing: 0 },
+          records: {
+            total: 1,
+            current: 1,
+            pending: 0,
+            failed: 0,
+            retired: 0,
+            missing: 0,
+          },
         }),
       ).text,
     ).toBe('1 product, everything the source shares.');

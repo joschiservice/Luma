@@ -289,28 +289,19 @@ const root: TypeResolvers = {
     );
   },
   webhookSubscriptions: async (_source, args, context) => {
-    const size = int(args, 'first') ?? int(args, 'last');
-    if (size === null)
-      throw argumentError('You must provide one of first or last.');
     const topics = texts(args, 'topics');
     const uri = text(args, 'uri');
-    const subscriptions = await list<WebhookSubscriptionData>(
+
+    return connection<WebhookSubscriptionData>(
       context,
-      {},
+      args,
+      { kind: 'WebhookSubscription' },
       {
-        kind: 'WebhookSubscription',
+        match: (item) =>
+          (!topics || topics.includes(item.data.topic)) &&
+          (uri === null || item.data.uri === uri),
       },
     );
-
-    return {
-      nodes: subscriptions
-        .filter(
-          (item) =>
-            (!topics || topics.includes(item.data.topic)) &&
-            (uri === null || item.data.uri === uri),
-        )
-        .slice(0, size),
-    };
   },
 };
 

@@ -56,7 +56,7 @@ export function listSql(
  ${view === 'needs_you' ? `${attention},` : ''}
  filtered AS NOT MATERIALIZED (
  SELECT o.* FROM orders_list o
- WHERE o.tenant_id=$1 AND ${connection ? 'o.connection_id=$3' : 'o.selected AND ($3::uuid IS NULL)'}
+ WHERE o.tenant_id=$1 AND NOT o.deleted AND ${connection ? 'o.connection_id=$3' : 'o.selected AND ($3::uuid IS NULL)'}
  AND ($4::text IS NULL OR o.status=$4) AND ($5::text IS NULL OR o.payment_status=$5)
  AND ($6::timestamptz IS NULL OR o.placed_at >= $6) AND ($7::timestamptz IS NULL OR o.placed_at < $7)
  AND ($8::timestamptz IS NULL OR o.source_updated_at >= $8) AND ($9::timestamptz IS NULL OR o.source_updated_at < $9)

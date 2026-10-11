@@ -29,11 +29,12 @@ const hits = `sku_hits AS MATERIALIZED (
 ), hits AS MATERIALIZED (
  SELECT p.entity_id AS id FROM orders_snapshots s JOIN orders_projections p ON p.tenant_id=s.tenant_id
   AND p.entity_id=s.entity_id AND p.connection_id=s.connection_id AND p.snapshot_id=s.id
- WHERE s.tenant_id=$1 AND ($3::uuid IS NULL OR s.connection_id=$3) AND s.kind='order' AND (s.display_number ILIKE $15
+ WHERE s.tenant_id=$1 AND NOT (s.document->>'deleted')::boolean AND ($3::uuid IS NULL OR s.connection_id=$3) AND s.kind='order' AND (s.display_number ILIKE $15
   OR EXISTS (SELECT 1 FROM jsonb_array_elements(s.document->'data'->'lines') l
    WHERE l->>'skuCode' ILIKE $15 OR l->>'skuId' IN (SELECT id FROM sku_hits)))
- UNION SELECT canonical_id FROM connector_source_mappings
+ UNION SELECT canonical_id FROM connector_source_mappings m
  WHERE tenant_id=$1 AND ($3::uuid IS NULL OR connection_id=$3) AND resource='order' AND external_id ILIKE $15
+ AND EXISTS (SELECT 1 FROM orders_projections p JOIN orders_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id WHERE p.tenant_id=$1 AND p.entity_id=m.canonical_id AND p.connection_id=m.connection_id AND s.kind='order' AND NOT (s.document->>'deleted')::boolean)
  UNION SELECT entity_id FROM order_sources WHERE entity_id::text=lower($14)
 )`;
 
@@ -60,7 +61,7 @@ export function legacyListSql(
   const filtered = (set: string) => `filtered AS MATERIALIZED (
  SELECT o.*,CASE WHEN (${sortKeys[sort]}) IS NULL THEN 1 ELSE 0 END AS sort_rank,
  COALESCE(${sortKeys[sort]},'') COLLATE "C" AS sort_key
- FROM ${set} o WHERE ${view === 'differs' ? `o.entity_id IN (SELECT entity_id FROM source_differences d WHERE ${anyDifference})` : viewFilters[view]}
+ FROM ${set} o WHERE NOT o.deleted AND ${view === 'differs' ? `o.entity_id IN (SELECT entity_id FROM source_differences d WHERE ${anyDifference})` : viewFilters[view]}
 ), page AS MATERIALIZED (
  SELECT * FROM filtered
  WHERE $11::int IS NULL OR sort_rank>$11 OR (sort_rank=$11 AND (sort_key ${op} $12 OR (sort_key=$12 AND entity_id ${op} $13::uuid)))

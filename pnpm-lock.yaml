@@ -904,6 +904,12 @@ importers:
       '@luma/app-shopify':
         specifier: workspace:*
         version: link:../apps/shopify
+      '@luma/simulator-core':
+        specifier: workspace:*
+        version: link:../simulator/core
+      '@luma/simulator-shopify':
+        specifier: workspace:*
+        version: link:../simulator/shopify
       '@luma/staff':
         specifier: workspace:*
         version: link:../staff
@@ -1081,6 +1087,9 @@ importers:
 
   packages/apps/shopify:
     dependencies:
+      '@luma/api-contract':
+        specifier: workspace:*
+        version: link:../../api-contract
       '@luma/app-host':
         specifier: workspace:*
         version: link:../../app-host

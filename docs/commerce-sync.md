@@ -69,8 +69,21 @@ The ledger holds one row per source record: a digest of the normalized observati
 status, source creation and update times, first/last seen and the last scan that saw it.
 A record whose digest and status are unchanged is not projected again, so re-imports and
 duplicate notifications add no snapshots. Full scans set `missing_since` on records they
-no longer return, and any later read that returns the record clears it. Only customers are
-ever deleted for being missing (see below). The returns stream's ledger holds both returns
+no longer return, and any later read that returns the record clears it. Missing is not deletion.
+For Shopify orders, products and stock positions, the next due read checks up to ten missing
+records independently before reading its page. Current grants must permit the lookup; older
+orders with unknown creation time or outside the 60-day window require `read_all_orders`.
+A complete, error-free null point lookup confirms deletion; a readable inventory item with
+no level at the previously observed location confirms disconnection. Failed, partial or
+history-limited lookups keep current projections and retry later. A record that reappears
+keeps its mappings and can become current again through the normal freshness rules.
+
+Confirmation stores a new tombstone observation and owner snapshot before marking the
+ledger record retired. A restart between those writes repeats the confirmation safely.
+Retirement affects only that connection, preserves mappings, evidence and linked issues,
+and excludes retired facts from current lists, comparisons, metrics and detection. Signed
+deletion hints request full reconciliation; scheduled full scans cover missed delivery.
+Customer profile retention follows the separate policy below. The returns stream's ledger holds both returns
 and refunds.
 
 Coverage per stream comes from the ledger (counts, oldest and newest creation date) and

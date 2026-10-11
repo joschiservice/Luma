@@ -1,15 +1,12 @@
+import './access.css';
+
+import { shopifyAccessSchema as accessSchema } from '@luma/api-contract';
 import type { AppUiProps } from '@luma/app-host/web';
-import { formatList } from '@luma/i18n/format';
+import { formatDateTime, formatList } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
+import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { useEffect, useState } from 'react';
 import { z } from 'zod';
-
-const accessSchema = z.object({
-  customerDataApproved: z.boolean(),
-  allOrdersApproved: z.boolean(),
-  grantedScopes: z.array(z.string()).nullable(),
-  missingScopes: z.array(z.string()),
-});
 
 const scopeLabels: Record<string, () => string> = {
   read_orders: m.shopify_scope_orders,
@@ -75,6 +72,32 @@ export function ShopifyAccess({
 
   return (
     <div className="field-help">
+      {connectionId ? (
+        <Disclosure className="shopify-subscriptions">
+          <summary>{m.shopify_subscriptions_title()}</summary>
+          <p>{m.shopify_subscriptions_help()}</p>
+          <ul>
+            {access.subscriptions.map((subscription) => (
+              <li key={subscription.topic}>
+                <span>{subscription.topic}</span>
+                {': '}
+                {{
+                  registered: m.shopify_subscriptions_registered,
+                  missing: m.shopify_subscriptions_missing,
+                  failed: m.shopify_subscriptions_failed,
+                  unavailable: m.shopify_subscriptions_unavailable,
+                }[subscription.status]()}
+                {' · '}
+                {subscription.lastReceivedAt
+                  ? m.shopify_subscriptions_received({
+                      time: formatDateTime(subscription.lastReceivedAt),
+                    })
+                  : m.shopify_subscriptions_no_delivery()}
+              </li>
+            ))}
+          </ul>
+        </Disclosure>
+      ) : null}
       <p>
         {history
           ? m.shopify_access_history_full()

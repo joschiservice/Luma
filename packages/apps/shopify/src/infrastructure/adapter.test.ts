@@ -1085,7 +1085,7 @@ describe('Shopify history import reads', () => {
       (await f.runtime.discover(context, 'connection-a')).find(
         (item) => item.capability === 'inventory.read',
       )?.filters,
-    ).toEqual(['historyImport']);
+    ).toEqual(['historyImport', 'confirmMissing']);
 
     f.data.scopes.push({ handle: 'read_all_orders' });
     const full = await f.read('orders.read');
@@ -1239,5 +1239,203 @@ describe('Shopify query contract', () => {
     'query($first: String) { orders(first: $first) { nodes { id } } }',
   ])('rejects incompatible operations: %s', (query) => {
     expect(validate(schema, parse(query)).length).toBeGreaterThan(0);
+  });
+});
+
+describe('Shopify independent deletion confirmation', () => {
+  const schema = buildSchema(
+    readFileSync(
+      new URL('./fixtures/admin-2026-07.graphql', import.meta.url),
+      'utf8',
+    ),
+  );
+
+  function confirmationFixture(
+    options: {
+      scopes?: string[];
+      present?: boolean;
+      connected?: boolean;
+      errors?: boolean;
+      persistFailure?: boolean;
+    } = {},
+  ) {
+    const fetch = vi.fn<typeof globalThis.fetch>(async (_url, init) => {
+      const { query } = JSON.parse(String(init?.body)) as { query: string };
+      expect(
+        validate(schema, parse(query)).map((error) => error.message),
+      ).toEqual([]);
+      if (query.includes('LumaDeletionAccess'))
+        return response({
+          currentAppInstallation: {
+            accessScopes: (
+              options.scopes ?? [
+                'read_orders',
+                'read_all_orders',
+                'read_products',
+                'read_inventory',
+              ]
+            ).map((handle) => ({ handle })),
+          },
+        });
+      if (options.errors)
+        return Response.json({
+          data: { node: null },
+          errors: [
+            { message: 'Denied', extensions: { code: 'ACCESS_DENIED' } },
+          ],
+        });
+      if (query.includes('LumaDeletionLevel'))
+        return response({
+          node: {
+            inventoryLevel: options.connected
+              ? { id: 'gid://shopify/InventoryLevel/1' }
+              : null,
+          },
+        });
+
+      return response({
+        node: options.present
+          ? {
+              id: query.includes('InventoryItem')
+                ? 'gid://shopify/InventoryItem/1'
+                : query.includes('Product')
+                  ? 'gid://shopify/Product/1'
+                  : 'gid://shopify/Order/1',
+            }
+          : null,
+      });
+    });
+
+    return {
+      ...fixture({
+        fetch,
+        ...(options.persistFailure
+          ? {
+              recordObservations: async () => {
+                throw new Error('Evidence unavailable');
+              },
+            }
+          : {}),
+      }),
+      fetch,
+    };
+  }
+
+  it.each(['orders.read', 'products.read', 'inventory.read'] as const)(
+    'confirms absence through a fresh point read for %s',
+    async (capability) => {
+      const f = confirmationFixture();
+      const result = await f.runtime.read(context, {
+        capability,
+        connectionId: f.connection.id,
+        version: '0',
+        input: {
+          limit: 1,
+          confirmMissing: {
+            externalId: `gid://shopify/${capability === 'orders.read' ? 'Order' : capability === 'products.read' ? 'Product' : 'InventoryItem'}/1`,
+            scopeKey:
+              capability === 'inventory.read' ? 'gid://shopify/Location/1' : '',
+            createdAt: '2026-09-01T00:00:00Z',
+          },
+        },
+      });
+      expect(result).toMatchObject({
+        ok: true,
+        value: {
+          confirmation: 'deleted',
+          items: [{ kind: 'tombstone', sourceUpdatedAt: null }],
+        },
+      });
+      expect(f.recordObservations).toHaveBeenCalledOnce();
+      expect(result.ok, JSON.stringify(result)).toBe(true);
+    },
+  );
+  it('confirms a disconnected level independently from its readable inventory item', async () => {
+    const f = confirmationFixture({ present: true });
+    expect(
+      await f.runtime.read(context, {
+        connectionId: f.connection.id,
+        capability: 'inventory.read',
+        version: '0',
+        input: {
+          limit: 1,
+          confirmMissing: {
+            externalId: 'gid://shopify/InventoryItem/1',
+            scopeKey: 'gid://shopify/Location/1',
+            createdAt: null,
+          },
+        },
+      }),
+    ).toMatchObject({ ok: true, value: { confirmation: 'deleted' } });
+    expect(f.fetch).toHaveBeenCalledTimes(3);
+  });
+  it.each([null, '2026-01-01T00:00:00Z'])(
+    'does not retire history-limited orders created at %s',
+    async (createdAt) => {
+      const f = confirmationFixture({ scopes: ['read_orders'] });
+      expect(
+        await f.runtime.read(context, {
+          connectionId: f.connection.id,
+          capability: 'orders.read',
+          version: '0',
+          input: {
+            limit: 1,
+            confirmMissing: {
+              externalId: 'gid://shopify/Order/1',
+              scopeKey: '',
+              createdAt,
+            },
+          },
+        }),
+      ).toMatchObject({
+        ok: true,
+        value: { confirmation: 'history_limited', items: [] },
+      });
+      expect(f.fetch).toHaveBeenCalledOnce();
+      expect(f.recordObservations).not.toHaveBeenCalled();
+    },
+  );
+  it.each([{ scopes: [] }, { errors: true }, { persistFailure: true }])(
+    'rejects scope loss, partial errors and failed evidence persistence: %j',
+    async (options) => {
+      const f = confirmationFixture(options);
+      expect(
+        await f.runtime.read(context, {
+          connectionId: f.connection.id,
+          capability: 'products.read',
+          version: '0',
+          input: {
+            limit: 1,
+            confirmMissing: {
+              externalId: 'gid://shopify/Product/1',
+              scopeKey: '',
+              createdAt: null,
+            },
+          },
+        }),
+      ).toMatchObject({ ok: false });
+    },
+  );
+  it('does not retire a record that reappeared after a missing scan', async () => {
+    const f = confirmationFixture({ present: true });
+    expect(
+      await f.runtime.read(context, {
+        connectionId: f.connection.id,
+        capability: 'products.read',
+        version: '0',
+        input: {
+          limit: 1,
+          confirmMissing: {
+            externalId: 'gid://shopify/Product/1',
+            scopeKey: '',
+            createdAt: null,
+          },
+        },
+      }),
+    ).toMatchObject({
+      ok: true,
+      value: { confirmation: 'present', items: [] },
+    });
+    expect(f.recordObservations).not.toHaveBeenCalled();
   });
 });

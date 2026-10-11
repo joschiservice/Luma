@@ -30,7 +30,8 @@
     "@tanstack/react-form": "catalog:",
     "fastify": "catalog:",
     "react": "catalog:",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "@luma/api-contract": "workspace:*"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

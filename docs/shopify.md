@@ -39,7 +39,8 @@ Nested collections (order lines, variants, inventory locations, fulfillment orde
 lines, returns and refunds) are fully paginated before a page returns. Missing or repeated
 cursors, malformed fields, GraphQL partial errors or failed child requests reject the
 whole page, and more than 1,000 continuation pages in one nested collection rejects the
-scan rather than truncating it. No read emits inferred tombstones.
+scan rather than truncating it. Collection absence never emits tombstones. Independent deletion confirmation follows the
+[commerce sync rules](commerce-sync.md#ledger-and-coverage).
 
 - **Orders:** `quantity` retains originally ordered units; `currentQuantity` excludes
   refunded and removed units. `cancelledQuantity` is their difference, a reduction fact
@@ -96,7 +97,14 @@ orders and fulfillment work. `orders/edited` uses `read_orders`; the fulfillment
 topics require a merchant-managed, assigned or third-party fulfillment-order read grant.
 Luma already requests the merchant-managed and third-party grants. Authorization skips
 these subscriptions when the grants are missing, while connection health reports missing
-fulfillment access. Existing connections must reconnect to register the new subscriptions;
+fulfillment access. One shared topic registry drives mapping and registration, including transactions, paid
+orders, inventory item and level changes, locations, customers and fulfillment holds.
+Registration checks actual grants, including write grants that imply reads. The connection
+access panel queries current subscriptions and distinguishes registered, missing, failed and
+unavailable topics. It reports the last verified delivery separately; no delivery yet does
+not prove failure. Reconnect repairs missing subscriptions without duplicating existing
+subscriptions at the same connection URL. Existing connections must reconnect to register
+new subscriptions;
 scheduled reads continue to cover changes in streams they can read.
 
 Emitted queries are validated against an offline snapshot of the versioned Admin schema.

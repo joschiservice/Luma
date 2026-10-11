@@ -54,6 +54,7 @@ export const syncStreamSchema = z.object({
     pending: z.number().int().nonnegative(),
     failed: z.number().int().nonnegative(),
     missing: z.number().int().nonnegative(),
+    retired: z.number().int().nonnegative(),
   }),
   problems: z.array(z.string()),
   coverage: z.object({

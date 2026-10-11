@@ -35,7 +35,7 @@ const observation = <T extends z.ZodTypeAny>(
       provider: z.literal('shopify'),
       resource: typeof resource === 'string' ? z.literal(resource) : resource,
     }),
-    kind: z.literal('snapshot'),
+    kind: z.enum(['snapshot', 'tombstone']),
     observedAt: timestamp,
     sourceUpdatedAt: timestamp.nullable(),
     sourceRevision: z.string().nullable(),
@@ -46,6 +46,9 @@ const observation = <T extends z.ZodTypeAny>(
 
 const page = <T extends z.ZodTypeAny>(item: T) =>
   z.object({
+    confirmation: z
+      .enum(['present', 'missing', 'history_limited', 'deleted'])
+      .optional(),
     items: z.array(item),
     nextCursor: z.string().nullable(),
     completeness: z.enum(['complete', 'partial']),
@@ -355,10 +358,26 @@ const scoped = (type: string) =>
   z.object({ externalId: gid(type), scopeKey: z.literal('') }).strict();
 
 export const inputs = {
-  'orders.read': changedInput,
-  'products.read': changedInput,
+  'orders.read': changedInput.extend({
+    confirmMissing: scoped('Order')
+      .extend({ createdAt: timestamp.nullable() })
+      .optional(),
+  }),
+  'products.read': changedInput.extend({
+    confirmMissing: scoped('Product')
+      .extend({ createdAt: timestamp.nullable() })
+      .optional(),
+  }),
   'customers.read': changedInput,
   'inventory.read': pageInput.extend({
+    confirmMissing: z
+      .object({
+        externalId: gid('InventoryItem'),
+        scopeKey: gid('Location'),
+        createdAt: timestamp.nullable(),
+      })
+      .strict()
+      .optional(),
     historyImport: z
       .object({
         key: z.string().uuid(),

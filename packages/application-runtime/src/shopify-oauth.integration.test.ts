@@ -121,6 +121,7 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
     let granted = scopes;
     let revoked = false;
     let transient = false;
+    const subscriptions = new Map<string, string>();
     const transport = vi.fn<typeof fetch>(async (url, init) => {
       if (String(url).endsWith('/admin/oauth/access_token')) {
         if (transient) return new Response(null, { status: 503 });
@@ -135,7 +136,10 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
           scope: granted,
         });
       }
-      const query = JSON.parse(String(init?.body)).query as string;
+      const { query, variables } = JSON.parse(String(init?.body)) as {
+        query: string;
+        variables: { uri?: string };
+      };
       expect(
         validate(schema, parse(query)).map((error) => error.message),
       ).toEqual([]);
@@ -147,8 +151,29 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
             },
           },
         });
-      if (query.includes('LumaLifecycleSubscriptions'))
-        return Response.json({ data: { webhookSubscriptions: { nodes: [] } } });
+      if (query.includes('LumaSubscriptionHealth'))
+        return Response.json({
+          data: {
+            webhookSubscriptions: {
+              nodes: [...subscriptions].map(([topic, uri]) => ({ topic, uri })),
+              pageInfo: { hasNextPage: false, endCursor: null },
+            },
+          },
+        });
+      if (query.includes('LumaLifecycleSubscriptions')) {
+        const topic = query.match(/topics: \[([A-Z_]+)\]/)?.[1];
+
+        return Response.json({
+          data: {
+            webhookSubscriptions: {
+              nodes:
+                topic && subscriptions.get(topic) === variables.uri
+                  ? [{ uri: variables.uri }]
+                  : [],
+            },
+          },
+        });
+      }
 
       if (
         options.rejectChangeSubscriptions &&
@@ -163,6 +188,9 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
             },
           },
         });
+
+      const topic = query.match(/topic: ([A-Z_]+),/)?.[1];
+      if (topic && variables.uri) subscriptions.set(topic, variables.uri);
 
       return Response.json({
         data: {
@@ -255,6 +283,7 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
       query,
       connection,
       transport,
+      subscriptions,
       verify,
       db,
       cipher,
@@ -546,9 +575,105 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
     const f = fixture({ rejectChangeSubscriptions: true });
     expect(await f.oauth.callback(f.ctx, await f.query())).toBe('connected');
     expect((await f.connection()).status).toBe('active');
+    const access = await f.oauth.access(f.ctx, (await f.connection()).id);
+    expect(
+      access.subscriptions.find((item) => item.topic === 'orders/paid')?.status,
+    ).toBe('failed');
+    expect(
+      access.subscriptions.find((item) => item.topic === 'customers/delete')
+        ?.status,
+    ).toBe('unavailable');
     expect(
       (await f.oauth.credential(f.ctx, (await f.connection()).id)).token,
     ).toBe('private-access-1');
+  });
+
+  it('reports missing subscriptions, repairs without duplicates and durably deduplicates signed deletion hints', async () => {
+    const f = fixture();
+    await f.oauth.callback(f.ctx, await f.query());
+    const c = await f.connection();
+    const initial = await f.oauth.access(f.ctx, c.id);
+    expect(
+      initial.subscriptions.find((item) => item.topic === 'orders/paid')
+        ?.status,
+    ).toBe('registered');
+    expect(
+      initial.subscriptions.find((item) => item.topic === 'orders/paid')
+        ?.lastReceivedAt,
+    ).toBeNull();
+    f.subscriptions.delete('ORDERS_PAID');
+    expect(
+      (await f.oauth.access(f.ctx, c.id)).subscriptions.find(
+        (item) => item.topic === 'orders/paid',
+      )?.status,
+    ).toBe('missing');
+    const creates = () =>
+      f.transport.mock.calls.filter(([, init]) =>
+        String(init?.body).includes('webhookSubscriptionCreate'),
+      ).length;
+    const prior = creates();
+    await f.oauth.callback(f.ctx, await f.query());
+    expect((await f.connection()).id).toBe(c.id);
+    expect(creates()).toBe(prior + 1);
+    await f.oauth.callback(f.ctx, await f.query());
+    expect(creates()).toBe(prior + 1);
+    const body = Buffer.from(JSON.stringify({ id: 123 }));
+    const signature = createHmac('sha256', config.clientSecret)
+      .update(body)
+      .digest('base64');
+    await expect(
+      f.oauth.changed(
+        f.ctx.tenantId,
+        c.id,
+        body,
+        'invalid',
+        f.shop,
+        'orders/delete',
+        'event',
+      ),
+    ).rejects.toThrow();
+    await f.oauth.changed(
+      f.ctx.tenantId,
+      c.id,
+      body,
+      signature,
+      f.shop,
+      'orders/delete',
+      'event',
+    );
+    await f.oauth.changed(
+      f.ctx.tenantId,
+      c.id,
+      body,
+      signature,
+      f.shop,
+      'orders/delete',
+      'event',
+    );
+    expect(
+      (
+        await owner.query(
+          'SELECT capabilities,reconcile FROM connector_refresh_hints WHERE tenant_id=$1',
+          [f.ctx.tenantId],
+        )
+      ).rows,
+    ).toEqual([
+      { capabilities: ['orders.read', 'fulfillment.read'], reconcile: true },
+    ]);
+    expect(
+      (await f.oauth.access(f.ctx, c.id)).subscriptions.find(
+        (item) => item.topic === 'orders/delete',
+      )?.lastReceivedAt,
+    ).toBeTruthy();
+    expect(
+      (
+        await owner.query(
+          'SELECT count(*)::int AS count FROM connector_observations WHERE tenant_id=$1',
+          [f.ctx.tenantId],
+        )
+      ).rows[0]?.count,
+    ).toBe(0);
+    await expect(f.oauth.access(context(), c.id)).rejects.toThrow();
   });
 
   it('authorizes, stores encrypted credentials and blocks replay and foreign tenants', async () => {
@@ -567,6 +692,12 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
     expect(c.status).toBe('active');
     for (const topic of [
       'ORDERS_EDITED',
+      'ORDERS_PAID',
+      'ORDER_TRANSACTIONS_CREATE',
+      'INVENTORY_LEVELS_CONNECT',
+      'INVENTORY_LEVELS_DISCONNECT',
+      'INVENTORY_ITEMS_UPDATE',
+      'FULFILLMENT_HOLDS_ADDED',
       'FULFILLMENT_ORDERS_MOVED',
       'FULFILLMENT_ORDERS_SPLIT',
       'FULFILLMENT_ORDERS_MERGED',

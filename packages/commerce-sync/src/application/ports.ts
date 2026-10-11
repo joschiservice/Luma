@@ -30,13 +30,13 @@ export const itemKey = (item: ItemKey) =>
 
 interface LedgerState {
   digest: string;
-  status: 'current' | 'pending' | 'failed';
+  status: 'current' | 'pending' | 'failed' | 'retired';
 }
 
 /** One source record's import result, written with the page checkpoint. */
 export interface LedgerEntry extends ItemKey {
   digest: string;
-  status: 'current' | 'pending' | 'failed';
+  status: 'current' | 'pending' | 'failed' | 'retired';
   problem: string | null;
   entityId: string | null;
   sourceCreatedAt: string | null;
@@ -103,6 +103,7 @@ export interface StreamCoverage {
   pending: number;
   failed: number;
   missing: number;
+  retired: number;
   oldest: string | null;
   newest: string | null;
   /** Up to five controlled explanations of records that could not be imported. */
@@ -204,6 +205,21 @@ export interface SyncStore {
     before: string,
     limit: number,
   ): Promise<ItemKey[]>;
+  /** Previously seen records absent from a full scan, excluding confirmed retirements. */
+  confirmationCandidates(
+    tenantId: string,
+    connectionId: string,
+    recordType: RecordType,
+    limit: number,
+  ): Promise<(ItemKey & { createdAt: string | null })[]>;
+  /** Records the independent lookup outcome without changing scan coverage or source history. */
+  recordConfirmation(
+    tenantId: string,
+    connectionId: string,
+    recordType: RecordType,
+    item: ItemKey,
+    outcome: 'present' | 'missing' | 'history_limited' | 'deleted',
+  ): Promise<void>;
   /** Commits one page; returns false when the lease was lost and nothing was written. */
   commitPage(
     tenantId: string,

@@ -38,13 +38,14 @@ export const orderSearchHits = `${orderSearchValues}, hits AS MATERIALIZED (
  SELECT v.entity_id AS id FROM value_hits h CROSS JOIN LATERAL (
  SELECT entity_id FROM orders_search_links v WHERE v.tenant_id=$1 AND v.value_id=h.id
  AND ($3::uuid IS NULL OR v.connection_id=$3) OFFSET 0) v
- UNION ALL SELECT canonical_id FROM mapping_hits WHERE resource='order'
+ UNION ALL SELECT canonical_id FROM mapping_hits m WHERE resource='order'
+ AND EXISTS (SELECT 1 FROM orders_list active WHERE active.tenant_id=$1 AND active.entity_id=m.canonical_id AND active.connection_id=m.connection_id AND NOT active.deleted)
  UNION ALL SELECT s.entity_id FROM mapping_hits m CROSS JOIN LATERAL (
  SELECT entity_id FROM orders_list_skus s WHERE s.tenant_id=$1 AND s.sku_id=m.canonical_id
  AND ($3::uuid IS NULL OR s.connection_id=$3) OFFSET 0) s WHERE m.resource='sku'
  UNION ALL SELECT entity_id FROM orders_list WHERE tenant_id=$1
  AND entity_id=CASE WHEN $14 ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN $14::uuid END
- AND ($3::uuid IS NULL OR connection_id=$3)
+ AND NOT deleted AND ($3::uuid IS NULL OR connection_id=$3)
  LIMIT 1001
 )`;
 
@@ -57,7 +58,8 @@ export const orderSearchPredicate = `(EXISTS (
  WHERE v.tenant_id=$1 AND v.entity_id=o.entity_id
  AND ($3::uuid IS NULL OR v.connection_id=$3) AND d.value ILIKE $15 OFFSET 0)
  OR EXISTS (SELECT 1 FROM connector_source_mappings m WHERE m.tenant_id=$1 AND m.canonical_id=o.entity_id
- AND m.resource='order' AND ($3::uuid IS NULL OR m.connection_id=$3) AND m.external_id ILIKE $15 OFFSET 0)
+ AND m.resource='order' AND ($3::uuid IS NULL OR m.connection_id=$3) AND m.external_id ILIKE $15
+ AND EXISTS (SELECT 1 FROM orders_list active WHERE active.tenant_id=$1 AND active.entity_id=m.canonical_id AND active.connection_id=m.connection_id AND NOT active.deleted) OFFSET 0)
  OR EXISTS (SELECT 1 FROM orders_list_skus s JOIN connector_source_mappings m ON m.tenant_id=$1 AND m.canonical_id=s.sku_id
  AND m.resource='sku' AND ($3::uuid IS NULL OR m.connection_id=$3) AND m.external_id ILIKE $15
  WHERE s.tenant_id=$1 AND s.entity_id=o.entity_id AND ($3::uuid IS NULL OR s.connection_id=$3) OFFSET 0)

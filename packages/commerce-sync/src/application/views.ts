@@ -29,6 +29,7 @@ export interface SyncStreamView {
     pending: number;
     failed: number;
     missing: number;
+    retired: number;
   };
   problems: string[];
   coverage: {

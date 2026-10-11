@@ -25,7 +25,7 @@ const readable = (key: string, noun: string) =>
 const positionRows = `FROM inventory_projections p JOIN inventory_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
  JOIN inventory_entities e ON e.tenant_id=p.tenant_id AND e.id=(s.document->'data'->>'skuId')::uuid
  JOIN inventory_entities l ON l.tenant_id=p.tenant_id AND l.id=(s.document->'data'->>'locationId')::uuid`;
-const positionScope = `WHERE p.tenant_id=$1 AND s.kind='position' AND ($2::uuid IS NULL OR p.entity_id=$2)
+const positionScope = `WHERE p.tenant_id=$1 AND s.kind='position' AND NOT (s.document->>'deleted')::boolean AND ($2::uuid IS NULL OR p.entity_id=$2)
  AND ($3::uuid IS NULL OR s.document->'data'->>'skuId'=$3::text)
  AND ($4::uuid IS NULL OR s.document->'data'->>'locationId'=$4::text)
  AND ($5::uuid IS NULL OR p.entity_id>$5)`;

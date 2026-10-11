@@ -165,3 +165,20 @@ References: [standalone authentication](https://shopify.dev/docs/apps/build/auth
 [protected customer data](https://shopify.dev/docs/apps/launch/protected-customer-data),
 [orders permissions](https://shopify.dev/docs/api/usage/access-scopes#orders-permissions),
 [privacy webhooks](https://shopify.dev/docs/apps/build/compliance/privacy-law-compliance).
+
+## Delivery validation evidence
+
+Simulator runs exercise registration, signed durable intake, deduplication and refresh
+scheduling through the real services. They do not prove Shopify delivers to a deployed
+HTTPS endpoint. Keep development-store delivery evidence separate from simulator results.
+
+On the development store, reconnect and inspect Change subscriptions. Change an order's
+payment, edit an order, update stock, disconnect a test stock level, edit a location and
+apply or release a fulfillment hold. Include customer changes only with approved access.
+Check each applicable topic's last verified delivery, the resulting sync run and fresh
+provider observations. Repeat a delivery and reconnect to check deduplication and
+subscription repair. Stop the tunnel and verify scheduled reconciliation still recovers
+changes, then restore it. For deleted synthetic orders and products, confirm the subsequent
+point lookup and source retirement; the signed payload alone must not retire anything.
+Record the deployed commit, app version, actual grants, topic, Shopify event ID, delivery
+and refresh times and result in restricted rollout evidence, excluding payloads and tokens.

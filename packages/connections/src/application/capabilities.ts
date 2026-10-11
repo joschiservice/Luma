@@ -26,7 +26,9 @@ export interface CapabilityDescriptor {
   /** Retry advice never authorizes replay of an uncertain write. */
   retry: { maxAttempts: number; initialDelayMs: number };
   /** Optional read filters the handler honors; absent means none. */
-  filters?: ('updatedSince' | 'createdSince' | 'historyImport')[];
+  filters?: (
+    'updatedSince' | 'createdSince' | 'historyImport' | 'confirmMissing'
+  )[];
   /**
    * App permission needed to propose, approve and run this write capability, as
    * `<appId>:<name>`. Without it, proposing needs actions.propose and running needs

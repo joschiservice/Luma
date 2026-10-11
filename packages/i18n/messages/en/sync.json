@@ -143,7 +143,7 @@
   "sync_note_waiting": "Waiting for related records: {records}. Luma imports them once those arrive.",
   "sync_note_failed": "Couldn’t import {records}.",
   "sync_note_failed_reasons": "Couldn’t import {records}: {reasons}.",
-  "sync_note_missing": "Not found in the last full check: {records}. Luma keeps them. Check whether they were deleted in the source.",
+  "sync_note_missing": "Not found in the last full check: {records}. Deletion is unconfirmed; current facts are kept until an independent read confirms it.",
   "sync_runs_title": "Recent sync runs",
   "sync_run_kind_backfill": "History import",
   "sync_run_kind_incremental": "Change sync",
@@ -280,5 +280,6 @@
   "sync_autolink_enable": "Enable automatic linking",
   "sync_autolink_error_role": "Your role no longer includes Manage imports.",
   "sync_autolink_error_conflict": "This rule changed or already exists. Close this dialog and refresh the page before trying again.",
-  "sync_autolink_error_save": "Luma couldn’t update automatic linking. Try again."
+  "sync_autolink_error_save": "Luma couldn’t update automatic linking. Try again.",
+  "sync_note_retired": "Confirmed deleted or disconnected: {records}. Current views exclude these source facts; their evidence is kept."
 }

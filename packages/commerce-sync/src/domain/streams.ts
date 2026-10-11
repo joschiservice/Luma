@@ -147,7 +147,7 @@ export function planScan(
   supportsSince: boolean,
 ): ScanPlan {
   const hinted = stream.hintAt !== null && Date.parse(stream.hintAt) <= +now;
-  if (hinted && stream.watermark && supportsSince)
+  if (hinted && !stream.fullRequested && stream.watermark && supportsSince)
     return {
       kind: 'incremental',
       since: new Date(
@@ -169,7 +169,11 @@ export function planScan(
     return {
       kind: 'reconcile',
       since: null,
-      trigger: stream.fullRequested ? 'operator' : 'schedule',
+      trigger: hinted
+        ? 'webhook'
+        : stream.fullRequested
+          ? 'operator'
+          : 'schedule',
     };
 
   return {

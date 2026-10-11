@@ -248,13 +248,13 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
         const result = await tx.query(
           `WITH hints AS (
             UPDATE connector_refresh_hints SET consumed_at=now()
-            WHERE tenant_id=$1 AND consumed_at IS NULL RETURNING connection_id,capabilities,received_at
+            WHERE tenant_id=$1 AND consumed_at IS NULL RETURNING connection_id,capabilities,received_at,reconcile
           ), latest AS (
-            SELECT connection_id,${recordTypeCase} AS record_type,min(received_at) AS received_at
+            SELECT connection_id,${recordTypeCase} AS record_type,min(received_at) AS received_at,bool_or(reconcile) AS reconcile
             FROM hints CROSS JOIN LATERAL unnest(capabilities) cap GROUP BY 1,2
           )
           UPDATE commerce_sync_streams s SET hint_at=LEAST(COALESCE(s.hint_at,'infinity'),
-            l.received_at+($2::integer*interval '1 millisecond')),updated_at=now()
+            l.received_at+($2::integer*interval '1 millisecond')),full_requested=s.full_requested OR l.reconcile,updated_at=now()
           FROM latest l WHERE s.tenant_id=$1 AND s.connection_id=l.connection_id AND s.record_type=l.record_type`,
           [tenantId, delayMs],
         );
@@ -398,7 +398,7 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
     async ledger(tenantId, connectionId, recordType, keys) {
       const found = new Map<
         string,
-        { digest: string; status: 'current' | 'pending' | 'failed' }
+        { digest: string; status: 'current' | 'pending' | 'failed' | 'retired' }
       >();
       if (!keys.length) return found;
       const rows = await db.transaction(
@@ -410,7 +410,7 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
               scope_key: string;
               external_id: string;
               digest: string;
-              status: 'current' | 'pending' | 'failed';
+              status: 'current' | 'pending' | 'failed' | 'retired';
             }>(
               `SELECT i.resource,i.scope_key,i.external_id,i.digest,i.status
             FROM unnest($4::text[],$5::text[],$6::text[]) AS k(resource,scope_key,external_id)
@@ -451,6 +451,46 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
               [tenantId, connectionId, recordType, before, limit],
             )
           ).rows,
+      );
+    },
+    async confirmationCandidates(tenantId, connectionId, recordType, limit) {
+      return db.transaction(
+        tenantId,
+        async (tx) =>
+          (
+            await tx.query<ItemKey & { createdAt: string | null }>(
+              `SELECT resource,scope_key AS "scopeKey",external_id AS "externalId",source_created_at::text AS "createdAt"
+         FROM commerce_sync_items WHERE tenant_id=$1 AND connection_id=$2 AND record_type=$3 AND missing_since IS NOT NULL AND status<>'retired'
+         ORDER BY COALESCE(confirmation_checked_at,missing_since),external_id LIMIT $4`,
+              [tenantId, connectionId, recordType, limit],
+            )
+          ).rows,
+      );
+    },
+    async recordConfirmation(
+      tenantId,
+      connectionId,
+      recordType,
+      item,
+      outcome,
+    ) {
+      await db.transaction(tenantId, (tx) =>
+        tx.query(
+          `UPDATE commerce_sync_items SET confirmation_checked_at=now(),
+        status=CASE WHEN $7='deleted' THEN 'retired' ELSE status END,
+        problem=CASE WHEN $7='history_limited' THEN 'Older records require full history access to confirm deletion'
+          WHEN $7='missing' THEN 'Source record missing; deletion is unconfirmed' ELSE NULL END
+        WHERE tenant_id=$1 AND connection_id=$2 AND record_type=$3 AND resource=$4 AND scope_key=$5 AND external_id=$6 AND missing_since IS NOT NULL`,
+          [
+            tenantId,
+            connectionId,
+            recordType,
+            item.resource,
+            item.scopeKey,
+            item.externalId,
+            outcome,
+          ],
+        ),
       );
     },
     async commitPage(tenantId, streamId, token, page) {
@@ -569,7 +609,7 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
           await tx.query(
             `UPDATE commerce_sync_items SET missing_since=COALESCE(missing_since,$5)
             WHERE tenant_id=$1 AND connection_id=$2 AND record_type=$3
-              AND seen_scan_id IS DISTINCT FROM $4 AND last_seen_at < $6`,
+              AND seen_scan_id IS DISTINCT FROM $4 AND last_seen_at < $6 AND status<>'retired'`,
             [...scope, current.scan_id, page.now, current.scan_started_at],
           );
           missing = Number(
@@ -696,6 +736,7 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
               pending: string;
               failed: string;
               missing: string;
+              retired: string;
               oldest: Date | null;
               newest: Date | null;
               problems: string[] | null;
@@ -704,11 +745,12 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
                 count(*) FILTER (WHERE i.status='current') AS current,
                 count(*) FILTER (WHERE i.status='pending') AS pending,
                 count(*) FILTER (WHERE i.status='failed') AS failed,
-                count(*) FILTER (WHERE i.missing_since IS NOT NULL) AS missing,
+                count(*) FILTER (WHERE i.status='retired') AS retired,
+                count(*) FILTER (WHERE i.missing_since IS NOT NULL AND i.status<>'retired') AS missing,
                 min(i.source_created_at) AS oldest,max(i.source_created_at) AS newest,
                 (SELECT array_agg(p.problem) FROM (SELECT DISTINCT x.problem FROM commerce_sync_items x
                   WHERE x.tenant_id=s.tenant_id AND x.connection_id=s.connection_id AND x.record_type=s.record_type
-                  AND x.status<>'current' AND x.problem IS NOT NULL ORDER BY x.problem LIMIT 5) p) AS problems
+                  AND (x.status IN ('pending','failed') OR x.missing_since IS NOT NULL) AND x.problem IS NOT NULL ORDER BY x.problem LIMIT 5) p) AS problems
               FROM commerce_sync_streams s
               LEFT JOIN commerce_sync_items i ON i.tenant_id=s.tenant_id AND i.connection_id=s.connection_id
                 AND i.record_type=s.record_type
@@ -722,6 +764,7 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
             pending: Number(row.pending),
             failed: Number(row.failed),
             missing: Number(row.missing),
+            retired: Number(row.retired),
             oldest: iso(row.oldest),
             newest: iso(row.newest),
             problems: row.problems ?? [],

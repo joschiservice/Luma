@@ -173,5 +173,13 @@
   "shopify_blocker_recovery_hold_gone": "The selected hold no longer exists.",
   "shopify_blocker_recovery_cancellation_pending": "The fulfillment service must accept the cancellation before this order can move.",
   "shopify_blocker_recovery_same_location": "Choose a different fulfillment location.",
-  "shopify_blocker_recovery_location_unavailable": "Shopify can’t move all remaining items to this location."
+  "shopify_blocker_recovery_location_unavailable": "Shopify can’t move all remaining items to this location.",
+  "shopify_subscriptions_title": "Change subscriptions",
+  "shopify_subscriptions_help": "Reconnect Shopify to repair subscriptions. Scheduled scans recover missed changes. Registration does not prove delivery.",
+  "shopify_subscriptions_registered": "Registered",
+  "shopify_subscriptions_missing": "Missing — reconnect to install",
+  "shopify_subscriptions_failed": "Registration failed — reconnect to retry",
+  "shopify_subscriptions_unavailable": "Unavailable with current access",
+  "shopify_subscriptions_received": "Last verified delivery: {time}",
+  "shopify_subscriptions_no_delivery": "No verified delivery yet"
 }

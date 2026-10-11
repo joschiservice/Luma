@@ -1610,10 +1610,12 @@ enum WebhookSubscriptionSortKeys {
 }
 
 type WebhookSubscriptionConnection {
+  pageInfo: PageInfo!
   nodes: [WebhookSubscription!]!
 }
 
 type WebhookSubscription implements Node {
+  topic: WebhookSubscriptionTopic!
   id: ID!
   uri: String!
 }

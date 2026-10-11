@@ -1,5 +1,7 @@
+import type { shopifyAccessSchema } from '@luma/api-contract';
 import type { InstallationCredentials } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
+import type { z } from 'zod';
 
 export interface ShopifyOAuth {
   config: { webOrigin: string };
@@ -7,13 +9,7 @@ export interface ShopifyOAuth {
   access(
     context: TenantContext,
     connectionId?: string,
-  ): Promise<{
-    customerDataApproved: boolean;
-    allOrdersApproved: boolean;
-    requestedScopes: string[];
-    grantedScopes: string[] | null;
-    missingScopes: string[];
-  }>;
+  ): Promise<z.infer<typeof shopifyAccessSchema>>;
   start(
     context: TenantContext,
     input: unknown,

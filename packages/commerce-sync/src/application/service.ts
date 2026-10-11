@@ -95,6 +95,7 @@ function streamView(
       pending: coverage?.pending ?? 0,
       failed: coverage?.failed ?? 0,
       missing: coverage?.missing ?? 0,
+      retired: coverage?.retired ?? 0,
     },
     problems: coverage?.problems ?? [],
     coverage: {

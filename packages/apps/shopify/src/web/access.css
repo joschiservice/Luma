@@ -1,0 +1,8 @@
+.shopify-subscriptions {
+  overflow-wrap: anywhere;
+}
+
+.shopify-subscriptions ul {
+  display: grid;
+  gap: var(--content-gap);
+}

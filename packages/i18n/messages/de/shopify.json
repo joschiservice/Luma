@@ -173,5 +173,13 @@
   "shopify_blocker_recovery_hold_gone": "Die ausgewählte Sperre besteht nicht mehr.",
   "shopify_blocker_recovery_cancellation_pending": "Der Fulfillment-Dienstleister muss die Stornierung annehmen, bevor dieser Auftrag verschoben werden kann.",
   "shopify_blocker_recovery_same_location": "Wähle einen anderen Fulfillment-Standort.",
-  "shopify_blocker_recovery_location_unavailable": "Shopify kann nicht alle verbleibenden Artikel an diesen Standort verschieben."
+  "shopify_blocker_recovery_location_unavailable": "Shopify kann nicht alle verbleibenden Artikel an diesen Standort verschieben.",
+  "shopify_subscriptions_title": "Änderungsabonnements",
+  "shopify_subscriptions_help": "Verbinde Shopify erneut, um Abonnements zu reparieren. Geplante Scans erfassen verpasste Änderungen. Eine Registrierung bestätigt keine Zustellung.",
+  "shopify_subscriptions_registered": "Registriert",
+  "shopify_subscriptions_missing": "Fehlt — zur Installation erneut verbinden",
+  "shopify_subscriptions_failed": "Registrierung fehlgeschlagen — zum Wiederholen erneut verbinden",
+  "shopify_subscriptions_unavailable": "Mit aktuellem Zugriff nicht verfügbar",
+  "shopify_subscriptions_received": "Letzte verifizierte Zustellung: {time}",
+  "shopify_subscriptions_no_delivery": "Noch keine verifizierte Zustellung"
 }

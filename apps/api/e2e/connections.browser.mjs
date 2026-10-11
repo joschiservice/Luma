@@ -396,8 +396,10 @@ test('starts Shopify authorization without token fields and reports callback out
       json: {
         customerDataApproved: false,
         allOrdersApproved: false,
+        requestedScopes: [],
         grantedScopes: null,
         missingScopes: [],
+        subscriptions: [],
       },
     }),
   );

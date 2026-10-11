@@ -70,6 +70,8 @@
     "@luma/staff": "workspace:*",
     "@luma/app-cin7": "workspace:*",
     "@luma/app-jtl": "workspace:*",
-    "@luma/app-shopify": "workspace:*"
+    "@luma/app-shopify": "workspace:*",
+    "@luma/simulator-core": "workspace:*",
+    "@luma/simulator-shopify": "workspace:*"
   }
 }

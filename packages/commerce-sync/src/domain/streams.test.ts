@@ -52,6 +52,16 @@ describe('planScan', () => {
     ).toBe('webhook');
   });
 
+  it('does not let a deletion hint downgrade requested full reconciliation to an incremental scan', () => {
+    expect(
+      planScan(
+        { ...base, fullRequested: true, hintAt: '2026-09-29T11:59:00.000Z' },
+        now,
+        true,
+      ),
+    ).toEqual({ kind: 'reconcile', since: null, trigger: 'webhook' });
+  });
+
   it('runs a full check when requested or once a day', () => {
     expect(planScan({ ...base, fullRequested: true }, now, true)).toEqual({
       kind: 'reconcile',

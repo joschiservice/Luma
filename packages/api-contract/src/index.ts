@@ -188,3 +188,5 @@ export * from './insights.js';
 export * from './assistant.js';
 
 export * from './messaging.js';
+
+export { shopifyAccessSchema } from './apps.js';

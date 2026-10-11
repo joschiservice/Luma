@@ -706,6 +706,14 @@ function StreamNotices({
           : m.sync_note_failed({ records: records(type, failed) })}
       </p>,
     );
+  if (stream.records.retired)
+    notices.push(
+      <p key="retired" className="sync-stream-note">
+        {m.sync_note_retired({
+          records: records(type, stream.records.retired),
+        })}
+      </p>,
+    );
   if (stream.records.missing)
     notices.push(
       <p key="missing" className="sync-stream-note">

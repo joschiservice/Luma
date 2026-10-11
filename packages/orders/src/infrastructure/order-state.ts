@@ -11,11 +11,11 @@ import {
 // evaluation time (`asOf`, timestamptz).
 
 /**
- * Orders the current sources of one canonical order: the newest source update wins, then
- * the newest observation, then the connection ID.
+ * Prefers active sources of one canonical order, then the newest source update,
+ * the newest observation and the connection ID.
  */
 export const sourceSelectionOrder =
-  'source_updated_at DESC NULLS LAST,observed_at DESC,connection_id';
+  'deleted ASC,source_updated_at DESC NULLS LAST,observed_at DESC,connection_id';
 
 /**
  * Returns a CTE with every current order snapshot, one row per order and source connection.

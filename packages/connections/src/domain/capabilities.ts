@@ -46,6 +46,8 @@ export interface Observation<T> {
 }
 
 interface PageQuery {
+  /** Point lookup to confirm a previously observed record missing from a complete scan. */
+  confirmMissing?: ExternalId & { createdAt: string | null };
   cursor?: string;
   limit: number;
   /**
@@ -70,6 +72,8 @@ export interface HistoryLimit {
 
 /** Only a complete successful scan can establish that an item is absent. */
 export interface Page<T> {
+  /** Absence confirmation; only `deleted` supplies an independently read tombstone. */
+  confirmation?: 'present' | 'missing' | 'history_limited' | 'deleted';
   items: Observation<T>[];
   nextCursor: string | null;
   completeness: 'complete' | 'partial';

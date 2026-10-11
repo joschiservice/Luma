@@ -334,6 +334,77 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
 
         return true;
       }
+      if (descriptor.filters?.includes('confirmMissing')) {
+        const candidates = await deps.store.confirmationCandidates(
+          tenantId,
+          claimed.connectionId,
+          claimed.recordType,
+          10,
+        );
+        for (const candidate of candidates) {
+          const confirmation = await deps.reader.read(tenant, {
+            connectionId: claimed.connectionId,
+            capability,
+            version: '0',
+            input: {
+              limit: 1,
+              confirmMissing: {
+                externalId: candidate.externalId,
+                scopeKey: candidate.scopeKey,
+                createdAt: candidate.createdAt
+                  ? new Date(candidate.createdAt).toISOString()
+                  : null,
+              },
+            },
+          });
+          if (!confirmation.ok) {
+            await fail(confirmation.error.code);
+
+            return true;
+          }
+          if (
+            confirmation.value.completeness !== 'complete' ||
+            !confirmation.value.confirmation
+          ) {
+            await fail('invalid_response');
+
+            return true;
+          }
+          if (confirmation.value.confirmation === 'deleted') {
+            if (
+              confirmation.value.items.length !== 1 ||
+              confirmation.value.items[0]?.kind !== 'tombstone' ||
+              itemKey(key(confirmation.value.items[0])) !== itemKey(candidate)
+            ) {
+              await fail('invalid_response');
+
+              return true;
+            }
+            const outcomes = await importRecords(
+              tenant,
+              claimed.recordType,
+              confirmation.value.items,
+            );
+            if (
+              outcomes.some(
+                (outcome) =>
+                  !outcome || outcome.status !== 'current' || outcome.retained,
+              )
+            ) {
+              await fail('invalid_response');
+
+              return true;
+            }
+          }
+          await deps.store.recordConfirmation(
+            tenantId,
+            claimed.connectionId,
+            claimed.recordType,
+            candidate,
+            confirmation.value.confirmation,
+          );
+        }
+      }
       const supportsSince =
         descriptor.filters?.includes('updatedSince') ?? false;
       let stream: SyncStream | null = claimed;
@@ -637,7 +708,9 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
   };
 }
 
-type RecordOutcome = Pick<LedgerEntry, 'status' | 'problem' | 'entityId'>;
+type RecordOutcome = Pick<LedgerEntry, 'status' | 'problem' | 'entityId'> & {
+  retained?: boolean;
+};
 
 const rejected: RecordOutcome = {
   status: 'failed',
@@ -655,7 +728,12 @@ function recordOutcome(outcome: ProjectionOutcome): RecordOutcome {
       entityId: null,
     };
 
-  return { status: 'current', problem: null, entityId: outcome.entityId };
+  return {
+    status: 'current',
+    problem: null,
+    entityId: outcome.entityId,
+    retained: outcome.status === 'retained',
+  };
 }
 
 /** Runs one record's import; a record-rule failure marks only that record as failed. */

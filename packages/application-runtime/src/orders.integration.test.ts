@@ -1272,8 +1272,13 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
       ...query,
       connectionId: shopify,
     });
-    expect(removed.items[0]?.open).toBe(false);
-    expect(removed.items[0]?.differs).toBe(false);
+    expect(removed.items).toEqual([]);
+    expect((await workspace().list(context(), query)).items).toEqual([]);
+    expect(
+      (await workspace().list(context(), { ...query, q: a })).items.map(
+        (item) => item.id,
+      ),
+    ).toContain(a);
   });
 
   it('serializes sibling fulfillments and evaluates future observations at read time', async () => {
