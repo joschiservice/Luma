@@ -1,5 +1,12 @@
 import type { ConnectorFailure } from '@luma/connector-core';
 
+import type {
+  ReturnSettlementPlan,
+  ReturnSettlementProof,
+  ReturnSettlementQuote,
+  ReturnSettlementWrite,
+} from './return-settlement.js';
+
 export { ConnectorError } from '@luma/connector-core';
 
 export type { ConnectorFailure } from '@luma/connector-core';
@@ -673,6 +680,24 @@ interface CapabilityContract {
   };
   /** Acceptance means the source recorded the return, not that any item came back. */
   'returns.create': { input: ReturnCreation; output: WriteReceipt };
+  /** Calculates the exact refund or reads the selected warehouse stock baseline. */
+  'returns.settlement.quote.read': {
+    input: ReturnSettlementQuote;
+    output: {
+      plan: ReturnSettlementPlan;
+      observedAt: string;
+      evidenceRefs: string[];
+    };
+  };
+  /** Independently reconciles the operation's exact marker and approved outcome. */
+  'returns.settlement.proof.read': {
+    input: ReturnSettlementWrite;
+    output: ReturnSettlementProof;
+  };
+  /** Financial write only: never restocks returned goods. */
+  'returns.refund': { input: ReturnSettlementWrite; output: WriteReceipt };
+  /** Adds only the approved resale units to the selected warehouse. */
+  'returns.restock': { input: ReturnSettlementWrite; output: WriteReceipt };
   /** Returns and refunds per order; the observation resource is `return` or `refund`. */
   'returns.read': {
     input: PageQuery & { order?: ExternalId };

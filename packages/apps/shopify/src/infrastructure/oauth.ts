@@ -288,6 +288,9 @@ export function createShopifyOAuth(
     'returns.options.read' as const,
     'returns.created.read' as const,
     'returns.create' as const,
+    'returns.settlement.quote.read' as const,
+    'returns.settlement.proof.read' as const,
+    'returns.refund' as const,
     ...(config.protectedCustomerDataApproved
       ? ['customers.read' as const]
       : []),
@@ -300,6 +303,7 @@ export function createShopifyOAuth(
     'write_third_party_fulfillment_orders',
     'read_returns',
     'write_returns',
+    'write_orders',
     'read_locations',
     ...(config.protectedCustomerDataApproved ? ['read_customers'] : []),
     ...(config.allOrdersApproved ? ['read_all_orders'] : []),

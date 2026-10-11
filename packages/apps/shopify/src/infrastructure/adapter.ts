@@ -35,6 +35,7 @@ import {
   readSelection,
 } from './read-selections.js';
 import { createShopifyReturnCapabilities } from './return-actions.js';
+import { createShopifySettlementCapabilities } from './return-settlement.js';
 import * as s from './schemas.js';
 
 const pageFields = 'pageInfo { hasNextPage endCursor }';
@@ -255,6 +256,8 @@ export function createShopifyConnector(
       | MessageReadCapability
       | 'returns.options.read'
       | 'returns.created.read'
+      | 'returns.settlement.quote.read'
+      | 'returns.settlement.proof.read'
     >,
   >(capability: K): CapabilityHandler<K> {
     return {
@@ -1243,6 +1246,7 @@ export function createShopifyConnector(
     executor: { kind: 'connector', id: s.adapterVersion },
     capabilities: {
       ...createShopifyReturnCapabilities(options),
+      ...createShopifySettlementCapabilities(options),
       'orders.read': handler('orders.read'),
       'products.read': handler('products.read'),
       'inventory.read': handler('inventory.read'),

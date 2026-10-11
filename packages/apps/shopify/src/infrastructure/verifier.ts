@@ -48,7 +48,13 @@ export function createInstallationVerifier(options: {
     const has = (scope: string) =>
       scopes.has(`read_${scope}`) || scopes.has(`write_${scope}`);
     const granted: InstallationCapability[] = [];
-    if (has('orders')) granted.push('orders.read');
+    if (has('orders'))
+      granted.push(
+        'orders.read',
+        'returns.settlement.quote.read',
+        'returns.settlement.proof.read',
+      );
+    if (scopes.has('write_orders')) granted.push('returns.refund');
     if (has('products')) granted.push('products.read');
     if (has('inventory')) granted.push('inventory.read');
     if (scopes.has('write_inventory'))

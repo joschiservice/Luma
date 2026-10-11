@@ -197,7 +197,9 @@ export function createReturnCaseStore(
             (
               await tx.query(
                 `UPDATE orders_return_cases SET state=$3,revision=$4,document=$5,updated_at=$6
-                 WHERE tenant_id=$1 AND id=$2 AND revision=$4-1`,
+                 WHERE tenant_id=$1 AND id=$2 AND revision=$4-1
+                  AND (NOT EXISTS(SELECT 1 FROM orders_return_actions a WHERE a.tenant_id=$1 AND a.case_id=$2 AND a.sent)
+                    OR (state=$3 AND document->'receipt'=$5::jsonb->'receipt' AND document->'inspection'=$5::jsonb->'inspection' AND document->'proposal'=$5::jsonb->'proposal'))`,
                 [
                   tenantId,
                   value.id,

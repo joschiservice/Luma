@@ -4,10 +4,12 @@ import type { AuditLog } from '@luma/audit';
 import type { TenantDatabase } from '@luma/platform';
 import { canonicalJson } from '@luma/platform';
 
+import { createReturnActions } from './application/return-actions.js';
 import {
   createReturnCases,
   type ReturnCaseDependencies,
 } from './application/return-cases.js';
+import { createReturnActionStore } from './infrastructure/return-action-store.js';
 import { createReturnCaseStore } from './infrastructure/return-case-store.js';
 
 export { createCommerceProjections } from './infrastructure/projections.js';
@@ -60,3 +62,28 @@ export type {
 } from './application/return-cases.js';
 
 export type { FoundReturn } from './domain/return-creations.js';
+
+/** Composes governed settlement with orders-owned storage and audited provider ports. */
+export function createReturnActionService(
+  db: TenantDatabase,
+  audit: (db: TenantDatabase) => AuditLog,
+  deps: Omit<
+    Parameters<typeof createReturnActions>[0],
+    'store' | 'cases' | 'digest' | 'uuid' | 'now'
+  >,
+) {
+  return createReturnActions({
+    ...deps,
+    store: createReturnActionStore(db, audit),
+    cases: createReturnCaseStore(db, audit),
+    digest,
+    uuid: nameUuid,
+    now: () => new Date(),
+  });
+}
+
+export type {
+  ReturnActions,
+  ReturnSettlementSystem,
+  ReturnSettlementAdmission,
+} from './application/return-actions.js';

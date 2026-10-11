@@ -42,6 +42,7 @@ import {
   returnCaseError,
   returnCaseKey,
   returnCaseOptions,
+  returnSettlementOptions,
 } from './case-data';
 import {
   CancelDialog,
@@ -63,6 +64,7 @@ import {
   resolutionLabels,
 } from './case-presentation';
 import { ReturnServiceSummary, ReturnServiceTimeline } from './case-service';
+import { ReturnSettlement } from './case-settlement';
 import { returnOptions } from './data';
 
 export type ReturnCaseLoadError = 'missing' | 'access' | 'unavailable';
@@ -76,6 +78,10 @@ export function ReturnCasePage() {
     from: '/app/$organizationId/returns/cases/$caseId',
   });
   const query = useQuery(returnCaseOptions(organizationId, caseId));
+  const settlements = useQuery({
+    ...returnSettlementOptions(organizationId, caseId),
+    enabled: !!query.data,
+  });
   const members = useQuery({
     ...membersOptions(organizationId),
     enabled: !!query.data?.canManage,
@@ -98,10 +104,24 @@ export function ReturnCasePage() {
       sourceDetail={sourceId ? source.data : undefined}
       sourceLoading={!!sourceId && source.isPending}
       sourceUnavailable={!!sourceId && source.isError}
+      settlement={
+        query.data ? (
+          <ReturnSettlement
+            organizationId={organizationId}
+            detail={query.data}
+            data={settlements.data}
+            loading={settlements.isPending}
+            unavailable={settlements.isError}
+            retry={() => void settlements.refetch()}
+          />
+        ) : null
+      }
+      settlementStarted={settlements.data?.items.some((a) => a.sent) ?? false}
       loading={query.isPending}
       refreshing={query.isFetching}
       refresh={() => {
         void query.refetch();
+        void settlements.refetch();
         if (sourceId) void source.refetch();
       }}
       people={(members.data ?? []).map((member) => ({
@@ -526,6 +546,8 @@ export function ReturnCaseView({
   sourceDetail,
   sourceLoading = false,
   sourceUnavailable = false,
+  settlement,
+  settlementStarted = false,
 }: {
   organizationId: string;
   detail?: ReturnCaseDetail | undefined;
@@ -537,6 +559,8 @@ export function ReturnCaseView({
   sourceDetail?: ReturnDetail | undefined;
   sourceLoading?: boolean;
   sourceUnavailable?: boolean;
+  settlement?: ReactNode;
+  settlementStarted?: boolean;
 }) {
   const now = new Date(useNow()).toISOString();
   const [dialog, setDialog] = useState<CaseDialogKind | null>(null);
@@ -553,7 +577,8 @@ export function ReturnCaseView({
   });
   const item = detail?.case;
   const open = item?.state === 'open';
-  const manage = !!detail?.canManage && open;
+  const canAssign = !!detail?.canManage && open;
+  const manage = canAssign && !settlementStarted;
   const order = detail?.order.number ?? detail?.order.id.slice(0, 8) ?? '';
   const source = detail?.order.connection.label ?? m.returns_source_fallback();
   const close = () => setDialog(null);
@@ -773,6 +798,10 @@ export function ReturnCaseView({
                 loading={sourceLoading}
                 unavailable={sourceUnavailable}
               />
+              {settlement}
+              {settlementStarted ? (
+                <Alert>{m.returns_settlement_locked()}</Alert>
+              ) : null}
               <Lines detail={detail} />
               <Decisions detail={detail} />
               <Creation
@@ -847,7 +876,7 @@ export function ReturnCaseView({
                           ? personName(item.assignee)
                           : m.returns_case_unassigned()}
                       </span>
-                      {manage && people.length ? (
+                      {canAssign && people.length ? (
                         <PersonPicker
                           label={m.returns_case_assign()}
                           title={m.returns_case_assign_title()}
@@ -856,7 +885,7 @@ export function ReturnCaseView({
                           onSelect={(id) => assign.mutate(id)}
                         />
                       ) : null}
-                      {manage && item.assignee ? (
+                      {canAssign && item.assignee ? (
                         <Button
                           variant="ghost"
                           size="sm"

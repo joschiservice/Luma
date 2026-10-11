@@ -51,6 +51,7 @@ import {
   type ReverseFulfillmentOrderLineItemData,
   type WebhookSubscriptionData,
 } from './records.js';
+import { suggestedRefund } from './refund-actions.js';
 import { matchesText, searchFilter } from './search.js';
 
 /** Resolves one field of a source value. */
@@ -327,6 +328,8 @@ const orderResolvers = on<OrderData>({
     list(context, args, { kind: 'Fulfillment', parent: order.id }),
   returns: (order, args, context) =>
     connection(context, args, { kind: 'Return', parent: order.id }),
+  suggestedRefund: (order, args, context) =>
+    suggestedRefund(context, order, args),
   refunds: (order, args, context) =>
     list(context, args, { kind: 'Refund', parent: order.id }),
   transactions: (order, args, context) =>
@@ -516,6 +519,7 @@ const resolvers: Record<string, TypeResolvers> = {
       })),
   }),
   Refund: on<RefundData>({
+    note: (refund) => refund.data.note ?? null,
     order: (refund, _args, context) =>
       load(context, 'Order', refund.data.order),
     return: (refund, _args, context) =>

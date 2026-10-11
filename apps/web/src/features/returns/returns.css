@@ -333,6 +333,29 @@
 }
 
 /* Return cases. */
+.returns-settlement-request {
+  max-width: 100%;
+  height: auto;
+}
+.returns-settlement-target {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+.returns-case-decisions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 16px;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px;
+}
+.returns-case-decisions > li {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .returns-case-actions {
   display: flex;
   gap: 8px;

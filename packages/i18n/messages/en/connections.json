@@ -63,5 +63,9 @@
   "connections_error_invalid": "Check the connection details and enter the credentials again.",
   "connections_error_unavailable": "The connection service is unavailable. Ask your administrator to check the app setup, then refresh.",
   "connections_error_unknown": "Luma couldn’t confirm the result. Refresh the list before trying again.",
-  "connections_write_mode_inherit": "Use workspace write mode"
+  "connections_write_mode_inherit": "Use workspace write mode",
+  "connections_capability_returns_quote": "Read refund and restock quotes",
+  "connections_capability_returns_proof": "Check refund and restock outcomes",
+  "connections_capability_returns_refund": "Refund received return units",
+  "connections_capability_returns_restock": "Restock inspected return units"
 }

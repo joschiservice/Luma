@@ -2,6 +2,11 @@ import { z } from 'zod';
 
 import { endpoint, organizationParamsSchema, requires } from '../common.js';
 import {
+  requestReturnActionSchema,
+  returnActionListSchema,
+  returnActionSchema,
+} from '../return-actions.js';
+import {
   assignReturnCaseSchema,
   cancelReturnCaseSchema,
   decideReturnCreationSchema,
@@ -54,7 +59,64 @@ function caseCommand<T extends z.ZodTypeAny>(
     .output(returnCaseDetailSchema);
 }
 
+const actionParams = caseParams.extend({ actionId: z.string().uuid() });
+
 export const returnCasesContract = {
+  actions: endpoint
+    .route({
+      method: 'GET',
+      path: `${path}/return-cases/{caseId}/settlements`,
+      summary: 'Read return settlement',
+      description:
+        'Reads recorded physical and financial actions. Managers with a restock proposal also receive current Wawi warehouse choices for explicitly mapped items.',
+    })
+    .meta({ access: requires('returns.read'), errors: [401, 403, 404, 503] })
+    .input(z.object({ params: caseParams }))
+    .output(returnActionListSchema),
+  requestAction: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-cases/{caseId}/settlements`,
+      summary: 'Request return settlement approval',
+      description:
+        'Freezes the provider-calculated refund or the inspected resale units at an explicitly mapped warehouse. Refunds never restock goods. An independent approver must authorize the exact action.',
+    })
+    .meta(writes)
+    .input(z.object({ params: caseParams, body: requestReturnActionSchema }))
+    .output(returnActionSchema),
+  decideAction: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-cases/{caseId}/settlements/{actionId}/decision`,
+      summary: 'Approve return settlement',
+      description:
+        'A current independent approver responds to the frozen action. Approval dispatches once as the requester after their authority and case facts are checked again.',
+    })
+    .meta(writes)
+    .input(z.object({ params: actionParams, body: decideReturnCreationSchema }))
+    .output(returnActionSchema),
+  sendAction: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-cases/{caseId}/settlements/{actionId}/send`,
+      summary: 'Send approved return settlement',
+      description:
+        'The requester sends an approved action through Action Admission. Repeated calls do not duplicate the provider effect.',
+    })
+    .meta(writes)
+    .input(z.object({ params: actionParams, body: empty }))
+    .output(returnActionSchema),
+  checkAction: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-cases/{caseId}/settlements/{actionId}/check`,
+      summary: 'Verify return settlement',
+      description:
+        'Independently reads the exact stock change or refund payment. Pending, failed and uncertain outcomes stay distinct. This command never sends a provider write.',
+    })
+    .meta(writes)
+    .input(z.object({ params: actionParams, body: empty }))
+    .output(returnActionSchema),
   list: endpoint
     .route({
       method: 'GET',

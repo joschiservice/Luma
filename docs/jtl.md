@@ -243,3 +243,13 @@ pass and `returns.created.read` when the return probe passes. Probes cannot esta
 `returns.write` grant, so only simulated installations that pass both return probes and
 the sales-order probe receive `returns.create` until an installation-specific sandbox
 smoke test exists.
+
+### Case resale stock
+
+The simulator installation can grant `returns.restock` with `jtl:returns.restock`. The action adds only
+inspected resale units to one explicitly chosen active warehouse using the stock endpoint with
+automatic workflows disabled. It freezes the physical baseline and records a machine operation
+marker on the stock movement. The pinned API provides no stock-write idempotency guarantee, so an
+uncertain attempt is never replayed. Independent proof requires one exact movement and the expected
+warehouse total; incomplete movement history or concurrent stock changes remain uncertain. Live
+installations do not receive this write grant until their endpoint behavior is verified.

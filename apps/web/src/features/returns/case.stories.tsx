@@ -1,4 +1,4 @@
-import type { ReturnCaseDetail } from '@luma/api-contract';
+import type { ReturnActionList, ReturnCaseDetail } from '@luma/api-contract';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -12,6 +12,7 @@ import { expect, userEvent, within } from 'storybook/test';
 
 import appStyles from '../../styles.css?inline';
 import { ReturnCaseView } from './case';
+import { ReturnSettlement } from './case-settlement';
 import { detail as sourceDetail } from './returns-fixtures';
 
 const org = '99999999-9999-4999-8999-999999999999';
@@ -206,6 +207,88 @@ const cancelled: ReturnCaseDetail = {
   creationAvailability: { ...open.creationAvailability, blocker: 'cancelled' },
 };
 
+function settlement(state: string): ReturnActionList {
+  const now = new Date().toISOString();
+
+  return {
+    available: true,
+    asOf: now,
+    targetStatus: 'not_configured',
+    targets: [],
+    items: [
+      {
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        caseId: proposed.case.id,
+        connectionId: proposed.case.connectionId,
+        orderLineId: null,
+        kind: 'refund',
+        plan: {
+          kind: 'refund',
+          order: { externalId: 'gid://shopify/Order/1', scopeKey: '' },
+          lines: [
+            {
+              orderLine: {
+                externalId: 'gid://shopify/LineItem/2',
+                scopeKey: 'gid://shopify/Order/1',
+              },
+              quantity: 2,
+            },
+          ],
+          amount: '48',
+          currency: 'EUR',
+          transactions: [
+            {
+              parentId: 'gid://shopify/OrderTransaction/3',
+              gateway: 'shopify_payments',
+              amount: '48',
+            },
+          ],
+        },
+        requestedBy: alex.id,
+        requestedAt: now,
+        expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+        decidedBy: sam.id,
+        decidedAt: now,
+        decisionId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        state:
+          state === 'stale'
+            ? 'verified'
+            : state === 'approval'
+              ? 'approval_required'
+              : state === 'failed'
+                ? 'failed'
+                : 'pending',
+        sent: state !== 'approval',
+        failure: null,
+        updatedAt: now,
+        proof:
+          state === 'approval'
+            ? null
+            : {
+                outcome:
+                  state === 'stale'
+                    ? 'passed'
+                    : state === 'failed'
+                      ? 'failed'
+                      : 'inconclusive',
+                payment:
+                  state === 'stale'
+                    ? 'paid'
+                    : state === 'failed'
+                      ? 'failed'
+                      : 'pending',
+                observedAt: state === 'stale' ? '2026-09-01T00:00:00Z' : now,
+                evidenceRefs: ['eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'],
+              },
+        canApprove: state === 'approval',
+        canCheck: state !== 'approval',
+        canSend: false,
+        observeOnly: false,
+      },
+    ],
+  };
+}
+
 const details: Record<string, ReturnCaseDetail> = {
   open,
   proposed,
@@ -237,9 +320,11 @@ const details: Record<string, ReturnCaseDetail> = {
 function Preview({
   state = 'open',
   evidence,
+  settlementState,
 }: {
   state?: string;
   evidence?: 'fresh' | 'stale' | 'loading' | 'unavailable';
+  settlementState?: 'pending' | 'failed' | 'stale' | 'approval' | 'unavailable';
 }) {
   const [client] = useState(() => new QueryClient());
   const [router] = useState(() =>
@@ -252,6 +337,25 @@ function Preview({
             <ReturnCaseView
               organizationId={org}
               detail={details[state]}
+              settlementStarted={
+                !!settlementState && settlementState !== 'approval'
+              }
+              settlement={
+                settlementState ? (
+                  <ReturnSettlement
+                    organizationId={org}
+                    detail={proposed}
+                    data={
+                      settlementState === 'unavailable'
+                        ? undefined
+                        : settlement(settlementState)
+                    }
+                    loading={false}
+                    unavailable={settlementState === 'unavailable'}
+                    retry={() => {}}
+                  />
+                ) : undefined
+              }
               sourceDetail={
                 evidence === 'fresh' || evidence === 'stale'
                   ? {
@@ -417,4 +521,54 @@ export const StaleSource: Story = {
     );
     await expect(summary.queryByText('Observed money returned')).toBeNull();
   },
+};
+
+export const SettlementPending: Story = {
+  args: { state: 'proposed', settlementState: 'pending' },
+  play: async ({ canvasElement }) => {
+    const section = within(canvasElement).getByRole('region', {
+      name: 'Stock and refund',
+    });
+    await expect(within(section).getByText('Refund processing')).toBeVisible();
+    await expect(
+      within(section).getByRole('button', { name: 'Check source' }),
+    ).toBeVisible();
+    await expect(
+      within(section).queryByText('Independently verified'),
+    ).not.toBeInTheDocument();
+  },
+};
+
+export const SettlementFailed: Story = {
+  args: { state: 'proposed', settlementState: 'failed' },
+};
+
+export const SettlementStale: Story = {
+  args: { state: 'proposed', settlementState: 'stale' },
+  play: async ({ canvasElement }) => {
+    const section = within(
+      within(canvasElement).getByRole('region', { name: 'Stock and refund' }),
+    );
+    await expect(
+      section.queryByText('Independently verified'),
+    ).not.toBeInTheDocument();
+  },
+};
+
+export const SettlementApproval: Story = {
+  args: { state: 'proposed', settlementState: 'approval' },
+};
+
+export const SettlementUnavailable: Story = {
+  args: { state: 'proposed', settlementState: 'unavailable' },
+};
+
+export const SettlementDark: Story = {
+  args: { state: 'proposed', settlementState: 'pending' },
+  globals: { theme: 'dark' },
+};
+
+export const SettlementNarrow: Story = {
+  args: { state: 'proposed', settlementState: 'pending' },
+  globals: { viewport: { value: 'mobile1', isRotated: false } },
 };

@@ -57,6 +57,7 @@ const shopifyScopes = [
   'write_merchant_managed_fulfillment_orders',
   'read_returns',
   'write_returns',
+  'write_orders',
   'read_customers',
 ];
 

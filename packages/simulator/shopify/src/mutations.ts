@@ -26,6 +26,7 @@ import {
   save,
   type WebhookSubscriptionData,
 } from './records.js';
+import { refundCreate } from './refund-actions.js';
 import type { TypeResolvers } from './resolvers.js';
 import { approveReturn, requestReturn } from './returns.js';
 import { idempotent } from './schema.js';
@@ -410,6 +411,8 @@ async function returnMutation(
 
 /** Shopify Admin API mutations Luma sends. */
 export const mutationResolvers: TypeResolvers = {
+  refundCreate: (_source, args, context, info) =>
+    refundCreate(context, args, info),
   returnCreate: (_source, args, context) =>
     returnMutation(context, args.returnInput, false),
   returnApproveRequest: (_source, args, context) =>

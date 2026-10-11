@@ -699,6 +699,11 @@ type Order implements Node {
   ): LineItemConnection!
   name: String!
   refunds(first: Int): [Refund!]!
+  suggestedRefund(
+    refundLineItems: [RefundLineItemInput!]
+    refundShipping: Boolean
+    suggestFullRefund: Boolean
+  ): SuggestedRefund
   returns(
     first: Int
     after: String
@@ -718,6 +723,7 @@ type Order implements Node {
 }
 
 type MoneyBag {
+  presentmentMoney: MoneyV2!
   shopMoney: MoneyV2!
 }
 
@@ -1131,6 +1137,7 @@ type LineItemEdge {
 }
 
 type Refund implements Node {
+  note: String
   createdAt: DateTime
   id: ID!
   order: Order!
@@ -1622,6 +1629,7 @@ type WebhookSubscription implements Node {
 }
 
 type Mutation {
+  refundCreate(input: RefundInput!): RefundCreatePayload
   returnCreate(returnInput: ReturnInput!): ReturnCreatePayload
   returnApproveRequest(input: ReturnApproveRequestInput!): ReturnCreatePayload
   bulkOperationRunQuery(
@@ -1827,4 +1835,43 @@ input ReturnApproveRequestInput {
 type ReturnCreatePayload {
   return: Return
   userErrors: [UserError!]!
+}
+
+input RefundLineItemInput {
+  lineItemId: ID!
+  quantity: Int!
+  restockType: RefundLineItemRestockType
+  locationId: ID
+}
+input OrderTransactionInput {
+  orderId: ID!
+  parentId: ID
+  gateway: String
+  kind: OrderTransactionKind!
+  amount: Money
+}
+input RefundInput {
+  orderId: ID!
+  currency: CurrencyCode
+  note: String
+  notify: Boolean
+  allowOverRefunding: Boolean
+  refundLineItems: [RefundLineItemInput!]
+  transactions: [OrderTransactionInput!]
+}
+type RefundCreatePayload {
+  refund: Refund
+  userErrors: [UserError!]!
+}
+type SuggestedOrderTransaction {
+  amountSet: MoneyBag!
+  gateway: String!
+  kind: OrderTransactionKind!
+  parentTransaction: OrderTransaction
+}
+type SuggestedRefund {
+  amountSet: MoneyBag!
+  maximumRefundableSet: MoneyBag!
+  refundLineItems: [RefundLineItem!]!
+  suggestedTransactions: [SuggestedOrderTransaction!]!
 }

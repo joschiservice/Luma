@@ -190,3 +190,5 @@ export * from './assistant.js';
 export * from './messaging.js';
 
 export { shopifyAccessSchema } from './apps.js';
+
+export type { ReturnActionView, ReturnActionList } from './return-actions.js';

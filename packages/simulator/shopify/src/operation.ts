@@ -89,6 +89,7 @@ export function prepare(query: string): Prepared {
 }
 
 const mutationCapabilities: Record<string, string> = {
+  refundCreate: 'returns.refund',
   returnCreate: 'returns.create',
   returnApproveRequest: 'returns.create',
   inventorySetQuantities: 'inventory.available.reconcile',
@@ -99,6 +100,9 @@ const mutationCapabilities: Record<string, string> = {
 };
 
 const namedCapabilities: Record<string, string> = {
+  LumaReturnRefundQuote: 'returns.settlement.quote.read',
+  LumaReturnRefundProof: 'returns.settlement.proof.read',
+  LumaReturnRefundDetail: 'returns.settlement.proof.read',
   LumaReturnActions: 'returns.created.read',
   LumaReturnable: 'returns.created.read',
   VerifyInstallation: 'connection.verify',

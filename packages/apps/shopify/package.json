@@ -31,7 +31,8 @@
     "fastify": "catalog:",
     "react": "catalog:",
     "zod": "catalog:",
-    "@luma/api-contract": "workspace:*"
+    "@luma/api-contract": "workspace:*",
+    "@luma/orders": "workspace:*"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

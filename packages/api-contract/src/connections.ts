@@ -23,6 +23,10 @@ const installationPermissions = z.enum([
   'returns.options.read',
   'returns.created.read',
   'returns.create',
+  'returns.settlement.quote.read',
+  'returns.settlement.proof.read',
+  'returns.refund',
+  'returns.restock',
 ]);
 
 const header = z
@@ -47,7 +51,7 @@ export const installationInput = z
     permissions: z
       .array(installationPermissions)
       .min(1)
-      .max(16)
+      .max(installationPermissions.options.length)
       .refine((v) => new Set(v).size === v.length),
     credentials: installationCredentials,
   })

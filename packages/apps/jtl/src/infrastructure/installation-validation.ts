@@ -14,6 +14,9 @@ const installationPermissions = z.enum([
   'returns.options.read',
   'returns.created.read',
   'returns.create',
+  'returns.settlement.quote.read',
+  'returns.settlement.proof.read',
+  'returns.restock',
 ]);
 
 const header = z

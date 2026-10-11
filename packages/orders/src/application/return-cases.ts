@@ -622,7 +622,11 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         if (!value) notFound('Return case not found');
         if (value!.revision !== input.expectedRevision)
           conflict('This return case changed. Refresh it and try again.');
-        const applied = await apply(value!, tx);
+        await tx.lockOrder(value!.orderId);
+        const current = await tx.case(caseId);
+        if (!current || current.revision !== input.expectedRevision)
+          conflict('This return case changed. Refresh it and try again.');
+        const applied = await apply(current!, tx);
         const next: ReturnCase = {
           ...applied.next,
           revision: value!.revision + 1,

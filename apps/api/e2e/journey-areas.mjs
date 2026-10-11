@@ -309,6 +309,10 @@ const messaging = [
   'packages/i18n/messages/*/{gmail,messaging}.json',
 ];
 const returnCases = [
+  'apps/api/e2e/return-settlement-fixture.mjs',
+  'packages/application-runtime/migrations/0088_return_settlement.sql',
+  'packages/application-runtime/src/composition/return-settlement.ts',
+  'packages/api-contract/src/return-actions.ts',
   'packages/application-runtime/migrations/0087_return_service_reads.sql',
   'packages/application-runtime/migrations/0086_return_creation_binding.sql',
   'packages/orders/**',
@@ -887,6 +891,22 @@ export const journeyAreas = {
     ...webShell,
     ...webHome,
     ...webCases,
+  ],
+  'return-settlement.browser.mjs': [
+    ...simulator,
+    ...returns,
+    ...returnCases,
+    ...decisions,
+    ...commerce,
+    ...webShell,
+    ...webReturns,
+  ],
+  'return-settlement.e2e.mjs': [
+    ...simulator,
+    ...returns,
+    ...returnCases,
+    ...decisions,
+    ...commerce,
   ],
   'return-cases.e2e.mjs': [
     ...simulator,

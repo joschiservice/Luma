@@ -6,6 +6,7 @@ import {
   refundProgress,
   type ReturnData,
   returnProgress,
+  settlementRefundProgress,
   toUnits,
 } from './returns.js';
 
@@ -196,4 +197,31 @@ it('converts decimals without floating point error', () => {
   expect(fromUnits(toUnits('0.1') + toUnits('0.2'))).toBe('0.3');
   expect(fromUnits(toUnits('-1.50'))).toBe('-1.5');
   expect(fromUnits(toUnits('12'))).toBe('12');
+});
+
+describe('case refund settlement', () => {
+  it('requires successful payments for exactly the approved amount and currency', () => {
+    expect(
+      settlementRefundProgress(aRefund([payment('success')]), eur('48')),
+    ).toBe('paid');
+    expect(
+      settlementRefundProgress(aRefund([payment('success', '24')]), eur('48')),
+    ).toBe('unknown');
+    expect(
+      settlementRefundProgress(aRefund([payment('success')]), {
+        amount: '48',
+        currency: 'USD',
+      }),
+    ).toBe('unknown');
+    expect(settlementRefundProgress(aRefund([]), eur('48'))).toBe('unknown');
+    expect(
+      settlementRefundProgress(
+        aRefund([payment('success', '24'), payment('pending', '24')]),
+        eur('48'),
+      ),
+    ).toBe('pending');
+    expect(
+      settlementRefundProgress(aRefund([payment('failed')]), eur('48')),
+    ).toBe('failed');
+  });
 });

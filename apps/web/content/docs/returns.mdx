@@ -106,3 +106,21 @@ confirm money returned. A recorded resolution proposal has not changed the conne
 
 Check the next step, owner and waiting reason before handing the case over. If no deadline has
 been configured, the view says so. Assign the case to a person who can manage returns.
+
+## Settle the case
+
+After recording receipt, inspection and a refund proposal, use **Stock and refund** on the case.
+Request the refund separately from restocking resale units. Choose the mapped Wawi item and actual
+warehouse for each restock. Damaged and missing units cannot be restocked; missing units cannot be
+refunded through this case action.
+
+Someone else approves each request with the relevant app permission. Luma sends the approved action
+once and reads the system again. **Refund processing** means the money is still processing. **Failed**
+means the payment did not succeed. Use **Check source** when a response or payment is uncertain.
+Checking never issues a second refund or stock addition.
+
+A successful refund does not prove stock changed, and a successful restock does not prove the refund
+was paid. Review both results and their read times. An old check needs a new read before you confirm
+the result to the customer. Once an action was sent, receipt, inspection and the proposal stay fixed;
+you can still hand the case to another owner. Wawi stock settlement is available in the simulator;
+your live connection must support the action before it can be used.

@@ -103,9 +103,19 @@ export function createShopifyProvider(
         tenantId: context.tenantId,
         connectionId: id,
         shop: target.shop,
-        accessToken: async () =>
-          (await runtime.installations.credential(context, id, capability))
-            .credentials.token,
+        accessToken: async () => {
+          if (capability === 'returns.refund')
+            for (const read of [
+              'orders.read',
+              'returns.settlement.quote.read',
+              'returns.settlement.proof.read',
+            ] as const)
+              await runtime.installations.credential(context, id, read);
+
+          return (
+            await runtime.installations.credential(context, id, capability)
+          ).credentials.token;
+        },
         recordObservations: runtime.recordObservations,
         ...(options.customerAccess
           ? {
@@ -198,8 +208,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         {
           key: 'shopify:returns.manage',
           label: 'Manage Shopify returns',
-          description:
-            'Request approval for and create or approve Shopify returns.',
+          description: 'Request approval for Shopify returns and refunds.',
           consequential: true,
         },
         {

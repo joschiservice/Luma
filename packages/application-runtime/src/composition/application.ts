@@ -30,8 +30,10 @@ import type { IdentityService, TenantContext } from '@luma/identity';
 import { createMessaging } from '@luma/messaging/composition';
 import {
   createOrderMetricReader,
+  createReturnActionService,
   createReturnCaseService,
   orderStateQueries,
+  type ReturnActions,
   type ReturnCases,
 } from '@luma/orders/composition';
 import type {
@@ -135,6 +137,11 @@ import {
   createReturnCreationEffects,
   createReturnSystem,
 } from './return-cases.js';
+import {
+  createReturnSettlementAdmission,
+  createReturnSettlementEffects,
+  createReturnSettlementSystem,
+} from './return-settlement.js';
 import { createSalesRuntime } from './sales.js';
 import {
   createDeskServices,
@@ -172,6 +179,7 @@ export interface ApplicationServices {
   procurement: ReturnType<typeof createProcurement>;
   commitments: SupplierCommitments;
   returnCases: ReturnCases;
+  returnActions: ReturnActions;
   library: ReturnType<typeof createPersistentPlaybookLibrary>;
   messaging: ReturnType<typeof createMessaging>;
   http: {
@@ -202,6 +210,7 @@ export interface ApplicationServices {
     fulfillment: ReturnType<typeof createFulfillmentWorkspace>;
     returns: ReturnType<typeof createReturnWorkspace>;
     returnCases: ReturnCases;
+    returnActions: ReturnActions;
     customers: ReturnType<typeof createCustomerWorkspace>;
     orders: ReturnType<typeof createOrderWorkspace>;
     sales: ReturnType<typeof createSalesRuntime>;
@@ -350,12 +359,20 @@ export function createApplicationServices(
     options.execution.kind === 'enabled' && options.returns
       ? createReturnCreationEffects(options.returns.runtime, () => returnCases)
       : { resolve: async () => null };
+  const settlementEffects =
+    options.execution.kind === 'enabled' && options.returns
+      ? createReturnSettlementEffects(
+          options.returns.runtime,
+          () => returnActions,
+        )
+      : { resolve: async () => null };
   const combinedEffects: EffectRegistry = {
     resolve: async (context, intent) =>
       (await procurementEffects.resolve(context, intent)) ??
       (await submissionEffects.resolve(context, intent)) ??
       (await replyEffects.resolve(context, intent)) ??
       (await returnCreationEffects.resolve(context, intent)) ??
+      (await settlementEffects.resolve(context, intent)) ??
       effects.resolve(context, intent),
   };
   const resolutionEligible = createAdmissionEligibility(detection.diagnoses);
@@ -367,9 +384,11 @@ export function createApplicationServices(
           ? messaging.replies.eligible(context, step)
           : step.subject?.kind === 'return_case_creation'
             ? returnCases.eligible(context, step)
-            : step.subject
-              ? replenishment.eligible(context, step)
-              : resolutionEligible(context, step),
+            : step.subject?.kind === 'return_case_settlement'
+              ? returnActions.eligible(context, step)
+              : step.subject
+                ? replenishment.eligible(context, step)
+                : resolutionEligible(context, step),
   });
   const commitments: SupplierCommitments = createSupplierCommitmentService(
     database,
@@ -480,6 +499,17 @@ export function createApplicationServices(
       principal: identity.resolveWorkflowContext,
     },
   );
+  const returnActions = createReturnActionService(database, createAuditLog, {
+    system: options.returns
+      ? createReturnSettlementSystem(options.returns.runtime)
+      : null,
+    admission:
+      options.execution.kind === 'enabled' && options.returns
+        ? createReturnSettlementAdmission(safety, combinedEffects)
+        : null,
+    refreshContext: identity.refreshContext,
+    principal: identity.resolveWorkflowContext,
+  });
   const desk = createDeskServices(
     database,
     identity,
@@ -778,6 +808,7 @@ export function createApplicationServices(
     procurement,
     commitments,
     returnCases,
+    returnActions,
     detection,
     safety,
     desk,
@@ -828,6 +859,7 @@ export function createApplicationServices(
       procurementContext: createProcurementContext(database),
       returns,
       returnCases,
+      returnActions,
       customers: createCustomerWorkspace(database),
       records: createRecordExplorer(database, hiddenOrderSources),
       orders,

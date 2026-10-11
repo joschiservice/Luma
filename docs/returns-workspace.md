@@ -153,3 +153,28 @@ Case search and Needs you use persisted tenant data, never provider reads. Custo
 explicit source order mappings and require both customer and returns access. Linked orders retain
 case reachability. Needs you uses the case's audited assignment; assignment changes go through
 the case's revision-checked command and never grant action or approval authority.
+
+### Settling goods and money
+
+Receipt, inspection and the proposal are separate from provider effects. A case refunds received
+units, including damaged units; it never refunds missing units. Restock is limited to the proposed
+resale quantity. Each line needs an explicit canonical SKU mapping to the Wawi item and a current
+warehouse chosen from an independent source read. Aggregate inventory locations are not warehouses.
+
+Each settlement freezes its provider quote, case facts, source identities and evidence. Refunds use
+Shopify's suggested refund for the selected units, including its tax, discount and captured-payment
+allocation. A high-risk Action Admission request requires independent approval and current app
+permission. Approval lasts 24 hours. A stale case or remapped source blocks dispatch. Changing case
+ownership preserves the approval; changing physical facts after dispatch is refused.
+
+One sent request permanently holds its case/kind/line slot. Restart or retry uses the same execution
+identity. An uncertain outcome is read again, never resent. Shopify uses native refund idempotency;
+Wawi stock changes have no provider idempotency guarantee. An independent read must find the exact
+operation marker, approved units and physical stock total. Concurrent unrelated movements leave the
+stock step uncertain. Financial proof requires successful transactions for the whole approved amount
+and currency. Pending, failed and partial payments never establish settlement. Case completion still
+requires the other steps; neither accepted mutation nor one verified step closes a case.
+
+Settlement proof older than five minutes is shown as stale. Unavailable reads retain the last proof
+and ask for another check. Wawi settlement writes are currently granted only in the installed
+simulator. A live installation needs its stock write capability verified before it can be granted.

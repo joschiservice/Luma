@@ -89938,7 +89938,11 @@
                                 "messages.send",
                                 "returns.options.read",
                                 "returns.created.read",
-                                "returns.create"
+                                "returns.create",
+                                "returns.settlement.quote.read",
+                                "returns.settlement.proof.read",
+                                "returns.refund",
+                                "returns.restock"
                               ],
                               "type": "string"
                             }
@@ -89968,7 +89972,11 @@
                                 "messages.send",
                                 "returns.options.read",
                                 "returns.created.read",
-                                "returns.create"
+                                "returns.create",
+                                "returns.settlement.quote.read",
+                                "returns.settlement.proof.read",
+                                "returns.refund",
+                                "returns.restock"
                               ],
                               "type": "string"
                             }
@@ -90173,7 +90181,7 @@
                   "permissions": {
                     "type": "array",
                     "minItems": 1,
-                    "maxItems": 16,
+                    "maxItems": 26,
                     "items": {
                       "enum": [
                         "orders.read",
@@ -90197,7 +90205,11 @@
                         "messages.send",
                         "returns.options.read",
                         "returns.created.read",
-                        "returns.create"
+                        "returns.create",
+                        "returns.settlement.quote.read",
+                        "returns.settlement.proof.read",
+                        "returns.refund",
+                        "returns.restock"
                       ],
                       "type": "string"
                     }
@@ -90310,7 +90322,11 @@
                           "messages.send",
                           "returns.options.read",
                           "returns.created.read",
-                          "returns.create"
+                          "returns.create",
+                          "returns.settlement.quote.read",
+                          "returns.settlement.proof.read",
+                          "returns.refund",
+                          "returns.restock"
                         ],
                         "type": "string"
                       }
@@ -90340,7 +90356,11 @@
                           "messages.send",
                           "returns.options.read",
                           "returns.created.read",
-                          "returns.create"
+                          "returns.create",
+                          "returns.settlement.quote.read",
+                          "returns.settlement.proof.read",
+                          "returns.refund",
+                          "returns.restock"
                         ],
                         "type": "string"
                       }
@@ -90640,7 +90660,11 @@
                           "messages.send",
                           "returns.options.read",
                           "returns.created.read",
-                          "returns.create"
+                          "returns.create",
+                          "returns.settlement.quote.read",
+                          "returns.settlement.proof.read",
+                          "returns.refund",
+                          "returns.restock"
                         ],
                         "type": "string"
                       }
@@ -90670,7 +90694,11 @@
                           "messages.send",
                           "returns.options.read",
                           "returns.created.read",
-                          "returns.create"
+                          "returns.create",
+                          "returns.settlement.quote.read",
+                          "returns.settlement.proof.read",
+                          "returns.refund",
+                          "returns.restock"
                         ],
                         "type": "string"
                       }
@@ -90959,7 +90987,11 @@
                           "messages.send",
                           "returns.options.read",
                           "returns.created.read",
-                          "returns.create"
+                          "returns.create",
+                          "returns.settlement.quote.read",
+                          "returns.settlement.proof.read",
+                          "returns.refund",
+                          "returns.restock"
                         ],
                         "type": "string"
                       }
@@ -90989,7 +91021,11 @@
                           "messages.send",
                           "returns.options.read",
                           "returns.created.read",
-                          "returns.create"
+                          "returns.create",
+                          "returns.settlement.quote.read",
+                          "returns.settlement.proof.read",
+                          "returns.refund",
+                          "returns.restock"
                         ],
                         "type": "string"
                       }
@@ -91292,7 +91328,11 @@
                           "messages.send",
                           "returns.options.read",
                           "returns.created.read",
-                          "returns.create"
+                          "returns.create",
+                          "returns.settlement.quote.read",
+                          "returns.settlement.proof.read",
+                          "returns.refund",
+                          "returns.restock"
                         ],
                         "type": "string"
                       }
@@ -91322,7 +91362,11 @@
                           "messages.send",
                           "returns.options.read",
                           "returns.created.read",
-                          "returns.create"
+                          "returns.create",
+                          "returns.settlement.quote.read",
+                          "returns.settlement.proof.read",
+                          "returns.refund",
+                          "returns.restock"
                         ],
                         "type": "string"
                       }
@@ -91612,7 +91656,11 @@
                           "messages.send",
                           "returns.options.read",
                           "returns.created.read",
-                          "returns.create"
+                          "returns.create",
+                          "returns.settlement.quote.read",
+                          "returns.settlement.proof.read",
+                          "returns.refund",
+                          "returns.restock"
                         ],
                         "type": "string"
                       }
@@ -91642,7 +91690,11 @@
                           "messages.send",
                           "returns.options.read",
                           "returns.created.read",
-                          "returns.create"
+                          "returns.create",
+                          "returns.settlement.quote.read",
+                          "returns.settlement.proof.read",
+                          "returns.refund",
+                          "returns.restock"
                         ],
                         "type": "string"
                       }
@@ -104610,6 +104662,2379 @@
           },
           "415": {
             "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/return-cases/{caseId}/settlements": {
+      "get": {
+        "operationId": "returnCases.actions",
+        "summary": "Read return settlement",
+        "description": "Reads recorded physical and financial actions. Managers with a restock proposal also receive current Wawi warehouse choices for explicitly mapped items.",
+        "tags": ["returnCases"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "caseId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "connectionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "orderLineId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "kind": {
+                            "enum": ["refund", "restock"],
+                            "type": "string"
+                          },
+                          "plan": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "const": "refund"
+                                  },
+                                  "order": {
+                                    "type": "object",
+                                    "properties": {
+                                      "externalId": {
+                                        "type": "string"
+                                      },
+                                      "scopeKey": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": ["externalId", "scopeKey"]
+                                  },
+                                  "lines": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "orderLine": {
+                                          "type": "object",
+                                          "properties": {
+                                            "externalId": {
+                                              "type": "string"
+                                            },
+                                            "scopeKey": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": ["externalId", "scopeKey"]
+                                        },
+                                        "quantity": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": ["orderLine", "quantity"]
+                                    }
+                                  },
+                                  "amount": {
+                                    "type": "string"
+                                  },
+                                  "currency": {
+                                    "type": "string"
+                                  },
+                                  "transactions": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "parentId": {
+                                          "type": "string"
+                                        },
+                                        "gateway": {
+                                          "type": "string"
+                                        },
+                                        "amount": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "parentId",
+                                        "gateway",
+                                        "amount"
+                                      ]
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "order",
+                                  "lines",
+                                  "amount",
+                                  "currency",
+                                  "transactions"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "const": "restock"
+                                  },
+                                  "item": {
+                                    "type": "object",
+                                    "properties": {
+                                      "externalId": {
+                                        "type": "string"
+                                      },
+                                      "scopeKey": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": ["externalId", "scopeKey"]
+                                  },
+                                  "warehouse": {
+                                    "type": "object",
+                                    "properties": {
+                                      "externalId": {
+                                        "type": "string"
+                                      },
+                                      "scopeKey": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": ["externalId", "scopeKey"]
+                                  },
+                                  "quantity": {
+                                    "type": "number"
+                                  },
+                                  "baselineOnHand": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "item",
+                                  "warehouse",
+                                  "quantity",
+                                  "baselineOnHand"
+                                ]
+                              }
+                            ]
+                          },
+                          "requestedBy": {
+                            "type": "string"
+                          },
+                          "requestedAt": {
+                            "type": "string"
+                          },
+                          "expiresAt": {
+                            "type": "string"
+                          },
+                          "decidedBy": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "decidedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "decisionId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "state": {
+                            "enum": [
+                              "approval_required",
+                              "approved",
+                              "rejected",
+                              "expired",
+                              "sending",
+                              "uncertain",
+                              "pending",
+                              "verified",
+                              "failed",
+                              "not_executed"
+                            ],
+                            "type": "string"
+                          },
+                          "sent": {
+                            "type": "boolean"
+                          },
+                          "failure": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          },
+                          "proof": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "outcome": {
+                                    "enum": [
+                                      "passed",
+                                      "failed",
+                                      "inconclusive"
+                                    ],
+                                    "type": "string"
+                                  },
+                                  "payment": {
+                                    "anyOf": [
+                                      {
+                                        "enum": ["pending", "failed", "paid"],
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "observedAt": {
+                                    "type": "string"
+                                  },
+                                  "evidenceRefs": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "outcome",
+                                  "payment",
+                                  "observedAt",
+                                  "evidenceRefs"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "canApprove": {
+                            "type": "boolean"
+                          },
+                          "canSend": {
+                            "type": "boolean"
+                          },
+                          "canCheck": {
+                            "type": "boolean"
+                          },
+                          "observeOnly": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "caseId",
+                          "connectionId",
+                          "orderLineId",
+                          "kind",
+                          "plan",
+                          "requestedBy",
+                          "requestedAt",
+                          "expiresAt",
+                          "decidedBy",
+                          "decidedAt",
+                          "decisionId",
+                          "state",
+                          "sent",
+                          "failure",
+                          "updatedAt",
+                          "proof",
+                          "canApprove",
+                          "canSend",
+                          "canCheck",
+                          "observeOnly"
+                        ]
+                      }
+                    },
+                    "available": {
+                      "type": "boolean"
+                    },
+                    "asOf": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "targetStatus": {
+                      "enum": [
+                        "ready",
+                        "unavailable",
+                        "not_configured",
+                        "not_required"
+                      ],
+                      "type": "string"
+                    },
+                    "targets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "orderLineId": {
+                            "type": "string"
+                          },
+                          "connectionId": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "item": {
+                            "type": "object",
+                            "properties": {
+                              "externalId": {
+                                "type": "string"
+                              },
+                              "scopeKey": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["externalId", "scopeKey"]
+                          },
+                          "warehouse": {
+                            "type": "object",
+                            "properties": {
+                              "externalId": {
+                                "type": "string"
+                              },
+                              "scopeKey": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["externalId", "scopeKey"]
+                          },
+                          "mappingIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "orderLineId",
+                          "connectionId",
+                          "label",
+                          "item",
+                          "warehouse",
+                          "mappingIds"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "available",
+                    "asOf",
+                    "targetStatus",
+                    "targets"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "returnCases.requestAction",
+        "summary": "Request return settlement approval",
+        "description": "Freezes the provider-calculated refund or the inspected resale units at an explicitly mapped warehouse. Refunds never restock goods. An independent approver must authorize the exact action.",
+        "tags": ["returnCases"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "kind": {
+                    "enum": ["refund", "restock"],
+                    "type": "string"
+                  },
+                  "targetId": {
+                    "type": "string",
+                    "maxLength": 256
+                  }
+                },
+                "required": ["id", "kind"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "caseId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "connectionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "orderLineId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "kind": {
+                      "enum": ["refund", "restock"],
+                      "type": "string"
+                    },
+                    "plan": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "const": "refund"
+                            },
+                            "order": {
+                              "type": "object",
+                              "properties": {
+                                "externalId": {
+                                  "type": "string"
+                                },
+                                "scopeKey": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["externalId", "scopeKey"]
+                            },
+                            "lines": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "orderLine": {
+                                    "type": "object",
+                                    "properties": {
+                                      "externalId": {
+                                        "type": "string"
+                                      },
+                                      "scopeKey": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": ["externalId", "scopeKey"]
+                                  },
+                                  "quantity": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": ["orderLine", "quantity"]
+                              }
+                            },
+                            "amount": {
+                              "type": "string"
+                            },
+                            "currency": {
+                              "type": "string"
+                            },
+                            "transactions": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "parentId": {
+                                    "type": "string"
+                                  },
+                                  "gateway": {
+                                    "type": "string"
+                                  },
+                                  "amount": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["parentId", "gateway", "amount"]
+                              }
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "order",
+                            "lines",
+                            "amount",
+                            "currency",
+                            "transactions"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "const": "restock"
+                            },
+                            "item": {
+                              "type": "object",
+                              "properties": {
+                                "externalId": {
+                                  "type": "string"
+                                },
+                                "scopeKey": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["externalId", "scopeKey"]
+                            },
+                            "warehouse": {
+                              "type": "object",
+                              "properties": {
+                                "externalId": {
+                                  "type": "string"
+                                },
+                                "scopeKey": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["externalId", "scopeKey"]
+                            },
+                            "quantity": {
+                              "type": "number"
+                            },
+                            "baselineOnHand": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "item",
+                            "warehouse",
+                            "quantity",
+                            "baselineOnHand"
+                          ]
+                        }
+                      ]
+                    },
+                    "requestedBy": {
+                      "type": "string"
+                    },
+                    "requestedAt": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "string"
+                    },
+                    "decidedBy": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "decidedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "decisionId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "state": {
+                      "enum": [
+                        "approval_required",
+                        "approved",
+                        "rejected",
+                        "expired",
+                        "sending",
+                        "uncertain",
+                        "pending",
+                        "verified",
+                        "failed",
+                        "not_executed"
+                      ],
+                      "type": "string"
+                    },
+                    "sent": {
+                      "type": "boolean"
+                    },
+                    "failure": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "proof": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "outcome": {
+                              "enum": ["passed", "failed", "inconclusive"],
+                              "type": "string"
+                            },
+                            "payment": {
+                              "anyOf": [
+                                {
+                                  "enum": ["pending", "failed", "paid"],
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "observedAt": {
+                              "type": "string"
+                            },
+                            "evidenceRefs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "outcome",
+                            "payment",
+                            "observedAt",
+                            "evidenceRefs"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "canApprove": {
+                      "type": "boolean"
+                    },
+                    "canSend": {
+                      "type": "boolean"
+                    },
+                    "canCheck": {
+                      "type": "boolean"
+                    },
+                    "observeOnly": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "caseId",
+                    "connectionId",
+                    "orderLineId",
+                    "kind",
+                    "plan",
+                    "requestedBy",
+                    "requestedAt",
+                    "expiresAt",
+                    "decidedBy",
+                    "decidedAt",
+                    "decisionId",
+                    "state",
+                    "sent",
+                    "failure",
+                    "updatedAt",
+                    "proof",
+                    "canApprove",
+                    "canSend",
+                    "canCheck",
+                    "observeOnly"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "422",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/return-cases/{caseId}/settlements/{actionId}/decision": {
+      "post": {
+        "operationId": "returnCases.decideAction",
+        "summary": "Approve return settlement",
+        "description": "A current independent approver responds to the frozen action. Approval dispatches once as the requester after their authority and case facts are checked again.",
+        "tags": ["returnCases"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "actionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "decisionId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "outcome": {
+                    "enum": ["approved", "rejected"],
+                    "type": "string"
+                  }
+                },
+                "required": ["decisionId", "outcome"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "caseId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "connectionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "orderLineId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "kind": {
+                      "enum": ["refund", "restock"],
+                      "type": "string"
+                    },
+                    "plan": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "const": "refund"
+                            },
+                            "order": {
+                              "type": "object",
+                              "properties": {
+                                "externalId": {
+                                  "type": "string"
+                                },
+                                "scopeKey": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["externalId", "scopeKey"]
+                            },
+                            "lines": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "orderLine": {
+                                    "type": "object",
+                                    "properties": {
+                                      "externalId": {
+                                        "type": "string"
+                                      },
+                                      "scopeKey": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": ["externalId", "scopeKey"]
+                                  },
+                                  "quantity": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": ["orderLine", "quantity"]
+                              }
+                            },
+                            "amount": {
+                              "type": "string"
+                            },
+                            "currency": {
+                              "type": "string"
+                            },
+                            "transactions": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "parentId": {
+                                    "type": "string"
+                                  },
+                                  "gateway": {
+                                    "type": "string"
+                                  },
+                                  "amount": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["parentId", "gateway", "amount"]
+                              }
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "order",
+                            "lines",
+                            "amount",
+                            "currency",
+                            "transactions"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "const": "restock"
+                            },
+                            "item": {
+                              "type": "object",
+                              "properties": {
+                                "externalId": {
+                                  "type": "string"
+                                },
+                                "scopeKey": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["externalId", "scopeKey"]
+                            },
+                            "warehouse": {
+                              "type": "object",
+                              "properties": {
+                                "externalId": {
+                                  "type": "string"
+                                },
+                                "scopeKey": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["externalId", "scopeKey"]
+                            },
+                            "quantity": {
+                              "type": "number"
+                            },
+                            "baselineOnHand": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "item",
+                            "warehouse",
+                            "quantity",
+                            "baselineOnHand"
+                          ]
+                        }
+                      ]
+                    },
+                    "requestedBy": {
+                      "type": "string"
+                    },
+                    "requestedAt": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "string"
+                    },
+                    "decidedBy": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "decidedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "decisionId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "state": {
+                      "enum": [
+                        "approval_required",
+                        "approved",
+                        "rejected",
+                        "expired",
+                        "sending",
+                        "uncertain",
+                        "pending",
+                        "verified",
+                        "failed",
+                        "not_executed"
+                      ],
+                      "type": "string"
+                    },
+                    "sent": {
+                      "type": "boolean"
+                    },
+                    "failure": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "proof": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "outcome": {
+                              "enum": ["passed", "failed", "inconclusive"],
+                              "type": "string"
+                            },
+                            "payment": {
+                              "anyOf": [
+                                {
+                                  "enum": ["pending", "failed", "paid"],
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "observedAt": {
+                              "type": "string"
+                            },
+                            "evidenceRefs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "outcome",
+                            "payment",
+                            "observedAt",
+                            "evidenceRefs"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "canApprove": {
+                      "type": "boolean"
+                    },
+                    "canSend": {
+                      "type": "boolean"
+                    },
+                    "canCheck": {
+                      "type": "boolean"
+                    },
+                    "observeOnly": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "caseId",
+                    "connectionId",
+                    "orderLineId",
+                    "kind",
+                    "plan",
+                    "requestedBy",
+                    "requestedAt",
+                    "expiresAt",
+                    "decidedBy",
+                    "decidedAt",
+                    "decisionId",
+                    "state",
+                    "sent",
+                    "failure",
+                    "updatedAt",
+                    "proof",
+                    "canApprove",
+                    "canSend",
+                    "canCheck",
+                    "observeOnly"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "422",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/return-cases/{caseId}/settlements/{actionId}/send": {
+      "post": {
+        "operationId": "returnCases.sendAction",
+        "summary": "Send approved return settlement",
+        "description": "The requester sends an approved action through Action Admission. Repeated calls do not duplicate the provider effect.",
+        "tags": ["returnCases"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "actionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "caseId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "connectionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "orderLineId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "kind": {
+                      "enum": ["refund", "restock"],
+                      "type": "string"
+                    },
+                    "plan": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "const": "refund"
+                            },
+                            "order": {
+                              "type": "object",
+                              "properties": {
+                                "externalId": {
+                                  "type": "string"
+                                },
+                                "scopeKey": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["externalId", "scopeKey"]
+                            },
+                            "lines": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "orderLine": {
+                                    "type": "object",
+                                    "properties": {
+                                      "externalId": {
+                                        "type": "string"
+                                      },
+                                      "scopeKey": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": ["externalId", "scopeKey"]
+                                  },
+                                  "quantity": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": ["orderLine", "quantity"]
+                              }
+                            },
+                            "amount": {
+                              "type": "string"
+                            },
+                            "currency": {
+                              "type": "string"
+                            },
+                            "transactions": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "parentId": {
+                                    "type": "string"
+                                  },
+                                  "gateway": {
+                                    "type": "string"
+                                  },
+                                  "amount": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["parentId", "gateway", "amount"]
+                              }
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "order",
+                            "lines",
+                            "amount",
+                            "currency",
+                            "transactions"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "const": "restock"
+                            },
+                            "item": {
+                              "type": "object",
+                              "properties": {
+                                "externalId": {
+                                  "type": "string"
+                                },
+                                "scopeKey": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["externalId", "scopeKey"]
+                            },
+                            "warehouse": {
+                              "type": "object",
+                              "properties": {
+                                "externalId": {
+                                  "type": "string"
+                                },
+                                "scopeKey": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["externalId", "scopeKey"]
+                            },
+                            "quantity": {
+                              "type": "number"
+                            },
+                            "baselineOnHand": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "item",
+                            "warehouse",
+                            "quantity",
+                            "baselineOnHand"
+                          ]
+                        }
+                      ]
+                    },
+                    "requestedBy": {
+                      "type": "string"
+                    },
+                    "requestedAt": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "string"
+                    },
+                    "decidedBy": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "decidedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "decisionId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "state": {
+                      "enum": [
+                        "approval_required",
+                        "approved",
+                        "rejected",
+                        "expired",
+                        "sending",
+                        "uncertain",
+                        "pending",
+                        "verified",
+                        "failed",
+                        "not_executed"
+                      ],
+                      "type": "string"
+                    },
+                    "sent": {
+                      "type": "boolean"
+                    },
+                    "failure": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "proof": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "outcome": {
+                              "enum": ["passed", "failed", "inconclusive"],
+                              "type": "string"
+                            },
+                            "payment": {
+                              "anyOf": [
+                                {
+                                  "enum": ["pending", "failed", "paid"],
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "observedAt": {
+                              "type": "string"
+                            },
+                            "evidenceRefs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "outcome",
+                            "payment",
+                            "observedAt",
+                            "evidenceRefs"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "canApprove": {
+                      "type": "boolean"
+                    },
+                    "canSend": {
+                      "type": "boolean"
+                    },
+                    "canCheck": {
+                      "type": "boolean"
+                    },
+                    "observeOnly": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "caseId",
+                    "connectionId",
+                    "orderLineId",
+                    "kind",
+                    "plan",
+                    "requestedBy",
+                    "requestedAt",
+                    "expiresAt",
+                    "decidedBy",
+                    "decidedAt",
+                    "decisionId",
+                    "state",
+                    "sent",
+                    "failure",
+                    "updatedAt",
+                    "proof",
+                    "canApprove",
+                    "canSend",
+                    "canCheck",
+                    "observeOnly"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "422",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/return-cases/{caseId}/settlements/{actionId}/check": {
+      "post": {
+        "operationId": "returnCases.checkAction",
+        "summary": "Verify return settlement",
+        "description": "Independently reads the exact stock change or refund payment. Pending, failed and uncertain outcomes stay distinct. This command never sends a provider write.",
+        "tags": ["returnCases"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "actionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "caseId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "connectionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "orderLineId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "kind": {
+                      "enum": ["refund", "restock"],
+                      "type": "string"
+                    },
+                    "plan": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "const": "refund"
+                            },
+                            "order": {
+                              "type": "object",
+                              "properties": {
+                                "externalId": {
+                                  "type": "string"
+                                },
+                                "scopeKey": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["externalId", "scopeKey"]
+                            },
+                            "lines": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "orderLine": {
+                                    "type": "object",
+                                    "properties": {
+                                      "externalId": {
+                                        "type": "string"
+                                      },
+                                      "scopeKey": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": ["externalId", "scopeKey"]
+                                  },
+                                  "quantity": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": ["orderLine", "quantity"]
+                              }
+                            },
+                            "amount": {
+                              "type": "string"
+                            },
+                            "currency": {
+                              "type": "string"
+                            },
+                            "transactions": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "parentId": {
+                                    "type": "string"
+                                  },
+                                  "gateway": {
+                                    "type": "string"
+                                  },
+                                  "amount": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["parentId", "gateway", "amount"]
+                              }
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "order",
+                            "lines",
+                            "amount",
+                            "currency",
+                            "transactions"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "const": "restock"
+                            },
+                            "item": {
+                              "type": "object",
+                              "properties": {
+                                "externalId": {
+                                  "type": "string"
+                                },
+                                "scopeKey": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["externalId", "scopeKey"]
+                            },
+                            "warehouse": {
+                              "type": "object",
+                              "properties": {
+                                "externalId": {
+                                  "type": "string"
+                                },
+                                "scopeKey": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["externalId", "scopeKey"]
+                            },
+                            "quantity": {
+                              "type": "number"
+                            },
+                            "baselineOnHand": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "item",
+                            "warehouse",
+                            "quantity",
+                            "baselineOnHand"
+                          ]
+                        }
+                      ]
+                    },
+                    "requestedBy": {
+                      "type": "string"
+                    },
+                    "requestedAt": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "string"
+                    },
+                    "decidedBy": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "decidedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "decisionId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "state": {
+                      "enum": [
+                        "approval_required",
+                        "approved",
+                        "rejected",
+                        "expired",
+                        "sending",
+                        "uncertain",
+                        "pending",
+                        "verified",
+                        "failed",
+                        "not_executed"
+                      ],
+                      "type": "string"
+                    },
+                    "sent": {
+                      "type": "boolean"
+                    },
+                    "failure": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "proof": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "outcome": {
+                              "enum": ["passed", "failed", "inconclusive"],
+                              "type": "string"
+                            },
+                            "payment": {
+                              "anyOf": [
+                                {
+                                  "enum": ["pending", "failed", "paid"],
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "observedAt": {
+                              "type": "string"
+                            },
+                            "evidenceRefs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "outcome",
+                            "payment",
+                            "observedAt",
+                            "evidenceRefs"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "canApprove": {
+                      "type": "boolean"
+                    },
+                    "canSend": {
+                      "type": "boolean"
+                    },
+                    "canCheck": {
+                      "type": "boolean"
+                    },
+                    "observeOnly": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "caseId",
+                    "connectionId",
+                    "orderLineId",
+                    "kind",
+                    "plan",
+                    "requestedBy",
+                    "requestedAt",
+                    "expiresAt",
+                    "decidedBy",
+                    "decidedAt",
+                    "decisionId",
+                    "state",
+                    "sent",
+                    "failure",
+                    "updatedAt",
+                    "proof",
+                    "canApprove",
+                    "canSend",
+                    "canCheck",
+                    "observeOnly"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "422",
             "content": {
               "application/json": {
                 "schema": {

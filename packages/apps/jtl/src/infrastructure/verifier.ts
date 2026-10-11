@@ -173,6 +173,18 @@ export function createInstallationVerifier(options: {
     )
       granted.push('returns.create');
 
+    if (
+      simulated &&
+      connection.permissions.includes('returns.restock') &&
+      (await readable('items', jtl.item)) &&
+      (await readable('warehouses', jtl.warehouse))
+    )
+      granted.push(
+        'returns.settlement.quote.read',
+        'returns.settlement.proof.read',
+        'returns.restock',
+      );
+
     return granted;
   };
 }

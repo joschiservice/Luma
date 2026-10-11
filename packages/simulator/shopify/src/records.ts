@@ -141,6 +141,7 @@ export interface ReverseFulfillmentOrderLineItemData {
 }
 
 export interface RefundData {
+  note?: string | null;
   order: string;
   return: string | null;
   /** Requested amount in minor units. */
@@ -283,6 +284,7 @@ export const money = (value: number) => (value / 100).toFixed(2);
 /** Builds a `MoneyBag` in the shop currency. */
 export const moneyBag = (value: number, currency: string) => ({
   shopMoney: { amount: decimal(value), currencyCode: currency },
+  presentmentMoney: { amount: decimal(value), currencyCode: currency },
 });
 
 /** Store ID of an inventory level. */

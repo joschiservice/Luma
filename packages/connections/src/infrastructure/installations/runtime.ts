@@ -226,6 +226,22 @@ export interface ReturnCreationBinding {
   ): Promise<VerificationResult>;
 }
 
+/** Maps a frozen settlement to its fixed, governed provider capability. */
+export interface ReturnSettlementBinding {
+  map(
+    context: TenantContext,
+    intent: EffectIntent,
+  ): Promise<CapabilityInput<'returns.refund'> | null>;
+  checkPreconditions(
+    context: TenantContext,
+    intent: EffectIntent,
+  ): Promise<boolean>;
+  verify(
+    context: TenantContext,
+    intent: EffectIntent,
+  ): Promise<VerificationResult>;
+}
+
 /**
  * Supplies return reads and return-creation effects through the same installation-gated
  * runtime. Creation is dispatched only by execution adapters bound to Action Admission.
@@ -236,6 +252,10 @@ export function createInstalledReturnRuntime(options: InstalledRuntimeOptions) {
   return Object.freeze({
     read: runtime.read,
     discover: runtime.discover,
+    settlementEffects: (
+      capability: 'returns.refund' | 'returns.restock',
+      binding: ReturnSettlementBinding,
+    ) => runtime.effects({ capability, ...binding }),
     creationEffects: (binding: ReturnCreationBinding) =>
       runtime.effects({ capability: 'returns.create', ...binding }),
   });

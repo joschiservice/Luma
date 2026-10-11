@@ -6,10 +6,14 @@ import type { HttpContext } from '@luma/identity/http';
 import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
+import type { ReturnActions } from '../application/return-actions.js';
 import type { ReturnCases } from '../application/return-cases.js';
 
 /** Registers tenant-authenticated return case reads and permission-gated changes. */
-export function returnCaseRoutes(service?: ReturnCases) {
+export function returnCaseRoutes(
+  service?: ReturnCases,
+  actions?: ReturnActions,
+) {
   function use(request: FastifyRequest) {
     if (!request.tenantContext)
       throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
@@ -25,7 +29,63 @@ export function returnCaseRoutes(service?: ReturnCases) {
 
   const os = implement(apiContract.returnCases).$context<HttpContext>();
 
+  function settlement(request: FastifyRequest) {
+    const current = use(request);
+    if (!actions)
+      throw new IdentityError(
+        503,
+        'SERVICE_UNAVAILABLE',
+        'Return settlement is unavailable',
+      );
+
+    return { context: current.context, service: actions };
+  }
+
   return os.router({
+    actions: os.actions.handler(({ context: { request }, input }) => {
+      const s = settlement(request);
+
+      return s.service.list(s.context, input.params.caseId);
+    }),
+    requestAction: os.requestAction.handler(
+      ({ context: { request }, input }) => {
+        const s = settlement(request);
+
+        return s.service.request(s.context, input.params.caseId, {
+          id: input.body.id,
+          kind: input.body.kind,
+          ...(input.body.targetId ? { targetId: input.body.targetId } : {}),
+        });
+      },
+    ),
+    decideAction: os.decideAction.handler(({ context: { request }, input }) => {
+      const s = settlement(request);
+
+      return s.service.decide(
+        s.context,
+        input.params.caseId,
+        input.params.actionId,
+        input.body,
+      );
+    }),
+    sendAction: os.sendAction.handler(({ context: { request }, input }) => {
+      const s = settlement(request);
+
+      return s.service.send(
+        s.context,
+        input.params.caseId,
+        input.params.actionId,
+      );
+    }),
+    checkAction: os.checkAction.handler(({ context: { request }, input }) => {
+      const s = settlement(request);
+
+      return s.service.check(
+        s.context,
+        input.params.caseId,
+        input.params.actionId,
+      );
+    }),
     list: os.list.handler(({ context: { request }, input }) => {
       const s = use(request);
 

@@ -1,0 +1,201 @@
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+
+import { setupSimulator } from './simulator-fixture.mjs';
+
+/** Creates a reviewed Shopify/Wawi return with two received units and one approved resale unit. */
+export async function settlementFixture(
+  t,
+  { origin = 'http://127.0.0.1:3000' } = {},
+) {
+  const f = await setupSimulator(t, { origin });
+  const org = f.manifest.organizationId,
+    connectionId = f.manifest.connections.shopify;
+  const root = `/v1/organizations/${org}`;
+
+  async function login(email) {
+    const response = await f.pilot.app.inject({
+      method: 'POST',
+      url: '/auth/sign-in/email',
+      headers: { origin },
+      payload: { email, password: f.password },
+    });
+    assert.equal(response.statusCode, 200, response.body);
+
+    return []
+      .concat(response.headers['set-cookie'])
+      .map((v) => v.split(';')[0])
+      .join('; ');
+  }
+
+  const requester = await login('pilot-operator@example.test'),
+    approver = await login('pilot-requester@example.test');
+
+  async function request(path, body, cookie = requester, status = 200) {
+    const response = await f.pilot.app.inject({
+      method: body ? 'POST' : 'GET',
+      url: `${root}${path}`,
+      headers: { cookie, origin },
+      ...(body ? { payload: body } : {}),
+    });
+    assert.equal(response.statusCode, status, response.body);
+
+    return response.json();
+  }
+
+  const command = (command) =>
+    f.call('runs/operations/control', {
+      action: 'command',
+      instance: 'shopify',
+      command,
+    });
+  const variants = (
+    await f.call(
+      'runs/operations/records/shopify?kind=ProductVariant&limit=100',
+    )
+  ).items;
+  const selected =
+    variants.find(
+      (v) =>
+        `gid://shopify/InventoryItem/${v.id}` ===
+        f.manifest.simulator.inventory.inventoryItem,
+    ) ?? variants[0];
+  const old = new Set(
+    (
+      await f.call('runs/operations/records/shopify?kind=Order&limit=100')
+    ).items.map((o) => o.id),
+  );
+  await f.call('runs/operations/control', {
+    action: 'order',
+    shop: 'shopify',
+    lines: [{ sku: selected.data.sku, quantity: 2 }],
+  });
+  const providerOrderId = (
+    await f.call('runs/operations/records/shopify?kind=Order&limit=100')
+  ).items.find((o) => !old.has(o.id)).id;
+  await command({
+    kind: 'fulfill',
+    order: providerOrderId,
+    carrier: 'DHL',
+    trackingNumber: 'settlement-test',
+    trackingUrl: 'https://example.test/tracking',
+  });
+  await f.pilot.observe({ check: false });
+  await f.pilot.link();
+  const skuSources = (
+    await f.db.owner.query(
+      "SELECT connection_id,canonical_id FROM connector_source_mappings WHERE tenant_id=$1 AND resource='sku' AND ((connection_id=$2 AND external_id=$3) OR (connection_id=$4 AND external_id=$5))",
+      [
+        org,
+        connectionId,
+        `gid://shopify/InventoryItem/${selected.id}`,
+        f.manifest.connections.jtl,
+        f.manifest.simulator.inventory.erpItem,
+      ],
+    )
+  ).rows;
+  const shopSku = skuSources.find(
+    (s) => s.connection_id === connectionId,
+  ).canonical_id;
+  const wawiSku = skuSources.find(
+    (s) => s.connection_id === f.manifest.connections.jtl,
+  ).canonical_id;
+  if (shopSku !== wawiSku) {
+    const linked = await request(
+      '/identities/links',
+      {
+        operation: 'link',
+        kind: 'sku',
+        entityId: wawiSku,
+        otherId: shopSku,
+        reason:
+          'Reviewed synthetic Shopify inventory item and Wawi item for the settlement journey',
+      },
+      requester,
+      202,
+    );
+    await f.pilot.observe({ check: false });
+    assert.equal(
+      (await request(`/identities/links/${linked.id}`)).state,
+      'completed',
+    );
+  }
+  const mapped = await f.db.owner.query(
+    "SELECT canonical_id FROM connector_source_mappings WHERE tenant_id=$1 AND connection_id=$2 AND resource='order' AND external_id=$3",
+    [org, connectionId, `gid://shopify/Order/${providerOrderId}`],
+  );
+  const orderId = mapped.rows[0].canonical_id;
+  const available = await request(`/orders/${orderId}/return-cases`),
+    line = available.sources.find((s) => s.connectionId === connectionId)
+      .lines[0];
+  let detail = await request(`/orders/${orderId}/return-cases`, {
+    id: randomUUID(),
+    connectionId,
+    sourceReturnId: null,
+    lines: [
+      {
+        orderLineId: line.orderLineId,
+        quantity: 2,
+        reason: 'damaged',
+        note: null,
+      },
+    ],
+  });
+  const path = `/return-cases/${detail.case.id}`,
+    lines = detail.lines;
+  const evidence = {
+    note: 'Warehouse counted two units; one damaged',
+    link: null,
+  };
+  detail = await request(`${path}/receipt`, {
+    commandId: randomUUID(),
+    expectedRevision: detail.case.revision,
+    lines: lines.map((l) => ({ orderLineId: l.orderLineId, received: 2 })),
+    evidence,
+  });
+  detail = await request(`${path}/inspection`, {
+    commandId: randomUUID(),
+    expectedRevision: detail.case.revision,
+    lines: lines.map((l) => ({
+      orderLineId: l.orderLineId,
+      resellable: 1,
+      damaged: 1,
+    })),
+    evidence,
+  });
+  await request(
+    `${path}/proposal`,
+    {
+      commandId: randomUUID(),
+      expectedRevision: detail.case.revision,
+      kind: 'refund',
+      lines: lines.map((l) => ({ orderLineId: l.orderLineId, restock: 2 })),
+      evidence,
+    },
+    requester,
+    409,
+  );
+  detail = await request(`${path}/proposal`, {
+    commandId: randomUUID(),
+    expectedRevision: detail.case.revision,
+    kind: 'refund',
+    lines: lines.map((l) => ({ orderLineId: l.orderLineId, restock: 1 })),
+    evidence,
+  });
+
+  return {
+    ...f,
+    org,
+    connectionId,
+    root,
+    requester,
+    approver,
+    request,
+    command,
+    providerOrderId,
+    detail,
+    path,
+    lines,
+    evidence,
+  };
+}

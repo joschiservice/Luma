@@ -116,3 +116,15 @@ approved total units per order line. Unrelated customer notes are discarded befo
 is recorded. A missing, changed or duplicated marker never permits replay; the case keeps
 its uncertain creation slot. Approval reconciles by the exact existing return ID and open
 state. Acceptance alone never means the case is resolved.
+
+### Case refunds
+
+Refund settlement needs `write_orders`, independent order reads and `shopify:returns.manage`.
+The approved plan comes from `Order.suggestedRefund` for received units. Luma sends `refundCreate`
+with the operation UUID as its native `@idempotent` key, captured parent transactions, notifications
+off and `NO_RESTOCK` on every line. Stock is a separate case action. A changed quote blocks dispatch.
+
+Proof independently scans at most 100 refund identities, then 20 lines and 20 transactions for the matching refund. At a bound,
+uniqueness or completeness is unknown. It requires exactly one machine operation marker, the approved
+lines and successful payment transactions in the approved currency. Notes unrelated to the marker
+are discarded. Pending or failed payment remains explicit and never triggers another refund.

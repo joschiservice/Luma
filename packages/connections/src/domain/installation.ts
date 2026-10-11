@@ -6,6 +6,8 @@ export type InstallationCapability =
   | 'orders.shipping-method.write'
   | 'purchase-orders.submit'
   | 'returns.create'
+  | 'returns.refund'
+  | 'returns.restock'
   | 'fulfillment.hold.release'
   | 'fulfillment.open'
   | 'fulfillment.move'

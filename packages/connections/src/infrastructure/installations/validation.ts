@@ -23,6 +23,10 @@ const installationPermissions = z.enum([
   'returns.options.read',
   'returns.created.read',
   'returns.create',
+  'returns.refund',
+  'returns.restock',
+  'returns.settlement.quote.read',
+  'returns.settlement.proof.read',
 ]);
 
 const installationTarget = z
@@ -42,7 +46,7 @@ const installationInput = z
     permissions: z
       .array(installationPermissions)
       .min(1)
-      .max(16)
+      .max(installationPermissions.options.length)
       .refine((v) => new Set(v).size === v.length),
     credentials: installationCredentials,
   })
@@ -52,5 +56,8 @@ export const installationBoundary = {
   input: (value: unknown) => installationInput.parse(value),
   credentials: (value: unknown) => installationCredentials.parse(value),
   permissions: (value: unknown) =>
-    z.array(installationPermissions).max(16).parse(value),
+    z
+      .array(installationPermissions)
+      .max(installationPermissions.options.length)
+      .parse(value),
 };

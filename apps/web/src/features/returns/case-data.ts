@@ -151,3 +151,34 @@ export const caseCommands = (organizationId: string, caseId: string) => {
       api.checkCreation({ params: { ...params, creationId }, body: {} }),
   };
 };
+
+/** Loads separately verified return stock and financial steps. */
+export function returnSettlementOptions(
+  organizationId: string,
+  caseId: string,
+) {
+  return queryOptions({
+    ...privateQueryDefaults,
+    queryKey: [...returnCaseKey(organizationId), caseId, 'settlement'],
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: 'always',
+    queryFn: ({ signal }) =>
+      api.actions({ params: { organizationId, caseId } }, { signal }),
+  });
+}
+
+/** Settlement commands keep request identity stable across uncertain HTTP responses. */
+export function settlementCommands(organizationId: string, caseId: string) {
+  const params = { organizationId, caseId };
+
+  return {
+    request: (body: Body<'requestAction'>) =>
+      api.requestAction({ params, body }),
+    decide: (actionId: string, body: Body<'decideAction'>) =>
+      api.decideAction({ params: { ...params, actionId }, body }),
+    send: (actionId: string) =>
+      api.sendAction({ params: { ...params, actionId }, body: {} }),
+    check: (actionId: string) =>
+      api.checkAction({ params: { ...params, actionId }, body: {} }),
+  };
+}

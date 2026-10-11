@@ -25,7 +25,8 @@
     "@luma/ui": "workspace:*",
     "@tanstack/react-form": "catalog:",
     "react": "catalog:",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "@luma/orders": "workspace:*"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",
