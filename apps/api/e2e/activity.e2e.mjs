@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { workspacePolicyVersion } from '@luma/policies';
 import { expect, it } from 'vitest';
 
 import { seedActivity } from './activity-fixture.mjs';
@@ -281,40 +282,70 @@ it('reads deterministic tenant history, safe provenance, bounded filters and rol
       { id: unboundProposal, tenantId },
     ],
   );
+  // Only a workspace that allows writes reserves executions.
+  await api.request(`/v1/organizations/${tenantId}/settings/write-mode`, {
+    method: 'PATCH',
+    cookie: owner.cookie,
+    body: { commandId: randomUUID(), revision: 0, writeMode: 'writes_enabled' },
+  });
   const policyDecisionId = randomUUID();
-  await db.owner.query(
-    'INSERT INTO policy_decisions(id,tenant_id,proposal_id,action_hash,document) VALUES($1,$2,$3,$4,$5)',
-    [
-      policyDecisionId,
+  // The reservation fence checks the decision against the workspace's effective approval
+  // rule, which it reads in the workspace's context.
+  const workspace = await db.owner.connect();
+  try {
+    await workspace.query('BEGIN');
+    await workspace.query("SELECT set_config('app.tenant_id',$1,true)", [
       tenantId,
-      unboundProposal,
-      'd'.repeat(64),
-      {
-        id: policyDecisionId,
+    ]);
+    const rule = (
+      await workspace.query(
+        'SELECT workspace_requires_independent_approval() AS required, (SELECT policy_revision FROM workspace_settings WHERE tenant_id=$1) AS revision',
+        [tenantId],
+      )
+    ).rows[0];
+    await workspace.query(
+      'INSERT INTO policy_decisions(id,tenant_id,proposal_id,action_hash,document) VALUES($1,$2,$3,$4,$5)',
+      [
+        policyDecisionId,
         tenantId,
-        proposalId: unboundProposal,
-        outcome: 'allowed',
-        policyVersion: 'v0.1',
-      },
-    ],
-  );
-  await db.owner.query(
-    "INSERT INTO executed_actions(id,tenant_id,proposal_id,idempotency_key,action_hash,state,document) VALUES($1,$2,$3,$4,$5,'prepared',$6)",
-    [
-      executionId,
-      tenantId,
-      unboundProposal,
-      `v0:${unboundProposal}`,
-      'd'.repeat(64),
-      {
-        id: executionId,
+        unboundProposal,
+        'd'.repeat(64),
+        {
+          id: policyDecisionId,
+          tenantId,
+          proposalId: unboundProposal,
+          outcome: 'allowed',
+          policyVersion: workspacePolicyVersion(
+            rule.revision ?? 0,
+            rule.required,
+          ),
+        },
+      ],
+    );
+    await workspace.query(
+      "INSERT INTO executed_actions(id,tenant_id,proposal_id,idempotency_key,action_hash,state,document) VALUES($1,$2,$3,$4,$5,'prepared',$6)",
+      [
+        executionId,
         tenantId,
-        proposalId: unboundProposal,
-        state: 'prepared',
-        attempt: { policyDecisionId },
-      },
-    ],
-  );
+        unboundProposal,
+        `v0:${unboundProposal}`,
+        'd'.repeat(64),
+        {
+          id: executionId,
+          tenantId,
+          proposalId: unboundProposal,
+          state: 'prepared',
+          attempt: { policyDecisionId },
+        },
+      ],
+    );
+    await workspace.query('COMMIT');
+  } catch (error) {
+    await workspace.query('ROLLBACK');
+    throw error;
+  } finally {
+    workspace.release();
+  }
   for (const phase of ['pending', 'completed']) {
     await db.owner.query(
       'INSERT INTO execution_verifications(tenant_id,id,proposal_id,phase,document) VALUES($1,$2,$3,$4,$5)',

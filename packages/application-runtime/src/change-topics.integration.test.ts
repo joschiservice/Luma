@@ -1,48 +1,21 @@
-import { randomUUID } from 'node:crypto';
-import { readdir, readFile } from 'node:fs/promises';
-
-import { Pool } from 'pg';
+import type { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+import { createMigratedDatabase } from './test-support/database.js';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 
 describe.skipIf(!databaseUrl)('workspace change topics', () => {
-  const name = `topics_${randomUUID().replaceAll('-', '')}`;
-  const admin = new Pool({ connectionString: databaseUrl });
+  let database: Awaited<ReturnType<typeof createMigratedDatabase>>;
   let owner: Pool;
 
   beforeAll(async () => {
-    await admin.query(`CREATE DATABASE "${name}"`);
-    const url = new URL(databaseUrl!);
-    url.pathname = `/${name}`;
-    owner = new Pool({ connectionString: url.toString() });
-    const setup = await admin.connect();
-    try {
-      await setup.query(
-        "SELECT pg_advisory_lock(hashtext('luma_test_role_setup'))",
-      );
-      for (const file of (
-        await readdir(new URL('../migrations/', import.meta.url))
-      ).sort())
-        if (file.endsWith('.sql'))
-          await owner.query(
-            await readFile(
-              new URL(`../migrations/${file}`, import.meta.url),
-              'utf8',
-            ),
-          );
-    } finally {
-      await setup.query(
-        "SELECT pg_advisory_unlock(hashtext('luma_test_role_setup'))",
-      );
-      setup.release();
-    }
+    database = await createMigratedDatabase(databaseUrl!);
+    owner = database.owner;
   });
 
   afterAll(async () => {
-    await owner?.end();
-    await admin.query(`DROP DATABASE IF EXISTS "${name}"`);
-    await admin.end();
+    await database?.drop();
   });
 
   // Live views refresh only for named topics, and a trigger missing an operation leaves
