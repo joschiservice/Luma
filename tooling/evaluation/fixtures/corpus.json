@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "shipping-correction/1",
+  "version": "shipping-correction/2",
   "fixture": {
     "version": "1",
     "provider": {
@@ -1899,7 +1899,7 @@
     },
     {
       "id": "partial-failure",
-      "version": "1",
+      "version": "2",
       "controls": {
         "commands": [
           {
@@ -1928,7 +1928,7 @@
             "operation": "orders.shipping-method.read",
             "resource": "1",
             "occurrence": 3,
-            "remaining": 1,
+            "remaining": 3,
             "matches": 0,
             "status": "armed",
             "kind": "unavailable"

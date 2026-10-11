@@ -27,6 +27,8 @@ Each reconstructed fixture contains:
 - `controls`: optional verification delay, external change before verification, or interruption before execution completion is persisted.
 - `expected`: exact ordered capability calls (including input, connection, tenant, version and idempotency key), provider PATCH requests, interpreter outcome sequence, and final JTL shipping method.
 
+Fault rules count provider requests, not capability calls. Reads repeat a transient failure up to three attempts, so a fault meant to fail one read must cover every attempt; a shorter fault is absorbed by the retry, and the scenario no longer exercises the failure it describes.
+
 Expectations are reviewed fixtures, never regenerated from a candidate's output. Unexpected capability calls and provider writes are rejected before dispatch and retained as violations even if execution catches the error. Missing calls, additional calls, wrong ordering, incorrect outcomes and Shopify state changes fail the gate.
 
 The corpus covers successful correction, approval denial, stale evidence, replay/idempotency, tenant isolation, lost response after commit, uncertain dispatch without commit, verification outage after a successful write, delayed/failed verification, exceeded verification windows, and worker restart with a persisted reservation.
