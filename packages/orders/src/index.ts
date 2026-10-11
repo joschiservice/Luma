@@ -21,6 +21,8 @@ export type {
 
 export type { OrderStateQueries } from './application/order-state.js';
 
+export type { ReturnCaseAttention } from './application/return-cases.js';
+
 export type {
   ComparisonState,
   ComparisonDifference,

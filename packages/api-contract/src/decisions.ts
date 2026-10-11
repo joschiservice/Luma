@@ -7,6 +7,7 @@ const timestamp = z.string().datetime({ offset: true });
 /** The owner whose authoritative decision an item projects. */
 const decisionKindSchema = z.enum([
   'case',
+  'return_case',
   'replenishment',
   'fulfillment_recovery',
   'inventory_correction',
@@ -55,6 +56,7 @@ const decisionViewSchema = z.enum(['all', 'mine', 'unassigned']);
 
 /** Where the authoritative decision controls live. Every surface acts on this same owner. */
 const decisionOwnerSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('return_case'), caseId: z.string().uuid() }),
   z.object({
     kind: z.literal('human_task'),
     definitionId: z.string(),

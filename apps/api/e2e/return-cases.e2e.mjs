@@ -83,6 +83,58 @@ it('counts partial returns once, keeps decisions apart from store records and en
     first.case.id,
     second.case.id,
   ]);
+  // Search is paged persisted data, and its cursor cannot be reused with another filter.
+  const found = await f.request(
+    f.member,
+    `${f.base}/return-cases?q=%231002&limit=1`,
+  );
+  expect(found.items).toHaveLength(1);
+  expect(found.items[0].orderNumber).toBe('#1002');
+  expect(found.nextCursor).toBeTruthy();
+  const next = await f.request(
+    f.member,
+    `${f.base}/return-cases?q=%231002&limit=1&cursor=${found.nextCursor}`,
+  );
+  expect(new Set([found.items[0].id, next.items[0].id])).toEqual(
+    new Set([first.case.id, second.case.id]),
+  );
+  await f.request(
+    f.member,
+    `${f.base}/return-cases?q=other&limit=1&cursor=${found.nextCursor}`,
+    'GET',
+    undefined,
+    422,
+  );
+
+  // A customer link uses the exact source order mapping, without copying contact details.
+  const customerId = randomUUID();
+  await f.db.owner.query(
+    `INSERT INTO customer_profiles(tenant_id,connection_id,external_id,id,state,contact_shared,address_shared,observed_at,observation_id) VALUES($1,$2,'customer-1002',$3,'enabled',false,false,now(),$4)`,
+    [f.org.id, r.store, customerId, randomUUID()],
+  );
+  await f.db.owner.query(
+    `INSERT INTO customer_orders(tenant_id,connection_id,order_scope_key,order_external_id,customer_external_id,observed_at) VALUES($1,$2,'','gid://shopify/Order/1002','customer-1002',now())`,
+    [f.org.id, r.store],
+  );
+  expect(
+    (
+      await f.request(
+        f.member,
+        `${f.base}/return-cases?customerId=${customerId}`,
+      )
+    ).items
+      .map((c) => c.id)
+      .sort(),
+  ).toEqual([first.case.id, second.case.id].sort());
+  expect(
+    (
+      await f.request(
+        f.member,
+        `${f.base}/return-cases?customerId=${randomUUID()}`,
+      )
+    ).items,
+  ).toEqual([]);
+
   // The store's own record is unchanged.
   const store = await f.request(
     f.member,
@@ -215,6 +267,27 @@ it('counts partial returns once, keeps decisions apart from store records and en
   });
   expect(detail.case.assignee).toEqual({ id: f.owner.id, name: 'Owner' });
 
+  // Needs you keeps the owning case assignment and offers members a read-only review.
+  const queue = await f.request(
+    f.member,
+    `${f.base}/decisions?view=all&limit=100`,
+  );
+  const attention = queue.items.find(
+    (item) => item.id === `return-case:${first.case.id}`,
+  );
+  expect(attention).toMatchObject({
+    kind: 'return_case',
+    response: 'view_only',
+    owner: { kind: 'return_case', caseId: first.case.id },
+    assignment: { assigneeId: f.owner.id, assignedBy: f.owner.id },
+  });
+  await post(
+    f.owner,
+    `${f.base}/decisions/assignments`,
+    { decisionId: attention.id, assigneeId: f.owner.id, revision: 0 },
+    404,
+  );
+
   // Cancelling frees the units; the store return no longer counts through the cancelled case.
   const cancelled = await post(
     f.owner,
@@ -267,11 +340,53 @@ it('counts partial returns once, keeps decisions apart from store records and en
     { commandId: randomUUID(), expectedRevision: 5, reason: 'Not mine' },
     404,
   );
+  expect(
+    (
+      await f.request(
+        f.outsider,
+        `/v1/organizations/${other.id}/return-cases?q=%231002&limit=20`,
+      )
+    ).items,
+  ).toEqual([]);
   const rows = await f.db.owner.query(
     'SELECT tenant_id FROM orders_return_cases WHERE id=$1',
     [first.case.id],
   );
   expect(rows.rows).toEqual([{ tenant_id: f.org.id }]);
+
+  const role = await f.app.inject({
+    method: 'POST',
+    url: `${f.base}/roles`,
+    headers: {
+      origin: f.config.baseURL,
+      cookie: f.owner.cookie,
+      'x-command-id': randomUUID(),
+    },
+    payload: {
+      name: 'Return reader',
+      description: '',
+      permissions: ['returns.read', 'orders.read'],
+    },
+  });
+  expect(role.statusCode, role.body).toBe(201);
+  await f.request(f.owner, `${f.base}/members/${f.membership.id}`, 'PATCH', {
+    roleId: role.json().id,
+  });
+  await f.request(
+    f.member,
+    `${f.base}/return-cases?customerId=${customerId}`,
+    'GET',
+    undefined,
+    403,
+  );
+  expect(
+    (
+      await f.request(f.member, `${f.base}/return-cases?openOnly=true`)
+    ).items.map((c) => c.id),
+  ).toEqual([first.case.id]);
+  expect(
+    (await f.request(f.member, `${f.base}/return-cases?openOnly=false`)).items,
+  ).toHaveLength(2);
 });
 
 /** Signs in a seeded pilot user and returns their session cookie. */

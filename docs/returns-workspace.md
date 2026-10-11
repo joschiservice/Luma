@@ -140,3 +140,16 @@ scans the tenant's returns (about 150 ms at 20,000); much larger volumes need a 
 search index like the order list's. Re-measure with `LUMA_RETURN_BENCHMARK=<return count>` on
 `returns.e2e.mjs`. The benchmark copies one return, so its detail reads are larger than for a
 real order.
+
+### Service review
+
+The case service view combines audited operator decisions with source return events and refund
+payments. It retains their origins and read times. Missing source transitions stay absent.
+The customer summary confirms payment facts only while the return and every associated refund
+read are at most 24 hours old and the connection has healthy, granted access. Pending and failed
+payments remain separate from successful money returned. A proposal is not execution evidence.
+
+Case search and Needs you use persisted tenant data, never provider reads. Customer links follow
+explicit source order mappings and require both customer and returns access. Linked orders retain
+case reachability. Needs you uses the case's audited assignment; assignment changes go through
+the case's revision-checked command and never grant action or approval authority.

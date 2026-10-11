@@ -25,6 +25,7 @@ export {
   messageReplyDecisionProvider,
   replenishmentDecisionProvider,
   replySendDecisionProvider,
+  returnCaseDecisionProvider,
   supplierCommitmentDecisionProvider,
   workflowHandoverDecisionProvider,
 } from './infrastructure/decisions/providers.js';

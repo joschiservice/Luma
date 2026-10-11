@@ -197,6 +197,13 @@ const returnCaseSummarySchema = z.object({
   updatedAt: z.string(),
 });
 
+export const returnCaseListSchema = z.object({
+  items: z.array(
+    returnCaseSummarySchema.extend({ orderNumber: z.string().nullable() }),
+  ),
+  nextCursor: z.string().nullable(),
+});
+
 const decidedSchema = z.object({
   by: personSchema,
   at: z.string(),

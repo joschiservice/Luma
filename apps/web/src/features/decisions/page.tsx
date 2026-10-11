@@ -78,6 +78,7 @@ import {
   groupDecisions,
   impactLabels,
   kindLabels,
+  localizeReturnDecision,
   memberName,
   reasonLabels,
   viewLabels,
@@ -228,7 +229,7 @@ export function NeedsYouView({
       cursor: undefined,
     });
   const filtered = !!(search.domain || search.reason);
-  const items = list?.items ?? [];
+  const items = (list?.items ?? []).map(localizeReturnDecision);
   const unavailable = list?.sources.filter((s) => s.state === 'unavailable');
   const open = (id: string | undefined) => onChange({ ...search, item: id });
   const empty = emptyCopy(view, filtered);
@@ -691,7 +692,9 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
             members={memberList}
             self={self}
             assignmentAccess={
-              item.kind === 'human_task' || item.kind === 'case'
+              item.kind === 'human_task' ||
+              item.kind === 'case' ||
+              item.kind === 'return_case'
                 ? 'none'
                 : assignmentAccess
             }

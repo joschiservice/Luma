@@ -44,11 +44,32 @@ export const uncertainFailure = (error: unknown) =>
 export const returnCaseKey = (organizationId: string) =>
   ['private', 'organization', organizationId, 'return-cases'] as const;
 
+/** Searches return cases with tenant-scoped source and customer filters. */
+export function returnCasesOptions(
+  organizationId: string,
+  query: {
+    q?: string;
+    customerId?: string;
+    openOnly?: boolean;
+    cursor?: string;
+    limit?: number;
+  } = {},
+) {
+  return queryOptions({
+    ...privateQueryDefaults,
+    queryKey: [...returnCaseKey(organizationId), 'list', query],
+    queryFn: ({ signal }) =>
+      api.list({ params: { organizationId }, query }, { signal }),
+  });
+}
+
 /** Loads one return case with its lines, decisions, history and creation state. */
 export function returnCaseOptions(organizationId: string, caseId: string) {
   return queryOptions({
     ...privateQueryDefaults,
     queryKey: [...returnCaseKey(organizationId), caseId],
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: 'always',
     refetchOnReconnect: 'always',
     queryFn: ({ signal }) =>
       api.get({ params: { organizationId, caseId } }, { signal }),

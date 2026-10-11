@@ -26,6 +26,21 @@ export function returnCaseRoutes(service?: ReturnCases) {
   const os = implement(apiContract.returnCases).$context<HttpContext>();
 
   return os.router({
+    list: os.list.handler(({ context: { request }, input }) => {
+      const s = use(request);
+
+      return s.service.list(s.context, {
+        q: input.query.q,
+        limit: input.query.limit,
+        ...(input.query.customerId
+          ? { customerId: input.query.customerId }
+          : {}),
+        ...(input.query.openOnly !== undefined
+          ? { openOnly: input.query.openOnly }
+          : {}),
+        ...(input.query.cursor ? { cursor: input.query.cursor } : {}),
+      });
+    }),
     forOrder: os.forOrder.handler(({ context: { request }, input }) => {
       const s = use(request);
 

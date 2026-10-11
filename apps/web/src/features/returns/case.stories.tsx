@@ -12,6 +12,7 @@ import { expect, userEvent, within } from 'storybook/test';
 
 import appStyles from '../../styles.css?inline';
 import { ReturnCaseView } from './case';
+import { detail as sourceDetail } from './returns-fixtures';
 
 const org = '99999999-9999-4999-8999-999999999999';
 const alex = {
@@ -233,7 +234,13 @@ const details: Record<string, ReturnCaseDetail> = {
   cancelled,
 };
 
-function Preview({ state = 'open' }: { state?: string }) {
+function Preview({
+  state = 'open',
+  evidence,
+}: {
+  state?: string;
+  evidence?: 'fresh' | 'stale' | 'loading' | 'unavailable';
+}) {
   const [client] = useState(() => new QueryClient());
   const [router] = useState(() =>
     createRouter({
@@ -245,6 +252,27 @@ function Preview({ state = 'open' }: { state?: string }) {
             <ReturnCaseView
               organizationId={org}
               detail={details[state]}
+              sourceDetail={
+                evidence === 'fresh' || evidence === 'stale'
+                  ? {
+                      ...sourceDetail,
+                      item: {
+                        ...sourceDetail.item,
+                        observedAt:
+                          evidence === 'fresh'
+                            ? open.asOf
+                            : '2026-09-01T00:00:00Z',
+                      },
+                      refunds: sourceDetail.refunds.map((r) => ({
+                        ...r,
+                        observedAt:
+                          evidence === 'fresh' ? open.asOf : r.observedAt,
+                      })),
+                    }
+                  : undefined
+              }
+              sourceLoading={evidence === 'loading'}
+              sourceUnavailable={evidence === 'unavailable'}
               loading={state === 'loading'}
               error={state === 'missing' ? 'missing' : undefined}
               refresh={() => {}}
@@ -352,5 +380,41 @@ export const ShopifyApproval: Story = {
     await expect(
       canvas.getByRole('button', { name: 'Approve the return in Shopify' }),
     ).toBeVisible();
+  },
+};
+
+export const SourceLoading: Story = {
+  args: { evidence: 'loading' },
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).getByText('Loading source evidence…'),
+    ).toBeVisible();
+  },
+};
+
+export const SourceUnavailable: Story = {
+  args: { evidence: 'unavailable' },
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(
+        within(canvasElement).getByRole('region', {
+          name: 'What you can tell the customer',
+        }),
+      ).getByText(
+        'Source evidence is unavailable. Financial status cannot be confirmed.',
+      ),
+    ).toBeVisible();
+  },
+};
+
+export const StaleSource: Story = {
+  args: { evidence: 'stale' },
+  play: async ({ canvasElement }) => {
+    const summary = within(
+      within(canvasElement).getByRole('region', {
+        name: 'What you can tell the customer',
+      }),
+    );
+    await expect(summary.queryByText('Observed money returned')).toBeNull();
   },
 };

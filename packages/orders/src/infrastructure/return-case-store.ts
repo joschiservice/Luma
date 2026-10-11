@@ -66,6 +66,51 @@ export function createReturnCaseStore(
           );
 
         return operation({
+          findCases: async (query) => {
+            const q = query.q.trim();
+            const pattern = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+            const rows = await tx.query<{
+              document: ReturnCase;
+              orderNumber: string | null;
+              creation: ReturnCreation | null;
+              assignment: ReturnCaseEvent | null;
+            }>(
+              `SELECT c.document,cr.document AS creation,ce.document AS assignment,s.document->'data'->>'displayNumber' AS "orderNumber"
+              FROM orders_return_cases c
+              LEFT JOIN orders_entity_redirects red ON red.tenant_id=c.tenant_id AND red.entity_id=c.order_id
+              LEFT JOIN LATERAL (SELECT document FROM orders_return_creations WHERE tenant_id=c.tenant_id AND case_id=c.id ORDER BY created_at DESC,id DESC LIMIT 1) cr ON true
+              LEFT JOIN LATERAL (SELECT document FROM orders_return_case_events WHERE tenant_id=c.tenant_id AND case_id=c.id AND kind='assigned' ORDER BY occurred_at DESC,revision DESC LIMIT 1) ce ON true
+              LEFT JOIN orders_projections p ON p.tenant_id=c.tenant_id AND p.entity_id=COALESCE(red.target_entity_id,c.order_id) AND p.connection_id=c.connection_id
+              LEFT JOIN orders_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
+              WHERE c.tenant_id=$1 AND (NOT $2::boolean OR c.state='open')
+              AND ($3='' OR c.id::text=lower($3) OR c.order_id::text=lower($3) OR s.document->'data'->>'displayNumber' ILIKE $4
+                OR EXISTS (SELECT 1 FROM jsonb_array_elements(c.document->'lines') l WHERE l->>'sku' ILIKE $4 OR l->>'title' ILIKE $4)
+                OR EXISTS (SELECT 1 FROM connector_source_mappings m WHERE m.tenant_id=c.tenant_id AND m.connection_id=c.connection_id
+                  AND m.canonical_id IN (COALESCE(red.target_entity_id,c.order_id),c.source_return_id) AND m.resource IN ('order','return') AND m.external_id ILIKE $4))
+              AND ($5::uuid IS NULL OR EXISTS (SELECT 1 FROM customer_profiles cp JOIN customer_orders co ON co.tenant_id=cp.tenant_id AND co.connection_id=cp.connection_id AND co.customer_external_id=cp.external_id
+                JOIN connector_source_mappings m ON m.tenant_id=co.tenant_id AND m.connection_id=co.connection_id AND m.resource='order' AND m.external_id=co.order_external_id AND m.scope_key=co.order_scope_key
+                WHERE cp.tenant_id=c.tenant_id AND cp.id=$5 AND m.canonical_id=COALESCE(red.target_entity_id,c.order_id)))
+              AND ($6::timestamptz IS NULL OR (c.updated_at,c.id)<($6,$7::uuid))
+              ORDER BY c.updated_at DESC,c.id DESC LIMIT $8`,
+              [
+                tenantId,
+                !!query.openOnly,
+                q,
+                pattern,
+                query.customerId ?? null,
+                query.after?.at ?? null,
+                query.after?.id ?? null,
+                query.limit,
+              ],
+            );
+
+            return rows.rows.map((row) => ({
+              value: row.document,
+              orderNumber: row.orderNumber,
+              creation: row.creation,
+              assignment: row.assignment,
+            }));
+          },
           lockOrder: async (orderId) => {
             await tx.query(
               'SELECT pg_advisory_xact_lock(hashtextextended($1,0))',

@@ -25,6 +25,7 @@ import {
   evidenceLabels,
   impactLabels,
   kindLabels,
+  localizeReturnDecision,
   memberName,
   timeLeft,
 } from './presentation';
@@ -116,7 +117,15 @@ function RecordLinks({
           {m.decisions_open_record()} <ArrowUpRight aria-hidden="true" />
         </Link>
       ) : null}
-      {owner.kind === 'case' ? (
+      {owner.kind === 'return_case' ? (
+        <Link
+          className={link}
+          to="/app/$organizationId/returns/cases/$caseId"
+          params={{ organizationId, caseId: owner.caseId }}
+        >
+          {m.returns_service_open_case()} <ArrowUpRight aria-hidden="true" />
+        </Link>
+      ) : owner.kind === 'case' ? (
         <Link
           className={link}
           to="/app/$organizationId/exceptions/$exceptionId/detail"
@@ -212,7 +221,7 @@ function Assignment({
  */
 export function DecisionInspector({
   organizationId,
-  item,
+  item: rawItem,
   departed = false,
   members,
   self,
@@ -240,6 +249,7 @@ export function DecisionInspector({
   assignError?: string | undefined;
   review: ReactNode;
 }) {
+  const item = localizeReturnDecision(rawItem);
   const id = useId();
   const status = decisionStatus(item);
   const requester = memberName(item.requesterId, members, self);

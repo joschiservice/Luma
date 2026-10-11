@@ -38,6 +38,7 @@ import {
 
 import { ordersOptions, suppliersOptions } from '../features/procurement/data';
 import { recordsOptions } from '../features/records/data';
+import { returnCasesOptions } from '../features/returns/case-data';
 import { usePermissions } from '../kit/identity/permissions';
 import { askLuma } from '../lib/assistant-panel';
 import { usesCommandKey } from '../lib/keyboard';
@@ -201,6 +202,10 @@ export function WorkspaceSearch({
   const records = useQuery({
     ...recordsOptions(organizationId, { q: recordQuery }),
     enabled: open && recordQuery.length >= 2,
+  });
+  const returnCases = useQuery({
+    ...returnCasesOptions(organizationId, { q: recordQuery, limit: 5 }),
+    enabled: open && recordQuery.length >= 2 && can('returns.read'),
   });
 
   // Procurement records are Luma-owned, so they are searched here rather than in Records.
@@ -425,6 +430,30 @@ export function WorkspaceSearch({
               />
             </Link>
           ))}
+          {returnCases.data?.items.map((item) => (
+            <Link
+              key={`return-case:${item.id}`}
+              className="command-item"
+              to="/app/$organizationId/returns/cases/$caseId"
+              params={{ organizationId, caseId: item.id }}
+              onClick={() => changeOpen(false)}
+            >
+              <span className="command-item-icon">
+                <DomainIcon domain="returns" size="sm" />
+              </span>
+              <span className="command-item-copy">
+                <strong>
+                  {m.returns_case_title({
+                    order: item.orderNumber ?? item.orderId.slice(0, 8),
+                  })}
+                </strong>
+                <span>{m.returns_service_cases()}</span>
+              </span>
+            </Link>
+          ))}
+          {returnCases.isError && can('returns.read') ? (
+            <p role="status">{m.returns_case_load_failed()}</p>
+          ) : null}
           {purchaseResults.map((item) => (
             <Link
               key={item.key}

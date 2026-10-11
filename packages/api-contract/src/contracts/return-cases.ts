@@ -12,6 +12,7 @@ import {
   recordReceiptSchema,
   requestReturnCreationSchema,
   returnCaseDetailSchema,
+  returnCaseListSchema,
   returnCreationOptionsSchema,
 } from '../return-cases.js';
 
@@ -54,6 +55,33 @@ function caseCommand<T extends z.ZodTypeAny>(
 }
 
 export const returnCasesContract = {
+  list: endpoint
+    .route({
+      method: 'GET',
+      path: `${path}/return-cases`,
+      summary: 'Find return cases',
+      description:
+        'Searches persisted return cases by case, order, source identity or item. Customer filtering also requires customers.read and follows source order mappings. No provider is called. The cursor is bound to the tenant and filters.',
+    })
+    .meta({ access: requires('returns.read'), errors: [401, 403, 422, 503] })
+    .input(
+      z.object({
+        params: organizationParamsSchema,
+        query: z.object({
+          q: z.string().max(120).default(''),
+          customerId: z.string().uuid().optional(),
+          openOnly: z
+            .union([
+              z.boolean(),
+              z.enum(['true', 'false']).transform((value) => value === 'true'),
+            ])
+            .optional(),
+          cursor: z.string().max(4096).optional(),
+          limit: z.coerce.number().int().min(1).max(50).default(20),
+        }),
+      }),
+    )
+    .output(returnCaseListSchema),
   forOrder: endpoint
     .route({
       method: 'GET',

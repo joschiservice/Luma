@@ -64,6 +64,7 @@ import {
   messageReplyDecisionProvider,
   replenishmentDecisionProvider,
   replySendDecisionProvider,
+  returnCaseDecisionProvider,
   supplierCommitmentDecisionProvider,
   workflowHandoverDecisionProvider,
 } from '@luma/read-models/composition';
@@ -640,6 +641,7 @@ export function createApplicationServices(
           })),
       },
       replenishmentDecisionProvider(replenishment.pending),
+      returnCaseDecisionProvider(returnCases.pending),
       supplierCommitmentDecisionProvider(async (context) =>
         (await commitments.pending(context)).map((item) => ({
           key: item.attention.key,
@@ -717,7 +719,12 @@ export function createApplicationServices(
     refreshContext: identity.refreshContext,
     members: async (context) =>
       (await identity.listMembers(context)).map((member) => member.userId),
-    pending: async (context, id) => !!(await decisions.find(context, id)),
+    pending: async (context, id) => {
+      const item = await decisions.find(context, id);
+
+      // Return case assignments belong to the case's revision-checked command.
+      return !!item && item.owner.kind !== 'return_case';
+    },
   });
   const orderQueries = {
     state: orderStateQueries,

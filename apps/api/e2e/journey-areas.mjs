@@ -211,6 +211,7 @@ const returns = [
   'packages/api-contract/src/**/returns.ts',
 ];
 const customers = [
+  'packages/application-runtime/migrations/0087_return_service_reads.sql',
   ...rmCustomers,
   'packages/customers/**',
   'packages/api-contract/src/**/customers.ts',
@@ -232,6 +233,8 @@ const operationalMetrics = [
   'packages/api-contract/src/operational-metrics.ts',
 ];
 const decisions = [
+  'packages/application-runtime/migrations/0087_return_service_reads.sql',
+  'packages/read-models/src/domain/return-case-decisions.ts',
   ...rmDecisions,
   'packages/resolution/**',
   'packages/api-contract/src/**/decisions.ts',
@@ -306,6 +309,7 @@ const messaging = [
   'packages/i18n/messages/*/{gmail,messaging}.json',
 ];
 const returnCases = [
+  'packages/application-runtime/migrations/0087_return_service_reads.sql',
   'packages/application-runtime/migrations/0086_return_creation_binding.sql',
   'packages/orders/**',
   'packages/api-contract/src/**/return-cases.ts',
@@ -891,6 +895,11 @@ export const journeyAreas = {
     ...decisions,
   ],
   'returns.browser.mjs': [
+    ...returnCases,
+    ...customers,
+    ...decisions,
+    ...webCustomers,
+    ...webNeedsYou,
     ...commerce,
     ...returns,
     ...orders,

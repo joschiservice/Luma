@@ -1,4 +1,6 @@
 /* global document */
+import { randomUUID } from 'node:crypto';
+
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 import { returnsFixture } from './returns-fixture.mjs';
@@ -11,6 +13,46 @@ test('opens a return from its order, tells pending work from money returned and 
     origin = `http://127.0.0.1:${port}`;
   const f = await settingsFixture(t, origin);
   const r = await returnsFixture(t, f);
+  const casesPath = `${f.base}/orders/${r.orders[1002]}/return-cases`;
+  const options = await f.request(f.owner, casesPath);
+  const line = options.sources.find((source) => source.connectionId === r.store)
+    .lines[0];
+  let service = await f.request(f.owner, casesPath, 'POST', {
+    id: randomUUID(),
+    connectionId: r.store,
+    sourceReturnId: r.returns.received,
+    lines: [
+      {
+        orderLineId: line.orderLineId,
+        quantity: 2,
+        reason: 'defective',
+        note: null,
+      },
+    ],
+  });
+  service = await f.request(
+    f.owner,
+    `${f.base}/return-cases/${service.case.id}/receipt`,
+    'POST',
+    {
+      commandId: randomUUID(),
+      expectedRevision: 1,
+      lines: [{ orderLineId: line.orderLineId, received: 2 }],
+      evidence: { note: 'Warehouse received both items', link: null },
+    },
+  );
+  const customerId = randomUUID();
+  await f.db.owner.query(
+    `INSERT INTO customer_profiles(tenant_id,connection_id,external_id,id,state,contact_shared,address_shared,observed_at,observation_id) VALUES($1,$2,'customer-1002',$3,'enabled',false,false,now(),$4)`,
+    [f.org.id, r.store, customerId, randomUUID()],
+  );
+  await f.db.owner.query(
+    `INSERT INTO customer_orders(tenant_id,connection_id,order_scope_key,order_external_id,customer_external_id,observed_at) VALUES($1,$2,'','gid://shopify/Order/1002','customer-1002',now())`,
+    [f.org.id, r.store],
+  );
+  const now = new Date().toISOString();
+  await r.refund('2001', 1002, true, [{ status: 'failed' }], now);
+  await r.refund('2002', 1002, true, [{ status: 'pending' }], now);
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
   const web = startProcess(
     t,
@@ -144,5 +186,64 @@ test('opens a return from its order, tells pending work from money returned and 
   await page.keyboard.press('g');
   await page.keyboard.press('t');
   await page.waitForURL(`**/app/${f.org.id}/returns*`);
+  // The case combines source payments with the separately recorded warehouse receipt.
+  await page.goto(`/app/${f.org.id}/orders/${r.orders[1002]}`);
+  await page.getByRole('link', { name: /Return case/ }).click();
+  await page
+    .getByRole('heading', { name: 'Return case for order #1002', level: 1 })
+    .waitFor();
+  const summary = page.getByRole('region', {
+    name: 'What you can tell the customer',
+  });
+  await expect(summary).toContainText('Payment still processing');
+  await expect(summary).toContainText('€48.00');
+  await expect(summary).toContainText(/Observed money returned\s*Not reported/);
+  const timeline = page.getByRole('region', { name: 'Return timeline' });
+  await expect(timeline).toContainText('Warehouse received both items');
+  await expect(timeline).toContainText('Refund payment pending');
+  await expect(timeline).toContainText('Luma decision');
+  await screenshot('service');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: '/tmp/luma193-service-mobile.png',
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+
+  await page.goto(`/app/${f.org.id}/customers/${customerId}`);
+  await page
+    .getByRole('region', { name: 'Return cases' })
+    .getByRole('link', { name: /Return case for order #1002/ })
+    .click();
+  await page.waitForURL(`**/returns/cases/${service.case.id}`);
+
+  // Keyboard search reaches the same authoritative case review.
+  await page.keyboard.press('Meta+k');
+  const workspaceSearch = page.getByRole('textbox', {
+    name: 'Search workspace',
+  });
+  await workspaceSearch.fill(service.case.id);
+  await page
+    .getByRole('navigation', { name: 'Search results' })
+    .getByRole('link', { name: /Return case for order #1002/ })
+    .focus();
+  await page.keyboard.press('Enter');
+  await page.waitForURL(`**/returns/cases/${service.case.id}`);
+
+  await page.goto(
+    `/app/${f.org.id}/needs-you?item=return-case:${service.case.id}`,
+  );
+  await page
+    .getByRole('link', { name: 'Open return case', exact: true })
+    .first()
+    .click();
+  await page.waitForURL(`**/returns/cases/${service.case.id}`);
   expect(errors).toEqual([]);
 });
