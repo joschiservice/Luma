@@ -82,7 +82,11 @@ export function CaseResolution({
 
           return;
         }
-        if (kind !== 'escalate' && !sameResolution(review, fresh.review)) {
+        if (
+          kind !== 'escalate' &&
+          kind !== 'close' &&
+          !sameResolution(review, fresh.review)
+        ) {
           setCheckError(
             m.exceptions_resolution_changed(),
             fresh.review.proposal?.id,
@@ -125,7 +129,8 @@ export function CaseResolution({
         if (
           !(error instanceof IdentityError) ||
           error.status !== 409 ||
-          !review.refreshable
+          !review.refreshable ||
+          kind === 'close'
         )
           throw error;
         // A rejected version check did not commit. Retry only the same visible action.
@@ -153,7 +158,7 @@ export function CaseResolution({
         command &&
         !(
           error instanceof IdentityError &&
-          [400, 401, 403, 404, 409].includes(error.status)
+          [400, 401, 403, 404, 409, 422].includes(error.status)
         )
       ) {
         setUncertain(command);
@@ -198,7 +203,7 @@ export function CaseResolution({
       if (
         retry &&
         error instanceof IdentityError &&
-        [400, 401, 403, 404, 409].includes(error.status)
+        [400, 401, 403, 404, 409, 422].includes(error.status)
       )
         setUncertain(undefined);
       setMessage(
@@ -296,18 +301,22 @@ export function CaseResolution({
       {receipt ? (
         <CaseNotice
           title={
-            receipt.kind === 'approve'
-              ? m.exceptions_receipt_approve_title()
-              : receipt.kind === 'reject'
-                ? m.exceptions_receipt_reject_title()
-                : m.exceptions_receipt_escalate_title()
+            receipt.kind === 'close'
+              ? m.issues_resolution_human_title()
+              : receipt.kind === 'approve'
+                ? m.exceptions_receipt_approve_title()
+                : receipt.kind === 'reject'
+                  ? m.exceptions_receipt_reject_title()
+                  : m.exceptions_receipt_escalate_title()
           }
         >
-          {receipt.kind === 'approve'
-            ? m.exceptions_receipt_approve_text()
-            : receipt.kind === 'reject'
-              ? m.exceptions_receipt_reject_text()
-              : m.exceptions_receipt_escalate_text()}
+          {receipt.kind === 'close'
+            ? m.issues_resolution_human_note()
+            : receipt.kind === 'approve'
+              ? m.exceptions_receipt_approve_text()
+              : receipt.kind === 'reject'
+                ? m.exceptions_receipt_reject_text()
+                : m.exceptions_receipt_escalate_text()}
         </CaseNotice>
       ) : null}
       {uncertain ? (
@@ -362,7 +371,9 @@ export function CaseResolution({
                   ...data.review,
                   permittedDecisions: data.review.permittedDecisions.filter(
                     (kind) =>
-                      kind === 'escalate' || (!expired && kind === 'reject'),
+                      kind === 'close' ||
+                      kind === 'escalate' ||
+                      (!expired && kind === 'reject'),
                   ),
                 }
               : data.review

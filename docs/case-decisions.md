@@ -1,6 +1,6 @@
 # Case decisions and progress
 
-The case desk lets people review a case's immutable proposal, approve, reject or escalate
+The case desk lets people review a case's immutable proposal, approve, reject, escalate or close
 it, and follow execution and verification. A decision response is a durable receipt, not
 an execution result, and a successful connector execution is never shown as a verified
 resolution. `@luma/resolution` owns the desk; the API contract exposes it under each case.
@@ -27,7 +27,7 @@ they never evaluate models or connector preconditions.
 
 ## Decisions
 
-Escalation needs `issues.manage`. Approval and rejection need `decisions.respond` and an
+Escalation and manual closure need `issues.manage` (**Work on issues**). Approval and rejection need `decisions.respond` and an
 approver who is not the proposal's requester. On submission the server checks membership,
 role, current case and diagnosis revisions, the immutable proposal ID and version, policy
 decision and version, expiry and current capability preconditions again. Unknown or
@@ -50,6 +50,25 @@ binding, so a committed escalation, rejected proposal or changed diagnosis preve
 later reservation. Once dispatch is reserved, escalation returns 409; it is not
 cancellation or compensation. The workflow's 30-second approval poll observes committed
 responses even without a wake-up notification.
+
+## Manual closure
+
+The `close` decision uses the same revision checks, command ID and receipt recovery as
+other decisions. A reason of 1–1000 characters is required; evidence references are
+optional, limited to 100, and must exist in the tenant. The exception owner records a
+`human_disposition` with actor, reason, evidence and an audit event in the receipt
+transaction. Manual closure never becomes verified resolution or verified success.
+
+Closing is available for every unresolved state, including failed and escalated cases.
+It removes the case from active attention. Pending proposals cannot be approved, renewed
+or dispatched after closure. Case workflow admission observes the resolved case and stops
+new work. Closure shares the case renewal and tenant dispatch locks, but does not cancel
+or undo a write already reserved or sent. Running workflows may complete their current
+work and checks; uncertain executions retain their reconciliation path. The client asks
+for confirmation when work is active or workflow availability is unknown.
+
+A resolved case stays immutable. Fresh evidence of the same fingerprint can create a
+successor linked to the closed case; replaying old evidence does not reopen it.
 
 ## Proposals and workflow composition
 

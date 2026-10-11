@@ -5,7 +5,7 @@ normalized evidence and persists the result as tenant-scoped incidents. It recor
 accepted evaluation with its rule and configuration versions, decision, evidence
 references and delivery correlation ID (inventory also keeps the exact signed difference,
 left minus right). Detection opens, updates and verifies incidents; it never repairs,
-redispatches or resolves without independent verification. `@luma/exceptions` owns the
+redispatches or records a verified resolution without independent verification. `@luma/exceptions` owns the
 rules and persistence; `@luma/application-runtime` composes them.
 
 ## Ingestion
@@ -102,8 +102,8 @@ Detection never deletes or overwrites earlier connector snapshots.
 
 There are two ways to resolve an incident:
 
-- **Human disposition** requires `issues.manage`, a reason and existing tenant evidence
-  references. It records the actor and never counts as autonomous verified success.
+- **Human disposition** requires `issues.manage`, a reason of 1–1000 characters and optional existing tenant evidence
+  references (at most 100). It records the actor and never counts as autonomous verified success.
   Caller-supplied verification results are rejected.
 - **Verification** asks the evaluator installed by the composition root, and fails closed
   when none is installed. The evaluator reads authoritative state itself; neither evidence

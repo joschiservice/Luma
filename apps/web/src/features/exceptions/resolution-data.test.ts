@@ -19,11 +19,11 @@ const commandId = '88888888-8888-4888-8888-888888888888';
 
 afterEach(() => vi.unstubAllGlobals());
 
-it.each(['approve', 'reject', 'escalate'] as const)(
+it.each(['approve', 'reject', 'escalate', 'close'] as const)(
   'sends versioned %s commands and recovers the original receipt',
   async (kind) => {
     const command = decisionCommand(
-      resolutionReview,
+      { ...resolutionReview, permittedDecisions: [kind] },
       kind,
       ' Checked evidence ',
       commandId,
@@ -31,7 +31,7 @@ it.each(['approve', 'reject', 'escalate'] as const)(
     expect(command.reason).toBe('Checked evidence');
     expect(command.caseRevision).toBe(4);
     expect(command.diagnosisRevision).toBe(2);
-    if (kind !== 'escalate')
+    if (kind !== 'escalate' && kind !== 'close')
       expect(command).toMatchObject({
         proposalId: resolutionReview.proposal!.id,
         proposalVersion: 1,

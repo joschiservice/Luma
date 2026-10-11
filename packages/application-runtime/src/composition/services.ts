@@ -250,6 +250,12 @@ export function createDeskServices(
 ): ReturnType<typeof createDeskService> {
   const store = createDeskStore(db, {
     parseAction,
+    close: (scoped, context, id, reason, evidenceRefs) =>
+      createExceptions(scoped, options.now).resolve(context, id, {
+        kind: 'human_disposition',
+        reason,
+        evidenceRefs,
+      }),
     escalate: (scoped, context, id, revision) =>
       createCaseEscalation(scoped)(context, id, revision),
     policies: (scoped) =>

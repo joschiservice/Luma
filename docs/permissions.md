@@ -46,7 +46,7 @@ Operational issues, their evidence, and the decisions they need.
 | Permission | Key | Description | Sensitive | Owner | Admin | Member |
 | --- | --- | --- | --- | --- | --- | --- |
 | View issues | `issues.read` | See issues, their evidence, diagnoses, and proposed changes. |  | Yes | Yes | Yes |
-| Work on issues | `issues.manage` | Check, escalate, and resolve issues, refresh their evidence, and record what was learned. |  | Yes | Yes |  |
+| Work on issues | `issues.manage` | Check and escalate issues, close them with a reason, verify resolutions, refresh evidence, and record what was learned. |  | Yes | Yes |  |
 | Take decisions | `decisions.self_assign` | Take unassigned decisions in Needs you and release your own. |  | Yes | Yes | Yes |
 | Assign decisions | `decisions.assign` | Assign or reassign any decision to a teammate. |  | Yes | Yes |  |
 | Approve or reject changes | `decisions.respond` | Respond to approval requests. The approver must be someone other than the person who proposed the change. | Yes | Yes | Yes |  |

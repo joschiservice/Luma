@@ -194,8 +194,8 @@ const evidenceSchema = z
 const humanDispositionSchema = z
   .object({
     kind: z.literal('human_disposition'),
-    reason: ref,
-    evidenceRefs: z.array(ref).min(1),
+    reason: z.string().trim().min(1).max(1000),
+    evidenceRefs: z.array(ref).max(100),
   })
   .strict();
 
@@ -203,8 +203,8 @@ const resolutionSchema = z.discriminatedUnion('kind', [
   z
     .object({
       kind: z.literal('human_disposition'),
-      reason: ref,
-      evidenceRefs: z.array(ref).min(1),
+      reason: z.string().trim().min(1).max(1000),
+      evidenceRefs: z.array(ref).max(100),
     })
     .strict(),
   z

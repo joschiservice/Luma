@@ -24,6 +24,7 @@ export const activityOutcomeRules: readonly {
   { field: 'outcome', values: ['approved', 'approve'], outcome: 'approved' },
   { field: 'outcome', values: ['rejected', 'reject'], outcome: 'rejected' },
   { field: 'outcome', values: ['escalate'], outcome: 'escalated' },
+  { field: 'outcome', values: ['close'], outcome: 'manually_disposed' },
   {
     field: 'action',
     values: ['exception.escalated', 'case.escalated'],

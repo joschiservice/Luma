@@ -10,7 +10,7 @@ Kann Luma ein Problem über ein verbundenes System beheben, schlägt Luma eine �
 ## Wer entscheiden kann [#who-can-decide]
 
 - Genehmigen und Ablehnen erfordern **Änderungen genehmigen oder ablehnen**. Die genehmigende Person muss eine andere sein als die Person, die die Änderung angefordert hat. Diese steht unter **Angefordert von**.
-- Eskalieren erfordert **Probleme bearbeiten**.
+- Eskalieren und Schließen eines Problems erfordern **Probleme bearbeiten**.
 
 Ohne diese Berechtigungen kannst du das ganze Problem lesen, und die Prüfung zeigt **Du kannst zu diesem Problem derzeit keine Entscheidung treffen.**
 
@@ -52,6 +52,20 @@ Bevor Luma deine Entscheidung erfasst, prüft Luma den aktuellen Stand. Danach b
 
 Gibt es keine Änderung zu prüfen, folge den empfohlenen Schritten in der **Übersicht**. Um das Problem an jemand anderen zu übergeben, wähle **Problem eskalieren**, gib an, warum es eskaliert werden muss, und wähle **Eskalation bestätigen**.
 
+## Problem selbst schließen [#close-an-issue-yourself]
+
+Schließe ein Problem, wenn keine weitere Bearbeitung nötig ist: etwa bei einem Fehlalarm, einer außerhalb von Luma vorgenommenen Korrektur, die Luma nicht bestätigen kann, oder einem Problem, das dein Team akzeptiert.
+
+1. Öffne den Abschnitt **Vorgeschlagene Änderung** des Problems und wähle **Problem schließen**.
+2. Gib einen **Grund für das Schließen (erforderlich)** ein, bis zu 1.000 Zeichen.
+3. Läuft möglicherweise noch Arbeit, bestätige, dass sie fortgesetzt werden kann, und wähle **Problem schließen**.
+
+Das Problem verlässt die aktiven Probleme, Wartet auf dich und Home. Es bleibt im Verlauf als **Manuell geschlossen** sichtbar, mit der Person und ihrem Grund. Auswertungen zählt es getrennt von bestätigten Korrekturen.
+
+Das Schließen blockiert ausstehende Vorschläge und neue Änderungen für dieses Problem. Bereits gesendete Änderungen werden weder abgebrochen noch rückgängig gemacht. Laufende Workflows können ihre aktuelle Arbeit und Ergebnisprüfung abschließen. Unklare Änderungen können weiterhin abgeglichen werden. Kann Luma die Workflow-Aktivität nicht bestätigen, musst du dies vor dem Schließen bestätigen.
+
+Neue Nachweise desselben Problems können ein neues Problem öffnen, das mit dem geschlossenen verknüpft ist. Erneut zugestellte alte Nachweise öffnen es nicht wieder.
+
 ## Wenn der Vorschlag abläuft oder sich ändert [#when-the-proposal-expires-or-changes]
 
 Ein Vorschlag und seine Nachweise gelten nur für begrenzte Zeit:
@@ -87,7 +101,7 @@ Danach endet das Problem in einem dieser Zustände:
 - **Ergebnis unklar**: Luma konnte nicht feststellen, ob die Änderung wirksam wurde. Prüfe den Datensatz im verbundenen System, bevor du es erneut versuchst.
 - **Änderung fehlgeschlagen**: Das System hat die Änderung nicht ausgeführt. Prüfe die Details des Versuchs und die aktuellen Befunde, bevor du über das weitere Vorgehen entscheidest.
 
-Siehst du **Von einer Person geschlossen**, hat jemand das Problem ohne bestätigte Korrektur geschlossen. Das bestätigt nicht, dass das Problem behoben wurde.
+Siehst du **Manuell geschlossen**, hat jemand das Problem ohne bestätigte Korrektur geschlossen. Das bestätigt nicht, dass das Problem behoben wurde.
 
 Lässt sich der Fortschritt nicht laden, siehst du **Fortschritt konnte nicht bestätigt werden**. Wähle **Fortschritt aktualisieren**, bevor du dich auf einen früheren Stand verlassen.
 

@@ -10,7 +10,7 @@ Open the change with **Review change** at the top of the full issue page, **Revi
 ## Who can decide
 
 - Approving and rejecting need **Approve or reject changes**. The approver must be someone other than the person who requested the change, shown under **Requested by**.
-- Escalating needs **Work on issues**.
+- Escalating and closing an issue need **Work on issues**.
 
 Without these permissions you can still read the whole issue, and the review says **You can’t make a decision on this issue right now.**
 
@@ -52,6 +52,20 @@ Before it records your decision, Luma checks current conditions. Then it confirm
 
 If there’s no change to review, follow the recommended steps in **Overview**. To hand the issue to someone else, select **Escalate issue**, say why it needs escalation, and select **Confirm escalation**.
 
+## Close an issue yourself
+
+Close an issue when it needs no more work: for example, a false positive, a fix made outside Luma that Luma cannot verify, or a problem your team accepts.
+
+1. Open the issue’s **Proposed change** section and select **Close issue**.
+2. Enter a **Reason for closing (required)**, up to 1,000 characters.
+3. If work may be in progress, confirm that it may continue, then select **Close issue**.
+
+The issue leaves active Issues, Needs you and Home. It stays in History as **Closed manually**, with who closed it and why. Insights counts it separately from verified fixes.
+
+Closing blocks pending proposals and new changes for this issue. It cannot cancel a change already sent or undo its effects. Running workflows may finish their current work and outcome checks, and uncertain changes can still be reconciled. If Luma cannot confirm workflow activity, it asks you to acknowledge this before closing.
+
+New evidence of the same problem can open a new issue linked to the closed one. Repeated delivery of old evidence does not reopen it.
+
 ## When the proposal expires or changes
 
 A proposal and its evidence are valid only for a limited time:
@@ -87,7 +101,7 @@ The issue then ends in one of these states:
 - **Outcome unclear**: Luma couldn’t tell whether the change took effect. Check the record in the connected system before trying again.
 - **Change failed**: the system didn’t make the change. Check the attempt details and current findings before you decide what to do next.
 
-If you see **Closed by a person**, someone closed the issue without a confirmed fix. That doesn’t confirm the problem was fixed.
+If you see **Closed manually**, someone closed the issue without a confirmed fix. That doesn’t confirm the problem was fixed.
 
 If progress can’t load, you see **Progress couldn’t be confirmed**. Select **Refresh progress** before you rely on an earlier status.
 

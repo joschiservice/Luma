@@ -45,3 +45,7 @@ describe('activity outcome evidence', () => {
     expect(activityOutcome({ resolution: 'unknown' })).toBe('recorded');
   });
 });
+
+it('labels the manual close command separately from verified outcomes', () => {
+  expect(activityOutcome({ outcome: 'close' })).toBe('manually_disposed');
+});

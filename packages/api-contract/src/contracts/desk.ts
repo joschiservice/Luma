@@ -43,13 +43,13 @@ export const caseDeskContract = {
     .route({
       method: 'POST',
       path: '/v1/organizations/{organizationId}/exceptions/{exceptionId}/decisions',
-      summary: 'Approve, reject or escalate a case',
+      summary: 'Approve, reject, escalate or close a case',
       description:
-        'Use a unique commandId and the current case, diagnosis, proposal and policy versions from review. Exact retries return the committed receipt. Conflicts return 409. Approval records a decision; it does not mean execution or verification succeeded.',
+        'Use a unique commandId and the current case, diagnosis, proposal and policy versions from review. Exact retries return the committed receipt. Conflicts return 409. Approval records a decision; it does not mean execution or verification succeeded. Closing requires issues.manage, a reason of 1–1000 characters and optional tenant-owned evidence references. It blocks pending proposals but does not cancel a change already in flight. Manual closure is separate from verified resolution.',
     })
     .meta({
       access: requires(['decisions.respond', 'issues.manage']),
-      errors: [401, 403, 404, 409, 503],
+      errors: [401, 403, 404, 409, 422, 503],
     })
     .input(z.object({ params: caseParams, body: caseDecisionSchema }))
     .output(decisionReceiptSchema),

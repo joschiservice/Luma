@@ -263,3 +263,69 @@ export const ObserveOnly: Story = {
     await expect(c.getByText('Target system')).toBeVisible();
   },
 };
+
+export const ManualClosure: Story = {
+  args: {
+    review: {
+      ...resolutionReview,
+      proposal: null,
+      permittedDecisions: ['close'],
+    },
+    progress: {
+      ...resolutionProgress,
+      workflow: { availability: 'not_started', progress: null },
+    },
+  },
+  play: async ({ canvasElement, args }) => {
+    const c = within(canvasElement);
+    await userEvent.click(c.getByRole('button', { name: 'Close issue' }));
+    const dialog = within(canvasElement.ownerDocument.body).getByRole(
+      'dialog',
+      { name: 'Close issue' },
+    );
+    const d = within(dialog);
+    await expect(d.getByRole('button', { name: 'Close issue' })).toBeDisabled();
+    await userEvent.type(
+      d.getByLabelText('Reason for closing (required)'),
+      'False positive',
+    );
+    await userEvent.click(d.getByRole('button', { name: 'Close issue' }));
+    await expect(args.onDecision).toHaveBeenCalledWith(
+      'close',
+      'False positive',
+    );
+  },
+};
+
+export const ClosureWhileRunning: Story = {
+  args: {
+    review: { ...resolutionReview, permittedDecisions: ['close'] },
+    progress: {
+      ...resolutionProgress,
+      workflow: { availability: 'available', progress: { phase: 'executing' } },
+    },
+  },
+  play: async ({ canvasElement, args }) => {
+    await userEvent.click(
+      within(canvasElement).getByRole('button', {
+        name: 'Close issue',
+      }),
+    );
+    const d = within(
+      within(canvasElement.ownerDocument.body).getByRole('dialog', {
+        name: 'Close issue',
+      }),
+    );
+    await userEvent.type(
+      d.getByLabelText('Reason for closing (required)'),
+      'Handled outside Luma',
+    );
+    await expect(d.getByRole('button', { name: 'Close issue' })).toBeDisabled();
+    await userEvent.click(d.getByRole('checkbox'));
+    await userEvent.click(d.getByRole('button', { name: 'Close issue' }));
+    await expect(args.onDecision).toHaveBeenCalledWith(
+      'close',
+      'Handled outside Luma',
+    );
+  },
+};

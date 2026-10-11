@@ -38,13 +38,14 @@ export interface DeskSnapshot {
 
 export interface CaseDecision {
   commandId: string;
-  kind: 'approve' | 'reject' | 'escalate';
+  kind: 'approve' | 'reject' | 'escalate' | 'close';
   caseRevision: number;
   diagnosisRevision: number;
   proposalId?: string | undefined;
   proposalVersion?: number | undefined;
   decisionId?: string | undefined;
   reason: string;
+  evidenceRefs?: string[] | undefined;
 }
 
 export interface DecisionReceipt {
@@ -65,6 +66,7 @@ export interface TimelineEvent {
   actor: ActivityActor;
   proposalId: string | null;
   outcome: string | null;
+  reason?: string | null;
   evidenceRefs: string[];
 }
 
@@ -81,6 +83,8 @@ interface DeskSession {
   ): Promise<Approval>;
   save(request: CaseDecision, receipt: DecisionReceipt): Promise<void>;
   escalate(): Promise<number>;
+  /** Resolves through the exception owner in the receipt transaction. Pending dispatch is fenced. */
+  close(reason: string, evidenceRefs: string[]): Promise<number>;
   /** Names the people behind recorded user IDs; see {@link ActivityActor}. */
   people(ids: readonly (string | null | undefined)[]): Promise<ActivityActor[]>;
 }
@@ -153,6 +157,7 @@ const decisionPermission = {
   approve: 'decisions.respond',
   reject: 'decisions.respond',
   escalate: 'issues.manage',
+  close: 'issues.manage',
 } as const satisfies Record<CaseDecision['kind'], Permission>;
 
 function conflict(
@@ -177,6 +182,11 @@ export function createDeskService(deps: DeskDependencies) {
 
   function permitted(context: TenantContext, s: DeskSnapshot) {
     const decisions: CaseDecision['kind'][] = [];
+    if (
+      s.incident.state !== 'resolved' &&
+      hasPermission(context, decisionPermission.close)
+    )
+      decisions.push('close');
     if (
       s.incident.state === 'resolved' ||
       s.incident.state === 'escalated' ||
@@ -379,7 +389,13 @@ export function createDeskService(deps: DeskDependencies) {
             conflict('This decision is no longer permitted.');
           let approvalId: string | null = null;
           let revision = s.revision;
-          if (request.kind === 'escalate') revision = await session.escalate();
+          if (request.kind === 'close')
+            revision = await session.close(
+              request.reason,
+              request.evidenceRefs ?? [],
+            );
+          else if (request.kind === 'escalate')
+            revision = await session.escalate();
           else {
             const p = s.proposal!;
             if (
@@ -495,6 +511,7 @@ export function createDeskService(deps: DeskDependencies) {
                   kind: s.incident.resolution.kind,
                   at: s.incident.resolution.at,
                   actorId: s.incident.resolution.actorId,
+                  reason: s.incident.resolution.reason,
                   evidenceRefs: s.incident.resolution.evidenceRefs.slice(
                     0,
                     100,

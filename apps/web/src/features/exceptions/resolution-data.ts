@@ -29,7 +29,8 @@ export function decisionCommand(
     caseRevision: review.caseRevision,
     diagnosisRevision: review.diagnosisRevision,
   };
-  if (kind === 'escalate') return caseDecisionSchema.parse(common);
+  if (kind === 'escalate' || kind === 'close')
+    return caseDecisionSchema.parse(common);
   const proposal = review.proposal;
   if (!proposal?.policy)
     throw new Error(m.exceptions_decision_needs_proposal());
@@ -75,7 +76,8 @@ export function decisionError(error: unknown) {
     if (error.status === 403) return m.exceptions_decision_error_permission();
     if (error.status === 404) return m.exceptions_decision_error_missing();
     if (error.status === 409) return m.exceptions_decision_error_conflict();
-    if (error.status === 400) return m.exceptions_decision_error_invalid();
+    if (error.status === 400 || error.status === 422)
+      return m.exceptions_decision_error_invalid();
   }
 
   return m.exceptions_decision_error_unclear();

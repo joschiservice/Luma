@@ -67146,9 +67146,9 @@
                     },
                     "permittedDecisions": {
                       "type": "array",
-                      "maxItems": 3,
+                      "maxItems": 4,
                       "items": {
-                        "enum": ["approve", "reject", "escalate"],
+                        "enum": ["approve", "reject", "escalate", "close"],
                         "type": "string"
                       }
                     },
@@ -67651,9 +67651,9 @@
                     },
                     "permittedDecisions": {
                       "type": "array",
-                      "maxItems": 3,
+                      "maxItems": 4,
                       "items": {
-                        "enum": ["approve", "reject", "escalate"],
+                        "enum": ["approve", "reject", "escalate", "close"],
                         "type": "string"
                       }
                     },
@@ -68007,8 +68007,8 @@
     "/v1/organizations/{organizationId}/exceptions/{exceptionId}/decisions": {
       "post": {
         "operationId": "caseDesk.decide",
-        "summary": "Approve, reject or escalate a case",
-        "description": "Use a unique commandId and the current case, diagnosis, proposal and policy versions from review. Exact retries return the committed receipt. Conflicts return 409. Approval records a decision; it does not mean execution or verification succeeded.",
+        "summary": "Approve, reject, escalate or close a case",
+        "description": "Use a unique commandId and the current case, diagnosis, proposal and policy versions from review. Exact retries return the committed receipt. Conflicts return 409. Approval records a decision; it does not mean execution or verification succeeded. Closing requires issues.manage, a reason of 1–1000 characters and optional tenant-owned evidence references. It blocks pending proposals but does not cancel a change already in flight. Manual closure is separate from verified resolution.",
         "tags": ["caseDesk"],
         "parameters": [
           {
@@ -68036,6 +68036,52 @@
             "application/json": {
               "schema": {
                 "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "commandId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "kind": {
+                        "const": "close"
+                      },
+                      "caseRevision": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "exclusiveMinimum": 0
+                      },
+                      "diagnosisRevision": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1000
+                      },
+                      "evidenceRefs": {
+                        "type": "array",
+                        "maxItems": 100,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 512
+                        },
+                        "default": []
+                      }
+                    },
+                    "required": [
+                      "commandId",
+                      "kind",
+                      "caseRevision",
+                      "diagnosisRevision",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  },
                   {
                     "type": "object",
                     "properties": {
@@ -68200,7 +68246,7 @@
                       "format": "uuid"
                     },
                     "kind": {
-                      "enum": ["approve", "reject", "escalate"],
+                      "enum": ["approve", "reject", "escalate", "close"],
                       "type": "string"
                     },
                     "actorId": {
@@ -68319,6 +68365,16 @@
               }
             }
           },
+          "422": {
+            "description": "422",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "500": {
             "description": "500",
             "content": {
@@ -68394,7 +68450,7 @@
                       "format": "uuid"
                     },
                     "kind": {
-                      "enum": ["approve", "reject", "escalate"],
+                      "enum": ["approve", "reject", "escalate", "close"],
                       "type": "string"
                     },
                     "actorId": {
@@ -68844,6 +68900,10 @@
                               "minLength": 1,
                               "maxLength": 512
                             },
+                            "reason": {
+                              "type": "string",
+                              "maxLength": 1000
+                            },
                             "evidenceRefs": {
                               "type": "array",
                               "maxItems": 100,
@@ -69204,6 +69264,17 @@
                                 "type": "string",
                                 "minLength": 1,
                                 "maxLength": 512
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "reason": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 1000
                               },
                               {
                                 "type": "null"

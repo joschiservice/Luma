@@ -155,5 +155,6 @@
   "activity_action_support_access_revoked": "Support-Zugriff entzogen",
   "activity_action_support_access_requested": "Support-Zugriff angefragt",
   "activity_action_support_access_request_approved": "Anfrage für Support-Zugriff angenommen",
-  "activity_action_support_access_request_declined": "Anfrage für Support-Zugriff abgelehnt"
+  "activity_action_support_access_request_declined": "Anfrage für Support-Zugriff abgelehnt",
+  "activity_action_issue_closed": "Problem manuell geschlossen"
 }

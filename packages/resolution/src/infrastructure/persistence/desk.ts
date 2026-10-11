@@ -84,6 +84,13 @@ export function createDeskStore(
   db: TenantDatabase,
   dependencies: {
     policies(db: TenantDatabase): PolicyService;
+    close(
+      db: TenantDatabase,
+      context: import('@luma/identity').TenantContext,
+      id: string,
+      reason: string,
+      evidenceRefs: string[],
+    ): Promise<boolean>;
     parseAction(action: unknown): { action: ProposedAction; hash: string };
     escalate(
       db: TenantDatabase,
@@ -195,6 +202,24 @@ export function createDeskStore(
           },
           escalate: () =>
             dependencies.escalate(scoped, context, id, snapshot.revision),
+          close: async (reason, evidenceRefs) => {
+            if (
+              !(await dependencies.close(
+                scoped,
+                context,
+                id,
+                reason,
+                evidenceRefs,
+              ))
+            )
+              throw new IdentityError(
+                409,
+                'CONFLICT',
+                'Case could not be closed',
+              );
+
+            return snapshot.revision + 1;
+          },
           people: (ids) => readPeople(tx, context.tenantId, ids),
         });
       }),
@@ -377,7 +402,7 @@ export function createDeskStore(
           SELECT 0 AS priority,id,created_at,document AS doc FROM audit_entries WHERE tenant_id=$1 AND proposal_id IN (SELECT id FROM proposals)
           UNION ALL SELECT 1,id,created_at,document FROM execution_outbox WHERE tenant_id=$1 AND proposal_id IN (SELECT id FROM proposals)
           UNION ALL SELECT 2,id,created_at,jsonb_build_object('eventType',document->'type','occurredAt',COALESCE(document->'document'->'evaluatedAt',document->'document'->'createdAt'),'actor',jsonb_build_object('id',COALESCE(document->'document'->'actorId',document->'document'->'approverId')),'proposalId',document->'document'->'proposalId','details',jsonb_build_object('outcome',document->'document'->'outcome')) FROM policy_outbox WHERE tenant_id=$1 AND (document->'document'->>'proposalId')::uuid IN (SELECT id FROM proposals)
-          UNION ALL SELECT 3,id,created_at,jsonb_build_object('eventType',document->'type','occurredAt',COALESCE(document->'at',document->'resolution'->'at'),'actor',jsonb_build_object('id',COALESCE(document->'actorId',document->'resolution'->'actorId')),'evidenceRefs',document->'resolution'->'evidenceRefs') FROM exception_outbox WHERE tenant_id=$1 AND exception_id=$2
+          UNION ALL SELECT 3,id,created_at,jsonb_build_object('eventType',document->'type','occurredAt',COALESCE(document->'at',document->'resolution'->'at'),'actor',jsonb_build_object('id',COALESCE(document->'actorId',document->'resolution'->'actorId')),'evidenceRefs',document->'resolution'->'evidenceRefs','reason',document->'resolution'->'reason','details',jsonb_build_object('outcome',document->'resolution'->'kind')) FROM exception_outbox WHERE tenant_id=$1 AND exception_id=$2
           UNION ALL SELECT 4,id,created_at,jsonb_build_object('eventType','case.' || (request->>'kind'),'occurredAt',document->'createdAt','actor',jsonb_build_object('id',actor_id),'proposalId',request->'proposalId','details',jsonb_build_object('outcome',request->'kind')) FROM case_commands WHERE tenant_id=$1 AND exception_id=$2
         ), unique_events AS (SELECT DISTINCT ON(id) id,COALESCE((doc->>'occurredAt')::timestamptz,created_at) AS at,doc FROM events ORDER BY id,priority
         ), page AS (SELECT * FROM unique_events WHERE ($3::timestamptz IS NULL OR (at,id)>($3::timestamptz,$4::uuid)) ORDER BY at,id LIMIT $5)
@@ -408,6 +433,8 @@ export function createDeskStore(
             actor: row.actor,
             proposalId: typeof d.proposalId === 'string' ? d.proposalId : null,
             outcome: details?.outcome ?? details?.state ?? null,
+            reason:
+              typeof d.reason === 'string' ? d.reason.slice(0, 1000) : null,
             evidenceRefs: Array.isArray(d.evidenceRefs)
               ? d.evidenceRefs
                   .filter((e): e is string => typeof e === 'string')

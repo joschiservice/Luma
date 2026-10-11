@@ -22,6 +22,16 @@ export const caseDecisionSchema = z.discriminatedUnion('kind', [
   z
     .object({
       commandId: id,
+      kind: z.literal('close'),
+      caseRevision: z.number().int().positive(),
+      diagnosisRevision: z.number().int().nonnegative(),
+      reason: z.string().trim().min(1).max(1000),
+      evidenceRefs: z.array(ref).max(100).default([]),
+    })
+    .strict(),
+  z
+    .object({
+      commandId: id,
       kind: z.literal('approve'),
       caseRevision: z.number().int().positive(),
       diagnosisRevision: z.number().int().nonnegative(),
@@ -57,7 +67,7 @@ export const caseDecisionSchema = z.discriminatedUnion('kind', [
 export const decisionReceiptSchema = z.object({
   id,
   exceptionId: id,
-  kind: z.enum(['approve', 'reject', 'escalate']),
+  kind: z.enum(['approve', 'reject', 'escalate', 'close']),
   actorId: ref,
   caseRevision: z.number().int().positive(),
   approvalId: id.nullable(),
@@ -74,7 +84,9 @@ export const caseReviewSchema = z.object({
   schemaVersion: z.literal(1),
   caseRevision: z.number().int().positive(),
   diagnosisRevision: z.number().int().nonnegative(),
-  permittedDecisions: z.array(z.enum(['approve', 'reject', 'escalate'])).max(3),
+  permittedDecisions: z
+    .array(z.enum(['approve', 'reject', 'escalate', 'close']))
+    .max(4),
   proposal: z
     .object({
       id,
@@ -153,6 +165,7 @@ export const caseProgressSchema = z.object({
       kind: z.enum(['verification', 'human_disposition']),
       at,
       actorId: ref,
+      reason: z.string().max(1000).optional(),
       evidenceRefs: z.array(ref).max(100),
     })
     .nullable(),
@@ -194,6 +207,7 @@ export const caseTimelineSchema = z.object({
         actor: activityActorSchema,
         proposalId: id.nullable(),
         outcome: ref.nullable(),
+        reason: z.string().max(1000).nullable().optional(),
         evidenceRefs: z.array(ref).max(100),
       }),
     )

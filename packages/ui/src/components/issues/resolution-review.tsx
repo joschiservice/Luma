@@ -32,9 +32,10 @@ import {
   verificationLabel,
   workflowStatusLabel,
 } from './case-presentation';
+import { CloseIssueDialog } from './close-issue-dialog';
 import { IssuePageNavigation } from './issue-section';
 
-type DecisionKind = CaseDecision['kind'];
+type DecisionKind = Exclude<CaseDecision['kind'], 'close'>;
 
 type Proposal = NonNullable<CaseReview['proposal']>;
 
@@ -90,9 +91,14 @@ export function ResolutionReview({
   disabled?: boolean;
   pending?: boolean;
   checking?: boolean;
-  onDecision: (kind: DecisionKind, reason: string) => void;
+  onDecision: (kind: CaseDecision['kind'], reason: string) => void;
 }) {
   const proposal = review.proposal;
+  const canClose = review.permittedDecisions.includes('close');
+  const decisions = review.permittedDecisions.filter(
+    (kind): kind is DecisionKind =>
+      kind !== 'close' && (!review.observeOnly || kind !== 'approve'),
+  );
   const navigate = useContext(IssuePageNavigation);
 
   return (
@@ -101,6 +107,13 @@ export function ResolutionReview({
       aria-label={m.issues_section_resolution()}
     >
       <section>
+        {canClose ? (
+          <CloseIssueDialog
+            progress={progress}
+            disabled={disabled || pending}
+            onClose={(reason) => onDecision('close', reason)}
+          />
+        ) : null}
         <h3>
           <ClipboardCheck size={16} aria-hidden="true" />{' '}
           {proposal ? m.issues_review_title() : m.issues_review_none_title()}
@@ -266,31 +279,31 @@ export function ResolutionReview({
           <p className="case-caption">{m.issues_review_refresh_note()}</p>
         ) : null}
         {/* Fresh evidence preserves the draft; a changed action starts a new decision. */}
-        <DecisionControls
-          key={JSON.stringify([
-            proposal?.version,
-            proposal?.capability,
-            proposal?.capabilityVersion,
-            proposal?.requestedBy,
-            proposal?.connectionId,
-            proposal?.target,
-            proposal?.parameters,
-            proposal?.expectedPostcondition,
-            proposal?.risk,
-            proposal?.available,
-            proposal?.policy?.policyVersion,
-            proposal?.policy?.outcome,
-            proposal?.policy?.reason,
-          ])}
-          compactEscalation={!proposal && !!navigate}
-          decisions={review.permittedDecisions.filter(
-            (kind) => !review.observeOnly || kind !== 'approve',
-          )}
-          disabled={disabled}
-          pending={pending}
-          checking={checking}
-          onDecision={onDecision}
-        />
+        {decisions.length || !canClose ? (
+          <DecisionControls
+            key={JSON.stringify([
+              proposal?.version,
+              proposal?.capability,
+              proposal?.capabilityVersion,
+              proposal?.requestedBy,
+              proposal?.connectionId,
+              proposal?.target,
+              proposal?.parameters,
+              proposal?.expectedPostcondition,
+              proposal?.risk,
+              proposal?.available,
+              proposal?.policy?.policyVersion,
+              proposal?.policy?.outcome,
+              proposal?.policy?.reason,
+            ])}
+            compactEscalation={!proposal && !!navigate}
+            decisions={decisions}
+            disabled={disabled}
+            pending={pending}
+            checking={checking}
+            onDecision={onDecision}
+          />
+        ) : null}
       </section>
       {navigate ? (
         proposal?.approval ||
@@ -419,7 +432,7 @@ function DecisionControls({
   disabled: boolean;
   pending: boolean;
   checking: boolean;
-  onDecision: (kind: DecisionKind, reason: string) => void;
+  onDecision: (kind: CaseDecision['kind'], reason: string) => void;
 }) {
   const [reason, setReason] = useState('');
   const [escalating, setEscalating] = useState(false);

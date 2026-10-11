@@ -566,11 +566,24 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
     .waitFor();
   await context.setOffline(false);
   await page.getByText('Live updates', { exact: true }).waitFor();
-  await services.exceptions.resolve(tenant, ids[0], {
-    kind: 'human_disposition',
-    reason: 'Handled by operator',
-    evidenceRefs: ['scan-0'],
+  await expandSection('Proposed change');
+  await page.getByRole('button', { name: 'Close issue', exact: true }).click();
+  const closeDialog = page.getByRole('dialog', {
+    name: 'Close issue',
+    exact: true,
   });
+  await expect(
+    closeDialog.getByRole('button', { name: 'Close issue', exact: true }),
+  ).toBeDisabled();
+  await closeDialog
+    .getByLabel('Reason for closing (required)')
+    .fill('Handled by operator');
+  const running = closeDialog.getByRole('checkbox');
+  if (await running.count()) await running.check();
+  await closeDialog
+    .getByRole('button', { name: 'Close issue', exact: true })
+    .click();
+  await expect(closeDialog).not.toBeVisible();
   const refreshIssues = page.getByRole('button', {
     name: 'Refresh issues',
     exact: true,
@@ -579,9 +592,20 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
   await page
     .getByText('This issue has left the current view', { exact: true })
     .waitFor();
+  const closedProgress = await (
+    await page.request.get(`${caseApi}/progress`)
+  ).json();
+  const signedInSession = await (
+    await page.request.get('/api/auth/get-session')
+  ).json();
+  expect(closedProgress.resolution).toMatchObject({
+    kind: 'human_disposition',
+    reason: 'Handled by operator',
+    actorId: signedInSession.user.id,
+  });
   // The resolution record names who closed the issue.
   const humanClosure = issueSection('Change and outcome check')
-    .getByRole('heading', { name: 'Closed by a person' })
+    .getByRole('heading', { name: 'Closed manually' })
     .last();
   await humanClosure.waitFor();
   await page.reload();

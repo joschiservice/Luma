@@ -228,7 +228,7 @@ export const permissionCatalog = [
     group: 'issues',
     label: 'Work on issues',
     description:
-      'Check, escalate, and resolve issues, refresh their evidence, and record what was learned.',
+      'Check and escalate issues, close them with a reason, verify resolutions, refresh evidence, and record what was learned.',
     consequential: false,
     introduced,
   },

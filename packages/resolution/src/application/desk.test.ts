@@ -57,6 +57,7 @@ function desk(fresh: TenantContext, overrides: Partial<DeskSnapshot> = {}) {
         respond: vi.fn(),
         save: vi.fn(),
         escalate: vi.fn(),
+        close: vi.fn(async () => 4),
         people: async () => [],
       });
     },
@@ -86,7 +87,7 @@ describe('Case desk permissions', () => {
   it.each([
     [['issues.read'], [], false],
     [['issues.read', 'decisions.respond'], ['reject', 'approve'], false],
-    [['issues.read', 'issues.manage'], ['escalate'], false],
+    [['issues.read', 'issues.manage'], ['close', 'escalate'], false],
     [['issues.read', 'actions.propose'], [], true],
   ] as const)(
     'offers only the decisions %j allows',
@@ -119,6 +120,7 @@ describe('Case desk permissions', () => {
 
   it.each([
     ['escalate', ['issues.read', 'decisions.respond']],
+    ['close', ['issues.read', 'decisions.respond']],
     ['approve', ['issues.read', 'issues.manage']],
     ['reject', ['issues.read', 'issues.manage']],
   ] as const)(
@@ -171,4 +173,18 @@ it('offers the requester a review only when independent approval is off', async 
       )
     ).permittedDecisions,
   ).toEqual([]);
+});
+
+it('allows closure after escalation or execution but never after resolution', async () => {
+  const context = as(['issues.read', 'issues.manage']);
+  for (const state of ['escalated', 'executing', 'failed'] as const) {
+    const review = await desk(context, {
+      incident: { state } as Incident,
+    }).service.review(context, 'case');
+    expect(review.permittedDecisions).toContain('close');
+  }
+  const review = await desk(context, {
+    incident: { state: 'resolved' } as Incident,
+  }).service.review(context, 'case');
+  expect(review.permittedDecisions).toEqual([]);
 });

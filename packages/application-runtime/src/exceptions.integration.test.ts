@@ -1610,7 +1610,7 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
   function decisionActor(
     role: 'owner' | 'admin' | 'member' = 'admin',
     user = 'approver',
-    tenant = tenantId,
+    tenant: string = tenantId,
   ) {
     return makeTenantContext(
       { userId: user, sessionId: 'session' },
@@ -1765,10 +1765,10 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       expect(
         (await f.desk.review(decisionActor(), f.incident.id))
           .permittedDecisions,
-      ).toEqual(['escalate', 'reject', 'approve']);
+      ).toEqual(['close', 'escalate', 'reject', 'approve']);
       expect(
         (await f.desk.review(context(), f.incident.id)).permittedDecisions,
-      ).toEqual(['escalate']);
+      ).toEqual(['close', 'escalate']);
       expect(
         (await f.desk.review(decisionActor('member'), f.incident.id))
           .permittedDecisions,
@@ -2029,6 +2029,294 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       await f.safety.close();
     }
   });
+  it('closes manually once, removes attention, blocks approved dispatch and preserves recurrence', async () => {
+    const f = await decisionFixture();
+    try {
+      await f.desk.decide(decisionActor(), f.incident.id, f.command);
+      const command = {
+        commandId: randomUUID(),
+        kind: 'close' as const,
+        caseRevision: f.command.caseRevision,
+        diagnosisRevision: f.command.diagnosisRevision,
+        reason: 'Accepted by the team',
+        evidenceRefs: [],
+      };
+      const receipts = await Promise.allSettled(
+        Array.from({ length: 8 }, () =>
+          f.desk.decide(decisionActor(), f.incident.id, command),
+        ),
+      );
+      for (const result of receipts) {
+        expect(result.status).toBe('fulfilled');
+        if (result.status === 'fulfilled')
+          expect(result.value).toMatchObject({
+            id: command.commandId,
+            caseRevision: command.caseRevision + 1,
+          });
+      }
+      const progress = await f.desk.progress(decisionActor(), f.incident.id);
+      expect(progress.resolution).toMatchObject({
+        kind: 'human_disposition',
+        actorId: 'approver',
+        reason: command.reason,
+        evidenceRefs: [],
+      });
+      expect(progress.state).toBe('resolved');
+      expect(
+        (await services.cases.get(context(), f.incident.id))!.attention
+          .required,
+      ).toBe(false);
+      for (const view of ['active', 'needs_you'] as const)
+        expect(
+          (
+            await services.cases.list(
+              context(),
+              caseQuerySchema.parse({ view }),
+            )
+          ).items.some((i) => i.id === f.incident.id),
+        ).toBe(false);
+      expect(
+        (
+          await services.cases.list(
+            context(),
+            caseQuerySchema.parse({ view: 'history' }),
+          )
+        ).items.find((i) => i.id === f.incident.id)?.resolution,
+      ).toBe('human_disposition');
+      expect(
+        (await f.desk.review(decisionActor(), f.incident.id))
+          .permittedDecisions,
+      ).toEqual([]);
+      expect(await f.desk.proposal(context(), f.action.id)).toBeNull();
+      await expect(
+        f.safety.execution.execute(context(), f.action),
+      ).rejects.toThrow('no longer permits dispatch');
+      expect(f.perform).not.toHaveBeenCalled();
+      const timeline = await f.desk.timeline(decisionActor(), f.incident.id, {
+        limit: 100,
+      });
+      expect(
+        timeline.items.find((i) => i.type === 'exception.resolved'),
+      ).toMatchObject({
+        reason: command.reason,
+        outcome: 'human_disposition',
+        actor: { id: 'approver' },
+      });
+      expect(
+        (
+          await owner.query(
+            "SELECT count(*) FROM exception_outbox WHERE exception_id=$1 AND document->>'type'='exception.resolved'",
+            [f.incident.id],
+          )
+        ).rows[0].count,
+      ).toBe('1');
+      await expect(
+        f.desk.decide(decisionActor(), f.incident.id, {
+          ...command,
+          reason: 'Different',
+        }),
+      ).rejects.toMatchObject({ statusCode: 409 });
+      await expect(
+        f.desk.decide(decisionActor(), f.incident.id, {
+          ...command,
+          commandId: randomUUID(),
+        }),
+      ).rejects.toMatchObject({ statusCode: 409 });
+      const old = request(f.action.preconditions.evidenceRefs[0]);
+      old.evidence[0]!.observedAt = now.toISOString();
+      expect(
+        (await services.exceptions.ingest(context(), old)).incident?.id,
+      ).toBe(f.incident.id);
+      const next = request(randomUUID());
+      next.evidence[0]!.observedAt = now.toISOString();
+      const successor = (await services.exceptions.ingest(context(), next))
+        .incident!;
+      expect(successor.id).not.toBe(f.incident.id);
+      expect(successor.previousExceptionId).toBe(f.incident.id);
+    } finally {
+      await f.safety.close();
+    }
+  });
+
+  it('retains uncertain execution and permits read-only reconciliation after manual closure', async () => {
+    const f = await decisionFixture();
+    try {
+      await f.desk.decide(decisionActor(), f.incident.id, f.command);
+      f.perform.mockRejectedValueOnce(new Error('Provider response lost'));
+      expect(
+        (await f.safety.execution.execute(context(), f.action)).state,
+      ).toBe('reconciliation_required');
+      const review = await f.desk.review(decisionActor(), f.incident.id);
+      await f.desk.decide(decisionActor(), f.incident.id, {
+        commandId: randomUUID(),
+        kind: 'close',
+        caseRevision: review.caseRevision,
+        diagnosisRevision: review.diagnosisRevision,
+        reason: 'Team accepted the uncertain outcome',
+      });
+      expect(
+        (await f.desk.progress(decisionActor(), f.incident.id)).execution
+          ?.state,
+      ).toBe('unknown');
+      expect(
+        (await f.safety.execution.reconcile(context(), f.action.id)).state,
+      ).toBe('succeeded');
+      expect(f.perform).toHaveBeenCalledTimes(1);
+      expect(
+        (await f.desk.progress(decisionActor(), f.incident.id)).resolution
+          ?.kind,
+      ).toBe('human_disposition');
+    } finally {
+      await f.safety.close();
+    }
+  });
+
+  it('exposes closure over HTTP with bounded reasons, tenant checks and permission enforcement', async () => {
+    const f = await decisionFixture();
+    const app = buildApp(
+      {},
+      {
+        desk: f.desk,
+        identity: {
+          resolveTenant: async (
+            credentials: { cookie?: string },
+            tenant: string,
+          ) =>
+            credentials.cookie === 'member=1'
+              ? decisionActor('member', 'reader', tenant)
+              : decisionActor('admin', 'approver', tenant),
+          hasSupportView: () => false,
+        } as unknown as IdentityService,
+        trustedOrigins: ['http://fixture.test'],
+      },
+    );
+    const command = {
+      commandId: randomUUID(),
+      kind: 'close',
+      caseRevision: f.command.caseRevision,
+      diagnosisRevision: f.command.diagnosisRevision,
+      reason: 'a'.repeat(1000),
+    };
+    const url = `/v1/organizations/${tenantId}/exceptions/${f.incident.id}/decisions`;
+    const headers = { cookie: 'admin=1', origin: 'http://fixture.test' };
+    try {
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url,
+            headers: { ...headers, cookie: 'member=1' },
+            payload: command,
+          })
+        ).statusCode,
+      ).toBe(403);
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url: url.replace(tenantId, otherTenant),
+            headers,
+            payload: command,
+          })
+        ).statusCode,
+      ).toBe(404);
+      for (const reason of [' ', 'a'.repeat(1001)])
+        expect(
+          (
+            await app.inject({
+              method: 'POST',
+              url,
+              headers,
+              payload: { ...command, reason },
+            })
+          ).statusCode,
+        ).toBe(400);
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url,
+            headers,
+            payload: { ...command, evidenceRefs: ['missing'] },
+          })
+        ).statusCode,
+      ).toBe(422);
+      const response = await app.inject({
+        method: 'POST',
+        url,
+        headers,
+        payload: command,
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        id: command.commandId,
+        kind: 'close',
+        reason: command.reason,
+      });
+      expect(
+        (
+          await app.inject({ method: 'POST', url, headers, payload: command })
+        ).json(),
+      ).toEqual(response.json());
+    } finally {
+      await app.close();
+      await f.safety.close();
+    }
+  });
+
+  it('enforces closure authority, tenant scope, evidence ownership and current revisions', async () => {
+    const f = await decisionFixture();
+    try {
+      const command = {
+        commandId: randomUUID(),
+        kind: 'close' as const,
+        caseRevision: f.command.caseRevision,
+        diagnosisRevision: f.command.diagnosisRevision,
+        reason: 'False positive',
+        evidenceRefs: [],
+      };
+      await expect(
+        f.desk.decide(decisionActor('member'), f.incident.id, command),
+      ).rejects.toMatchObject({ statusCode: 403 });
+      await expect(
+        f.desk.decide(context(otherTenant), f.incident.id, command),
+      ).rejects.toMatchObject({ statusCode: 404 });
+      await expect(
+        f.desk.decide(decisionActor(), f.incident.id, {
+          ...command,
+          caseRevision: command.caseRevision + 1,
+        }),
+      ).rejects.toMatchObject({ statusCode: 409 });
+      const foreign = request('foreign-evidence', otherTenant);
+      foreign.evidence[0]!.observedAt = now.toISOString();
+      await services.exceptions.ingest(context(otherTenant), foreign);
+      await expect(
+        f.desk.decide(decisionActor(), f.incident.id, {
+          ...command,
+          evidenceRefs: ['foreign-evidence'],
+        }),
+      ).rejects.toMatchObject({ statusCode: 422 });
+      expect(
+        (await services.exceptions.get(context(), f.incident.id))!.state,
+      ).not.toBe('resolved');
+      expect(
+        (await owner.query('SELECT count(*) FROM case_commands')).rows[0].count,
+      ).toBe('0');
+      f.refreshContext
+        .mockResolvedValueOnce(decisionActor())
+        .mockResolvedValueOnce(decisionActor('member'));
+      await expect(
+        f.desk.decide(decisionActor(), f.incident.id, command),
+      ).rejects.toMatchObject({ statusCode: 403 });
+      await f.desk.decide(decisionActor(), f.incident.id, {
+        ...command,
+        evidenceRefs: f.action.preconditions.evidenceRefs,
+      });
+    } finally {
+      await f.safety.close();
+    }
+  });
+
   it('fences an approved proposal when an operator escalates before dispatch', async () => {
     const f = await decisionFixture();
     try {

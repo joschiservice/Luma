@@ -46,6 +46,7 @@ const activityLabels: Record<string, Label> = {
 
   'exception.detected': m.activity_action_issue_detected,
   'exception.resolved': m.activity_action_issue_resolved,
+  'case.close': m.activity_action_issue_closed,
   'exception.escalated': m.activity_action_issue_escalated,
   'case.escalated': m.activity_action_issue_escalated,
   'case.escalate': m.activity_action_issue_escalated,

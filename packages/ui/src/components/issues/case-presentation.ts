@@ -174,6 +174,7 @@ const decisions = {
   approve: m.issues_decision_approve,
   reject: m.issues_decision_reject,
   escalate: m.issues_decision_escalate,
+  close: m.issues_close_action,
 } satisfies Record<CaseReview['permittedDecisions'][number], Label>;
 
 /** Names a decision someone can make on an issue, such as “Escalate”. */
@@ -182,6 +183,9 @@ export function decisionLabel(kind: CaseReview['permittedDecisions'][number]) {
 }
 
 const outcomes: Record<string, Label> = {
+  human_disposition: m.issues_resolution_human_title,
+  verification: m.issues_resolution_verified_title,
+  close: m.issues_resolution_human_title,
   succeeded: m.issues_outcome_succeeded,
   failed: m.issues_outcome_failed,
   passed: m.issues_check_confirmed,

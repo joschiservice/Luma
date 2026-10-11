@@ -301,3 +301,17 @@ it('keeps observe-only outcomes out of verified and autonomous totals even after
     cohort.find((m) => m.definition.id === 'resolution.verified')?.items,
   ).toEqual([]);
 });
+
+it('counts manual closure separately even when an execution previously passed its check', () => {
+  const manual = source({
+    resolution: { ...source().resolution!, kind: 'human_disposition' },
+  });
+  expect(classifyResolution(manual, asOf)).toMatchObject({
+    outcome: 'human_disposition',
+    verifiedAt: null,
+  });
+  expect(metric([manual], 'verified').value).toBe(0);
+  expect(metric([manual], 'autonomous').value).toBe(0);
+  const verified = source({ id: 'verified-incident' });
+  expect(metric([verified, manual], 'verified').value).toBe(1);
+});

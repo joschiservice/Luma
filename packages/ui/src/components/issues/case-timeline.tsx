@@ -61,6 +61,8 @@ const eventNames: Record<string, () => string> = {
   'case.approve': m.issues_event_approved,
   'case.reject': m.issues_event_rejected,
   'case.escalate': m.issues_event_escalated,
+  'case.close': m.issues_resolution_human_title,
+  'exception.resolved': m.issues_event_closed,
 };
 
 const executors = {
@@ -517,6 +519,9 @@ export function CaseTimeline({
                 },
               )}
             </p>
+            {progress.resolution.reason ? (
+              <p>{progress.resolution.reason}</p>
+            ) : null}
             <References refs={progress.resolution.evidenceRefs} />
           </div>
         ) : !expanded ? (
@@ -643,6 +648,7 @@ export function CaseTimeline({
                         {eventOutcomeLabel(event.outcome)}
                       </p>
                     ) : null}
+                    {event.reason ? <p>{event.reason}</p> : null}
                     {event.actor.kind !== 'unrecorded' ? (
                       <p className="case-caption audit-actor">
                         {m.issues_history_by({

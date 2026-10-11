@@ -50,7 +50,7 @@
   "permissions_issues_read_label": "Probleme ansehen",
   "permissions_issues_read_description": "Probleme mit Nachweisen, Diagnosen und vorgeschlagenen Änderungen ansehen.",
   "permissions_issues_manage_label": "Probleme bearbeiten",
-  "permissions_issues_manage_description": "Probleme prüfen, eskalieren und lösen, ihre Nachweise aktualisieren und Erkenntnisse festhalten.",
+  "permissions_issues_manage_description": "Probleme prüfen und eskalieren, mit einem Grund schließen, Lösungen bestätigen, Nachweise aktualisieren und Erkenntnisse festhalten.",
   "permissions_decisions_self_assign_label": "Entscheidungen übernehmen",
   "permissions_decisions_self_assign_description": "Nicht zugewiesene Entscheidungen in „Wartet auf dich“ übernehmen und eigene wieder freigeben.",
   "permissions_decisions_assign_label": "Entscheidungen zuweisen",

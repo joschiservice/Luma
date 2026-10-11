@@ -181,6 +181,42 @@ test('a rejected correction hands the case to a person without writing to Shopif
   expect(await shopStock(f)).toBe(before);
 });
 
+test('closing an issue blocks its waiting workflow change without counting a verified fix', async (t) => {
+  const f = await caseWorkflowFixture(t);
+  await f.activate(stock);
+  const { opened } = await driftedStock(f);
+  await f.tick();
+  const [run] = await f.runs(stock);
+  const waiting = await f.waitFor(stock, run.id, 'awaiting_decision');
+  const before = await shopStock(f);
+  const review = await f.request(`/exceptions/${opened.id}/review`);
+  await f.request(`/exceptions/${opened.id}/decisions`, {
+    commandId: randomUUID(),
+    kind: 'close',
+    reason: 'The team accepts this discrepancy',
+    caseRevision: review.caseRevision,
+    diagnosisRevision: review.diagnosisRevision,
+  });
+  await f.request(
+    '/apps/shopify/inventory-correction-approve',
+    { id: f.proposal(waiting, 'correct-stock'), outcome: 'approved' },
+    { cookie: f.approverCookie },
+  );
+  await f.wake(run.id);
+  const stopped = await f.waitFor(stock, run.id, 'escalated');
+  expect(
+    stopped.processSteps.find(
+      (step) => step.stepId === 'correct-stock' && step.state === 'escalated',
+    ).reason,
+  ).toBe('case_resolved');
+  expect(await shopStock(f)).toBe(before);
+  expect(
+    (await f.request(`/exceptions/${opened.id}/progress`)).resolution.kind,
+  ).toBe('human_disposition');
+  await f.tick();
+  expect(await f.runs(stock)).toHaveLength(1);
+});
+
 test('turning a workflow off stops new runs and blocks a waiting change', async (t) => {
   const f = await caseWorkflowFixture(t);
   const { activation } = await f.activate(stock);

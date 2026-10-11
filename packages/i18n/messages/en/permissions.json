@@ -50,7 +50,7 @@
   "permissions_issues_read_label": "View issues",
   "permissions_issues_read_description": "See issues, their evidence, diagnoses, and proposed changes.",
   "permissions_issues_manage_label": "Work on issues",
-  "permissions_issues_manage_description": "Check, escalate, and resolve issues, refresh their evidence, and record what was learned.",
+  "permissions_issues_manage_description": "Check and escalate issues, close them with a reason, verify resolutions, refresh evidence, and record what was learned.",
   "permissions_decisions_self_assign_label": "Take decisions",
   "permissions_decisions_self_assign_description": "Take unassigned decisions in Needs you and release your own.",
   "permissions_decisions_assign_label": "Assign decisions",
