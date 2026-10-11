@@ -50,7 +50,7 @@
     "evaluate:playbook": "pnpm exec turbo run build --filter=@luma/resolution... --filter=@luma/simulator... && node tooling/evaluation/cli.mjs",
     "test:evaluation": "pnpm exec turbo run build --filter=@luma/resolution... --filter=@luma/simulator... && node --test tooling/evaluation/*.test.mjs",
     "capture:incident": "pnpm exec turbo run build --filter=@luma/resolution... && node tooling/evaluation/capture-cli.mjs",
-    "apps:sync": "node tooling/apps/generate.mjs && prettier --write packages/app-catalog/src/generated.ts",
+    "apps:sync": "node tooling/apps/generate.mjs && eslint --fix packages/app-catalog/src/generated.ts && prettier --write packages/app-catalog/src/generated.ts",
     "simulator:replenishment": "pnpm test:e2e replenishment.e2e.mjs",
     "setup:code": "node tooling/code-runtime/setup.mjs",
     "evaluate:code": "pnpm --filter @luma/workflows build && node tooling/evaluation/code-cli.mjs",
@@ -59,7 +59,7 @@
     "benchmark": "node tooling/benchmarks/run.mjs",
     "test:browser:report": "pnpm --filter @luma/api exec playwright show-report ../../.luma/playwright/report",
     "knip": "knip",
-    "knip:check": "knip --include files,dependencies --no-config-hints && knip --workspace packages/connectors/core --exports --include-entry-exports --no-config-hints",
+    "knip:check": "knip --include files,dependencies,unlisted,unresolved --no-config-hints && knip --workspace packages/connectors/core --exports --include-entry-exports --no-config-hints",
     "typecheck:tooling": "tsc -p tooling/tsconfig.json",
     "lint:ui": "node tooling/style/check-ui.mjs",
     "dev:staff": "node tooling/dev/cli.mjs staff"

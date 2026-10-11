@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { chromium } from '../../apps/api/node_modules/playwright/index.mjs';
+import { chromium } from 'playwright';
+
 import { createApp } from '../../apps/simulator/dist/app.js';
 import { testSimulatorDatabase } from './database.mjs';
 

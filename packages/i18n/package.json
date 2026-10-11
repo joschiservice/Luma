@@ -30,7 +30,13 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "react": "catalog:"
+    "react": "catalog:",
+    "vite": "catalog:"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@inlang/paraglide-js": "2.26.0",
@@ -44,6 +50,7 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "typescript": "catalog:typescript-compatible-5-9-3",
+    "vite": "catalog:",
     "vitest": "catalog:"
   }
 }

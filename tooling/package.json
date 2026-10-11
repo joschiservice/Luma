@@ -26,6 +26,7 @@
     "@luma/staff": "workspace:*",
     "@luma/workflow-temporal": "workspace:*",
     "@luma/workflows": "workspace:*",
+    "playwright": "catalog:",
     "@luma/app-cin7": "workspace:*",
     "@luma/app-jtl": "workspace:*",
     "@luma/app-shopify": "workspace:*"

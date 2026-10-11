@@ -11,8 +11,12 @@
         "benchmarks/commerce.mjs",
       ],
       "project": ["**/*.mjs"],
-      // The app generator writes this import into another workspace.
-      "ignoreDependencies": ["@luma/app-host"],
+      // The app generator writes this import into another workspace. Observability loads the
+      // OpenTelemetry hook from the API's dependencies, which the instrumented processes use.
+      "ignoreDependencies": [
+        "@luma/app-host",
+        "@opentelemetry/instrumentation",
+      ],
     },
     "apps/api": {
       "entry": [
@@ -29,6 +33,8 @@
         "scripts/update-shopify-schema.mjs",
         "*.ts",
       ],
+      // Journey servers start the web and staff apps with each app's own Vite.
+      "ignoreDependencies": ["vite"],
     },
     "apps/simulator": { "entry": ["src/server.ts"] },
     "apps/simulator-web": { "entry": ["src/main.tsx"] },
