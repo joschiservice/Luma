@@ -10,7 +10,7 @@ export type ActivityOutcome =
   | 'manually_disposed'
   | 'recorded';
 
-export type ActivityType =
+type ActivityType =
   | 'issue'
   | 'decision'
   | 'execution'

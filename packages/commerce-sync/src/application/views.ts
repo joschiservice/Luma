@@ -62,7 +62,7 @@ export interface SyncConnectionView {
   }[];
 }
 
-export interface SyncRunView {
+interface SyncRunView {
   id: string;
   connectionId: string;
   recordType: RecordType;

@@ -61,7 +61,7 @@ export type OperationalCohortItem =
   | PurchaseOrderMetricItem
   | ConnectionMetricItem;
 
-export interface OperationalSummaryResponse {
+interface OperationalSummaryResponse {
   definitionVersion: 2;
   scope: NonNullable<OperationalSummaryRequest['scope']>;
   asOf: string;

@@ -1,12 +1,4 @@
-export type {
-  SalesAddress,
-  SalesEdit,
-  SalesLine,
-  SalesOrder,
-} from './domain/order.js';
+/** @public Declaration emit names these in the inferred type of `createSalesRuntime` in application-runtime. */
+export type { SalesEdit, SalesOrder } from './domain/order.js';
 
-export type {
-  SalesDependencies,
-  SalesService,
-  SalesTransaction,
-} from './application/service.js';
+export type { SalesService } from './application/service.js';

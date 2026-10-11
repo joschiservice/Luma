@@ -73,6 +73,4 @@ export const salesEditSchema = z
 
 export type SalesOrder = z.infer<typeof salesOrderSchema>;
 
-export type SalesEdit = z.infer<typeof salesEditSchema>;
-
 export type SalesAddress = z.infer<typeof salesAddressSchema>;

@@ -1,6 +1,5 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema-jsonc.json",
-  "rules": { "types": "off", "nsTypes": "off" },
   // Exports read by tools that knip does not follow.
   "ignoreIssues": {
     // tooling/dev/studio.mjs passes this file to drizzle-kit studio.

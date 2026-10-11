@@ -64,8 +64,6 @@ const provisioningSchema = z
   })
   .strict();
 
-export type StaffProvisioningInput = z.input<typeof provisioningSchema>;
-
 /** Validates privileged staff enrollment input before connecting to the administrator database. */
 export function validateStaffProvisioning(input: unknown) {
   return provisioningSchema.parse(input);

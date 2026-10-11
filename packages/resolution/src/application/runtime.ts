@@ -58,7 +58,7 @@ export interface WorkflowProgress {
   reason?: string;
 }
 
-export type WorkflowExecutionResult =
+type WorkflowExecutionResult =
   | { state: 'not_executed'; reason: 'observe_only' }
   | { state: 'proposal_changed'; proposal: ProposalReference }
   | { state: 'approval_required'; decisionId: string }

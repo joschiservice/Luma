@@ -20,7 +20,7 @@ export interface MetricRequest {
   cursor?: string | undefined;
 }
 
-export interface MetricResponse {
+interface MetricResponse {
   nextRefreshAt?: string | null;
   definitionVersion: 1;
   scope: OrderMetricScope;

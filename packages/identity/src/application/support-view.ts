@@ -2,7 +2,7 @@ import type { SupportViewMode } from '../domain/context.js';
 import type { Credentials } from './identity.js';
 
 /** Why a support view ended. */
-export type SupportViewEndReason =
+type SupportViewEndReason =
   'ended' | 'expired' | 'consent_revoked' | 'staff_access_revoked' | 'replaced';
 
 /** The state of the view a cookie token names, checked on every request. */

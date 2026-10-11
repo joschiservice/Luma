@@ -194,12 +194,15 @@ when every job succeeds.
   database row types rely on the implicit index signature of type aliases. An
   intentionally empty production callback needs a comment.
 - `pnpm knip:check` finds unused files, dependencies and exports in every workspace,
-  including entry-point exports, so packages export only what other code uses, and imports
-  of packages a workspace does not declare. Exported types are not checked. Runtime-loaded
-  entry points and deliberate exceptions belong in `knip.jsonc`. A package's `tsconfig.json`
-  needs `rootDir` and `outDir` so knip maps imports of its compiled `dist` exports back to
-  source. `pnpm test:architecture` also checks that each workspace declares the workspace
-  packages it imports; pnpm would otherwise resolve them only by accident.
+  including entry-point exports and exported types, so packages export only what other code
+  uses, and imports of packages a workspace does not declare. Name re-exported types
+  explicitly instead of `export type *`. Knip does not see types that declaration emit names
+  in inferred signatures; when `pnpm build` fails because such a type is not exported, export
+  it with a `@public` tag that names the inferred export. Runtime-loaded entry points and
+  deliberate exceptions belong in `knip.jsonc`. A package's `tsconfig.json` needs `rootDir`
+  and `outDir` so knip maps imports of its compiled `dist` exports back to source.
+  `pnpm test:architecture` also checks that each workspace declares the workspace packages
+  it imports; pnpm would otherwise resolve them only by accident.
 - `pnpm typecheck:tooling` type-checks tooling modules with JSDoc. Add a module to
   `tooling/tsconfig.json` when bringing it under checks.
 - Shared dependency versions live in `pnpm-workspace.yaml` catalogs. Upgrade a catalog

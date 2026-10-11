@@ -4,13 +4,13 @@ import { decimalString, decimalUnits } from './facts.js';
 
 export const diagnosisVersion = 'diagnosis-v1';
 
-export interface Finding {
+interface Finding {
   code: string;
   text: string;
   evidenceRefs: string[];
 }
 
-export interface Hypothesis extends Finding {
+interface Hypothesis extends Finding {
   contradictingEvidenceRefs: string[];
   uncertainty: 'unsubstantiated';
   missingChecks: string[];
@@ -18,7 +18,7 @@ export interface Hypothesis extends Finding {
 }
 
 /** Recommendations carry no execution authority. Candidate proposals are owned by policies. */
-export interface NextStep extends Finding {
+interface NextStep extends Finding {
   kind: 'read_investigate' | 'manual_intervention';
   preconditions: string[];
   verificationCriteria: string[];

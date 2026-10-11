@@ -33,7 +33,7 @@ export interface HumanDisposition {
   evidenceRefs: string[];
 }
 
-export interface VerifiedDisposition {
+interface VerifiedDisposition {
   kind: 'verification';
   reason: string;
   evidenceRefs: string[];
@@ -55,7 +55,7 @@ export const verificationPostconditions = {
   workflow_failure: 'workflow_business_postcondition_verified',
 } as const;
 
-export interface VerificationBinding {
+interface VerificationBinding {
   evidenceKey: string;
   exceptionClass: ExceptionClass;
   subject: Incident['subject'];
@@ -113,13 +113,14 @@ export interface Incident {
   resolution?: Resolution & { actorId: string; at: string; auditId: string };
 }
 
+/** @public Declaration emit names it in the inferred type of `createExceptions`. */
 export interface DetectionResult {
   decision: Decision;
   incident: Incident | null;
   reviewRequired: boolean;
 }
 
-export interface Evaluation {
+interface Evaluation {
   request: DetectionRequest & { deliveryKey: string };
   decision: Decision;
   fingerprint: string;

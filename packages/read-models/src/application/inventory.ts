@@ -13,7 +13,7 @@ export interface InventoryQuery {
   cursor?: string | undefined;
 }
 
-export interface InventoryList {
+interface InventoryList {
   items: StockPosition[];
   nextCursor: string | null;
   asOf: string;

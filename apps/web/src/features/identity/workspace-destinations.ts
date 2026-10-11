@@ -22,10 +22,10 @@ import {
 } from 'lucide-react';
 
 /** Where a destination appears in the sidebar. */
-export type DestinationGroup = 'core' | 'operations' | 'workspace';
+type DestinationGroup = 'core' | 'operations' | 'workspace';
 
 /** Workspace route segments that appear in navigation. */
-export type DestinationPath =
+type DestinationPath =
   | 'home'
   | 'needs-you'
   | 'exceptions'

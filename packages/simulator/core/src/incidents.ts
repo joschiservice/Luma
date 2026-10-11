@@ -1,5 +1,5 @@
 /** Where Luma is expected to show an operational incident. */
-export type IncidentSurface =
+type IncidentSurface =
   'case' | 'fulfillment' | 'returns' | 'orders' | 'procurement' | 'connections';
 
 export interface IncidentKind {

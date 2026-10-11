@@ -13,7 +13,7 @@ export type FulfillmentSignal =
   | 'late_delivery'
   | 'failed';
 
-export type FulfillmentSort = 'waiting' | 'recent' | 'deadline';
+type FulfillmentSort = 'waiting' | 'recent' | 'deadline';
 
 type Tracking = {
   carrier: string | null;
@@ -75,7 +75,7 @@ export interface FulfillmentQuery {
   limit?: number | undefined;
 }
 
-export interface FulfillmentList {
+interface FulfillmentList {
   items: FulfillmentItem[];
   sources: FulfillmentSource[];
   locations: { id: string; name: string | null; open: number }[];

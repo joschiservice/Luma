@@ -1,7 +1,8 @@
+/** @public Declaration emit names it in the inferred types of the detection pipeline and inventory monitor in resolution. */
+export type { DetectionResult } from './application/detection.js';
+
 export type {
-  DetectionRepository,
   DetectionRequest,
-  DetectionResult,
   DetectionService,
   Evidence,
   Incident,
@@ -16,19 +17,12 @@ export {
   defaultConfiguration,
 } from './domain/facts.js';
 
-export type {
-  Configuration,
-  EvaluationInput,
-  ExceptionClass,
-  Facts,
-} from './domain/facts.js';
+export type { Configuration, Facts } from './domain/facts.js';
 
 export type {
   DiagnosisOptions,
-  DiagnosisRepository,
   DiagnosisRereader,
   DiagnosisService,
-  ReasoningSelection,
 } from './application/diagnosis.js';
 
 export type { Diagnosis, DiagnosisInput } from './domain/diagnosis.js';

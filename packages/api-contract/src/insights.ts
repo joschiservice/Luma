@@ -277,10 +277,6 @@ export type InsightChart = z.infer<typeof insightChartSchema>;
 
 export type InsightRange = z.infer<typeof insightRangeSchema>;
 
-export type InsightQuery = z.infer<typeof insightQuerySchema>;
-
-export type InsightRecordQuery = z.infer<typeof insightRecordQuerySchema>;
-
 export type InsightPoint = z.infer<typeof insightPointSchema>;
 
 export type InsightSource = z.infer<typeof insightSourceSchema>;
@@ -288,5 +284,3 @@ export type InsightSource = z.infer<typeof insightSourceSchema>;
 export type InsightChartResponse = z.infer<typeof insightChartResponseSchema>;
 
 export type InsightRecord = z.infer<typeof insightRecordSchema>;
-
-export type InsightRecordList = z.infer<typeof insightRecordListSchema>;

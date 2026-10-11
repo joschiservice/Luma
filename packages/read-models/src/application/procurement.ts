@@ -45,7 +45,7 @@ export interface ReplenishmentTrace {
 /** Procurement context sections that need another area's read permission. */
 export type ProcurementContextSection = 'positions' | 'issues';
 
-export interface PurchaseOrderContext {
+interface PurchaseOrderContext {
   lines: (SkuContext & { lineId: string })[];
   issues: { id: string; label: string; state: string }[];
   replenishment: ReplenishmentTrace | null;
@@ -55,7 +55,7 @@ export interface PurchaseOrderContext {
   asOf: string;
 }
 
-export interface SupplierContext {
+interface SupplierContext {
   skus: (SkuContext & { onOrder: { quantity: number; unit: string }[] })[];
   issues: { id: string; label: string; state: string }[];
   truncated: boolean;

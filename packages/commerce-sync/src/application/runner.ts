@@ -637,8 +637,6 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
   };
 }
 
-export type SyncRunner = ReturnType<typeof createSyncRunner>;
-
 type RecordOutcome = Pick<LedgerEntry, 'status' | 'problem' | 'entityId'>;
 
 const rejected: RecordOutcome = {

@@ -50,11 +50,6 @@ export type { ShopifyOAuth };
 
 export type { ShopifyConfig } from './config.js';
 
-export type {
-  ShopifyConnectorOptions,
-  ShopifyEvidence,
-} from './infrastructure/adapter.js';
-
 export { mapShopifyWebhook } from './infrastructure/webhooks.js';
 
 /** Creates Shopify capability, validation, and credential-refresh contributions. */
@@ -392,8 +387,3 @@ export function createApp(context: AppFactoryContext): AppDefinition {
 }
 
 export { createShopifyRecordReader } from './infrastructure/records.js';
-
-export type {
-  ShopifyRecordDetail,
-  ShopifyRecordKind,
-} from './domain/records.js';

@@ -1,4 +1,4 @@
-export interface Thresholds {
+interface Thresholds {
   freshnessSeconds: number;
   pairSkewSeconds: number;
   syncFailureSeconds: number;

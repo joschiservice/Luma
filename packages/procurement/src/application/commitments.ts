@@ -47,7 +47,11 @@ import {
 } from './extraction.js';
 import type { ProcurementEvent } from './procurement.js';
 
-/** A connection that can act as a purchasing system. */
+/**
+ * A connection that can act as a purchasing system.
+ *
+ * @public Declaration emit names it in the inferred type of `createSupplierCommitmentService`.
+ */
 export interface PurchasingConnection {
   id: string;
   label: string;
@@ -58,6 +62,7 @@ export interface PurchasingConnection {
   canListSuppliers: boolean;
 }
 
+/** @public Declaration emit names it in the inferred type of `createSupplierCommitmentService`. */
 export interface PurchasingSupplier extends SupplierSnapshot {
   externalId: string;
   scopeKey: string;
@@ -71,7 +76,7 @@ export interface PurchasingOrder {
   data: SupplierOrderSnapshot;
 }
 
-export type PurchasingResult<T> =
+type PurchasingResult<T> =
   { ok: true; value: T } | { ok: false; reason: string };
 
 /** Reads the merchant's purchasing system through installed connections. */

@@ -1,7 +1,7 @@
 import { Input as InputPrimitive } from '@base-ui/react/input';
 import { cn } from '@luma/ui/lib/utils';
 
-export type InputProps = InputPrimitive.Props;
+type InputProps = InputPrimitive.Props;
 
 /** Shared text-control appearance used by inputs, textareas and select triggers. */
 export const controlClassName =

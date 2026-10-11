@@ -48,11 +48,6 @@ export function createProcurement(
 
 export { createReplenishmentStore } from './infrastructure/replenishment-store.js';
 
-export type {
-  ReplenishmentActivation,
-  ReplenishmentStock,
-} from './application/replenishment.js';
-
 export {
   createProcurementMetricReader,
   createStockRiskReader,
@@ -126,9 +121,7 @@ export function createSupplierCommitmentService(
 }
 
 export type {
-  PurchasingConnection,
   PurchasingOrder,
-  PurchasingSupplier,
   PurchasingSystem,
   SubmissionAdmission,
   SubmissionExecution,

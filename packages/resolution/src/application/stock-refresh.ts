@@ -94,5 +94,3 @@ export function createStockRefresh(deps: {
     },
   };
 }
-
-export type StockRefresh = ReturnType<typeof createStockRefresh>;

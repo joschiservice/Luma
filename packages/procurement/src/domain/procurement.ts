@@ -1,3 +1,4 @@
+/** @public Declaration emit names it in the inferred type of `createProcurement`. */
 export interface ExternalReference {
   system: string;
   externalId: string;
@@ -21,7 +22,7 @@ export interface Supplier extends SupplierInput {
   confirmationHours?: number | undefined;
 }
 
-export interface SupplierLink {
+interface SupplierLink {
   connectionId: string;
   externalId: string;
   scopeKey: string;

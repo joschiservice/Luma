@@ -32,6 +32,7 @@ export interface DirectoryWorkspace {
   dataRegion: string;
 }
 
+/** @public Declaration emit names it in the inferred type of `createStaff`. */
 export interface WorkspaceAccess {
   id: string;
   workspaceId: string;
@@ -39,6 +40,7 @@ export interface WorkspaceAccess {
   expiresAt: string;
 }
 
+/** @public Declaration emit names it in the inferred type of `createStaff`. */
 export interface WorkspaceDetail {
   membersTruncated: boolean;
   connectionsTruncated: boolean;
@@ -68,7 +70,11 @@ export interface WorkspaceDetail {
   };
 }
 
-/** A pending request asking the workspace to allow support views. */
+/**
+ * A pending request asking the workspace to allow support views.
+ *
+ * @public Declaration emit names it in the inferred type of `createStaff`.
+ */
 export interface SupportAccessRequest {
   id: string;
   durationHours: 24 | 72 | 168;
@@ -91,6 +97,7 @@ export type SupportViewInput = {
     }
 );
 
+/** @public Declaration emit names it in the inferred type of `createStaff`. */
 export interface AccountAccess {
   id: string;
   userId: string;
@@ -442,7 +449,7 @@ export function createStaffService(
   };
 }
 
-export type StaffService = ReturnType<typeof createStaffService>;
+type StaffService = ReturnType<typeof createStaffService>;
 
 /** Staff HTTP composition port; callers receive operations without database handles. */
 export interface StaffRuntime {

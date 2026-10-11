@@ -68,7 +68,7 @@ export interface TimelineEvent {
   evidenceRefs: string[];
 }
 
-export interface DeskSession {
+interface DeskSession {
   snapshot: DeskSnapshot;
   receipt(
     id: string,

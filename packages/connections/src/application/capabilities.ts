@@ -19,7 +19,7 @@ import type {
   VerificationResult,
 } from './effects.js';
 
-export interface CapabilityDescriptor {
+interface CapabilityDescriptor {
   version: '0';
   minimumRisk: EffectAdapter['minimumRisk'];
   idempotency: 'provider_key' | 'conditional_write' | 'none';

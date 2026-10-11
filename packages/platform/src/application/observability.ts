@@ -5,7 +5,7 @@ export type Operation =
   | 'model.generate'
   | 'tool.execute';
 
-export type ProductEvent =
+type ProductEvent =
   'connector_provider_viewed' | 'observability_test_completed';
 
 /** Flag keys that may be evaluated; add a key here before creating it in PostHog. */
@@ -55,7 +55,7 @@ export interface HttpFailureContext {
 }
 
 /** Where an unexpected failure happened. Messages are fixed operation descriptions. */
-export interface FailureContext {
+interface FailureContext {
   context?: TraceContext;
   request?: HttpFailureContext;
   message?: string;

@@ -9,7 +9,7 @@ import { z } from 'zod';
 
 export const API_VERSION = '2.2';
 
-export type JtlConnection =
+type JtlConnection =
   | { kind: 'cloud'; jtlTenantId: string; accessToken(): Promise<string> }
   | {
       kind: 'onprem';

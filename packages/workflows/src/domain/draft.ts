@@ -7,7 +7,7 @@ import type { WorkflowDefinition, WorkflowTrigger } from './workflow.js';
 export type AuthoringMode = 'template' | 'visual' | 'code' | 'language';
 
 /** A Code Step before publication binds its runtime and artifact digest. */
-export type DraftCodeStep = Omit<CodeStep, 'artifactDigest' | 'runtime'>;
+type DraftCodeStep = Omit<CodeStep, 'artifactDigest' | 'runtime'>;
 
 export type DraftStep = Exclude<ProcessStep, CodeStep> | DraftCodeStep;
 

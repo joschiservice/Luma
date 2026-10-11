@@ -25,7 +25,7 @@ export type CatalogListing = {
 };
 
 /** A catalog source whose current catalog does not contain the SKU. */
-export interface CatalogGap {
+interface CatalogGap {
   connectionId: string;
   /** Another SKU in that source with the same normalized SKU code, not yet linked. */
   match: { skuId: string; sku: string } | null;
@@ -67,7 +67,7 @@ export interface ProductQuery {
   limit?: number | undefined;
 }
 
-export interface ProductList {
+interface ProductList {
   items: CatalogItem[];
   sources: CatalogSource[];
   /** Matching SKUs per view for the current search and source filters. */

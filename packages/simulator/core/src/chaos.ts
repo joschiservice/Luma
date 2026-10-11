@@ -23,6 +23,7 @@ export interface LatencyProfile {
   p99Ms: number;
 }
 
+/** @public Declaration emit names it in the inferred type of `chaosPresets`. */
 export interface TransportChaos {
   /** Share of requests that fail before or around the provider's work, from 0 to 1. */
   errorRate: number;
@@ -39,7 +40,11 @@ export interface TransportChaos {
   rateLimits: boolean;
 }
 
-/** Changes transport behavior for one provider instance or operation. */
+/**
+ * Changes transport behavior for one provider instance or operation.
+ *
+ * @public Declaration emit names it in the inferred type of `chaosPresets`.
+ */
 export interface ChaosOverride {
   instance?: string | undefined;
   operation?: string | undefined;
@@ -49,7 +54,7 @@ export interface ChaosOverride {
 }
 
 /** A period in simulation time with a different failure rate, optionally repeating. */
-export interface ChaosWindow {
+interface ChaosWindow {
   id: string;
   label: string;
   startsAt: number;
@@ -63,6 +68,7 @@ export interface ChaosWindow {
   fault?: TransportFault | undefined;
 }
 
+/** @public Declaration emit names it in the inferred type of `chaosPresets`. */
 export interface WebhookChaos {
   dropRate: number;
   duplicateRate: number;

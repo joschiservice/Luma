@@ -2,16 +2,11 @@ import type { TenantContext } from '@luma/identity';
 
 import type { RefundData, ReturnData } from '../domain/returns.js';
 
-export type {
-  CanonicalMoney,
-  RefundData,
-  ReturnData,
-} from '../domain/returns.js';
+export type { RefundData, ReturnData } from '../domain/returns.js';
 
-export type EntityKind =
-  'order' | 'order_line' | 'fulfillment' | 'return' | 'refund';
+type EntityKind = 'order' | 'order_line' | 'fulfillment' | 'return' | 'refund';
 
-export type CommerceData =
+type CommerceData =
   | {
       type: 'order';
       displayNumber: string | null;

@@ -55,7 +55,11 @@ export interface GenerationAvailability {
   reason: string | null;
 }
 
-/** The model route that served a generation. Null values mean no model answered. */
+/**
+ * The model route that served a generation. Null values mean no model answered.
+ *
+ * @public Declaration emit names it in the inferred type of `createDraftGenerations`.
+ */
 export interface GenerationRoute {
   profile: string;
   adapter: string | null;
@@ -72,13 +76,13 @@ export interface GenerationSummary {
 }
 
 /** A proposed change to a draft. Nothing is applied until the author accepts it. */
-export interface ProposalResult extends GenerationSummary {
+interface ProposalResult extends GenerationSummary {
   content: WorkflowDraftContent;
   changes: DraftChange[];
 }
 
 /** A generated Code Step suggestion. It is never saved by generation. */
-export interface CodeStepResult {
+interface CodeStepResult {
   stepId: string | null;
   source: string;
   fields: PlaybookFields;
@@ -89,7 +93,7 @@ export interface CodeStepResult {
 }
 
 /** The author's decision on a proposal. */
-export interface ProposalDecision {
+interface ProposalDecision {
   state: 'open' | 'accepted' | 'rejected';
   decidedBy: string | null;
   decidedAt: string | null;

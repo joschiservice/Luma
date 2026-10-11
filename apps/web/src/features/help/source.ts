@@ -29,8 +29,6 @@ export const source = loader({
   source: docs.toFumadocsSource(),
 });
 
-export type DocPage = NonNullable<ReturnType<typeof source.getPage>>;
-
 /**
  * Finds a guide in the reader's language. `translated` is false when the language has no
  * translation and the English guide is shown instead.
@@ -47,7 +45,7 @@ export function docPage(slug: string, locale: Locale = getLocale()) {
   return { page, translated };
 }
 
-export interface DocGuide {
+interface DocGuide {
   slug: string;
   url: string;
   title: string;

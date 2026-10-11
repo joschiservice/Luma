@@ -132,7 +132,7 @@ export function caseDeadline(facts: CaseDecisionFacts): string | null {
 }
 
 /** The workspace permissions that change what a reader may do with a presented decision. */
-export type DecisionPermission = 'decisions.respond';
+type DecisionPermission = 'decisions.respond';
 
 /** The person reading the queue and a check of their current permissions. */
 export interface DecisionReader {

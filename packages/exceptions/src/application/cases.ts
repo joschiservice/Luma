@@ -13,6 +13,7 @@ export interface CaseQuery {
   limit: number;
 }
 
+/** @public Declaration emit names it in the inferred type of `createCases`. */
 export interface CaseSummary {
   schemaVersion: 1;
   id: string;
@@ -46,6 +47,7 @@ export interface CaseDetail extends CaseSummary {
   diagnosis: Diagnosis | null;
 }
 
+/** @public Declaration emit names it in the inferred type of `createCases`. */
 export interface CaseOverview {
   attentionCount: number;
   activeCount: number;

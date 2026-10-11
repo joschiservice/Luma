@@ -188,18 +188,12 @@ export type DecisionReason = z.infer<typeof decisionReasonSchema>;
 
 export type DecisionDomain = z.infer<typeof decisionDomainSchema>;
 
-export type DecisionResponse = z.infer<typeof decisionResponseSchema>;
-
 export type DecisionView = z.infer<typeof decisionViewSchema>;
 
 export type DecisionOwner = z.infer<typeof decisionOwnerSchema>;
 
 export type DecisionItem = z.infer<typeof decisionItemSchema>;
 
-export type DecisionQuery = z.infer<typeof decisionQuerySchema>;
-
 export type DecisionList = z.infer<typeof decisionListSchema>;
-
-export type DecisionAssignment = z.infer<typeof decisionAssignmentSchema>;
 
 export type DecisionAssignInput = z.infer<typeof decisionAssignInputSchema>;

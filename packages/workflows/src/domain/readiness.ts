@@ -2,7 +2,7 @@
  * Where an operator repairs a readiness issue. The web maps each destination to a route;
  * `server` has no product page because only whoever runs Luma can fix it.
  */
-export type ReadinessDestination =
+type ReadinessDestination =
   | 'connections'
   | 'suppliers'
   | 'inventory'

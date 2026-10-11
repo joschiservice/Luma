@@ -16,7 +16,7 @@ export type SecurityEventType =
   | 'account.deletion-scheduled'
   | 'account.restored';
 
-export type SecurityEventOutcome = 'succeeded' | 'failed';
+type SecurityEventOutcome = 'succeeded' | 'failed';
 
 /**
  * Explains an outcome without recording what was submitted. Failed sign-ins carry a failure

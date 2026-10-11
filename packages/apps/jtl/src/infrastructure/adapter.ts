@@ -45,7 +45,7 @@ const ref = (id: number | string, scopeKey = ''): ExternalId => ({
   scopeKey,
 });
 
-export interface JtlEvidence {
+interface JtlEvidence {
   tenantId: string;
   connectionId: string;
   apiVersion: typeof API_VERSION;

@@ -1,6 +1,5 @@
 import type {
   PermissionDefinition,
-  PermissionGroup,
   RoleHistoryEvent,
   RolesSnapshot,
   WorkspaceRole,
@@ -11,7 +10,7 @@ import { privateQueryDefaults } from '../../lib/private-query';
 import { localizeRoles } from '../identity/permission-text';
 import { settingsApi } from './data';
 
-export type { PermissionDefinition, PermissionGroup, WorkspaceRole };
+export type { PermissionDefinition, WorkspaceRole };
 
 /**
  * Loads workspace roles with member counts and the grantable permission catalog, with known

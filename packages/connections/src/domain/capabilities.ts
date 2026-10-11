@@ -2,10 +2,7 @@ import type { ConnectorFailure } from '@luma/connector-core';
 
 export { ConnectorError } from '@luma/connector-core';
 
-export type {
-  ConnectorErrorCode,
-  ConnectorFailure,
-} from '@luma/connector-core';
+export type { ConnectorFailure } from '@luma/connector-core';
 
 /** Provider IDs are opaque and case-preserved; scopeKey identifies a parent-local namespace. */
 export interface ExternalId {
@@ -46,7 +43,7 @@ export interface Observation<T> {
   data: T;
 }
 
-export interface PageQuery {
+interface PageQuery {
   cursor?: string;
   limit: number;
   /**
@@ -87,14 +84,14 @@ export interface Page<T> {
   retryAfterMs?: number;
 }
 
-export interface Quantity {
+interface Quantity {
   /** Decimal string with at most six fractional and fourteen integer digits. */
   amount: string;
   unit: string;
 }
 
 /** A decimal amount in an ISO 4217 currency, as reported by the source. */
-export interface Money {
+interface Money {
   /** Decimal string with at most six fractional and fourteen integer digits. */
   amount: string;
   currency: string;
@@ -199,9 +196,9 @@ export interface FulfillmentSnapshot {
   delivery?: FulfillmentDelivery | null;
 }
 
-export type FulfillmentKind = 'fulfillment_order' | 'shipment';
+type FulfillmentKind = 'fulfillment_order' | 'shipment';
 
-export type FulfillmentHoldReason =
+type FulfillmentHoldReason =
   | 'awaiting_payment'
   | 'high_risk_of_fraud'
   | 'incorrect_address'
@@ -210,7 +207,7 @@ export type FulfillmentHoldReason =
   | 'awaiting_return_items'
   | 'other';
 
-export type FulfillmentMethodType =
+type FulfillmentMethodType =
   | 'shipping'
   | 'pick_up'
   | 'pickup_point'
@@ -219,7 +216,7 @@ export type FulfillmentMethodType =
   | 'none'
   | 'unknown';
 
-export type FulfillmentDelivery =
+type FulfillmentDelivery =
   | 'label_created'
   | 'in_transit'
   | 'out_for_delivery'
@@ -229,7 +226,7 @@ export type FulfillmentDelivery =
   | 'delivered'
   | 'failed';
 
-export interface FulfillmentTracking {
+interface FulfillmentTracking {
   carrier: string | null;
   number: string | null;
   /** An absolute http(s) tracking link. */
@@ -240,7 +237,7 @@ export interface FulfillmentTracking {
  * A source list price. `currency` is null when the source reports an amount without its
  * currency; such prices are shown but never compared.
  */
-export interface ListPrice {
+interface ListPrice {
   /** Decimal string with at most six fractional and fourteen integer digits. */
   amount: string;
   currency: string | null;
@@ -333,7 +330,7 @@ export interface ReturnSnapshot {
 }
 
 /** A refund payment attempt. Only `success` means money was returned. */
-export interface RefundTransaction {
+interface RefundTransaction {
   status: 'success' | 'pending' | 'failed' | 'unknown';
   amount: Money;
   processedAt: string | null;
@@ -362,7 +359,7 @@ export interface RefundSnapshot {
 }
 
 /** Acceptance is not proof that the expected business state was reached. */
-export interface WriteReceipt {
+interface WriteReceipt {
   status: 'accepted';
   evidenceRefs: string[];
   providerRequestId: string | null;
@@ -420,7 +417,7 @@ export interface SupplierOrderSnapshot {
 }
 
 /** Creates one purchase order in the purchasing system for an approved Luma order. */
-export interface PurchaseOrderSubmission {
+interface PurchaseOrderSubmission {
   /** The Luma purchase-order ID; the adapter stores it so the order can be found again. */
   lumaOrderId: string;
   /** Buyer reference shown to the supplier. */
@@ -431,14 +428,14 @@ export interface PurchaseOrderSubmission {
   lines: { sku: ExternalId; quantity: Quantity }[];
 }
 
-export interface ShippingMethodSnapshot {
+interface ShippingMethodSnapshot {
   orderStatus: 'open' | 'shipped' | 'cancelled' | 'unknown';
   shippingMethod: ExternalId;
   isCancelled: boolean;
 }
 
 /** A recovery command is bound to an exact provider record and reviewed revision. */
-export interface FulfillmentRecoveryInput {
+interface FulfillmentRecoveryInput {
   orderId: string;
   fulfillmentOrderId: string;
   expectedRevision: string;
@@ -446,7 +443,7 @@ export interface FulfillmentRecoveryInput {
   locationId?: string;
 }
 
-export interface CapabilityContract {
+interface CapabilityContract {
   /** Corrects one approved item/location's available stock using provider CAS and idempotency. */
   'inventory.available.reconcile': {
     input: {

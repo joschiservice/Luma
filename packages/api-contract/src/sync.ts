@@ -210,8 +210,6 @@ export const linkInputSchema = z.discriminatedUnion('operation', [
 
 export type SyncRecordType = z.infer<typeof syncRecordTypeSchema>;
 
-export type SyncStatus = z.infer<typeof syncStatusSchema>;
-
 export type SyncStreamView = z.infer<typeof syncStreamSchema>;
 
 export type SyncConnectionView = z.infer<typeof syncConnectionSchema>;
@@ -223,8 +221,6 @@ export type SyncOverview = z.infer<typeof syncOverviewSchema>;
 export type SyncCommand = z.infer<typeof syncCommandSchema>['command'];
 
 export type IdentityDetail = z.infer<typeof identityDetailSchema>;
-
-export type LinkRequestView = z.infer<typeof linkRequestSchema>;
 
 export type LinkInput = z.infer<typeof linkInputSchema>;
 

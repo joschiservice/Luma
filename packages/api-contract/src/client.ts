@@ -8,7 +8,7 @@ import { caseStreamEventSchema } from './desk.js';
 import { apiContract } from './index.js';
 
 /** Per-call client context. `headers` adds request headers, such as `x-luma-action-id`. */
-export interface ApiClientContext {
+interface ApiClientContext {
   headers?: Record<string, string>;
 }
 

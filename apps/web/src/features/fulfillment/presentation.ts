@@ -454,7 +454,7 @@ export function timelineChanges(entries: TimelineEntry[], truncated = false) {
   });
 }
 
-export type TimelineGroup = {
+type TimelineGroup = {
   entry: TimelineEntry;
   changes: string[];
   /** Consecutive reads without a visible change, oldest first; empty for a changed read. */

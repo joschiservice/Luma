@@ -1,6 +1,6 @@
 import type { TenantContext } from '@luma/identity';
 
-export type CustomerState =
+type CustomerState =
   'enabled' | 'disabled' | 'invited' | 'declined' | 'unknown';
 
 /** One connection's current profile of one source customer, as last imported. */
@@ -57,7 +57,7 @@ export interface CustomerQuery {
   limit: number;
 }
 
-export interface CustomerList {
+interface CustomerList {
   items: CustomerListItem[];
   sources: CustomerSource[];
   /** Profiles matching the filters, across all pages. */

@@ -87,8 +87,6 @@ export const assistantAnswerSchema = z.object({
 
 export type AssistantRecordKind = z.infer<typeof assistantRecordKindSchema>;
 
-export type AssistantAvailability = z.infer<typeof assistantAvailabilitySchema>;
-
 export type AssistantTurn = z.infer<typeof assistantTurnSchema>;
 
 export type AskAssistant = z.input<typeof askAssistantSchema>;

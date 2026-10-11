@@ -114,7 +114,3 @@ export function createDecisionAssignmentService(deps: {
     },
   };
 }
-
-export type DecisionAssignmentService = ReturnType<
-  typeof createDecisionAssignmentService
->;

@@ -2,7 +2,7 @@ import type { TenantContext } from '@luma/identity';
 
 import type { CustomerOrder, CustomerProfile } from '../domain/profiles.js';
 
-export interface CustomerProfileQuery {
+interface CustomerProfileQuery {
   /** Matches the start of a name or email address, case-insensitively. */
   q?: string;
   connectionId?: string;

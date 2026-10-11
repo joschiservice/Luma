@@ -54,7 +54,7 @@ import {
 import { matchesText, searchFilter } from './search.js';
 
 /** Resolves one field of a source value. */
-export type Resolver<S = unknown> = (
+type Resolver<S = unknown> = (
   source: S,
   args: Args,
   context: RequestContext,

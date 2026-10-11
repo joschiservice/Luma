@@ -8,7 +8,7 @@ export interface OrderMetricScope {
   updatedBefore?: string | undefined;
 }
 
-export interface OrderMetricRow {
+interface OrderMetricRow {
   id: string;
   displayNumber: string | null;
   connectionId: string;

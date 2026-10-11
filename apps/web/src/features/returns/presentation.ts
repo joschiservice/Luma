@@ -264,7 +264,7 @@ export function accessMessage(source: ReturnSource) {
       });
 }
 
-export type StepState =
+type StepState =
   'done' | 'current' | 'upcoming' | 'failed' | 'skipped' | 'unreported';
 
 export interface ReturnStep {

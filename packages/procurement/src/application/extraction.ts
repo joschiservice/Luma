@@ -40,10 +40,10 @@ export interface ExtractionOutput {
   }[];
 }
 
-export type ExtractableKind = (typeof extractable)[number];
+type ExtractableKind = (typeof extractable)[number];
 
 /** A fact found in a message, located by its exact quote. */
-export interface ExtractedFact {
+interface ExtractedFact {
   id: string;
   kind: ExtractableKind;
   lineId: string | null;

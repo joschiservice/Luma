@@ -750,5 +750,3 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
     },
   };
 }
-
-export type DetectionMonitor = ReturnType<typeof createDetectionMonitor>;

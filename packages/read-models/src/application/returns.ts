@@ -1,12 +1,12 @@
 import type { TenantContext } from '@luma/identity';
 import type { RefundState, ReturnStage, StageGroup } from '@luma/orders';
 
-export type { RefundState, ReturnStage, StageGroup };
+export type { ReturnStage };
 
 /** `action` needs a person; `waiting` is with the customer or payment provider; `done` is final. */
 export type ReturnView = StageGroup | 'all';
 
-export type ReturnStatus =
+type ReturnStatus =
   'requested' | 'open' | 'closed' | 'declined' | 'cancelled' | 'unknown';
 
 type Money = {
@@ -15,7 +15,7 @@ type Money = {
 };
 
 /** Refund payment totals. Only `refunded` is money returned to the customer. */
-export type ReturnRefund = {
+type ReturnRefund = {
   state: RefundState;
   currency: string | null;
   refunded: string | null;
@@ -77,7 +77,7 @@ export interface ReturnQuery {
   limit: number;
 }
 
-export interface ReturnList {
+interface ReturnList {
   items: ReturnListItem[];
   sources: ReturnSource[];
   /** Matches per view and per stage for the search and source filters; every key is present. */

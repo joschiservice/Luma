@@ -1,4 +1,4 @@
-export interface CanonicalMoney {
+interface CanonicalMoney {
   amount: string;
   currency: string;
 }
@@ -100,7 +100,7 @@ export const stageGroups: Record<ReturnStage, StageGroup> = {
 };
 
 /** Money totals in one currency; amounts are null when the refunds use several currencies. */
-export interface RefundTotals {
+interface RefundTotals {
   currency: string | null;
   /** Sum of successful refund payments: money actually returned. */
   refunded: string | null;

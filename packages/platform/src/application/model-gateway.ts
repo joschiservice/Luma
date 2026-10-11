@@ -59,7 +59,7 @@ export interface ModelUsage {
   readonly costUsd: number | null;
 }
 
-export interface ModelResult<T> {
+interface ModelResult<T> {
   readonly output: T | null;
   /** Proposals only. The caller must authorize and execute them through execution. */
   readonly toolCalls: readonly ModelToolCall[];

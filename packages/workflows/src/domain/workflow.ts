@@ -1,5 +1,4 @@
 import type {
-  PlaybookActivation,
   PlaybookFields,
   PlaybookIR,
   PlaybookScalar,
@@ -27,10 +26,6 @@ export interface WorkflowDefinition {
   intent: string;
   category: string;
 }
-
-/** Structured steps have stable IDs. Unsupported step kinds cannot acquire execution authority. */
-export type WorkflowStep = PlaybookIR[
-  'eligibility' | 'action' | 'approval' | 'verification' | 'recovery'];
 
 /** An immutable definition of inputs, applicability, decisions, effects and verification. */
 export interface WorkflowSource {
@@ -68,8 +63,6 @@ export interface WorkflowVersion extends WorkflowSource {
 /** Native versions can use either the original Resolution-shaped contract or the process runtime. */
 export type PublishedWorkflowVersion = WorkflowVersion | ProcessWorkflowVersion;
 
-export type WorkflowActivation = PlaybookActivation;
-
 /** A run binds an exact version, subject, actor and immutable input snapshot. */
 export interface WorkflowRun {
   id: string;
@@ -86,19 +79,6 @@ export interface WorkflowRun {
   contextDigest: string;
   createdAt: string;
   resolution?: { incidentId: string; diagnosisRevision: number };
-}
-
-/** Append-only step evidence keeps workflow progress separate from action dispatch and verification. */
-export interface WorkflowStepRecord {
-  runId: string;
-  stepId: string;
-  actor: WorkflowActor;
-  state: 'awaiting_approval' | 'verified' | 'denied' | 'escalated';
-  reason: string;
-  proposalId: string;
-  decisionId?: string;
-  outputs: Record<string, PlaybookScalar>;
-  evidenceRefs: string[];
 }
 
 /** Projects the existing executable representation without changing its signed content. */

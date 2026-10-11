@@ -1,3 +1,4 @@
+import type { WorkflowTrigger } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 
 /** Displays provider names while preserving unknown installed system identifiers. */
@@ -16,9 +17,7 @@ export function workflowSystemLabel(system: string): string {
 }
 
 /** Gives each supported trigger an unambiguous human-readable description. */
-export function workflowTriggerLabel(
-  trigger: import('@luma/api-contract').WorkflowTrigger,
-): string {
+export function workflowTriggerLabel(trigger: WorkflowTrigger): string {
   switch (trigger.kind) {
     case 'manual':
       return m.workflows_trigger_manual();

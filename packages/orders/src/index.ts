@@ -1,9 +1,6 @@
 export type {
   CanonicalSnapshot,
-  CommerceData,
   CommerceProjections,
-  EntityKind,
-  Projection,
   RefundData,
   ReturnData,
 } from './application/projections.js';
@@ -27,7 +24,6 @@ export type { OrderStateQueries } from './application/order-state.js';
 export type {
   ComparisonState,
   ComparisonDifference,
-  ComparisonField,
 } from './domain/source-comparison.js';
 
 export { orderComparisonState } from './domain/source-comparison.js';

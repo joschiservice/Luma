@@ -57,7 +57,7 @@ export interface LineItemData {
   price: number;
 }
 
-export interface FulfillmentHoldData {
+interface FulfillmentHoldData {
   id: string;
   reason: ShopifyHoldReason;
   heldByRequestingApp: boolean;

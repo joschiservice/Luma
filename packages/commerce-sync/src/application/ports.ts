@@ -28,7 +28,7 @@ export type ItemKey = Pick<
 export const itemKey = (item: ItemKey) =>
   JSON.stringify([item.resource, item.scopeKey, item.externalId]);
 
-export interface LedgerState {
+interface LedgerState {
   digest: string;
   status: 'current' | 'pending' | 'failed';
 }
@@ -52,7 +52,7 @@ export interface PageCounts {
 }
 
 /** Everything a successful page commits atomically with its checkpoint. */
-export interface PageCommit {
+interface PageCommit {
   /** Records imported or re-imported from this page. */
   entries: LedgerEntry[];
   /** Records whose stored digest matched; only their last-seen scan is updated. */

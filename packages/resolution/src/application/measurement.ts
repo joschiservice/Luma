@@ -20,7 +20,7 @@ export interface MeasurementCommand {
   fact: MeasurementFact;
 }
 
-export interface MeasurementHistory {
+interface MeasurementHistory {
   items: MeasurementEvent[];
   /** The people who recorded the listed facts. */
   people: ActivityActor[];

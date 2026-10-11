@@ -1,36 +1,50 @@
-export type * from './domain/playbook.js';
+export type {
+  PlaybookActivation,
+  PlaybookIR,
+  PlaybookScalar,
+  PlaybookSnapshot,
+  PlaybookValue,
+  PlaybookVersion,
+} from './domain/playbook.js';
 
 export { playbookEligible } from './domain/playbook.js';
 
-export type * from './domain/playbook-library.js';
+export type {
+  PlaybookDependencies,
+  PlaybookOutcome,
+  PlaybookRun,
+  PlaybookService,
+} from './application/playbook.js';
 
-export type * from './application/playbook.js';
+export type { PlaybookLibrary } from './application/playbook-library.js';
 
-export type * from './application/playbook-library.js';
+export type {
+  WorkflowTriggerRequest,
+  WorkflowTriggerRun,
+} from './domain/workflow.js';
 
-export type * from './domain/workflow.js';
+export type {
+  ProcessRun,
+  ProcessStepOutput,
+  ProcessWorkflowVersion,
+} from './domain/process.js';
 
-export type * from './domain/process.js';
-
-export type * from './application/process-runtime.js';
+export type {
+  ProcessActionResult,
+  ProcessActivities,
+  ProcessProgress,
+} from './application/process-runtime.js';
 
 export { runProcess } from './application/process-runtime.js';
 
 export { resolutionWorkflow } from './domain/workflow.js';
 
-export type {
-  WorkflowCatalog,
-  WorkflowPeople,
-  WorkflowPerson,
-} from './application/catalog.js';
+export type { WorkflowCatalog } from './application/catalog.js';
 
 export type {
   ReplenishmentBatchResult,
-  ReplenishmentPreview,
-  ReplenishmentPreviewItem,
   ReplenishmentPositionQuery,
   ReplenishmentRunSummary,
-  ReplenishmentSubjectCoverage,
   ReplenishmentWorkflow,
 } from './application/replenishment-port.js';
 
@@ -38,19 +52,18 @@ export type { WorkflowTriggerStore } from './application/triggers.js';
 
 export type { WorkflowCatalogStore } from './application/catalog.js';
 
-export type * from './domain/draft.js';
-
-export type * from './domain/vocabulary.js';
+export type { WorkflowDraft, WorkflowDraftContent } from './domain/draft.js';
 
 export type {
-  DraftValidation,
-  VocabularySource,
-  WorkflowDrafts,
-} from './application/drafts.js';
+  AuthoringVocabulary,
+  VocabularyContribution,
+} from './domain/vocabulary.js';
+
+export type { WorkflowDrafts } from './application/drafts.js';
 
 export { draftFromVersion } from './domain/draft.js';
 
-export type * from './domain/template.js';
+export type { TemplateRequirement } from './domain/template.js';
 
 export {
   processDraftFromPlaybook,
@@ -70,44 +83,29 @@ export { presentProcessVersion } from './domain/process-presentation.js';
 
 export { presentTriggerRun } from './application/trigger-presentation.js';
 
-export type * from './domain/code-step.js';
-
-export type { CodeJournal } from './application/code-activity.js';
-
 export { CodeRequestStopped } from './domain/code-step.js';
 
-export type * from './domain/draft-test.js';
+export type {
+  DraftTestCase,
+  StepReply,
+  TestOutcome,
+  TestScenario,
+} from './domain/draft-test.js';
 
 export { adaptCase, defaultCase, sameStep } from './domain/draft-test.js';
 
 export type {
   DraftTests,
   DraftTestStore,
-  DraftTestSummary,
-  SavedDraftTests,
-  StartDraftTest,
   StoredDraftTestRun,
   TestScenarioSource,
 } from './application/draft-tests.js';
 
 export { createDraftTests } from './application/draft-tests.js';
 
-export type * from './domain/draft-generation.js';
+export type { DraftGeneration } from './application/draft-generation.js';
 
-export type { DraftChange } from './domain/draft-diff.js';
-
-export type {
-  CodeStepResult,
-  DraftGeneration,
-  GenerationAvailability,
-  GenerationOptions,
-  GenerationRecord,
-  GenerationRoute,
-  GenerationSummary,
-  ProposalResult,
-} from './application/draft-generation.js';
-
-export type * from './domain/readiness.js';
+export type { ReadinessIssue, WorkflowReadiness } from './domain/readiness.js';
 
 export {
   assessReadiness,
@@ -115,15 +113,16 @@ export {
   summarizeOutcomes,
 } from './domain/readiness.js';
 
-export type * from './domain/case-workflow.js';
+export type {
+  CaseEvidence,
+  CaseSignal,
+  WorkflowSignal,
+} from './domain/case-workflow.js';
 
 export type {
-  CaseActivationStore,
   CaseReader,
   CaseRun,
   CaseRunTransport,
   CaseWorkflowAdapter,
   CaseWorkflows,
-  SignalReader,
-  WorkflowHandover,
 } from './application/case-workflows.js';

@@ -22,14 +22,7 @@ export {
   createExceptionWorkflowRuntime,
 } from './composition/workflow-runtime.js';
 
-export type { AppDependencies } from './composition/http-app.js';
-
 export { createApplicationServices } from './composition/application.js';
-
-export type {
-  ApplicationOptions,
-  ExecutionConfiguration,
-} from './composition/application.js';
 
 export { createResourceScope } from './composition/resources.js';
 

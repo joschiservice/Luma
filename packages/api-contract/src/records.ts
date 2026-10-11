@@ -73,5 +73,3 @@ export const recordQuerySchema = z
 export type RecordKind = z.infer<typeof recordKindSchema>;
 
 export type RecordSummary = z.infer<typeof recordSummarySchema>;
-
-export type RecordDetail = z.infer<typeof recordDetailSchema>;

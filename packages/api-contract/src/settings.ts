@@ -73,12 +73,4 @@ export const supportAccessSchema = z.object({
 
 export type SupportAccess = z.infer<typeof supportAccessSchema>;
 
-export type WorkspaceSettings = z.infer<typeof workspaceSettingsSchema>;
-
-export type NotificationPreferences = z.infer<
-  typeof notificationPreferencesSchema
->;
-
-export type WorkspaceInvitation = z.infer<typeof invitationSchema>;
-
 export type SettingsSnapshot = z.infer<typeof settingsSnapshotSchema>;

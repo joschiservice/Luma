@@ -1,5 +1,5 @@
 /** One term of Shopify's search syntax, such as `updated_at:>='2026-01-01'` or `"Anna"`. */
-export interface SearchTerm {
+interface SearchTerm {
   field: string | null;
   comparator: '>=' | '<=' | '>' | '<' | '=';
   value: string;

@@ -11,7 +11,7 @@ import type {
 
 export { rateLimit } from './http.js';
 
-export { readOrder, readStock, type ShopifyOrderView } from './read.js';
+export { readOrder, readStock } from './read.js';
 
 export * from './types.js';
 

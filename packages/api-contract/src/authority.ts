@@ -55,5 +55,3 @@ export type FactAuthority = z.infer<typeof factAuthoritySchema>;
 export type AuthoritySnapshot = z.infer<typeof authoritySnapshotSchema>;
 
 export type AuthorityChange = z.infer<typeof authorityChangeSchema>;
-
-export type AuthorityEvent = z.infer<typeof authorityEventSchema>;

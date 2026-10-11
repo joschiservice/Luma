@@ -1,5 +1,5 @@
 /** Record kinds whose identity may be established by a configured connection-pair rule. */
-export type AutoLinkKind = 'sku' | 'order';
+type AutoLinkKind = 'sku' | 'order';
 
 export interface AutoLinkPair {
   kind: AutoLinkKind;
@@ -25,7 +25,7 @@ export interface AutoLinkRule extends AutoLinkInput {
 export type AutoLinkDisposition =
   'eligible' | 'ambiguous' | 'conflict' | 'excluded' | 'stale';
 
-export interface AutoLinkCandidate {
+interface AutoLinkCandidate {
   key: string;
   targetId: string;
   sourceId: string;

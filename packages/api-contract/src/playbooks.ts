@@ -119,16 +119,6 @@ export const activatePlaybookSchema = z
   })
   .strict();
 
-export type PlaybookSummary = z.infer<typeof playbookSummarySchema>;
-
-export type PlaybookDetail = z.infer<typeof playbookDetailSchema>;
-
-export type PlaybookVersionView = z.infer<typeof playbookVersionViewSchema>;
-
-export type PlaybookConnection = z.infer<typeof playbookConnectionSchema>;
-
 export type PlaybookActivationView = z.infer<typeof playbookActivationSchema>;
-
-export type PlaybookRunView = z.infer<typeof playbookRunViewSchema>;
 
 export type ActivatePlaybook = z.infer<typeof activatePlaybookSchema>;

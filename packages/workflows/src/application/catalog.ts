@@ -79,7 +79,11 @@ export interface WorkflowCatalogStore {
   ): Promise<Map<string, ProcessStepOutput[]>>;
 }
 
-/** A person named by a recorded user ID, as Activity names them. */
+/**
+ * A person named by a recorded user ID, as Activity names them.
+ *
+ * @public Declaration emit names it in the inferred type of `createWorkflows`.
+ */
 export interface WorkflowPerson {
   kind:
     'member' | 'former_member' | 'luma' | 'support' | 'service' | 'unrecorded';

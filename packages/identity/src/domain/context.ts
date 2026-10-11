@@ -2,7 +2,7 @@ import type { AppPermission, Permission } from './permissions.js';
 import type { BuiltInRoleKey, RoleReference } from './roles.js';
 import { builtInReference, PermissionSet } from './roles.js';
 
-export type DataRegion = 'EU' | 'US' | 'APAC';
+type DataRegion = 'EU' | 'US' | 'APAC';
 
 export interface Organization {
   id: string;

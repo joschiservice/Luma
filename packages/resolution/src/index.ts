@@ -4,19 +4,10 @@ export { createInventoryMonitor } from './application/inventory-monitor.js';
 
 export { createDetectionMonitor } from './application/detection-monitor.js';
 
-export type {
-  DetectionMonitor,
-  DetectionSources,
-} from './application/detection-monitor.js';
-
-export type {
-  FulfillmentMapping,
-  InventoryMapping,
-} from './application/detection.js';
+/** @public Declaration emit names it in the inferred type of `createScheduledDetection` in application-runtime. */
+export type { DetectionSources } from './application/detection-monitor.js';
 
 export { createDiagnosisRereader } from './application/diagnosis.js';
-
-export type { DiagnosisReadPlan } from './application/diagnosis.js';
 
 export type {
   ExceptionActivities,
@@ -31,7 +22,6 @@ export { resolutionMetricDefinitions } from './domain/measurement.js';
 
 export type {
   MeasurementEnvironment,
-  MeasurementScope,
   ResolutionMetricItem,
 } from './domain/measurement.js';
 
@@ -42,25 +32,11 @@ export type {
 
 export type { OperationsOverviewService } from './application/overview.js';
 
-export type {
-  DeskDependencies,
-  DeskService,
-  DeskStore,
-} from './application/desk.js';
+export type { DeskDependencies, DeskService } from './application/desk.js';
 
-export type {
-  PlaybookActivation,
-  PlaybookDefinition,
-  PlaybookIR,
-  PlaybookSnapshot,
-  PlaybookVersion,
-} from '@luma/workflows';
+export type { PlaybookSnapshot } from '@luma/workflows';
 
-export type {
-  PlaybookOutcome,
-  PlaybookRun,
-  PlaybookService,
-} from '@luma/workflows';
+export type { PlaybookService } from '@luma/workflows';
 
 export { shippingMethodPlaybook } from './domain/shipping-method-playbook.js';
 
@@ -74,10 +50,9 @@ export type {
   LearningStore,
   LearningRunSources,
   LearningEventSources,
-  ResolutionHistory,
 } from './application/learning.js';
 
-export type { PlaybookLibrary, PlaybookLibraryScope } from '@luma/workflows';
+export type { PlaybookLibrary } from '@luma/workflows';
 
 export type { ActivityService } from './application/activity.js';
 
@@ -87,16 +62,9 @@ export { WorkflowInputError } from './application/runtime.js';
 
 export { createProposalRefresher } from './application/refresh-proposal.js';
 
-export type { ProposalRefreshDependencies } from './application/refresh-proposal.js';
-
 export type { ShadowService } from './application/shadow.js';
 
-export type {
-  MetricEvents,
-  MetricWakeup,
-} from './application/metric-events.js';
-
-export type { DecisionAssignmentService } from './application/decision-assignments.js';
+export type { MetricEvents } from './application/metric-events.js';
 
 export { connectionCheckSource } from './domain/connection-check.js';
 
@@ -114,7 +82,4 @@ export {
   type RefundCandidate,
 } from './application/follow-ups.js';
 
-export {
-  createStockRefresh,
-  type StockRefresh,
-} from './application/stock-refresh.js';
+export { createStockRefresh } from './application/stock-refresh.js';

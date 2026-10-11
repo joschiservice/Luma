@@ -198,7 +198,7 @@ const trackingUrl = (value: string | null | undefined) => {
   }
 };
 
-export interface ShopifyEvidence {
+interface ShopifyEvidence {
   tenantId: string;
   connectionId: string;
   apiVersion: typeof API_VERSION;

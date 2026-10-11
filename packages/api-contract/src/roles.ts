@@ -99,14 +99,10 @@ export const roleHistoryEventSchema = z.object({
     .nullable(),
 });
 
-export type RoleReference = z.infer<typeof roleReferenceSchema>;
-
 export type WorkspaceRole = z.infer<typeof workspaceRoleSchema>;
 
 export type RolesSnapshot = z.infer<typeof rolesSnapshotSchema>;
 
 export type PermissionDefinition = z.infer<typeof permissionDefinitionSchema>;
-
-export type PermissionGroup = z.infer<typeof permissionGroupSchema>;
 
 export type RoleHistoryEvent = z.infer<typeof roleHistoryEventSchema>;

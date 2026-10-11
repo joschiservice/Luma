@@ -68,7 +68,7 @@ export function createLoader(store: RecordStore) {
   };
 }
 
-export type Loader = ReturnType<typeof createLoader>;
+type Loader = ReturnType<typeof createLoader>;
 
 /** State shared by the resolvers of one GraphQL request. */
 export interface RequestContext {

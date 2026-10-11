@@ -2,20 +2,14 @@ import type { TenantContext } from '@luma/identity';
 
 import type { InsightCoverage, InsightPoint } from '../domain/insights.js';
 
-export type {
-  InsightCoverage,
-  InsightPoint,
-  InsightPointCoverage,
-  InsightSource,
-  InsightSourceState,
-} from '../domain/insights.js';
+export type { InsightSource } from '../domain/insights.js';
 
 export type InsightChart =
   'orders' | 'fulfillment' | 'stock' | 'cases' | 'procurement';
 
 export type InsightRange = '7d' | '30d' | '13w';
 
-export type InsightUnit =
+type InsightUnit =
   'order' | 'fulfillment' | 'stock_position' | 'case' | 'purchase_order';
 
 export interface InsightQuery {

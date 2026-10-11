@@ -1,5 +1,5 @@
 /** A scoped wake-up requests a fresh authorized read; it never carries business data. */
-export interface MetricWakeup {
+interface MetricWakeup {
   tenantId?: string;
   connected: boolean;
   /** Areas that changed. Absent after a reconnection or an untagged change: reconcile all. */

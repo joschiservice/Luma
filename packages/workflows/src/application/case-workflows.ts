@@ -161,7 +161,7 @@ export interface CaseReader {
 }
 
 /** An owner's follow-ups for one workflow, within the caller's tenant. */
-export interface SignalReader {
+interface SignalReader {
   open(context: TenantContext): Promise<WorkflowSignal[]>;
   /** The current state of one follow-up; closed when the owner no longer reports it. */
   get(context: TenantContext, id: string): Promise<WorkflowSignal | null>;

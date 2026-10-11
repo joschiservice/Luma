@@ -14,7 +14,7 @@ import type {
   InstallationService,
 } from './installations.js';
 
-export interface ConnectorEvidence {
+interface ConnectorEvidence {
   tenantId: string;
   connectionId: string;
   apiVersion: string;

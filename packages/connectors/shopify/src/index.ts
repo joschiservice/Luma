@@ -12,8 +12,6 @@ export {
   shopifyScopes,
 } from './oauth.js';
 
-export type { OAuthConfig, OAuthCredentials } from './oauth.js';
-
 export { verifyWebhook } from './webhooks.js';
 
 export { createReadBudget, type ReadBudget } from './read-budget.js';

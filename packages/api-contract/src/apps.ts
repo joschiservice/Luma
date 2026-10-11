@@ -56,7 +56,3 @@ export const workspaceAppStateSchema = workspaceAppSchema.extend({
 });
 
 export type AppManifest = z.infer<typeof appManifestSchema>;
-
-export type WorkspaceApp = z.infer<typeof workspaceAppSchema>;
-
-export type WorkspaceAppState = z.infer<typeof workspaceAppStateSchema>;

@@ -23,8 +23,7 @@ import {
 import { cin7 } from './cin7.js';
 import type { ErpInstance, Instance, WorldModel } from './model.js';
 
-export type HealthStatus =
-  'healthy' | 'rate-limited' | 'unavailable' | 'unauthorized';
+type HealthStatus = 'healthy' | 'rate-limited' | 'unavailable' | 'unauthorized';
 
 /** A service health override; timed overrides come from provider-level incidents. */
 export interface HealthWindow {
@@ -42,7 +41,7 @@ export interface EngineState {
   nextStockSync: number;
 }
 
-export interface RunState {
+interface RunState {
   id: string;
   seed: number;
   profile: MerchantProfile;

@@ -2,7 +2,7 @@ import type { FaultKind } from './faults.js';
 import type { IncidentKindName } from './incidents.js';
 
 /** One provider change a scenario makes. `shop` is the run's first shop. */
-export type ScenarioStep =
+type ScenarioStep =
   | { kind: 'incident'; incident: IncidentKindName; on: 'shop' }
   | {
       kind: 'fault';

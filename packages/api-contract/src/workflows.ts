@@ -285,14 +285,11 @@ export type WorkflowVersionView = z.infer<typeof workflowVersionViewSchema>;
 
 export type WorkflowRunView = z.infer<typeof workflowRunViewSchema>;
 
-export type WorkflowActor = z.infer<typeof workflowActorSchema>;
-
 export type WorkflowTrigger = z.infer<typeof workflowTriggerSchema>;
 
 export type {
   ActivatePlaybook as ActivateWorkflow,
   PlaybookActivationView as WorkflowActivationView,
-  PlaybookConnection as WorkflowConnection,
 } from './playbooks.js';
 
 const scalar = z.union([

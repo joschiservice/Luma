@@ -1,8 +1,8 @@
 import type { TenantContext } from '@luma/identity';
 
-export type EntityKind = 'sku' | 'location' | 'product' | 'position';
+type EntityKind = 'sku' | 'location' | 'product' | 'position';
 
-export type CommerceData =
+type CommerceData =
   | {
       type: 'position';
       skuId: string;
@@ -57,7 +57,7 @@ export interface CanonicalSnapshot {
   data: CommerceData;
 }
 
-export interface Projection {
+interface Projection {
   snapshotId: string;
   version: number;
   snapshot: CanonicalSnapshot;

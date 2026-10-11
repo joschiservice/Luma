@@ -14,7 +14,7 @@ export type WorkflowActivationView = Omit<
   'tenantId' | 'definitionId'
 >;
 
-export type WorkflowRunView = ReturnType<typeof presentTriggerRun>;
+type WorkflowRunView = ReturnType<typeof presentTriggerRun>;
 
 export type WorkflowDetail = Omit<
   PlaybookDetail,
@@ -30,7 +30,7 @@ export type WorkflowDetail = Omit<
   activations: WorkflowActivationView[];
 };
 
-export interface ReplenishmentRuleInput {
+interface ReplenishmentRuleInput {
   id: string;
   positionId: string;
   connectionId: string;
@@ -49,6 +49,7 @@ export interface ReplenishmentPositionQuery {
   connectionId?: string | undefined;
 }
 
+/** @public Declaration emit names it in the inferred type of `createWorkflows`. */
 export interface ReplenishmentSetup {
   available: boolean;
   canManage: boolean;
@@ -93,12 +94,16 @@ export interface ReplenishmentRunSummary {
 }
 
 /** One proposed rule in a bulk setup request, before it has an activation ID. */
-export type ReplenishmentPreviewItem = Omit<
+type ReplenishmentPreviewItem = Omit<
   ReplenishmentRuleInput,
   'id' | 'reviewedDigest' | 'supplierId'
 >;
 
-/** What activating each proposed rule would do, checked against current stock and rules. */
+/**
+ * What activating each proposed rule would do, checked against current stock and rules.
+ *
+ * @public Declaration emit names it in the inferred type of `createWorkflows`.
+ */
 export interface ReplenishmentPreview {
   approval: WorkflowReadiness['approval'];
   supplier: { id: string; name: string };
@@ -135,7 +140,11 @@ export interface ReplenishmentBatchResult {
   activation: WorkflowActivationView | null;
 }
 
-/** How replenishment covers one stock position, with the same readiness as the workflow. */
+/**
+ * How replenishment covers one stock position, with the same readiness as the workflow.
+ *
+ * @public Declaration emit names it in the inferred type of `createWorkflows`.
+ */
 export interface ReplenishmentSubjectCoverage {
   definitionId: string;
   name: string;

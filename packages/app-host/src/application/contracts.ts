@@ -9,7 +9,7 @@ import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 import type { CaseWorkflowAdapter } from '@luma/workflows';
 import type { FastifyInstance } from 'fastify';
 
-export type AppSlot =
+type AppSlot =
   | 'connections'
   | 'settings'
   | 'app-settings'
@@ -19,7 +19,7 @@ export type AppSlot =
   | 'fulfillment';
 
 /** A permission an app owns. People who can manage roles grant it like a core permission. */
-export interface AppPermissionDeclaration {
+interface AppPermissionDeclaration {
   /** Namespaced as `<appId>:<name>`, for example `shopify:fulfillment_recovery.run`. */
   key: string;
   label: string;

@@ -849,5 +849,3 @@ export function createShopifyOAuth(
     },
   };
 }
-
-export type ShopifyOAuth = ReturnType<typeof createShopifyOAuth>;

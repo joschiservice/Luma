@@ -36,7 +36,7 @@ import { adapterVersion, type Cin7ReadCapability, outputs } from './outputs.js';
 import { createSaleCache, type SaleCache } from './sale-cache.js';
 import { createProductUnits, type ProductUnits, unitOf } from './units.js';
 
-export interface Cin7Evidence {
+interface Cin7Evidence {
   tenantId: string;
   connectionId: string;
   apiVersion: typeof API_VERSION;

@@ -56,7 +56,7 @@ export interface WorkflowAuditEntry {
 }
 
 /** Transactional draft operations. `lock` holds the draft row until the transaction ends. */
-export interface WorkflowDraftTransaction {
+interface WorkflowDraftTransaction {
   lock(id: string): Promise<StoredWorkflowDraft | null>;
   /** Inserts a new draft. Returns false when the ID already exists. */
   insert(draft: StoredWorkflowDraft): Promise<boolean>;

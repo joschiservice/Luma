@@ -66,16 +66,11 @@ export {
   createInstalledShippingMethodEffects,
 } from './infrastructure/installations/runtime.js';
 
-export type {
-  InstalledPurchaseOrderRuntime,
-  InstalledRuntimeOptions,
-} from './infrastructure/installations/runtime.js';
+export type { InstalledPurchaseOrderRuntime } from './infrastructure/installations/runtime.js';
 
 export type { StoredInstallation } from './application/installations.js';
 
 export { createShippingMethodEffects } from './application/shipping-method-effects.js';
-
-export type { ShippingMethodEffectBinding } from './application/shipping-method-effects.js';
 
 export { createSourceRecords } from './infrastructure/source-records.js';
 

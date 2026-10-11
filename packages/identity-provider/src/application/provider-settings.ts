@@ -1,7 +1,7 @@
 import type { VerifiedExternalIdentity } from '../domain/external-identity.js';
 
 /** Authorizes an explicit issuer/subject binding without deriving authority from email alone. */
-export type ExternalIdentityValidator = (
+type ExternalIdentityValidator = (
   identity: VerifiedExternalIdentity,
 ) => boolean | Promise<boolean>;
 

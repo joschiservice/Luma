@@ -1,4 +1,4 @@
-export interface SalesAddress {
+interface SalesAddress {
   name: string;
   company: string;
   street: string;

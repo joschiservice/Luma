@@ -68,7 +68,7 @@ export interface SupplierRecord {
   profile: SupplierProfile;
 }
 
-export interface OrderLineRecord {
+interface OrderLineRecord {
   id: string;
   itemId: string;
   sku: string;

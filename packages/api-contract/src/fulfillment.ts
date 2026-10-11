@@ -225,15 +225,7 @@ export type FulfillmentView = z.infer<typeof fulfillmentViewSchema>;
 
 export type FulfillmentSignal = z.infer<typeof fulfillmentSignalSchema>;
 
-export type FulfillmentSort = z.infer<typeof fulfillmentSortSchema>;
-
-export type FulfillmentHoldReason = z.infer<typeof fulfillmentHoldReasonSchema>;
-
-export type FulfillmentDelivery = z.infer<typeof fulfillmentDeliverySchema>;
-
 export type FulfillmentItem = z.infer<typeof fulfillmentItemSchema>;
-
-export type FulfillmentSource = z.infer<typeof fulfillmentSourceSchema>;
 
 export type FulfillmentList = z.infer<typeof fulfillmentListSchema>;
 

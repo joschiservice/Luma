@@ -14,32 +14,32 @@ export interface VocabularyAvailability {
   reason: string | null;
 }
 
-export interface TriggerEntry extends VocabularyAvailability {
+interface TriggerEntry extends VocabularyAvailability {
   kind: WorkflowTrigger['kind'];
   label: string;
   description: string;
 }
 
-export interface StepKindEntry extends VocabularyAvailability {
+interface StepKindEntry extends VocabularyAvailability {
   kind: ProcessStep['kind'];
   label: string;
   description: string;
 }
 
-export interface SubjectEntry extends VocabularyAvailability {
+interface SubjectEntry extends VocabularyAvailability {
   kind: string;
   label: string;
   description: string;
 }
 
-export interface ReadEntry extends VocabularyAvailability {
+interface ReadEntry extends VocabularyAvailability {
   source: string;
   label: string;
   description: string;
   fields: PlaybookFields;
 }
 
-export interface CapabilityEntry extends VocabularyAvailability {
+interface CapabilityEntry extends VocabularyAvailability {
   capability: string;
   version: string;
   label: string;
@@ -55,7 +55,7 @@ export interface CapabilityEntry extends VocabularyAvailability {
   evaluators: string[];
 }
 
-export interface EvaluatorEntry extends VocabularyAvailability {
+interface EvaluatorEntry extends VocabularyAvailability {
   version: string;
   label: string;
   description: string;

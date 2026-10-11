@@ -1,8 +1,1 @@
-export type {
-  CanonicalSnapshot,
-  CommerceData,
-  CommerceProjections,
-  Dependent,
-  EntityKind,
-  Projection,
-} from './application/projections.js';
+export type { CommerceProjections } from './application/projections.js';

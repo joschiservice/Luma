@@ -1,6 +1,6 @@
 /** Types of the Needs you queue items, shared by presentation rules and the application port. */
 
-export type DecisionKind =
+type DecisionKind =
   | 'case'
   | 'replenishment'
   | 'fulfillment_recovery'
@@ -19,7 +19,7 @@ export type DecisionResponse =
 
 export type DecisionView = 'all' | 'mine' | 'unassigned';
 
-export type DecisionRecordKind =
+type DecisionRecordKind =
   'order' | 'fulfillment' | 'position' | 'sku' | 'product';
 
 export type DecisionOwner =

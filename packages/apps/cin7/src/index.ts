@@ -22,11 +22,6 @@ import { createInstallationVerifier } from './infrastructure/verifier.js';
 
 export { createCin7Connector, createInstallationVerifier };
 
-export type {
-  Cin7ConnectorOptions,
-  Cin7Evidence,
-} from './infrastructure/adapter.js';
-
 /**
  * Creates the Cin7 connector contribution. Adapters of one connection share its request
  * pacer, product units and recent sale details within this process.

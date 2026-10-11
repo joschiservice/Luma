@@ -25,9 +25,7 @@ import {
 } from '../domain/learning.js';
 
 export type {
-  ResolutionSelection,
   StartResolutionRun,
-  LearningFact,
   LearningCommand,
   LearningEvent,
 } from '../domain/learning.js';

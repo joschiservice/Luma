@@ -14,7 +14,7 @@ export const API_VERSION = 'v2';
 /** The fixed Cin7 Core API root; accounts are selected by header, not by host. */
 const API_ROOT = 'https://inventory.dearsystems.com/ExternalApi/v2/';
 
-export interface Cin7Connection {
+interface Cin7Connection {
   /** Cin7 Core account ID. It selects the company and is not secret. */
   accountId: string;
   /** API application key, resolved on every request so rotation applies at once. */
@@ -146,5 +146,3 @@ export function createClient(options: Cin7TransportOptions) {
     },
   };
 }
-
-export type Cin7Client = ReturnType<typeof createClient>;

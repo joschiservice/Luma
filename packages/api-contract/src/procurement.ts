@@ -127,10 +127,6 @@ export const purchaseOrderDetailSchema = z.object({
   canManage: z.boolean(),
 });
 
-export type PurchaseOrderDetail = z.infer<typeof purchaseOrderDetailSchema>;
-
-export type PurchaseOrderLine = PurchaseOrder['lines'][number];
-
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const externalIdSchema = z.object({
   externalId: z.string(),
@@ -579,17 +575,9 @@ export const followUpInputSchema = z
 
 export type SupplierLinkInput = z.input<typeof supplierLinkInputSchema>;
 
-export type PurchasingConnection = z.infer<typeof purchasingConnectionSchema>;
-
-export type PurchasingSupplier = z.infer<typeof purchasingSupplierSchema>;
-
-export type SubmissionView = z.infer<typeof submissionViewSchema>;
-
 export type Commitment = z.infer<typeof commitmentSchema>;
 
 export type Communication = z.infer<typeof communicationSchema>;
-
-export type Extraction = z.infer<typeof extractionSchema>;
 
 export type OrderProgress = z.infer<typeof orderProgressSchema>;
 

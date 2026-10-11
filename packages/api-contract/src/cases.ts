@@ -117,6 +117,4 @@ export const caseEvidencePageSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 
-export type CaseEvidenceQuery = z.infer<typeof caseEvidenceQuerySchema>;
-
 export type CaseEvidencePage = z.infer<typeof caseEvidencePageSchema>;

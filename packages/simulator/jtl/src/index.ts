@@ -22,8 +22,6 @@ import type { JtlCommand, JtlCommandResult, JtlConfig } from './types.js';
 
 export { readOrder, openOrders } from './orders.js';
 
-export type { JtlOrderView } from './orders.js';
-
 export { supplierEvents } from './purchasing.js';
 
 export { kinds } from './records.js';
@@ -32,7 +30,6 @@ export { kinds } from './records.js';
 export type {
   CustomerRecord,
   ItemRecord,
-  JtlContext,
   NoteRecord,
   OrderRecord,
   PurchaseOrderRecord,
@@ -41,7 +38,7 @@ export type {
 
 export { itemsPage, readItemStock } from './stock.js';
 
-export type { ItemStock, ItemStockRow } from './stock.js';
+export type { ItemStock } from './stock.js';
 
 export * from './types.js';
 

@@ -8,7 +8,7 @@ export type CommitmentKind =
   'confirmed_quantity' | 'promised_date' | 'shipped' | 'received' | 'condition';
 
 /** Where a commitment came from. Every source stays attached to the commitment it produced. */
-export type CommitmentSource =
+type CommitmentSource =
   | {
       kind: 'purchasing_system';
       connectionId: string;
@@ -30,7 +30,7 @@ export type CommitmentSource =
  * Confirmed commitments count. `needs_review` is a candidate a person must check; `rejected`
  * stays as history. Values are never edited; corrections add a new commitment.
  */
-export type CommitmentStatus = 'confirmed' | 'needs_review' | 'rejected';
+type CommitmentStatus = 'confirmed' | 'needs_review' | 'rejected';
 
 export interface Commitment {
   id: string;
@@ -63,7 +63,7 @@ export type ReviewReason =
   | 'unmatched_line'
   | 'supplier_condition';
 
-export type SubmissionState =
+type SubmissionState =
   | 'not_executed'
   | 'approval_required'
   | 'approved'
@@ -127,7 +127,7 @@ export interface FollowUp {
   respondedAt: string;
 }
 
-export type LineStage =
+type LineStage =
   | 'not_submitted'
   | 'awaiting_confirmation'
   | 'confirmed'
@@ -136,7 +136,7 @@ export type LineStage =
   | 'received'
   | 'cancelled';
 
-export interface LineProgress {
+interface LineProgress {
   lineId: string;
   sku: string;
   description: string;
@@ -159,9 +159,9 @@ export interface LineProgress {
   overdue: boolean;
 }
 
-export type MilestoneKey = 'drafted' | 'submitted' | 'confirmed' | 'received';
+type MilestoneKey = 'drafted' | 'submitted' | 'confirmed' | 'received';
 
-export type MilestoneState =
+type MilestoneState =
   | 'complete'
   | 'partial'
   | 'in_progress'
@@ -170,7 +170,7 @@ export type MilestoneState =
   | 'not_started'
   | 'stopped';
 
-export interface Milestone {
+interface Milestone {
   key: MilestoneKey;
   state: MilestoneState;
   at: string | null;
@@ -178,7 +178,7 @@ export interface Milestone {
   evidence: string;
 }
 
-export type AttentionKind =
+type AttentionKind =
   | 'submission_approval'
   | 'submission_uncertain'
   | 'review_commitment'
@@ -198,10 +198,10 @@ export interface Attention {
   summary: string;
 }
 
-export type NextOwner =
+type NextOwner =
   'buyer' | 'approver' | 'supplier' | 'warehouse' | 'luma' | 'none';
 
-export interface NextAction {
+interface NextAction {
   owner: NextOwner;
   title: string;
   detail: string;

@@ -32,7 +32,7 @@ export interface ShopProfile {
   timeZone: string;
 }
 
-export interface WarehouseProfile {
+interface WarehouseProfile {
   id: string;
   name: string;
   city: string;
@@ -44,7 +44,7 @@ export interface WarehouseProfile {
   stockShare: number;
 }
 
-export interface CarrierProfile {
+interface CarrierProfile {
   name: string;
   share: number;
   transitDays: LatencyProfile;
@@ -52,7 +52,7 @@ export interface CarrierProfile {
   trackingUrl: string;
 }
 
-export interface Promotion {
+interface Promotion {
   label: string;
   /** Hours after the run starts. */
   startsAfterHours: number;

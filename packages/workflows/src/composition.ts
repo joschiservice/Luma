@@ -134,19 +134,6 @@ export { compileProcessWorkflow } from './infrastructure/process-schema.js';
 
 export { createProcessStepStore };
 
-export type {
-  ProcessActivities,
-  ProcessClock,
-  ProcessProgress,
-} from './application/process-runtime.js';
-
-export type {
-  ProcessRun,
-  ProcessStep,
-  ProcessStepOutput,
-  ProcessWorkflowVersion,
-} from './domain/process.js';
-
 /** Composes the catalog with refreshed membership and shared resolution admission controls. */
 export function createWorkflows(
   db: TenantDatabase,

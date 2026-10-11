@@ -120,7 +120,7 @@ function supplierTrace(requestId: string) {
   };
 }
 
-export type ExecutionConfiguration =
+type ExecutionConfiguration =
   { kind: 'disabled' } | { kind: 'enabled'; effects: EffectRegistry };
 
 export interface ApplicationServices {

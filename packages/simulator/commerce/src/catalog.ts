@@ -37,7 +37,7 @@ export interface CatalogProduct {
   variants: CatalogVariant[];
 }
 
-export interface CatalogSupplier {
+interface CatalogSupplier {
   id: string;
   name: string;
   number: string;

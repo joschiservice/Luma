@@ -6,7 +6,7 @@ import type { ActivityActor } from '@luma/resolution';
 import type { ReturnListItem } from './returns.js';
 
 /** Fulfillment across an order's lines, from shipped, delivered or completed work of the same source. */
-export type FulfillmentState =
+type FulfillmentState =
   'unfulfilled' | 'partial' | 'fulfilled' | 'not_required' | 'no_lines';
 
 /** A source disagreement with immutable evidence and the current workspace authority. */
@@ -231,7 +231,7 @@ export interface OrderDetail {
   asOf: string;
 }
 
-export interface OrderActivityEntry {
+interface OrderActivityEntry {
   id: string;
   recordedAt: string;
   action: string;

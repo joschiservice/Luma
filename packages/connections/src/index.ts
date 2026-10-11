@@ -1,10 +1,9 @@
-export type { Provider, ProviderCatalog } from './application/providers.js';
+export type { ProviderCatalog } from './application/providers.js';
 
 export { authorityGroups, resolveAuthority } from './domain/authority.js';
 
 export type {
   AuthorityConnection,
-  AuthorityGroup,
   AuthorityOverrides,
   FactAuthority,
 } from './domain/authority.js';
@@ -16,7 +15,6 @@ export type {
 } from './application/authority.js';
 
 export type {
-  EffectAdapter,
   EffectIntent,
   EffectRegistry,
   VerificationResult,
@@ -25,48 +23,30 @@ export type {
 export { ConnectorError } from './domain/capabilities.js';
 
 export type {
-  Capability,
-  CapabilityContract,
   CapabilityInput,
   CapabilityOutput,
   CapabilityResult,
-  ConnectorErrorCode,
   ConnectorFailure,
   CustomerSnapshot,
   ExternalId,
-  FulfillmentDelivery,
-  FulfillmentHoldReason,
-  FulfillmentKind,
-  FulfillmentMethodType,
   FulfillmentSnapshot,
-  FulfillmentTracking,
   HistoryLimit,
   InventorySnapshot,
-  ListPrice,
-  Money,
   Observation,
   OrderSnapshot,
   Page,
-  PageQuery,
   ProductSnapshot,
-  PurchaseOrderSubmission,
-  Quantity,
   ReadCapability,
   RefundSnapshot,
-  RefundTransaction,
   ReturnSnapshot,
-  ShippingMethodSnapshot,
   SourceIdentity,
   SupplierOrderSnapshot,
   SupplierOrderStatus,
   SupplierSnapshot,
   WriteCapability,
-  WriteReceipt,
 } from './domain/capabilities.js';
 
 export type {
-  CapabilityDescriptor,
-  CapabilityEvent,
   CapabilityReader,
   CapabilityRequest,
 } from './application/capabilities.js';
@@ -81,7 +61,6 @@ export type { ConnectionManagement } from './application/installations.js';
 
 export type {
   CommerceObservation,
-  SourceMapping,
   SourceRecords,
 } from './application/source-records.js';
 
@@ -93,7 +72,6 @@ export type {
 } from './application/playbook-grants.js';
 
 export type {
-  CapabilityDependencies,
   CapabilityHandler,
   ConnectorConnection,
   InvocationContext,
@@ -102,25 +80,17 @@ export type {
 export type {
   InstallationDependencies,
   InstallationService,
-  InstallationRepository,
   StoredInstallation,
   SecretCipher,
 } from './application/installations.js';
 
 export { secretBinding } from './application/installations.js';
 
-export type {
-  InstallationInput,
-  InstallationCredentials,
-} from './domain/installation.js';
+export type { InstallationCredentials } from './domain/installation.js';
 
 export { createShippingMethodEffects } from './application/shipping-method-effects.js';
 
-export type {
-  ConnectionProvider,
-  ConnectorEvidence,
-  ProviderRuntimeOptions,
-} from './application/provider.js';
+export type { ConnectionProvider } from './application/provider.js';
 
 export {
   connectionMetricDefinitions,

@@ -1,4 +1,4 @@
-export interface AuditActor {
+interface AuditActor {
   kind: 'user' | 'service' | 'agent' | 'connector';
   id: string;
   initiatingUserId?: string;

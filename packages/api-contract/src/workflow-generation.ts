@@ -179,19 +179,11 @@ export const workflowGenerationSchema = z.object({
   createdAt: z.string().datetime(),
 });
 
-export type GenerationAvailability = z.infer<
-  typeof generationAvailabilitySchema
->;
-
-export type GenerationQuestion = z.infer<typeof generationQuestionSchema>;
-
 export type DescribeWorkflow = z.infer<typeof describeWorkflowSchema>;
 
 export type GeneratedDraft = z.infer<typeof generatedDraftSchema>;
 
 export type RefineWorkflowDraft = z.infer<typeof refineWorkflowDraftSchema>;
-
-export type DraftChange = z.infer<typeof draftChangeSchema>;
 
 export type DraftProposal = z.infer<typeof draftProposalSchema>;
 
@@ -202,5 +194,3 @@ export type CodeStepSuggestionRequest = z.infer<
 >;
 
 export type CodeStepSuggestion = z.infer<typeof codeStepSuggestionSchema>;
-
-export type WorkflowGeneration = z.infer<typeof workflowGenerationSchema>;

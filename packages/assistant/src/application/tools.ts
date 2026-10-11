@@ -14,7 +14,7 @@ import {
 } from '../domain/answer.js';
 
 /** What a read returns: data for the model and the records it may cite. */
-export interface ToolOutput {
+interface ToolOutput {
   /** JSON-serializable. */
   data: unknown;
   records: RecordReference[];

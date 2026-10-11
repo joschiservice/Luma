@@ -60,6 +60,4 @@ export const metricSummaryResponseSchema = z.object({
 
 export type MetricSummaryRequest = z.input<typeof metricSummaryRequestSchema>;
 
-export type MetricSummaryPart = z.infer<typeof metricSummaryPartSchema>;
-
 export type MetricSummaryResponse = z.infer<typeof metricSummaryResponseSchema>;

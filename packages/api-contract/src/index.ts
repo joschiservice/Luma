@@ -103,16 +103,12 @@ export {
   organizationParamsSchema,
 } from './common.js';
 
-export type {
-  ApiError,
-  ErrorStatus,
-  RouteAccess,
-  RouteMeta,
-} from './common.js';
+export type { ApiError, RouteAccess } from './common.js';
+
+/** @public Declaration emit names it in the inferred types of the oRPC routes in each domain package. */
+export type { RouteMeta } from './common.js';
 
 export { contractRoutes } from './routes.js';
-
-export type { ContractRoute } from './routes.js';
 
 export { organizationSchema } from './contracts/identity.js';
 
@@ -125,15 +121,13 @@ export type {
 
 export * from './roles.js';
 
-export type { ConnectorProvider } from './contracts/providers.js';
-
 export {
   caseEventsContract,
   metricEventsContract,
   workspaceTopics,
 } from './contracts/events.js';
 
-export type { EventStreamRoute, WorkspaceTopic } from './contracts/events.js';
+export type { WorkspaceTopic } from './contracts/events.js';
 
 export * from './playbooks.js';
 

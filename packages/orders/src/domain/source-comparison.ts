@@ -23,13 +23,13 @@ export type ComparisonField =
   | 'unit';
 
 /** Immutable reads supporting a source value; times are measured on Luma's clock. */
-export interface ComparisonEvidence {
+interface ComparisonEvidence {
   snapshotId: string;
   observationId: string;
   observedAt: string;
 }
 
-export interface ComparisonLine {
+interface ComparisonLine {
   id: string;
   skuId: string | null;
   quantity: string;

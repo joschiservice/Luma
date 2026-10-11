@@ -13,7 +13,7 @@ import type {
 } from '../domain/authority.js';
 import { authorityGroups, resolveAuthority } from '../domain/authority.js';
 
-export interface AuthorityChange {
+interface AuthorityChange {
   commandId: string;
   revision: number;
   group: AuthorityGroup;

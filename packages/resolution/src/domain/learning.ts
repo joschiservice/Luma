@@ -1,4 +1,4 @@
-export interface ResolutionSelection {
+interface ResolutionSelection {
   id: string;
   version: string;
   use: 'created' | 'improved' | 'reused' | 'partner_specific';
@@ -94,7 +94,7 @@ export interface LearningSelectionFacts {
 }
 
 /** Canonical incident verification relevant to an operator's claimed outcome. */
-export interface LearningVerification {
+interface LearningVerification {
   outcome: 'passed' | 'failed' | 'inconclusive';
   authoritative: boolean;
   complete: boolean;

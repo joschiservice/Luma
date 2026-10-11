@@ -183,15 +183,9 @@ export type TestOutcome = z.infer<typeof testOutcomeSchema>;
 
 export type DraftTestCase = z.infer<typeof draftTestCaseSchema>;
 
-export type TestStepResult = z.infer<typeof testStepResultSchema>;
-
-export type DraftTestResult = z.infer<typeof draftTestResultSchema>;
-
 export type DraftTestRun = z.infer<typeof draftTestRunSchema>;
 
 export type DraftTestSummary = z.infer<typeof draftTestSummarySchema>;
-
-export type DraftTestExamples = z.infer<typeof draftTestExamplesSchema>;
 
 export type SaveDraftTests = z.infer<typeof saveDraftTestsSchema>;
 

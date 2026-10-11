@@ -8,8 +8,6 @@ const connectorProviderSchema = z.object({
   category: z.enum(['storefront', 'erp']),
 });
 
-export type ConnectorProvider = z.infer<typeof connectorProviderSchema>;
-
 export const connectorProvidersContract = {
   list: endpoint
     .route({

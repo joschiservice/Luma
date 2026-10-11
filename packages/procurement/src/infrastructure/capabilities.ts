@@ -101,7 +101,3 @@ export function createProcurementCapabilities(service: ProcurementService) {
     },
   };
 }
-
-export type ProcurementCapabilities = ReturnType<
-  typeof createProcurementCapabilities
->;

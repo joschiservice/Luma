@@ -21,13 +21,13 @@ export interface NotificationPreferences {
 }
 
 /** One module on a member's Home, in display order. */
-export interface HomeModule {
+interface HomeModule {
   id: string;
   size: 'half' | 'full';
 }
 
 /** A workspace page pinned to a member's sidebar. */
-export interface PinnedPage {
+interface PinnedPage {
   path: string;
   label: string;
 }
@@ -40,7 +40,7 @@ export interface WorkspaceLayout {
   revision: number;
 }
 
-export type DeliveryState = 'queued' | 'sent' | 'failed' | 'cancelled';
+type DeliveryState = 'queued' | 'sent' | 'failed' | 'cancelled';
 
 export interface WorkspaceInvitation {
   id: string;
@@ -64,7 +64,7 @@ export interface SettingsSnapshot {
 export type SupportAccessDuration = 24 | 72 | 168;
 
 /** A pending request from Luma support to allow access. */
-export interface SupportAccessRequest {
+interface SupportAccessRequest {
   id: string;
   reason: string;
   durationHours: SupportAccessDuration;

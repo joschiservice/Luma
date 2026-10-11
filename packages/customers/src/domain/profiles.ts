@@ -1,5 +1,5 @@
 /** A postal address as the source reported it; every field may be absent. */
-export interface CustomerAddress {
+interface CustomerAddress {
   line1: string | null;
   line2: string | null;
   city: string | null;

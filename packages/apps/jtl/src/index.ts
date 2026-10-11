@@ -20,13 +20,6 @@ import { createInstallationVerifier } from './infrastructure/verifier.js';
 
 export { createJtlConnector };
 
-export type {
-  JtlConnectorOptions,
-  JtlEvidence,
-} from './infrastructure/adapter.js';
-
-export type { JtlConnection } from '@luma/connector-jtl';
-
 export { createInstallationVerifier };
 
 export type { JtlEndpoint };

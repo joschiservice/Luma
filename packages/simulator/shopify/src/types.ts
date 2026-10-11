@@ -53,7 +53,7 @@ export interface ShopifyCustomerInput {
   address: { address1: string; city: string; zip: string; countryCode: string };
 }
 
-export interface ShopifyOrderLineInput {
+interface ShopifyOrderLineInput {
   /** Numeric variant ID. */
   variant: string;
   quantity: number;

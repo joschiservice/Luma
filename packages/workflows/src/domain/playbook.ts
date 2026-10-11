@@ -10,7 +10,7 @@ export type PlaybookValue =
   | { source: 'input' | 'evidence'; field: string }
   | { source: 'literal'; value: PlaybookScalar };
 
-export interface PlaybookDefinition {
+interface PlaybookDefinition {
   id: string;
   name: string;
   intent: string;

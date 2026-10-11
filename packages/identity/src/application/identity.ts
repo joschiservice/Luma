@@ -100,7 +100,7 @@ export interface IdentityTransaction {
 }
 
 /** A workspace with the signed-in person's membership status in it. */
-export type OrganizationAccess = Organization & {
+type OrganizationAccess = Organization & {
   membershipStatus: MembershipStatus;
 };
 
