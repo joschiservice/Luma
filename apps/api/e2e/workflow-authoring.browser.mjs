@@ -138,11 +138,29 @@ test('creates workflows from templates and from scratch, then publishes without 
   await page.mouse.down();
   await page.mouse.move(from.x + 10, from.y + 30, { steps: 5 });
   await page.getByText('Drop here').first().waitFor();
-  const to = await page.locator('.authoring-slot').first().boundingBox();
-  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, {
-    steps: 12,
-  });
-  await page.getByText('Release to add here').waitFor();
+  // Slots grow while a drag is in progress. Follow the first one, and release only once its
+  // box has stopped moving and it shows that it receives the step.
+  const slot = page.locator('.authoring-slot').first();
+  const release = page.getByText('Release to add here');
+  let previous;
+  await expect
+    .poll(
+      async () => {
+        const to = await slot.boundingBox();
+        const settled =
+          previous !== undefined &&
+          Math.abs(previous.y - to.y) < 1 &&
+          Math.abs(previous.height - to.height) < 1;
+        previous = to;
+        await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, {
+          steps: 2,
+        });
+
+        return settled && (await release.isVisible());
+      },
+      { timeout: 15_000 },
+    )
+    .toBe(true);
   await page.mouse.up();
   const steps = page.getByRole('list', { name: 'Workflow steps' });
   await steps.getByText('Compute result with sandboxed TypeScript.').waitFor();
