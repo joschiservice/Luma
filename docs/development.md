@@ -94,7 +94,7 @@ Start with the smallest check that proves the change, then widen:
 | One backend journey | `pnpm test:e2e returns.e2e.mjs`                                 |
 | One browser journey | `pnpm test:browser returns.browser.mjs`                         |
 | Shared components   | `pnpm test:ui`                                                  |
-| A feature area      | `pnpm verify:feature <simulator\|workflows\|orders>`            |
+| A feature area      | `pnpm verify:feature <simulator\|workflows\|orders\|inbox>`     |
 | Before review       | `pnpm check`                                                    |
 | Every CI gate       | `pnpm test:full`                                                |
 

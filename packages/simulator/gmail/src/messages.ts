@@ -139,6 +139,11 @@ export function composeHeaders(input: {
   ];
 }
 
+const attachmentIdPrefix = 'ANGjdJ';
+
+/** Stored attachment IDs are the prefix and an unpadded base64url SHA-256 (43 characters). */
+export const attachmentIdLength = attachmentIdPrefix.length + 43;
+
 /**
  * Stores a message with its attachments and updates its thread. Returns the stored record.
  * Gmail IDs: the thread ID is the ID of the thread's first message.
@@ -149,7 +154,7 @@ export async function storeMessage(context: GmailContext, input: NewMessage) {
   const historyId = await nextHistoryId(context);
   const attachments: AttachmentMeta[] = [];
   for (const [index, attachment] of input.attachments.entries()) {
-    const attachmentId = `ANGjdJ${toBase64Url(
+    const attachmentId = `${attachmentIdPrefix}${toBase64Url(
       createHash('sha256').update(`${id}:${index}`).digest('base64'),
     )}`;
     const size = Buffer.from(attachment.base64, 'base64').length;

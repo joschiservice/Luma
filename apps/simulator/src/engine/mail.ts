@@ -51,9 +51,13 @@ const signature = (supplier: SupplierRecord, de: boolean) =>
 
 /**
  * Records the purchase-order email the ERP sends from the operations mailbox, with the order
- * as a PDF. Delivering it again for the same order changes nothing.
+ * as a PDF, at `at` (now by default). Delivering it again for the same order changes nothing.
  */
-export async function purchaseOrderMail(world: World, id: string) {
+export async function purchaseOrderMail(
+  world: World,
+  id: string,
+  at = world.now,
+) {
   const found = await purchaseOrder(world, id);
   if (!found) return;
   const { order, supplier } = found;
@@ -100,7 +104,7 @@ export async function purchaseOrderMail(world: World, id: string) {
         ]),
       },
     ],
-    at: world.now,
+    at,
   });
 }
 

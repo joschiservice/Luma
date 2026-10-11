@@ -27,9 +27,21 @@ try {
       'api-contract',
       'web',
     ],
+    inbox: [
+      'messaging',
+      'app-gmail',
+      'connector-gmail',
+      'simulator',
+      'simulator-gmail',
+      'application-runtime',
+      'api-contract',
+      'web',
+    ],
   };
   if (process.argv.length !== 3 || !Object.hasOwn(packages, feature))
-    throw new Error('Usage: pnpm verify:feature <simulator|workflows|orders>');
+    throw new Error(
+      'Usage: pnpm verify:feature <simulator|workflows|orders|inbox>',
+    );
 
   const directory = await mkdtemp(join(tmpdir(), `luma-verify-${feature}-`));
   console.log(`Logs: ${directory}`);

@@ -10,6 +10,7 @@ import {
 } from '@luma/simulator-core';
 
 import {
+  attachmentIdLength,
   snippet,
   storeMessage,
   threadByReferences,
@@ -410,7 +411,8 @@ function payloadOf(message: MessageRecord, read: number) {
               { name: 'X-Attachment-Id', value: `f_${message.id}_${index}` },
             ],
             body: {
-              attachmentId: `${attachment.attachmentId}.${read.toString(36)}`,
+              // Gmail attachment IDs are base64url, so the per-read suffix has no separator.
+              attachmentId: `${attachment.attachmentId}${read.toString(36)}`,
               size: attachment.size,
             },
           })),
@@ -791,7 +793,7 @@ async function gmail(
   if (root === 'messages' && get && id && sub === 'attachments' && subId) {
     const record = await context.store.get<AttachmentRecord>(
       kinds.attachment,
-      subId.split('.')[0]!,
+      subId.slice(0, attachmentIdLength),
     );
     if (!record || record.data.messageId !== id) return notFound();
     const bytes = Buffer.from(record.data.base64, 'base64');

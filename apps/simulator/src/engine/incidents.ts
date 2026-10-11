@@ -332,8 +332,9 @@ async function silentPurchaseOrder(world: World) {
 /** A supplier emails a split delivery for an open purchase order; the ERP stays unchanged. */
 async function supplierSplitMail(world: World, input: InjectIncident) {
   const purchaseOrder = await silentPurchaseOrder(world);
-  // The order email comes first, so the answer threads with it.
-  await purchaseOrderMail(world, purchaseOrder);
+  // The order email comes first, a minute before the answer, so the answer threads with it
+  // and is the thread's latest message.
+  await purchaseOrderMail(world, purchaseOrder, world.now - 60_000);
   const { order, supplier, lines, result } = await splitDeliveryMail(
     world,
     purchaseOrder,
