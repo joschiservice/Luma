@@ -52,7 +52,8 @@
     "@orpc/server": "catalog:",
     "fastify": "catalog:",
     "pg": "catalog:pg-8-20-0",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "@luma/sales": "workspace:*"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

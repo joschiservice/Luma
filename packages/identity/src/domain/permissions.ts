@@ -89,6 +89,15 @@ const introduced = '2026-10-06';
  */
 export const permissionCatalog = [
   {
+    key: 'sales.manage',
+    group: 'records',
+    label: 'Manage Luma orders',
+    description:
+      'Accept storefront orders and read and edit Luma order records, including addresses.',
+    consequential: true,
+    introduced: '2026-10-11',
+  },
+  {
     key: 'workspace.settings.manage',
     group: 'workspace',
     label: 'Edit workspace settings',

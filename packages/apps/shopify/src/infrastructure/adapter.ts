@@ -641,7 +641,7 @@ export function createShopifyConnector(
               parent.id,
               'Order',
               'lineItems',
-              'id quantity currentQuantity name sku variant { inventoryItem { id } }',
+              'id quantity currentQuantity name sku originalUnitPriceSet { shopMoney { amount currencyCode } } taxLines { rate } variant { inventoryItem { id } }',
               s.orderLine,
             );
             const total = order.currentTotalPriceSet?.shopMoney;
@@ -673,6 +673,20 @@ export function createShopifyConnector(
                 cancelledQuantity: quantity(
                   line.quantity - line.currentQuantity,
                 ),
+                unitPrice: line.originalUnitPriceSet?.shopMoney
+                  ? {
+                      amount: line.originalUnitPriceSet.shopMoney.amount,
+                      currency:
+                        line.originalUnitPriceSet.shopMoney.currencyCode,
+                    }
+                  : null,
+                // Multiple tax jurisdictions do not establish one tax rate.
+                taxRate:
+                  line.taxLines?.length === 1 && line.taxLines[0]?.rate != null
+                    ? String(line.taxLines[0].rate)
+                    : line.taxLines?.length === 0
+                      ? '0'
+                      : null,
                 skuCode: text(line.sku),
                 title: text(line.name),
               })),

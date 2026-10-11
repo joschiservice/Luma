@@ -169,3 +169,10 @@ with audited overrides described in [workspace settings](workspace-settings.md#s
 ADR-002's full versioned field-group publication remains designed rather than implemented. Raw provider payloads are not retained, and observations
 never carry customer or address data. Imported customer profiles and the customer references
 that order reads report are stored separately (see [Commerce sync](commerce-sync.md#customers)).
+
+Order schema version 4 adds optional source-reported line unit prices and fractional tax
+rates. JTL's net price and percentage tax rate and Shopify's original shop-currency unit
+price and unambiguous tax line are retained without converting currencies or estimating
+missing facts. Price tax inclusion remains the source's convention; these facts do not
+establish an invoice total. Internal record publication uses the same owner transaction as
+Sales, unlike replay recovery across independent external observations.

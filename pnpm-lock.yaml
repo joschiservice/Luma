@@ -891,6 +891,9 @@ importers:
       '@luma/resolution':
         specifier: workspace:*
         version: link:../resolution
+      '@luma/sales':
+        specifier: workspace:*
+        version: link:../sales
       '@luma/workflow-temporal':
         specifier: workspace:*
         version: link:../workflow-temporal
@@ -1750,6 +1753,43 @@ importers:
       fastify:
         specifier: 'catalog:'
         version: 5.12.5
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.5
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
+
+  packages/sales:
+    dependencies:
+      '@luma/api-contract':
+        specifier: workspace:*
+        version: link:../api-contract
+      '@luma/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@luma/connections':
+        specifier: workspace:*
+        version: link:../connections
+      '@luma/identity':
+        specifier: workspace:*
+        version: link:../identity
+      '@luma/orders':
+        specifier: workspace:*
+        version: link:../orders
+      '@luma/platform':
+        specifier: workspace:*
+        version: link:../platform
+      '@orpc/server':
+        specifier: 'catalog:'
+        version: 1.15.5(@opentelemetry/api@1.9.1)(fastify@5.12.5)(ws@8.21.3)
       zod:
         specifier: 'catalog:'
         version: 4.6.5

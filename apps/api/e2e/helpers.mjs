@@ -150,7 +150,7 @@ export async function database(t) {
     },
     async grantRuntime() {
       await admin.query(
-        `GRANT luma_identity,luma_case_reader,luma_desk,luma_policies,luma_execution,luma_audit,luma_connectors,luma_commerce_sync TO "${id}"`,
+        `GRANT luma_identity,luma_case_reader,luma_desk,luma_policies,luma_execution,luma_audit,luma_connectors,luma_commerce_sync,luma_sales TO "${id}"`,
       );
     },
   };

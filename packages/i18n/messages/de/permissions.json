@@ -98,5 +98,7 @@
   "permissions_role_admin_name": "Admin",
   "permissions_role_admin_description": "Verwaltet den Workspace: Einstellungen, Team, Verbindungen, Workflows und alle Änderungen. Kann Inhaber nicht ändern.",
   "permissions_role_member_name": "Mitglied",
-  "permissions_role_member_description": "Sieht Betrieb, Datensätze und Workflows, übernimmt Entscheidungen und fragt Luma. Kann keine Daten oder Einstellungen ändern."
+  "permissions_role_member_description": "Sieht Betrieb, Datensätze und Workflows, übernimmt Entscheidungen und fragt Luma. Kann keine Daten oder Einstellungen ändern.",
+  "permissions_sales_manage_label": "Luma-Aufträge verwalten",
+  "permissions_sales_manage_description": "Shop-Aufträge übernehmen sowie Luma-Aufträge einschließlich Adressen lesen und bearbeiten."
 }

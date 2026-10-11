@@ -12,6 +12,8 @@ import {
   createReadinessCheck,
   createReplenishmentWorker,
   createResourceScope,
+  createSalesReadSource,
+  createSalesTenantRelease,
   createScheduledDetection,
   createStockRefreshService,
 } from '@luma/application-runtime';
@@ -251,6 +253,7 @@ export async function createPilot(
         });
     const commerce = simulation ? createCommerceServices(db) : undefined;
     const installedOptions = {
+      internalSource: createSalesReadSource(db, observability),
       installations,
       simulation,
       jtlEndpoints: [],
@@ -316,11 +319,14 @@ export async function createPilot(
     const detectionErrors = [];
     const scheduled = simulation
       ? createScheduledDetection({
+          internalOrdersEnabled: createSalesTenantRelease(observability),
           ...detectionTiming,
           database: db,
           capabilities,
           category: (provider) =>
-            installations.providerCatalog.get(provider)?.category ?? null,
+            provider === 'luma-erp'
+              ? 'erp'
+              : (installations.providerCatalog.get(provider)?.category ?? null),
           detection: () => detection,
           log: (message, error) => {
             detectionErrors.push({ message, error: error?.message ?? null });
@@ -438,6 +444,7 @@ export async function createPilot(
       : undefined;
     if (processClient) resources.add(processClient.close);
     const application = createApplicationServices({
+      observability,
       ...(processClient ? { replenishmentTransport: processClient } : {}),
       database: db,
       identity: identity.service,
@@ -539,6 +546,7 @@ export async function createPilot(
                 db,
                 identity.service,
                 connections,
+                observability,
               ),
               apps: installations.apps,
               appRegistry: installations.registry,

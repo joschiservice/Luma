@@ -17,9 +17,10 @@ export function createSourceAuthority(
   db: TenantDatabase,
   category: (provider: string) => AuthorityConnection['category'],
   refreshContext: (context: TenantContext) => Promise<TenantContext>,
+  internalOrdersEnabled?: (tenantId: string) => Promise<boolean>,
 ) {
   return createAuthorityService(
-    createAuthorityRepository(db, category),
+    createAuthorityRepository(db, category, internalOrdersEnabled),
     refreshContext,
   );
 }
@@ -54,6 +55,10 @@ export function createInstallationService(
 }
 
 export { createSecretCipher, createInstallationRepository };
+
+export { createOrderSourceVisibility } from './infrastructure/source-visibility.js';
+
+export { createInternalOrderSource } from './infrastructure/internal-source.js';
 
 export {
   createInstalledPurchaseOrderRuntime,

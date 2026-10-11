@@ -24,6 +24,7 @@ import { connectorProvidersContract } from './contracts/providers.js';
 import { recordsContract } from './contracts/records.js';
 import { returnsContract } from './contracts/returns.js';
 import { rolesContract } from './contracts/roles.js';
+import { salesContract } from './contracts/sales.js';
 import { settingsContract } from './contracts/settings.js';
 import { shadowContract } from './contracts/shadow.js';
 import { syncContract } from './contracts/sync.js';
@@ -63,6 +64,7 @@ export const apiContract = {
   inventory: inventoryContract,
   products: productsContract,
   orders: ordersContract,
+  sales: salesContract,
   returns: returnsContract,
   customers: customersContract,
   sync: syncContract,
@@ -87,6 +89,8 @@ export * from './cases.js';
 export * from './connections.js';
 
 export * from './authority.js';
+
+export * from './sales.js';
 
 export { diagnosisSchema } from './diagnosis.js';
 

@@ -55,6 +55,8 @@ export const orderLine = z.object({
   ]),
   quantity: decimal,
   salesUnit: z.string().min(1),
+  salesPriceNet: decimal.nullable().optional().catch(null),
+  taxRate: decimal.nullable().optional().catch(null),
   name: z.string().nullable().optional().catch(null),
   sKU: z.string().nullable().optional().catch(null),
 });

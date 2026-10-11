@@ -31,7 +31,7 @@ export function currentOrderSources(name: string, filter = 'true') {
  (s.document->>'deleted')::boolean AS deleted,(s.document->'data'->>'placedAt')::timestamptz AS placed_at,
  (s.document->'data'->>'dueAt')::timestamptz AS due_at
  FROM orders_projections p JOIN orders_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
- WHERE p.tenant_id=$1 AND s.kind='order' AND (${filter})
+ WHERE p.tenant_id=$1 AND s.kind='order' AND p.connection_id <> ALL(COALESCE(NULLIF(current_setting('app.hidden_order_sources',true),''),'{}')::uuid[]) AND (${filter})
 )`;
 }
 

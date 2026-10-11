@@ -43,6 +43,11 @@ const line = z
     currentQuantity: count.nullable().optional(),
     cancelledQuantity: decimal.nullable(),
     unit,
+    unitPrice: money.nullable().optional(),
+    taxRate: count
+      .refine((v) => Number(v) <= 1)
+      .nullable()
+      .optional(),
     skuCode: text.nullable().optional(),
     title: text.nullable().optional(),
   })
@@ -273,7 +278,12 @@ const refundRecord = z
 export const snapshotSchema = z.union([
   base
     .extend({
-      schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+      schemaVersion: z.union([
+        z.literal(1),
+        z.literal(2),
+        z.literal(3),
+        z.literal(4),
+      ]),
       kind: z.literal('order'),
       data: order,
     })

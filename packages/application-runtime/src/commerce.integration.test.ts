@@ -1,12 +1,21 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir, readFile, writeFile } from 'node:fs/promises';
 
-import { buildApp, createCommerceServices } from '@luma/application-runtime';
+import {
+  buildApp,
+  createCommerceServices,
+  createSalesRuntime,
+} from '@luma/application-runtime';
+import { createAuditLog } from '@luma/audit/composition';
 import type { CommerceObservation, SourceIdentity } from '@luma/connections';
 import {
+  commerceSchema,
   createConnectionCoverage,
+  createInternalOrderSource,
+  createOrderSourceVisibility,
   createProductIdentityReader,
   createReadChecks,
+  createSourceAuthority,
 } from '@luma/connections/composition';
 import { orderAttentionQuery } from '@luma/exceptions/composition';
 import type { IdentityService } from '@luma/identity';
@@ -21,6 +30,10 @@ import {
   createOperationalMetrics,
   createRecordExplorer,
 } from '@luma/read-models/composition';
+import {
+  createSalesPersistence,
+  createSalesSource,
+} from '@luma/sales/composition';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -154,7 +167,7 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       `CREATE ROLE "${name}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
     );
     await admin.query(
-      `GRANT luma_connectors,luma_orders,luma_inventory,luma_case_reader TO "${name}"`,
+      `GRANT luma_connectors,luma_orders,luma_inventory,luma_case_reader,luma_sales TO "${name}"`,
     );
     url.username = name;
     url.password = password;
@@ -198,6 +211,380 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       'TRUNCATE connector_observations,connector_source_mappings,orders_entities,inventory_entities CASCADE',
     );
   });
+  it('owns orders atomically with retry-safe edits, explicit authority and tenant isolation', async () => {
+    const input: CommerceObservation & { capability: 'orders.read' } = {
+      capability: 'orders.read',
+      observation: {
+        id: randomUUID(),
+        source: {
+          tenantId: tenant,
+          connectionId: connection,
+          provider: 'shopify',
+          resource: 'order',
+          externalId: 'native-order',
+          scopeKey: '',
+        },
+        kind: 'snapshot',
+        observedAt: new Date().toISOString(),
+        sourceUpdatedAt: new Date().toISOString(),
+        sourceRevision: '1',
+        adapterVersion: 'fixture/1',
+        schemaVersion: 1,
+        data: {
+          displayNumber: `NATIVE-${randomUUID()}`,
+          status: 'open',
+          paymentStatus: 'paid',
+          total: { amount: '20', currency: 'EUR' },
+          lines: [
+            {
+              id: { externalId: 'native-line', scopeKey: 'native-order' },
+              sku: null,
+              quantity: { amount: '2', unit: 'each' },
+              currentQuantity: { amount: '2', unit: 'each' },
+              cancelledQuantity: { amount: '0', unit: 'each' },
+              unitPrice: { amount: '10', currency: 'EUR' },
+              taxRate: '0',
+            },
+          ],
+        },
+      },
+    };
+    const imported = await services.ingestion.import(
+      context(),
+      'native-intake',
+      input,
+    );
+    if (imported.status === 'pending') throw new Error('Fixture must project');
+    const orderId = imported.entityId;
+    const db = createTenantDatabase(runtime);
+    const authority = (scoped: typeof db) =>
+      createSourceAuthority(
+        scoped,
+        (provider) => (provider === 'luma-erp' ? 'erp' : 'storefront'),
+        async (c) => c,
+        async () => true,
+      );
+    const sales = createSalesRuntime(
+      db,
+      { refreshContext: async (c) => c },
+      async () => true,
+      authority,
+    );
+    const off = createSalesRuntime(
+      db,
+      { refreshContext: async (c) => c },
+      async () => false,
+      authority,
+    );
+    await expect(
+      off.accept(context(), orderId, connection),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    const member = makeTenantContext(
+      { userId: 'reader', sessionId: 'reader' },
+      {
+        id: tenant,
+        name: 'Fixture',
+        slug: 'fixture',
+        status: 'active',
+        dataRegion: 'EU',
+      },
+      builtInMembership(
+        { id: 'reader', organizationId: tenant, userId: 'reader' },
+        'member',
+      ),
+      randomUUID(),
+    );
+    await expect(
+      sales.accept(member, orderId, connection),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    const [record, retry] = await Promise.all([
+      sales.accept(context(), orderId, connection),
+      sales.accept(context(), orderId, connection),
+    ]);
+    expect(retry.id).toBe(record.id);
+    expect(await sales.get(context(otherTenant), orderId)).toBeNull();
+    expect(await services.orders.current(context(), orderId)).toHaveLength(2);
+    expect(await services.orders.history(context(), orderId)).toHaveLength(2);
+    expect(
+      await createSourceAuthority(
+        db,
+        () => 'erp',
+        async (c) => c,
+      ).read(context()),
+    ).toMatchObject({
+      connections: expect.not.arrayContaining([
+        expect.objectContaining({ id: record.connectionId }),
+      ]),
+    });
+    const command = {
+      commandId: randomUUID(),
+      version: record.version,
+      status: 'cancelled' as const,
+    };
+    await expect(sales.edit(context(), orderId, command)).rejects.toMatchObject(
+      { statusCode: 409 },
+    );
+    for (const group of ['order_lifecycle', 'order_lines'] as const) {
+      const current = await authority(db).read(context());
+      await authority(db).change(context(), {
+        commandId: randomUUID(),
+        revision: current.revision,
+        group,
+        connectionId: record.connectionId,
+      });
+    }
+    const address = {
+      name: 'Private name',
+      company: '',
+      street: 'Private address',
+      city: 'Berlin',
+      postalCode: '10115',
+      country: 'DE',
+    };
+    const addressEdit = {
+      commandId: randomUUID(),
+      version: 1,
+      shippingAddress: address,
+    };
+    const addressed = await sales.edit(context(), orderId, addressEdit);
+    expect(addressed.version).toBe(2);
+    expect(await services.orders.history(context(), orderId)).toHaveLength(2);
+    expect(await sales.edit(context(), orderId, addressEdit)).toEqual(
+      addressed,
+    );
+    await expect(
+      sales.edit(context(), orderId, { ...addressEdit, status: 'cancelled' }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    await expect(sales.edit(context(), orderId, command)).rejects.toMatchObject(
+      { statusCode: 409 },
+    );
+    const hidden = createOrderSourceVisibility(db, async () => false);
+    expect(await hidden(context())).toContain(record.connectionId);
+    const unreleased = await createRecordExplorer(db, hidden).get(
+      context(),
+      'order',
+      orderId,
+    );
+    expect(
+      unreleased?.record.sources.map((source) => source.connectionId),
+    ).toEqual([connection]);
+    expect(unreleased?.snapshots).toHaveLength(1);
+    const readSource = createSalesSource(
+      db,
+      async () => true,
+      (observation) => {
+        commerceSchema.parse({ capability: 'orders.read', observation });
+      },
+    );
+    const internal = await readSource(context(), record.connectionId);
+    const reader = internal?.capabilities['orders.read'];
+    if (!reader) throw new Error('Internal read capability missing');
+    const page = await reader.run(
+      {
+        tenant: context(),
+        connectionId: record.connectionId,
+        provider: 'luma-erp',
+      },
+      { limit: 10 },
+    );
+    const validated = reader.parseOutput(page);
+    expect(validated.items).toHaveLength(1);
+    expect(validated.items[0]?.sourceRevision).toBe('2');
+    expect(JSON.stringify(validated)).not.toContain('Private');
+    expect(
+      await createSalesSource(
+        db,
+        async () => false,
+        () => undefined,
+      )(context(), record.connectionId),
+    ).toBeNull();
+    await expect(
+      off.edit(context(), orderId, {
+        commandId: randomUUID(),
+        version: 2,
+        status: 'cancelled',
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+
+    if (process.env.LUMA_ORDER_BENCHMARK) {
+      const rollback = new Error('Benchmark rollback');
+      const samples = { record: [] as number[], publication: [] as number[] };
+      for (let iteration = 0; iteration < 40; iteration++) {
+        for (const publish of [false, true]) {
+          const started = performance.now();
+          await expect(
+            db.transaction(tenant, async (tx) => {
+              await tx.query(
+                'SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
+                [`sales:${tenant}`],
+              );
+              await tx.query(
+                'SELECT pg_advisory_xact_lock_shared(hashtextextended($1,0))',
+                [`commerce-ingestion:${tenant}`],
+              );
+              const scoped: typeof db = {
+                transaction: async (_tenantId, work) => work(tx),
+              };
+              const commerce = createCommerceServices(scoped);
+              const persistence = createSalesPersistence(tx, context(), {
+                sources: commerce.sources,
+                orders: commerce.orders,
+                source: createInternalOrderSource(scoped),
+                authority: authority(scoped),
+                audit: createAuditLog(scoped),
+              });
+              const previous = await persistence.get(orderId);
+              if (!previous) throw new Error('Benchmark record missing');
+              const next = {
+                ...previous,
+                version: previous.version + 1,
+                updatedAt: new Date().toISOString(),
+                total: null,
+                lines: previous.lines.map((line) => ({
+                  ...line,
+                  currentQuantity: '1',
+                })),
+              };
+              const commandId = randomUUID();
+              await persistence.requireAuthority(next);
+              await persistence.save(next);
+              if (publish) await persistence.publish(next);
+              await persistence.audit(next, commandId, 'edited');
+              await persistence.remember(
+                commandId,
+                orderId,
+                {
+                  commandId,
+                  version: previous.version,
+                  lines: [{ id: next.lines[0]!.id, currentQuantity: '1' }],
+                },
+                next,
+              );
+              throw rollback;
+            }),
+          ).rejects.toBe(rollback);
+          if (iteration >= 10)
+            samples[publish ? 'publication' : 'record'].push(
+              performance.now() - started,
+            );
+        }
+      }
+      const percentile = (values: number[], fraction: number) =>
+        [...values].sort((a, b) => a - b)[
+          Math.floor((values.length - 1) * fraction)
+        ]!;
+      await writeFile(
+        '/tmp/luma176-native-order-benchmark.json',
+        JSON.stringify({
+          record: {
+            medianMs: percentile(samples.record, 0.5),
+            p95Ms: percentile(samples.record, 0.95),
+          },
+          publication: {
+            medianMs: percentile(samples.publication, 0.5),
+            p95Ms: percentile(samples.publication, 0.95),
+          },
+          medianOverheadMs:
+            percentile(samples.publication, 0.5) -
+            percentile(samples.record, 0.5),
+        }),
+      );
+    }
+    // Fail after record and snapshot writes: the owner transaction rolls back every effect.
+    const failingDb: typeof db = {
+      transaction: (tenantId, work, options) =>
+        db.transaction(
+          tenantId,
+          (tx) =>
+            work({
+              query: async (sql, values) => {
+                if (sql.startsWith('INSERT INTO audit_entries'))
+                  throw new Error('Injected audit failure');
+
+                return tx.query(sql, values);
+              },
+            }),
+          options,
+        ),
+    };
+    const failing = createSalesRuntime(
+      failingDb,
+      { refreshContext: async (c) => c },
+      async () => true,
+      authority,
+    );
+    const cancel = {
+      commandId: randomUUID(),
+      version: 2,
+      status: 'cancelled' as const,
+    };
+    await expect(failing.edit(context(), orderId, cancel)).rejects.toThrow(
+      'Injected audit failure',
+    );
+    expect((await sales.get(context(), orderId))?.version).toBe(2);
+    expect(await services.orders.history(context(), orderId)).toHaveLength(2);
+    const cancelled = await sales.edit(context(), orderId, cancel);
+    expect(cancelled.version).toBe(3);
+    const compared = await owner.query<{
+      comparison_raw: string;
+      comparison_differences: { values: { connectionId: string }[] }[];
+    }>(
+      'SELECT comparison_raw,comparison_differences FROM orders_list WHERE tenant_id=$1 AND entity_id=$2 AND selected',
+      [tenant, orderId],
+    );
+    expect(compared.rows[0]?.comparison_raw).toBe('different');
+    expect(
+      compared.rows[0]?.comparison_differences.some((difference) =>
+        difference.values.some(
+          (value) => value.connectionId === record.connectionId,
+        ),
+      ),
+    ).toBe(true);
+    expect(await services.orders.history(context(), orderId)).toHaveLength(3);
+    expect(
+      (await services.orders.current(context(), orderId)).find(
+        (p) => p.snapshot.connectionId === record.connectionId,
+      )?.snapshot.data,
+    ).toMatchObject({
+      status: 'cancelled',
+      lines: [{ currentQuantity: '0', cancelledQuantity: '2' }],
+    });
+    await expect(
+      sales.edit(context(), orderId, {
+        commandId: randomUUID(),
+        version: 3,
+        status: 'open',
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    const raw = await runtime.connect();
+    try {
+      await raw.query('BEGIN');
+      expect((await raw.query('SELECT * FROM sales_orders')).rows).toHaveLength(
+        0,
+      );
+      await raw.query("SELECT set_config('app.tenant_id',$1,true)", [
+        otherTenant,
+      ]);
+      expect((await raw.query('SELECT * FROM sales_orders')).rows).toHaveLength(
+        0,
+      );
+      await raw.query('SET LOCAL ROLE luma_orders');
+      await expect(
+        raw.query('SELECT * FROM sales_orders'),
+      ).rejects.toMatchObject({ code: '42501' });
+      await raw.query('ROLLBACK');
+    } finally {
+      raw.release();
+    }
+    const evidence = await owner.query(
+      'SELECT document::text FROM connector_observations WHERE tenant_id=$1 AND connection_id=$2',
+      [tenant, record.connectionId],
+    );
+    expect(evidence.rows.map((row) => row.document).join('')).not.toContain(
+      'Private',
+    );
+  }, 60_000);
+
   it('reads only requested replenishment positions and connections under tenant RLS', async () => {
     const first = await mapStock(stock({ amount: '3' }), 'watched-first');
     await mapStock(
@@ -1349,8 +1736,8 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
         version: 2,
         snapshot: {
           observationId: completed.observation.id,
-          schemaVersion: 3,
-          normalizerVersion: 'commerce/3',
+          schemaVersion: 4,
+          normalizerVersion: 'commerce/4',
           sourceUpdatedAt: null,
           data: {
             status: 'completed',
@@ -1479,12 +1866,12 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       ).toEqual([
         [1, 'commerce/1'],
         [2, 'commerce/2'],
-        [3, 'commerce/3'],
+        [4, 'commerce/4'],
       ]);
       expect(
         (await services.orders.current(context(), id))[0]?.snapshot,
       ).toMatchObject({
-        schemaVersion: 3,
+        schemaVersion: 4,
         data: { total: { amount: '48', currency: 'EUR' } },
       });
       await expect(

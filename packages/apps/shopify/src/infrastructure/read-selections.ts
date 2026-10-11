@@ -7,7 +7,7 @@ const connection = (field: string, size: number, fields: string) =>
 const order =
   'id updatedAt createdAt name cancelledAt closed displayFinancialStatus currentTotalPriceSet { shopMoney { amount currencyCode } }';
 const orderLine =
-  'id quantity currentQuantity name sku variant { inventoryItem { id } }';
+  'id quantity currentQuantity name sku originalUnitPriceSet { shopMoney { amount currencyCode } } taxLines { rate } variant { inventoryItem { id } }';
 
 /** Order fields; the customer reference needs protected customer data access and `read_customers`. */
 export function orderSelection(customer = false) {

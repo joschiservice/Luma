@@ -1,3 +1,9 @@
+export {
+  createSalesRuntime,
+  createSalesReadSource,
+  createSalesTenantRelease,
+} from './composition/sales.js';
+
 export { buildApp } from './composition/http-app.js';
 
 export { buildRuntimeApp } from './composition/runtime-app.js';

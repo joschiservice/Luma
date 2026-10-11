@@ -175,7 +175,7 @@ export async function readHistory(
       AND p.connection_id=s.connection_id AND p.snapshot_id=s.id) AS current,
      s.observed_at AS "observedAt",s.source_updated_at AS "sourceUpdatedAt"
      FROM orders_snapshots s
-     WHERE s.tenant_id=$1 AND EXISTS (SELECT 1 FROM origins o WHERE o.connection_id=s.connection_id
+     WHERE s.tenant_id=$1 AND s.connection_id <> ALL(COALESCE(NULLIF(current_setting('app.hidden_order_sources',true),''),'{}')::uuid[]) AND EXISTS (SELECT 1 FROM origins o WHERE o.connection_id=s.connection_id
        AND (o.entity_id=s.entity_id OR o.entity_id=s.order_id))
      ORDER BY s.observed_at DESC,s.created_at DESC,s.id DESC LIMIT 101`,
     [tenantId, orderIds],

@@ -7,7 +7,7 @@ export * from '@luma/connector-shopify/schemas';
  * Version of this adapter's normalized output, recorded as observation provenance. Bump it
  * whenever the same provider response would normalize differently.
  */
-export const adapterVersion = 'shopify/5';
+export const adapterVersion = 'shopify/6';
 
 const externalId = z
   .object({ externalId: z.string().min(1), scopeKey: z.string() })
@@ -144,6 +144,14 @@ export const outputs = {
             quantity,
             currentQuantity: quantity,
             cancelledQuantity: quantity.nullable(),
+            unitPrice: z
+              .object({
+                amount: decimal,
+                currency: z.string().regex(/^[A-Z]{3}$/),
+              })
+              .nullable()
+              .optional(),
+            taxRate: decimal.nullable().optional(),
             skuCode: text,
             title: text,
           }),

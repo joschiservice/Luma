@@ -44,6 +44,14 @@ If an order exists in more than one system, **Source comparison** lines up what 
 
 **Current state** names each difference, for example: Payment differs between sources: “Paid” in Shopify and “Payment pending” in JTL-Wawi. The **Authoritative source** column shows which connection your workspace trusts for lines, cancellation, fulfillment, location and tracking. Each fact can use a different source. **Unknown authority** or **Conflicting authority** means Luma cannot choose a trusted source. Review the choice in [Source authority settings](/docs/workspace-settings#source-authority). Payment and totals have no authority rule yet. Systems often update at different times, so compare when each source last updated the order before you decide which one is wrong. Correct the order in that system; Luma shows the change after its next read.
 
+## Manage an order in Luma
+
+When native orders are available in your workspace, open a Shopify order and choose **Accept into Luma**. You need **Manage Luma orders** and **Manage imports**. Luma creates a record linked to the existing order. The list continues to show one order with Shopify and Luma ERP as sources.
+
+Before editing, choose **Luma ERP** for order lifecycle and order lines under [Source authority](/docs/workspace-settings#source-authority). In **Luma order record**, change the status or current line quantities. Expand **Billing address** or **Shipping address** to edit an address, then choose **Save order**. If another person changed the record, refresh it before trying again.
+
+Cancellation is final. Reducing a line quantity makes the total unknown because shipping, discounts and tax adjustments cannot be calculated from the line price alone. Address changes do not create a new source version in order history. Edits stay in Luma; they are not sent to Shopify. You can compare the sources to see their differences. An accepted record’s source identity remains fixed, so it cannot be linked or unlinked through the source controls.
+
 ## See live Shopify details
 
 For an order from Shopify, a live details section reads payments, the customer, fulfillment holds, returns, refunds and events directly from your store, with the connection’s permissions. Luma doesn’t store these details. Choose **Refresh** to read them again, or **Open in Shopify admin** to open the order in Shopify.

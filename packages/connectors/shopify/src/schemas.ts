@@ -30,6 +30,15 @@ export const orderLine = z
     currentQuantity: count,
     name: z.string().nullable().optional().catch(null),
     sku: z.string().nullable().optional().catch(null),
+    originalUnitPriceSet: z
+      .object({ shopMoney: money })
+      .nullable()
+      .optional()
+      .catch(null),
+    taxLines: z
+      .array(z.object({ rate: z.number().min(0).max(1).nullable() }))
+      .optional()
+      .catch(undefined),
     variant: z
       .object({ inventoryItem: z.object({ id: gid('InventoryItem') }) })
       .nullable(),

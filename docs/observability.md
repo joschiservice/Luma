@@ -40,6 +40,8 @@ Flags are server-side release toggles evaluated through `Observability.flag`. Th
 - A failed or unavailable evaluation returns the caller's fallback, `false` by default. Choose the fallback that is safe while PostHog is unreachable.
 - `FEATURE_FLAG_OVERRIDES=observability-test=true,…` fixes flag values with or without PostHog, for development, the pilot, simulators and tests. Startup fails for unlisted keys, duplicates, or any environment other than development and test.
 
+`FEATURE_FLAG_OVERRIDES=luma-erp-orders=true` enables native order intake in development and the pilot. The API reports availability per workspace. Enabling the release does not select Luma ERP as the authoritative source; that remains an audited workspace setting.
+
 Flags never decide authorization, policy admission or approval. Keep tenant entitlements and execution controls in their owning domain, where they are scoped and audited. Temporal workflow code cannot evaluate flags: evaluate in an activity or before starting the workflow and pass the value as input, so replays see the same value. Change workflow code with Temporal versioning, not flags.
 
 ## Data policy

@@ -44,6 +44,14 @@ Gibt es eine Bestellung in mehreren Systemen, stellt **Quellenvergleich** die An
 
 **Aktueller Stand** nennt jede Abweichung, zum Beispiel: Die Zahlung weicht zwischen Quellen ab: „Bezahlt“ in Shopify und „Zahlung ausstehend“ in JTL-Wawi. Die Spalte **Maßgebliche Quelle** zeigt, welcher Verbindung dein Workspace bei Positionen, Stornierung, Abwicklung, Standort und Sendungsverfolgung vertraut. Jede Angabe kann eine andere Quelle verwenden. **Maßgebliche Quelle unbekannt** oder **Widersprüchliche Quellenzuordnung** bedeutet, dass Luma keine verlässliche Quelle wählen kann. Prüfe die Auswahl unter [Maßgebliche Quellen](/docs/workspace-settings#source-authority). Für Zahlung und Summen gibt es noch keine Quellenregel. Systeme aktualisieren oft zu unterschiedlichen Zeiten. Vergleiche deshalb, wann jede Quelle die Bestellung zuletzt aktualisiert hat, bevor du entscheidest, welche falsch ist. Korrigiere die Bestellung in diesem System; Luma zeigt die Änderung nach dem nächsten Abruf.
 
+## Bestellung in Luma verwalten [#manage-an-order-in-luma]
+
+Wenn native Bestellungen in deinem Workspace verfügbar sind, öffne eine Shopify-Bestellung und wähle **In Luma übernehmen**. Du brauchst **Luma-Aufträge verwalten** und **Importe verwalten**. Luma erstellt einen Datensatz, der mit der bestehenden Bestellung verknüpft ist. Die Liste zeigt weiterhin eine Bestellung mit Shopify und Luma ERP als Quellen.
+
+Wähle vor dem Bearbeiten unter [Maßgebliche Quellen](/docs/workspace-settings#source-authority) **Luma ERP** für Bestellstatus und Bestellpositionen. Ändere unter **Luma-Auftrag** den Status oder die aktuelle Positionsmenge. Klappe **Rechnungsadresse** oder **Lieferadresse** auf, bearbeite die Adresse und wähle **Auftrag speichern**. Wenn jemand den Datensatz inzwischen geändert hat, aktualisiere ihn vor einem weiteren Versuch.
+
+Eine Stornierung ist endgültig. Wenn du eine Positionsmenge reduzierst, wird die Summe unbekannt: Versand, Rabatte und Steueranpassungen lassen sich nicht allein aus dem Positionspreis berechnen. Adressänderungen erzeugen keine neue Quellversion im Bestellverlauf. Änderungen bleiben in Luma und werden nicht an Shopify gesendet. Vergleiche die Quellen, um Unterschiede zu sehen. Die Quellenzuordnung einer übernommenen Bestellung bleibt fest und kann über die Quellensteuerung nicht verknüpft oder getrennt werden.
+
 ## Live-Details aus Shopify ansehen [#see-live-shopify-details]
 
 Bei einer Bestellung aus Shopify liest ein Abschnitt mit Live-Details Zahlungen, Kunde, Fulfillment-Sperren, Retouren, Erstattungen und Ereignisse direkt aus deinem Shop, mit den Berechtigungen der Verbindung. Luma speichert diese Details nicht. Wähle **Aktualisieren**, um sie erneut zu lesen, oder **In Shopify Admin öffnen**, um die Bestellung in Shopify zu öffnen.

@@ -102,6 +102,8 @@ export interface OrderSourceFacts extends OrderSource {
     id: string;
     skuId: string | null;
     comparisonKey: string | null;
+    unitPrice?: { amount: string; currency: string } | null;
+    taxRate?: string | null;
     skuCode: string | null;
     title: string | null;
     quantity: string;

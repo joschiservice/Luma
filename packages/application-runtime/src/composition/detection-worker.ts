@@ -12,12 +12,13 @@ import type { Configuration } from '@luma/exceptions';
 import { defaultConfiguration } from '@luma/exceptions';
 import type { IdentityService, TenantContext } from '@luma/identity';
 import { pausesBackgroundWork } from '@luma/identity';
-import type { TenantDatabase } from '@luma/platform';
+import type { Observability, TenantDatabase } from '@luma/platform';
 import { createFailureLog } from '@luma/platform';
 import { createDetectionMonitor, createStockRefresh } from '@luma/resolution';
 import { createDetectionSources } from '@luma/resolution/composition';
 import type { Pool } from 'pg';
 
+import { createSalesReadSource, createSalesTenantRelease } from './sales.js';
 import { createCommerceServices, createDetectionServices } from './services.js';
 
 type Detection = Pick<
@@ -65,6 +66,7 @@ export function createStockRefreshService(options: {
 export function createScheduledDetection(options: {
   database: TenantDatabase;
   capabilities: Pick<CapabilityReader, 'read'>;
+  internalOrdersEnabled?: (tenantId: string) => Promise<boolean>;
   category(provider: string): 'erp' | 'storefront' | null;
   detection(): Detection;
   configuration?: Configuration;
@@ -79,6 +81,7 @@ export function createScheduledDetection(options: {
     options.database,
     options.category,
     async (context) => context,
+    options.internalOrdersEnabled,
   );
   const monitor = createDetectionMonitor({
     sources,
@@ -123,6 +126,7 @@ export function createDetectionWorker(options: {
   identity: Pick<IdentityService, 'resolveWorkflowContext' | 'refreshContext'>;
   connections: ConnectionsConfig;
   env?: Readonly<Record<string, string | undefined>>;
+  observability?: Observability;
   intervalMs?: number;
   log?: (message: string, error?: unknown) => void;
 }) {
@@ -133,15 +137,22 @@ export function createDetectionWorker(options: {
   });
   const log = options.log ?? createFailureLog();
   const monitor = createScheduledDetection({
+    internalOrdersEnabled: createSalesTenantRelease(options.observability),
     database: options.database,
     capabilities: createInstalledRuntime({
+      internalSource: createSalesReadSource(
+        options.database,
+        options.observability,
+      ),
       installations: host.connections,
       providers: host.registry.providers(),
       record: async () => undefined,
       recordObservations: async () => undefined,
     }),
     category: (provider) =>
-      host.providerCatalog.get(provider)?.category ?? null,
+      provider === 'luma-erp'
+        ? 'erp'
+        : (host.providerCatalog.get(provider)?.category ?? null),
     // Read when a pass runs, after the services below receive the monitor's verifier.
     detection: () => detection,
     log,

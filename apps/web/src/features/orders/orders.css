@@ -235,3 +235,19 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.sales-record-form fieldset {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.sales-record-form label {
+  display: grid;
+  gap: 4px;
+}
+.sales-record-form legend {
+  margin-block: 12px;
+}

@@ -9,7 +9,7 @@ import { database, secret } from './helpers.mjs';
 export async function settingsFixture(
   t,
   origin = 'http://localhost:3000',
-  { connections } = {},
+  { connections, observability } = {},
 ) {
   const db = await database(t);
   await db.migrate();
@@ -35,7 +35,7 @@ export async function settingsFixture(
   const app = await buildRuntimeApp(
     config,
     {},
-    undefined,
+    observability,
     undefined,
     connections,
   );

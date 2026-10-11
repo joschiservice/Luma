@@ -195,7 +195,11 @@ const cursorSchema = z
   })
   .strict();
 
-function cursorContext(tenantId: string, query: RecordQuery) {
+function cursorContext(
+  tenantId: string,
+  query: RecordQuery,
+  excluded: string[],
+) {
   return createHash('sha256')
     .update(
       JSON.stringify([
@@ -204,6 +208,7 @@ function cursorContext(tenantId: string, query: RecordQuery) {
         query.q,
         query.kind ?? null,
         query.connectionId ?? null,
+        excluded,
       ]),
     )
     .digest('hex');
@@ -241,6 +246,7 @@ async function recordRows(
     kinds: RecordKind[];
   },
   page?: { after: RecordCursor | null; limit: number },
+  excluded: string[] = [],
 ) {
   const query = filter.q ?? '';
   const result = await tx.query<PageRow>(
@@ -248,6 +254,7 @@ async function recordRows(
      SELECT * FROM (${projectionRows}) records
      WHERE ($2::text IS NULL OR kind=$2) AND kind=ANY($11::text[]) AND ($3::uuid IS NULL OR id=$3)
      AND ($6::uuid IS NULL OR "connectionId"=$6)
+     AND ("connectionId" IS NULL OR "connectionId"<>ALL($12::uuid[]))
      AND ($4::text='' OR id::text ILIKE $5 OR "externalId" ILIKE $5
        OR document->'data'->>'displayNumber' ILIKE $5
        OR document->'data'->>'status' ILIKE $5
@@ -273,6 +280,7 @@ async function recordRows(
       page?.after?.id ?? null,
       page ? page.limit : null,
       filter.kinds,
+      excluded,
     ],
   );
 
@@ -280,10 +288,17 @@ async function recordRows(
 }
 
 /** Reads current tenant records, retaining separate source snapshots and explicit identity coverage. */
-export function createRecordExplorer(db: TenantDatabase): RecordExplorer {
+export function createRecordExplorer(
+  db: TenantDatabase,
+  excludedSources: (
+    context: TenantContext,
+  ) => Promise<string[]> = async () => [],
+): RecordExplorer {
   return {
     async resolve(context, query) {
       requirePermission(context, 'orders.read');
+      if ((await excludedSources(context)).includes(query.connectionId))
+        return { ids: [] };
 
       return db.transaction(context.tenantId, async (tx) => {
         const result = await tx.query<{ id: string }>(
@@ -298,7 +313,8 @@ export function createRecordExplorer(db: TenantDatabase): RecordExplorer {
     },
     async list(context: TenantContext, query: RecordQuery) {
       requireTenant(context, context.tenantId);
-      const scope = cursorContext(context.tenantId, query);
+      const excluded = await excludedSources(context);
+      const scope = cursorContext(context.tenantId, query, excluded);
       const after = query.cursor ? readCursor(query.cursor, scope) : null;
       const requested = query.kind ? [query.kind] : recordKinds;
       const kinds = requested.filter((kind) => canReadRecord(context, kind));
@@ -313,6 +329,7 @@ export function createRecordExplorer(db: TenantDatabase): RecordExplorer {
                 context.tenantId,
                 { ...query, kinds },
                 { after, limit: pageSize + 1 },
+                excluded,
               )
             : [];
           // Rows arrive grouped by record in page order.
@@ -360,16 +377,24 @@ export function createRecordExplorer(db: TenantDatabase): RecordExplorer {
           'Your role does not allow this. Ask a workspace admin for access.',
         );
 
+      const excluded = await excludedSources(context);
+
       return db.transaction(
         context.tenantId,
         async (tx) => {
           if (kind === 'order' || kind === 'fulfillment')
             id = await resolveOrderEntity(tx, context.tenantId, id);
-          const rows = await recordRows(tx, context.tenantId, {
-            kind,
-            id,
-            kinds: [kind],
-          });
+          const rows = await recordRows(
+            tx,
+            context.tenantId,
+            {
+              kind,
+              id,
+              kinds: [kind],
+            },
+            undefined,
+            excluded,
+          );
           if (!rows.length) return null;
           const links: RecordDetail['links'] = [];
           const add = (

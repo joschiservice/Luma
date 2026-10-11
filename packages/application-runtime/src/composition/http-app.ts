@@ -89,6 +89,8 @@ import {
   registerMetricEvents,
   shadowRoutes,
 } from '@luma/resolution/http';
+import type { SalesService } from '@luma/sales';
+import { salesRoutes } from '@luma/sales/http';
 import type {
   DraftGeneration,
   DraftTests,
@@ -142,6 +144,7 @@ export interface AppDependencies {
   returns?: ReturnWorkspace;
   customers?: CustomerWorkspace;
   orders?: OrderWorkspace;
+  sales?: SalesService;
   decisions?: DecisionQueue;
   decisionAssignments?: DecisionAssignments;
   insights?: Insights;
@@ -374,7 +377,10 @@ export function buildApp(
       settings: settingsRoutes(dependencies.settings),
       roles: rolesRoutes(dependencies.roles),
       apps: appRoutes(dependencies.apps),
-      connections: connectionRoutes(dependencies.connections),
+      connections: connectionRoutes(
+        dependencies.connections,
+        dependencies.sales?.enabled,
+      ),
       sourceAuthority: sourceAuthorityRoutes(dependencies.sourceAuthority),
       system: {
         health: os.system.health.handler(() => ({ status: 'ok' as const })),
@@ -421,6 +427,7 @@ export function buildApp(
       ),
       fulfillment: fulfillmentRoutes(dependencies.fulfillment),
       orders: orderRoutes(dependencies.orders),
+      sales: salesRoutes(dependencies.sales),
       returns: returnRoutes(dependencies.returns),
       customers: customerRoutes(dependencies.customers),
       sync: syncRoutes(dependencies.sync),

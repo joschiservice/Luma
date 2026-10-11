@@ -208,7 +208,7 @@ describe('Shopify read capabilities', () => {
         items: [
           {
             source: { provider: 'shopify', externalId: commerce.order.id },
-            adapterVersion: 'shopify/5',
+            adapterVersion: 'shopify/6',
             data: {
               paymentStatus: 'paid',
               placedAt: '2026-09-14T08:30:00Z',
@@ -219,10 +219,18 @@ describe('Shopify read capabilities', () => {
                   quantity: { amount: '3' },
                   currentQuantity: { amount: '3' },
                   cancelledQuantity: { amount: '0' },
+                  unitPrice: { amount: '14.50', currency: 'EUR' },
+                  taxRate: '0.19',
                   skuCode: 'MUG-Blue',
                   title: 'Blue mug',
                 },
-                { sku: null, skuCode: null, title: null },
+                {
+                  sku: null,
+                  skuCode: null,
+                  title: null,
+                  unitPrice: null,
+                  taxRate: null,
+                },
               ],
             },
           },

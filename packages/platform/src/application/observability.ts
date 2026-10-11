@@ -9,7 +9,7 @@ export type ProductEvent =
   'connector_provider_viewed' | 'observability_test_completed';
 
 /** Flag keys that may be evaluated; add a key here before creating it in PostHog. */
-export const featureFlags = ['observability-test'] as const;
+export const featureFlags = ['observability-test', 'luma-erp-orders'] as const;
 
 export type FeatureFlag = (typeof featureFlags)[number];
 

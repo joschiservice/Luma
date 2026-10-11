@@ -861,7 +861,13 @@ type FulfillmentOrderLineItem implements Node {
   totalQuantity: Int!
 }
 
+type TaxLine {
+  rate: Float
+}
+
 type LineItem implements Node {
+  originalUnitPriceSet: MoneyBag!
+  taxLines: [TaxLine!]!
   currentQuantity: Int!
   id: ID!
   name: String!

@@ -9,6 +9,7 @@ import type {
 } from '@luma/connections';
 import {
   createConnectionCoverage,
+  createOrderSourceVisibility,
   createPlaybookGrantReader,
   createSourceAuthority,
   type InstalledPurchaseOrderRuntime,
@@ -102,6 +103,7 @@ import {
   createReplenishmentRuntime,
   type ReplenishmentTransport,
 } from './replenishment.js';
+import { createSalesRuntime } from './sales.js';
 import {
   createDeskServices,
   createDetectionServices,
@@ -163,6 +165,7 @@ export interface ApplicationServices {
     returns: ReturnType<typeof createReturnWorkspace>;
     customers: ReturnType<typeof createCustomerWorkspace>;
     orders: ReturnType<typeof createOrderWorkspace>;
+    sales: ReturnType<typeof createSalesRuntime>;
     sourceAuthority: ReturnType<typeof createSourceAuthority>;
     decisions: ReturnType<typeof createDecisionQueue>;
     decisionAssignments: ReturnType<typeof createDecisionAssignments>;
@@ -222,11 +225,36 @@ export function createApplicationServices(
     options.execution.kind === 'enabled'
       ? options.execution.effects
       : { resolve: async () => null };
+  const erpEnabledForTenant = async (tenantId: string) => {
+    const observation = options.observability?.request(
+      randomBytes(16).toString('hex'),
+    );
+    if (!observation || !options.observability) return false;
+    try {
+      const trace = options.observability.forTenant(
+        observation.context,
+        tenantId,
+        'EU',
+      );
+
+      return await options.observability.flag(trace, 'luma-erp-orders', false);
+    } finally {
+      observation.end();
+    }
+  };
+  const hiddenOrderSources = createOrderSourceVisibility(
+    database,
+    erpEnabledForTenant,
+  );
   const authority = (scoped: TenantDatabase) =>
     createSourceAuthority(
       scoped,
-      (provider) => options.providerCatalog?.get(provider)?.category ?? null,
+      (provider) =>
+        provider === 'luma-erp'
+          ? 'erp'
+          : (options.providerCatalog?.get(provider)?.category ?? null),
       identity.refreshContext,
+      erpEnabledForTenant,
     );
   const detection = createDetectionServices(
     database,
@@ -487,6 +515,8 @@ export function createApplicationServices(
     createActivityStore,
     identity.refreshContext,
     authority,
+    undefined,
+    hiddenOrderSources,
   );
   const fulfillment = createFulfillmentWorkspace(
     database,
@@ -554,7 +584,8 @@ export function createApplicationServices(
         coverage: createConnectionCoverage,
       }),
       metrics: createOperationalMetrics(database, {
-        orders: (db) => createOrderMetricReader(db, orderAttentionQuery),
+        orders: (db) =>
+          createOrderMetricReader(db, orderAttentionQuery, hiddenOrderSources),
         attentionBoundary: createOrderAttentionBoundaryReader,
         coverage: createConnectionCoverage,
       }),
@@ -569,8 +600,14 @@ export function createApplicationServices(
       procurementContext: createProcurementContext(database),
       returns,
       customers: createCustomerWorkspace(database),
-      records: createRecordExplorer(database),
+      records: createRecordExplorer(database, hiddenOrderSources),
       orders,
+      sales: createSalesRuntime(
+        database,
+        identity,
+        (context) => erpEnabledForTenant(context.tenantId),
+        authority,
+      ),
       sourceAuthority: authority(database),
       fulfillment,
       decisions,

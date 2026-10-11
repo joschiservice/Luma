@@ -49,6 +49,7 @@ import {
   OrderFulfillments,
 } from './order-timeline';
 import { orderSummary, type SummaryKind } from './presentation';
+import { SalesRecord } from './sales-record';
 import { OrderLines, SourceComparison } from './source-facts';
 
 const summaryIcons: Record<SummaryKind, LucideIcon> = {
@@ -139,10 +140,13 @@ export function OrderPage() {
       refresh={() => void query.refetch()}
       linkedSources={
         query.data ? (
-          <OrderIdentityLinks
-            organizationId={organizationId}
-            orderId={query.data.order.id}
-          />
+          <>
+            <SalesRecord organizationId={organizationId} detail={query.data} />
+            <OrderIdentityLinks
+              organizationId={organizationId}
+              orderId={query.data.order.id}
+            />
+          </>
         ) : null
       }
       sourceContext={(source) =>

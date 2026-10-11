@@ -1,3 +1,4 @@
+import type { TenantContext } from '@luma/identity';
 import { requireTenant } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 
@@ -58,13 +59,21 @@ SELECT jsonb_build_object(
 export function createOrderMetricReader(
   db: TenantDatabase,
   attentionQuery: string,
+  excludedSources: (
+    context: TenantContext,
+  ) => Promise<string[]> = async () => [],
 ): OrderMetricReader {
   const query = facts(attentionQuery);
 
-  return (context, request) => {
+  return async (context, request) => {
     requireTenant(context, context.tenantId);
 
+    const hidden = await excludedSources(context);
+
     return db.transaction(context.tenantId, async (tx) => {
+      await tx.query("SELECT set_config('app.hidden_order_sources',$1,true)", [
+        `{${hidden.join(',')}}`,
+      ]);
       await tx.query("SET LOCAL statement_timeout = '3000ms'");
       const result = await tx.query<{ result: OrderMetricRead }>(query, [
         context.tenantId,

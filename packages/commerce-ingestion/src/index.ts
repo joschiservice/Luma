@@ -27,7 +27,7 @@ export type ProjectionOutcome =
 const normalizers = {
   inventory: 'commerce/1',
   product: 'commerce/2',
-  order: 'commerce/3',
+  order: 'commerce/4',
   fulfillment: 'commerce/3',
   return: 'commerce/1',
   refund: 'commerce/1',
@@ -174,6 +174,10 @@ export function createCommerceIngestion(
               : { currentQuantity: line.currentQuantity?.amount ?? null }),
             cancelledQuantity: line.cancelledQuantity?.amount ?? null,
             unit: line.quantity.unit,
+            ...(line.unitPrice === undefined
+              ? {}
+              : { unitPrice: line.unitPrice }),
+            ...(line.taxRate === undefined ? {} : { taxRate: line.taxRate }),
             ...(line.skuCode === undefined ? {} : { skuCode: line.skuCode }),
             ...(line.title === undefined ? {} : { title: line.title }),
           });
@@ -184,7 +188,7 @@ export function createCommerceIngestion(
         owner: 'orders',
         snapshot: {
           ...provenance,
-          schemaVersion: 3,
+          schemaVersion: 4,
           normalizerVersion: normalizers.order,
           entityId,
           kind: 'order',

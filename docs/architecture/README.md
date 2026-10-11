@@ -21,6 +21,8 @@ decisions.
 | [010](010-orpc-http-contracts.md)                 | HTTP contracts with oRPC and one Zod version               | Accepted                           |
 | [011](011-support-view.md)                        | Read-only support view                                     | Accepted                           |
 
+| [012](012-native-order-records.md) | Native order records and source evidence | Accepted |
+
 ## Baseline
 
 - TypeScript and Node.js; Fastify; contract-first REST and OpenAPI through oRPC.

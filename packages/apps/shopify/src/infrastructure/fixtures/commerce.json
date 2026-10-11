@@ -25,7 +25,18 @@
           "id": "gid://shopify/InventoryItem/31"
         }
       },
-      "currentQuantity": 3
+      "currentQuantity": 3,
+      "originalUnitPriceSet": {
+        "shopMoney": {
+          "amount": "14.50",
+          "currencyCode": "EUR"
+        }
+      },
+      "taxLines": [
+        {
+          "rate": 0.19
+        }
+      ]
     },
     {
       "id": "gid://shopify/LineItem/12",

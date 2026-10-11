@@ -130,7 +130,7 @@ CROSS JOIN LATERAL (
   'observedAt',c.document->>'observedAt','sourceUpdatedAt',c.document->>'sourceUpdatedAt') ORDER BY c.connection_id) AS sources
  FROM (SELECT p.entity_id,p.connection_id,s.document,(s.document->>'deleted')::boolean AS deleted
   FROM orders_projections p JOIN orders_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
-  WHERE p.tenant_id=$1 AND p.entity_id=o.entity_id AND s.kind='order') c
+  WHERE p.tenant_id=$1 AND p.entity_id=o.entity_id AND s.kind='order' AND p.connection_id <> ALL(COALESCE(NULLIF(current_setting('app.hidden_order_sources',true),''),'{}')::uuid[])) c
  LEFT JOIN connector_installations ci ON ci.tenant_id=$1 AND ci.id=c.connection_id
  LEFT JOIN LATERAL (SELECT external_id FROM connector_source_mappings WHERE tenant_id=$1 AND connection_id=c.connection_id
   AND resource='order' AND canonical_id=c.entity_id ORDER BY created_at,id LIMIT 1) m ON true

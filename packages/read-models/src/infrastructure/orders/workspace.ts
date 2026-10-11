@@ -28,6 +28,9 @@ export function createOrderWorkspace(
   refreshContext: (context: TenantContext) => Promise<TenantContext>,
   authority: (db: TenantDatabase) => AuthorityReader,
   now = () => new Date(),
+  excludedSources: (
+    context: TenantContext,
+  ) => Promise<string[]> = async () => [],
 ): OrderWorkspace {
   async function read<T>(
     context: TenantContext,
@@ -36,6 +39,7 @@ export function createOrderWorkspace(
       scoped: TenantDatabase,
       fresh: TenantContext,
       asOf: string,
+      hidden: string[],
     ) => Promise<T>,
   ) {
     const fresh = await refreshContext(context);
@@ -44,10 +48,15 @@ export function createOrderWorkspace(
       throw new IdentityError(403, 'FORBIDDEN', 'Actor changed');
     requirePermission(fresh, 'orders.read');
     const asOf = now().toISOString();
+    const hidden = await excludedSources(fresh);
 
     return db.transaction(
       fresh.tenantId,
       async (tx) => {
+        await tx.query(
+          "SELECT set_config('app.hidden_order_sources',$1,true)",
+          [`{${hidden.join(',')}}`],
+        );
         await tx.query("SET LOCAL statement_timeout = '4000ms'");
         // JIT compilation of these large plans costs more than it saves on interactive reads.
         await tx.query('SET LOCAL jit = off');
@@ -59,7 +68,7 @@ export function createOrderWorkspace(
           },
         };
 
-        return operation(tx, scoped, fresh, asOf);
+        return operation(tx, scoped, fresh, asOf, hidden);
       },
       { readOnlySnapshot: true },
     );
@@ -67,9 +76,16 @@ export function createOrderWorkspace(
 
   return {
     list: (context, query) =>
-      read(context, async (tx, _scoped, fresh, asOf) => {
+      read(context, async (tx, _scoped, fresh, asOf, hidden) => {
         if (query.customerId) requirePermission(fresh, 'customers.read');
-        const list = await listOrders(tx, queries, fresh, query, asOf);
+        const list = await listOrders(
+          tx,
+          queries,
+          fresh,
+          query,
+          asOf,
+          hidden.length > 0,
+        );
 
         // The needs-you view still selects by issue, but readers without issue access get no links.
         return hasPermission(fresh, 'issues.read')

@@ -125,6 +125,7 @@ export async function buildRuntimeApp(
       connectionService ?? {
         list: (context) => installations.list(context.tenantId),
       },
+      observability,
     );
 
     const workflowReader = workflowSettings

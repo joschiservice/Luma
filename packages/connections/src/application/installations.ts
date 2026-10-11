@@ -197,6 +197,13 @@ export function createInstallationService(
     )
       throw unavailable();
 
+    if (record.connection.provider === 'luma-erp')
+      throw new IdentityError(
+        409,
+        'CONFLICT',
+        'Built-in sources are managed by Luma',
+      );
+
     return record;
   }
 

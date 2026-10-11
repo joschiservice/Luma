@@ -30,6 +30,10 @@ const permissionText: Record<
     m.permissions_roles_manage_label,
     m.permissions_roles_manage_description,
   ],
+  'sales.manage': [
+    m.permissions_sales_manage_label,
+    m.permissions_sales_manage_description,
+  ],
   'orders.read': [
     m.permissions_orders_read_label,
     m.permissions_orders_read_description,

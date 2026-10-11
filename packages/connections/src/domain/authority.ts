@@ -16,6 +16,8 @@ export interface AuthorityConnection {
   label: string;
   category: 'storefront' | 'erp' | null;
   available: boolean;
+  /** Internal record sources require an audited workspace override. */
+  explicitSelection?: boolean;
   capabilities: InstallationCapability[];
 }
 
@@ -84,7 +86,10 @@ export function resolveAuthority(
     ? eligible.filter((connection) => connection.id === overrideConnectionId)
     : (rules[group].categories
         .map((category) =>
-          eligible.filter((connection) => connection.category === category),
+          eligible.filter(
+            (connection) =>
+              connection.category === category && !connection.explicitSelection,
+          ),
         )
         .find((items) => items.length > 0) ?? []);
 

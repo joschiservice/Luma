@@ -98,5 +98,7 @@
   "permissions_role_admin_name": "Admin",
   "permissions_role_admin_description": "Runs the workspace: settings, team, connections, workflows, and every change. Can’t change owners.",
   "permissions_role_member_name": "Member",
-  "permissions_role_member_description": "Sees operations, records, and workflows, takes decisions, and asks Luma. Can’t change data or settings."
+  "permissions_role_member_description": "Sees operations, records, and workflows, takes decisions, and asks Luma. Can’t change data or settings.",
+  "permissions_sales_manage_label": "Manage Luma orders",
+  "permissions_sales_manage_description": "Accept storefront orders and read and edit Luma order records, including addresses."
 }

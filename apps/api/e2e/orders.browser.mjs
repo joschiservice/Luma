@@ -79,6 +79,16 @@ test('finds an order by number or SKU, explains it and pages a historical import
     ],
   });
   await orders.importHistory(mug, 150);
+  expect(
+    await fixture.request(fixture.owner, `${fixture.base}/sales/availability`),
+  ).toEqual({ enabled: false });
+  await fixture.request(
+    fixture.owner,
+    `${fixture.base}/sales/orders/${tote}/accept`,
+    'POST',
+    { connectionId: orders.store },
+    404,
+  );
   const orderPage = await fixture.request(
     fixture.member,
     `${fixture.base}/orders?limit=50`,

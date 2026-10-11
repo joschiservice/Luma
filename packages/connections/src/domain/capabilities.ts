@@ -136,6 +136,10 @@ export interface OrderSnapshot {
     cancelledQuantity: Quantity | null;
     /** SKU text on the source line. It describes the line but never establishes SKU identity. */
     skuCode?: string | null;
+    /** Source unit price; absent or null when not reported. */
+    unitPrice?: Money | null;
+    /** Fractional tax rate (0.19 means 19%); absent or null when not reported. */
+    taxRate?: string | null;
     /** Line title at the source when the order was read. */
     title?: string | null;
   }[];

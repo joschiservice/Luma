@@ -29,6 +29,7 @@ Imported orders, stock, products, customers, and returns.
 
 | Permission | Key | Description | Sensitive | Owner | Admin | Member |
 | --- | --- | --- | --- | --- | --- | --- |
+| Manage Luma orders | `sales.manage` | Accept storefront orders and read and edit Luma order records, including addresses. | Yes | Yes | Yes |  |
 | View orders | `orders.read` | See orders, their lines, payments, and links to the source systems. |  | Yes | Yes | Yes |
 | View fulfillment | `fulfillment.read` | See shipments, carriers, and fulfillment progress. |  | Yes | Yes | Yes |
 | View inventory | `inventory.read` | See stock positions, locations, and stock history. |  | Yes | Yes | Yes |

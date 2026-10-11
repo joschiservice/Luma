@@ -29,6 +29,8 @@ const settingsSchema = z.object({
 export function createAuthorityRepository(
   db: TenantDatabase,
   category: (provider: string) => AuthorityConnection['category'],
+  internalOrdersEnabled: (tenantId: string) => Promise<boolean> = async () =>
+    false,
 ): AuthorityRepository {
   async function read(
     tx: SqlTransaction,
@@ -49,19 +51,26 @@ export function createAuthorityRepository(
       [tenantId],
     );
 
+    const internalVisible = await internalOrdersEnabled(tenantId);
+
     return {
       ...settingsSchema.parse(
         settings.rows[0] ?? { revision: 0, overrides: {} },
       ),
-      connections: connections.rows.map(({ document: c, installed }) => ({
-        id: c.id,
-        label: c.label,
-        category: category(c.provider ?? c.target.kind),
-        available: installed && ['active', 'degraded'].includes(c.status),
-        capabilities: c.permissions.filter((capability) =>
-          c.granted.includes(capability),
-        ),
-      })),
+      connections: connections.rows
+        .filter(
+          ({ document: c }) => c.provider !== 'luma-erp' || internalVisible,
+        )
+        .map(({ document: c, installed }) => ({
+          id: c.id,
+          label: c.label,
+          category: category(c.provider ?? c.target.kind),
+          ...(c.provider === 'luma-erp' ? { explicitSelection: true } : {}),
+          available: installed && ['active', 'degraded'].includes(c.status),
+          capabilities: c.permissions.filter((capability) =>
+            c.granted.includes(capability),
+          ),
+        })),
     };
   }
 

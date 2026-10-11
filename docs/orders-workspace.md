@@ -3,7 +3,7 @@
 The Orders workspace lists current canonical orders and explains one order at a time. It
 reads the per-source order projections described in
 [canonical commerce projections](commerce-projections.md) and composes linked issues,
-workflow runs and Luma activity. It never writes commerce data.
+workflow runs and Luma activity. Released native order commands write through the Sales owner.
 
 Code: `@luma/read-models` (reads), `@luma/orders` (list projection and order-state SQL).
 
@@ -192,3 +192,22 @@ counts, rare combinations of broad search and filters, and retained unreferenced
 still increase work. Re-measure with `LUMA_ORDER_BENCHMARK=<order count>` on the Orders
 integration test, which also checks that a single-order refresh uses dictionary hash lookups
 instead of scanning stored search values.
+
+## Luma-owned records
+
+The `luma-erp-orders` release flag defaults to false. When enabled, people with
+`sales.manage` and `sync.manage` can accept a known Shopify order into one Luma record.
+Intake links the sources using canonical identities, never their numbers. It is retry-safe
+and does not change workspace authority. Select Luma ERP for order lifecycle and lines
+through the audited source-authority settings before editing.
+
+Sales stores addresses separately from immutable evidence. Edits check the reviewed version
+and current permissions, and commit the record, changed evidence and audit together.
+An unchanged document or an address-only edit writes no snapshot. Quantity changes clear
+the imported total because discounts, shipping and tax adjustments are not recalculated.
+Cancellation preserves original units and publishes zero current units; reopening is refused.
+
+Line unit price and fractional tax rates use canonical order schema version 4. They are
+source-reported facts, not invoices. Missing prices and ambiguous tax rates remain unknown.
+Stored earlier schema versions remain readable. See
+[ADR-012](architecture/012-native-order-records.md) for ownership and retention.

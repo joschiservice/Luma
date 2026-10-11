@@ -394,6 +394,21 @@ export function createJtlConnector(
                 quantity: { amount: line.quantity, unit: unit(line.salesUnit) },
                 // ERP 2.2 exposes delivered/returned units, but no cancelled line quantity.
                 cancelledQuantity: null,
+                unitPrice:
+                  line.salesPriceNet != null &&
+                  order.currencyIso &&
+                  /^[A-Z]{3}$/.test(order.currencyIso)
+                    ? {
+                        amount: line.salesPriceNet,
+                        currency: order.currencyIso,
+                      }
+                    : null,
+                taxRate:
+                  line.taxRate != null &&
+                  Number(line.taxRate) >= 0 &&
+                  Number(line.taxRate) <= 100
+                    ? String(Number(line.taxRate) / 100)
+                    : null,
                 skuCode: text(line.sKU),
                 title: text(line.name),
               })),

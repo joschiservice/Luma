@@ -22,7 +22,9 @@
       "name": "Rolled oats",
       "sKU": "Mixed-Case-SKU",
       "quantity": 3.5,
-      "salesUnit": "stk"
+      "salesUnit": "stk",
+      "salesPriceNet": 25.5,
+      "taxRate": 19
     },
     {
       "id": 102,
@@ -120,7 +122,7 @@
       "emailAddress": "mia@keller.example",
       "phoneNumber": "",
       "mobilePhoneNumber": "+49 151 1234567",
-      "street": "Hauptstraße 12",
+      "street": "Hauptstra\u00dfe 12",
       "additionalAddressLine": "",
       "postalCode": "10115",
       "city": "Berlin",

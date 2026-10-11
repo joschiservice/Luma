@@ -24,8 +24,10 @@ export function comparisonStateSql(alias: string) {
 
 /** Reads bounded owner-maintained comparison evidence for the requested canonical orders. */
 export function sourceComparison(_sources: string, entities: string) {
+  const hidden = `EXISTS(SELECT 1 FROM orders_list h WHERE h.tenant_id=$1 AND h.entity_id=o.entity_id AND h.connection_id=ANY(COALESCE(NULLIF(current_setting('app.hidden_order_sources',true),''),'{}')::uuid[]))`;
+
   return `source_differences AS MATERIALIZED (
-    SELECT DISTINCT ON(o.entity_id) o.entity_id,${comparisonStateSql('o')} AS state,o.comparison_differences AS differences,
+    SELECT DISTINCT ON(o.entity_id) o.entity_id,CASE WHEN ${hidden} THEN 'inconclusive' ELSE ${comparisonStateSql('o')} END AS state,CASE WHEN ${hidden} THEN '[]'::jsonb ELSE o.comparison_differences END AS differences,
       jsonb_build_object('raw',o.comparison_raw,'readAt',o.comparison_read_at,'latestReadAt',o.comparison_latest_read_at,'confirmAfter',o.comparison_confirm_after) AS timing,${incompleteReadSql('o')} AS incomplete
     FROM orders_list o WHERE o.tenant_id=$1 AND o.entity_id IN (SELECT entity_id FROM ${entities})
     ORDER BY o.entity_id,o.selected DESC,o.connection_id

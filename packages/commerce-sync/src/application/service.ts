@@ -43,6 +43,10 @@ export interface SyncServiceDependencies {
   connections: Pick<ConnectionManagement, 'list'>;
   identities: IdentityReader;
   refreshContext(context: TenantContext): Promise<TenantContext>;
+  /** Sources withheld by a release gate or anchored to an owner record. */
+  sourcePolicy?(
+    context: TenantContext,
+  ): Promise<{ hidden: string[]; fixed: string[] }>;
   now?: () => Date;
   id?: () => string;
 }
@@ -152,11 +156,18 @@ export function createSyncService(deps: SyncServiceDependencies) {
     return deps.automaticLinks;
   }
 
+  async function sourcePolicy(
+    context: TenantContext,
+  ): Promise<{ hidden: string[]; fixed: string[] }> {
+    return deps.sourcePolicy?.(context) ?? { hidden: [], fixed: [] };
+  }
+
   async function overview(context: TenantContext): Promise<SyncOverview> {
     const fresh = await deps.refreshContext(context);
-    const [connections, data] = await Promise.all([
+    const [connections, data, policy] = await Promise.all([
       deps.connections.list(fresh),
       deps.store.overview(fresh.tenantId),
+      sourcePolicy(fresh),
     ]);
     const coverage = new Map(
       data.coverage.map((item) => [item.streamId, item]),
@@ -164,6 +175,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
 
     return {
       connections: connections
+        .filter((connection) => !policy.hidden.includes(connection.id))
         .filter(
           (connection) =>
             !['disconnected', 'revoked'].includes(connection.status) ||
@@ -208,27 +220,29 @@ export function createSyncService(deps: SyncServiceDependencies) {
             }),
           };
         }),
-      runs: data.runs.map((run) => ({
-        id: run.id,
-        connectionId: run.connectionId,
-        recordType: run.recordType,
-        kind: run.kind,
-        trigger: run.trigger,
-        since: run.since,
-        createdSince: run.createdSince ?? null,
-        fullScan: run.fullScan,
-        startedAt: run.startedAt,
-        finishedAt: run.finishedAt,
-        outcome: run.outcome,
-        pages: run.pages,
-        records: run.records,
-        changed: run.changed,
-        unchanged: run.unchanged,
-        pending: run.pending,
-        failed: run.failed,
-        missing: run.missing,
-        errors: run.errors,
-      })),
+      runs: data.runs
+        .filter((run) => !policy.hidden.includes(run.connectionId))
+        .map((run) => ({
+          id: run.id,
+          connectionId: run.connectionId,
+          recordType: run.recordType,
+          kind: run.kind,
+          trigger: run.trigger,
+          since: run.since,
+          createdSince: run.createdSince ?? null,
+          fullScan: run.fullScan,
+          startedAt: run.startedAt,
+          finishedAt: run.finishedAt,
+          outcome: run.outcome,
+          pages: run.pages,
+          records: run.records,
+          changed: run.changed,
+          unchanged: run.unchanged,
+          pending: run.pending,
+          failed: run.failed,
+          missing: run.missing,
+          errors: run.errors,
+        })),
       canManage: manage(fresh),
       asOf: now().toISOString(),
     };
@@ -254,6 +268,13 @@ export function createSyncService(deps: SyncServiceDependencies) {
       command: StreamCommand['kind'],
     ): Promise<SyncStreamView> {
       const fresh = await manager(context);
+      const visible = await overview(fresh);
+      if (
+        !visible.connections.some((connection) =>
+          connection.recordTypes.some((item) => item.stream?.id === streamId),
+        )
+      )
+        throw new IdentityError(404, 'NOT_FOUND', 'Sync not found');
       if (
         !(await deps.store.command(
           fresh.tenantId,
@@ -278,17 +299,39 @@ export function createSyncService(deps: SyncServiceDependencies) {
       entityId: string,
     ): Promise<IdentityDetail> {
       const fresh = await deps.refreshContext(context);
-      const [detail, requests] = await Promise.all([
+      const [detail, requests, policy] = await Promise.all([
         deps.identities(fresh.tenantId, kind, entityId),
         deps.store.linkRequests(fresh.tenantId, entityId),
+        sourcePolicy(fresh),
       ]);
       if (!detail)
         throw new IdentityError(404, 'NOT_FOUND', 'Record not found');
 
       return {
         ...detail,
-        requests: requests.map(linkView),
-        canManage: manage(fresh),
+        sources: detail.sources.filter(
+          (source) => !policy.hidden.includes(source.connectionId),
+        ),
+        suggestions: detail.suggestions.filter((suggestion) =>
+          suggestion.sources.every(
+            (source) =>
+              ![...policy.hidden, ...policy.fixed].includes(
+                source.connectionId,
+              ),
+          ),
+        ),
+        requests: requests
+          .filter(
+            (request) =>
+              !request.connectionId ||
+              !policy.hidden.includes(request.connectionId),
+          )
+          .map(linkView),
+        canManage:
+          manage(fresh) &&
+          !detail.sources.some((source) =>
+            policy.fixed.includes(source.connectionId),
+          ),
       };
     },
     /** Records a link or unlink request; the sync worker applies it with the caller's access. */
@@ -304,6 +347,22 @@ export function createSyncService(deps: SyncServiceDependencies) {
       );
       if (!detail)
         throw new IdentityError(404, 'NOT_FOUND', 'Record not found');
+      const policy = await sourcePolicy(fresh);
+      if (
+        detail.sources.some((source) =>
+          policy.fixed.includes(source.connectionId),
+        )
+      )
+        throw new IdentityError(
+          409,
+          'CONFLICT',
+          'This identity is anchored to an owned record',
+        );
+      if (
+        input.operation === 'unlink' &&
+        policy.hidden.includes(input.connectionId)
+      )
+        throw new IdentityError(404, 'NOT_FOUND', 'Source not found');
       if (!input.reason.trim() || input.reason.trim().length > 2000)
         throw new IdentityError(
           422,
@@ -330,6 +389,16 @@ export function createSyncService(deps: SyncServiceDependencies) {
         );
         if (!other || !other.sources.length)
           throw new IdentityError(404, 'NOT_FOUND', 'Record not found');
+        if (
+          other.sources.some((source) =>
+            [...policy.hidden, ...policy.fixed].includes(source.connectionId),
+          )
+        )
+          throw new IdentityError(
+            409,
+            'CONFLICT',
+            'This identity cannot be relinked',
+          );
         if (
           other.sources.some((source) =>
             detail.sources.some(

@@ -121,6 +121,11 @@ export const orderLineSchema = z.object({
   id: z.string().uuid(),
   skuId: z.string().uuid().nullable(),
   comparisonKey: z.string().uuid().nullable(),
+  unitPrice: z
+    .object({ amount: z.string(), currency: z.string() })
+    .nullable()
+    .optional(),
+  taxRate: z.string().nullable().optional(),
   skuCode: z.string().nullable(),
   title: z.string().nullable(),
   quantity: z

@@ -64,6 +64,7 @@ export async function listOrders(
   context: TenantContext,
   query: OrderListQuery,
   asOf: string,
+  hiddenSources = false,
 ): Promise<OrderList> {
   const scope = cursorContext(context.tenantId, query);
   const after = query.cursor ? readCursor(query.cursor, scope) : null;
@@ -113,26 +114,27 @@ export async function listOrders(
     values.push(await customerOrderIds(tx, context.tenantId, query.customerId));
     customer = values.length;
   }
-  const sql = rebuilding.rowCount
-    ? legacyListSql(
-        queries,
-        query.view,
-        query.sort,
-        query.direction,
-        search,
-        query.count === 'exact',
-        customer,
-      )
-    : listSql(
-        queries,
-        query.view,
-        query.sort,
-        query.direction,
-        searchPlan,
-        !!query.connectionId,
-        query.count === 'exact',
-        customer,
-      );
+  const sql =
+    rebuilding.rowCount || hiddenSources
+      ? legacyListSql(
+          queries,
+          query.view,
+          query.sort,
+          query.direction,
+          search,
+          query.count === 'exact',
+          customer,
+        )
+      : listSql(
+          queries,
+          query.view,
+          query.sort,
+          query.direction,
+          searchPlan,
+          !!query.connectionId,
+          query.count === 'exact',
+          customer,
+        );
   const result = await tx.query<{
     totalCount: number | null;
     items: ListRow[];

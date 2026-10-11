@@ -18,6 +18,7 @@ import type { CommerceSyncConfig, ConnectionsConfig } from '@luma/config';
 import type { ConnectionManagement } from '@luma/connections';
 import {
   createInstalledRuntime,
+  createOrderSourceVisibility,
   createReadChecks,
 } from '@luma/connections/composition';
 import { createCustomerProfiles } from '@luma/customers/composition';
@@ -30,6 +31,7 @@ import { Pool } from 'pg';
 
 import { createDetectionWorker } from './detection-worker.js';
 import { createResourceScope } from './resources.js';
+import { createSalesReadSource, createSalesTenantRelease } from './sales.js';
 import { createCommerceServices } from './services.js';
 import { createSupplierFollowUpWorker } from './supplier-follow-up.js';
 
@@ -51,6 +53,7 @@ export function createCommerceSyncWorker(options: {
   concurrency?: number;
   workspaceConcurrency?: number;
   connectionConcurrency?: number;
+  observability?: Observability;
   idleMs?: number;
   log?: (message: string, error?: unknown) => void;
 }) {
@@ -61,6 +64,10 @@ export function createCommerceSyncWorker(options: {
   });
   const commerce = createCommerceServices(options.database);
   const reader = createInstalledRuntime({
+    internalSource: createSalesReadSource(
+      options.database,
+      options.observability,
+    ),
     installations: host.connections,
     providers: host.registry.providers(),
     // Capability telemetry has no production sink; sync outcomes are persisted as runs.
@@ -134,8 +141,23 @@ export function createCommerceSyncService(
   database: TenantDatabase,
   identity: Pick<IdentityService, 'refreshContext'>,
   connections: Pick<ConnectionManagement, 'list'>,
+  observability?: Observability,
 ) {
+  const hidden = createOrderSourceVisibility(
+    database,
+    createSalesTenantRelease(observability),
+  );
+  const fixed = createOrderSourceVisibility(database, async () => false);
+
   return createSyncService({
+    sourcePolicy: async (context) => {
+      const [hiddenSources, fixedSources] = await Promise.all([
+        hidden(context),
+        fixed(context),
+      ]);
+
+      return { hidden: hiddenSources, fixed: fixedSources };
+    },
     automaticLinks: createAutoLinkService({
       store: createAutomaticLinkStore(database),
       refreshContext: identity.refreshContext,
@@ -157,7 +179,7 @@ export async function createDefaultCommerceSyncWorker(
   identitySettings: Parameters<typeof createIdentity>[0],
   settings: CommerceSyncConfig,
   env: Readonly<Record<string, string | undefined>> = process.env,
-  observability?: Pick<Observability, 'captureError'>,
+  observability?: Observability,
 ) {
   const resources = createResourceScope();
   const log = createFailureLog(observability);
@@ -174,6 +196,7 @@ export async function createDefaultCommerceSyncWorker(
       identity: identity.service,
       connections: settings.connections,
       env,
+      ...(observability ? { observability } : {}),
       concurrency: settings.concurrency,
       workspaceConcurrency: settings.workspaceConcurrency,
       connectionConcurrency: settings.connectionConcurrency,
@@ -190,6 +213,7 @@ export async function createDefaultCommerceSyncWorker(
     });
 
     const detection = createDetectionWorker({
+      ...(observability ? { observability } : {}),
       database: createTenantDatabase(pool),
       pool,
       identity: identity.service,

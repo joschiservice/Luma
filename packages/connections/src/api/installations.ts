@@ -1,6 +1,7 @@
 import '@luma/identity/http';
 
 import { apiContract, installedConnectionSchema } from '@luma/api-contract';
+import type { TenantContext } from '@luma/identity';
 import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
 import { implement } from '@orpc/server';
@@ -17,7 +18,12 @@ type ConnectionManagement = Omit<
  * Creates authenticated connection-management handlers; returns service unavailable when
  * management is not configured.
  */
-export function connectionRoutes(service?: ConnectionManagement) {
+export function connectionRoutes(
+  service?: ConnectionManagement,
+  internalOrdersEnabled: (
+    context: TenantContext,
+  ) => Promise<boolean> = async () => false,
+) {
   function use(request: FastifyRequest) {
     if (!request.tenantContext)
       throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
@@ -54,7 +60,13 @@ export function connectionRoutes(service?: ConnectionManagement) {
     list: os.list.handler(async ({ context: { request } }) => {
       const { service, context } = use(request);
 
-      return { items: (await service.list(context)).map(summary) };
+      const enabled = await internalOrdersEnabled(context);
+
+      return {
+        items: (await service.list(context))
+          .filter((connection) => connection.provider !== 'luma-erp' || enabled)
+          .map(summary),
+      };
     }),
     install: os.install.handler(
       async ({ context: { request }, input: { body } }) => {

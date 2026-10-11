@@ -12,6 +12,7 @@ export const dependencies = {
   staff: ['platform', 'identity', 'federation'],
   audit: ['platform'],
   orders: ['platform', 'identity'],
+  sales: ['platform', 'identity', 'audit', 'orders', 'connectors'],
   procurement: [
     'platform',
     'identity',
@@ -77,6 +78,7 @@ export const domainPackages = {
   staff: 'staff',
   audit: 'audit',
   orders: 'orders',
+  sales: 'sales',
   procurement: 'procurement',
   inventory: 'inventory',
   connections: 'connectors',

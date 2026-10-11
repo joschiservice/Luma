@@ -80,6 +80,13 @@ export async function readSourceFacts(
           id: String(line.id),
           skuId: text(line.skuId),
           comparisonKey: null as string | null,
+          unitPrice: line.unitPrice
+            ? {
+                amount: String(object(line.unitPrice).amount),
+                currency: String(object(line.unitPrice).currency),
+              }
+            : null,
+          taxRate: text(line.taxRate),
           skuCode: text(line.skuCode),
           title: text(line.title),
           quantity: String(line.quantity),

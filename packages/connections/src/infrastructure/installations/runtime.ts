@@ -26,12 +26,16 @@ import type { InstallationCapability } from '../../domain/installation.js';
 export interface InstalledRuntimeOptions extends ProviderRuntimeOptions {
   providers: readonly ConnectionProvider[];
   record: CapabilityDependencies['record'];
+  /** Trusted built-in read sources; these have no provider credentials or external effects. */
+  internalSource?: CapabilityDependencies['resolve'];
 }
 
 function installedRuntime(options: InstalledRuntimeOptions) {
   return createCapabilityRuntime({
     record: options.record,
     async resolve(context, id) {
+      const internal = await options.internalSource?.(context, id);
+      if (internal) return internal;
       const connection = (await options.installations.list(context)).find(
         (c) => c.id === id,
       );

@@ -73589,6 +73589,35 @@
                                     }
                                   ]
                                 },
+                                "unitPrice": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "amount": {
+                                          "type": "string"
+                                        },
+                                        "currency": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": ["amount", "currency"]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "taxRate": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
                                 "skuCode": {
                                   "anyOf": [
                                     {
@@ -74799,6 +74828,35 @@
                                           }
                                         ]
                                       },
+                                      "unitPrice": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"]
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "taxRate": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
                                       "skuCode": {
                                         "anyOf": [
                                           {
@@ -75281,6 +75339,1560 @@
           },
           "415": {
             "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/sales/availability": {
+      "get": {
+        "operationId": "sales.availability",
+        "summary": "Check Luma order availability",
+        "tags": ["sales"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["enabled"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/sales/orders/{orderId}": {
+      "get": {
+        "operationId": "sales.get",
+        "summary": "Read a Luma order record",
+        "description": "Returns the editable record and addresses when Luma orders are released for this workspace. Returns null before intake.",
+        "tags": ["sales"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "orderId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "connectionId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "version": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "exclusiveMinimum": 0
+                        },
+                        "number": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "status": {
+                          "enum": ["open", "completed", "cancelled"],
+                          "type": "string"
+                        },
+                        "paymentStatus": {
+                          "enum": [
+                            "pending",
+                            "authorized",
+                            "paid",
+                            "partially_refunded",
+                            "refunded",
+                            "failed",
+                            "unknown"
+                          ],
+                          "type": "string"
+                        },
+                        "customerId": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "billingAddress": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string",
+                                  "maxLength": 200
+                                },
+                                "company": {
+                                  "type": "string",
+                                  "maxLength": 200
+                                },
+                                "street": {
+                                  "type": "string",
+                                  "maxLength": 300
+                                },
+                                "city": {
+                                  "type": "string",
+                                  "maxLength": 200
+                                },
+                                "postalCode": {
+                                  "type": "string",
+                                  "maxLength": 40
+                                },
+                                "country": {
+                                  "type": "string",
+                                  "pattern": "^[A-Z]{2}$"
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "company",
+                                "street",
+                                "city",
+                                "postalCode",
+                                "country"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "shippingAddress": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string",
+                                  "maxLength": 200
+                                },
+                                "company": {
+                                  "type": "string",
+                                  "maxLength": 200
+                                },
+                                "street": {
+                                  "type": "string",
+                                  "maxLength": 300
+                                },
+                                "city": {
+                                  "type": "string",
+                                  "maxLength": 200
+                                },
+                                "postalCode": {
+                                  "type": "string",
+                                  "maxLength": 40
+                                },
+                                "country": {
+                                  "type": "string",
+                                  "pattern": "^[A-Z]{2}$"
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "company",
+                                "street",
+                                "city",
+                                "postalCode",
+                                "country"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "currency": {
+                          "type": "string",
+                          "pattern": "^[A-Z]{3}$"
+                        },
+                        "channel": {
+                          "type": "string"
+                        },
+                        "total": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "placedAt": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "dueAt": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "lines": {
+                          "type": "array",
+                          "maxItems": 1000,
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "skuId": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "skuCode": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "title": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "quantity": {
+                                "type": "string",
+                                "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                              },
+                              "currentQuantity": {
+                                "type": "string",
+                                "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                              },
+                              "unit": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "unitPrice": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "taxRate": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "skuId",
+                              "skuCode",
+                              "title",
+                              "quantity",
+                              "currentQuantity",
+                              "unit",
+                              "unitPrice",
+                              "taxRate"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "orderId",
+                        "connectionId",
+                        "version",
+                        "number",
+                        "status",
+                        "paymentStatus",
+                        "customerId",
+                        "billingAddress",
+                        "shippingAddress",
+                        "currency",
+                        "channel",
+                        "total",
+                        "placedAt",
+                        "dueAt",
+                        "updatedAt",
+                        "lines"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "sales.edit",
+        "summary": "Edit a Luma order",
+        "description": "Checks the reviewed version and Luma lifecycle and line authority, then atomically saves the record, changed evidence and an audit receipt. Reuse the command ID for an identical retry.",
+        "tags": ["sales"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "commandId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991,
+                    "exclusiveMinimum": 0
+                  },
+                  "status": {
+                    "enum": ["open", "completed", "cancelled"],
+                    "type": "string"
+                  },
+                  "billingAddress": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "maxLength": 200
+                          },
+                          "company": {
+                            "type": "string",
+                            "maxLength": 200
+                          },
+                          "street": {
+                            "type": "string",
+                            "maxLength": 300
+                          },
+                          "city": {
+                            "type": "string",
+                            "maxLength": 200
+                          },
+                          "postalCode": {
+                            "type": "string",
+                            "maxLength": 40
+                          },
+                          "country": {
+                            "type": "string",
+                            "pattern": "^[A-Z]{2}$"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "company",
+                          "street",
+                          "city",
+                          "postalCode",
+                          "country"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "shippingAddress": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "maxLength": 200
+                          },
+                          "company": {
+                            "type": "string",
+                            "maxLength": 200
+                          },
+                          "street": {
+                            "type": "string",
+                            "maxLength": 300
+                          },
+                          "city": {
+                            "type": "string",
+                            "maxLength": 200
+                          },
+                          "postalCode": {
+                            "type": "string",
+                            "maxLength": 40
+                          },
+                          "country": {
+                            "type": "string",
+                            "pattern": "^[A-Z]{2}$"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "company",
+                          "street",
+                          "city",
+                          "postalCode",
+                          "country"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "lines": {
+                    "type": "array",
+                    "maxItems": 1000,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "currentQuantity": {
+                          "type": "string",
+                          "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                        }
+                      },
+                      "required": ["id", "currentQuantity"],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": ["commandId", "version"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "orderId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "connectionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "exclusiveMinimum": 0
+                    },
+                    "number": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "status": {
+                      "enum": ["open", "completed", "cancelled"],
+                      "type": "string"
+                    },
+                    "paymentStatus": {
+                      "enum": [
+                        "pending",
+                        "authorized",
+                        "paid",
+                        "partially_refunded",
+                        "refunded",
+                        "failed",
+                        "unknown"
+                      ],
+                      "type": "string"
+                    },
+                    "customerId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "billingAddress": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "maxLength": 200
+                            },
+                            "company": {
+                              "type": "string",
+                              "maxLength": 200
+                            },
+                            "street": {
+                              "type": "string",
+                              "maxLength": 300
+                            },
+                            "city": {
+                              "type": "string",
+                              "maxLength": 200
+                            },
+                            "postalCode": {
+                              "type": "string",
+                              "maxLength": 40
+                            },
+                            "country": {
+                              "type": "string",
+                              "pattern": "^[A-Z]{2}$"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "company",
+                            "street",
+                            "city",
+                            "postalCode",
+                            "country"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "shippingAddress": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "maxLength": 200
+                            },
+                            "company": {
+                              "type": "string",
+                              "maxLength": 200
+                            },
+                            "street": {
+                              "type": "string",
+                              "maxLength": 300
+                            },
+                            "city": {
+                              "type": "string",
+                              "maxLength": 200
+                            },
+                            "postalCode": {
+                              "type": "string",
+                              "maxLength": 40
+                            },
+                            "country": {
+                              "type": "string",
+                              "pattern": "^[A-Z]{2}$"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "company",
+                            "street",
+                            "city",
+                            "postalCode",
+                            "country"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "currency": {
+                      "type": "string",
+                      "pattern": "^[A-Z]{3}$"
+                    },
+                    "channel": {
+                      "type": "string"
+                    },
+                    "total": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "placedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "dueAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "lines": {
+                      "type": "array",
+                      "maxItems": 1000,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "skuId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "skuCode": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "title": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "quantity": {
+                            "type": "string",
+                            "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                          },
+                          "currentQuantity": {
+                            "type": "string",
+                            "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                          },
+                          "unit": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "unitPrice": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "taxRate": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "skuId",
+                          "skuCode",
+                          "title",
+                          "quantity",
+                          "currentQuantity",
+                          "unit",
+                          "unitPrice",
+                          "taxRate"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "orderId",
+                    "connectionId",
+                    "version",
+                    "number",
+                    "status",
+                    "paymentStatus",
+                    "customerId",
+                    "billingAddress",
+                    "shippingAddress",
+                    "currency",
+                    "channel",
+                    "total",
+                    "placedAt",
+                    "dueAt",
+                    "updatedAt",
+                    "lines"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "422",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/sales/orders/{orderId}/accept": {
+      "post": {
+        "operationId": "sales.accept",
+        "summary": "Accept a Shopify order into Luma",
+        "description": "Copies a current Shopify order into one Luma record. Requires import management. Repeated intake returns the existing record. Does not change source authority.",
+        "tags": ["sales"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "connectionId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": ["connectionId"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "orderId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "connectionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "exclusiveMinimum": 0
+                    },
+                    "number": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "status": {
+                      "enum": ["open", "completed", "cancelled"],
+                      "type": "string"
+                    },
+                    "paymentStatus": {
+                      "enum": [
+                        "pending",
+                        "authorized",
+                        "paid",
+                        "partially_refunded",
+                        "refunded",
+                        "failed",
+                        "unknown"
+                      ],
+                      "type": "string"
+                    },
+                    "customerId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "billingAddress": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "maxLength": 200
+                            },
+                            "company": {
+                              "type": "string",
+                              "maxLength": 200
+                            },
+                            "street": {
+                              "type": "string",
+                              "maxLength": 300
+                            },
+                            "city": {
+                              "type": "string",
+                              "maxLength": 200
+                            },
+                            "postalCode": {
+                              "type": "string",
+                              "maxLength": 40
+                            },
+                            "country": {
+                              "type": "string",
+                              "pattern": "^[A-Z]{2}$"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "company",
+                            "street",
+                            "city",
+                            "postalCode",
+                            "country"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "shippingAddress": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "maxLength": 200
+                            },
+                            "company": {
+                              "type": "string",
+                              "maxLength": 200
+                            },
+                            "street": {
+                              "type": "string",
+                              "maxLength": 300
+                            },
+                            "city": {
+                              "type": "string",
+                              "maxLength": 200
+                            },
+                            "postalCode": {
+                              "type": "string",
+                              "maxLength": 40
+                            },
+                            "country": {
+                              "type": "string",
+                              "pattern": "^[A-Z]{2}$"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "company",
+                            "street",
+                            "city",
+                            "postalCode",
+                            "country"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "currency": {
+                      "type": "string",
+                      "pattern": "^[A-Z]{3}$"
+                    },
+                    "channel": {
+                      "type": "string"
+                    },
+                    "total": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "placedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "dueAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "lines": {
+                      "type": "array",
+                      "maxItems": 1000,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "skuId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "skuCode": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "title": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "quantity": {
+                            "type": "string",
+                            "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                          },
+                          "currentQuantity": {
+                            "type": "string",
+                            "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                          },
+                          "unit": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "unitPrice": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "taxRate": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "skuId",
+                          "skuCode",
+                          "title",
+                          "quantity",
+                          "currentQuantity",
+                          "unit",
+                          "unitPrice",
+                          "taxRate"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "orderId",
+                    "connectionId",
+                    "version",
+                    "number",
+                    "status",
+                    "paymentStatus",
+                    "customerId",
+                    "billingAddress",
+                    "shippingAddress",
+                    "currency",
+                    "channel",
+                    "total",
+                    "placedAt",
+                    "dueAt",
+                    "updatedAt",
+                    "lines"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "422",
             "content": {
               "application/json": {
                 "schema": {
