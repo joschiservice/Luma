@@ -14,6 +14,7 @@
     "dev/process.mjs",
     "dev/environment.mjs",
     "dev/test-plan.mjs",
-    "dev/affected.mjs"
+    "dev/affected.mjs",
+    "evaluation/state.mjs"
   ]
 }
