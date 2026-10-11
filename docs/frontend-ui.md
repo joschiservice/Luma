@@ -43,9 +43,27 @@ Every `DataTable` needs a `caption`; it is visually hidden and names the table f
 
 `BarChart` stacks bars from one baseline: vertical for calendar buckets, horizontal for named categories. Assign series the `chart-1` to `chart-5` slots in order; use state colors only when the color means good or bad, and `muted` for unknown values. Set `unknown` on a category so it is hatched and never reads as zero, and `note` to mark an incomplete period. The chart is one tab stop with arrow-key navigation, and every bar has a spoken summary. Add `ChartLegend` for two or more series and offer a `DataTable` of the same values. The palette is validated for color-vision deficiencies on the card surface in both themes; validate again when changing `--chart-*` tokens.
 
+## Web app layers
+
+`apps/web/src` has four layers, and a module imports only its own layer or lower ones:
+
+| Layer      | Holds                                                                                  |
+| ---------- | -------------------------------------------------------------------------------------- |
+| `shell`    | Workspace layout, navigation, search, Home and routes; composes features               |
+| `features` | One folder per product area                                                            |
+| `shared`   | Building blocks several features render, such as order presentation                    |
+| `kit`      | Session, permissions, common states, workspace-wide data and live change subscriptions |
+
+Features may use each other, but never in a cycle. When two features would need each other,
+move the shared part down to `shared` or `kit`, or let the shell supply it: record pages show
+linked inbox threads through `kit/record-messages`, which the shell fills with the inbox's view.
+Stories and tests may use any layer. `pnpm test:architecture` checks the direction and cycles.
+Features have no barrel `index.ts`: features import their own CSS, so a barrel would pull every
+module and style of a feature into each route that uses one export.
+
 ## Pages and navigation
 
-Top-level workspace pages are registered once in `workspaceDestinations` in the web identity feature. That list drives the sidebar, the command menu, the `G` keyboard shortcuts and the no-access explanation for its `permission`, so a page missing from it is unreachable by keyboard and search. Top-level pages are named once, by the breadcrumb; page-level explanations belong in contextual help or empty states, and page actions go into the bar through `WorkspacePageActionsSlot`. Pages about one record use `RecordHeader`: the breadcrumb reads “Section › Record” and is the only visible name, the `h1` stays for assistive technology, record actions go into the bar and the page opens with status flags and key facts. The section crumb returns to the list with its filters; when the reader arrived from another record, a back arrow before it returns there. Don't add a back link or a second title in the page. Page controls go into the top bar through `WorkspaceHeaderSlot`. Working views such as the issue inbox use `page-full`; reading pages use a comfortable maximum width.
+Top-level workspace pages are registered once in `workspaceDestinations` in the web shell. That list drives the sidebar, the command menu, the `G` keyboard shortcuts and the no-access explanation for its `permission`, so a page missing from it is unreachable by keyboard and search. Top-level pages are named once, by the breadcrumb; page-level explanations belong in contextual help or empty states, and page actions go into the bar through `WorkspacePageActionsSlot`. Pages about one record use `RecordHeader`: the breadcrumb reads “Section › Record” and is the only visible name, the `h1` stays for assistive technology, record actions go into the bar and the page opens with status flags and key facts. The section crumb returns to the list with its filters; when the reader arrived from another record, a back arrow before it returns there. Don't add a back link or a second title in the page. Page controls go into the top bar through `WorkspaceHeaderSlot`. Working views such as the issue inbox use `page-full`; reading pages use a comfortable maximum width.
 
 Home and sidebar pins are per-member layouts; see [workspace settings](workspace-settings.md#personal-layouts). Home's attention module and the sidebar count read the [Needs you queue](needs-you.md).
 

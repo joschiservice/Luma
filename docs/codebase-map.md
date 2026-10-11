@@ -52,8 +52,10 @@ with scheduled detection), `apps/web` (product UI), `apps/simulator` and
   routes.
 - **Web features:** `apps/web/src/features/<feature>`, usually with `page.tsx`,
   `detail.tsx`, URL state in `data.ts` and wording in `presentation.ts`; text comes from the
-  feature's namespace in the `@luma/i18n` catalogs. Shell, navigation
-  and the command menu are in `features/identity`; Home modules are in `features/home`.
+  feature's namespace in the `@luma/i18n` catalogs. The workspace shell, navigation, command
+  menu and Home are in `apps/web/src/shell`; session, permissions and workspace-wide data in
+  `kit`; building blocks several features share in `shared`. See
+  [web app layers](frontend-ui.md#web-app-layers).
 - **Migrations:** numbered SQL in `packages/application-runtime/migrations`; the simulator
   has its own in `apps/simulator/migrations`.
 - **Wiring:** `packages/application-runtime/src/composition` assembles services for the API,
