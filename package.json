@@ -59,7 +59,7 @@
     "benchmark": "node tooling/benchmarks/run.mjs",
     "test:browser:report": "pnpm --filter @luma/api exec playwright show-report ../../.luma/playwright/report",
     "knip": "knip",
-    "knip:check": "knip --include files,dependencies,unlisted,unresolved --no-config-hints && knip --workspace packages/connectors/core --exports --include-entry-exports --no-config-hints",
+    "knip:check": "knip --include files,dependencies,unlisted,unresolved --no-config-hints && knip --exports --include-entry-exports --no-config-hints",
     "typecheck:tooling": "tsc -p tooling/tsconfig.json",
     "lint:ui": "node tooling/style/check-ui.mjs",
     "dev:staff": "node tooling/dev/cli.mjs staff"

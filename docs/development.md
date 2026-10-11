@@ -193,10 +193,13 @@ when every job succeeds.
 - Run `pnpm lint:fix`, then `pnpm format`. Both interfaces and type aliases are allowed:
   database row types rely on the implicit index signature of type aliases. An
   intentionally empty production callback needs a comment.
-- `pnpm knip:check` finds unused files and dependencies, and imports of packages a
-  workspace does not declare. Runtime-loaded entry points and deliberate exceptions belong
-  in `knip.jsonc`. `pnpm test:architecture` also checks that each workspace declares the
-  workspace packages it imports; pnpm would otherwise resolve them only by accident.
+- `pnpm knip:check` finds unused files, dependencies and exports in every workspace,
+  including entry-point exports, so packages export only what other code uses, and imports
+  of packages a workspace does not declare. Exported types are not checked. Runtime-loaded
+  entry points and deliberate exceptions belong in `knip.jsonc`. A package's `tsconfig.json`
+  needs `rootDir` and `outDir` so knip maps imports of its compiled `dist` exports back to
+  source. `pnpm test:architecture` also checks that each workspace declares the workspace
+  packages it imports; pnpm would otherwise resolve them only by accident.
 - `pnpm typecheck:tooling` type-checks tooling modules with JSDoc. Add a module to
   `tooling/tsconfig.json` when bringing it under checks.
 - Shared dependency versions live in `pnpm-workspace.yaml` catalogs. Upgrade a catalog

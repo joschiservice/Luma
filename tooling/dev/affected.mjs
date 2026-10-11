@@ -57,7 +57,7 @@ export function relativeImports(file, seen = new Set()) {
  * a shallow clone, so callers can run everything.
  * @param {string} base
  */
-export function changedFiles(base) {
+function changedFiles(base) {
   let mergeBase;
   try {
     [mergeBase] = git('merge-base', base, 'HEAD');

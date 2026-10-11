@@ -1,6 +1,15 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema-jsonc.json",
   "rules": { "types": "off", "nsTypes": "off" },
+  // Exports read by tools that knip does not follow.
+  "ignoreIssues": {
+    // tooling/dev/studio.mjs passes this file to drizzle-kit studio.
+    "apps/api/drizzle.studio.config.ts": ["exports"],
+    // Better Auth reads the tables from this module namespace by model name.
+    "packages/identity/src/infrastructure/schema.ts": ["exports"],
+    // Hand-written declarations for vite.mjs.
+    "packages/i18n/vite.d.mts": ["exports"],
+  },
   "ignoreBinaries": ["docker", "mise", "hyperfine"],
   "workspaces": {
     ".": { "project": ["*.mjs"] },
@@ -40,11 +49,7 @@
     "apps/simulator-web": { "entry": ["src/main.tsx"] },
     "apps/staff": { "entry": ["src/main.tsx"] },
     "apps/staff-api": { "entry": ["src/index.ts", "scripts/*.mjs"] },
-    "packages/api-contract": {
-      "entry": ["src/generate-openapi.ts", "src/staff.ts"],
-    },
-    // Public subpaths resolve to compiled output; retain their source entry points.
-    "packages/connectors/*": { "entry": ["src/index.ts", "src/schemas.ts"] },
+    "packages/api-contract": { "entry": ["src/generate-openapi.ts"] },
     "packages/application-runtime": {
       "entry": ["scripts/*.mjs"],
       // CLI integration tests load tsx through child_process execArgv --import.
