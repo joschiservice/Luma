@@ -285,6 +285,9 @@ export function createShopifyOAuth(
   const permissions = [
     ...shopifyReads,
     'returns.read' as const,
+    'returns.options.read' as const,
+    'returns.created.read' as const,
+    'returns.create' as const,
     ...(config.protectedCustomerDataApproved
       ? ['customers.read' as const]
       : []),
@@ -296,6 +299,7 @@ export function createShopifyOAuth(
     'write_merchant_managed_fulfillment_orders',
     'write_third_party_fulfillment_orders',
     'read_returns',
+    'write_returns',
     'read_locations',
     ...(config.protectedCustomerDataApproved ? ['read_customers'] : []),
     ...(config.allOrdersApproved ? ['read_all_orders'] : []),

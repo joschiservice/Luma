@@ -1222,6 +1222,7 @@ interface ReturnLineItemType implements Node {
   id: ID!
   quantity: Int!
   refundedQuantity: Int!
+  returnReasonNote: String
   returnReasonDefinition: ReturnReasonDefinition
 }
 
@@ -1621,6 +1622,8 @@ type WebhookSubscription implements Node {
 }
 
 type Mutation {
+  returnCreate(returnInput: ReturnInput!): ReturnCreatePayload
+  returnApproveRequest(input: ReturnApproveRequestInput!): ReturnCreatePayload
   bulkOperationRunQuery(
     query: String!
     groupObjects: Boolean! = false
@@ -1784,6 +1787,7 @@ type ReturnLineItem implements Node & ReturnLineItemType {
   id: ID!
   quantity: Int!
   refundedQuantity: Int!
+  returnReasonNote: String
   returnReasonDefinition: ReturnReasonDefinition
   withCodeDiscountedTotalPriceSet: MoneyBag!
 }
@@ -1792,4 +1796,35 @@ type BasicEvent implements Event & Node {
   action: String!
   createdAt: DateTime!
   id: ID!
+}
+
+input ReturnInput {
+  orderId: ID!
+  returnLineItems: [ReturnLineItemInput!]!
+}
+input ReturnLineItemInput {
+  fulfillmentLineItemId: ID!
+  quantity: Int!
+  returnReason: ReturnReason
+  returnReasonNote: String
+}
+enum ReturnReason {
+  SIZE_TOO_SMALL
+  SIZE_TOO_LARGE
+  UNWANTED
+  DEFECTIVE
+  WRONG_ITEM
+  OTHER
+  UNKNOWN
+  STYLE
+  COLOR
+  NOT_AS_DESCRIBED
+}
+input ReturnApproveRequestInput {
+  id: ID!
+  notifyCustomer: Boolean = false
+}
+type ReturnCreatePayload {
+  return: Return
+  userErrors: [UserError!]!
 }

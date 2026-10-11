@@ -196,6 +196,13 @@ export function createApp(context: AppFactoryContext): AppDefinition {
       connectionTypes: [{ kind: 'shopify', name: 'Shopify' }],
       permissions: [
         {
+          key: 'shopify:returns.manage',
+          label: 'Manage Shopify returns',
+          description:
+            'Request approval for and create or approve Shopify returns.',
+          consequential: true,
+        },
+        {
           key: 'shopify:fulfillment_recovery.run',
           label: 'Recover Shopify fulfillments',
           description:

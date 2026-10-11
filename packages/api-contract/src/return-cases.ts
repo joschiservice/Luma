@@ -213,6 +213,7 @@ const historyLineSchema = z.object({
 });
 
 const returnCreationSchema = z.object({
+  operation: z.enum(['create', 'approve']).optional(),
   id: z.string().uuid(),
   state: returnCreationStateSchema,
   connectionId: z.string().uuid(),

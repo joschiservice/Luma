@@ -242,6 +242,9 @@ export async function seedPilot(
                         ? [
                             'inventory.available.reconcile',
                             'returns.read',
+                            'returns.options.read',
+                            'returns.created.read',
+                            'returns.create',
                             'customers.read',
                             'fulfillment.hold.release',
                             'fulfillment.open',

@@ -55,6 +55,7 @@ export interface OrderSource {
 export interface SourceReturnRecord extends StoreReturn {
   orderId: string;
   name: string | null;
+  source?: SourceRef;
 }
 
 export type ReturnCaseEventKind =
@@ -178,7 +179,11 @@ export interface ReturnSystem {
   created(
     context: TenantContext,
     connectionId: string,
-    query: { order: SourceRef; lumaCaseId: string },
+    query: {
+      order: SourceRef;
+      lumaCaseId: string;
+      requestedReturn?: SourceRef;
+    },
   ): Promise<ReturnSystemResult<{ items: FoundReturn[]; complete: boolean }>>;
 }
 
@@ -290,6 +295,7 @@ export interface PersonView {
 }
 
 export interface CreationView {
+  operation?: 'create' | 'approve';
   id: string;
   state: CreationState;
   connectionId: string;
@@ -644,6 +650,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     });
 
     return {
+      operation: creation.requestedReturn ? 'approve' : 'create',
       id: creation.id,
       state: expired ? 'expired' : creation.state,
       connectionId: creation.connectionId,
@@ -711,6 +718,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     value: ReturnCase,
     creation: ReturnCreation | null,
     mapped: boolean,
+    sourceReturn: SourceReturnRecord | null,
   ): ReturnCaseDetail['creationAvailability'] {
     const result = (blocker: CreationBlocker | null) => ({
       blocker,
@@ -721,7 +729,13 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     if (value.state === 'cancelled') return result('cancelled');
     if (!connection?.offersCreation) return result('unsupported');
     if (!deps.admission) return result('execution_disabled');
-    if (creation?.state === 'created') return result('created');
+    if (
+      creation?.state === 'created' ||
+      (connection.provider === 'shopify' &&
+        sourceReturn &&
+        sourceReturn.status !== 'requested')
+    )
+      return result('created');
     if (
       creation &&
       liveCreationStates.includes(creation.state) &&
@@ -906,6 +920,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         value,
         latest,
         data!.mapped,
+        data!.sourceReturn,
       ),
       canManage: hasPermission(context, 'returns.manage'),
       asOf: deps.now().toISOString(),
@@ -955,6 +970,9 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     const result = await deps.system.created(context, creation.connectionId, {
       order: creation.order,
       lumaCaseId: creation.caseId,
+      ...(creation.requestedReturn
+        ? { requestedReturn: creation.requestedReturn }
+        : {}),
     });
 
     return result.ok
@@ -985,9 +1003,16 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     if (execution.state === 'withheld' || execution.state === 'failed')
       return save({ state: 'failed', failure: execution.failure });
     if (execution.state !== 'verified') return save({ state: 'uncertain' });
-    const { found } = await locate(context, creation);
+    const { found, complete } = await locate(context, creation);
     const match = found.length === 1 ? found[0]! : null;
-    if (!match || !matchesCreation(creation, match))
+    if (
+      !complete ||
+      !match ||
+      !Number.isFinite(Date.parse(match.observedAt)) ||
+      Date.parse(match.observedAt) < Date.parse(creation.requestedAt) ||
+      Date.parse(match.observedAt) > deps.now().getTime() ||
+      !matchesCreation(creation, match)
+    )
       return save({ state: 'uncertain' });
     await deps.store.transaction(context.tenantId, true, async (tx) => {
       const current = (await tx.creation(creationId))!;
@@ -1470,9 +1495,16 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
           existing.requestedBy !== context.actor.id ||
           canonicalJson([
             existing.warehouse.externalId,
+            existing.warehouse.scopeKey,
             existing.reason.externalId,
+            existing.reason.scopeKey,
           ]) !==
-            canonicalJson([input.warehouse.externalId, input.reason.externalId])
+            canonicalJson([
+              input.warehouse.externalId,
+              input.warehouse.scopeKey,
+              input.reason.externalId,
+              input.reason.scopeKey,
+            ])
         )
           conflict(
             'This request ID was already used. Refresh before trying again.',
@@ -1506,6 +1538,9 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
           'The return can’t be created in the order’s system right now.',
         );
 
+      const connection = (await deps.system!.connections(context)).find(
+        (c) => c.id === current!.connectionId,
+      );
       const creation = await deps.store.transaction(
         context.tenantId,
         true,
@@ -1535,6 +1570,15 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
             value!.lines.some((l) => !ids.lines.has(l.orderLineId))
           )
             conflict('Some lines are not linked to the order’s system.');
+          const sourceReturn = value!.sourceReturnId
+            ? await tx.sourceReturn(value!.sourceReturnId)
+            : null;
+          if (
+            connection?.provider === 'shopify' &&
+            sourceReturn &&
+            (sourceReturn.status !== 'requested' || !sourceReturn.source)
+          )
+            conflict('Only a requested Shopify return can be approved.');
           const now = deps.now();
           const created: ReturnCreation = {
             id: input.id,
@@ -1542,6 +1586,9 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
             caseId,
             connectionId: value!.connectionId,
             order: ids.order!,
+            ...(connection?.provider === 'shopify' && sourceReturn?.source
+              ? { requestedReturn: sourceReturn.source }
+              : {}),
             warehouse: {
               externalId: warehouse!.externalId,
               scopeKey: warehouse!.scopeKey,
@@ -1774,8 +1821,17 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       );
       if (!creation)
         return { outcome: 'inconclusive' as const, observationRefs: [] };
-      const { found } = await locate(context, creation);
-      if (found.length === 0)
+      const { found, complete } = await locate(context, creation);
+      if (
+        !complete ||
+        found.length === 0 ||
+        found.some(
+          (f) =>
+            !Number.isFinite(Date.parse(f.observedAt)) ||
+            Date.parse(f.observedAt) < Date.parse(creation.requestedAt) ||
+            Date.parse(f.observedAt) > deps.now().getTime(),
+        )
+      )
         return { outcome: 'inconclusive' as const, observationRefs: [] };
       if (found.length > 1)
         return {
@@ -1820,6 +1876,12 @@ function creationAction(creation: ReturnCreation): ProposedAction {
       returnCaseId: creation.caseId,
       orderId: creation.order.externalId,
       orderScope: creation.order.scopeKey,
+      ...(creation.requestedReturn
+        ? {
+            requestedReturnId: creation.requestedReturn.externalId,
+            requestedReturnScope: creation.requestedReturn.scopeKey,
+          }
+        : {}),
       warehouseId: creation.warehouse.externalId,
       warehouseScope: creation.warehouse.scopeKey,
       reasonId: creation.reason.externalId,

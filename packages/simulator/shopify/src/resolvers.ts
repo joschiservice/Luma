@@ -487,6 +487,7 @@ const resolvers: Record<string, TypeResolvers> = {
       }),
   }),
   ReturnLineItem: on<ReturnLineItemData>({
+    returnReasonNote: (line) => line.data.returnReasonNote ?? null,
     fulfillmentLineItem: (line, _args, context) =>
       load(context, 'FulfillmentLineItem', line.data.fulfillmentLineItem),
     withCodeDiscountedTotalPriceSet: (line, _args, context) =>

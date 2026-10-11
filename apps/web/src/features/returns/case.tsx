@@ -287,6 +287,11 @@ function Creation({
   open: (dialog: CaseDialogKind) => void;
 }) {
   const { creation, creationAvailability: availability } = detail;
+  const approving =
+    creation?.operation === 'approve' ||
+    (!creation &&
+      detail.order.connection.provider === 'shopify' &&
+      detail.sourceReturn?.status === 'requested');
   const system =
     availability.connection?.label ??
     detail.order.connection.label ??
@@ -317,14 +322,24 @@ function Creation({
 
   return (
     <Section
-      title={m.returns_case_creation_title({ system })}
-      description={m.returns_case_creation_description({ system })}
+      title={
+        approving
+          ? m.returns_case_approval_title({ system })
+          : m.returns_case_creation_title({ system })
+      }
+      description={
+        approving
+          ? m.returns_case_approval_description({ system })
+          : m.returns_case_creation_description({ system })
+      }
     >
       {creation ? (
         <div className="returns-case-creation">
           <p>
             <StatePill state={creationStateStates[creation.state]}>
-              {creationStateLabels[creation.state]}
+              {approving && creation.state === 'created'
+                ? m.returns_case_approval_verified()
+                : creationStateLabels[creation.state]}
             </StatePill>
           </p>
           {creation.observeOnly ? (
@@ -345,14 +360,18 @@ function Creation({
                 })}
               </dd>
             </div>
-            <div>
-              <dt>{m.returns_case_creation_warehouse()}</dt>
-              <dd>{creation.warehouse.name ?? m.common_not_reported()}</dd>
-            </div>
-            <div>
-              <dt>{m.returns_case_creation_reason()}</dt>
-              <dd>{creation.reason.name ?? m.common_not_reported()}</dd>
-            </div>
+            {!approving ? (
+              <div>
+                <dt>{m.returns_case_creation_warehouse()}</dt>
+                <dd>{creation.warehouse.name ?? m.common_not_reported()}</dd>
+              </div>
+            ) : null}
+            {!approving ? (
+              <div>
+                <dt>{m.returns_case_creation_reason()}</dt>
+                <dd>{creation.reason.name ?? m.common_not_reported()}</dd>
+              </div>
+            ) : null}
             {creation.state === 'approval_required' ? (
               <div>
                 <dt>{m.returns_case_creation_expires()}</dt>
@@ -413,7 +432,9 @@ function Creation({
                   <Send size={14} aria-hidden="true" />
                   {decide.isPending
                     ? m.returns_case_creation_sending()
-                    : m.returns_case_creation_approve({ system })}
+                    : approving
+                      ? m.returns_case_approval_send({ system })
+                      : m.returns_case_creation_approve({ system })}
                 </Button>
                 <Button
                   variant="outline"
@@ -464,7 +485,9 @@ function Creation({
             <Send size={14} aria-hidden="true" />
             {creation
               ? m.returns_case_creation_request_again({ system })
-              : m.returns_case_creation_start({ system })}
+              : approving
+                ? m.returns_case_approval_start({ system })
+                : m.returns_case_creation_start({ system })}
           </Button>
         </div>
       ) : null}

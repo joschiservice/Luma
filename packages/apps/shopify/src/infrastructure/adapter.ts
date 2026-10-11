@@ -34,6 +34,7 @@ import {
   readPageSize,
   readSelection,
 } from './read-selections.js';
+import { createShopifyReturnCapabilities } from './return-actions.js';
 import * as s from './schemas.js';
 
 const pageFields = 'pageInfo { hasNextPage endCursor }';
@@ -1241,6 +1242,7 @@ export function createShopifyConnector(
     mechanism: 'api',
     executor: { kind: 'connector', id: s.adapterVersion },
     capabilities: {
+      ...createShopifyReturnCapabilities(options),
       'orders.read': handler('orders.read'),
       'products.read': handler('products.read'),
       'inventory.read': handler('inventory.read'),

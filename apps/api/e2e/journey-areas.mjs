@@ -306,6 +306,7 @@ const messaging = [
   'packages/i18n/messages/*/{gmail,messaging}.json',
 ];
 const returnCases = [
+  'packages/application-runtime/migrations/0086_return_creation_binding.sql',
   'packages/orders/**',
   'packages/api-contract/src/**/return-cases.ts',
   'packages/application-runtime/src/composition/return-cases.ts',

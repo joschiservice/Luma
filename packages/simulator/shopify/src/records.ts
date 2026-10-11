@@ -116,6 +116,7 @@ export interface ReturnLineItemData {
   lineItem: string;
   quantity: number;
   refundedQuantity: number;
+  returnReasonNote?: string | null;
   reason: string;
   /** Value of the returned units in minor units. */
   amount: number;

@@ -187,13 +187,16 @@ function fixture(overrides: Partial<ShopifyConnectorOptions> = {}) {
 }
 
 describe('Shopify read capabilities', () => {
-  it('discovers only reads, normalizes all four resources and persists evidence before returning', async () => {
+  it('discovers available capabilities, normalizes commerce reads and persists evidence before returning', async () => {
     const f = fixture({ rawRetentionMs: 3600000 });
     expect(
       (await f.runtime.discover(context, 'connection-a')).map(
         (item) => item.capability,
       ),
     ).toEqual([
+      'returns.options.read',
+      'returns.created.read',
+      'returns.create',
       'orders.read',
       'products.read',
       'inventory.read',

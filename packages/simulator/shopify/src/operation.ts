@@ -89,6 +89,8 @@ export function prepare(query: string): Prepared {
 }
 
 const mutationCapabilities: Record<string, string> = {
+  returnCreate: 'returns.create',
+  returnApproveRequest: 'returns.create',
   inventorySetQuantities: 'inventory.available.reconcile',
   fulfillmentOrderReleaseHold: 'fulfillment.hold.release',
   fulfillmentOrderOpen: 'fulfillment.open',
@@ -97,6 +99,8 @@ const mutationCapabilities: Record<string, string> = {
 };
 
 const namedCapabilities: Record<string, string> = {
+  LumaReturnActions: 'returns.created.read',
+  LumaReturnable: 'returns.created.read',
   VerifyInstallation: 'connection.verify',
   LumaScopeUpdate: 'connection.verify',
   LumaLifecycleSubscriptions: 'connection.verify',

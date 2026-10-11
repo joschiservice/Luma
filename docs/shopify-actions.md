@@ -1,8 +1,8 @@
 # Shopify actions
 
-The Shopify app offers two governed writes: **fulfillment recovery** (release a hold,
+The Shopify app offers governed writes for **returns**, **fulfillment recovery** (release a hold,
 reopen, or move remaining items) and **inventory corrections** (set Shopify's available
-quantity from a selected JTL ERP source). Both run as exact, persisted previews that
+quantity from a selected JTL ERP source). They run as exact, persisted previews that
 someone with approval permission approves under the [workspace rules](workspace-settings.md#approval-preference), dispatch through shared policy, audit, Action Admission and
 execution, and count as done only after an independent Shopify read verifies the outcome.
 Code: `@luma/app-shopify`.
@@ -92,3 +92,27 @@ because its quantity differs. JTL remains a read-only reference.
   changed ERP quantity, availability or mapping leaves it unverified. A newer ERP read
   with the same values is not a change, so detection's frequent rereads do not invalidate
   a reviewed correction; its expiry still follows the reviewed read.
+
+## Returns
+
+Permission: `shopify:returns.manage`, together with `returns.manage` for case commands.
+The connection needs `write_returns` and order reads; reconnect older connections to grant
+creation and the independent lookup capabilities. Shopify remains the authority on whether
+fulfilled, unrefunded items are eligible. Creation uses `returnCreate`; a case linked to a
+customer request uses `returnApproveRequest` for its exact source ID, lines and quantities.
+These operations neither refund money nor report physical receipt or restocking.
+
+The shared return-case action fixes source order lines, quantities and reason, asks for
+approval and dispatches once through Action Admission. The 24-hour case request window
+applies. Creation requires one unambiguous fulfillment-line mapping per order line; split
+shipments require an explicit allocation and are refused. Lookup reads at most five returns
+with twenty lines each. Any overflow blocks dispatch or verification rather than treating a
+truncated collection as complete.
+
+Shopify has no creation idempotency key in the pinned API. Every created line carries the
+exact machine marker `luma-rc:<case UUID>` in its reason note. Reconciliation reads the order
+independently, requires the marker on every line of exactly one open return, and checks the
+approved total units per order line. Unrelated customer notes are discarded before evidence
+is recorded. A missing, changed or duplicated marker never permits replay; the case keeps
+its uncertain creation slot. Approval reconciles by the exact existing return ID and open
+state. Acceptance alone never means the case is resolved.

@@ -3,7 +3,7 @@ title: Follow returns and refunds
 description: See which returns need you, follow each one from request to refund, work it in a return case and tell a requested refund from money returned.
 ---
 
-Returns shows every return a connected store shares with Luma, and every refund that no return settles. Each return keeps its order, items, reasons, refunds and the evidence Luma read. Luma reads your store’s returns; it doesn’t approve, receive or refund them there. You do that in your store, and Luma reads the result on its next sync. To record what arrived, how it was judged and how to settle it, work the return in a [return case](#work-a-return-in-a-case). Open **Returns** in the sidebar or press **G**, then **T**.
+Returns shows every return a connected store shares with Luma, and every refund that no return settles. Each return keeps its order, items, reasons, refunds and the evidence Luma read. Luma reads your store’s returns and refunds. A return case can also request creation or approval of a Shopify return. Receipt and refunds stay separate steps, and Luma reads the store’s results on its next sync. To record what arrived, how it was judged and how to settle it, work the return in a [return case](#work-a-return-in-a-case). Open **Returns** in the sidebar or press **G**, then **T**.
 
 ## Find returns that need you
 
@@ -79,7 +79,7 @@ For an order from JTL-Wawi, a case can create the return in JTL-Wawi, so your wa
 
 Luma creates the return without a credit; a refund stays a separate decision in JTL-Wawi. A request expires after 24 hours. If JTL-Wawi doesn’t confirm the request, the case shows **Not confirmed**: select **Check**, followed by your connection’s name, to read it again. Luma never sends the request a second time. In an observe-only workspace, Luma records the request and sends nothing.
 
-The JTL-Wawi connection needs access to returns. A connection set up before returns were available must be reconnected; see [Apps and connections](/docs/apps-and-connections#change-or-reconnect-a-connection). Shopify and Cin7 Core can’t create returns from Luma.
+The JTL-Wawi connection needs access to returns. A connection set up before returns were available must be reconnected; see [Apps and connections](/docs/apps-and-connections#change-or-reconnect-a-connection). Shopify can also create returns when the connection has return write access. A case linked to a customer’s requested return asks for approval of that exact request; an unlinked case creates a new return. Luma checks the lines and quantities before sending and reads Shopify independently to verify the result. Missing or uncertain results stay **Not confirmed**, and Luma never sends them again. This action does not refund or restock items. Cin7 Core cannot create returns from Luma.
 
 ## When returns are missing
 

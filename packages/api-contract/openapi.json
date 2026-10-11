@@ -105917,6 +105917,10 @@
                         {
                           "type": "object",
                           "properties": {
+                            "operation": {
+                              "enum": ["create", "approve"],
+                              "type": "string"
+                            },
                             "id": {
                               "type": "string",
                               "format": "uuid"
@@ -107159,6 +107163,10 @@
                         {
                           "type": "object",
                           "properties": {
+                            "operation": {
+                              "enum": ["create", "approve"],
+                              "type": "string"
+                            },
                             "id": {
                               "type": "string",
                               "format": "uuid"
@@ -108415,6 +108423,10 @@
                         {
                           "type": "object",
                           "properties": {
+                            "operation": {
+                              "enum": ["create", "approve"],
+                              "type": "string"
+                            },
                             "id": {
                               "type": "string",
                               "format": "uuid"
@@ -109736,6 +109748,10 @@
                         {
                           "type": "object",
                           "properties": {
+                            "operation": {
+                              "enum": ["create", "approve"],
+                              "type": "string"
+                            },
                             "id": {
                               "type": "string",
                               "format": "uuid"
@@ -111062,6 +111078,10 @@
                         {
                           "type": "object",
                           "properties": {
+                            "operation": {
+                              "enum": ["create", "approve"],
+                              "type": "string"
+                            },
                             "id": {
                               "type": "string",
                               "format": "uuid"
@@ -112388,6 +112408,10 @@
                         {
                           "type": "object",
                           "properties": {
+                            "operation": {
+                              "enum": ["create", "approve"],
+                              "type": "string"
+                            },
                             "id": {
                               "type": "string",
                               "format": "uuid"
@@ -113658,6 +113682,10 @@
                         {
                           "type": "object",
                           "properties": {
+                            "operation": {
+                              "enum": ["create", "approve"],
+                              "type": "string"
+                            },
                             "id": {
                               "type": "string",
                               "format": "uuid"
@@ -115131,6 +115159,10 @@
                         {
                           "type": "object",
                           "properties": {
+                            "operation": {
+                              "enum": ["create", "approve"],
+                              "type": "string"
+                            },
                             "id": {
                               "type": "string",
                               "format": "uuid"
@@ -116404,6 +116436,10 @@
                         {
                           "type": "object",
                           "properties": {
+                            "operation": {
+                              "enum": ["create", "approve"],
+                              "type": "string"
+                            },
                             "id": {
                               "type": "string",
                               "format": "uuid"
@@ -117666,6 +117702,10 @@
                         {
                           "type": "object",
                           "properties": {
+                            "operation": {
+                              "enum": ["create", "approve"],
+                              "type": "string"
+                            },
                             "id": {
                               "type": "string",
                               "format": "uuid"
@@ -118928,6 +118968,10 @@
                         {
                           "type": "object",
                           "properties": {
+                            "operation": {
+                              "enum": ["create", "approve"],
+                              "type": "string"
+                            },
                             "id": {
                               "type": "string",
                               "format": "uuid"

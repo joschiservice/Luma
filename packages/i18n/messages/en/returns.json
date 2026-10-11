@@ -443,5 +443,11 @@
   "returns_case_store_open_case": "Open case",
   "returns_case_store_description": "Open a case to record receipt and inspection and to propose a resolution.",
   "returns_case_store_closed": "This return is declined or cancelled in the store.",
-  "returns_case_store_action": "Work this return in a case"
+  "returns_case_store_action": "Work this return in a case",
+  "returns_case_approval_title": "Approve the request in {system}",
+  "returns_case_approval_description": "Approve the existing customer return request. Luma checks the exact return and quantities before sending and verifies the result independently.",
+  "returns_case_approval_start": "Request approval in {system}",
+  "returns_case_approval_request": "Request approval",
+  "returns_case_approval_verified": "Approved and verified",
+  "returns_case_approval_send": "Approve the return in {system}"
 }

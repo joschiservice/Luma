@@ -20,11 +20,12 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const currentOrder = `COALESCE((SELECT target_entity_id FROM orders_entity_redirects
   WHERE tenant_id=$1 AND entity_id=$2::uuid),$2::uuid)`;
 
-const storeReturnSql = `SELECT r.entity_id,r.connection_id,r.order_id,r.name,r.status,s.document->'data'->'lines' AS lines
+const storeReturnSql = `SELECT r.entity_id,r.connection_id,r.order_id,r.name,r.status,(SELECT CASE WHEN count(*)=1 THEN jsonb_build_object('externalId',min(m.external_id),'scopeKey',min(m.scope_key)) END FROM connector_source_mappings m WHERE m.tenant_id=r.tenant_id AND m.connection_id=r.connection_id AND m.resource='return' AND m.canonical_id=r.entity_id) AS source,s.document->'data'->'lines' AS lines
   FROM orders_returns r JOIN orders_snapshots s ON s.tenant_id=r.tenant_id AND s.id=r.snapshot_id
   WHERE r.tenant_id=$1 AND r.kind='return' AND NOT r.deleted`;
 
 interface StoreReturnRow extends Record<string, unknown> {
+  source: SourceRef | null;
   entity_id: string;
   connection_id: string;
   order_id: string;
@@ -34,6 +35,7 @@ interface StoreReturnRow extends Record<string, unknown> {
 }
 
 const storeReturn = (row: StoreReturnRow): SourceReturnRecord => ({
+  ...(row.source ? { source: row.source } : {}),
   entityId: row.entity_id,
   connectionId: row.connection_id,
   orderId: row.order_id,

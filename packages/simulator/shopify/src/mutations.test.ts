@@ -509,3 +509,85 @@ describe('webhook subscriptions', () => {
     );
   });
 });
+
+it('creates marked returns and approves the exact customer request through the Admin API', async () => {
+  const shop = createShop({
+    scopes: ['read_orders', 'read_all_orders', 'read_returns', 'write_returns'],
+  });
+  await shop.run({ kind: 'seed-catalog', products: catalog });
+  const order = await shop.order();
+  await shop.run({
+    kind: 'fulfill',
+    order: order.id,
+    carrier: 'DHL',
+    trackingNumber: 'one',
+    trackingUrl: 'https://example.test/one',
+  });
+  const shipments = (
+    await shop.store.page({ kind: 'Fulfillment', parent: order.id, limit: 10 })
+  ).items;
+  const lines = (
+    await shop.store.page({
+      kind: 'FulfillmentLineItem',
+      parent: shipments[0]!.id,
+      limit: 10,
+    })
+  ).items;
+  const send = (query: string, variables: Record<string, unknown>) =>
+    shopify.handle(shop.context(), graphqlRequest(query, variables));
+  const created = await send(
+    `mutation($input: ReturnInput!) { returnCreate(returnInput: $input) { return { id status returnLineItems(first: 10) { nodes { returnReasonNote } } } userErrors { message } } }`,
+    {
+      input: {
+        orderId: `gid://shopify/Order/${order.id}`,
+        returnLineItems: [
+          {
+            fulfillmentLineItemId: `gid://shopify/FulfillmentLineItem/${lines[0]!.id}`,
+            quantity: 1,
+            returnReason: 'OTHER',
+            returnReasonNote: 'luma-rc:00000000-0000-4000-8000-000000000001',
+          },
+        ],
+      },
+    },
+  );
+  expect(created.body).not.toHaveProperty('errors');
+  expect(created.committed).toBe(true);
+  expect(created.body).toMatchObject({
+    data: {
+      returnCreate: {
+        return: {
+          status: 'OPEN',
+          returnLineItems: {
+            nodes: [
+              {
+                returnReasonNote:
+                  'luma-rc:00000000-0000-4000-8000-000000000001',
+              },
+            ],
+          },
+        },
+        userErrors: [],
+      },
+    },
+  });
+  const source = await readOrder(shop.context(), order.id);
+  const requested = await shop.run({
+    kind: 'return',
+    order: order.id,
+    lines: [{ lineItem: source!.lines[0]!.id, quantity: 1 }],
+    reason: 'Wrong size',
+  });
+  const approved = await send(
+    `mutation($input: ReturnApproveRequestInput!) { returnApproveRequest(input: $input) { return { id status } userErrors { message } } }`,
+    { input: { id: requested.gid, notifyCustomer: false } },
+  );
+  expect(approved.body).toMatchObject({
+    data: {
+      returnApproveRequest: {
+        return: { id: requested.gid, status: 'OPEN' },
+        userErrors: [],
+      },
+    },
+  });
+});

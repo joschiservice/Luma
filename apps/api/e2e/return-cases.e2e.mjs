@@ -492,3 +492,163 @@ it('creates an approved return in JTL-Wawi once and verifies it with an independ
     ]),
   );
 });
+
+it('creates and approves Shopify returns through policy, links imported units once and reconciles independently', async (t) => {
+  const f = await setupSimulator(t);
+  const org = f.manifest.organizationId,
+    connectionId = f.manifest.connections.shopify;
+  const requester = await login(f, 'pilot-operator@example.test');
+  const approver = await login(f, 'pilot-requester@example.test');
+  const root = `/v1/organizations/${org}`;
+  const request = async (path, body, cookie = requester, status = 200) => {
+    const response = await f.pilot.app.inject({
+      method: body ? 'POST' : 'GET',
+      url: `${root}${path}`,
+      headers: { cookie, origin: 'http://127.0.0.1:3000' },
+      ...(body ? { payload: body } : {}),
+    });
+    expect(response.statusCode, response.body).toBe(status);
+
+    return response.json();
+  };
+  const variants = (
+    await f.call('runs/operations/records/shopify?kind=ProductVariant&limit=10')
+  ).items;
+  const oldOrders = new Set(
+    (
+      await f.call('runs/operations/records/shopify?kind=Order&limit=100')
+    ).items.map((o) => o.id),
+  );
+  const command = (command) =>
+    f.call('runs/operations/control', {
+      action: 'command',
+      instance: 'shopify',
+      command,
+    });
+  await f.call('runs/operations/control', {
+    action: 'order',
+    shop: 'shopify',
+    lines: [{ sku: variants[0].data.sku, quantity: 2 }],
+  });
+  const providerOrderId = (
+    await f.call('runs/operations/records/shopify?kind=Order&limit=100')
+  ).items.find((o) => !oldOrders.has(o.id)).id;
+  await command({
+    kind: 'fulfill',
+    order: providerOrderId,
+    carrier: 'DHL',
+    trackingNumber: 'return-test',
+    trackingUrl: 'https://example.test/tracking',
+  });
+  await f.pilot.observe({ check: false });
+  const mapped = await f.db.owner.query(
+    "SELECT canonical_id FROM connector_source_mappings WHERE tenant_id=$1 AND connection_id=$2 AND resource='order' AND external_id=$3",
+    [org, connectionId, `gid://shopify/Order/${providerOrderId}`],
+  );
+  const orderId = mapped.rows[0].canonical_id;
+  const available = await request(`/orders/${orderId}/return-cases`);
+  const line = available.sources.find((s) => s.connectionId === connectionId)
+    .lines[0];
+  const opened = await request(`/orders/${orderId}/return-cases`, {
+    id: randomUUID(),
+    connectionId,
+    sourceReturnId: null,
+    lines: [
+      {
+        orderLineId: line.orderLineId,
+        quantity: 1,
+        reason: 'size_or_fit',
+        note: null,
+      },
+    ],
+  });
+  expect(opened.creationAvailability.blocker).toBeNull();
+  const path = `/return-cases/${opened.case.id}`;
+  const options = await request(`${path}/creation-options`);
+  const choice = {
+    warehouse: { externalId: 'shopify', scopeKey: '' },
+    reason: { externalId: 'SIZE_TOO_SMALL', scopeKey: '' },
+  };
+  expect(options.warehouses).toContainEqual(
+    expect.objectContaining(choice.warehouse),
+  );
+  const pending = await request(`${path}/creations`, {
+    id: randomUUID(),
+    ...choice,
+  });
+  expect(pending.creation).toMatchObject({
+    state: 'approval_required',
+    operation: 'create',
+  });
+  await request(
+    `${path}/creations/${pending.creation.id}/decision`,
+    { decisionId: pending.creation.decisionId, outcome: 'approved' },
+    requester,
+    409,
+  );
+  const created = await request(
+    `${path}/creations/${pending.creation.id}/decision`,
+    { decisionId: pending.creation.decisionId, outcome: 'approved' },
+    approver,
+  );
+  expect(created.creation).toMatchObject({
+    state: 'created',
+    operation: 'create',
+  });
+  await f.pilot.observe({ check: false });
+  const bound = await request(path);
+  expect(bound.case.sourceReturnId).toBeTruthy();
+  const counted = await request(`/orders/${orderId}/return-cases`);
+  expect(
+    counted.sources.find((s) => s.connectionId === connectionId).lines[0],
+  ).toMatchObject({ inCases: 1, inStoreReturns: 0, returnable: 1 });
+  // A customer requests the remaining unit; Luma approves that request, without creating another return.
+  const providerLines = (
+    await f.call('runs/operations/records/shopify?kind=LineItem&limit=100')
+  ).items.filter((l) => l.data.order === providerOrderId);
+  await command({
+    kind: 'return',
+    order: providerOrderId,
+    lines: [{ lineItem: providerLines[0].id, quantity: 1 }],
+    reason: 'Wrong size',
+  });
+  await f.pilot.observe({ check: false });
+  const next = await request(`/orders/${orderId}/return-cases`);
+  const source = next.sources.find((s) => s.connectionId === connectionId);
+  const sourceReturn = source.storeReturns.find(
+    (r) => r.status === 'requested',
+  );
+  const second = await request(`/orders/${orderId}/return-cases`, {
+    id: randomUUID(),
+    connectionId,
+    sourceReturnId: sourceReturn.id,
+    lines: [
+      {
+        orderLineId: line.orderLineId,
+        quantity: 1,
+        reason: 'size_or_fit',
+        note: null,
+      },
+    ],
+  });
+  const secondPath = `/return-cases/${second.case.id}`;
+  const approval = await request(`${secondPath}/creations`, {
+    id: randomUUID(),
+    ...choice,
+  });
+  expect(approval.creation.operation).toBe('approve');
+  const approved = await request(
+    `${secondPath}/creations/${approval.creation.id}/decision`,
+    { decisionId: approval.creation.decisionId, outcome: 'approved' },
+    approver,
+  );
+  expect(approved.creation).toMatchObject({
+    state: 'created',
+    operation: 'approve',
+  });
+  expect(
+    (
+      await f.call('runs/operations/records/shopify?kind=Return&limit=100')
+    ).items.filter((r) => r.data.order === providerOrderId),
+  ).toHaveLength(2);
+});

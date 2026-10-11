@@ -471,6 +471,8 @@ interface ReturnCreation {
   /** The Luma return case ID; the adapter stores it so the return can be found again. */
   lumaCaseId: string;
   order: ExternalId;
+  /** Approve this requested return instead of creating another return. */
+  requestedReturn?: ExternalId;
   /** The source warehouse that receives the returned items. */
   warehouse: ExternalId;
   /** The source return reason recorded on every line. */
@@ -662,7 +664,11 @@ interface CapabilityContract {
   };
   /** Finds the returns created at the source for a Luma return case. Resource `return`. */
   'returns.created.read': {
-    input: PageQuery & { order: ExternalId; lumaCaseId: string };
+    input: PageQuery & {
+      order: ExternalId;
+      lumaCaseId: string;
+      requestedReturn?: ExternalId;
+    };
     output: Page<CreatedReturnSnapshot>;
   };
   /** Acceptance means the source recorded the return, not that any item came back. */

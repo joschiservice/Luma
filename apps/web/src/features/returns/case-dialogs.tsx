@@ -528,16 +528,35 @@ export function CreationDialog({
   ) => options.find((option) => key(option) === value);
   const warehouses = choices.data?.warehouses ?? [];
   const reasons = choices.data?.reasons ?? [];
-  const chosenWarehouse = pick(warehouses, warehouse);
-  const chosenReason = pick(reasons, reason);
+  const chosenWarehouse =
+    pick(warehouses, warehouse) ??
+    (warehouses.length === 1 ? warehouses[0] : undefined);
+  const approving =
+    detail.order.connection.provider === 'shopify' &&
+    detail.sourceReturn?.status === 'requested';
+  const chosenReason =
+    pick(reasons, reason) ??
+    (approving ? reasons.find((r) => r.externalId === 'OTHER') : undefined);
 
   return (
     <CaseDialog
-      title={m.returns_case_creation_dialog_title({ system })}
-      description={m.returns_case_creation_dialog_description({ system })}
+      title={
+        approving
+          ? m.returns_case_approval_title({ system })
+          : m.returns_case_creation_dialog_title({ system })
+      }
+      description={
+        approving
+          ? m.returns_case_approval_description({ system })
+          : m.returns_case_creation_dialog_description({ system })
+      }
       command={command}
       close={close}
-      label={m.returns_case_creation_request()}
+      label={
+        approving
+          ? m.returns_case_approval_request()
+          : m.returns_case_creation_request()
+      }
       pending={m.returns_case_creation_requesting()}
       disabled={!chosenWarehouse || !chosenReason}
       submit={() =>
@@ -566,32 +585,36 @@ export function CreationDialog({
         </Alert>
       ) : (
         <>
-          <label>
-            {m.returns_case_creation_warehouse()}
-            <Select
-              aria-label={m.returns_case_creation_warehouse()}
-              value={warehouse}
-              placeholder={m.returns_case_creation_choose()}
-              onValueChange={setWarehouse}
-              options={warehouses.map((option) => ({
-                value: key(option),
-                label: option.name ?? option.externalId,
-              }))}
-            />
-          </label>
-          <label>
-            {m.returns_case_creation_reason()}
-            <Select
-              aria-label={m.returns_case_creation_reason()}
-              value={reason}
-              placeholder={m.returns_case_creation_choose()}
-              onValueChange={setReason}
-              options={reasons.map((option) => ({
-                value: key(option),
-                label: option.name ?? option.externalId,
-              }))}
-            />
-          </label>
+          {!approving ? (
+            <label>
+              {m.returns_case_creation_warehouse()}
+              <Select
+                aria-label={m.returns_case_creation_warehouse()}
+                value={warehouse}
+                placeholder={m.returns_case_creation_choose()}
+                onValueChange={setWarehouse}
+                options={warehouses.map((option) => ({
+                  value: key(option),
+                  label: option.name ?? option.externalId,
+                }))}
+              />
+            </label>
+          ) : null}
+          {!approving ? (
+            <label>
+              {m.returns_case_creation_reason()}
+              <Select
+                aria-label={m.returns_case_creation_reason()}
+                value={reason}
+                placeholder={m.returns_case_creation_choose()}
+                onValueChange={setReason}
+                options={reasons.map((option) => ({
+                  value: key(option),
+                  label: option.name ?? option.externalId,
+                }))}
+              />
+            </label>
+          ) : null}
         </>
       )}
       <div className="returns-case-summary">

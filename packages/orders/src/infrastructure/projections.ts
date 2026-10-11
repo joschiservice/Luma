@@ -700,8 +700,28 @@ async function refresh(
   );
   const returns = (value: CanonicalSnapshot) =>
     value.data.type === 'return' || value.data.type === 'refund';
-  for (const orderId of sortedUnique(values.filter(returns).map(orderOf)))
+  for (const orderId of sortedUnique(values.filter(returns).map(orderOf))) {
     await refreshReturnList(tx, tenantId, orderId);
+    // Share the case command fence: an imported return must not claim these units twice.
+    await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+      `orders-return-cases:${tenantId}:${orderId}`,
+    ]);
+    await tx.query(
+      `UPDATE orders_return_cases c SET source_return_id=m.canonical_id,
+      revision=c.revision+1,updated_at=now(),document=c.document || jsonb_build_object(
+        'sourceReturnId',m.canonical_id,'revision',c.revision+1,'updatedAt',to_char(now() AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
+      FROM orders_return_creations r JOIN connector_source_mappings m
+        ON m.tenant_id=r.tenant_id AND m.connection_id=r.connection_id AND m.resource='return'
+        AND m.external_id=r.document->'externalReturn'->>'externalId' AND m.scope_key=''
+      JOIN orders_returns imported ON imported.tenant_id=m.tenant_id AND imported.connection_id=m.connection_id
+        AND imported.entity_id=m.canonical_id AND imported.order_id=$2 AND NOT imported.deleted
+      WHERE c.tenant_id=$1 AND c.order_id=$2 AND c.state='open' AND c.source_return_id IS NULL
+        AND r.tenant_id=c.tenant_id AND r.case_id=c.id AND r.state='created'
+        AND NOT EXISTS (SELECT 1 FROM orders_return_cases other WHERE other.tenant_id=c.tenant_id
+          AND other.source_return_id=m.canonical_id AND other.state='open' AND other.id<>c.id)`,
+      [tenantId, orderId],
+    );
+  }
   const listed = values.filter((value) => !returns(value));
   const orders = listed.filter((value) => value.data.type === 'order');
   const searched = sortedUnique(orders.map(orderOf));

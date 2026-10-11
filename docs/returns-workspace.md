@@ -2,8 +2,8 @@
 
 Returns lists the returns a connected store shares, and refunds that no return settles, with
 their stage, refund state, order and evidence. Returns and refunds are imported through
-commerce sync into the Orders owner's projections. Store records are only read: approving,
-receiving and refunding happen in the store, and Luma reads the result on its next sync.
+commerce sync into the Orders owner's projections. Store records are imported without changing their facts. Shopify creation and approval run
+through governed case actions; receipt and refunds remain separate steps.
 People record their own receipt, inspection and resolution decisions in
 [return cases](#return-cases), which link to store records without changing them.
 
@@ -119,8 +119,18 @@ Success needs an independent read through `returns.created.read` that finds exac
 return for the case with the approved lines and units; more than one, or different lines,
 fails the request and nothing is sent again. An uncertain dispatch only reconciles by
 reading. One request per case can be live or created. Approval requests expire after 24
-hours. Requests are not in Needs you yet; approvers open the case. JTL-Wawi is the only
-provider that creates returns; see [JTL](jtl.md#returns).
+hours. Requests are not in Needs you yet; approvers open the case. JTL-Wawi and Shopify
+create returns; see [JTL](jtl.md#returns) and [Shopify actions](shopify-actions.md#returns).
+
+For Shopify, a case linked to a requested return approves that exact request instead of
+creating a second return. It must cover all the request's lines and quantities. An open,
+closed, declined or cancelled source return cannot be approved again. A new case's return
+uses a machine case marker on every source return line. A fresh complete read must find
+exactly one open return with that marker and the approved units; matching quantities alone
+never establish identity. If Shopify loses or changes that marker, the write stays uncertain.
+After verified creation, commerce sync binds the imported return to the case and advances
+its revision, preventing double counting. This technical binding changes no receipt,
+inspection or financial decision.
 
 ## Limits
 

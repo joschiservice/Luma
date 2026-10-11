@@ -209,6 +209,27 @@ const details: Record<string, ReturnCaseDetail> = {
   open,
   proposed,
   approval: awaitingApproval,
+  shopifyApproval: {
+    ...awaitingApproval,
+    order: {
+      ...open.order,
+      connection: {
+        ...open.order.connection,
+        label: 'Shopify',
+        provider: 'shopify',
+      },
+    },
+    sourceReturn: {
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      name: '#1042-R1',
+      status: 'requested',
+    },
+    creation: { ...awaitingApproval.creation!, operation: 'approve' },
+    creationAvailability: {
+      ...awaitingApproval.creationAvailability,
+      connection: { id: open.order.connection.id, label: 'Shopify' },
+    },
+  },
   cancelled,
 };
 
@@ -315,3 +336,21 @@ export const Narrow: Story = {
 export const Missing: Story = { args: { state: 'missing' } };
 
 export const Loading: Story = { args: { state: 'loading' } };
+
+export const ShopifyApproval: Story = {
+  args: { state: 'shopifyApproval' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByRole('heading', {
+        name: 'Approve the request in Shopify',
+      }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByText(/Approve the existing customer return request/),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole('button', { name: 'Approve the return in Shopify' }),
+    ).toBeVisible();
+  },
+};

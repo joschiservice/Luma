@@ -443,5 +443,11 @@
   "returns_case_store_open_case": "Fall öffnen",
   "returns_case_store_description": "Eröffne einen Fall, um Wareneingang und Prüfung zu erfassen und eine Lösung vorzuschlagen.",
   "returns_case_store_closed": "Diese Retoure ist im Shop abgelehnt oder storniert.",
-  "returns_case_store_action": "Retoure in einem Fall bearbeiten"
+  "returns_case_store_action": "Retoure in einem Fall bearbeiten",
+  "returns_case_approval_title": "Anfrage in {system} genehmigen",
+  "returns_case_approval_description": "Genehmige die bestehende Retourenanfrage. Luma prüft die genaue Retoure und Mengen vor dem Senden und bestätigt das Ergebnis durch einen unabhängigen Abruf.",
+  "returns_case_approval_start": "Freigabe in {system} anfordern",
+  "returns_case_approval_request": "Freigabe anfordern",
+  "returns_case_approval_verified": "Genehmigt und geprüft",
+  "returns_case_approval_send": "Retoure in {system} genehmigen"
 }

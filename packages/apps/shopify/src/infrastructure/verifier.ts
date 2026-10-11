@@ -55,6 +55,10 @@ export function createInstallationVerifier(options: {
       granted.push('inventory.available.reconcile');
     if (has('customers')) granted.push('customers.read');
     if (has('orders') && has('returns')) granted.push('returns.read');
+    if (has('orders') && has('returns'))
+      granted.push('returns.options.read', 'returns.created.read');
+    if (has('orders') && scopes.has('write_returns'))
+      granted.push('returns.create');
     if (
       has('orders') &&
       [
