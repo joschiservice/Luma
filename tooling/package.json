@@ -1,0 +1,33 @@
+{
+  "name": "@luma/tooling",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Development, validation and evaluation scripts run from the repository root.",
+  "devDependencies": {
+    "@luma/app-catalog": "workspace:*",
+    "@luma/app-host": "workspace:*",
+    "@luma/application-runtime": "workspace:*",
+    "@luma/commerce-sync": "workspace:*",
+    "@luma/connections": "workspace:*",
+    "@luma/customers": "workspace:*",
+    "@luma/exceptions": "workspace:*",
+    "@luma/execution": "workspace:*",
+    "@luma/identity": "workspace:*",
+    "@luma/orders": "workspace:*",
+    "@luma/platform": "workspace:*",
+    "@luma/policies": "workspace:*",
+    "@luma/procurement": "workspace:*",
+    "@luma/resolution": "workspace:*",
+    "@luma/simulator-cin7": "workspace:*",
+    "@luma/simulator-commerce": "workspace:*",
+    "@luma/simulator-core": "workspace:*",
+    "@luma/simulator-jtl": "workspace:*",
+    "@luma/simulator-shopify": "workspace:*",
+    "@luma/staff": "workspace:*",
+    "@luma/workflow-temporal": "workspace:*",
+    "@luma/workflows": "workspace:*",
+    "@luma/app-cin7": "workspace:*",
+    "@luma/app-jtl": "workspace:*",
+    "@luma/app-shopify": "workspace:*"
+  }
+}

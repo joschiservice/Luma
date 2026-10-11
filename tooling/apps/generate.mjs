@@ -38,7 +38,7 @@ Object.assign(pkg.dependencies, dependencies);
 await writeFile(path, JSON.stringify(pkg, null, 2) + '\n');
 // Provider fixtures follow the app packages present in this checkout.
 for (const file of [
-  'package.json',
+  'tooling/package.json',
   'packages/application-runtime/package.json',
 ]) {
   const path = new URL(file, root);

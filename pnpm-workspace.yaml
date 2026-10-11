@@ -4,6 +4,7 @@ packages:
   - packages/apps/*
   - packages/connectors/*
   - packages/simulator/*
+  - tooling
 
 minimumReleaseAge: 0
 saveExact: true
