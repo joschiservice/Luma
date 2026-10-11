@@ -44,7 +44,7 @@ const unavailable = () =>
 const digest = (state: string) =>
   createHash('sha256').update(state).digest('hex');
 
-export const oauthStartInput = z
+const oauthStartInput = z
   .object({ shop: shopHostname, label: z.string().trim().min(1).max(120) })
   .strict();
 

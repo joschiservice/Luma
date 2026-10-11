@@ -13,7 +13,7 @@ import { IdentityError } from '../identity/data';
 const api = createWebApiClient();
 
 /** Returns the query-key prefix for one organization's installed connections. */
-export const connectionsKey = (organizationId: string) =>
+const connectionsKey = (organizationId: string) =>
   ['private', 'organization', organizationId, 'connections'] as const;
 
 /**

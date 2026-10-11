@@ -14,7 +14,7 @@ const docs = defineDocs({ dir: 'content/docs', docs: { async: true } });
  * Guides use the interface languages. A translation sits beside its English guide with the
  * language before the extension (`orders.de.mdx`); English is shown when it is missing.
  */
-export const docsI18n = defineI18n({
+const docsI18n = defineI18n({
   languages: [...locales],
   defaultLanguage: baseLocale,
   parser: 'dot',

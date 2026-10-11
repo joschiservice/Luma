@@ -20,7 +20,7 @@ export function isOwnerRole(role: { key: string } | null | undefined) {
 }
 
 /** Reports whether a granted set allows a core or app permission. */
-export function grants(
+function grants(
   permissions: readonly string[],
   allAppPermissions: boolean,
   permission: string,
@@ -124,25 +124,5 @@ export function NoAccess({
         {m.identity_access_see_role()}
       </Link>
     </Empty>
-  );
-}
-
-/** A short explanation shown beside an action the person's role does not allow. */
-export function MissingPermission({
-  organizationId,
-  permission,
-  id,
-}: {
-  organizationId: string;
-  permission: string;
-  id?: string;
-}) {
-  const label = usePermissionLabel(organizationId, permission);
-
-  return (
-    <span className="missing-permission" id={id}>
-      <LockKeyhole size={12} aria-hidden="true" />{' '}
-      {m.identity_access_requires({ permission: label })}
-    </span>
   );
 }

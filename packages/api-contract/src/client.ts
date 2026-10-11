@@ -18,7 +18,7 @@ export type ApiClient = ContractRouterClient<
 >;
 
 /** A response with an error status. `body` is the API error payload when the server sent one. */
-export class ApiResponseError extends Error {
+class ApiResponseError extends Error {
   constructor(
     readonly status: number,
     readonly body: unknown,

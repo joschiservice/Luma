@@ -1,4 +1,4 @@
-export { API_ROOT, API_VERSION, accountId, createClient } from './client.js';
+export { API_VERSION, accountId, createClient } from './client.js';
 
 export type {
   Cin7Client,
@@ -6,10 +6,6 @@ export type {
   Cin7TransportOptions,
 } from './client.js';
 
-export {
-  createRequestPacer,
-  defaultIntervalMs,
-  type RequestPacer,
-} from './pacer.js';
+export { createRequestPacer, type RequestPacer } from './pacer.js';
 
 export { fail, parse } from '@luma/connector-core/transport';

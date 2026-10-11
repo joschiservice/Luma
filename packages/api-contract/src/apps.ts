@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const appSlotSchema = z.enum([
+const appSlotSchema = z.enum([
   'connections',
   'settings',
   'app-settings',

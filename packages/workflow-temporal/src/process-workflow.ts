@@ -17,10 +17,9 @@ import {
 
 import { pauseWhileInactive } from './workspace-pause.js';
 
-export const processProgressQuery =
-  defineQuery<ProcessProgress>('processProgress');
+const processProgressQuery = defineQuery<ProcessProgress>('processProgress');
 
-export const processDecisionChanged = defineSignal('processDecisionChanged');
+const processDecisionChanged = defineSignal('processDecisionChanged');
 
 // Every activity pauses the run while its workspace is suspended or closed.
 const activities = pauseWhileInactive(
@@ -56,7 +55,11 @@ const code = pauseWhileInactive(
   }),
 );
 
-/** Replays a version-bound process with durable waits and activity-backed effects. */
+/**
+ * Replays a version-bound process with durable waits and activity-backed effects.
+ *
+ * @public The Temporal bundler loads it by workflow type through `workflows.ts`.
+ */
 export async function processWorkflow(
   run: ProcessRun,
   version: ProcessWorkflowVersion,

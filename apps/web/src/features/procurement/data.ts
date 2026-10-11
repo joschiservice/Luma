@@ -59,18 +59,6 @@ export const ordersOptions = (organizationId: string) =>
       api.orders({ params: { organizationId } }, { signal }),
   });
 
-/** Reads immutable order details and lifecycle evidence together. */
-export const purchaseOrderOptions = (
-  organizationId: string,
-  purchaseOrderId: string,
-) =>
-  queryOptions({
-    queryKey: [...procurementKey(organizationId), 'orders', purchaseOrderId],
-    ...privateQueryDefaults,
-    queryFn: ({ signal }) =>
-      api.detail({ params: { organizationId, purchaseOrderId } }, { signal }),
-  });
-
 /** Creates a supplier; callers retain the body for retries. */
 export async function createSupplier(
   organizationId: string,

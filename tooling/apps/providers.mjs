@@ -9,7 +9,7 @@ import {
 } from '@luma/connections/composition';
 
 /** Composes every adapter for local simulator fixtures, in the order of `factories`. */
-export function fixtureProviders(options) {
+function fixtureProviders(options) {
   return [
     createJtlProvider({ ...options, jtlEndpoints: options.jtlEndpoints ?? [] }),
     createShopifyProvider(options),

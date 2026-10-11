@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const authorityGroupSchema = z.enum([
+const authorityGroupSchema = z.enum([
   'order_lines',
   'order_lifecycle',
   'order_fulfillment',

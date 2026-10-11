@@ -44,8 +44,6 @@ export {
   createShopifyOAuth,
   createPrivacyIntake,
   createInstallationVerifier,
-  readShopifyConfig,
-  registerShopifyRoutes,
 };
 
 export type { ShopifyOAuth };

@@ -36,7 +36,7 @@ const failedPartSchema = z.object({
   error: apiErrorSchema,
 });
 
-export const metricSummaryPartSchema = z.union([
+const metricSummaryPartSchema = z.union([
   z.object({
     kind: z.literal('orders'),
     status: z.literal(200),

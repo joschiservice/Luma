@@ -218,7 +218,7 @@ export function ShadowResult({ item }: { item: ShadowComparison }) {
 }
 
 /** Displays scalar business fields as readable labels and values. */
-export function ActionFields({
+function ActionFields({
   fields,
   empty,
 }: {

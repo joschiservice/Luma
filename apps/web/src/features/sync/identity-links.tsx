@@ -436,7 +436,7 @@ export function IdentityLinksView({
 }
 
 /** Source facts supporting an order match; missing facts stay visibly unknown. */
-export function OrderMatchFacts({ sources }: { sources: Source[] }) {
+function OrderMatchFacts({ sources }: { sources: Source[] }) {
   return (
     <div className="sync-order-facts">
       {sources.map((source) => (

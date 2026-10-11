@@ -19,7 +19,7 @@ const shownValue = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 const shownValues = z.record(z.string(), shownValue);
 
 /** Final outcomes of a test run. `awaiting_decision` means the workflow would wait for a person. */
-export const testOutcomeSchema = z.enum([
+const testOutcomeSchema = z.enum([
   'not_executed',
   'verified',
   'ended',
@@ -31,7 +31,7 @@ export const testOutcomeSchema = z.enum([
 ]);
 
 /** The example reply a step receives instead of calling a connected system. */
-export const stepReplySchema = z.discriminatedUnion('kind', [
+const stepReplySchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('read'), values }).strict(),
   z
     .object({
@@ -58,7 +58,7 @@ export const stepReplySchema = z.discriminatedUnion('kind', [
  * Example data for one test: inputs and context facts for the run, and replies keyed by step ID.
  * A missing approval reply means nobody has decided yet, so the run pauses there.
  */
-export const draftTestCaseSchema = z
+const draftTestCaseSchema = z
   .object({
     id: z.string().uuid(),
     name: z.string().min(1).max(200),
@@ -73,7 +73,7 @@ export const draftTestCaseSchema = z
   })
   .strict();
 
-export const testStepResultSchema = z.object({
+const testStepResultSchema = z.object({
   stepId: z.string(),
   kind: z.enum(workflowStepKinds),
   title: z.string(),
@@ -96,7 +96,7 @@ export const testStepResultSchema = z.object({
   code: codeTelemetrySchema.optional(),
 });
 
-export const draftTestResultSchema = z.object({
+const draftTestResultSchema = z.object({
   outcome: testOutcomeSchema,
   stoppedAt: z.string().nullable(),
   reason: z.string().nullable(),

@@ -7,7 +7,7 @@ import { buildSchema, type GraphQLDirective } from 'graphql';
  * Shopify's introspection for the adapter's contract tests. The file must stay identical to
  * the adapter fixture; the simulator contract test checks this.
  */
-export const schemaSource = readFileSync(
+const schemaSource = readFileSync(
   new URL('../admin-2026-07.graphql', import.meta.url),
   'utf8',
 );

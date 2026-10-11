@@ -24,7 +24,7 @@ export const fulfillmentViewSchema = z.enum([
  * delivery. `late_delivery`: a shipment is past its estimated delivery and not delivered.
  * `failed`: the source reports the fulfillment failed.
  */
-export const fulfillmentSignalSchema = z.enum([
+const fulfillmentSignalSchema = z.enum([
   'held',
   'overdue',
   'stalled',
@@ -33,7 +33,7 @@ export const fulfillmentSignalSchema = z.enum([
   'failed',
 ]);
 
-export const fulfillmentKindSchema = z.enum([
+const fulfillmentKindSchema = z.enum([
   'fulfillment_order',
   'shipment',
   'unknown',
@@ -41,7 +41,7 @@ export const fulfillmentKindSchema = z.enum([
 
 export const fulfillmentSortSchema = z.enum(['waiting', 'recent', 'deadline']);
 
-export const fulfillmentStatusSchema = z.enum([
+const fulfillmentStatusSchema = z.enum([
   'pending',
   'processing',
   'completed',
@@ -52,7 +52,7 @@ export const fulfillmentStatusSchema = z.enum([
   'unknown',
 ]);
 
-export const fulfillmentHoldReasonSchema = z.enum([
+const fulfillmentHoldReasonSchema = z.enum([
   'awaiting_payment',
   'high_risk_of_fraud',
   'incorrect_address',
@@ -62,7 +62,7 @@ export const fulfillmentHoldReasonSchema = z.enum([
   'other',
 ]);
 
-export const fulfillmentDeliverySchema = z.enum([
+const fulfillmentDeliverySchema = z.enum([
   'label_created',
   'in_transit',
   'out_for_delivery',
@@ -79,7 +79,7 @@ const trackingSchema = z.object({
   url: z.string().url().nullable(),
 });
 
-export const fulfillmentItemSchema = z.object({
+const fulfillmentItemSchema = z.object({
   id: z.string().uuid(),
   connectionId: z.string().uuid(),
   externalId: z.string().nullable(),
@@ -118,7 +118,7 @@ export const fulfillmentItemSchema = z.object({
   sourceUpdatedAt: timestamp.nullable(),
 });
 
-export const fulfillmentSourceSchema = z.object({
+const fulfillmentSourceSchema = z.object({
   connectionId: z.string().uuid(),
   label: z.string(),
   system: z.string().nullable(),

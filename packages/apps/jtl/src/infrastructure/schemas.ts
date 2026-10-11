@@ -41,9 +41,7 @@ export const inputs = {
 };
 
 /** Luma purchase-order IDs as stored in the JTL internal-comment marker. */
-export const lumaOrderId = z
-  .string()
-  .regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/);
+const lumaOrderId = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/);
 
 const calendarDate = z
   .string()

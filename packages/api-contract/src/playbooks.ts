@@ -50,7 +50,7 @@ export const playbookVersionViewSchema = z.object({
   representation: z.string(),
 });
 
-export const playbookConnectionSchema = z.object({
+const playbookConnectionSchema = z.object({
   id: z.string().uuid(),
   label: text,
   system: text,

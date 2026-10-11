@@ -10,7 +10,7 @@ import type { JtlConfig, JtlSeedItem, JtlSeedSupplier } from '../types.js';
 
 export const start = Date.parse('2026-10-01T08:00:00Z');
 
-export const config: JtlConfig = {
+const config: JtlConfig = {
   warehouses: [
     { id: '1', name: 'Hamburg' },
     { id: '2', name: 'Leipzig' },

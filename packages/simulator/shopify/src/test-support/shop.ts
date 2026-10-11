@@ -12,7 +12,7 @@ import type {
   ShopifySeedProduct,
 } from '../types.js';
 
-export const config: ShopifyConfig = {
+const config: ShopifyConfig = {
   shop: 'luma-test.myshopify.com',
   name: 'Luma Test',
   currency: 'EUR',

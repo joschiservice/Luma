@@ -27,10 +27,7 @@ import { passwordMailLocale } from './password-mail.js';
 type Database = Pick<Pool, 'query'>;
 
 /** Writes one event; a repeated successful sign-in for the same session is ignored. */
-export async function recordSecurityEvent(
-  db: Database,
-  event: SecurityEventRecord,
-) {
+async function recordSecurityEvent(db: Database, event: SecurityEventRecord) {
   await db.query(
     `INSERT INTO account_security_events(id,user_id,email_hash,event_type,outcome,reason_code,session_id,ip_address,user_agent,request_id)
      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT DO NOTHING`,
@@ -80,7 +77,7 @@ export async function listSecurityEvents(
 }
 
 /** Converts a stored event row; shared with the staff read adapter's column names. */
-export function eventFromRow(row: EventRow): SecurityEvent {
+function eventFromRow(row: EventRow): SecurityEvent {
   return {
     id: row.id,
     type: row.event_type,

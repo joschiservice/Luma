@@ -23,7 +23,7 @@ type OrderCommand = Extract<JtlCommand, { kind: 'order' }>;
 type ShipCommand = Extract<JtlCommand, { kind: 'ship' }>;
 
 /** JTL delivery status: 1 open, 3 partially shipped, 5 shipped. */
-export function deliveryStatus(order: OrderRecord) {
+function deliveryStatus(order: OrderRecord) {
   const shipped = order.lines.reduce((sum, line) => sum + line.shipped, 0);
   if (!shipped) return 1;
 

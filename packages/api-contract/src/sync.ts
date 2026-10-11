@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const timestamp = z.string().datetime({ offset: true });
 
-export const syncRecordTypeSchema = z.enum([
+const syncRecordTypeSchema = z.enum([
   'orders',
   'fulfillments',
   'products',
@@ -11,7 +11,7 @@ export const syncRecordTypeSchema = z.enum([
   'returns',
 ]);
 
-export const syncStatusSchema = z.enum([
+const syncStatusSchema = z.enum([
   'paused',
   'blocked',
   'failing',
@@ -22,11 +22,7 @@ export const syncStatusSchema = z.enum([
   'up_to_date',
 ]);
 
-export const syncScanKindSchema = z.enum([
-  'backfill',
-  'incremental',
-  'reconcile',
-]);
+const syncScanKindSchema = z.enum(['backfill', 'incremental', 'reconcile']);
 
 export const syncStreamSchema = z.object({
   id: z.string().uuid(),
@@ -85,7 +81,7 @@ export const syncStreamSchema = z.object({
     .nullable(),
 });
 
-export const syncConnectionSchema = z.object({
+const syncConnectionSchema = z.object({
   connectionId: z.string().uuid(),
   label: z.string(),
   provider: z.string(),
@@ -100,7 +96,7 @@ export const syncConnectionSchema = z.object({
   ),
 });
 
-export const syncRunSchema = z.object({
+const syncRunSchema = z.object({
   id: z.string().uuid(),
   connectionId: z.string().uuid(),
   recordType: syncRecordTypeSchema,

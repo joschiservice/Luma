@@ -25,7 +25,7 @@ const durationLabel = (hours: Duration) =>
   durations.find((item) => item.hours === hours)?.label() ?? '';
 
 /** Loads until when Luma support may view the workspace, and pending requests. */
-export const supportAccessOptions = (organizationId: string) =>
+const supportAccessOptions = (organizationId: string) =>
   queryOptions({
     ...privateQueryDefaults,
     queryKey: ['private', 'organization', organizationId, 'support-access'],

@@ -9,9 +9,7 @@ export const recoveryCapabilities = [
   'fulfillment.move',
 ] as const;
 
-export const recoveryCapability = z.enum(recoveryCapabilities);
-
-export type RecoveryCapability = z.infer<typeof recoveryCapability>;
+export type RecoveryCapability = (typeof recoveryCapabilities)[number];
 
 export const recoveryTarget = z
   .object({

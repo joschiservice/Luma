@@ -973,11 +973,3 @@
   color: var(--foreground);
   font-weight: 600;
 }
-
-.missing-permission {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--foreground-subtle);
-  font-size: 12px;
-}

@@ -15,7 +15,7 @@ const api = createWebApiClient();
 export const securityActivityKey = ['private', 'security-activity'] as const;
 
 /** Pages through the signed-in person's own security events, newest first. */
-export const securityActivityOptions = () =>
+const securityActivityOptions = () =>
   infiniteQueryOptions({
     ...privateQueryDefaults,
     queryKey: securityActivityKey,

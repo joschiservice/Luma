@@ -9,7 +9,7 @@ export interface Random {
 }
 
 /** Hashes stable parts to an unsigned 32-bit integer with FNV-1a and a final avalanche. */
-export function hash32(...parts: readonly (string | number)[]): number {
+function hash32(...parts: readonly (string | number)[]): number {
   let hash = 0x811c9dc5;
   for (const part of parts) {
     const text = `${part}\u001f`;
@@ -86,7 +86,7 @@ export function poisson(random: Random, mean: number): number {
 }
 
 /** Draws a standard normal value with the Box-Muller transform. */
-export function normal(random: Random): number {
+function normal(random: Random): number {
   const first = Math.max(random.next(), Number.EPSILON);
 
   return (

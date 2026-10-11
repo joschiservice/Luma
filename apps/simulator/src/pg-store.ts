@@ -8,7 +8,7 @@ import {
 } from '@luma/simulator-core';
 import type { PoolClient, QueryResult, QueryResultRow } from 'pg';
 
-export const recordTables = [
+const recordTables = [
   'sim_shopify_records',
   'sim_jtl_records',
   'sim_cin7_records',

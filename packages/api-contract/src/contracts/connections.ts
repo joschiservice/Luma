@@ -12,11 +12,11 @@ import {
   installedConnectionSchema,
 } from '../connections.js';
 
-export const connectionParams = organizationParamsSchema.extend({
+const connectionParams = organizationParamsSchema.extend({
   connectionId: z.string().uuid(),
 });
 
-export const connectionVersion = z
+const connectionVersion = z
   .object({ version: z.number().int().positive() })
   .strict();
 

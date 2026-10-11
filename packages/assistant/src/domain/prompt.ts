@@ -1,6 +1,3 @@
-/** Changes when the instructions change, so evaluations can compare answers by version. */
-export const assistantPromptVersion = 'assistant-2026-10-05';
-
 /** Shown when an answer stops at a read, length or call limit. */
 export const incompleteAnswer =
   'I couldn’t finish looking this up within the limits for one question. Try a narrower question, for example a shorter date range, one status or a specific order number.';

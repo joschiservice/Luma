@@ -170,7 +170,7 @@ export function PurchaseOrderPage() {
 }
 
 /** Shows how far an order has come, what is pending, and who acts next. */
-export function PurchaseOrderRecordView({
+function PurchaseOrderRecordView({
   organizationId,
   record,
   context,

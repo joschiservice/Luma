@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const installationPermissions = z.enum([
+const installationPermissions = z.enum([
   'orders.read',
   'products.read',
   'inventory.read',

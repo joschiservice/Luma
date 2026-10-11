@@ -39,7 +39,7 @@ const staffDeletionReferenceSchema = z.string().trim().min(3).max(200);
 /** A suspended membership keeps its role and the account; it has no access to the workspace. */
 const staffMembershipStatusSchema = z.enum(['active', 'suspended']);
 
-export const staffWorkspaceSchema = z.object({
+const staffWorkspaceSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
   slug: z.string(),
@@ -47,20 +47,20 @@ export const staffWorkspaceSchema = z.object({
   dataRegion: z.string(),
 });
 
-export const staffUserSchema = z.object({
+const staffUserSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
   email: z.string(),
 });
 
-export const staffAccessSchema = z.object({
+const staffAccessSchema = z.object({
   id: z.string().uuid(),
   workspaceId: z.string().uuid(),
   reason: z.string(),
   expiresAt: z.string().datetime(),
 });
 
-export const staffDetailSchema = z.object({
+const staffDetailSchema = z.object({
   membersTruncated: z.boolean(),
   connectionsTruncated: z.boolean(),
   workspace: staffWorkspaceSchema,
@@ -108,7 +108,7 @@ export const staffDetailSchema = z.object({
   }),
 });
 
-export const staffReasonSchema = z.string().trim().min(10).max(500);
+const staffReasonSchema = z.string().trim().min(10).max(500);
 
 export const staffConfigSchema = z.object({
   mode: z.enum(['local', 'google']),
@@ -170,7 +170,7 @@ export const staffMembershipChangeSchema = z.object({
 });
 
 /** Emergency support views need one of these reasons and an external reference. */
-export const staffEmergencyCategorySchema = z.enum([
+const staffEmergencyCategorySchema = z.enum([
   'security_incident',
   'legal_request',
 ]);
@@ -367,7 +367,7 @@ export const staffWorkspaceHealthSchema = z.object({
 });
 
 /** An access history position: the event time with microseconds and its ID. */
-export const staffAccessHistoryCursorSchema = z
+const staffAccessHistoryCursorSchema = z
   .string()
   .regex(
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
@@ -389,12 +389,12 @@ export const staffAccessHistorySchema = z.object({
 });
 
 /** A staff audit position: the entry time with microseconds and its sequence number. */
-export const staffAuditCursorSchema = z
+const staffAuditCursorSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z_\d{1,19}$/);
 
 /** Optional audit filters. Staff member and account accept an ID or an exact email address. */
-export const staffAuditQuerySchema = z
+const staffAuditQuerySchema = z
   .object({
     staff: z.string().trim().min(1).max(320).optional(),
     workspace: z.string().uuid().optional(),

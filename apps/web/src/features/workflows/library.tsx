@@ -45,7 +45,7 @@ import {
 } from './readiness';
 
 /** Library views. Enablement and readiness are separate, so a view never hides a blocker. */
-export const statusNames = {
+const statusNames = {
   attention: m.workflows_library_view_attention,
   enabled: m.workflows_library_view_enabled,
   not_enabled: m.workflows_library_view_not_enabled,
@@ -393,7 +393,7 @@ export function WorkflowLibraryView({
 }
 
 /** Lists open drafts with how and when they were last edited. Drafts never run. */
-export function DraftList({
+function DraftList({
   organizationId,
   drafts,
   canEdit,

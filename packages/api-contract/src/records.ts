@@ -9,14 +9,14 @@ export const recordKindSchema = z.enum([
   'issue',
 ]);
 
-export const recordLinkSchema = z.object({
+const recordLinkSchema = z.object({
   kind: recordKindSchema,
   id: z.string().uuid(),
   label: z.string(),
   relationship: z.string(),
 });
 
-export const recordSourceSchema = z.object({
+const recordSourceSchema = z.object({
   connectionId: z.string().uuid(),
   label: z.string(),
   status: z.string(),
@@ -26,7 +26,7 @@ export const recordSourceSchema = z.object({
   sourceUpdatedAt: z.string().datetime().nullable(),
 });
 
-export const recordSummarySchema = z.object({
+const recordSummarySchema = z.object({
   kind: recordKindSchema,
   id: z.string().uuid(),
   label: z.string(),

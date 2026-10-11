@@ -27,7 +27,7 @@ export type {
 
 export type { JtlConnection } from '@luma/connector-jtl';
 
-export { readJtlEndpoints, createInstallationVerifier };
+export { createInstallationVerifier };
 
 export type { JtlEndpoint };
 

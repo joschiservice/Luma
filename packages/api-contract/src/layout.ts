@@ -14,7 +14,7 @@ export const homeModuleIds = [
   'returns',
 ] as const;
 
-export const homeModuleSchema = z
+const homeModuleSchema = z
   .object({
     id: z.enum(homeModuleIds),
     size: z.enum(['half', 'full']),
@@ -22,7 +22,7 @@ export const homeModuleSchema = z
   .strict();
 
 /** A workspace page pinned to the sidebar, addressed relative to the workspace root. */
-export const pinnedPageSchema = z
+const pinnedPageSchema = z
   .object({
     path: z
       .string()

@@ -12,7 +12,7 @@ export const correctionTarget = z
   })
   .strict();
 
-export const correctionChoice = z
+const correctionChoice = z
   .object({ capability: z.literal('inventory.available.reconcile') })
   .strict();
 

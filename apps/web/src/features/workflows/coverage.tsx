@@ -53,7 +53,7 @@ export function WorkflowCoverageCard({
 }
 
 /** Presents loading, unavailable and covered states for a record's workflows. */
-export function WorkflowCoverageView({
+function WorkflowCoverageView({
   organizationId,
   items,
   loading = false,

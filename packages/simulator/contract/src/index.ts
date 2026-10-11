@@ -19,9 +19,9 @@ export const runIdSchema = name;
 
 export const instanceSchema = name;
 
-export const transportFaultSchema = z.enum(transportFaults);
+const transportFaultSchema = z.enum(transportFaults);
 
-export const incidentKindSchema = z.enum(
+const incidentKindSchema = z.enum(
   incidentKindNames as [
     (typeof incidentKindNames)[number],
     ...(typeof incidentKindNames)[number][],
@@ -113,7 +113,7 @@ export const faultRuleSchema = z.object({
   lifetimeMs: z.number().int().positive().max(86_400_000).optional(),
 });
 
-export const serviceHealthSchema = z.enum([
+const serviceHealthSchema = z.enum([
   'healthy',
   'rate-limited',
   'unavailable',

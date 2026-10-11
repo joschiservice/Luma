@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const operationalMetricIdSchema = z.enum([
+const operationalMetricIdSchema = z.enum([
   'cases.active',
   'cases.attention',
   'cases.oldest_unresolved_age',
@@ -22,7 +22,7 @@ export const operationalMetricIdSchema = z.enum([
   'resolution.unresolved_age',
 ]);
 
-export const operationalMetricScopeSchema = z
+const operationalMetricScopeSchema = z
   .object({
     connectionId: z.string().uuid().optional(),
     supplierId: z.string().uuid().optional(),

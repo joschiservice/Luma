@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const stockSourceSchema = z.object({
+const stockSourceSchema = z.object({
   connectionId: z.string().uuid(),
   label: z.string(),
   status: z.string(),

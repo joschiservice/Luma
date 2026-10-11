@@ -20,48 +20,6 @@ const transitionSchema = transitionInputSchema.extend({
   purchaseOrderId: z.string().uuid(),
 });
 
-/** Describes only procurement operations backed by authoritative reads and writes. */
-export const procurementCapabilityCatalog = [
-  {
-    name: 'procurement.supplier.lookup',
-    version: '1',
-    kind: 'read',
-    minimumRisk: 'low',
-    approval: 'none',
-    resource: 'supplier',
-    verification: 'authoritative_read',
-  },
-  {
-    name: 'procurement.purchase-order.open.lookup',
-    version: '1',
-    kind: 'read',
-    minimumRisk: 'low',
-    approval: 'none',
-    resource: 'purchase_order',
-    verification: 'authoritative_read',
-  },
-  {
-    name: 'procurement.purchase-order.create',
-    version: '1',
-    kind: 'write',
-    minimumRisk: 'medium',
-    approval: 'workspace_policy',
-    resource: 'purchase_order',
-    idempotency: 'order_id',
-    verification: 'authoritative_read',
-  },
-  {
-    name: 'procurement.purchase-order.transition',
-    version: '1',
-    kind: 'write',
-    minimumRisk: 'high',
-    approval: 'workspace_policy',
-    resource: 'purchase_order',
-    idempotency: 'command_id',
-    verification: 'authoritative_read',
-  },
-] as const;
-
 /** Binds typed procurement operations to the tenant-owned record service. */
 export function createProcurementCapabilities(service: ProcurementService) {
   return {

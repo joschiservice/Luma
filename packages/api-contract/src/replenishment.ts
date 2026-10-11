@@ -25,7 +25,7 @@ export const replenishmentRuleSchema = z
   });
 
 /** The most recent run for one stock position. */
-export const replenishmentRunSummarySchema = z.object({
+const replenishmentRunSummarySchema = z.object({
   runId: z.string().uuid(),
   state: z.string().nullable(),
   summary: z.string(),

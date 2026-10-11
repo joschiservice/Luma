@@ -26,7 +26,7 @@ export const processWorkflowId = (tenantId: string, runId: string) =>
   `process-v2:${tenantId}:${runId}`;
 
 /** Starts and queries exact published versions; callers must persist the run before starting it. */
-export function createProcessCommands(
+function createProcessCommands(
   client: Client,
   taskQueue: string,
   identity: Pick<IdentityService, 'refreshContext'>,

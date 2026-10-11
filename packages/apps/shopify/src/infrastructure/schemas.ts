@@ -383,13 +383,6 @@ const shopMoney = z
   .optional()
   .catch(null);
 
-/** An order in a returns page, with whether it has any returns or refunds. */
-export const returnsPageOrder = z.object({
-  id: gid('Order'),
-  returns: z.object({ nodes: z.array(z.object({ id: gid('Return') })) }),
-  refunds: z.array(z.object({ id: gid('Refund') })),
-});
-
 export const returnNode = z.object({
   id: gid('Return'),
   name: z.string().nullable().optional().catch(null),

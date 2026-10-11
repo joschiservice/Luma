@@ -31,7 +31,7 @@ const unsupported: [RegExp, () => string][] = [
 ];
 
 /** Flags features Code Steps never support, before the source is saved. */
-export function unsupportedFeatures(source: string) {
+function unsupportedFeatures(source: string) {
   const found = unsupported
     .filter(([pattern]) => pattern.test(source))
     .map(([, message]) => message());
@@ -42,7 +42,7 @@ export function unsupportedFeatures(source: string) {
 }
 
 /** Offers `input` fields and granted steps for completion inside Code Step source. */
-export function codeStepCompletions(
+function codeStepCompletions(
   scope: ValueOption[],
   grants: string[],
 ): CodeEditorCompletion[] {
@@ -69,7 +69,7 @@ export function codeStepCompletions(
 }
 
 /** Steps a Code Step may request: the reads and actions right after it, in order. */
-export function grantable(content: WorkflowDraftContent, index: number) {
+function grantable(content: WorkflowDraftContent, index: number) {
   const found: string[] = [];
   for (let next = index + 1; next < content.steps.length;) {
     const step = content.steps[next]!;

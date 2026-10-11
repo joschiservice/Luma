@@ -168,7 +168,7 @@ function sumMoney(values: CanonicalMoney[]): CanonicalMoney | null {
 }
 
 /** Sums refund payments by outcome. Pending and failed payments never count as refunded. */
-export function refundTotals(refunds: RefundData[]): RefundTotals {
+function refundTotals(refunds: RefundData[]): RefundTotals {
   const transactions = refunds.flatMap((refund) => refund.transactions);
   const currencies = new Set(
     transactions.map((transaction) => transaction.amount.currency),

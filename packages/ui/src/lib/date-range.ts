@@ -8,7 +8,7 @@ export interface CalendarRange {
 }
 
 /** Moves an ISO calendar date by whole days without applying a browser-local offset. */
-export function shiftCalendarDay(value: string, days: number) {
+function shiftCalendarDay(value: string, days: number) {
   return new Date(Date.parse(`${value}T00:00:00Z`) + days * 86400000)
     .toISOString()
     .slice(0, 10);
@@ -24,7 +24,7 @@ const presetLabels = {
 } satisfies Record<CalendarPresetId, () => string>;
 
 /** Names a quick range in the interface language, such as "Last 30 days". */
-export function calendarPresetLabel(id: CalendarPresetId) {
+function calendarPresetLabel(id: CalendarPresetId) {
   return presetLabels[id]();
 }
 

@@ -217,15 +217,13 @@ export interface OrderProgress {
   next: NextAction;
 }
 
-const day = 86_400_000;
-
 const dateOnly = (iso: string) => iso.slice(0, 10);
 
 const plural = (count: number, word: string) =>
   `${count} ${word}${count === 1 ? '' : 's'}`;
 
 /** Formats a quantity without float noise. */
-export function formatQuantity(value: number) {
+function formatQuantity(value: number) {
   return Number(value.toFixed(6)).toLocaleString('en-US', {
     maximumFractionDigits: 6,
     useGrouping: false,
@@ -806,11 +804,6 @@ function nextAction(input: {
       ? `Expected on ${input.expectedDate}. Receipt is booked in the purchasing system.`
       : 'Receipt is booked in the purchasing system.',
   };
-}
-
-/** Days between two calendar dates, positive when `later` is after `earlier`. */
-export function daysBetween(earlier: string, later: string) {
-  return Math.round((Date.parse(later) - Date.parse(earlier)) / day);
 }
 
 /** A supplier message captured for an order. Text is removed after its retention period. */

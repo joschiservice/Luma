@@ -11,8 +11,6 @@ import { z } from 'zod';
 
 import { createReadBudget, type ReadBudget } from './read-budget.js';
 
-export { fail, parse } from '@luma/connector-core/transport';
-
 export const API_VERSION = '2026-07';
 
 export interface ShopifyTransportOptions {

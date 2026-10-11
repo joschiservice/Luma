@@ -59,7 +59,7 @@ export function createSalesRuntime(
 }
 
 /** Evaluates the workspace release in application code; workflow replay receives only its result. */
-export function createSalesRelease(observability?: Observability) {
+function createSalesRelease(observability?: Observability) {
   return async (context: TenantContext) => {
     if (!observability) return false;
     const observation = observability.request(context.requestId);

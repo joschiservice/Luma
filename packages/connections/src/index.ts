@@ -1,10 +1,6 @@
 export type { Provider, ProviderCatalog } from './application/providers.js';
 
-export {
-  authorityGroups,
-  eligibleAuthority,
-  resolveAuthority,
-} from './domain/authority.js';
+export { authorityGroups, resolveAuthority } from './domain/authority.js';
 
 export type {
   AuthorityConnection,

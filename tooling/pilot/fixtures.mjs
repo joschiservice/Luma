@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { defaultConfiguration } from '@luma/exceptions';
 import { parseInput } from '@luma/exceptions/composition';
 
-export const scenarios = [
+const scenarios = [
   'healthy',
   'decisions-needed',
   'diagnosis-pending',
@@ -22,7 +22,7 @@ export const scenarios = [
 export const readJson = async (path) =>
   JSON.parse(await readFile(path, 'utf8'));
 
-export const corpus = await readJson(
+const corpus = await readJson(
   new URL(
     '../../packages/exceptions/fixtures/exceptions-v0.json',
     import.meta.url,
@@ -36,7 +36,7 @@ export const jtl = await readJson(
   ),
 );
 
-export const shopify = await readJson(
+const shopify = await readJson(
   new URL(
     '../../packages/apps/shopify/src/infrastructure/fixtures/commerce.json',
     import.meta.url,

@@ -14,7 +14,7 @@ const time = z.string().datetime({ offset: true });
 const refs = z.array(z.string().min(1).max(200)).min(1).max(50);
 const code = z.string().min(1).max(100);
 
-export const measurementFactSchema = z.discriminatedUnion('kind', [
+const measurementFactSchema = z.discriminatedUnion('kind', [
   z
     .object({
       kind: z.literal('environment'),

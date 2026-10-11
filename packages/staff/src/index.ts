@@ -1,5 +1,3 @@
-export { StaffError, staffPermissions } from './domain/access.js';
-
 export type { StaffContext, StaffPermission } from './domain/access.js';
 
 export type {

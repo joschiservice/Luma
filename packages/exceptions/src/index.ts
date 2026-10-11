@@ -1,5 +1,3 @@
-export { createDetectionService } from './application/detection.js';
-
 export type {
   DetectionRepository,
   DetectionRequest,
@@ -24,8 +22,6 @@ export type {
   ExceptionClass,
   Facts,
 } from './domain/facts.js';
-
-export { createDiagnosisService } from './application/diagnosis.js';
 
 export type {
   DiagnosisOptions,

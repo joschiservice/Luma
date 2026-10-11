@@ -26,7 +26,7 @@ import { LazyCodeEditor } from './lazy-code-editor';
 const narrowQuery = '(max-width: 760px)';
 
 /** Tracks whether the viewport is narrow, where code is shown read-only. */
-export function useNarrow() {
+function useNarrow() {
   return useSyncExternalStore(
     (notify) => {
       const query = window.matchMedia(narrowQuery);
@@ -48,7 +48,7 @@ function lineOf(text: string, pattern: string, from = 1) {
 }
 
 /** Places server diagnostics on the lines of code they refer to. */
-export function codeDiagnostics(
+function codeDiagnostics(
   text: string,
   diagnostics: WorkflowDiagnostic[],
 ): CodeEditorDiagnostic[] {
@@ -74,7 +74,7 @@ export function codeDiagnostics(
 }
 
 /** Suggests names from the workspace vocabulary while editing workflow code. */
-export function vocabularyCompletions(
+function vocabularyCompletions(
   vocabulary: AuthoringVocabulary,
 ): CodeEditorCompletion[] {
   return [

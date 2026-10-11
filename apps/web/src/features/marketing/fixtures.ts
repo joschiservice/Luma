@@ -36,7 +36,7 @@ export const self = alex;
 
 export const timeZone = 'Europe/Berlin';
 
-export const storeLabel = 'Northstar Shop';
+const storeLabel = 'Northstar Shop';
 
 type Text = { en: string; de: string };
 

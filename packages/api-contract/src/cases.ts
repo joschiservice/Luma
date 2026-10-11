@@ -107,7 +107,7 @@ export const caseEvidenceQuerySchema = z
   })
   .strict();
 
-export const caseEvidenceSchema = evidenceReferenceSchema.extend({
+const caseEvidenceSchema = evidenceReferenceSchema.extend({
   completeness: z.enum(['complete', 'incomplete', 'unknown']),
 });
 

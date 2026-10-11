@@ -12,7 +12,7 @@ import {
 
 const text = z.string().min(1);
 
-export const workflowTriggerSchema = z.discriminatedUnion('kind', [
+const workflowTriggerSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('exception'), issueType: text }),
   z.object({ kind: z.literal('manual') }),
   z.object({ kind: z.literal('event'), eventType: text }),
@@ -61,7 +61,7 @@ const workflowVersionBaseSchema = playbookVersionViewSchema
     }),
   });
 
-export const workflowVersionViewSchema = z.union([
+const workflowVersionViewSchema = z.union([
   workflowVersionBaseSchema,
   workflowVersionBaseSchema.omit({ policy: true, outcome: true }).extend({
     format: z.literal('workflow/2'),
@@ -72,7 +72,7 @@ export const workflowVersionViewSchema = z.union([
 ]);
 
 /** Where an operator repairs an issue. `server` means only whoever runs Luma can fix it. */
-export const readinessRepairSchema = z.object({
+const readinessRepairSchema = z.object({
   label: text,
   destination: z.enum([
     'connections',
@@ -89,7 +89,7 @@ export const readinessRepairSchema = z.object({
   recordId: text.optional(),
 });
 
-export const readinessIssueSchema = z.object({
+const readinessIssueSchema = z.object({
   code: text,
   /** `blocking` stops the workflow; `degrading` stops part of its coverage. */
   severity: z.enum(['blocking', 'degrading']),

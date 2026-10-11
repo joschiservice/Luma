@@ -36,7 +36,7 @@ const sessionsSchema = z.array(
 type AccountSession = z.infer<typeof sessionsSchema>[number];
 
 /** Reads active account sessions; failed or malformed responses never appear as an empty list. */
-export const accountSessionsOptions = () =>
+const accountSessionsOptions = () =>
   queryOptions({
     ...privateQueryDefaults,
     queryKey: accountSessionsKey,

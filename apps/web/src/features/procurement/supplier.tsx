@@ -85,7 +85,7 @@ function Stat({
 }
 
 /** Shows what is ordered from a supplier, where each order stands and what it supplies. */
-export function SupplierRecordView({
+function SupplierRecordView({
   organizationId,
   record,
   context,

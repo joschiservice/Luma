@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { endpoint } from '../common.js';
 
-export const connectorProviderSchema = z.object({
+const connectorProviderSchema = z.object({
   id: z.string().regex(/^[a-z][a-z0-9-]*$/),
   name: z.string().min(1),
   category: z.enum(['storefront', 'erp']),

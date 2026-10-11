@@ -107,7 +107,7 @@ export interface ChaosRequest {
 }
 
 /** Returns the window active at `now` for the target, if any. */
-export function activeWindow(
+function activeWindow(
   windows: readonly ChaosWindow[],
   instance: string,
   operation: string,

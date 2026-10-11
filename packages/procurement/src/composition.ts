@@ -25,12 +25,7 @@ import {
   transitionInputSchema,
 } from './infrastructure/validation.js';
 
-export {
-  createProcurementCapabilities,
-  procurementCapabilityCatalog,
-} from './infrastructure/capabilities.js';
-
-export { createSimulatedProcurement } from './infrastructure/simulator.js';
+export { createProcurementCapabilities } from './infrastructure/capabilities.js';
 
 /** Composes authoritative procurement storage with refreshed membership and transactional audit. */
 export function createProcurement(
@@ -129,8 +124,6 @@ export function createSupplierCommitmentService(
     },
   });
 }
-
-export { submissionAction } from './application/commitments.js';
 
 export type {
   PurchasingConnection,

@@ -7,7 +7,7 @@ import { expect, it } from 'vitest';
 import { database, signup, startApi } from './helpers.mjs';
 
 /** A computation workflow that validates against the default installed vocabulary. */
-export const checkOrder = {
+const checkOrder = {
   schemaVersion: 2,
   definition: {
     id: 'order-hold-check',

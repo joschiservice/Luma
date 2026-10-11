@@ -9,10 +9,7 @@ export type {
   TransitionInput,
 } from './domain/procurement.js';
 
-export {
-  planReplenishment,
-  replenishmentSource,
-} from './domain/replenishment.js';
+export { replenishmentSource } from './domain/replenishment.js';
 
 export type { ReplenishmentRule } from './domain/replenishment.js';
 

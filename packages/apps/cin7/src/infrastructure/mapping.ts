@@ -25,7 +25,7 @@ export const ref = (externalId: string, scopeKey = ''): ExternalId => ({
 });
 
 /** Source text, or null when blank or longer than `max`; text is never truncated. */
-export const text = (value: string | null | undefined, max = 512) => {
+const text = (value: string | null | undefined, max = 512) => {
   const trimmed = value?.trim();
 
   return trimmed && trimmed.length <= max ? trimmed : null;
@@ -77,7 +77,7 @@ interface Line {
  * Sums a document's lines per product. Cin7 lines have no ID, so a product identifies its line
  * within the sale or purchase; lines without a product, such as charges, are not product lines.
  */
-export function byProduct(lines: Line[]) {
+function byProduct(lines: Line[]) {
   const result = new Map<
     string,
     { quantity: string; sku: string | null; name: string | null }

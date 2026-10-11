@@ -15,13 +15,13 @@ export const id = z
   .union([externalId, z.number().int().positive().max(2147483647)])
   .transform(String);
 
-export const timestamp = z
+const timestamp = z
   .string()
   .datetime({ offset: true })
   .refine((value) => !value.startsWith('0001-'));
 
 // Reject values outside the canonical precision instead of silently rounding them.
-export const decimal = z
+const decimal = z
   .union([z.number().finite(), z.string()])
   .transform(String)
   .refine((value) => /^-?\d{1,14}(\.\d{1,6})?$/.test(value));

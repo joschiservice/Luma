@@ -180,7 +180,6 @@
   "identity_access_role_missing": "Your {role} role doesn’t include {permission}. Ask a workspace admin if you need it.",
   "identity_access_missing": "Your role doesn’t include {permission}. Ask a workspace admin if you need it.",
   "identity_access_see_role": "See what your role allows",
-  "identity_access_requires": "Requires {permission}",
   "identity_layout_skip": "Skip to content",
   "identity_layout_sidebar_label": "Workspace",
   "identity_layout_sidebar_expand": "Expand sidebar",

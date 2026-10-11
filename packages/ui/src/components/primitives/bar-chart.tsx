@@ -59,7 +59,7 @@ export interface ChartSelection {
 }
 
 /** Rounds a maximum up to a readable axis: 1, 2 or 5 times a power of ten per step. */
-export function chartTicks(max: number, count = 4) {
+function chartTicks(max: number, count = 4) {
   if (max <= 0) return [0, 1];
   const rough = max / count;
   const power = 10 ** Math.floor(Math.log10(rough));

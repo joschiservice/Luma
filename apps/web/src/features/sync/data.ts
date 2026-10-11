@@ -18,7 +18,7 @@ export const syncKey = (organizationId: string) =>
   ['private', 'organization', organizationId, 'sync'] as const;
 
 /** Whether any sync is actively reading, so the view should refresh quickly. */
-export function syncBusy(overview: SyncOverview | undefined) {
+function syncBusy(overview: SyncOverview | undefined) {
   return !!overview?.connections.some((connection) =>
     connection.recordTypes.some(
       ({ stream }) =>

@@ -87,7 +87,7 @@ function useHashTarget(ready: unknown) {
 }
 
 /** Reads current workflow controls and history independently and hides private content after access loss. */
-export function WorkflowDetailPage({
+function WorkflowDetailPage({
   organizationId,
   definitionId,
   filters = {},

@@ -87,7 +87,7 @@ export function insightChartOptions(
   });
 }
 
-export const recordPageSize = 25;
+const recordPageSize = 25;
 
 /**
  * Lists the records behind a chart point and series at the chart's evaluation time, so the

@@ -1,6 +1,6 @@
 export type * from './domain/playbook.js';
 
-export { playbookEligible, playbookValue } from './domain/playbook.js';
+export { playbookEligible } from './domain/playbook.js';
 
 export type * from './domain/playbook-library.js';
 
@@ -64,11 +64,6 @@ export type {
 
 export { connectionBlockers } from './application/playbook-library.js';
 
-export {
-  parseWorkflowSource,
-  printWorkflowSource,
-} from './domain/workflow-code.js';
-
 export { createProcessActivities } from './application/process-activities.js';
 
 export { presentProcessVersion } from './domain/process-presentation.js';
@@ -79,21 +74,11 @@ export type * from './domain/code-step.js';
 
 export type { CodeJournal } from './application/code-activity.js';
 
-export { createCodeActivity } from './application/code-activity.js';
-
 export { CodeRequestStopped } from './domain/code-step.js';
 
 export type * from './domain/draft-test.js';
 
-export {
-  adaptCase,
-  checkTestCase,
-  defaultCase,
-  repliesFromOutputs,
-  sameStep,
-} from './domain/draft-test.js';
-
-export { presentTestResult } from './domain/draft-test-presentation.js';
+export { adaptCase, defaultCase, sameStep } from './domain/draft-test.js';
 
 export type {
   DraftTests,
@@ -105,7 +90,7 @@ export type {
   TestScenarioSource,
 } from './application/draft-tests.js';
 
-export { createDraftTests, runExampleCode } from './application/draft-tests.js';
+export { createDraftTests } from './application/draft-tests.js';
 
 export type * from './domain/draft-generation.js';
 
@@ -131,8 +116,6 @@ export {
 } from './domain/readiness.js';
 
 export type * from './domain/case-workflow.js';
-
-export { caseRunOutcome, caseStartable } from './domain/case-workflow.js';
 
 export type {
   CaseActivationStore,

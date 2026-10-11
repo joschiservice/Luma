@@ -9,12 +9,10 @@ import { z } from 'zod';
 
 import { createRequestPacer, type RequestPacer } from './pacer.js';
 
-export { fail, parse } from '@luma/connector-core/transport';
-
 export const API_VERSION = 'v2';
 
 /** The fixed Cin7 Core API root; accounts are selected by header, not by host. */
-export const API_ROOT = 'https://inventory.dearsystems.com/ExternalApi/v2/';
+const API_ROOT = 'https://inventory.dearsystems.com/ExternalApi/v2/';
 
 export interface Cin7Connection {
   /** Cin7 Core account ID. It selects the company and is not secret. */

@@ -3,7 +3,7 @@ import { z } from 'zod';
 const timestamp = z.string().datetime({ offset: true });
 
 /** Records the assistant can read and cite. Each has a detail page in the workspace. */
-export const assistantRecordKindSchema = z.enum([
+const assistantRecordKindSchema = z.enum([
   'order',
   'issue',
   'stock_position',
@@ -19,7 +19,7 @@ export const assistantAvailabilitySchema = z.object({
 });
 
 /** An earlier turn of the conversation, as the client shows it. Luma doesn't store conversations. */
-export const assistantTurnSchema = z
+const assistantTurnSchema = z
   .object({
     role: z.enum(['user', 'assistant']),
     content: z.string().min(1).max(8000),
@@ -37,7 +37,7 @@ export const askAssistantSchema = z
   .strict();
 
 /** A record an answer refers to, with the source and observation time of the data read. */
-export const assistantCitationSchema = z.object({
+const assistantCitationSchema = z.object({
   kind: assistantRecordKindSchema,
   id: z.string().uuid(),
   label: z.string(),
@@ -52,7 +52,7 @@ export const assistantCitationSchema = z.object({
 });
 
 /** One read the assistant made while answering. */
-export const assistantStepSchema = z.object({
+const assistantStepSchema = z.object({
   tool: z.string(),
   summary: z.string(),
   outcome: z.enum([

@@ -32,9 +32,9 @@ export const insightChartSchema = z.enum([
 ]);
 
 /** Time windows ending today in the requested time zone: 7 or 30 days by day, 13 weeks by week. */
-export const insightRangeSchema = z.enum(['7d', '30d', '13w']);
+const insightRangeSchema = z.enum(['7d', '30d', '13w']);
 
-export const insightUnitSchema = z.enum([
+const insightUnitSchema = z.enum([
   'order',
   'fulfillment',
   'stock_position',
@@ -93,13 +93,13 @@ export const insightRecordQuerySchema = z
  * some source's history or extends past `dataThrough`. Sources that were never imported are
  * reported by the chart's `coverage` instead.
  */
-export const insightPointCoverageSchema = z.enum([
+const insightPointCoverageSchema = z.enum([
   'complete',
   'partial',
   'not_imported',
 ]);
 
-export const insightPointSchema = z.object({
+const insightPointSchema = z.object({
   key: z.string(),
   /** First and last calendar day of a timeline bucket, in the requested time zone. */
   start: day.nullable(),
@@ -120,7 +120,7 @@ export const insightPointSchema = z.object({
  * `paused` sync is paused or blocked; `disconnected` the connection no longer reads;
  * `not_synced` records arrive only as individual observations, with no complete import.
  */
-export const insightSourceStateSchema = z.enum([
+const insightSourceStateSchema = z.enum([
   'complete',
   'limited',
   'importing',
@@ -131,7 +131,7 @@ export const insightSourceStateSchema = z.enum([
   'not_synced',
 ]);
 
-export const insightSourceSchema = z.object({
+const insightSourceSchema = z.object({
   connectionId: z.string().uuid(),
   label: z.string(),
   system: z.string().nullable(),
@@ -143,7 +143,7 @@ export const insightSourceSchema = z.object({
   lastReadAt: timestamp.nullable(),
 });
 
-export const insightCoverageSchema = z.object({
+const insightCoverageSchema = z.object({
   /**
    * `complete` every source covers the window; `partial` at least one source is limited,
    * importing, failing, paused or not synced; `stale` reads are older than 24 hours;
@@ -192,7 +192,7 @@ const source = z.object({
   label: z.string(),
 });
 
-export const insightRecordSchema = z.discriminatedUnion('kind', [
+const insightRecordSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('order'),
     id: z.string().uuid(),

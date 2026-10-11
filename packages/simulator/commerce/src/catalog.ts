@@ -159,7 +159,7 @@ function shuffle<T>(random: Random, values: T[]) {
 }
 
 /** Average units ordered per order, from the basket profile. */
-export function unitsPerOrder(profile: MerchantProfile) {
+function unitsPerOrder(profile: MerchantProfile) {
   const mean = (weights: number[]) => {
     const total = weights.reduce((sum, weight) => sum + weight, 0);
 

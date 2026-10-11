@@ -20,7 +20,7 @@ export interface ItemStock {
 }
 
 /** Derives the stock totals JTL reports for an item. */
-export function stockOf(item: ItemRecord): ItemStock {
+function stockOf(item: ItemRecord): ItemStock {
   const total = Object.values(item.stock).reduce(
     (sum, value) => sum + value,
     0,

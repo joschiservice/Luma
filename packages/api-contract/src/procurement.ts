@@ -4,7 +4,7 @@ import { stockPositionSchema } from './inventory.js';
 
 const text = z.string().trim().min(1).max(200);
 
-export const externalReferenceSchema = z
+const externalReferenceSchema = z
   .object({
     system: text,
     externalId: text,
@@ -21,7 +21,7 @@ export const supplierInputSchema = z
   })
   .strict();
 
-export const supplierLinkSchema = z
+const supplierLinkSchema = z
   .object({
     connectionId: z.string().uuid(),
     externalId: z.string().min(1).max(200),
@@ -40,7 +40,7 @@ export const supplierSchema = supplierInputSchema.extend({
   confirmationHours: z.number().int().min(1).optional(),
 });
 
-export const purchaseOrderStatusSchema = z.enum([
+const purchaseOrderStatusSchema = z.enum([
   'draft',
   'open',
   'closed',
@@ -109,7 +109,7 @@ export type TransitionInput = z.output<typeof transitionInputSchema>;
 
 export type PurchaseOrderStatus = PurchaseOrder['status'];
 
-export const procurementEventSchema = z.object({
+const procurementEventSchema = z.object({
   id: z.string().uuid(),
   commandId: z.string().uuid().optional(),
   occurredAt: z.string().datetime(),
@@ -175,7 +175,7 @@ export const purchasingSupplierSchema = z.object({
   email: z.string().nullable(),
 });
 
-export const submissionStateSchema = z.enum([
+const submissionStateSchema = z.enum([
   'not_executed',
   'approval_required',
   'approved',
@@ -187,7 +187,7 @@ export const submissionStateSchema = z.enum([
   'failed',
 ]);
 
-export const submissionSchema = z.object({
+const submissionSchema = z.object({
   id: z.string().uuid(),
   tenantId: z.string().uuid(),
   purchaseOrderId: z.string().uuid(),
@@ -227,7 +227,7 @@ export const submissionViewSchema = submissionSchema.extend({
   message: z.string(),
 });
 
-export const commitmentKindSchema = z.enum([
+const commitmentKindSchema = z.enum([
   'confirmed_quantity',
   'promised_date',
   'shipped',
@@ -330,7 +330,7 @@ export const followUpSchema = z.object({
   respondedAt: z.string().datetime(),
 });
 
-export const purchasingObservationSchema = z.object({
+const purchasingObservationSchema = z.object({
   id: z.string().uuid(),
   tenantId: z.string().uuid(),
   purchaseOrderId: z.string().uuid(),
@@ -369,7 +369,7 @@ export const orderStageSchema = z.enum([
   'cancelled',
 ]);
 
-export const attentionSchema = z.object({
+const attentionSchema = z.object({
   key: z.string(),
   kind: z.enum([
     'submission_approval',
@@ -386,7 +386,7 @@ export const attentionSchema = z.object({
   summary: z.string(),
 });
 
-export const nextOwnerSchema = z.enum([
+const nextOwnerSchema = z.enum([
   'buyer',
   'approver',
   'supplier',
@@ -395,7 +395,7 @@ export const nextOwnerSchema = z.enum([
   'none',
 ]);
 
-export const orderProgressSchema = z.object({
+const orderProgressSchema = z.object({
   milestones: z.array(
     z.object({
       key: z.enum(['drafted', 'submitted', 'confirmed', 'received']),

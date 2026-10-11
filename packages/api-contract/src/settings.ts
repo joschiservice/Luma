@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { roleReferenceSchema } from './roles.js';
 
-export const workspaceSettingsSchema = z.object({
+const workspaceSettingsSchema = z.object({
   name: z.string(),
   slug: z.string(),
   dataRegion: z.string(),
@@ -16,18 +16,13 @@ export const workspaceSettingsSchema = z.object({
   writeMode: z.enum(['observe_only', 'writes_enabled']),
 });
 
-export const notificationPreferencesSchema = z.object({
+const notificationPreferencesSchema = z.object({
   issues: z.boolean(),
   connections: z.boolean(),
   revision: z.number().int(),
 });
 
-export const deliveryStateSchema = z.enum([
-  'queued',
-  'sent',
-  'failed',
-  'cancelled',
-]);
+const deliveryStateSchema = z.enum(['queued', 'sent', 'failed', 'cancelled']);
 
 export const invitationSchema = z.object({
   id: z.string().uuid(),
@@ -56,7 +51,7 @@ export const supportAccessDurationSchema = z.union([
   z.literal(168),
 ]);
 
-export const supportAccessRequestSchema = z.object({
+const supportAccessRequestSchema = z.object({
   id: z.string().uuid(),
   /** Why Luma support asks for access, written by the support team. */
   reason: z.string(),

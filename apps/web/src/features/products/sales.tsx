@@ -9,7 +9,7 @@ import { formatSourceNumber } from '../orders/presentation';
 type Sales = ProductDetail['sales']['sources'][number];
 
 /** Expands sparse daily totals into one entry per UTC day from `since`, zero-filled. */
-export function dailySeries(sales: Sales, since: string, days = 30) {
+function dailySeries(sales: Sales, since: string, days = 30) {
   const totals = new Map(
     sales.daily.map((day) => [day.date, Number(day.quantity)]),
   );

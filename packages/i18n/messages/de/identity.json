@@ -180,7 +180,6 @@
   "identity_access_role_missing": "Deine Rolle „{role}“ umfasst nicht die Berechtigung {permission}. Wende dich an einen Workspace-Admin, falls du sie benötigst.",
   "identity_access_missing": "Deine Rolle umfasst nicht die Berechtigung {permission}. Wende dich an einen Workspace-Admin, falls du sie benötigst.",
   "identity_access_see_role": "Berechtigungen deiner Rolle ansehen",
-  "identity_access_requires": "Erfordert {permission}",
   "identity_layout_skip": "Zum Inhalt springen",
   "identity_layout_sidebar_label": "Workspace",
   "identity_layout_sidebar_expand": "Seitenleiste ausklappen",

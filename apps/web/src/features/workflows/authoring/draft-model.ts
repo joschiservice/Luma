@@ -296,7 +296,7 @@ export function valueLabel(value: StepValue | ValueOption) {
 }
 
 /** Formats a whole number of seconds in the largest unit that divides it, such as “2 hours”. */
-export function formatDuration(seconds: number) {
+function formatDuration(seconds: number) {
   const [unit, size] =
     (
       [
@@ -333,17 +333,6 @@ export function diagnosticsAt(
         item.field === field ||
         item.field?.startsWith(`${field}.`)),
   );
-}
-
-/** Ordered IDs of steps an approval or check may name at this position. */
-export function actionsNear(content: WorkflowDraftContent, index: number) {
-  return content.steps
-    .map((step, position) => ({ step, position }))
-    .filter(
-      ({ step, position }) =>
-        step.kind === 'capability' && Math.abs(position - index) <= 1,
-    )
-    .map(({ step }) => step.id);
 }
 
 /** Where a new step lands by default: before the final Finish or Escalate step, else at the end. */

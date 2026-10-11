@@ -5,7 +5,7 @@ import { recordKindSchema } from './records.js';
 const timestamp = z.string().datetime({ offset: true });
 
 /** The owner whose authoritative decision an item projects. */
-export const decisionKindSchema = z.enum([
+const decisionKindSchema = z.enum([
   'case',
   'replenishment',
   'fulfillment_recovery',
@@ -19,7 +19,7 @@ export const decisionKindSchema = z.enum([
  * waiting for its requester; `recovery` is an accepted or uncertain write that needs a check;
  * `manual_intervention` is a step Luma can't take; `uncertainty` is evidence Luma won't act on.
  */
-export const decisionReasonSchema = z.enum([
+const decisionReasonSchema = z.enum([
   'approval',
   'run',
   'recovery',
@@ -27,7 +27,7 @@ export const decisionReasonSchema = z.enum([
   'uncertainty',
 ]);
 
-export const decisionDomainSchema = z.enum([
+const decisionDomainSchema = z.enum([
   'orders',
   'fulfillment',
   'inventory',
@@ -40,7 +40,7 @@ export const decisionDomainSchema = z.enum([
  * `check` an accepted or uncertain write; `investigate` in the issue; `awaiting_other` means
  * someone else must approve; `view_only` means the reader's permissions don't allow a response.
  */
-export const decisionResponseSchema = z.enum([
+const decisionResponseSchema = z.enum([
   'decide',
   'run',
   'check',
@@ -49,10 +49,10 @@ export const decisionResponseSchema = z.enum([
   'view_only',
 ]);
 
-export const decisionViewSchema = z.enum(['all', 'mine', 'unassigned']);
+const decisionViewSchema = z.enum(['all', 'mine', 'unassigned']);
 
 /** Where the authoritative decision controls live. Every surface acts on this same owner. */
-export const decisionOwnerSchema = z.discriminatedUnion('kind', [
+const decisionOwnerSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('case'), exceptionId: z.string().uuid() }),
   z.object({
     kind: z.literal('workflow_run'),
@@ -77,7 +77,7 @@ export const decisionOwnerSchema = z.discriminatedUnion('kind', [
   }),
 ]);
 
-export const decisionAssignmentSchema = z.object({
+const decisionAssignmentSchema = z.object({
   assigneeId: z.string().uuid().nullable(),
   assignedBy: z.string().uuid(),
   assignedAt: timestamp,
@@ -85,7 +85,7 @@ export const decisionAssignmentSchema = z.object({
   revision: z.number().int().nonnegative(),
 });
 
-export const decisionItemSchema = z.object({
+const decisionItemSchema = z.object({
   observeOnly: z.boolean().optional(),
   /** Stable queue ID, such as `case:<uuid>`. Assignments and links use it. */
   id: z.string().min(1).max(200),
@@ -138,7 +138,7 @@ export const decisionQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(25),
 });
 
-export const decisionSourceSchema = z.object({
+const decisionSourceSchema = z.object({
   id: z.string(),
   label: z.string(),
   /** `unavailable`: the owner failed to answer, so its decisions are missing from this page. */

@@ -63,17 +63,6 @@ export function createAdmission(
   });
 }
 
-/** Give interpreted logic only this bound, reference-only function. Do not pass the service or provisioning store. */
-export function bindActionAdmission(
-  admission: import('./application/admission.js').ActionAdmission,
-  context: import('@luma/identity').TenantContext,
-  runId: string,
-) {
-  return Object.freeze({
-    execute: (stepId: string) => admission.execute(context, { runId, stepId }),
-  });
-}
-
 export { createExecutionService, createActionAdmission };
 
 export { parseEvidence, parseVerification };

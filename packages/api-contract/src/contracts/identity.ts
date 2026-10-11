@@ -19,9 +19,9 @@ export const organizationSchema = z.object({
 });
 
 /** A suspended membership keeps its role but has no access to the workspace until reactivated. */
-export const membershipStatusSchema = z.enum(['active', 'suspended']);
+const membershipStatusSchema = z.enum(['active', 'suspended']);
 
-export const membershipSchema = z.object({
+const membershipSchema = z.object({
   name: z.string().optional(),
   email: z.string().optional(),
   id: z.string().uuid(),
@@ -32,11 +32,11 @@ export const membershipSchema = z.object({
 });
 
 /** A workspace in the signed-in person's list, with their membership status in it. */
-export const organizationAccessSchema = organizationSchema.extend({
+const organizationAccessSchema = organizationSchema.extend({
   membershipStatus: membershipStatusSchema,
 });
 
-export const tenantContextSchema = z.object({
+const tenantContextSchema = z.object({
   tenantId: z.string().uuid(),
   dataRegion: z.literal('EU'),
   requestId: z.string(),
@@ -63,7 +63,7 @@ export const tenantContextSchema = z.object({
     .optional(),
 });
 
-export const supportViewEndReasonSchema = z.enum([
+const supportViewEndReasonSchema = z.enum([
   'ended',
   'expired',
   'consent_revoked',
@@ -72,7 +72,7 @@ export const supportViewEndReasonSchema = z.enum([
 ]);
 
 /** The support view this browser holds, if any. */
-export const supportViewStateSchema = z.discriminatedUnion('active', [
+const supportViewStateSchema = z.discriminatedUnion('active', [
   z.object({
     active: z.literal(false),
     /** Why the view this browser held ended, when it just ended. */
@@ -113,7 +113,7 @@ export const securityEventTypeSchema = z.enum([
   'account.restored',
 ]);
 
-export const securityEventSchema = z.object({
+const securityEventSchema = z.object({
   id: z.string().uuid(),
   type: securityEventTypeSchema,
   outcome: z.enum(['succeeded', 'failed']),
@@ -134,7 +134,7 @@ export type Membership = z.infer<typeof membershipSchema>;
 
 export type TenantContextResponse = z.infer<typeof tenantContextSchema>;
 
-export const memberParamsSchema = organizationParamsSchema.extend({
+const memberParamsSchema = organizationParamsSchema.extend({
   memberId: z.string().uuid(),
 });
 

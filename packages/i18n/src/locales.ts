@@ -1,6 +1,6 @@
-import { baseLocale, type Locale, locales } from '../dist/paraglide/runtime.js';
+import type { Locale } from '../dist/paraglide/runtime.js';
 
-export { baseLocale, type Locale, locales };
+export type { Locale };
 
 /** Each language's own name, so people can find their language whatever the current one is. */
 export const localeNames: Record<Locale, string> = {

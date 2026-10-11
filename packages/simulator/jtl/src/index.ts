@@ -26,7 +26,7 @@ export type { JtlOrderView } from './orders.js';
 
 export { supplierEvents } from './purchasing.js';
 
-export { JtlError, kinds } from './records.js';
+export { kinds } from './records.js';
 
 // A host can serve this ERP model through another provider's API, such as Cin7's.
 export type {

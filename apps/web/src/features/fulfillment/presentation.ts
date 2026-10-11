@@ -54,7 +54,7 @@ export const signalLabels = localized({
   failed: m.fulfillment_signal_failed,
 } satisfies Record<FulfillmentSignal, () => string>);
 
-export const holdLabels: Record<string, string> = localized({
+const holdLabels: Record<string, string> = localized({
   awaiting_payment: m.fulfillment_hold_awaiting_payment,
   high_risk_of_fraud: m.fulfillment_hold_high_risk_of_fraud,
   incorrect_address: m.fulfillment_hold_incorrect_address,

@@ -7,7 +7,7 @@ export const organizationId = '22222222-2222-4222-8222-222222222222';
 
 export const exceptionId = '11111111-1111-4111-8111-111111111111';
 
-export const evidenceId = '33333333-3333-4333-8333-333333333333';
+const evidenceId = '33333333-3333-4333-8333-333333333333';
 
 export const workflow = 'shipping-method-correction';
 
@@ -43,7 +43,7 @@ const summary: Omit<WorkflowSummary, 'readiness'> = {
 };
 
 /** Supplies a bounded shipping prediction for interactive UI previews. */
-export function comparison(): ShadowComparison {
+function comparison(): ShadowComparison {
   return {
     evaluation: {
       id: '44444444-4444-4444-8444-444444444444',
@@ -91,7 +91,7 @@ export function comparison(): ShadowComparison {
 }
 
 /** Reports missing observations as empty denominators rather than zero performance. */
-export function report(items: ShadowComparison[]): ShadowReport {
+function report(items: ShadowComparison[]): ShadowReport {
   const unknown = { numerator: 0, denominator: 0, rate: null };
 
   return {

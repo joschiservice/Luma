@@ -1,16 +1,3 @@
-export {
-  failureMessage,
-  historyWindow,
-  nextDueAt,
-  planScan,
-  recordCapabilities,
-  recordTypeFor,
-  recordTypes,
-  retryDelayMs,
-  streamStatus,
-  syncPolicy,
-} from './domain/streams.js';
-
 export type {
   BlockReason,
   RecordType,
@@ -20,8 +7,6 @@ export type {
   StreamStatus,
   SyncStream,
 } from './domain/streams.js';
-
-export { readableKey } from './domain/labels.js';
 
 export { createSyncRunner } from './application/runner.js';
 

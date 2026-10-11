@@ -118,11 +118,6 @@ export { createPlaybookLibrary } from './application/playbook-library.js';
 
 export { createWorkflowTemplates } from './application/templates.js';
 
-export {
-  parseWorkflowSource,
-  printWorkflowSource,
-} from './domain/workflow-code.js';
-
 export { createPlaybookLibraryStore } from './infrastructure/playbooks/library.js';
 
 export { createPlaybookActivations } from './application/playbook-activations.js';
@@ -133,18 +128,9 @@ export { activationRequestSchema } from './infrastructure/playbooks/schema.js';
 
 export { createPlaybookService, parsePlaybookSnapshot, playbookHash };
 
-export {
-  defineWorkflow,
-  compileWorkflow,
-  printWorkflowCode,
-  parseWorkflowCode,
-} from './infrastructure/workflow-schema.js';
+export { defineWorkflow } from './infrastructure/workflow-schema.js';
 
 export { compileProcessWorkflow } from './infrastructure/process-schema.js';
-
-export { runProcess } from './application/process-runtime.js';
-
-export { createProcessActivities } from './application/process-activities.js';
 
 export { createProcessStepStore };
 
@@ -319,10 +305,6 @@ export { createWorkflowTriggers } from './application/triggers.js';
 
 export { parseProcessSnapshot } from './infrastructure/process-schema.js';
 
-export { presentProcessVersion } from './domain/process-presentation.js';
-
-export { presentTriggerRun } from './application/trigger-presentation.js';
-
 export { defineCodeStep, checkCodeStep } from './infrastructure/code/schema.js';
 
 export { createWasmtimeRunner } from './infrastructure/code/runner.js';
@@ -385,9 +367,7 @@ export function createDrafts(
 
 export {
   checkDraftContent,
-  checkProcessWorkflow,
   draftFromVersion,
-  parseDraftShape,
 } from './infrastructure/process-schema.js';
 
 /**

@@ -4,8 +4,6 @@ export type {
   CustomerProfile,
 } from './domain/profiles.js';
 
-export { replacesProfile } from './domain/profiles.js';
-
 export type {
   CustomerProfileQuery,
   CustomerProfiles,

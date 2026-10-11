@@ -43,7 +43,7 @@ export const activityQuerySchema = z
     { message: 'Select a date range of at most 366 days' },
   );
 
-export const activityActorKinds = [
+const activityActorKinds = [
   'member',
   'former_member',
   'luma',
@@ -67,7 +67,7 @@ export const activityActorSchema = z.object({
     .nullable(),
 });
 
-export const activityEventSchema = z.object({
+const activityEventSchema = z.object({
   id: z.string().max(200),
   recordedAt: z.string().datetime(),
   occurredAt: z.string().datetime().nullable(),

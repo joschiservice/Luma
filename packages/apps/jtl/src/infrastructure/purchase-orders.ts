@@ -89,8 +89,7 @@ const CREATED_SCAN_PAGES = 5;
 const CREATED_SCAN_PAGE_SIZE = 100;
 
 /** Marks an order so Luma can find it again; JTL never sends the internal comment to a supplier. */
-export const lumaOrderMarker = (lumaOrderId: string) =>
-  `luma-po:${lumaOrderId}`;
+const lumaOrderMarker = (lumaOrderId: string) => `luma-po:${lumaOrderId}`;
 
 function notDispatched(
   code: ConnectorFailure['code'],
@@ -105,7 +104,7 @@ function notDispatched(
 }
 
 /** Purchase orders are read with their detail; only allowlisted fields leave the adapter. */
-export function toSupplierOrder(order: PurchaseOrder): SupplierOrderSnapshot {
+function toSupplierOrder(order: PurchaseOrder): SupplierOrderSnapshot {
   // ERP 2.2 purchase-order lines carry no unit. Luma submits countable items only, so its own
   // orders are in `each`; for orders created elsewhere the unit is unknown.
   const unit = order.lumaOrderIds.length === 1 ? 'each' : 'unknown';

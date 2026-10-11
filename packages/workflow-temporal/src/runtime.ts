@@ -74,7 +74,7 @@ const sourceSchema = z
   .strict();
 
 /** Derives a stable workflow ID from the tenant and detection or incident source. */
-export function exceptionWorkflowId(tenantId: string, source: WorkflowSource) {
+function exceptionWorkflowId(tenantId: string, source: WorkflowSource) {
   return `exception-v1:${createHash('sha256')
     .update(JSON.stringify([tenantId, source.kind, source.id]))
     .digest('hex')}`;

@@ -36,7 +36,7 @@ export interface FaultRule {
 }
 
 /** Response loss happens after a write commits; every other manual fault replaces the response. */
-export const faultPhase = (kind: FaultKind) =>
+const faultPhase = (kind: FaultKind) =>
   kind === 'response-loss' ? 'after-commit' : 'before';
 
 /**

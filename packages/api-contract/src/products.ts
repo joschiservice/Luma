@@ -11,7 +11,7 @@ const listPriceSchema = z.object({
   currency: z.string().nullable(),
 });
 
-export const catalogFieldSchema = z.enum([
+const catalogFieldSchema = z.enum([
   'title',
   'status',
   'published',
@@ -19,14 +19,9 @@ export const catalogFieldSchema = z.enum([
   'barcode',
 ]);
 
-export const catalogViewSchema = z.enum([
-  'all',
-  'differs',
-  'missing',
-  'unlinked',
-]);
+const catalogViewSchema = z.enum(['all', 'differs', 'missing', 'unlinked']);
 
-export const catalogListingSchema = z.object({
+const catalogListingSchema = z.object({
   connectionId: z.string().uuid(),
   productId: z.string().uuid(),
   externalProduct: z.string().nullable(),
@@ -44,7 +39,7 @@ export const catalogListingSchema = z.object({
   sourceUpdatedAt: timestamp.nullable(),
 });
 
-export const catalogItemSchema = z.object({
+const catalogItemSchema = z.object({
   skuId: z.string().uuid(),
   sku: z.string(),
   skuKey: z.string(),
@@ -59,7 +54,7 @@ export const catalogItemSchema = z.object({
   ),
 });
 
-export const catalogSourceSchema = z.object({
+const catalogSourceSchema = z.object({
   connectionId: z.string().uuid(),
   label: z.string(),
   system: z.string().nullable(),

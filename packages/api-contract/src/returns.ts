@@ -21,7 +21,7 @@ export const returnStageSchema = z.enum([
 
 export const returnViewSchema = z.enum(['action', 'waiting', 'done', 'all']);
 
-export const refundStateSchema = z.enum([
+const refundStateSchema = z.enum([
   'none',
   'recorded',
   'pending',
@@ -30,7 +30,7 @@ export const refundStateSchema = z.enum([
   'refunded',
 ]);
 
-export const returnStatusSchema = z.enum([
+const returnStatusSchema = z.enum([
   'requested',
   'open',
   'closed',
@@ -71,7 +71,7 @@ export const returnListItemSchema = z.object({
   deleted: z.boolean(),
 });
 
-export const returnSourceSchema = z.object({
+const returnSourceSchema = z.object({
   connectionId: z.string().uuid(),
   label: z.string(),
   system: z.string().nullable(),

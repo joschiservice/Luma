@@ -124,7 +124,7 @@ interface AuditedMember {
 }
 
 /** Strips grants from a membership for API responses and command receipts. */
-export function memberDto(member: Membership): MemberDto {
+function memberDto(member: Membership): MemberDto {
   return {
     id: member.id,
     organizationId: member.organizationId,

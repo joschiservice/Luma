@@ -190,7 +190,7 @@ export function ScalarInput({
  * Chooses where a value comes from: a fixed value, an input, an evidence field or an output of an
  * earlier step. Only values available at this point and of the needed type are offered.
  */
-export function ValuePicker({
+function ValuePicker({
   type,
   value,
   scope,

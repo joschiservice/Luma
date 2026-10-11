@@ -5,7 +5,6 @@ import type { MerchantProfile } from '@luma/simulator-commerce';
 import {
   type ChaosProfile,
   type IncidentKindName,
-  incidentKinds,
   type ProviderContext,
   type ProviderEvent,
   type RecordStore,
@@ -104,7 +103,7 @@ export function instance(world: World, name: string): Instance {
 }
 
 /** Builds a provider context whose notifications are handled after the call. */
-export function providerContext(
+function providerContext(
   world: World,
   name: string,
   events: ProviderEvent[],
@@ -349,7 +348,3 @@ export async function closeIncident(world: World, id: string, reason: string) {
 
   return incident;
 }
-
-/** Labels an incident kind for summaries. */
-export const incidentLabel = (kind: IncidentKindName) =>
-  incidentKinds[kind].label;

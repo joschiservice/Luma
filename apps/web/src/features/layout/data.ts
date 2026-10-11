@@ -15,11 +15,11 @@ import { privateQueryDefaults } from '../../lib/private-query';
 import { settingsApi, SettingsError } from '../settings/data';
 
 /** Returns the query key for one member's layout in a workspace. */
-export const layoutKey = (organizationId: string) =>
+const layoutKey = (organizationId: string) =>
   ['private', 'organization', organizationId, 'layout'] as const;
 
 /** Loads the signed-in member's Home modules and sidebar pins for a workspace. */
-export const layoutOptions = (organizationId: string) =>
+const layoutOptions = (organizationId: string) =>
   queryOptions({
     ...privateQueryDefaults,
     gcTime: 5 * 60_000,

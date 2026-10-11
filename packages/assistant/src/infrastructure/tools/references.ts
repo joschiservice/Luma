@@ -55,7 +55,7 @@ export function parser<Schema extends ZodTypeAny>(schema: Schema) {
 }
 
 /** Formats an ISO time as a date for step summaries. */
-export function day(value: string | undefined) {
+function day(value: string | undefined) {
   return value ? value.slice(0, 10) : null;
 }
 

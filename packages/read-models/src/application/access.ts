@@ -7,7 +7,7 @@ import type { RecordKind } from './records.js';
  * The permissions that let a reader see a record kind; any one of them is enough. SKUs are the
  * shared identity of the product catalog and of stock, so either area reveals them.
  */
-export const recordReadPermissions = {
+const recordReadPermissions = {
   order: ['orders.read'],
   fulfillment: ['fulfillment.read'],
   position: ['inventory.read'],

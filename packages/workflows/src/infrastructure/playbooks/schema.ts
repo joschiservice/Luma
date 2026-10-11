@@ -29,7 +29,7 @@ const values = z.record(
   ]),
 );
 
-export const definitionSchema = z
+const definitionSchema = z
   .object({ id: key, name: text, intent: z.string().min(1).max(2000) })
   .strict();
 

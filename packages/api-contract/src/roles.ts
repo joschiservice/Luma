@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const roleKeySchema = z.enum(['owner', 'admin', 'member', 'custom']);
+const roleKeySchema = z.enum(['owner', 'admin', 'member', 'custom']);
 
 /** The role a membership or invitation uses. Built-in role IDs equal their key. */
 export const roleReferenceSchema = z.object({
@@ -18,7 +18,7 @@ const appOwnerSchema = z.object({
   available: z.boolean(),
 });
 
-export const permissionGroupSchema = z.object({
+const permissionGroupSchema = z.object({
   id: z.string(),
   label: z.string(),
   description: z.string(),
@@ -26,7 +26,7 @@ export const permissionGroupSchema = z.object({
   app: appOwnerSchema.nullable(),
 });
 
-export const permissionDefinitionSchema = z.object({
+const permissionDefinitionSchema = z.object({
   key: z.string(),
   group: z.string(),
   label: z.string(),

@@ -42,9 +42,7 @@ export const workspaceTopics = [
   'decisions',
 ] as const;
 
-export const workspaceTopicSchema = z.enum(workspaceTopics);
-
-export type WorkspaceTopic = z.infer<typeof workspaceTopicSchema>;
+export type WorkspaceTopic = (typeof workspaceTopics)[number];
 
 export const metricStreamEventSchema = z.object({
   schemaVersion: z.literal(1),

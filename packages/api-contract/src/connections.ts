@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const installationPermissions = z.enum([
+const installationPermissions = z.enum([
   'orders.read',
   'products.read',
   'inventory.read',
@@ -25,7 +25,7 @@ const header = z
   .regex(/^[\x20-\x7e]+$/)
   .refine((s) => !!s.trim());
 
-export const installationTarget = z
+const installationTarget = z
   .object({ kind: z.string().min(1).max(100) })
   .catchall(z.string().max(4096));
 

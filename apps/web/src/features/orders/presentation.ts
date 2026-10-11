@@ -161,13 +161,6 @@ export const sortLabels: Record<OrderSort, string> = localizedLabels({
   due: m.orders_sort_due,
 });
 
-export const differenceLabels: Record<string, string> = localizedLabels({
-  status: m.orders_difference_status,
-  paymentStatus: m.orders_difference_payment,
-  total: m.orders_difference_total,
-  lines: m.orders_difference_lines,
-});
-
 /**
  * Labels fulfillment progress. Closed orders without reported fulfillment work say so instead
  * of reading as unfulfilled.
@@ -230,16 +223,6 @@ export function formatQuantity(quantity: string, unit: string) {
   return isPieceUnit(unit)
     ? formatted
     : quantityWithUnit(formatted, unit, quantity);
-}
-
-/**
- * Joins a count with an English noun, such as “3 units”.
- *
- * @deprecated English-only: the noun and its plural come from the caller. Write an ICU plural
- * message instead, such as `{count, plural, one {{count, number} unit} other {{count, number} units}}`.
- */
-export function plural(count: number, one: string, many = `${one}s`) {
-  return `${formatNumber(count)} ${count === 1 ? one : many}`;
 }
 
 function add(values: string[]) {

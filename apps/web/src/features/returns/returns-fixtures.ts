@@ -5,9 +5,9 @@ import type {
   ReturnSource,
 } from '@luma/api-contract';
 
-export const store = '11111111-1111-4111-8111-111111111111';
+const store = '11111111-1111-4111-8111-111111111111';
 
-export const erp = '22222222-2222-4222-8222-222222222222';
+const erp = '22222222-2222-4222-8222-222222222222';
 
 const asOf = '2026-09-30T09:00:00.000Z';
 
@@ -83,7 +83,7 @@ export function returnItem(
 const id = (n: number) =>
   `33333333-3333-4333-8333-3333333333${String(n).padStart(2, '0')}`;
 
-export const items: ReturnListItem[] = [
+const items: ReturnListItem[] = [
   returnItem({
     id: id(2),
     name: '#1004-R1',

@@ -49,7 +49,7 @@ const signal = (incident: Incident): CaseSignal => ({
 });
 
 /** Reads cases for workflows through the exceptions owner, in the caller's tenant. */
-export function caseReader(
+function caseReader(
   exceptions: Pick<DetectionService, 'list' | 'get' | 'evidence'>,
 ): CaseReader {
   return {

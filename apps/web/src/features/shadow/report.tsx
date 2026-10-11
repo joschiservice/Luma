@@ -182,7 +182,7 @@ export function ShadowReport({
 }
 
 /** Shows denominators and missing evidence explicitly, alongside individual case comparisons. */
-export function ShadowReportResults({
+function ShadowReportResults({
   report,
   organizationId,
 }: {

@@ -19,7 +19,7 @@ type Label = () => string;
  * Readable names for activity codes: outcomes, event types, modes and the recorded actions
  * Luma knows. Values are message functions so each render reads the active language.
  */
-export const activityLabels: Record<string, Label> = {
+const activityLabels: Record<string, Label> = {
   approved: m.activity_outcome_approved,
   rejected: m.activity_outcome_rejected,
   escalated: m.activity_outcome_escalated,

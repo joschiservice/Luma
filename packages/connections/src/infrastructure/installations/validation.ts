@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const installationPermissions = z.enum([
+const installationPermissions = z.enum([
   'orders.read',
   'products.read',
   'inventory.read',
@@ -18,17 +18,17 @@ export const installationPermissions = z.enum([
   'purchase-orders.submit',
 ]);
 
-export const installationTarget = z
+const installationTarget = z
   .object({ kind: z.string().min(1).max(100) })
   .catchall(z.string().max(4096));
 
-export const installationCredentials = z
+const installationCredentials = z
   .object({ token: z.string().min(1).max(4096) })
   .catchall(z.unknown());
 
 export const storedCredentials = installationCredentials;
 
-export const installationInput = z
+const installationInput = z
   .object({
     label: z.string().trim().min(1).max(120),
     target: installationTarget,

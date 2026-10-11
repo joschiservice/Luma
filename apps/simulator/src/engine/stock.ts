@@ -45,13 +45,6 @@ export function mirrored(world: World, stock: ItemStock, location: string) {
     : stock.available;
 }
 
-/** Marks an item for the next ERP-to-shop stock push. */
-export async function markDirty(world: World, itemId: string) {
-  await world
-    .store(worldInstance)
-    .put('dirty', itemId, {}, { updatedAt: world.now });
-}
-
 /** Returns the shops that list a variant and the location that mirrors ERP stock. */
 function listings(world: World, variantId: string) {
   const variant = world.model.variant(variantId);

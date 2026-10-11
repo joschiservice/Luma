@@ -106,7 +106,7 @@ const statusText = {
  * Keeps local edits, autosaves them against the loaded revision and never overwrites someone
  * else's save. An uncertain save is retried with the same save ID and body.
  */
-export function useDraftSession(
+function useDraftSession(
   organizationId: string,
   initial: WorkflowDraft,
   editable: boolean,
@@ -235,7 +235,7 @@ export function useDraftSession(
  * Checks the working copy on the server shortly after each change, so broken references appear
  * immediately. The result records which content it describes.
  */
-export function useLiveValidation(
+function useLiveValidation(
   organizationId: string,
   draftId: string,
   content: WorkflowDraftContent,

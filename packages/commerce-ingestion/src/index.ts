@@ -15,8 +15,6 @@ import {
 } from './application/order-links.js';
 import { sourceLocalKey } from './application/source-local.js';
 
-export { sourceLocalKey } from './application/source-local.js';
-
 export type ProjectionOutcome =
   | { status: 'pending'; missing: SourceIdentity[] }
   | { status: 'applied' | 'retained' | 'duplicate'; entityId: string };
@@ -34,7 +32,7 @@ const normalizers = {
 } as const;
 
 /** Mapping method recorded for identities created by a history import or sync. */
-export const sourceLocalMethod =
+const sourceLocalMethod =
   'Imported source record with its own canonical identity';
 
 /** Coordinates idempotent owner transactions; replay resumes after a partial failure. */

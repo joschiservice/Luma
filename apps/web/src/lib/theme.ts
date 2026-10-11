@@ -13,7 +13,7 @@ const changeEvent = 'luma-theme-change';
 export const themeBootScript = `(()=>{try{var p=localStorage.getItem('${storageKey}');var d=p==='dark'||(p!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d)}catch(e){}})()`;
 
 /** Reads the stored preference, falling back to `system` when storage is unavailable. */
-export function readThemePreference(): ThemePreference {
+function readThemePreference(): ThemePreference {
   try {
     const value = localStorage.getItem(storageKey);
 
@@ -24,7 +24,7 @@ export function readThemePreference(): ThemePreference {
 }
 
 /** Applies the effective theme to the document element so portals inherit it. */
-export function applyTheme(preference = readThemePreference()) {
+function applyTheme(preference = readThemePreference()) {
   const dark =
     preference === 'dark' ||
     (preference === 'system' &&

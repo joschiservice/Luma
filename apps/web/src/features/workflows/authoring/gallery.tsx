@@ -434,7 +434,7 @@ function ScratchCard({
 }
 
 /** Shows what a template does, what success means and what it still needs here. */
-export function TemplateCard({
+function TemplateCard({
   organizationId,
   template,
   canManage,

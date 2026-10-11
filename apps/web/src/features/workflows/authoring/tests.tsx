@@ -703,7 +703,7 @@ function TestCaseEditor({
 }
 
 /** Shows a test run step by step, including where it would wait for a person. */
-export function TestRunView({
+function TestRunView({
   organizationId,
   draftId,
   runId,

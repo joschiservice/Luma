@@ -23,24 +23,24 @@ export const generationAvailabilitySchema = z.object({
 });
 
 /** A question the model couldn't answer. It highlights one field in the builder. */
-export const generationQuestionSchema = z.object({
+const generationQuestionSchema = z.object({
   stepId: z.string().nullable(),
   field: z.string(),
   question: z.string(),
 });
 
-export const stepExplanationSchema = z.object({
+const stepExplanationSchema = z.object({
   stepId: z.string(),
   explanation: z.string(),
 });
 
-export const generationUsageSchema = z.object({
+const generationUsageSchema = z.object({
   inputTokens: z.number().int().nonnegative(),
   outputTokens: z.number().int().nonnegative(),
   costUsd: z.number().nonnegative().nullable(),
 });
 
-export const generationRouteSchema = z.object({
+const generationRouteSchema = z.object({
   profile: z.string(),
   adapter: z.string().nullable(),
   model: z.string().nullable(),
@@ -85,7 +85,7 @@ export const refineWorkflowDraftSchema = z
   .strict();
 
 /** One step-level difference. Workflow settings have a null step ID and name the setting in `field`. */
-export const draftChangeSchema = z.object({
+const draftChangeSchema = z.object({
   change: z.enum(['added', 'removed', 'changed', 'moved']),
   stepId: z.string().nullable(),
   field: z.string().nullable(),
@@ -136,7 +136,7 @@ export const codeStepSuggestionRequestSchema = z
   .strict();
 
 /** An example case in the Code Step evaluator's input format. */
-export const codeStepExampleSchema = z.object({
+const codeStepExampleSchema = z.object({
   name: z.string(),
   input: z.object({
     inputs: values,

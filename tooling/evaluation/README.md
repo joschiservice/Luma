@@ -21,7 +21,7 @@ The report records the candidate, corpus and fixture hashes and the interpreter,
 Each reconstructed fixture contains:
 
 - `id`, `version`, and `incident.provenance`: stable identity and source reference.
-- `provider`: the initial simulated world: in-memory JTL and Shopify record store snapshots (`jtl`, `shopify`), the clock (`now`, epoch milliseconds), manual fault rules (`faults`) and an empty provider journal. [provider.mjs](provider.mjs) serves requests against it with the simulator provider packages; `createEvaluationProvider` builds the shared world.
+- `provider`: the initial simulated world: in-memory JTL and Shopify record store snapshots (`jtl`, `shopify`), the clock (`now`, epoch milliseconds), manual fault rules (`faults`) and an empty provider journal. [provider.mjs](provider.mjs) serves requests against it with the simulator provider packages.
 - `incident`: evidence snapshot, proposed action, connection/target grants, external-ID mapping, authority reference, diagnosis revision/status/cause, and initial capability reads. Use `null` for an unknown cause.
 - `controls.commands`: ordered `execute`, `approve`, `reject`, `reconcile`, `restart`, `foreign-tenant`, or `advance` commands (`advance` includes `ms`).
 - `controls`: optional verification delay, external change before verification, or interruption before execution completion is persisted.

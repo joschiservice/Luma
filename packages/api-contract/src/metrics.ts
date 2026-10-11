@@ -1,13 +1,13 @@
 import { z } from 'zod';
 
-export const metricIdSchema = z.enum([
+const metricIdSchema = z.enum([
   'orders.open',
   'orders.overdue',
   'orders.attention',
 ]);
 const timestamp = z.string().datetime({ offset: true });
 
-export const metricScopeSchema = z
+const metricScopeSchema = z
   .object({
     connectionId: z.string().uuid().optional(),
     updatedFrom: timestamp.optional(),

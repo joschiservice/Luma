@@ -37,7 +37,7 @@ const link = z.object({
   label: z.string(),
 });
 
-export const recordRow = z.object({
+const recordRow = z.object({
   id: z.string(),
   sourceUpdatedAt: z.string().datetime({ offset: true }).nullable(),
   fields: z.record(
@@ -47,7 +47,7 @@ export const recordRow = z.object({
   links: z.array(link),
 });
 
-export const recordSection = z.object({
+const recordSection = z.object({
   key: z.string(),
   title: z.string(),
   status: z.enum([

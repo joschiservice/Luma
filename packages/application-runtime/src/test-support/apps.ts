@@ -16,7 +16,7 @@ import {
 import { requirePermission } from '@luma/identity';
 
 /** Composes real provider contributions against injected fixture transports. */
-export function providers(options: Parameters<typeof createJtlProvider>[0]) {
+function providers(options: Parameters<typeof createJtlProvider>[0]) {
   return [
     createJtlProvider(options),
     createShopifyProvider(options),

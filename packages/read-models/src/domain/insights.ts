@@ -40,7 +40,7 @@ export interface InsightCoverage {
 }
 
 /** A source read older than this no longer establishes current data. */
-export const staleAfterMs = 24 * 60 * 60 * 1000;
+const staleAfterMs = 24 * 60 * 60 * 1000;
 
 export const orderSeries = ['open', 'completed', 'cancelled', 'unknown'];
 

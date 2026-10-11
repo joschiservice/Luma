@@ -34,7 +34,7 @@ export const orderViewSchema = z.enum([
 
 export const orderSortSchema = z.enum(['updated', 'placed', 'number', 'due']);
 
-export const orderFulfillmentStateSchema = z.enum([
+const orderFulfillmentStateSchema = z.enum([
   'unfulfilled',
   'partial',
   'fulfilled',
@@ -42,12 +42,12 @@ export const orderFulfillmentStateSchema = z.enum([
   'no_lines',
 ]);
 
-export const moneySchema = z.object({
+const moneySchema = z.object({
   amount: z.string(),
   currency: z.string(),
 });
 
-export const orderSourceSchema = z.object({
+const orderSourceSchema = z.object({
   connectionId: z.string().uuid(),
   label: z.string(),
   system: z.string().nullable(),
@@ -59,7 +59,7 @@ export const orderSourceSchema = z.object({
   sourceUpdatedAt: timestamp.nullable(),
 });
 
-export const orderListItemSchema = z.object({
+const orderListItemSchema = z.object({
   id: z.string().uuid(),
   displayNumber: z.string().nullable(),
   placedAt: timestamp.nullable(),
@@ -117,7 +117,7 @@ export const orderListQuerySchema = z
   })
   .strict();
 
-export const orderLineSchema = z.object({
+const orderLineSchema = z.object({
   id: z.string().uuid(),
   skuId: z.string().uuid().nullable(),
   comparisonKey: z.string().uuid().nullable(),
@@ -148,7 +148,7 @@ export const orderLineSchema = z.object({
   remainingQuantity: z.string().nullable(),
 });
 
-export const orderSourceFactsSchema = orderSourceSchema.extend({
+const orderSourceFactsSchema = orderSourceSchema.extend({
   appId: z.string().nullable(),
   mappingMethod: z.string().nullable(),
   displayNumber: z.string().nullable(),
@@ -162,7 +162,7 @@ export const orderSourceFactsSchema = orderSourceSchema.extend({
   lines: z.array(orderLineSchema),
 });
 
-export const orderDifferenceSchema = z.object({
+const orderDifferenceSchema = z.object({
   field: z.enum([
     'status',
     'paymentStatus',
@@ -195,7 +195,7 @@ export const orderDifferenceSchema = z.object({
   ),
 });
 
-export const orderFulfillmentSchema = z.object({
+const orderFulfillmentSchema = z.object({
   id: z.string().uuid(),
   connectionId: z.string().uuid(),
   externalId: z.string().nullable(),
@@ -260,7 +260,7 @@ export const orderWorkflowRunSchema = z.object({
   relationship: z.enum(['order', 'issue']),
 });
 
-export const orderHistoryEntrySchema = z.object({
+const orderHistoryEntrySchema = z.object({
   snapshotId: z.string().uuid(),
   entityKind: z.enum(['order', 'fulfillment', 'return', 'refund']),
   entityId: z.string().uuid(),

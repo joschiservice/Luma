@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const decimal = z.string().regex(/^\d{1,14}(\.\d{1,6})?$/);
 
-export const salesAddressSchema = z
+const salesAddressSchema = z
   .object({
     name: z.string().max(200),
     company: z.string().max(200),
@@ -13,7 +13,7 @@ export const salesAddressSchema = z
   })
   .strict();
 
-export const salesLineSchema = z
+const salesLineSchema = z
   .object({
     id: z.string().uuid(),
     skuId: z.string().uuid().nullable(),

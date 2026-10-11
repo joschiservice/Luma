@@ -133,7 +133,7 @@ export const factSchemas = {
     .strict(),
 };
 
-export const thresholdsSchema = z
+const thresholdsSchema = z
   .object({
     freshnessSeconds: z.number().int().positive(),
     pairSkewSeconds: z.number().int().positive(),
@@ -143,7 +143,7 @@ export const thresholdsSchema = z
   })
   .strict();
 
-export const configurationSchema = z
+const configurationSchema = z
   .object({
     version: z.string().min(1),
     ruleVersion: z.literal('v0.1'),
@@ -168,7 +168,7 @@ export function parseInput(
 
 const ref = z.string().min(1).max(512);
 
-export const evidenceSchema = z
+const evidenceSchema = z
   .object({
     key: ref,
     tenantId: z.string().uuid(),
@@ -199,7 +199,7 @@ const humanDispositionSchema = z
   })
   .strict();
 
-export const resolutionSchema = z.discriminatedUnion('kind', [
+const resolutionSchema = z.discriminatedUnion('kind', [
   z
     .object({
       kind: z.literal('human_disposition'),

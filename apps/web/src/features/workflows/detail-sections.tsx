@@ -209,7 +209,7 @@ export function WorkflowTechnical({
 }
 
 /** Shows version and connection prerequisites with links to resolve connection access. */
-export function WorkflowCompatibility({
+function WorkflowCompatibility({
   detail,
   version,
   organizationId,
@@ -410,7 +410,7 @@ export function WorkflowActivations({
 }
 
 /** Keeps where each published version came from and its exact content available for inspection. */
-export function WorkflowVersions({ detail }: { detail: WorkflowDetail }) {
+function WorkflowVersions({ detail }: { detail: WorkflowDetail }) {
   return (
     <>
       {detail.versions.map((v) => (

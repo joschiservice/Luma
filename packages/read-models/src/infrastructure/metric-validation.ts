@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const timestamp = z.string().datetime({ offset: true });
 
-export const metricScopeSchema = z
+const metricScopeSchema = z
   .object({
     connectionId: z.string().uuid().optional(),
     updatedFrom: timestamp.optional(),

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const text = z.string().trim().min(1).max(200);
 
-export const externalReferenceSchema = z
+const externalReferenceSchema = z
   .object({
     system: text,
     externalId: text,
@@ -19,7 +19,7 @@ export const supplierInputSchema = z
   })
   .strict();
 
-export const supplierLinkSchema = z
+const supplierLinkSchema = z
   .object({
     connectionId: z.string().uuid(),
     externalId: z.string().min(1).max(200),
@@ -38,7 +38,7 @@ export const supplierOutputSchema = supplierInputSchema.extend({
   confirmationHours: z.number().int().min(1).optional(),
 });
 
-export const purchaseOrderStatusSchema = z.enum([
+const purchaseOrderStatusSchema = z.enum([
   'draft',
   'open',
   'closed',

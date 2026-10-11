@@ -8,7 +8,6 @@ export {
   makeTenantContext,
   MembershipSuspendedError,
   pausesBackgroundWork,
-  ReadOnlyAccessError,
   requireChangesAllowed,
   requirePermission,
   requireTenant,
@@ -28,8 +27,6 @@ export {
   appPermissionOwner,
   isAppPermission,
   isPermission,
-  permissionCatalog,
-  permissionGroups,
 } from './domain/permissions.js';
 
 export type {
@@ -38,11 +35,7 @@ export type {
   PermissionDefinition,
 } from './domain/permissions.js';
 
-export {
-  builtInReference,
-  builtInRoles,
-  PermissionSet,
-} from './domain/roles.js';
+export { PermissionSet } from './domain/roles.js';
 
 export type { BuiltInRoleKey, RoleReference } from './domain/roles.js';
 
@@ -51,8 +44,6 @@ export { describeUserAgent } from './domain/sessions.js';
 export {
   decodeSecurityEventCursor,
   encodeSecurityEventCursor,
-  securityEventNetworkRetentionDays,
-  securityEventRetentionDays,
 } from './domain/security-events.js';
 
 export type {

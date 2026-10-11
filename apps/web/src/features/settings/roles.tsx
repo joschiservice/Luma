@@ -41,7 +41,7 @@ export function RoleMark({ role }: { role: Pick<WorkspaceRole, 'key'> }) {
 }
 
 /** Summarizes a role's reach in a few words, such as "12 of 31 permissions". */
-export function roleReach(role: WorkspaceRole, total: number) {
+function roleReach(role: WorkspaceRole, total: number) {
   if (role.allAppPermissions) return m.settings_role_every_permission();
 
   return m.settings_role_reach({ count: role.permissions.length, total });

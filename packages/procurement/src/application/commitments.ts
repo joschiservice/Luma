@@ -2179,7 +2179,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
 }
 
 /** The exact action a submission asks admission to perform. */
-export function submissionAction(
+function submissionAction(
   submission: Submission,
   order: Pick<PurchaseOrder, 'reference'>,
 ): ProposedAction {

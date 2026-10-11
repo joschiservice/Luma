@@ -12,7 +12,7 @@ import type { ShopifyContext } from './records.js';
 import { typeResolver } from './resolvers.js';
 import { schema } from './schema.js';
 
-export const apiVersion = '2026-07';
+const apiVersion = '2026-07';
 
 const endpoint = `/admin/api/${apiVersion}/graphql.json`;
 

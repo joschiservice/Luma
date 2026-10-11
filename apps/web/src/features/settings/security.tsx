@@ -29,10 +29,10 @@ import { SectionHeading } from './section-heading';
 import { SecurityActivity, securityActivityKey } from './security-activity';
 import { SessionSettings } from './sessions';
 
-export const passkeysKey = ['private', 'passkeys'] as const;
+const passkeysKey = ['private', 'passkeys'] as const;
 
 /** Lists the signed-in person's passkeys; rejects failed reads with their HTTP status. */
-export const passkeysOptions = () =>
+const passkeysOptions = () =>
   queryOptions({
     ...privateQueryDefaults,
     queryKey: passkeysKey,

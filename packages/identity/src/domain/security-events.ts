@@ -1,23 +1,20 @@
-export const securityEventTypes = [
-  'sign-in.password',
-  'sign-in.passkey',
-  'sign-in.two-factor',
-  'two-factor.enabled',
-  'two-factor.disabled',
-  'two-factor.backup-codes-regenerated',
-  'passkey.added',
-  'passkey.removed',
-  'password.changed',
-  'password.reset',
-  'sessions.revoked',
-  'sessions.revoked-by-staff',
-  'account.disabled',
-  'account.enabled',
-  'account.deletion-scheduled',
-  'account.restored',
-] as const;
-
-export type SecurityEventType = (typeof securityEventTypes)[number];
+export type SecurityEventType =
+  | 'sign-in.password'
+  | 'sign-in.passkey'
+  | 'sign-in.two-factor'
+  | 'two-factor.enabled'
+  | 'two-factor.disabled'
+  | 'two-factor.backup-codes-regenerated'
+  | 'passkey.added'
+  | 'passkey.removed'
+  | 'password.changed'
+  | 'password.reset'
+  | 'sessions.revoked'
+  | 'sessions.revoked-by-staff'
+  | 'account.disabled'
+  | 'account.enabled'
+  | 'account.deletion-scheduled'
+  | 'account.restored';
 
 export type SecurityEventOutcome = 'succeeded' | 'failed';
 

@@ -31,7 +31,7 @@ const unquote = (value: string) =>
  * Parses Shopify's search syntax into terms. Connectives are treated as AND, as Luma's
  * searches only combine terms that must all match.
  */
-export function parseSearch(query: string): SearchTerm[] {
+function parseSearch(query: string): SearchTerm[] {
   const terms: SearchTerm[] = [];
   let position = 0;
   while (position < query.length) {

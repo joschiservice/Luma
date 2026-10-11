@@ -60,15 +60,6 @@ export async function worldOrder(
   )?.data;
 }
 
-/** Finds the shop order behind a JTL sales order. */
-export async function worldOrderForErp(world: World, erpOrder: string) {
-  const page = await world
-    .store(worldInstance)
-    .page<WorldOrder>({ kind: 'order', key: `erp:${erpOrder}`, limit: 1 });
-
-  return page.items[0]?.data;
-}
-
 /** Saves the world's record of a shop order. */
 export async function saveWorldOrder(world: World, order: WorldOrder) {
   await world
@@ -120,11 +111,7 @@ export async function orderIncident(
 }
 
 /** Picks the incident kinds that will affect an order, at the chaos profile's rates. */
-export function plannedIncidents(
-  world: World,
-  shopName: string,
-  identity: string,
-) {
+function plannedIncidents(world: World, shopName: string, identity: string) {
   if (!world.live) return [];
 
   return (

@@ -258,7 +258,7 @@ const shortDay = (value: string) =>
   formatCalendarDate(value, { month: 'short', day: 'numeric' });
 
 /** Names a calendar bucket, such as "Mon 21 Sept" or "21 Sept – 27 Sept". */
-export function bucketLabel(point: InsightPoint, bucket: 'day' | 'week') {
+function bucketLabel(point: InsightPoint, bucket: 'day' | 'week') {
   if (!point.start) return point.key;
 
   return bucket === 'day'

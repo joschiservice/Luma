@@ -26,7 +26,7 @@ export function referenceContent(reference) {
  * The parts two workflows must share to be equivalent: how they start, their ordered step kinds,
  * the data sources, actions and result checks they use, and the fields their conditions test.
  */
-export function structure(content) {
+function structure(content) {
   const steps = content.steps;
   const sorted = (items) => [...new Set(items)].sort();
   const trigger = content.applicability.trigger;

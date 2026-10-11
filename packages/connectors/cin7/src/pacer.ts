@@ -17,7 +17,7 @@ export interface RequestPacer {
  * Cin7 allows 60 calls per minute per API application. The default interval admits about
  * 55, leaving room for clock differences and requests from another Luma process.
  */
-export const defaultIntervalMs = 1100;
+const defaultIntervalMs = 1100;
 
 /** Creates a pacer that spaces request admissions evenly. */
 export function createRequestPacer(

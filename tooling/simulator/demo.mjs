@@ -8,7 +8,7 @@ import { erpOf } from './erp.mjs';
  * Workflows the demo turns on. Each starts a run when detection opens its kind of case, or when
  * an owner reports a follow-up such as an overdue supplier order.
  */
-export const demoCaseWorkflows = [
+const demoCaseWorkflows = [
   'shopify-stock-correction',
   'shopify-hold-release',
   'connection-sync-check',
@@ -46,7 +46,7 @@ const stableId = (value) => {
  * The most-demanded SKUs the demo sets stock rules for, with their suppliers and the answer
  * profile each supplier gets. Deterministic for a run's profile and seed.
  */
-export function demoPlan(manifest, rules = 8) {
+function demoPlan(manifest, rules = 8) {
   const stock = manifest.simulator?.stock;
   if (!stock) return { variants: [], suppliers: [] };
   const catalog = generateCatalog(merchantProfile(stock.profile), stock.seed);

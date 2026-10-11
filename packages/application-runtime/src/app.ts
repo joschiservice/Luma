@@ -19,13 +19,10 @@ export {
 
 export {
   createAdmissionEligibility,
-  createDefaultExceptionWorker,
   createExceptionWorkflowRuntime,
 } from './composition/workflow-runtime.js';
 
 export type { AppDependencies } from './composition/http-app.js';
-
-export { createPersistentPlaybookLibrary } from './composition/playbook-library.js';
 
 export { createApplicationServices } from './composition/application.js';
 
@@ -41,7 +38,6 @@ export { createReadinessCheck } from './composition/readiness.js';
 export { createReplenishmentWorker } from './composition/replenishment-worker.js';
 
 export {
-  createDetectionWorker,
   createScheduledDetection,
   createStockRefreshService,
 } from './composition/detection-worker.js';

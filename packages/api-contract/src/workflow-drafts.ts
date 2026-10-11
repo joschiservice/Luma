@@ -32,7 +32,7 @@ export const workflowStepKinds = [
   'code',
 ] as const;
 
-export const workflowTriggerKinds = [
+const workflowTriggerKinds = [
   'manual',
   'event',
   'schedule',
@@ -131,12 +131,7 @@ export const workflowDraftContentSchema = z
   })
   .strict();
 
-export const authoringModeSchema = z.enum([
-  'template',
-  'visual',
-  'code',
-  'language',
-]);
+const authoringModeSchema = z.enum(['template', 'visual', 'code', 'language']);
 
 export const workflowDraftSchema = z.object({
   id: z.string().uuid(),
@@ -176,7 +171,7 @@ export const workflowDiagnosticSchema = z.object({
   detail: z.string(),
 });
 
-export const valueOptionSchema = z.object({
+const valueOptionSchema = z.object({
   source: z.enum(['input', 'evidence', 'step']),
   stepId: z.string().nullable(),
   field: z.string(),

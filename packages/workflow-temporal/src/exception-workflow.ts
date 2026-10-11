@@ -20,10 +20,10 @@ import {
 
 import { pauseWhileInactive } from './workspace-pause.js';
 
-export const progressQuery = defineQuery<WorkflowProgress>('progress');
+const progressQuery = defineQuery<WorkflowProgress>('progress');
 
 /** A wake-up hint only. The execution service reads the persisted approval. */
-export const approvalChanged = defineSignal('approvalChanged');
+const approvalChanged = defineSignal('approvalChanged');
 
 const activityOptions: ActivityOptions = {
   startToCloseTimeout: '1 minute',
@@ -56,6 +56,8 @@ const execution = pauseWhileInactive(
 /**
  * Runs the durable exception lifecycle, waiting for approval when required and reconciling
  * uncertain execution before verification.
+ *
+ * @public The Temporal bundler loads it by workflow type through `workflows.ts`.
  */
 export async function exceptionWorkflow(
   input: ExceptionWorkflowInput,

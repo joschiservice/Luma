@@ -18,13 +18,6 @@ function localized<K extends string>(
   return labels;
 }
 
-export const reads = [
-  'orders.read',
-  'products.read',
-  'inventory.read',
-  'fulfillment.read',
-] as const;
-
 export const capabilities = localized({
   'orders.read': m.connections_capability_orders_read,
   'products.read': m.connections_capability_products_read,

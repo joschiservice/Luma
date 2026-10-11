@@ -7,8 +7,6 @@ import {
 } from '@luma/connector-core/transport';
 import { z } from 'zod';
 
-export { fail, parse } from '@luma/connector-core/transport';
-
 export const API_VERSION = '2.2';
 
 export type JtlConnection =

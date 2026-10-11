@@ -101,7 +101,6 @@ export {
   apiErrorSchema,
   dataRegionSchema,
   organizationParamsSchema,
-  requires,
 } from './common.js';
 
 export type {
@@ -115,13 +114,7 @@ export { contractRoutes } from './routes.js';
 
 export type { ContractRoute } from './routes.js';
 
-export {
-  membershipSchema,
-  organizationSchema,
-  securityEventSchema,
-  supportViewStateSchema,
-  tenantContextSchema,
-} from './contracts/identity.js';
+export { organizationSchema } from './contracts/identity.js';
 
 export type {
   Membership,
@@ -132,16 +125,12 @@ export type {
 
 export * from './roles.js';
 
-export { connectorProviderSchema } from './contracts/providers.js';
-
 export type { ConnectorProvider } from './contracts/providers.js';
 
 export {
   caseEventsContract,
   metricEventsContract,
-  metricStreamEventSchema,
   workspaceTopics,
-  workspaceTopicSchema,
 } from './contracts/events.js';
 
 export type { EventStreamRoute, WorkspaceTopic } from './contracts/events.js';

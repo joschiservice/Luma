@@ -12,7 +12,7 @@ export const customerStateSchema = z.enum([
 
 export const customerSortSchema = z.enum(['created', 'orders', 'name']);
 
-export const customerListItemSchema = z.object({
+const customerListItemSchema = z.object({
   id: z.string().uuid(),
   connectionId: z.string().uuid(),
   externalId: z.string(),
@@ -36,7 +36,7 @@ export const customerListItemSchema = z.object({
     ),
 });
 
-export const customerSourceSchema = z.object({
+const customerSourceSchema = z.object({
   connectionId: z.string().uuid(),
   label: z.string(),
   system: z.string().nullable(),

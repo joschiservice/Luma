@@ -5,8 +5,6 @@ export type {
   SalesOrder,
 } from './domain/order.js';
 
-export { publishedOrder } from './domain/order.js';
-
 export type {
   SalesDependencies,
   SalesService,

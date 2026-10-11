@@ -5,7 +5,7 @@ import {
   resolutionMetricItemSchema,
 } from './measurement.js';
 
-export const operationalMetricIdSchema = z.enum([
+const operationalMetricIdSchema = z.enum([
   'cases.active',
   'cases.attention',
   'cases.oldest_unresolved_age',
@@ -60,7 +60,7 @@ export const operationalMetricDefinitionSchema = z.object({
   permissions: z.literal('workspace_member'),
 });
 
-export const operationalMetricScopeSchema = z
+const operationalMetricScopeSchema = z
   .object({
     connectionId: z.string().uuid().optional(),
     supplierId: z.string().uuid().optional(),
@@ -104,7 +104,7 @@ export const operationalMetricRequestSchema = z
     'The selected metrics do not support these filters.',
   );
 
-export const operationalMetricItemSchema = z.discriminatedUnion('kind', [
+const operationalMetricItemSchema = z.discriminatedUnion('kind', [
   resolutionMetricItemSchema,
   z.object({
     kind: z.literal('case'),
