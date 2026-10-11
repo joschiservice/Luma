@@ -64,14 +64,7 @@ export function CaseResolution({
     });
 
   async function decide(kind: CaseDecision['kind'], reason: string) {
-    if (
-      lock.current ||
-      uncertain ||
-      !confirmed ||
-      query.isError ||
-      query.isFetching ||
-      !query.data
-    )
+    if (lock.current || uncertain || !confirmed || query.isError || !query.data)
       return;
     lock.current = true;
     setPending(true);
@@ -80,6 +73,25 @@ export function CaseResolution({
     let command: CaseDecision | undefined;
     try {
       let review = query.data.review;
+      // A refresh in flight may carry a re-evaluated decision. Decide on its result, and approve
+      // or reject only if it still shows the change the person reviewed.
+      if (query.isFetching) {
+        const fresh = (await query.refetch({ cancelRefetch: false })).data;
+        if (!fresh) {
+          setCheckError(m.exceptions_resolution_check_failed());
+
+          return;
+        }
+        if (kind !== 'escalate' && !sameResolution(review, fresh.review)) {
+          setCheckError(
+            m.exceptions_resolution_changed(),
+            fresh.review.proposal?.id,
+          );
+
+          return;
+        }
+        review = fresh.review;
+      }
       if (kind === 'approve' && review.refreshable) {
         setChecking(true);
         setCheckError('');
@@ -362,7 +374,6 @@ export function CaseResolution({
           disabled={!confirmed || query.isError || Boolean(uncertain)}
           pending={pending || checking}
           checking={checking}
-          refreshing={query.isFetching}
           onDecision={(kind, reason) => void decide(kind, reason)}
         />
       ) : null}

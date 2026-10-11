@@ -360,16 +360,19 @@ test('reviews decisions, recovers ambiguous commands and escalates through the c
   expect(await reason.evaluate((el) => el === document.activeElement)).toBe(
     true,
   );
-  expect(await approve.isDisabled()).toBe(true);
+  // Background polling never blocks the decision; an approval made during it waits for the
+  // re-evaluated decision and is sent with it.
+  expect(await approve.isEnabled()).toBe(true);
   await page.keyboard.type(' and risk');
-  holdReview = false;
-  for (const releaseReview of reviewReleases) releaseReview();
-  await expect.poll(() => approve.isEnabled()).toBe(true);
   expect(await reason.inputValue()).toBe('Reviewed source order and risk');
   expect(await reason.evaluate((el) => el === document.activeElement)).toBe(
     true,
   );
   await approve.click();
+  await expect.poll(() => approve.isDisabled()).toBe(true);
+  expect(posts).toHaveLength(0);
+  holdReview = false;
+  for (const releaseReview of reviewReleases) releaseReview();
   await expect.poll(() => posts.length).toBe(1);
   expect(posts[0].decisionId).toBe(reevaluatedDecisionId);
   expect(posts[0].caseRevision).toBe(5);

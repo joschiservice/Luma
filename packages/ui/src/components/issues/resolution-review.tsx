@@ -72,7 +72,8 @@ function fieldLabel(value: string) {
 
 /**
  * Presents a proposed change, what the workspace’s approval rules require, and the decisions the
- * reader may make, with caller-controlled submission state.
+ * reader may make, with caller-controlled submission state. Decisions stay available while the
+ * caller refreshes in the background; the caller decides on the refreshed result.
  */
 export function ResolutionReview({
   review,
@@ -81,7 +82,6 @@ export function ResolutionReview({
   disabled = false,
   pending = false,
   checking = false,
-  refreshing = false,
   onDecision,
 }: {
   review: CaseReview;
@@ -90,7 +90,6 @@ export function ResolutionReview({
   disabled?: boolean;
   pending?: boolean;
   checking?: boolean;
-  refreshing?: boolean;
   onDecision: (kind: DecisionKind, reason: string) => void;
 }) {
   const proposal = review.proposal;
@@ -290,7 +289,6 @@ export function ResolutionReview({
           disabled={disabled}
           pending={pending}
           checking={checking}
-          refreshing={refreshing}
           onDecision={onDecision}
         />
       </section>
@@ -414,7 +412,6 @@ function DecisionControls({
   disabled,
   pending,
   checking,
-  refreshing,
   onDecision,
 }: {
   compactEscalation?: boolean;
@@ -422,7 +419,6 @@ function DecisionControls({
   disabled: boolean;
   pending: boolean;
   checking: boolean;
-  refreshing: boolean;
   onDecision: (kind: DecisionKind, reason: string) => void;
 }) {
   const [reason, setReason] = useState('');
@@ -443,7 +439,7 @@ function DecisionControls({
         ref={trigger}
         className="resolution-escalate-trigger"
         variant="outline"
-        disabled={disabled || pending || refreshing}
+        disabled={disabled || pending}
         onClick={() => setEscalating(true)}
       >
         <ArrowUpRight size={15} aria-hidden="true" />
@@ -489,7 +485,7 @@ function DecisionControls({
           <Button
             key={kind}
             variant={kind === 'approve' ? 'default' : 'outline'}
-            disabled={disabled || pending || refreshing || !reason.trim()}
+            disabled={disabled || pending || !reason.trim()}
             onClick={() => onDecision(kind, reason.trim())}
           >
             {kind === 'approve' ? (
