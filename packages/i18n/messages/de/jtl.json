@@ -23,5 +23,6 @@
   "jtl_setup_customers": "Kunden importieren, einschließlich Namen, Kontaktdaten und Adressen, und ihren Bestellungen zuordnen. Erfordert Lesezugriff auf Kunden in JTL.",
   "jtl_setup_uncertain": "Luma konnte nicht bestätigen, ob die Eingaben gespeichert wurden. Schließe dieses Formular und aktualisiere die Liste, bevor du es erneut versuchst.",
   "jtl_setup_confirm_replacement": "Ersetzen bestätigen",
-  "jtl_setup_save": "Verbindung speichern"
+  "jtl_setup_save": "Verbindung speichern",
+  "jtl_setup_exchanges": "Ersatzaufträge und Reservierungen für Umtausch lesen. Benötigt Zugriff auf Verkaufsaufträge und Bestand in JTL."
 }

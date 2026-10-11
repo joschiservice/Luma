@@ -16,7 +16,6 @@ const reads = [
   'products.read',
   'inventory.read',
   'fulfillment.read',
-  'returns.exchange.reservation.read',
 ] as const;
 
 /**
@@ -62,6 +61,10 @@ export default function JtlSettings({
         false,
       returns:
         suppliedConnection?.permissions.includes('returns.create') ?? false,
+      exchanges:
+        suppliedConnection?.permissions.includes(
+          'returns.exchange.reservation.read',
+        ) ?? false,
       customers:
         suppliedConnection?.permissions.includes('customers.read') ?? false,
     },
@@ -107,6 +110,9 @@ export default function JtlSettings({
                 'returns.created.read',
                 'returns.create',
               ] as const)
+            : []),
+          ...(value.exchanges
+            ? (['returns.exchange.reservation.read'] as const)
             : []),
           ...(value.customers ? (['customers.read'] as const) : []),
         ],
@@ -273,6 +279,19 @@ export default function JtlSettings({
                   disabled={pending}
                 />
                 {m.jtl_setup_returns()}
+              </label>
+            )}
+          </form.Field>
+          <form.Field name="exchanges">
+            {(field) => (
+              <label className="connection-checkbox">
+                <input
+                  type="checkbox"
+                  checked={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.checked)}
+                  disabled={pending}
+                />
+                {m.jtl_setup_exchanges()}
               </label>
             )}
           </form.Field>

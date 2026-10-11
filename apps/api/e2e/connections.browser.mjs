@@ -452,3 +452,38 @@ test('starts Shopify authorization without token fields and reports callback out
     .waitFor();
   expect(errors).toEqual([]);
 }, 120000);
+
+test('keeps basic Wawi access independent of an explicitly requested exchange reservation read', async ({
+  resources: t,
+}) => {
+  const { page, context, organizationId } = await fixture(t);
+  await setup(page, 'JTL Cloud', 'Exchange read');
+  await page
+    .getByLabel('JTL Cloud tenant ID')
+    .fill('22222222-2222-4222-8222-222222222222');
+  const exchange = page.getByLabel(
+    /Read exchange replacement orders and reservations/,
+  );
+  await expect(exchange).not.toBeChecked();
+  await exchange.check();
+  const card = await save(page, 'Exchange read');
+  const list = await (
+    await context.request.get(
+      `/api/v1/organizations/${organizationId}/connections`,
+    )
+  ).json();
+  expect(list.items[0].permissions).toContain(
+    'returns.exchange.reservation.read',
+  );
+  await card.getByRole('button', { name: 'Validate access' }).click();
+  // This provider fixture supports basic reads only. Opt-in must never manufacture a grant.
+  await expect(
+    card.getByText('Needs attention', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    card.getByText('Replacement order and reservation evidence', {
+      exact: true,
+    }),
+  ).toBeVisible();
+  expect(await card.getByText('Permitted', { exact: true }).count()).toBe(0);
+});

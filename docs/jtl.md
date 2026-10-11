@@ -256,6 +256,8 @@ installations do not receive this write grant until their endpoint behavior is v
 
 ### Exchange replacement reservations
 
+When adding a connection for exchanges, select **Read exchange replacement orders and reservations**.
+Basic order and inventory connections do not request this optional access.
 `returns.exchange.reservation.read` is a read-only capability. It requires successful sales-order,
 item and native stock-reservation probes. An operator creates a replacement sales order in Wawi with
 the exact reference shown in its Luma case; Luma does not create that ERP order. The read scans orders
