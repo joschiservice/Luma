@@ -1,15 +1,22 @@
+import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const webRoot = fileURLToPath(new URL('../../web/', import.meta.url));
+if (!existsSync(`${webRoot}dist/server/server.js`))
+  throw new Error('Build @luma/web first; pnpm test:browser does');
 
 const require = createRequire(`${webRoot}/package.json`);
 
-const { createServer } = await import(require.resolve('vite'));
+const { preview } = await import(require.resolve('vite'));
 
-const server = await createServer({
+// Journeys use the production build that `pnpm test:browser` prepares; compiling the app
+// on demand would cost every test seconds. TanStack Start's preview server loads the
+// server bundle relative to the working directory.
+process.chdir(webRoot);
+await preview({
   root: webRoot,
-  server: {
+  preview: {
     host: '127.0.0.1',
     port: Number(process.env.TEST_WEB_PORT),
     strictPort: true,
@@ -21,7 +28,5 @@ const server = await createServer({
     },
   },
 });
-
-await server.listen();
 
 process.send?.({ type: 'listening' });

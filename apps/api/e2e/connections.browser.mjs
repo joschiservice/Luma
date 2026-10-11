@@ -1,8 +1,14 @@
 /* global document, innerWidth, getComputedStyle */
+import { readdirSync } from 'node:fs';
+
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, database, startApi, startProcess } from './helpers.mjs';
 
 let origin;
+// The web build names each workspace app's lazy UI chunk after the app.
+const appChunk = new RegExp(
+  `/assets/app-(${readdirSync(new URL('../../../packages/apps/', import.meta.url)).join('|')})-`,
+);
 
 async function fixture(t) {
   const port = await availablePort();
@@ -28,8 +34,8 @@ async function fixture(t) {
   const errors = [];
   const appModules = [];
   page.on('request', (request) => {
-    if (/packages\/apps\/[^/]+\/src\/web/.test(request.url()))
-      appModules.push(request.url());
+    const app = appChunk.exec(request.url())?.[1];
+    if (app) appModules.push(app);
   });
   page.on('pageerror', (error) => errors.push(error.message));
   page.setDefaultTimeout(15_000);
@@ -96,8 +102,8 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
     await fixture(t);
   expect(await page.title()).toBe('Luma');
   await setup(page, 'JTL Cloud', 'Main shop', 'invalid-test-token');
-  expect(appModules.some((url) => url.includes('/jtl/'))).toBe(true);
-  expect(appModules.some((url) => url.includes('/shopify/'))).toBe(false);
+  expect(appModules).toContain('jtl');
+  expect(appModules).not.toContain('shopify');
   await page
     .getByLabel('JTL Cloud tenant ID')
     .fill('22222222-2222-4222-8222-222222222222');

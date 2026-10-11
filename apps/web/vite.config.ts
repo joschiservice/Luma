@@ -16,6 +16,23 @@ export default defineConfig(({ mode }) => {
       tanstackStart(),
       react(),
     ],
+    build: {
+      rolldownOptions: {
+        output: {
+          // Names each workspace app's lazy UI chunk after the app, such as `app-jtl-….js`,
+          // so a page load shows which app code it fetched.
+          chunkFileNames: (chunk) => {
+            const app = /packages\/apps\/([^/]+)\/src\/web\/index\.tsx$/.exec(
+              chunk.facadeModuleId ?? '',
+            )?.[1];
+
+            return app
+              ? `assets/app-${app}-[hash].js`
+              : 'assets/[name]-[hash].js';
+          },
+        },
+      },
+    },
     server: {
       host: '127.0.0.1',
       allowedHosts: ['luma-dev.tail2dda1b.ts.net'],

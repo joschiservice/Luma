@@ -10,7 +10,7 @@ const artifacts = fileURLToPath(
 export default defineConfig({
   testDir: './e2e',
   testMatch: '**/*.browser.mjs',
-  fullyParallel: false,
+  fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
   timeout: 120_000,

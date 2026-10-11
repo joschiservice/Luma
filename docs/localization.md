@@ -102,6 +102,6 @@ Compiles take turns through a lock and swap the result into place, so concurrent
 and dev servers never read a half-written runtime. Dev servers don't compile at startup unless
 the runtime is missing; they recompile when a message file changes. Don't switch to
 Paraglide's own Vite plugin: it rewrites the runtime whenever a server starts, which breaks
-parallel browser tests that each start a dev server. The ICU storage plugin loads from the
+other servers and builds reading it at the same time. The ICU storage plugin loads from the
 installed package rather than a CDN, so compiling needs no network access; keep it that way
 when upgrading.

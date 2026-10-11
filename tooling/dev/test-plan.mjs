@@ -1,4 +1,4 @@
-// The simulator serves its control panel from the panel's build output.
+// Browser journeys and the simulator serve the web apps and control panel from build output.
 const build = [
   'exec',
   'turbo',
@@ -9,6 +9,8 @@ const build = [
   '--filter=@luma/simulator...',
   '--filter=@luma/simulator-web',
   '--filter=@luma/staff-api...',
+  '--filter=@luma/web',
+  '--filter=@luma/staff-web',
 ];
 
 /** @type {Record<string, string[][]>} */

@@ -121,10 +121,14 @@ suites cannot run. Report that limitation when relying on it.
   exceed hook timeouts. Apply the same settings to a supplied cluster.
 - Migration helpers hold a cluster-wide advisory lock, so database setup does not scale
   with more workers.
-- E2E files run in parallel on half the available CPUs, capped at four backend and six
-  browser files; tests within a file run sequentially. Browser workers reuse Chromium with
-  a fresh context and database per test. A supplied cluster needs enough connections for
-  the worker count.
+- E2E suites run on half the available CPUs, capped at four backend and six browser
+  workers. Backend files run in parallel with their tests in sequence; browser tests run in
+  parallel even within a file, so each test sets up its own state. Browser workers reuse
+  Chromium with a fresh context and database per test. A supplied cluster needs enough
+  connections for the worker count.
+- Browser journeys serve the web and staff apps from their production builds, which
+  `pnpm test:browser` prepares. A dev server compiled each page on first request, which cost
+  every test seconds. React's development-only checks therefore don't run in journeys.
 - Retries are disabled so flaky failures stay visible. Reproduce with
   `pnpm test:browser --workers=1`, `pnpm test:e2e --maxWorkers=1`, `--grep "<name>"`,
   `--headed` or `--shard=1/4`.

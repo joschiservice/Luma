@@ -62,6 +62,8 @@ try {
         '--filter=@luma/simulator...',
         '--filter=@luma/simulator-web',
         '--filter=@luma/worker...',
+        // Browser journeys serve the web app's build output.
+        '--filter=@luma/web',
       ],
     ],
     [
