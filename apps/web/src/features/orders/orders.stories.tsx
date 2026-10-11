@@ -62,6 +62,7 @@ const order = (
   dueAt: null,
   issueIds: [],
   differs: false,
+  comparisonState: 'matching' as const,
   sources: [sources[0]!],
   observedAt: '2026-09-28T08:00:00.000Z',
   sourceUpdatedAt: '2026-09-28T07:55:00.000Z',
@@ -76,6 +77,7 @@ const list: OrderList = {
       fulfillment: 'partial',
       issueIds: ['77777777-7777-4777-8777-777777777777'],
       differs: true,
+      comparisonState: 'confirmed',
       sources,
     }),
     order(2, {
@@ -100,6 +102,7 @@ const line = (
 ) => ({
   id: '88888888-8888-4888-8888-888888888888',
   skuId: '99999999-9999-4999-8999-999999999999',
+  comparisonKey: '99999999-9999-4999-8999-999999999999',
   skuCode: 'TOTE-RED',
   title: 'Canvas tote',
   quantity: '2',
@@ -178,9 +181,53 @@ const detail: OrderDetail = {
   differences: [
     {
       field: 'paymentStatus',
+      lineKey: null,
+      authority: null,
       values: [
-        { connectionId: shop, value: 'paid' },
-        { connectionId: erp, value: 'pending' },
+        { connectionId: shop, value: 'paid', evidence: [] },
+        { connectionId: erp, value: 'pending', evidence: [] },
+      ],
+    },
+    {
+      field: 'fulfilledQuantity',
+      lineKey: '99999999-9999-4999-8999-999999999999',
+      authority: {
+        group: 'order_fulfillment',
+        state: 'resolved',
+        basis: 'default',
+        connectionId: erp,
+        overrideConnectionId: null,
+        candidateIds: [],
+        eligibleIds: [shop, erp],
+      },
+      values: [
+        { connectionId: shop, value: '1', evidence: [] },
+        { connectionId: erp, value: '0', evidence: [] },
+      ],
+    },
+    {
+      field: 'location',
+      lineKey: '99999999-9999-4999-8999-999999999999',
+      authority: {
+        group: 'order_fulfillment',
+        state: 'resolved',
+        basis: 'default',
+        connectionId: erp,
+        overrideConnectionId: null,
+        candidateIds: [],
+        eligibleIds: [shop, erp],
+      },
+      values: [
+        {
+          connectionId: shop,
+          value: '[["bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","1"]]',
+          evidence: [],
+        },
+        {
+          connectionId: erp,
+          value: '[["cccccccc-cccc-4ccc-8ccc-cccccccccccc","2"]]',
+          evidence: [],
+        },
       ],
     },
   ],
@@ -190,7 +237,10 @@ const detail: OrderDetail = {
       connectionId: shop,
       externalId: 'gid://shopify/Fulfillment/51',
       status: 'shipped',
-      location: null,
+      location: {
+        locationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        name: 'Tokyo warehouse',
+      },
       tracking: null,
       lastProgressAt: '2026-09-27T10:00:00.000Z',
       failureCode: null,
@@ -202,6 +252,31 @@ const detail: OrderDetail = {
           orderLineId: '88888888-8888-4888-8888-888888888888',
           quantity: '1',
           remainingQuantity: null,
+          unit: 'each',
+        },
+      ],
+    },
+    {
+      id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      connectionId: erp,
+      externalId: 'work-10',
+      status: 'pending',
+      kind: 'fulfillment_order',
+      location: {
+        locationId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        name: 'Osaka warehouse',
+      },
+      tracking: null,
+      lastProgressAt: null,
+      failureCode: null,
+      deleted: false,
+      observedAt: '2026-09-27T10:05:00.000Z',
+      sourceUpdatedAt: '2026-09-27T10:00:00.000Z',
+      lines: [
+        {
+          orderLineId: '88888888-8888-4888-8888-888888888888',
+          quantity: '2',
+          remainingQuantity: '2',
           unit: 'each',
         },
       ],
@@ -341,7 +416,14 @@ function ListPreview({ state = 'ready' }: { state?: ListState }) {
 function DetailPreview({
   state = 'ready',
 }: {
-  state?: 'ready' | 'loading' | OrderError | 'offline' | undefined;
+  state?:
+    | 'ready'
+    | 'loading'
+    | OrderError
+    | 'offline'
+    | 'pending'
+    | 'inconclusive'
+    | undefined;
 }) {
   return (
     <OrderDetailView
@@ -355,7 +437,20 @@ function DetailPreview({
           ? state
           : undefined
       }
-      detail={state === 'ready' || state === 'offline' ? detail : undefined}
+      detail={
+        state === 'pending' || state === 'inconclusive'
+          ? {
+              ...detail,
+              order: {
+                ...detail.order,
+                differs: false,
+                comparisonState: state,
+              },
+            }
+          : state === 'ready' || state === 'offline'
+            ? detail
+            : undefined
+      }
       sourceContext={(source) =>
         source.appId === 'shopify' ? (
           <p className="order-note">
@@ -564,4 +659,12 @@ export const RecordOffline: Story = {
 export const RecordNarrow: Story = {
   args: { page: 'detail' },
   globals: { viewport: { value: 'mobile1', isRotated: false } },
+};
+
+export const RecordPending: Story = {
+  args: { page: 'detail', state: 'pending' },
+};
+
+export const RecordInconclusive: Story = {
+  args: { page: 'detail', state: 'inconclusive' },
 };

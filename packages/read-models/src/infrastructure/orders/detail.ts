@@ -63,6 +63,7 @@ async function readFulfillments(
       connectionId: row.connectionId,
       externalId: row.externalId,
       status: text(data.status) ?? 'unknown',
+      kind: text(data.kind),
       lastProgressAt: iso(data.lastProgressAt),
       failureCode: text(data.failureCode),
       deleted: row.document.deleted === true,
@@ -119,7 +120,7 @@ export async function readDetail(
   const orderIds = await orderEntityAliases(tx, tenantId, [orderId]);
   const facts = await readSourceFacts(tx, queries, tenantId, orderId, asOf);
   if (!facts) return null;
-  const { sources, differences, overdue } = facts;
+  const { sources, overdue, comparisonState } = facts;
   const selected = sources.find((source) => source.selected)!;
   const fulfillments = await readFulfillments(tx, tenantId, orderId);
   const refs = {
@@ -185,12 +186,37 @@ export async function readDetail(
       })
     : { items: [], nextCursor: null };
 
+  const resolved = resolveOrderFacts(
+    await authority.read(context),
+    sources,
+    shown('fulfillments') ? fulfillments : null,
+  );
+  const differences = facts.differences.map((difference) => {
+    const group =
+      difference.field === 'status' || difference.field === 'cancelledQuantity'
+        ? 'order_lifecycle'
+        : [
+              'fulfilledQuantity',
+              'remainingQuantity',
+              'fulfillment',
+              'location',
+              'overfulfillment',
+            ].includes(difference.field)
+          ? 'order_fulfillment'
+          : ['orderedQuantity', 'currentQuantity', 'unit', 'lines'].includes(
+                difference.field,
+              )
+            ? 'order_lines'
+            : null;
+
+    return {
+      ...difference,
+      authority: resolved.groups.find((item) => item.group === group) ?? null,
+    };
+  });
+
   return {
-    authority: resolveOrderFacts(
-      await authority.read(context),
-      sources,
-      shown('fulfillments') ? fulfillments : null,
-    ),
+    authority: resolved,
     redirectedFrom: requestedId === orderId ? null : requestedId,
     order: {
       id: orderId,
@@ -206,7 +232,8 @@ export async function readDetail(
       dueAt: selected.dueAt,
       // Needs-you follows the list and metrics rule: removed orders need no attention.
       issueIds: selected.deleted || !shown('issues') ? [] : [...needsYou],
-      differs: differences.length > 0,
+      differs: comparisonState === 'confirmed',
+      comparisonState,
       sources: sources.map((item) => ({
         connectionId: item.connectionId,
         label: item.label,

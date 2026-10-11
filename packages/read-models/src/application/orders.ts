@@ -1,5 +1,6 @@
 import type { FactAuthority } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
+import type { ComparisonDifference, ComparisonState } from '@luma/orders';
 import type { ActivityActor } from '@luma/resolution';
 
 import type { ReturnListItem } from './returns.js';
@@ -8,10 +9,9 @@ import type { ReturnListItem } from './returns.js';
 export type FulfillmentState =
   'unfulfilled' | 'partial' | 'fulfilled' | 'not_required' | 'no_lines';
 
-/** A compared field whose known values disagree between current sources; null is unknown. */
-export interface OrderDifference {
-  field: 'status' | 'paymentStatus' | 'total' | 'lines';
-  values: { connectionId: string; value: string | null }[];
+/** A source disagreement with immutable evidence and the current workspace authority. */
+export interface OrderDifference extends ComparisonDifference {
+  authority: FactAuthority | null;
 }
 
 export type OrderView =
@@ -74,6 +74,7 @@ export interface OrderListItem {
   /** Unresolved issues on this order that currently need a person. */
   issueIds: string[];
   differs: boolean;
+  comparisonState: ComparisonState;
   sources: OrderSource[];
   observedAt: string;
   sourceUpdatedAt: string | null;
@@ -100,6 +101,7 @@ export interface OrderSourceFacts extends OrderSource {
   lines: {
     id: string;
     skuId: string | null;
+    comparisonKey: string | null;
     skuCode: string | null;
     title: string | null;
     quantity: string;
@@ -161,6 +163,8 @@ export interface OrderDetail {
     connectionId: string;
     externalId: string | null;
     status: string;
+    /** Source record kind distinguishes fulfillment work from shipments when reported. */
+    kind?: string | null;
     lastProgressAt: string | null;
     failureCode: string | null;
     deleted: boolean;

@@ -279,7 +279,7 @@ export function OrderDetailView({
               from={here}
             />
             {linkedSources}
-            {detail.sources.length > 1 ? (
+            {detail.sources.length > 1 || detail.differences.length ? (
               <SourceComparison detail={detail} />
             ) : null}
             <OrderFulfillments

@@ -1,5 +1,9 @@
 import type { OrderStateQueries } from '../application/order-state.js';
-import { anyDifference, sourceComparison } from './source-comparison.js';
+import {
+  anyDifference,
+  comparisonStateSql,
+  sourceComparison,
+} from './source-comparison.js';
 
 // SQL building blocks for order state under `orderMetricDefinitions` v1. The order metrics,
 // the Orders list and the order detail compose these so open, overdue and fulfillment state
@@ -86,6 +90,7 @@ export function orderProgress(set: string) {
 export const orderStateQueries: OrderStateQueries = {
   sourceSelectionOrder,
   anyDifference,
+  comparisonState: comparisonStateSql,
   sourceComparison,
   currentOrderSources,
   orderProgress,

@@ -363,13 +363,38 @@ export function orderSummary(
   if (needsYou) say('issues', m.orders_summary_needs_you({ count: needsYou }));
   else if (openIssues)
     say('issues', m.orders_summary_open_issues({ count: openIssues }));
-  for (const difference of detail.differences) {
+  if (detail.order.comparisonState === 'pending')
+    say('differs', m.orders_comparison_pending_description());
+  if (detail.order.comparisonState === 'inconclusive')
+    say('unknown', m.orders_comparison_inconclusive_description());
+  let lineDifferenceShown = false;
+  for (const difference of detail.order.comparisonState === 'confirmed'
+    ? detail.differences
+    : []) {
+    if (difference.field === 'overfulfillment') {
+      for (const entry of difference.values)
+        if (entry.value !== null)
+          say(
+            'differs',
+            m.orders_summary_overfulfillment({
+              value: formatSourceNumber(entry.value),
+              source: label(entry.connectionId),
+            }),
+          );
+      continue;
+    }
     const values = [...difference.values].sort(
       (left, right) =>
         Number(right.connectionId === source.connectionId) -
         Number(left.connectionId === source.connectionId),
     );
-    if (difference.field === 'lines') {
+    if (
+      difference.field !== 'status' &&
+      difference.field !== 'paymentStatus' &&
+      difference.field !== 'total'
+    ) {
+      if (lineDifferenceShown) continue;
+      lineDifferenceShown = true;
       say(
         'differs',
         m.orders_summary_differs_lines({

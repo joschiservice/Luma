@@ -2,13 +2,13 @@ import type { TenantContext } from '@luma/identity';
 import { requirePermission } from '@luma/identity';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 
+import { readOrderComparisons } from './comparison-projection.js';
 import { refreshFulfillmentList } from './fulfillment-list.js';
 import {
   currentOrderSources,
   orderProgress,
   sourceSelectionOrder,
 } from './order-state.js';
-import { anyDifference, sourceComparison } from './source-comparison.js';
 
 const timestampKey = (column: string) =>
   `to_char(${column} AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US')`;
@@ -36,36 +36,42 @@ export async function refreshOrderList(
     'UPDATE orders_list SET selected=false WHERE tenant_id=$1 AND entity_id=ANY($2::uuid[]) AND selected',
     [tenant, ids],
   );
+  const comparisons = await readOrderComparisons(tx, tenant, ids);
   await tx.query(
-    `WITH ${currentOrderSources('sources', 'p.entity_id=ANY($3::uuid[])')},
-    ${orderProgress('sources')}, ${sourceComparison('sources', 'sources')},
+    `WITH comparisons AS (SELECT * FROM jsonb_to_recordset($4::jsonb) AS v(entity_id uuid,connection_id uuid,signature text,changed_at timestamptz,raw text,read_at timestamptz,latest_read_at timestamptz,confirm_after timestamptz,differences jsonb)), ${currentOrderSources('sources', 'p.entity_id=ANY($3::uuid[])')},
+    ${orderProgress('sources')},
     winners AS (SELECT DISTINCT ON(entity_id) entity_id,connection_id FROM sources ORDER BY entity_id,${sourceSelectionOrder})
     INSERT INTO orders_list(tenant_id,entity_id,connection_id,snapshot_id,selected,status,payment_status,display_number,
       observed_at,source_updated_at,placed_at,due_at,deleted,line_count,fulfillment,open,state_valid_from,differs,
-      updated_key,placed_key,placed_rank,number_key,number_rank,due_key,due_rank,external_order_number)
+      updated_key,placed_key,placed_rank,number_key,number_rank,due_key,due_rank,external_order_number,comparison_signature,comparison_changed_at,comparison_raw,comparison_read_at,comparison_latest_read_at,comparison_confirm_after,comparison_differences)
     SELECT $1,o.entity_id,o.connection_id,o.snapshot_id,w.connection_id=o.connection_id,o.status,o.payment_status,o.display_number,
       o.observed_at,o.source_updated_at,o.placed_at,o.due_at,o.deleted,o.line_count,o.fulfillment,o.open,
       GREATEST(o.observed_at,COALESCE((SELECT max(s.observed_at) FROM orders_snapshots s
        JOIN orders_projections p ON p.tenant_id=s.tenant_id AND p.entity_id=s.entity_id AND p.snapshot_id=s.id AND p.connection_id=s.connection_id
        WHERE s.tenant_id=$1 AND s.order_id=o.entity_id AND s.connection_id=o.connection_id
        AND s.kind='fulfillment' AND s.status IN ('completed','shipped','delivered') AND NOT (s.document->>'deleted')::boolean),o.observed_at)),
-      COALESCE(${anyDifference},false),
+      v.raw='different',
       ${timestampKey('COALESCE(o.source_updated_at,o.observed_at)')},
       COALESCE(${timestampKey('o.placed_at')},''),(o.placed_at IS NULL)::int,
       COALESCE(lpad(length(o.display_number)::text,6,'0')||left(lower(o.display_number),120),''),(o.display_number IS NULL)::int,
       COALESCE(${timestampKey('o.due_at')},''),(o.due_at IS NULL)::int,
       (SELECT obs.document->'observation'->'data'->>'externalOrderNumber' FROM orders_snapshots snap
        JOIN connector_observations obs ON obs.tenant_id=snap.tenant_id AND obs.id=snap.observation_id
-       WHERE snap.tenant_id=$1 AND snap.id=o.snapshot_id)
-    FROM order_state o JOIN winners w USING(entity_id) LEFT JOIN source_differences d USING(entity_id)
+       WHERE snap.tenant_id=$1 AND snap.id=o.snapshot_id),
+      v.signature,v.changed_at,COALESCE(v.raw,'inconclusive'),v.read_at,v.latest_read_at,v.confirm_after,COALESCE(v.differences,'[]'::jsonb)
+    FROM order_state o JOIN winners w USING(entity_id) LEFT JOIN comparisons v ON v.entity_id=o.entity_id AND v.connection_id=o.connection_id
     ON CONFLICT(tenant_id,entity_id,connection_id) DO UPDATE SET
       snapshot_id=EXCLUDED.snapshot_id,selected=EXCLUDED.selected,status=EXCLUDED.status,payment_status=EXCLUDED.payment_status,
       display_number=EXCLUDED.display_number,observed_at=EXCLUDED.observed_at,source_updated_at=EXCLUDED.source_updated_at,
       placed_at=EXCLUDED.placed_at,due_at=EXCLUDED.due_at,deleted=EXCLUDED.deleted,line_count=EXCLUDED.line_count,
       fulfillment=EXCLUDED.fulfillment,open=EXCLUDED.open,state_valid_from=EXCLUDED.state_valid_from,differs=EXCLUDED.differs,
       updated_key=EXCLUDED.updated_key,placed_key=EXCLUDED.placed_key,placed_rank=EXCLUDED.placed_rank,
-      number_key=EXCLUDED.number_key,number_rank=EXCLUDED.number_rank,due_key=EXCLUDED.due_key,due_rank=EXCLUDED.due_rank,external_order_number=EXCLUDED.external_order_number`,
-    [tenant, 'infinity', ids],
+      number_key=EXCLUDED.number_key,number_rank=EXCLUDED.number_rank,due_key=EXCLUDED.due_key,due_rank=EXCLUDED.due_rank,external_order_number=EXCLUDED.external_order_number,
+      comparison_signature=EXCLUDED.comparison_signature,comparison_changed_at=EXCLUDED.comparison_changed_at,
+      comparison_raw=EXCLUDED.comparison_raw,comparison_read_at=EXCLUDED.comparison_read_at,
+      comparison_latest_read_at=EXCLUDED.comparison_latest_read_at,comparison_confirm_after=EXCLUDED.comparison_confirm_after,
+      comparison_differences=EXCLUDED.comparison_differences`,
+    [tenant, 'infinity', ids, JSON.stringify(comparisons)],
   );
   if (!refreshSearch) return;
   await tx.query(

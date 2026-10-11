@@ -23,3 +23,11 @@ export type {
 } from './application/metrics.js';
 
 export type { OrderStateQueries } from './application/order-state.js';
+
+export type {
+  ComparisonState,
+  ComparisonDifference,
+  ComparisonField,
+} from './domain/source-comparison.js';
+
+export { orderComparisonState } from './domain/source-comparison.js';

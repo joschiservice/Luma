@@ -29,6 +29,7 @@ const source = (
     {
       id: 'line',
       skuId: null,
+      comparisonKey: null,
       skuCode: 'TOTE',
       title: 'Canvas tote',
       quantity: '3',
@@ -64,6 +65,7 @@ const detail = (
     dueAt: '2026-09-19T00:00:00.000Z',
     issueIds: [],
     differs: false,
+    comparisonState: 'matching' as const,
     sources: [],
     observedAt: '2026-09-20T00:00:00.000Z',
     sourceUpdatedAt: null,
@@ -106,12 +108,15 @@ describe('order presentation', () => {
               paymentStatus: 'pending',
             }),
           ],
+          order: { ...detail().order, comparisonState: 'confirmed' },
           differences: [
             {
               field: 'paymentStatus',
+              lineKey: null,
+              authority: null,
               values: [
-                { connectionId: 'shop', value: 'paid' },
-                { connectionId: 'erp', value: 'pending' },
+                { connectionId: 'shop', value: 'paid', evidence: [] },
+                { connectionId: 'erp', value: 'pending', evidence: [] },
               ],
             },
           ],

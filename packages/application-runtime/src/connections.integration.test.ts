@@ -54,7 +54,7 @@ describe.skipIf(!databaseUrl)('installed connections on PostgreSQL', () => {
       );
       for (const file of [
         '0004_connector_installations.sql',
-        '0074_connection_write_mode_audit.sql',
+        '0075_connection_write_mode_audit.sql',
       ])
         await owner.query(
           await readFile(

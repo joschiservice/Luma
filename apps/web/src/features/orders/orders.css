@@ -140,6 +140,7 @@
 }
 
 .order-comparison-field {
+  min-width: 10rem;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
