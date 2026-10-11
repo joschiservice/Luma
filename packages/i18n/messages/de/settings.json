@@ -470,5 +470,9 @@
   "settings_authority_fact": "Angabengruppe",
   "settings_authority_override": "Workspace-Anpassung",
   "settings_authority_default": "Kategorienstandard verwenden",
-  "settings_authority_unavailable": "{source} (nicht verfügbar)"
+  "settings_authority_unavailable": "{source} (nicht verfügbar)",
+  "settings_write_mode_title": "Änderungen in verbundenen Systemen",
+  "settings_write_mode_description": "Im Beobachtungsmodus laufen Erkennung, Untersuchung und Vorschläge weiter. Nur Workspace-Inhaber dürfen Änderungen in verbundenen Systemen erlauben.",
+  "settings_write_mode_enabled": "Änderungen erlaubt",
+  "settings_write_mode_owner": "Nur Workspace-Inhaber können den Änderungsmodus umstellen."
 }

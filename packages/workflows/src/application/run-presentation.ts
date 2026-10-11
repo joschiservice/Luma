@@ -46,11 +46,13 @@ export function presentResolutionRun(
       version.provenance.kind === 'pilot' ? 'pilot' : 'unclassified',
     execution:
       outcome?.execution?.state ??
-      (outcome?.state === 'awaiting_approval'
-        ? 'awaiting_approval'
-        : outcome?.state === 'denied'
-          ? 'denied'
-          : 'not_recorded'),
+      (outcome?.state === 'not_executed'
+        ? 'not_executed'
+        : outcome?.state === 'awaiting_approval'
+          ? 'awaiting_approval'
+          : outcome?.state === 'denied'
+            ? 'denied'
+            : 'not_recorded'),
     verification:
       outcome?.state === 'verified'
         ? 'verified'
@@ -72,6 +74,8 @@ export function presentResolutionStory(
 ) {
   const view = presentResolutionRun(run, version, outcome);
   const decisions: Record<PlaybookOutcome['reason'], string> = {
+    observe_only:
+      'Not executed: observe-only. Would run when writes are enabled.',
     approval_required:
       'Waiting for someone else who can approve changes to decide on the proposed change.',
     verified: 'The expected correction was confirmed by verification.',

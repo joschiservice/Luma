@@ -539,3 +539,54 @@ it('keeps Home layouts and pins personal, versioned and tenant scoped', async (t
     }),
   ).toEqual({ home: null, pinned: [], revision: 2 });
 });
+
+it('defaults new workspaces to observe-only and audits owner mode commands without accepting stale or foreign writes', async (t) => {
+  const f = await settingsFixture(t);
+  const { request, owner, member, outsider, base, command } = f;
+  expect((await request(owner, `${base}/settings`)).workspace.writeMode).toBe(
+    'observe_only',
+  );
+  const enable = command({ revision: 0, writeMode: 'writes_enabled' });
+  await request(member, `${base}/settings/write-mode`, 'PATCH', enable, 403);
+  await request(outsider, `${base}/settings/write-mode`, 'PATCH', enable, 404);
+  const enabled = await request(
+    owner,
+    `${base}/settings/write-mode`,
+    'PATCH',
+    enable,
+  );
+  expect(enabled.workspace).toMatchObject({
+    writeMode: 'writes_enabled',
+    revision: 1,
+  });
+  expect(
+    await request(owner, `${base}/settings/write-mode`, 'PATCH', enable),
+  ).toEqual(enabled);
+  await request(
+    owner,
+    `${base}/settings/write-mode`,
+    'PATCH',
+    command({ revision: 0, writeMode: 'observe_only' }),
+    409,
+  );
+  await request(
+    owner,
+    `${base}/settings/write-mode`,
+    'PATCH',
+    command({ revision: 1, writeMode: 'observe_only' }),
+  );
+  const events = await f.db.owner.query(
+    "SELECT before_value,after_value FROM workspace_access_events WHERE tenant_id=$1 AND event_type='workspace.write_mode_changed' ORDER BY created_at",
+    [f.org.id],
+  );
+  expect(events.rows).toEqual([
+    {
+      before_value: { writeMode: 'observe_only' },
+      after_value: { writeMode: 'writes_enabled' },
+    },
+    {
+      before_value: { writeMode: 'writes_enabled' },
+      after_value: { writeMode: 'observe_only' },
+    },
+  ]);
+});

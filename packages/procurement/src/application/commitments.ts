@@ -97,6 +97,7 @@ export interface PurchasingSystem {
 /** Execution state of a submission action, as Action Admission recorded it. */
 export type SubmissionExecution =
   | { state: 'not_started' }
+  | { state: 'not_executed'; reason: 'observe_only' }
   | { state: 'withheld'; reason: string }
   | { state: 'accepted' }
   | { state: 'verified' }
@@ -105,6 +106,11 @@ export type SubmissionExecution =
 
 /** Binds submissions to Action Admission, workspace policy and audited execution. */
 export interface SubmissionAdmission {
+  /** Reads effective workspace and connection write controls without provider calls. */
+  writeMode?(
+    context: TenantContext,
+    connectionId: string,
+  ): Promise<'observe_only' | 'writes_enabled'>;
   /** Binds the action to its admission step and evaluates policy with a fresh precondition check. */
   prepare(
     context: TenantContext,
@@ -282,6 +288,7 @@ export interface CommitmentDependencies {
 
 /** What a person can do with a submission now, from persisted state. */
 export interface SubmissionView extends Submission {
+  observeOnly?: boolean;
   approvalOutcome: 'approved' | 'rejected' | null;
   canApprove: boolean;
   canSend: boolean;
@@ -438,6 +445,13 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
     const expired =
       submission.state === 'approval_required' &&
       Date.parse(submission.expiresAt) <= deps.now().getTime();
+    const observeOnly =
+      submission.state === 'not_executed' ||
+      (['approval_required', 'approved'].includes(submission.state) &&
+        (await deps.admission?.writeMode?.(
+          context,
+          submission.connectionId,
+        )) === 'observe_only');
     const requester = context.actor.id === submission.requestedBy;
     const manager = hasPermission(context, 'procurement.manage');
     // Approvers also need permission to approve changes and any app permission the
@@ -449,6 +463,8 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         !isAppPermission(decision.permission) ||
         hasPermission(context, decision.permission));
     const messages: Record<Submission['state'], string> = {
+      not_executed:
+        'Observe-only. Would run when writes are enabled. Nothing was sent.',
       approval_required: requester
         ? 'Waiting for someone else who can approve changes to approve sending this order.'
         : 'Check the supplier, lines and requested date before approving. Luma places the order in the purchasing system right after approval.',
@@ -466,18 +482,28 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
 
     return {
       ...submission,
+      observeOnly,
       state: expired ? 'expired' : submission.state,
       approvalOutcome: decision?.approval?.outcome ?? null,
       canApprove:
+        !observeOnly &&
         !expired &&
         approver &&
         !requester &&
         submission.state === 'approval_required' &&
         !decision?.approval,
-      canSend: !expired && requester && submission.state === 'approved',
+      canSend:
+        !observeOnly &&
+        !expired &&
+        requester &&
+        submission.state === 'approved',
       canCheck:
         manager && ['uncertain', 'submitting'].includes(submission.state),
-      message: expired ? messages.expired : messages[submission.state],
+      message: observeOnly
+        ? messages.not_executed
+        : expired
+          ? messages.expired
+          : messages[submission.state],
     };
   }
 
@@ -769,6 +795,13 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
     );
     if (!submission) return null;
     if (execution.state === 'not_started') return submission;
+    if (execution.state === 'not_executed')
+      return deps.store.transaction(context.tenantId, true, async (tx) =>
+        saveSubmission(tx, submission!, {
+          state: 'not_executed',
+          failure: null,
+        }),
+      );
     if (execution.state === 'withheld' || execution.state === 'failed')
       return deps.store.transaction(context.tenantId, true, async (tx) =>
         saveSubmission(tx, submission!, {
@@ -1197,7 +1230,10 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
           const orderIds = new Set([
             ...submissions
               .filter(
-                (s) => !['rejected', 'expired', 'failed'].includes(s.state),
+                (s) =>
+                  !['rejected', 'expired', 'failed', 'not_executed'].includes(
+                    s.state,
+                  ),
               )
               .map((s) => s.purchaseOrderId),
             ...commitments.map((c) => c.purchaseOrderId),
@@ -1371,7 +1407,10 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
           const ready = await readiness(context, tx, order!, supplier);
           if (!ready.ready) conflict(ready.blockers[0]!);
           const live = (await tx.submissions([orderId])).find(
-            (s) => !['rejected', 'expired', 'failed'].includes(s.state),
+            (s) =>
+              !['rejected', 'expired', 'failed', 'not_executed'].includes(
+                s.state,
+              ),
           );
           if (
             live &&
@@ -1468,7 +1507,12 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
                 : {}),
           }),
       );
-      if (saved.state === 'approved') await dispatch(context, saved);
+      if (
+        saved.state === 'approved' ||
+        (await deps.admission?.writeMode?.(context, saved.connectionId)) ===
+          'observe_only'
+      )
+        await dispatch(context, saved);
 
       return submissionView(
         context,

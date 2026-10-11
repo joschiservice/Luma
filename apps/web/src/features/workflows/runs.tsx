@@ -37,6 +37,7 @@ const processStateLabels: Record<
   verified: [m.workflows_run_state_verified, 'verified'],
   ended: [m.workflows_run_state_ended, 'idle'],
   denied: [m.workflows_run_state_denied, 'attention'],
+  not_executed: [m.issues_observe_only_title, 'idle'],
   failed_verification: [m.workflows_run_state_failed_verification, 'error'],
   inconclusive_verification: [
     m.workflows_run_state_inconclusive_verification,
@@ -46,6 +47,7 @@ const processStateLabels: Record<
 };
 
 const stepStateLabels = {
+  not_executed: m.issues_observe_only_title,
   completed: m.workflows_step_state_completed,
   waiting: m.workflows_step_state_waiting,
   denied: m.workflows_step_state_denied,
@@ -64,6 +66,7 @@ const evidenceLabels = {
 } satisfies Record<WorkflowRunView['evidenceKind'], () => string>;
 
 function processStepDescription(step: ProcessStep) {
+  if (step.reason === 'observe_only') return m.issues_observe_only_proposal();
   if (
     step.reason &&
     !['condition_not_met', 'policy_approval_required'].includes(step.reason)
@@ -226,7 +229,11 @@ export function WorkflowRuns({
                 {run.processState ? (
                   <div className="workflow-process-status" role="status">
                     <StatePill state={pill}>{stateLabel()}</StatePill>
-                    <span>{run.reason}</span>
+                    <span>
+                      {run.processState === 'not_executed'
+                        ? m.issues_observe_only_proposal()
+                        : run.reason}
+                    </span>
                   </div>
                 ) : null}
                 {run.triggerState ? (

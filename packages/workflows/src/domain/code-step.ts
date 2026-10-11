@@ -53,7 +53,7 @@ export interface CodeCall {
 
 /** The host may suspend an instruction for policy approval without retaining a sandbox. */
 export interface CodeActivityResult extends CodeResult {
-  state: 'completed' | 'awaiting_approval' | 'failed';
+  state: 'completed' | 'awaiting_approval' | 'not_executed' | 'failed';
   evidenceRefs: string[];
 }
 

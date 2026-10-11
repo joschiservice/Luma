@@ -13,54 +13,58 @@ export function presentTriggerRun(
       ? latest.kind === 'wait'
         ? 'waiting'
         : 'awaiting_decision'
-      : latest.state === 'denied'
-        ? 'denied'
-        : latest.state === 'failed'
-          ? 'failed_verification'
-          : latest.state === 'inconclusive'
-            ? 'inconclusive_verification'
-            : latest.state === 'ended'
-              ? 'ended'
-              : latest.state === 'escalated'
-                ? 'escalated'
-                : latest.kind === 'end'
-                  ? processSteps.some(
-                      (step) =>
-                        step.state === 'completed' &&
-                        (step.kind === 'verification' ||
-                          (step.code?.verifiedActions ?? 0) > 0),
-                    )
-                    ? 'verified'
-                    : 'ended'
-                  : 'running';
+      : latest.state === 'not_executed'
+        ? 'not_executed'
+        : latest.state === 'denied'
+          ? 'denied'
+          : latest.state === 'failed'
+            ? 'failed_verification'
+            : latest.state === 'inconclusive'
+              ? 'inconclusive_verification'
+              : latest.state === 'ended'
+                ? 'ended'
+                : latest.state === 'escalated'
+                  ? 'escalated'
+                  : latest.kind === 'end'
+                    ? processSteps.some(
+                        (step) =>
+                          step.state === 'completed' &&
+                          (step.kind === 'verification' ||
+                            (step.code?.verifiedActions ?? 0) > 0),
+                      )
+                      ? 'verified'
+                      : 'ended'
+                    : 'running';
   const reason =
-    processState === 'verified'
-      ? 'The expected result was verified.'
-      : processState === 'ended'
-        ? latest?.kind === 'condition'
-          ? 'The current conditions do not require an action.'
-          : 'The workflow finished without a verification step.'
-        : processState === 'failed_verification'
-          ? 'Verification found a different result. Operator review is required.'
-          : processState === 'inconclusive_verification'
-            ? 'Verification could not confirm the result. Operator review is required.'
-            : processState === 'escalated'
-              ? 'The run needs operator review.'
-              : processState === 'denied'
-                ? 'The decision denied this run.'
-                : processState === 'waiting'
-                  ? 'The workflow is waiting before its next step.'
-                  : processState === 'awaiting_decision'
-                    ? 'The workflow is waiting for a decision.'
-                    : processState === 'running'
-                      ? 'The workflow is progressing through its steps.'
-                      : run.state === 'scheduled'
-                        ? 'Waiting for the scheduled time.'
-                        : run.state === 'cancelled'
-                          ? 'The scheduled start was cancelled.'
-                          : run.state === 'skipped'
-                            ? 'The scheduled time passed while the workspace was suspended, so this start was skipped.'
-                            : 'Trigger received. Execution requires a separate activation and admission.';
+    processState === 'not_executed'
+      ? 'Not executed: observe-only. Would run when writes are enabled.'
+      : processState === 'verified'
+        ? 'The expected result was verified.'
+        : processState === 'ended'
+          ? latest?.kind === 'condition'
+            ? 'The current conditions do not require an action.'
+            : 'The workflow finished without a verification step.'
+          : processState === 'failed_verification'
+            ? 'Verification found a different result. Operator review is required.'
+            : processState === 'inconclusive_verification'
+              ? 'Verification could not confirm the result. Operator review is required.'
+              : processState === 'escalated'
+                ? 'The run needs operator review.'
+                : processState === 'denied'
+                  ? 'The decision denied this run.'
+                  : processState === 'waiting'
+                    ? 'The workflow is waiting before its next step.'
+                    : processState === 'awaiting_decision'
+                      ? 'The workflow is waiting for a decision.'
+                      : processState === 'running'
+                        ? 'The workflow is progressing through its steps.'
+                        : run.state === 'scheduled'
+                          ? 'Waiting for the scheduled time.'
+                          : run.state === 'cancelled'
+                            ? 'The scheduled start was cancelled.'
+                            : run.state === 'skipped'
+                              ? 'The scheduled time passed while the workspace was suspended, so this start was skipped.'
+                              : 'Trigger received. Execution requires a separate activation and admission.';
 
   return {
     id: run.id,
@@ -69,13 +73,16 @@ export function presentTriggerRun(
     versionDigest: run.versionDigest,
     activationId: run.activationId,
     evidenceKind: 'unclassified' as const,
-    execution: processSteps.some(
-      (step) =>
-        (step.state === 'completed' && step.kind === 'capability') ||
-        (step.code?.verifiedActions ?? 0) > 0,
-    )
-      ? 'accepted'
-      : 'not_recorded',
+    execution:
+      processState === 'not_executed'
+        ? 'not_executed'
+        : processSteps.some(
+              (step) =>
+                (step.state === 'completed' && step.kind === 'capability') ||
+                (step.code?.verifiedActions ?? 0) > 0,
+            )
+          ? 'accepted'
+          : 'not_recorded',
     verification:
       processState === 'verified'
         ? 'verified'

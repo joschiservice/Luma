@@ -137,6 +137,12 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       );
       setup.release();
     }
+    // This fixture exercises enabled execution independently of identity provisioning.
+    for (const id of [tenantId, otherTenant])
+      await owner.query(
+        "INSERT INTO organizations(id,name,slug,created_at,write_mode) VALUES($1::uuid,'Fixture',$1::uuid::text,now(),'writes_enabled')",
+        [id],
+      );
     const password = randomUUID();
     await admin.query(
       `CREATE ROLE "${name}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,

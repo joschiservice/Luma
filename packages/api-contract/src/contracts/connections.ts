@@ -30,6 +30,27 @@ export const connectionsContract = {
     .meta({ access: anyMember, errors: [401, 403, 404, 409, 422, 503] })
     .input(z.object({ params: organizationParamsSchema }))
     .output(z.object({ items: z.array(installedConnectionSchema) })),
+  updateWriteMode: endpoint
+    .route({
+      method: 'PATCH',
+      path: '/v1/organizations/{organizationId}/connections/{connectionId}/write-mode',
+      summary: 'Change connection write mode',
+      description:
+        'Owners may impose observe-only or restore workspace inheritance. A connection cannot enable writes in an observe-only workspace.',
+    })
+    .meta({ access: anyMember, errors: [401, 403, 404, 409, 422, 503] })
+    .input(
+      z.object({
+        params: connectionParams,
+        body: z
+          .object({
+            version: z.number().int().positive(),
+            writeMode: z.literal('observe_only').nullable(),
+          })
+          .strict(),
+      }),
+    )
+    .output(installedConnectionSchema),
   install: endpoint
     .route({
       method: 'POST',

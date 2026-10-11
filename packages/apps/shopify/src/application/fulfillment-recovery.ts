@@ -108,6 +108,11 @@ export function createFulfillmentRecovery(deps: RecoveryDependencies) {
   ): Promise<RecoveryView> {
     const execution = result ?? (await deps.admission.get(context, run.id));
     const record = execution && 'record' in execution ? execution.record : null;
+    const observeOnly =
+      !record &&
+      (execution?.state === 'not_executed' ||
+        (await deps.admission.writeMode?.(context, run.target.connectionId)) ===
+          'observe_only');
     const decision = run.decisionId
       ? await deps.policies.decision(context, run.decisionId)
       : null;
@@ -176,6 +181,7 @@ export function createFulfillmentRecovery(deps: RecoveryDependencies) {
                       : 'Review the exact change. Shopify eligibility is checked again before dispatch.';
 
     return {
+      observeOnly,
       id: run.id,
       target: run.target,
       choice: run.choice,
@@ -204,6 +210,7 @@ export function createFulfillmentRecovery(deps: RecoveryDependencies) {
           : 'not_sent',
       message,
       canExecute:
+        !observeOnly &&
         !record &&
         !expired &&
         !changed &&
@@ -214,6 +221,7 @@ export function createFulfillmentRecovery(deps: RecoveryDependencies) {
         (decision?.outcome !== 'approval_required' ||
           decision.approval?.outcome === 'approved'),
       canApprove:
+        !observeOnly &&
         !record &&
         !expired &&
         !changed &&
@@ -352,8 +360,11 @@ export function createFulfillmentRecovery(deps: RecoveryDependencies) {
           'Only the requester can run this action.',
         );
       const previous = await deps.admission.get(context, id);
+      if (previous?.state === 'not_executed')
+        return view(context, run, previous);
       if (!previous || !('record' in previous)) {
-        if (!(await view(context, run)).canExecute)
+        const current = await view(context, run);
+        if (!current.canExecute && !current.observeOnly)
           throw new IdentityError(
             409,
             'CONFLICT',
@@ -436,9 +447,11 @@ export function createFulfillmentRecovery(deps: RecoveryDependencies) {
 
       return views.filter(
         (item) =>
+          item.observeOnly ||
           ['approval_required', 'uncertain', 'recovery_required'].includes(
             item.state,
-          ) || item.canExecute,
+          ) ||
+          item.canExecute,
       );
     },
     /** Rejects stale, altered or unrelated admission steps before the shared engine reserves a write. */

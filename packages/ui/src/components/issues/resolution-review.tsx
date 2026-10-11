@@ -108,6 +108,14 @@ export function ResolutionReview({
         </h3>
         {proposal ? (
           <>
+            {review.observeOnly ? (
+              <Alert tone="neutral" role="status">
+                <AlertTitle>{m.issues_observe_only_title()}</AlertTitle>
+                <AlertDescription>
+                  {m.issues_observe_only_proposal()}
+                </AlertDescription>
+              </Alert>
+            ) : null}
             <Card as="div" variant="subtle" className="resolution-proposal">
               <CardHeader className="resolution-proposal-heading">
                 <h4>
@@ -276,7 +284,9 @@ export function ResolutionReview({
             proposal?.policy?.reason,
           ])}
           compactEscalation={!proposal && !!navigate}
-          decisions={review.permittedDecisions}
+          decisions={review.permittedDecisions.filter(
+            (kind) => !review.observeOnly || kind !== 'approve',
+          )}
           disabled={disabled}
           pending={pending}
           checking={checking}

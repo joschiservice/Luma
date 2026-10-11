@@ -7528,6 +7528,7 @@
                         "ended",
                         "denied",
                         "failed_verification",
+                        "not_executed",
                         "inconclusive_verification",
                         "escalated"
                       ],
@@ -7558,6 +7559,7 @@
                           },
                           "state": {
                             "enum": [
+                              "not_executed",
                               "completed",
                               "waiting",
                               "denied",
@@ -10882,6 +10884,7 @@
                               "ended",
                               "denied",
                               "failed_verification",
+                              "not_executed",
                               "inconclusive_verification",
                               "escalated"
                             ],
@@ -10912,6 +10915,7 @@
                                 },
                                 "state": {
                                   "enum": [
+                                    "not_executed",
                                     "completed",
                                     "waiting",
                                     "denied",
@@ -11755,6 +11759,7 @@
                         "ended",
                         "denied",
                         "failed_verification",
+                        "not_executed",
                         "inconclusive_verification",
                         "escalated"
                       ],
@@ -11785,6 +11790,7 @@
                           },
                           "state": {
                             "enum": [
+                              "not_executed",
                               "completed",
                               "waiting",
                               "denied",
@@ -12381,6 +12387,7 @@
                         "ended",
                         "denied",
                         "failed_verification",
+                        "not_executed",
                         "inconclusive_verification",
                         "escalated"
                       ],
@@ -12411,6 +12418,7 @@
                           },
                           "state": {
                             "enum": [
+                              "not_executed",
                               "completed",
                               "waiting",
                               "denied",
@@ -30121,6 +30129,7 @@
                                 "properties": {
                                   "outcome": {
                                     "enum": [
+                                      "not_executed",
                                       "verified",
                                       "ended",
                                       "denied",
@@ -30192,6 +30201,7 @@
                             "anyOf": [
                               {
                                 "enum": [
+                                  "not_executed",
                                   "verified",
                                   "ended",
                                   "denied",
@@ -30578,6 +30588,7 @@
                               "properties": {
                                 "outcome": {
                                   "enum": [
+                                    "not_executed",
                                     "verified",
                                     "ended",
                                     "denied",
@@ -30823,6 +30834,7 @@
                                 "properties": {
                                   "outcome": {
                                     "enum": [
+                                      "not_executed",
                                       "verified",
                                       "ended",
                                       "denied",
@@ -30894,6 +30906,7 @@
                             "anyOf": [
                               {
                                 "enum": [
+                                  "not_executed",
                                   "verified",
                                   "ended",
                                   "denied",
@@ -31308,6 +31321,7 @@
                                 "properties": {
                                   "outcome": {
                                     "enum": [
+                                      "not_executed",
                                       "verified",
                                       "ended",
                                       "denied",
@@ -31379,6 +31393,7 @@
                             "anyOf": [
                               {
                                 "enum": [
+                                  "not_executed",
                                   "verified",
                                   "ended",
                                   "denied",
@@ -31760,6 +31775,7 @@
                               "properties": {
                                 "outcome": {
                                   "enum": [
+                                    "not_executed",
                                     "verified",
                                     "ended",
                                     "denied",
@@ -31991,6 +32007,7 @@
                                     "properties": {
                                       "outcome": {
                                         "enum": [
+                                          "not_executed",
                                           "verified",
                                           "ended",
                                           "denied",
@@ -32229,6 +32246,7 @@
                                     "properties": {
                                       "outcome": {
                                         "enum": [
+                                          "not_executed",
                                           "verified",
                                           "ended",
                                           "denied",
@@ -32595,6 +32613,7 @@
                             "properties": {
                               "outcome": {
                                 "enum": [
+                                  "not_executed",
                                   "verified",
                                   "ended",
                                   "denied",
@@ -32684,6 +32703,7 @@
                           "properties": {
                             "outcome": {
                               "enum": [
+                                "not_executed",
                                 "verified",
                                 "ended",
                                 "denied",
@@ -32751,6 +32771,7 @@
                                   },
                                   "state": {
                                     "enum": [
+                                      "not_executed",
                                       "completed",
                                       "waiting",
                                       "denied",
@@ -33112,6 +33133,7 @@
                           "properties": {
                             "outcome": {
                               "enum": [
+                                "not_executed",
                                 "verified",
                                 "ended",
                                 "denied",
@@ -33179,6 +33201,7 @@
                                   },
                                   "state": {
                                     "enum": [
+                                      "not_executed",
                                       "completed",
                                       "waiting",
                                       "denied",
@@ -33551,6 +33574,7 @@
                           "properties": {
                             "outcome": {
                               "enum": [
+                                "not_executed",
                                 "verified",
                                 "ended",
                                 "denied",
@@ -33618,6 +33642,7 @@
                                   },
                                   "state": {
                                     "enum": [
+                                      "not_executed",
                                       "completed",
                                       "waiting",
                                       "denied",
@@ -37693,6 +37718,7 @@
                             },
                             "state": {
                               "enum": [
+                                "not_executed",
                                 "approval_required",
                                 "approved",
                                 "rejected",
@@ -37775,6 +37801,9 @@
                             "updatedAt": {
                               "type": "string",
                               "format": "date-time"
+                            },
+                            "observeOnly": {
+                              "type": "boolean"
                             },
                             "approvalOutcome": {
                               "anyOf": [
@@ -37928,6 +37957,7 @@
                           },
                           "state": {
                             "enum": [
+                              "not_executed",
                               "approval_required",
                               "approved",
                               "rejected",
@@ -39700,6 +39730,7 @@
                             },
                             "state": {
                               "enum": [
+                                "not_executed",
                                 "approval_required",
                                 "approved",
                                 "rejected",
@@ -39782,6 +39813,9 @@
                             "updatedAt": {
                               "type": "string",
                               "format": "date-time"
+                            },
+                            "observeOnly": {
+                              "type": "boolean"
                             },
                             "approvalOutcome": {
                               "anyOf": [
@@ -39935,6 +39969,7 @@
                           },
                           "state": {
                             "enum": [
+                              "not_executed",
                               "approval_required",
                               "approved",
                               "rejected",
@@ -41379,6 +41414,7 @@
                     },
                     "state": {
                       "enum": [
+                        "not_executed",
                         "approval_required",
                         "approved",
                         "rejected",
@@ -41461,6 +41497,9 @@
                     "updatedAt": {
                       "type": "string",
                       "format": "date-time"
+                    },
+                    "observeOnly": {
+                      "type": "boolean"
                     },
                     "approvalOutcome": {
                       "anyOf": [
@@ -41756,6 +41795,7 @@
                     },
                     "state": {
                       "enum": [
+                        "not_executed",
                         "approval_required",
                         "approved",
                         "rejected",
@@ -41838,6 +41878,9 @@
                     "updatedAt": {
                       "type": "string",
                       "format": "date-time"
+                    },
+                    "observeOnly": {
+                      "type": "boolean"
                     },
                     "approvalOutcome": {
                       "anyOf": [
@@ -42122,6 +42165,7 @@
                     },
                     "state": {
                       "enum": [
+                        "not_executed",
                         "approval_required",
                         "approved",
                         "rejected",
@@ -42204,6 +42248,9 @@
                     "updatedAt": {
                       "type": "string",
                       "format": "date-time"
+                    },
+                    "observeOnly": {
+                      "type": "boolean"
                     },
                     "approvalOutcome": {
                       "anyOf": [
@@ -42488,6 +42535,7 @@
                     },
                     "state": {
                       "enum": [
+                        "not_executed",
                         "approval_required",
                         "approved",
                         "rejected",
@@ -42570,6 +42618,9 @@
                     "updatedAt": {
                       "type": "string",
                       "format": "date-time"
+                    },
+                    "observeOnly": {
+                      "type": "boolean"
                     },
                     "approvalOutcome": {
                       "anyOf": [
@@ -48257,6 +48308,9 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "observeOnly": {
+                      "type": "boolean"
+                    },
                     "people": {
                       "type": "array",
                       "maxItems": 10,
@@ -48759,6 +48813,9 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "observeOnly": {
+                      "type": "boolean"
+                    },
                     "people": {
                       "type": "array",
                       "maxItems": 10,
@@ -50097,6 +50154,7 @@
                                     "resolved",
                                     "no_incident",
                                     "shadow_completed",
+                                    "not_executed",
                                     "escalated",
                                     "denied"
                                   ],
@@ -50607,6 +50665,7 @@
                               "pilot",
                               "synthetic",
                               "shadow",
+                              "observe_only",
                               "unknown"
                             ],
                             "type": "string"
@@ -50859,6 +50918,7 @@
                                 "pilot",
                                 "synthetic",
                                 "shadow",
+                                "observe_only",
                                 "unknown"
                               ],
                               "type": "string"
@@ -51252,6 +51312,7 @@
                                       "pilot",
                                       "synthetic",
                                       "shadow",
+                                      "observe_only",
                                       "unknown"
                                     ],
                                     "type": "string"
@@ -52482,6 +52543,7 @@
                           "pilot",
                           "synthetic",
                           "shadow",
+                          "observe_only",
                           "unknown"
                         ],
                         "type": "string"
@@ -52545,6 +52607,7 @@
                             "pilot",
                             "synthetic",
                             "shadow",
+                            "observe_only",
                             "unknown"
                           ],
                           "type": "string"
@@ -52814,6 +52877,7 @@
                                         "pilot",
                                         "synthetic",
                                         "shadow",
+                                        "observe_only",
                                         "unknown"
                                       ],
                                       "type": "string"
@@ -53495,6 +53559,7 @@
                                         "pilot",
                                         "synthetic",
                                         "shadow",
+                                        "observe_only",
                                         "unknown"
                                       ],
                                       "type": "string"
@@ -53929,6 +53994,7 @@
                                           "pilot",
                                           "synthetic",
                                           "shadow",
+                                          "observe_only",
                                           "unknown"
                                         ],
                                         "type": "string"
@@ -54206,6 +54272,7 @@
                                                       "pilot",
                                                       "synthetic",
                                                       "shadow",
+                                                      "observe_only",
                                                       "unknown"
                                                     ],
                                                     "type": "string"
@@ -59152,6 +59219,10 @@
                           "type": "integer",
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991
+                        },
+                        "writeMode": {
+                          "enum": ["observe_only", "writes_enabled"],
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -59161,7 +59232,8 @@
                         "timezone",
                         "revision",
                         "alwaysRequireApproval",
-                        "policyRevision"
+                        "policyRevision",
+                        "writeMode"
                       ]
                     },
                     "preferences": {
@@ -59393,6 +59465,10 @@
                           "type": "integer",
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991
+                        },
+                        "writeMode": {
+                          "enum": ["observe_only", "writes_enabled"],
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -59402,7 +59478,249 @@
                         "timezone",
                         "revision",
                         "alwaysRequireApproval",
-                        "policyRevision"
+                        "policyRevision",
+                        "writeMode"
+                      ]
+                    },
+                    "preferences": {
+                      "type": "object",
+                      "properties": {
+                        "issues": {
+                          "type": "boolean"
+                        },
+                        "connections": {
+                          "type": "boolean"
+                        },
+                        "revision": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": ["issues", "connections", "revision"]
+                    },
+                    "deliveryAvailable": {
+                      "type": "boolean"
+                    },
+                    "lastTest": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "state": {
+                              "enum": ["queued", "sent", "failed", "cancelled"],
+                              "type": "string"
+                            }
+                          },
+                          "required": ["id", "state"]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "workspace",
+                    "preferences",
+                    "deliveryAvailable",
+                    "lastTest"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/settings/write-mode": {
+      "patch": {
+        "operationId": "settings.updateWriteMode",
+        "summary": "Change workspace provider write mode",
+        "description": "Only workspace owners may change this mode. Observe-only preserves reads and proposals while refusing provider writes.",
+        "tags": ["settings"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "commandId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "writeMode": {
+                    "enum": ["observe_only", "writes_enabled"],
+                    "type": "string"
+                  }
+                },
+                "required": ["commandId", "revision", "writeMode"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "workspace": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "slug": {
+                          "type": "string"
+                        },
+                        "dataRegion": {
+                          "type": "string"
+                        },
+                        "timezone": {
+                          "type": "string"
+                        },
+                        "revision": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "alwaysRequireApproval": {
+                          "type": "boolean"
+                        },
+                        "policyRevision": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "writeMode": {
+                          "enum": ["observe_only", "writes_enabled"],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "slug",
+                        "dataRegion",
+                        "timezone",
+                        "revision",
+                        "alwaysRequireApproval",
+                        "policyRevision",
+                        "writeMode"
                       ]
                     },
                     "preferences": {
@@ -59628,6 +59946,10 @@
                           "type": "integer",
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991
+                        },
+                        "writeMode": {
+                          "enum": ["observe_only", "writes_enabled"],
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -59637,7 +59959,8 @@
                         "timezone",
                         "revision",
                         "alwaysRequireApproval",
-                        "policyRevision"
+                        "policyRevision",
+                        "writeMode"
                       ]
                     },
                     "preferences": {
@@ -59865,6 +60188,10 @@
                           "type": "integer",
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991
+                        },
+                        "writeMode": {
+                          "enum": ["observe_only", "writes_enabled"],
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -59874,7 +60201,8 @@
                         "timezone",
                         "revision",
                         "alwaysRequireApproval",
-                        "policyRevision"
+                        "policyRevision",
+                        "writeMode"
                       ]
                     },
                     "preferences": {
@@ -60543,6 +60871,10 @@
                           "type": "integer",
                           "minimum": -9007199254740991,
                           "maximum": 9007199254740991
+                        },
+                        "writeMode": {
+                          "enum": ["observe_only", "writes_enabled"],
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -60552,7 +60884,8 @@
                         "timezone",
                         "revision",
                         "alwaysRequireApproval",
-                        "policyRevision"
+                        "policyRevision",
+                        "writeMode"
                       ]
                     },
                     "preferences": {
@@ -63866,6 +64199,16 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "writeMode": {
+                            "anyOf": [
+                              {
+                                "const": "observe_only"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "provider": {
                             "type": "string"
                           },
@@ -64207,6 +64550,332 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "writeMode": {
+                      "anyOf": [
+                        {
+                          "const": "observe_only"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "provider": {
+                      "type": "string"
+                    },
+                    "appId": {
+                      "type": "string"
+                    },
+                    "management": {
+                      "type": "array",
+                      "items": {
+                        "enum": ["check", "rotate"],
+                        "type": "string"
+                      }
+                    },
+                    "appInstallationVersion": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "exclusiveMinimum": 0
+                    },
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "tenantId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "target": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        }
+                      },
+                      "required": ["kind"],
+                      "additionalProperties": {
+                        "type": "string",
+                        "maxLength": 4096
+                      }
+                    },
+                    "permissions": {
+                      "type": "array",
+                      "items": {
+                        "enum": [
+                          "orders.read",
+                          "products.read",
+                          "inventory.read",
+                          "inventory.available.reconcile",
+                          "fulfillment.read",
+                          "fulfillment.hold.release",
+                          "fulfillment.open",
+                          "fulfillment.move",
+                          "customers.read",
+                          "returns.read",
+                          "orders.shipping-method.read",
+                          "orders.shipping-method.write",
+                          "suppliers.read",
+                          "purchase-orders.read",
+                          "purchase-orders.submit"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "granted": {
+                      "type": "array",
+                      "items": {
+                        "enum": [
+                          "orders.read",
+                          "products.read",
+                          "inventory.read",
+                          "inventory.available.reconcile",
+                          "fulfillment.read",
+                          "fulfillment.hold.release",
+                          "fulfillment.open",
+                          "fulfillment.move",
+                          "customers.read",
+                          "returns.read",
+                          "orders.shipping-method.read",
+                          "orders.shipping-method.write",
+                          "suppliers.read",
+                          "purchase-orders.read",
+                          "purchase-orders.submit"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "status": {
+                      "enum": [
+                        "pending",
+                        "active",
+                        "degraded",
+                        "disconnected",
+                        "revoked"
+                      ],
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "exclusiveMinimum": 0
+                    },
+                    "credentialVersion": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "exclusiveMinimum": 0
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "tenantId",
+                    "label",
+                    "target",
+                    "permissions",
+                    "granted",
+                    "status",
+                    "version",
+                    "credentialVersion",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "422",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/connections/{connectionId}/write-mode": {
+      "patch": {
+        "operationId": "connections.updateWriteMode",
+        "summary": "Change connection write mode",
+        "description": "Owners may impose observe-only or restore workspace inheritance. A connection cannot enable writes in an observe-only workspace.",
+        "tags": ["connections"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "connectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991,
+                    "exclusiveMinimum": 0
+                  },
+                  "writeMode": {
+                    "anyOf": [
+                      {
+                        "const": "observe_only"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": ["version", "writeMode"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "writeMode": {
+                      "anyOf": [
+                        {
+                          "const": "observe_only"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "provider": {
                       "type": "string"
                     },
@@ -64502,6 +65171,16 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "writeMode": {
+                      "anyOf": [
+                        {
+                          "const": "observe_only"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "provider": {
                       "type": "string"
                     },
@@ -64811,6 +65490,16 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "writeMode": {
+                      "anyOf": [
+                        {
+                          "const": "observe_only"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "provider": {
                       "type": "string"
                     },
@@ -65107,6 +65796,16 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "writeMode": {
+                      "anyOf": [
+                        {
+                          "const": "observe_only"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "provider": {
                       "type": "string"
                     },
@@ -80280,6 +80979,9 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "observeOnly": {
+                            "type": "boolean"
+                          },
                           "id": {
                             "type": "string",
                             "minLength": 1,

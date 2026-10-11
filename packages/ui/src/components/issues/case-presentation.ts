@@ -149,6 +149,7 @@ const phases = {
   verifying: m.issues_state_verifying,
   resolved: m.issues_state_resolved,
   no_incident: m.issues_phase_no_incident,
+  not_executed: m.issues_observe_only_title,
   shadow_completed: m.issues_phase_shadow_completed,
   escalated: m.issues_state_escalated,
   denied: m.issues_phase_denied,

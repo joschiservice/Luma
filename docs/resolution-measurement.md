@@ -41,12 +41,16 @@ scope is classified, never complete provider coverage.
 
 People with `issues.manage` append facts to an incident's measurement ledger:
 
-- **Environment:** live, partner pilot, synthetic, shadow or unknown; immutable. Classify
+- **Environment:** live, partner pilot, synthetic, shadow, observe-only or unknown; immutable. Classify
   from trusted deployment and source evidence; deployment mode alone does not establish
   that provider data is live. Known synthetic source markers and simulated installation
   targets override a live assessment. Detection inputs resolve through their retained
   evidence mappings; input IDs are not source evidence IDs. Unclassified incidents stay
   unknown, are excluded from live metrics and are inspectable through the unknown cohort.
+  A persisted observe-only execution result classifies its incident as observe-only,
+  even if someone assessed it as live or its sources are synthetic. This remains true
+  after a mode change. It never contributes a verified or autonomous outcome, including
+  when a later operator change produces an independent passing verification.
 - **Eligibility:** eligible, ineligible or unknown, with rule version, reason and owned
   evidence. A later revision replaces the classification and keeps earlier assessments.
   This is reporting eligibility only; it grants no execution authority and does not
@@ -97,7 +101,7 @@ oldest pending outcome. Its only filters are `environment` and `window` (default
 seven days); other filters return 400. Every known count equals its full cohort length.
 `unknownCount` is unresolved classification, while the unknown-specific metrics count
 known-unknown cohorts. Breakdowns describe the same population; unknown environment
-describes the excluded population. Live, synthetic, pilot and shadow are never combined.
+describes the excluded population. Live, synthetic, pilot, shadow and observe-only are never combined.
 Offline, unavailable and access-loss states hide previous counts.
 
 Workload bounds, not latency guarantees: a three-second statement timeout; failure above

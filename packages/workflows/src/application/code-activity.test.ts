@@ -9,6 +9,7 @@ import {
 } from '../domain/code-step.js';
 import { processVersion } from '../domain/process.fixture.js';
 import { type CodeJournal, createCodeActivity } from './code-activity.js';
+import type { ProcessActivities } from './process-runtime.js';
 import { presentTriggerRun } from './trigger-presentation.js';
 
 const step: CodeStep = {
@@ -65,7 +66,7 @@ function fixture(completedOutcome: CodeTelemetry['outcome'] = 'completed') {
       evidenceRefs: ['read'],
       observedAt: new Date().toISOString(),
     })),
-    action: vi.fn(async () => ({
+    action: vi.fn<ProcessActivities['action']>(async () => ({
       state: 'accepted' as const,
       proposalId: 'proposal',
       receiptId: 'receipt',
@@ -246,4 +247,25 @@ it('does not persist cancellation when its status lookup fails', async () => {
   );
   expect(f.journal.finish).not.toHaveBeenCalled();
   expect(f.activities.action).not.toHaveBeenCalled();
+});
+
+it('records observe-only as terminal and never verifies or repeats the capability on replay', async () => {
+  const f = fixture();
+  f.activities.action.mockResolvedValue({
+    state: 'not_executed',
+    proposalId: 'proposal',
+    reason: 'observe_only',
+  });
+  const result = await f.execute(run, processVersion, step, []);
+  expect(result).toMatchObject({
+    state: 'not_executed',
+    evidenceRefs: [step.artifactDigest, 'proposal'],
+  });
+  expect(result.telemetry.verifiedActions).toBe(0);
+  expect(f.activities.verify).not.toHaveBeenCalled();
+  expect(f.journal.append).not.toHaveBeenCalled();
+  expect(f.journal.finish).toHaveBeenCalledOnce();
+  vi.mocked(f.journal.result).mockResolvedValue(result);
+  expect(await f.execute(run, processVersion, step, [])).toEqual(result);
+  expect(f.activities.action).toHaveBeenCalledOnce();
 });

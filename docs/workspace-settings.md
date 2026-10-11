@@ -79,6 +79,14 @@ The mail port accepts only destination, subject, plain text and message ID. Mess
 
 Timestamps are stored in UTC; the default display timezone is UTC. `WorkspaceDate` formats visible dates in the workspace's IANA timezone, and Activity and Shadow reporting use workspace day boundaries, including daylight-saving transitions.
 
+## Provider writes
+
+Only owners change workspace write mode. New workspaces default to observe-only; reads,
+diagnosis and proposals keep running, while provider writes stop at execution admission.
+Changing the mode uses the workspace revision and a command receipt and records the
+previous and new mode. Connection overrides can only make this rule stricter. See
+[execution controls](execution.md#observe-only).
+
 ## Approval preference
 
 The workspace approval preference can only strengthen platform policy: when on, even otherwise allowed low-risk changes need independent approval by someone else with `decisions.respond`. Turning it off restores platform rules. Capability restrictions, denial, verification and action admission stay mandatory either way.

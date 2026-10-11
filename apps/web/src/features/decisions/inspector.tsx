@@ -246,8 +246,13 @@ export function DecisionInspector({
               {kindLabels[item.kind]()} · {domainLabels[item.domain]()}
             </span>
             <div className="issue-panel-heading">
-              <h2 id={`${id}-title`} title={item.title}>
-                {item.title}
+              <h2
+                id={`${id}-title`}
+                title={
+                  item.observeOnly ? m.issues_observe_only_title() : item.title
+                }
+              >
+                {item.observeOnly ? m.issues_observe_only_title() : item.title}
               </h2>
             </div>
             <div className="issue-panel-status">
@@ -277,7 +282,9 @@ export function DecisionInspector({
       <div className="decision-brief">
         <section className="decision-section" aria-labelledby={`${id}-why`}>
           <h3 id={`${id}-why`}>{m.decisions_why_title()}</h3>
-          <p>{item.why}</p>
+          <p>
+            {item.observeOnly ? m.issues_observe_only_proposal() : item.why}
+          </p>
           {item.response === 'awaiting_other' ? (
             <p className="decision-note">{m.decisions_note_awaiting_other()}</p>
           ) : item.response === 'view_only' ? (
@@ -390,6 +397,11 @@ export function DecisionInspector({
             <p role="alert" className="decision-error">
               {assignError}
             </p>
+          ) : null}
+          {item.observeOnly ? (
+            <CaseNotice title={m.issues_observe_only_title()}>
+              {m.issues_observe_only_proposal()}
+            </CaseNotice>
           ) : null}
           <RecordLinks organizationId={organizationId} item={item} />
         </section>

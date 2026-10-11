@@ -73,3 +73,15 @@ export function connectionError(error: unknown) {
 
   return m.connections_error_unknown();
 }
+
+/** Owners impose observe-only or restore inheritance against the reviewed connection version. */
+export async function changeConnectionWriteMode(
+  organizationId: string,
+  connection: InstalledConnection,
+  writeMode: 'observe_only' | null,
+) {
+  return api.connections.updateWriteMode({
+    params: { organizationId, connectionId: connection.id },
+    body: { version: connection.version, writeMode },
+  });
+}

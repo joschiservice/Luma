@@ -752,3 +752,72 @@ test('a silent supplier: Luma notes the follow-up, waits, and hands the order ba
   );
   expect(await handovers(f, id)).toEqual([]);
 });
+
+test('records observe-only capability work without provider writes or retries after worker replacement', async (t) => {
+  const f = await caseWorkflowFixture(t);
+  const settings = await f.request('/settings', undefined, {
+    cookie: f.approverCookie,
+  });
+  const mode = async (writeMode, revision) => {
+    const response = await f.pilot.app.inject({
+      method: 'PATCH',
+      url: `${f.base}/settings/write-mode`,
+      headers: { cookie: f.approverCookie, origin: 'http://127.0.0.1:3000' },
+      payload: { commandId: randomUUID(), revision, writeMode },
+    });
+    expect(response.statusCode, response.body).toBe(200);
+
+    return response.json();
+  };
+  const observed = await mode('observe_only', settings.workspace.revision);
+  await f.activate(stock);
+  const { opened } = await driftedStock(f);
+  const before = await shopStock(f);
+  const beforeWrites = (
+    await f.call(`runs/${f.manifest.simulator.runId}/journal`)
+  ).items.filter((entry) => entry.kind === 'provider-write');
+  await f.tick();
+  const [run] = await f.runs(stock);
+  const stopped = await f.waitFor(stock, run.id, 'not_executed');
+  expect(stopped.processSteps.at(-1)).toMatchObject({
+    stepId: 'correct-stock',
+    state: 'not_executed',
+    reason: 'observe_only',
+  });
+  const proposalId = stopped.processSteps.at(-1).values.proposalId;
+  expect(
+    (
+      await f.db.owner.query(
+        'SELECT count(*)::int AS n FROM executed_actions WHERE tenant_id=$1 AND proposal_id=$2',
+        [f.manifest.organizationId, proposalId],
+      )
+    ).rows[0].n,
+  ).toBe(0);
+  expect(
+    (
+      await f.db.owner.query(
+        'SELECT document FROM execution_observe_only WHERE tenant_id=$1 AND proposal_id=$2',
+        [f.manifest.organizationId, proposalId],
+      )
+    ).rows[0].document,
+  ).toMatchObject({ state: 'not_executed', reason: 'observe_only' });
+  expect(await shopStock(f)).toBe(before);
+  await mode('writes_enabled', observed.workspace.revision);
+  await f.restartWorker();
+  await expect(f.wake(run.id)).rejects.toThrow(
+    'workflow execution already completed',
+  );
+  await f.tick();
+  expect(await f.waitFor(stock, run.id, 'not_executed')).toMatchObject({
+    id: run.id,
+  });
+  expect(await f.runs(stock)).toHaveLength(1);
+  expect(await shopStock(f)).toBe(before);
+  const journal = await f.call(`runs/${f.manifest.simulator.runId}/journal`);
+  expect(
+    journal.items.filter((entry) => entry.kind === 'provider-write'),
+  ).toEqual(beforeWrites);
+  expect(
+    (await f.pilot.detection.exceptions.get(f.actor, opened.id)).state,
+  ).not.toBe('resolved');
+});

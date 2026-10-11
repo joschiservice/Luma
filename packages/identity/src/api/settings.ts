@@ -56,6 +56,10 @@ export function settingsRoutes(service?: SettingsService) {
       async ({ context: { request }, input: { body } }) =>
         await use().updateWorkspace(context(request), body),
     ),
+    updateWriteMode: os.updateWriteMode.handler(
+      async ({ context: { request }, input: { body } }) =>
+        await use().updateWriteMode(context(request), body),
+    ),
     updateApprovals: os.updateApprovals.handler(
       async ({ context: { request }, input: { body } }) =>
         await use().updateApprovals(context(request), body),

@@ -28,7 +28,7 @@ export const operationalMetricScopeSchema = z
     supplierId: z.string().uuid().optional(),
     authority: z.enum(['luma', 'external']).optional(),
     environment: z
-      .enum(['live', 'pilot', 'synthetic', 'shadow', 'unknown'])
+      .enum(['live', 'pilot', 'synthetic', 'shadow', 'observe_only', 'unknown'])
       .optional(),
     window: z.enum(['24h', '7d']).optional(),
   })

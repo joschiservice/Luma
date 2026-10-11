@@ -25,6 +25,7 @@ import type { AuthoringVocabulary } from './vocabulary.js';
 type Seen = Pick<ProcessStepOutput, 'stepId' | 'kind' | 'values'>;
 
 const outcomeReasons: Record<TestOutcome, string> = {
+  not_executed: 'Not executed: observe-only.',
   verified:
     'The workflow finished and its result check confirmed the expected result.',
   ended: 'The workflow finished without taking further action.',
@@ -39,6 +40,7 @@ const outcomeReasons: Record<TestOutcome, string> = {
 };
 
 const stopBranches: Record<TestOutcome, TestStepResult['branch']> = {
+  not_executed: 'ended',
   verified: 'ended',
   ended: 'ended',
   escalated: 'escalated',

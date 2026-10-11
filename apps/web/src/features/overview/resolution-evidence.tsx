@@ -49,6 +49,7 @@ const helpLabels = {
 
 const environmentLabels = {
   live: m.overview_outcomes_env_live,
+  observe_only: m.issues_observe_only_title,
   pilot: m.overview_outcomes_env_pilot,
   synthetic: m.overview_outcomes_env_synthetic,
   shadow: m.overview_outcomes_env_shadow,

@@ -468,6 +468,7 @@ function RecoveryReview({
         </p>
       ) : null}
       <div className="shopify-recovery-controls">
+        {review.observeOnly ? <p>{m.issues_observe_only_proposal()}</p> : null}
         {review.canApprove ? (
           <>
             <Button

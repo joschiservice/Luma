@@ -209,6 +209,7 @@ export const workflowRunViewSchema = playbookRunViewSchema
         'ended',
         'denied',
         'failed_verification',
+        'not_executed',
         'inconclusive_verification',
         'escalated',
       ])
@@ -229,6 +230,7 @@ export const workflowRunViewSchema = playbookRunViewSchema
             'end',
           ]),
           state: z.enum([
+            'not_executed',
             'completed',
             'waiting',
             'denied',

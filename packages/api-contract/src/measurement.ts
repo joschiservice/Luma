@@ -7,6 +7,7 @@ export const measurementEnvironmentSchema = z.enum([
   'pilot',
   'synthetic',
   'shadow',
+  'observe_only',
   'unknown',
 ]);
 const time = z.string().datetime({ offset: true });

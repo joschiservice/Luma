@@ -30,6 +30,7 @@ const data: SettingsSnapshot = {
     revision: 1,
     alwaysRequireApproval: false,
     policyRevision: 0,
+    writeMode: 'writes_enabled',
   },
   preferences: { issues: false, connections: false, revision: 0 },
   deliveryAvailable: true,

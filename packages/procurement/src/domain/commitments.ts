@@ -64,6 +64,7 @@ export type ReviewReason =
   | 'supplier_condition';
 
 export type SubmissionState =
+  | 'not_executed'
   | 'approval_required'
   | 'approved'
   | 'rejected'
@@ -509,6 +510,7 @@ export function orderProgress(input: {
   const receivedLines = lines.filter((l) => l.received > 0).length;
   const allReceived = lines.every((l) => l.stage === 'received');
   const submissionLabel: Record<SubmissionState, string> = {
+    not_executed: 'Observe-only. Nothing was sent.',
     approval_required: 'Waiting for a second person to approve sending it.',
     approved: 'Approved. Luma is placing it in the purchasing system.',
     rejected: 'Sending was rejected.',
@@ -707,6 +709,13 @@ function nextAction(input: {
       title: 'Follow it in the external system',
       detail: 'Luma does not track this order’s supplier lifecycle.',
     };
+  if (submission?.state === 'not_executed')
+    return {
+      owner: 'none',
+      title: 'Observe-only',
+      detail:
+        'Would run when writes are enabled. Request a fresh proposal after enabling writes.',
+    };
   const first = attention[0];
   if (first?.kind === 'submission_approval')
     return {
@@ -891,7 +900,7 @@ export function orderStage(
 ): OrderStage {
   if (order.status === 'cancelled') return 'cancelled';
   if (order.status === 'closed') return 'closed';
-  if (!submission) return 'draft';
+  if (!submission || submission.state === 'not_executed') return 'draft';
   if (submission.state === 'approval_required') return 'awaiting_approval';
   if (['approved', 'submitting', 'uncertain'].includes(submission.state))
     return 'sending';

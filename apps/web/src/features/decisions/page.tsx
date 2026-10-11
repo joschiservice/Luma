@@ -131,7 +131,9 @@ function DecisionRow({
         className="issue-row-icon"
       />
       <div className="issue-row-copy">
-        <strong className="case-row-summary">{item.title}</strong>
+        <strong className="case-row-summary">
+          {item.observeOnly ? m.issues_observe_only_title() : item.title}
+        </strong>
         <span className="case-row-subject">
           <span>{kindLabels[item.kind]()}</span>
           <span>{item.subject.label}</span>

@@ -24,7 +24,11 @@ import { useEffect, useRef, useState } from 'react';
 
 import { AppExtension } from '../apps/extension';
 import { connectionSummary } from '../sync/presentation';
-import { changeConnection, connectionError } from './data';
+import {
+  changeConnection,
+  changeConnectionWriteMode,
+  connectionError,
+} from './data';
 import {
   capabilities,
   connectionKindName,
@@ -45,16 +49,24 @@ export function ConnectionCard({
   refresh,
   sync,
   syncAsOf,
+  owner = false,
+  workspaceWriteMode,
 }: {
   connection: InstalledConnection;
   organizationId: string;
   canManage: boolean;
+  /** Fresh owner access and workspace mode, loaded once by the settings page. */
+  owner?: boolean;
+  workspaceWriteMode?: 'observe_only' | 'writes_enabled' | undefined;
   appAvailable?: boolean;
   refresh: () => Promise<void>;
   /** Import and sync state for this connection, when loaded. */
   sync?: SyncConnectionView | undefined;
   syncAsOf?: string | undefined;
 }) {
+  const observeOnly =
+    connection.writeMode === 'observe_only' ||
+    workspaceWriteMode === 'observe_only';
   const [dialog, setDialog] = useState<'settings' | 'disconnect' | null>(null);
   const [pending, setPending] = useState(false);
   useEffect(() => {
@@ -135,6 +147,42 @@ export function ConnectionCard({
           {statuses[connection.status]}
         </Badge>
       </CardHeader>
+      <p>
+        {observeOnly
+          ? m.issues_observe_only_title()
+          : workspaceWriteMode
+            ? m.settings_write_mode_enabled()
+            : null}
+      </p>
+      {owner ? (
+        <Button
+          variant="outline"
+          disabled={pending || terminal}
+          onClick={async () => {
+            if (lock.current) return;
+            lock.current = true;
+            setPending(true);
+            try {
+              await changeConnectionWriteMode(
+                organizationId,
+                connection,
+                connection.writeMode === 'observe_only' ? null : 'observe_only',
+              );
+              setMessage(m.settings_command_saved());
+            } catch (error) {
+              setMessage(connectionError(error));
+            } finally {
+              await refresh();
+              lock.current = false;
+              setPending(false);
+            }
+          }}
+        >
+          {connection.writeMode === 'observe_only'
+            ? m.connections_write_mode_inherit()
+            : m.issues_observe_only_title()}
+        </Button>
+      ) : null}
       <p className="connection-target">{target}</p>
       <p className="connection-description">
         {!appAvailable

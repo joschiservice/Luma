@@ -433,5 +433,7 @@
   "issues_review_reject": "Reject change",
   "issues_review_escalate_confirm": "Confirm escalation",
   "issues_review_checking": "Checking current conditions…",
-  "issues_review_saving_decision": "Saving your decision…"
+  "issues_review_saving_decision": "Saving your decision…",
+  "issues_observe_only_title": "Observe-only",
+  "issues_observe_only_proposal": "Would run when writes are enabled. Luma keeps this proposal and its evidence, but makes no provider changes."
 }

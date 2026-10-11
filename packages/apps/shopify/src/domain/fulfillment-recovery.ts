@@ -195,6 +195,7 @@ export const recoveryPreviewInput = recoveryTarget
   .strict();
 
 export const recoveryView = z.object({
+  observeOnly: z.boolean().optional(),
   id: z.string().uuid(),
   target: recoveryTarget,
   choice: recoveryChoice,

@@ -36,12 +36,21 @@ export function createInstallationRepository(
     save: (record, expectedVersion, actorId, event) =>
       db.transaction(record.connection.tenantId, async (tx) => {
         const c = record.connection;
+        await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+          `exceptions:${c.tenantId}`,
+        ]);
         // Lock app state before connection rows, matching uninstall and OAuth refresh.
         if (c.appId && c.appInstallationVersion)
           await tx.query(
             'SELECT app_id FROM workspace_apps WHERE tenant_id=$1 AND app_id=$2 FOR SHARE',
             [c.tenantId, c.appId],
           );
+        const before = (
+          await tx.query<{ document: InstalledConnection }>(
+            'SELECT document FROM connector_installations WHERE tenant_id=$1 AND id=$2 FOR UPDATE',
+            [c.tenantId, c.id],
+          )
+        ).rows[0]?.document;
         const result =
           expectedVersion === null
             ? await tx.query(
@@ -61,7 +70,7 @@ export function createInstallationRepository(
               );
         if (result.rowCount !== 1) return false;
         await tx.query(
-          'INSERT INTO connector_lifecycle_events(tenant_id,connection_id,version,event,actor_id,status,credential_version) VALUES($1,$2,$3,$4,$5,$6,$7)',
+          'INSERT INTO connector_lifecycle_events(tenant_id,connection_id,version,event,actor_id,status,credential_version,before_value,after_value) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',
           [
             c.tenantId,
             c.id,
@@ -70,6 +79,8 @@ export function createInstallationRepository(
             actorId,
             c.status,
             c.credentialVersion,
+            { writeMode: before?.writeMode ?? null },
+            { writeMode: c.writeMode ?? null },
           ],
         );
 

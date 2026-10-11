@@ -22,6 +22,7 @@ export interface BoundProposal {
 }
 
 export interface DeskSnapshot {
+  observeOnly?: boolean;
   policyStale?: boolean;
   effectivePolicyVersion?: string;
   incident: Incident;
@@ -202,7 +203,8 @@ export function createDeskService(deps: DeskDependencies) {
         Date.parse(s.diagnosis.provenance.validUntil) > deps.now().getTime())
     ) {
       decisions.push('reject');
-      if (deps.capability(p.action)) decisions.push('approve');
+      if (!s.observeOnly && deps.capability(p.action))
+        decisions.push('approve');
     }
 
     return decisions;
@@ -285,6 +287,7 @@ export function createDeskService(deps: DeskDependencies) {
               : null,
             s.approval?.approverId,
           ]),
+          observeOnly: s.observeOnly ?? false,
           policyStale: s.policyStale ?? false,
           refreshable:
             hasPermission(context, 'actions.propose') &&

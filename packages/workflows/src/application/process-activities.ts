@@ -127,7 +127,10 @@ export function createProcessActivities(deps: {
         throw error;
       }
       let result = await deps.admission.get(context, proposalId);
-      if (!result || !('record' in result)) {
+      if (
+        !result ||
+        (!('record' in result) && result.state !== 'not_executed')
+      ) {
         try {
           result = await deps.admission.execute(context, {
             runId: run.id,
@@ -142,6 +145,8 @@ export function createProcessActivities(deps: {
           }
         }
       }
+      if (result.state === 'not_executed')
+        return { state: 'not_executed', proposalId, reason: 'observe_only' };
       if (result.state === 'approval_required')
         return {
           state: 'awaiting_approval',

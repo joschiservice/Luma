@@ -26,7 +26,10 @@ const snapshotSql = `SELECT e.document AS incident,e.version AS revision,d.docum
  (SELECT jsonb_build_object('action',p.document,'actionHash',p.action_hash,'version',p.version,'diagnosisRevision',p.diagnosis_revision)) AS proposal,
  (SELECT document FROM policy_decisions WHERE tenant_id=e.tenant_id AND proposal_id=p.id AND action_hash=p.action_hash ORDER BY created_at DESC,id DESC LIMIT 1) AS decision,
  (SELECT document FROM policy_approvals WHERE tenant_id=e.tenant_id AND proposal_id=p.id AND action_hash=p.action_hash ORDER BY created_at DESC,id DESC LIMIT 1) AS approval,
- (SELECT x.document FROM executed_actions x JOIN case_proposals cp ON cp.tenant_id=x.tenant_id AND cp.id=x.proposal_id WHERE cp.tenant_id=e.tenant_id AND cp.exception_id=e.id ORDER BY x.created_at DESC,x.id DESC LIMIT 1) AS execution
+ (SELECT x.document FROM executed_actions x JOIN case_proposals cp ON cp.tenant_id=x.tenant_id AND cp.id=x.proposal_id WHERE cp.tenant_id=e.tenant_id AND cp.exception_id=e.id ORDER BY x.created_at DESC,x.id DESC LIMIT 1) AS execution,
+ (EXISTS(SELECT FROM organizations WHERE id=e.tenant_id AND write_mode='observe_only')
+ OR EXISTS(SELECT FROM connector_installations WHERE tenant_id=e.tenant_id AND id=(p.document->>'connectionId')::uuid AND document->>'writeMode'='observe_only')
+ OR EXISTS(SELECT FROM execution_observe_only WHERE tenant_id=e.tenant_id AND proposal_id=p.id)) AS "observeOnly"
  FROM exceptions e
  LEFT JOIN exception_diagnosis_heads h ON h.tenant_id=e.tenant_id AND h.exception_id=e.id
  LEFT JOIN exception_diagnoses d ON d.tenant_id=h.tenant_id AND d.exception_id=h.exception_id AND d.revision=h.revision

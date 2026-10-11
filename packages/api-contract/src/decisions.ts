@@ -86,6 +86,7 @@ export const decisionAssignmentSchema = z.object({
 });
 
 export const decisionItemSchema = z.object({
+  observeOnly: z.boolean().optional(),
   /** Stable queue ID, such as `case:<uuid>`. Assignments and links use it. */
   id: z.string().min(1).max(200),
   kind: decisionKindSchema,

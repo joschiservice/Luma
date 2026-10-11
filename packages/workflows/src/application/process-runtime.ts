@@ -16,7 +16,7 @@ export type ProcessActionResult =
   | { state: 'accepted'; proposalId: string; receiptId: string }
   | { state: 'awaiting_approval'; proposalId: string; decisionId: string }
   | {
-      state: 'denied' | 'reconciliation_required';
+      state: 'denied' | 'reconciliation_required' | 'not_executed';
       proposalId: string;
       reason: string;
     };
@@ -168,6 +168,23 @@ export async function runProcess(
             step,
             outputs.filter((output) => output.stepId !== step.id),
           );
+        }
+        if (result.state === 'not_executed') {
+          await record(
+            step,
+            'not_executed',
+            {},
+            result.evidenceRefs,
+            'observe_only',
+            undefined,
+            result.telemetry,
+          );
+
+          return set({
+            state: 'not_executed',
+            stepId: step.id,
+            reason: 'observe_only',
+          });
         }
         await record(
           step,
@@ -332,6 +349,21 @@ export async function runProcess(
           }
           await clock.decisionChanged(30_000);
           result = await activities.action(run, version, step, outputs);
+        }
+        if (result.state === 'not_executed') {
+          await record(
+            step,
+            'not_executed',
+            { proposalId: result.proposalId },
+            [result.proposalId],
+            'observe_only',
+          );
+
+          return set({
+            state: 'not_executed',
+            stepId: step.id,
+            reason: 'observe_only',
+          });
         }
         if (result.state !== 'accepted') {
           await record(

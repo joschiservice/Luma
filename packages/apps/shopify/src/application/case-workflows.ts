@@ -153,7 +153,7 @@ export function createShopifyCaseWorkflows(deps: {
     if (run.stop && view.acceptance === 'not_sent')
       return { state: 'denied', proposalId: id, reason: run.stop };
     if (view.state === 'preview') view = await service.check(context, { id });
-    if (view.canExecute) {
+    if (view.canExecute || view.observeOnly) {
       try {
         view = await service.execute(context, { id });
       } catch (error) {
@@ -166,6 +166,8 @@ export function createShopifyCaseWorkflows(deps: {
         };
       }
     }
+    if (view.observeOnly)
+      return { state: 'not_executed', proposalId: id, reason: 'observe_only' };
     if (view.state === 'uncertain') view = await service.check(context, { id });
     switch (view.state) {
       case 'verified':

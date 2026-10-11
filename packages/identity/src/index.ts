@@ -3,6 +3,7 @@ export {
   AccountErasedError,
   builtInMembership,
   hasPermission,
+  isOwner,
   IdentityError,
   makeTenantContext,
   MembershipSuspendedError,

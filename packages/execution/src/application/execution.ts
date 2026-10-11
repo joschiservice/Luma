@@ -89,6 +89,23 @@ export interface ExecutionRepository {
 }
 
 export interface ExecutionDependencies {
+  /** Trusted write controls; persistent composition supplies this for every provider effect. */
+  writeControl?: {
+    mode(
+      tenantId: string,
+      connectionId: string,
+    ): Promise<'observe_only' | 'writes_enabled'>;
+    get(
+      tenantId: string,
+      proposalId: string,
+    ): Promise<ObserveOnlyResult | null>;
+    record(
+      action: ProposedAction,
+      hash: string,
+      result: ObserveOnlyResult,
+      event: AuditEntry,
+    ): Promise<ExecutionResult>;
+  };
   repository: ExecutionRepository;
   policies: PolicyService;
   audit: AuditLog;
@@ -101,7 +118,19 @@ export interface ExecutionDependencies {
   id(): string;
 }
 
+/** A terminal observation of intended work, with no reserved or dispatched provider effect. */
+export interface ObserveOnlyResult {
+  state: 'not_executed';
+  reason: 'observe_only';
+  proposalId: string;
+  actionHash: string;
+  observedAt: string;
+  /** Capability permission retained for the same readers as an executed receipt. */
+  permission: string;
+}
+
 export type ExecutionResult =
+  | ObserveOnlyResult
   | { state: 'denied' | 'approval_required'; decision: PolicyDecision }
   | {
       state: 'succeeded' | 'failed' | 'reconciliation_required';
@@ -255,14 +284,18 @@ export function createExecutionService(deps: ExecutionDependencies) {
    * Execution records are visible to people who may act: anyone proposing or running actions,
    * or holding the capability permission the record was evaluated against.
    */
-  function requireReader(context: TenantContext, record?: ExecutionRecord) {
+  function requireReader(
+    context: TenantContext,
+    record?: ExecutionRecord | ObserveOnlyResult,
+  ) {
+    const permission =
+      record && 'attempt' in record
+        ? record.attempt.permission
+        : record?.permission;
     if (
       !hasPermission(context, 'actions.execute') &&
       !hasPermission(context, 'actions.propose') &&
-      !(
-        record?.attempt.permission &&
-        context.permissions.has(record.attempt.permission)
-      )
+      !(permission && context.permissions.has(permission))
     )
       throw new IdentityError(
         403,
@@ -272,6 +305,17 @@ export function createExecutionService(deps: ExecutionDependencies) {
   }
 
   return {
+    /** Reads effective owner controls with fresh tenant access; never reads provider data. */
+    async writeMode(context: TenantContext, connectionId: string) {
+      requireTenant(context, context.tenantId);
+      const fresh = await deps.refreshContext(context);
+      requireTenant(fresh, context.tenantId);
+
+      return (
+        (await deps.writeControl?.mode(fresh.tenantId, connectionId)) ??
+        'writes_enabled'
+      );
+    },
     async get(
       context: TenantContext,
       proposalId: string,
@@ -280,8 +324,17 @@ export function createExecutionService(deps: ExecutionDependencies) {
       const fresh = await deps.refreshContext(context);
       requireTenant(fresh, context.tenantId);
       const record = await deps.repository.get(fresh.tenantId, proposalId);
-      requireReader(fresh, record ?? undefined);
-      if (!record) return null;
+      if (!record) {
+        const observed = await deps.writeControl?.get(
+          fresh.tenantId,
+          proposalId,
+        );
+        requireReader(fresh, observed ?? undefined);
+        if (observed) await flush(fresh.tenantId, proposalId);
+
+        return observed ?? null;
+      }
+      requireReader(fresh, record);
       await flush(fresh.tenantId, proposalId);
 
       return result(record);
@@ -314,13 +367,54 @@ export function createExecutionService(deps: ExecutionDependencies) {
 
         return result(previous);
       }
+      const observed = await deps.writeControl?.get(
+        context.tenantId,
+        action.id,
+      );
+      if (observed) {
+        if (observed.actionHash !== hash)
+          throw new Error('Observed intent conflicts');
+        await flush(context.tenantId, action.id);
+
+        return observed;
+      }
+      const observeOnly = async (): Promise<ExecutionResult> => {
+        const receipt: ObserveOnlyResult = {
+          state: 'not_executed',
+          reason: 'observe_only',
+          proposalId: action.id,
+          actionHash: hash,
+          observedAt: deps.now().toISOString(),
+          permission,
+        };
+        const saved = await deps.writeControl!.record(
+          action,
+          hash,
+          receipt,
+          event(context, action, hash, 'execution.not_executed', deps.id(), {
+            reason: 'observe_only',
+            dispatch: 'not_dispatched',
+          }),
+        );
+        await flush(context.tenantId, action.id);
+
+        return saved;
+      };
       const adapter = await deps.registry.resolve(context, action);
+      const permission = adapter?.permission ?? 'actions.execute';
+      if (
+        context.permissions.has(permission) &&
+        (await deps.writeControl?.mode(
+          context.tenantId,
+          action.connectionId,
+        )) === 'observe_only'
+      )
+        return observeOnly();
       const available =
         !!adapter &&
         adapter.capability === action.capability &&
         adapter.version === action.capabilityVersion &&
         (await adapter.checkPreconditions(action)) === true;
-      const permission = adapter?.permission ?? 'actions.execute';
       const decision = await deps.policies.evaluate(context, action, hash, {
         available,
         minimumRisk: adapter?.minimumRisk ?? 'high',
@@ -391,7 +485,36 @@ export function createExecutionService(deps: ExecutionDependencies) {
       );
       prepared.proposedBy = action.proposedBy;
       prepared.executor = record.attempt.executor;
-      if (!(await deps.repository.prepare(record, prepared))) {
+      if (
+        (await deps.writeControl?.mode(
+          context.tenantId,
+          action.connectionId,
+        )) === 'observe_only'
+      )
+        return observeOnly();
+      let reserved: boolean;
+      try {
+        reserved = await deps.repository.prepare(record, prepared);
+      } catch (error) {
+        const withheld = await deps.writeControl?.get(
+          context.tenantId,
+          action.id,
+        );
+        if (withheld) {
+          await flush(context.tenantId, action.id);
+
+          return withheld;
+        }
+        if (
+          (await deps.writeControl?.mode(
+            context.tenantId,
+            action.connectionId,
+          )) === 'observe_only'
+        )
+          return observeOnly();
+        throw error;
+      }
+      if (!reserved) {
         const winner = await existing(context.tenantId, action.id, hash);
         if (!winner) throw new Error('Execution reservation missing');
 
@@ -402,6 +525,10 @@ export function createExecutionService(deps: ExecutionDependencies) {
       // Audit persistence can take time; expired decisions never authorize a call, and a
       // requester who lost the permission meanwhile is withheld before dispatch.
       const admissionCurrent =
+        (await deps.writeControl?.mode(
+          context.tenantId,
+          action.connectionId,
+        )) !== 'observe_only' &&
         (await deps
           .refreshContext(context)
           .then((current) => current.permissions.has(permission))

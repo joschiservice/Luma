@@ -39,6 +39,7 @@ export interface ProposalReference {
 
 export interface WorkflowProgress {
   phase:
+    | 'not_executed'
     | 'shadow_completed'
     | 'detecting'
     | 'diagnosing'
@@ -58,6 +59,7 @@ export interface WorkflowProgress {
 }
 
 export type WorkflowExecutionResult =
+  | { state: 'not_executed'; reason: 'observe_only' }
   | { state: 'proposal_changed'; proposal: ProposalReference }
   | { state: 'approval_required'; decisionId: string }
   | { state: 'denied' | 'succeeded' | 'failed' | 'reconciliation_required' };
@@ -190,6 +192,8 @@ export function createExceptionActivities(deps: {
   function playbookResult(outcome: PlaybookOutcome): WorkflowExecutionResult {
     if (outcome.state === 'awaiting_approval' && outcome.decisionId)
       return { state: 'approval_required', decisionId: outcome.decisionId };
+    if (outcome.state === 'not_executed')
+      return { state: 'not_executed', reason: 'observe_only' };
     if (outcome.state === 'verified') return { state: 'succeeded' };
     if (outcome.state === 'denied') return { state: 'denied' };
 
@@ -338,6 +342,7 @@ export function createExceptionActivities(deps: {
         return playbookResult(await deps.playbook.execute(fresh, proposal.id));
       }
       const previous = await deps.execution.get(fresh, proposal.id);
+      if (previous?.state === 'not_executed') return previous;
       if (previous && 'record' in previous) return { state: previous.state };
       const stored = await deps.bindings.proposals?.get(fresh, proposal.id);
       if (
@@ -353,6 +358,8 @@ export function createExceptionActivities(deps: {
         runId: stored.action.id,
         stepId: 'execute',
       });
+
+      if (result.state === 'not_executed') return result;
 
       return result.state === 'approval_required'
         ? { state: result.state, decisionId: result.decision.id }
@@ -373,6 +380,8 @@ export function createExceptionActivities(deps: {
       );
       if (result.state === 'approval_required')
         throw new WorkflowInputError('Unexpected reconciliation result');
+
+      if (result.state === 'not_executed') return result;
 
       return { state: result.state };
     },

@@ -66,6 +66,7 @@ export const decisionReceiptSchema = z.object({
 });
 
 export const caseReviewSchema = z.object({
+  observeOnly: z.boolean().optional(),
   /** The people behind `proposal.requestedBy` and `proposal.approval.actorId`. */
   people: casePeople,
   policyStale: z.boolean().optional(),
@@ -170,6 +171,7 @@ export const caseProgressSchema = z.object({
           'resolved',
           'no_incident',
           'shadow_completed',
+          'not_executed',
           'escalated',
           'denied',
         ]),

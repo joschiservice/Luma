@@ -4,7 +4,7 @@ import type {
 } from '@luma/platform';
 
 export type MeasurementEnvironment =
-  'live' | 'pilot' | 'synthetic' | 'shadow' | 'unknown';
+  'live' | 'pilot' | 'synthetic' | 'shadow' | 'observe_only' | 'unknown';
 
 export type MeasurementFact =
   | {
@@ -76,6 +76,7 @@ export interface MeasurementSource {
   events: MeasurementEvent[];
   humanEvidence: string[];
   synthetic: boolean;
+  observeOnly?: boolean;
 }
 
 export interface ResolutionMetricItem {
@@ -207,6 +208,11 @@ export function classifyResolution(
     .find((f) => f.kind === 'attribution');
   const resolution = source.resolution;
   const verified =
+    !source.observeOnly &&
+    !(
+      environment?.kind === 'environment' &&
+      environment.environment === 'observe_only'
+    ) &&
     source.state === 'resolved' &&
     resolution?.kind === 'verification' &&
     resolution.outcome === 'passed' &&
@@ -239,11 +245,13 @@ export function classifyResolution(
     title: source.title,
     state: source.state,
     detectedAt: source.detectedAt,
-    environment: source.synthetic
-      ? 'synthetic'
-      : environment?.kind === 'environment'
-        ? environment.environment
-        : 'unknown',
+    environment: source.observeOnly
+      ? 'observe_only'
+      : source.synthetic
+        ? 'synthetic'
+        : environment?.kind === 'environment'
+          ? environment.environment
+          : 'unknown',
     eligibility:
       eligibility?.kind === 'eligibility' ? eligibility.status : 'unknown',
     involvement: human ? 'human' : complete ? 'none' : 'unknown',

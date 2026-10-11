@@ -69,6 +69,7 @@ export function createCodeActivity(deps: {
     const callOutputs = [...outputs];
     let index = 0;
     let waiting = false;
+    let observeOnly = false;
     let verifiedActions = saved.filter((call) =>
       version.steps.some(
         (node) => node.id === call.grant && node.kind === 'capability',
@@ -143,6 +144,11 @@ export function createCodeActivity(deps: {
                 node,
                 callOutputs,
               );
+              if (action.state === 'not_executed') {
+                observeOnly = true;
+                evidence.add(action.proposalId);
+                throw new CodeRequestStopped('capability_denied');
+              }
               if (action.state === 'awaiting_approval') {
                 waiting = true;
                 evidence.add(action.decisionId);
@@ -217,9 +223,12 @@ export function createCodeActivity(deps: {
       const outcome: CodeActivityResult = {
         ...result,
         telemetry: { ...result.telemetry, verifiedActions },
-        state:
-          waiting &&
-          !['cancelled', 'resource_limit'].includes(result.telemetry.outcome)
+        state: observeOnly
+          ? 'not_executed'
+          : waiting &&
+              !['cancelled', 'resource_limit'].includes(
+                result.telemetry.outcome,
+              )
             ? 'awaiting_approval'
             : result.telemetry.outcome === 'completed'
               ? 'completed'

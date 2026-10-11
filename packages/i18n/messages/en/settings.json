@@ -470,5 +470,9 @@
   "settings_authority_fact": "Fact group",
   "settings_authority_override": "Workspace override",
   "settings_authority_default": "Use category default",
-  "settings_authority_unavailable": "{source} (unavailable)"
+  "settings_authority_unavailable": "{source} (unavailable)",
+  "settings_write_mode_title": "Provider writes",
+  "settings_write_mode_description": "Observe-only keeps detection, investigation and proposals running. Only workspace owners can enable provider writes.",
+  "settings_write_mode_enabled": "Writes enabled",
+  "settings_write_mode_owner": "Only workspace owners can change write mode."
 }

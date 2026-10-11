@@ -8,6 +8,7 @@ export interface WorkspaceSettings {
   revision: number;
   alwaysRequireApproval: boolean;
   policyRevision: number;
+  writeMode: 'observe_only' | 'writes_enabled';
 }
 
 export interface NotificationPreferences {

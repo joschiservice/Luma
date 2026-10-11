@@ -62,6 +62,8 @@ export type { WorkspaceApp } from '../domain/installation.js';
  * responses still go through the app's own review, which checks the exact proposal again.
  */
 export interface AppDecision {
+  /** Writes are withheld by workspace or connection owner controls. */
+  observeOnly?: boolean;
   /**
    * Stable and app-prefixed, such as `shopify:inventory_correction:<target>`. Keep it while the
    * same problem waits on a person, so a refreshed proposal updates the item in place.

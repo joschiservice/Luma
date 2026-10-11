@@ -408,6 +408,9 @@ export function ShopifyInventoryCorrection({
             ) : null}
             {review ? (
               <div aria-live="polite" className="shopify-stock-review">
+                {review.observeOnly ? (
+                  <p>{m.issues_observe_only_proposal()}</p>
+                ) : null}
                 <ol className="shopify-stock-stages">
                   <li>
                     <StatePill

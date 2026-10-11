@@ -113,6 +113,7 @@ export const correctionPreviewInput = correctionTarget
   .strict();
 
 export const correctionView = z.object({
+  observeOnly: z.boolean().optional(),
   id: z.string().uuid(),
   target: correctionTarget,
   choice: correctionChoice,

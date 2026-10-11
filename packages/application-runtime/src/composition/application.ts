@@ -428,6 +428,7 @@ export function createApplicationServices(
               : null,
           requesterId: item.submission?.requestedBy ?? null,
           canRespond: item.canRespond,
+          observeOnly: item.submission?.observeOnly ?? false,
           requestedDeliveryDate: item.submission?.requestedDeliveryDate ?? null,
           // Descriptions read better than canonical SKU keys in a decision.
           lines: item.order.lines.map((l) => ({

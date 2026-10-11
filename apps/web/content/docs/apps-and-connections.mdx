@@ -120,3 +120,16 @@ On the app’s page, choose **Uninstall app**, then **Uninstall and disconnect**
 - Keeps the records the app imported and its history. The app then appears under **Previously used apps**.
 
 Requests already sent to your systems may still finish. As with disconnecting, revoke Luma’s access in Shopify or JTL as well.
+
+## Observe-only
+
+New workspaces start in observe-only. Luma can read your systems, detect issues, investigate
+them and show proposed changes without writing to a provider. Proposals say **Would run when
+writes are enabled**; you cannot approve them while observe-only applies.
+
+Workspace owners can enable provider writes in **Settings → Workspace → Provider writes**.
+The connection card in an app's settings can impose **Observe-only** for that connection,
+or **Use workspace write mode** to restore inheritance. A connection cannot enable writes
+while the workspace observes only. Each mode change is recorded in the audit history.
+Enabling writes keeps normal permissions, approvals and verification requirements. Work
+already recorded as not executed needs a fresh proposal before it can run.

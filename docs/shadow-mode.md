@@ -7,6 +7,13 @@ Predictions and operator comparisons stay separate from live verified-success me
 `@luma/resolution` owns the service; every operation requires a freshly refreshed context
 with `playbooks.activate`.
 
+Workspace and connection observe-only controls protect the normal execution path for
+all installed write capabilities while keeping detection, diagnosis and proposals running.
+They record intended work as `not_executed`, without predicting its outcome. Shadow Mode
+adds capability-specific simulation and operator agreement reports; its supported
+prediction model and separate workflow identities still apply. Neither environment
+establishes a verified resolution. See [execution controls](execution.md#observe-only).
+
 ## Evaluations
 
 An evaluation ID is a client-chosen UUID. Keep it for retries: exact retries return the

@@ -128,6 +128,7 @@ const runStateLabels: Record<string, string> = localizedLabels({
   ended: m.orders_run_state_ended,
   denied: m.orders_run_state_denied,
   failed: m.orders_run_state_failed,
+  not_executed: m.issues_observe_only_title,
   failed_verification: m.orders_run_state_failed_verification,
   inconclusive: m.orders_run_state_inconclusive,
   inconclusive_verification: m.orders_run_state_inconclusive_verification,

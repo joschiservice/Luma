@@ -16,6 +16,7 @@ import {
   parseEvidence,
   parseVerification,
 } from './infrastructure/validation.js';
+import { createWriteControl } from './infrastructure/write-control.js';
 
 /**
  * Creates persistent action execution with policy, audit, capability, and authorization
@@ -29,6 +30,7 @@ export function createExecution(
   refreshContext: ExecutionDependencies['refreshContext'],
 ) {
   return createExecutionService({
+    writeControl: createWriteControl(db),
     repository: createExecutionRepository(db),
     policies,
     audit,

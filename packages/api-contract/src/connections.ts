@@ -47,6 +47,7 @@ export const installationInput = z
   .strict();
 
 export const installedConnectionSchema = z.object({
+  writeMode: z.literal('observe_only').nullable().optional(),
   provider: z.string().optional(),
   appId: z.string().optional(),
   management: z.array(z.enum(['check', 'rotate'])).optional(),

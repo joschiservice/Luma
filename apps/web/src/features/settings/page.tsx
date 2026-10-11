@@ -30,7 +30,11 @@ import { useId, useState } from 'react';
 
 import { Failure } from '../identity/common';
 import { contextOptions, IdentityError } from '../identity/data';
-import { usePermissionLabel, usePermissions } from '../identity/permissions';
+import {
+  isOwnerRole,
+  usePermissionLabel,
+  usePermissions,
+} from '../identity/permissions';
 import {
   CommandFeedback,
   useSettingsCommand,
@@ -136,6 +140,7 @@ export function SettingsPage({
       data={query.data}
       can={permissions.can}
       actorId={access.data?.actor.id ?? ''}
+      isOwner={isOwnerRole(access.data?.actor.role)}
       supportView={supportView}
       loading={query.isPending}
       error={error ? m.settings_load_failed() : undefined}
@@ -153,6 +158,7 @@ export function SettingsView({
   can,
   actorId,
   supportView = false,
+  isOwner = false,
   loading,
   error,
   retry,
@@ -164,6 +170,7 @@ export function SettingsView({
   /** Whether the signed-in person holds a permission. */
   can: (permission: string) => boolean;
   actorId: string;
+  isOwner?: boolean;
   /** In a Luma support view, personal security settings aren't offered. */
   supportView?: boolean | undefined;
   loading?: boolean | undefined;
@@ -241,6 +248,13 @@ export function SettingsView({
                 <ReadOnlyNotice
                   organizationId={organizationId}
                   permission={required}
+                />
+              ) : null}
+              {section === 'workspace' ? (
+                <WriteModeForm
+                  data={data}
+                  organizationId={organizationId}
+                  disabled={!isOwner || !online || supportView}
                 />
               ) : null}
               {section === 'workspace' ? (
@@ -726,5 +740,71 @@ function SaveBar({
         {pending ? m.common_saving() : m.common_save_changes()}
       </Button>
     </div>
+  );
+}
+
+/** Displays the effective workspace mode and submits owner changes with a durable command. */
+function WriteModeForm({
+  data,
+  organizationId,
+  disabled,
+}: {
+  data: SettingsSnapshot;
+  organizationId: string;
+  disabled: boolean;
+}) {
+  const command = useSettingsCommand(organizationId);
+  const [draft, setDraft] = useState<{
+    enabled: boolean;
+    revision: number;
+  } | null>(null);
+  const enabled =
+    draft?.enabled ?? data.workspace.writeMode === 'writes_enabled';
+
+  return (
+    <section>
+      <SectionHeading
+        title={m.settings_write_mode_title()}
+        description={m.settings_write_mode_description()}
+      />
+      <p>
+        {data.workspace.writeMode === 'observe_only'
+          ? m.issues_observe_only_title()
+          : m.settings_write_mode_enabled()}
+      </p>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void command.run(async (commandId) => {
+            await settingsApi.settings.updateWriteMode({
+              params: { organizationId },
+              body: {
+                commandId,
+                revision: draft?.revision ?? data.workspace.revision,
+                writeMode: enabled ? 'writes_enabled' : 'observe_only',
+              },
+            });
+            setDraft(null);
+          });
+        }}
+      >
+        <PreferenceRow
+          title={m.settings_write_mode_enabled()}
+          description={m.settings_write_mode_owner()}
+          checked={enabled}
+          disabled={disabled || command.locked}
+          change={(value) =>
+            setDraft({
+              enabled: value,
+              revision: draft?.revision ?? data.workspace.revision,
+            })
+          }
+        />
+        <Button type="submit" disabled={disabled || command.locked || !draft}>
+          {m.common_save()}
+        </Button>
+        <CommandFeedback command={command} />
+      </form>
+    </section>
   );
 }

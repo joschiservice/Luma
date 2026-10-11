@@ -210,7 +210,8 @@ export function createResolutionMetricReader(
             OR s.document->>'adapterVersion' LIKE '%simulator%' OR s.document->>'key' LIKE 'pilot:%'
             OR installation.document->>'label' LIKE 'SIMULATED %'
             OR EXISTS(SELECT 1 FROM jsonb_each_text(COALESCE(installation.document->'target','{}'::jsonb)) t WHERE t.value LIKE '%.invalid%' OR t.value LIKE 'luma-synthetic-%')
-          )) AS synthetic
+          )) AS synthetic,
+        EXISTS(SELECT FROM proposals p JOIN execution_observe_only o ON o.tenant_id=p.tenant_id AND o.proposal_id=p.id WHERE p.exception_id=c.id) AS "observeOnly"
       FROM cohort c ORDER BY c.document->>'firstDetectedAt',c.id`,
           [tenantId, start, asOf],
         )

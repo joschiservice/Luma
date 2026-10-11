@@ -10,6 +10,7 @@ export const workspaceSettingsSchema = z.object({
   revision: z.number().int(),
   alwaysRequireApproval: z.boolean(),
   policyRevision: z.number().int(),
+  writeMode: z.enum(['observe_only', 'writes_enabled']),
 });
 
 export const notificationPreferencesSchema = z.object({

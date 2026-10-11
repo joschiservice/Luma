@@ -87,6 +87,27 @@ export const settingsContract = {
       }),
     )
     .output(settingsSnapshotSchema),
+  updateWriteMode: endpoint
+    .route({
+      method: 'PATCH',
+      path: `${path}/write-mode`,
+      summary: 'Change workspace provider write mode',
+      description:
+        'Only workspace owners may change this mode. Observe-only preserves reads and proposals while refusing provider writes.',
+    })
+    .meta({ access: anyMember, errors: [401, 403, 404, 409, 503] })
+    .input(
+      z.object({
+        params: organizationParamsSchema,
+        body: command
+          .extend({
+            revision: z.number().int().nonnegative(),
+            writeMode: z.enum(['observe_only', 'writes_enabled']),
+          })
+          .strict(),
+      }),
+    )
+    .output(settingsSnapshotSchema),
   updateApprovals: endpoint
     .route({
       method: 'PATCH',

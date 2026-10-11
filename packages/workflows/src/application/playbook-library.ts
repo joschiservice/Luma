@@ -118,30 +118,34 @@ export function connectionBlockers({
 }
 
 const runState = (run: PlaybookRunView) =>
-  run.verification === 'verified'
-    ? 'verified'
-    : run.verification === 'failed'
-      ? 'failed_verification'
-      : run.verification === 'inconclusive'
-        ? 'inconclusive_verification'
-        : run.execution === 'denied'
-          ? 'denied'
-          : run.execution === 'awaiting_approval'
-            ? 'awaiting_decision'
-            : 'running';
+  run.execution === 'not_executed'
+    ? 'not_executed'
+    : run.verification === 'verified'
+      ? 'verified'
+      : run.verification === 'failed'
+        ? 'failed_verification'
+        : run.verification === 'inconclusive'
+          ? 'inconclusive_verification'
+          : run.execution === 'denied'
+            ? 'denied'
+            : run.execution === 'awaiting_approval'
+              ? 'awaiting_decision'
+              : 'running';
 
 const runSummary = (state: string | undefined) =>
-  state === 'verified'
-    ? 'The order’s shipping method was independently verified.'
-    : state === 'failed_verification'
-      ? 'The expected shipping method wasn’t observed on the order.'
-      : state === 'inconclusive_verification'
-        ? 'The correction couldn’t be confirmed.'
-        : state === 'denied'
-          ? 'The proposed correction was rejected or wasn’t allowed.'
-          : state === 'awaiting_decision'
-            ? 'The proposed correction is waiting for approval.'
-            : 'The correction is in progress.';
+  state === 'not_executed'
+    ? 'Not executed: observe-only.'
+    : state === 'verified'
+      ? 'The order’s shipping method was independently verified.'
+      : state === 'failed_verification'
+        ? 'The expected shipping method wasn’t observed on the order.'
+        : state === 'inconclusive_verification'
+          ? 'The correction couldn’t be confirmed.'
+          : state === 'denied'
+            ? 'The proposed correction was rejected or wasn’t allowed.'
+            : state === 'awaiting_decision'
+              ? 'The proposed correction is waiting for approval.'
+              : 'The correction is in progress.';
 
 /**
  * Derives readiness from current connection access and active grants. An active grant on a

@@ -55,5 +55,6 @@
   "connections_error_conflict": "Diese Verbindung wurde geändert. Aktualisiere die Liste, bevor du es erneut versuchst.",
   "connections_error_invalid": "Prüfe die Verbindungsdaten und gib die Zugangsdaten erneut ein.",
   "connections_error_unavailable": "Der Verbindungsdienst ist nicht verfügbar. Bitte deine Administration, die App-Einrichtung zu prüfen, und aktualisiere dann.",
-  "connections_error_unknown": "Luma konnte das Ergebnis nicht bestätigen. Aktualisiere die Liste, bevor du es erneut versuchst."
+  "connections_error_unknown": "Luma konnte das Ergebnis nicht bestätigen. Aktualisiere die Liste, bevor du es erneut versuchst.",
+  "connections_write_mode_inherit": "Änderungsmodus des Workspace verwenden"
 }

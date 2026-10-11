@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 
 import {
@@ -10,6 +10,7 @@ import {
 import type { AuditEntry } from '@luma/audit';
 import { createAuditLog } from '@luma/audit/composition';
 import { ConnectorError } from '@luma/connections';
+import { createInstalledConnections } from '@luma/connections/composition';
 import { createTenantDatabase } from '@luma/platform/composition';
 import { shippingMethodPlaybook } from '@luma/resolution';
 import {
@@ -647,7 +648,7 @@ describe.skipIf(!databaseUrl)(
         `CREATE ROLE "${login}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
       );
       await admin.query(
-        `GRANT luma_identity,luma_policies,luma_execution,luma_audit,luma_desk TO "${login}"`,
+        `GRANT luma_identity,luma_policies,luma_execution,luma_audit,luma_desk,luma_connectors TO "${login}"`,
       );
       url.username = login;
       url.password = password;
@@ -673,7 +674,15 @@ describe.skipIf(!databaseUrl)(
       const m = await signup('member');
       const o = await signup('outsider');
       tenantId = await organization(a.cookie, 'tenant-a');
+      await owner.query(
+        "UPDATE organizations SET write_mode='writes_enabled' WHERE id=$1",
+        [tenantId],
+      );
       const tenantB = await organization(o.cookie, 'tenant-b');
+      await owner.query(
+        "UPDATE organizations SET write_mode='writes_enabled' WHERE id=$1",
+        [tenantB],
+      );
       for (const [user, role] of [
         [b, 'admin'],
         [m, 'member'],
@@ -722,6 +731,105 @@ describe.skipIf(!databaseUrl)(
       await admin.query(`DROP DATABASE IF EXISTS "${database}"`);
       await admin.query(`DROP ROLE IF EXISTS "${login}"`);
       await admin.end();
+    });
+
+    it('isolates connection controls, audits owner changes and retains observed proposals after enabling writes', async () => {
+      const connections = createInstalledConnections(
+        createTenantDatabase(runtime),
+        {
+          refreshContext,
+          verify: async (connection) => connection.permissions,
+          activeKeyId: 'test',
+          keys: new Map([['test', randomBytes(32)]]),
+        },
+      );
+      const install = (label: string) =>
+        connections.install(alice, {
+          label,
+          target: { kind: 'fixture' },
+          permissions: ['inventory.available.reconcile'],
+          credentials: { token: 'fixture' },
+        });
+      const first = await install('Observed');
+      const second = await install('Enabled');
+      for (const actor of [bob, member])
+        await expect(
+          connections.updateWriteMode(
+            actor,
+            first.id,
+            first.version,
+            'observe_only',
+          ),
+        ).rejects.toMatchObject({ statusCode: 403 });
+      await expect(
+        connections.updateWriteMode(
+          outsider,
+          first.id,
+          first.version,
+          'observe_only',
+        ),
+      ).rejects.toMatchObject({ statusCode: 404 });
+      const restricted = await connections.updateWriteMode(
+        alice,
+        first.id,
+        first.version,
+        'observe_only',
+      );
+      resolve.mockResolvedValue(adapter);
+      const observedAction = action({ connectionId: first.id });
+      const observed = await safety.execution.execute(alice, observedAction);
+      expect(observed).toMatchObject({
+        state: 'not_executed',
+        reason: 'observe_only',
+      });
+      expect(execute).not.toHaveBeenCalled();
+      expect(checkPreconditions).not.toHaveBeenCalled();
+      expect(
+        await safety.execution.execute(
+          alice,
+          action({ connectionId: second.id }),
+        ),
+      ).toMatchObject({ state: 'succeeded' });
+      expect(execute).toHaveBeenCalledTimes(1);
+      const restored = await connections.updateWriteMode(
+        alice,
+        first.id,
+        restricted.version,
+        null,
+      );
+      expect(restored.writeMode).toBeNull();
+      await safety.close();
+      safety = startSafety();
+      expect(await safety.execution.execute(alice, observedAction)).toEqual(
+        observed,
+      );
+      expect(execute).toHaveBeenCalledTimes(1);
+      const events = (
+        await owner.query(
+          "SELECT actor_id,before_value,after_value FROM connector_lifecycle_events WHERE tenant_id=$1 AND connection_id=$2 AND event='write_mode_changed' ORDER BY version",
+          [tenantId, first.id],
+        )
+      ).rows;
+      expect(events).toEqual([
+        {
+          actor_id: alice.actor.id,
+          before_value: { writeMode: null },
+          after_value: { writeMode: 'observe_only' },
+        },
+        {
+          actor_id: alice.actor.id,
+          before_value: { writeMode: 'observe_only' },
+          after_value: { writeMode: null },
+        },
+      ]);
+      expect(
+        (
+          await owner.query(
+            'SELECT count(*)::int AS n FROM executed_actions WHERE tenant_id=$1 AND proposal_id=$2',
+            [tenantId, observedAction.id],
+          )
+        ).rows[0].n,
+      ).toBe(0);
     });
 
     async function playbookFixture(

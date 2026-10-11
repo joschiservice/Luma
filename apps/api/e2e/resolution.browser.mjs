@@ -499,6 +499,24 @@ test('reviews decisions, recovers ambiguous commands and escalates through the c
     ),
   ).toBe(true);
   await page.screenshot({ path: '/tmp/luma-35-mobile.png', fullPage: true });
+  review = { ...structuredClone(resolutionReview), observeOnly: true };
+  progress = structuredClone(resolutionProgress);
+  for (const colorScheme of ['light', 'dark']) {
+    await page.emulateMedia({ colorScheme });
+    await page.reload();
+    await openSection('Proposed change');
+    await page.getByText('Observe-only', { exact: true }).waitFor();
+    await expect(
+      page.getByText('Would run when writes are enabled.', { exact: false }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Approve change', exact: true }),
+    ).toHaveCount(0);
+    await page.screenshot({
+      path: `/tmp/luma173-observe-${colorScheme}.png`,
+      fullPage: true,
+    });
+  }
   // Remove only fixture endpoints; the final decision reaches authenticated policy services and PostgreSQL.
   await page.unroute(`**${path}`);
   await page.unroute(`**${path}/events`);

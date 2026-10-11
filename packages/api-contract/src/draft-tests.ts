@@ -20,6 +20,7 @@ const shownValues = z.record(z.string(), shownValue);
 
 /** Final outcomes of a test run. `awaiting_decision` means the workflow would wait for a person. */
 export const testOutcomeSchema = z.enum([
+  'not_executed',
   'verified',
   'ended',
   'denied',
@@ -77,6 +78,7 @@ export const testStepResultSchema = z.object({
   kind: z.enum(workflowStepKinds),
   title: z.string(),
   state: z.enum([
+    'not_executed',
     'completed',
     'waiting',
     'denied',

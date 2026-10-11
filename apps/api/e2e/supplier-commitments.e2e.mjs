@@ -128,6 +128,59 @@ it('places an approved order once, follows supplier confirmation and receipt, an
   const requestedDeliveryDate = new Date(Date.now() + 7 * 86_400_000)
     .toISOString()
     .slice(0, 10);
+  const settings = await request(
+    `/v1/organizations/${org}/settings`,
+    undefined,
+    { cookie: approver },
+  );
+  const writeMode = async (mode, revision) => {
+    const response = await f.pilot.app.inject({
+      method: 'PATCH',
+      url: `/v1/organizations/${org}/settings/write-mode`,
+      headers: { cookie: approver, origin },
+      payload: { commandId: randomUUID(), writeMode: mode, revision },
+    });
+    expect(response.statusCode, response.body).toBe(200);
+
+    return response.json();
+  };
+  const observing = await writeMode(
+    'observe_only',
+    settings.workspace.revision,
+  );
+  const observedRequest = { id: randomUUID(), requestedDeliveryDate };
+  const observed = await call(
+    `/purchase-orders/${order.id}/submissions`,
+    observedRequest,
+  );
+  expect(observed).toMatchObject({
+    state: 'not_executed',
+    observeOnly: true,
+    canApprove: false,
+    canSend: false,
+    canCheck: false,
+    failure: null,
+  });
+  await f.pilot.followUp();
+  expect(
+    await call(`/purchase-orders/${order.id}/submissions`, observedRequest),
+  ).toMatchObject({ id: observed.id, state: 'not_executed' });
+  expect((await call(`/purchase-orders/${order.id}/record`)).stage).toBe(
+    'draft',
+  );
+  expect(
+    (
+      await f.db.owner.query(
+        'SELECT count(*)::int AS n FROM executed_actions WHERE tenant_id=$1 AND proposal_id=$2',
+        [org, observed.actionId],
+      )
+    ).rows[0].n,
+  ).toBe(0);
+  await writeMode('writes_enabled', observing.workspace.revision);
+  // Enabling writes requires a fresh submission; the observed request stays terminal.
+  expect(
+    await call(`/purchase-orders/${order.id}/submissions`, observedRequest),
+  ).toMatchObject({ state: 'not_executed' });
   const submissionRequest = { id: randomUUID(), requestedDeliveryDate };
   const [requested, retried] = await Promise.all([
     call(`/purchase-orders/${order.id}/submissions`, submissionRequest),

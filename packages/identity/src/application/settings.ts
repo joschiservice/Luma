@@ -3,7 +3,11 @@ import type {
   SessionIdentity,
   TenantContext,
 } from '../domain/context.js';
-import { IdentityError, requireActiveMembership } from '../domain/context.js';
+import {
+  IdentityError,
+  requireActiveMembership,
+  requireChangesAllowed,
+} from '../domain/context.js';
 import type { Permission } from '../domain/permissions.js';
 import type { PermissionSet, RoleReference } from '../domain/roles.js';
 import type {
@@ -291,6 +295,46 @@ export function createSettingsService(deps: SettingsDependencies) {
           return tx.snapshot(context.actor.id);
         },
       );
+    },
+    /** Changes provider write admission for owners at the reviewed workspace revision. */
+    updateWriteMode(
+      context: TenantContext,
+      input: {
+        commandId: string;
+        revision: number;
+        writeMode: 'observe_only' | 'writes_enabled';
+      },
+    ) {
+      requireChangesAllowed(context);
+
+      return command(context, null, input, 'write_mode', async (tx, actor) => {
+        if (actor.role.key !== 'owner')
+          throw new IdentityError(
+            403,
+            'FORBIDDEN',
+            'Only workspace owners can change write mode.',
+          );
+        const before = (await tx.snapshot(context.actor.id)).workspace;
+        if (before.revision !== input.revision)
+          conflict('Write settings changed. Refresh before saving.');
+        if (before.writeMode !== input.writeMode) {
+          const after = {
+            ...before,
+            writeMode: input.writeMode,
+            revision: before.revision + 1,
+          };
+          await tx.saveWorkspace(after);
+          await tx.audit(
+            context.actor.id,
+            'workspace.write_mode_changed',
+            context.tenantId,
+            { writeMode: before.writeMode },
+            { writeMode: after.writeMode },
+          );
+        }
+
+        return tx.snapshot(context.actor.id);
+      });
     },
     /** Versions approval requirements so older reviews cannot authorize a changed policy. */
     updateApprovals(

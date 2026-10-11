@@ -433,5 +433,7 @@
   "issues_review_reject": "Änderung ablehnen",
   "issues_review_escalate_confirm": "Eskalation bestätigen",
   "issues_review_checking": "Aktueller Stand wird geprüft…",
-  "issues_review_saving_decision": "Deine Entscheidung wird gespeichert…"
+  "issues_review_saving_decision": "Deine Entscheidung wird gespeichert…",
+  "issues_observe_only_title": "Nur beobachten",
+  "issues_observe_only_proposal": "Würde ausgeführt, sobald Änderungen erlaubt sind. Luma behält diesen Vorschlag und seine Belege, ändert aber nichts im verbundenen System."
 }

@@ -36,8 +36,10 @@ export interface PlaybookRun {
 }
 
 export interface PlaybookOutcome {
-  state: 'awaiting_approval' | 'verified' | 'denied' | 'escalated';
+  state:
+    'awaiting_approval' | 'verified' | 'denied' | 'escalated' | 'not_executed';
   reason:
+    | 'observe_only'
     | 'approval_required'
     | 'verified'
     | 'policy_denied'
@@ -176,6 +178,7 @@ export function createPlaybookService(deps: PlaybookDependencies) {
       const prior = await deps.store.outcomes(context, id);
       const terminal = prior.find(
         (o) =>
+          o.state === 'not_executed' ||
           o.state === 'denied' ||
           o.state === 'escalated' ||
           o.state === 'verified',
@@ -226,6 +229,12 @@ export function createPlaybookService(deps: PlaybookDependencies) {
         }
       }
     }
+    if (result.state === 'not_executed')
+      return record({
+        state: 'not_executed',
+        reason: 'observe_only',
+        stepId: ir.action.id,
+      });
     if (result.state === 'approval_required')
       return record({
         state: 'awaiting_approval',

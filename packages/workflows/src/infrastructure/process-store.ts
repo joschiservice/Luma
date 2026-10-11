@@ -19,7 +19,7 @@ function validateOutput(
     code: ['waiting', 'completed', 'escalated'],
     read: ['completed'],
     condition: ['completed', 'ended', 'escalated'],
-    capability: ['waiting', 'completed', 'escalated'],
+    capability: ['waiting', 'completed', 'escalated', 'not_executed'],
     approval: ['waiting', 'completed', 'denied'],
     wait: ['waiting', 'completed'],
     verification: ['completed', 'failed', 'inconclusive'],

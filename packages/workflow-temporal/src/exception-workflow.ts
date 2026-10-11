@@ -197,6 +197,8 @@ export async function exceptionWorkflow(
       finish('reconciling');
       result = await activities.reconcile(input, proposal.id);
     }
+    if (result.state === 'not_executed')
+      return finish('not_executed', 'observe_only');
     if (result.state === 'denied') return finish('denied', 'policy_denied');
     if (result.state !== 'succeeded')
       return finish('escalated', 'execution_requires_review');

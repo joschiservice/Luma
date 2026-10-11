@@ -248,3 +248,18 @@ export const PageEscalationPending: Story = {
     ).toBeDisabled();
   },
 };
+
+export const ObserveOnly: Story = {
+  args: { review: { ...resolutionReview, observeOnly: true } },
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement);
+    await expect(c.getByText('Observe-only', { exact: true })).toBeVisible();
+    await expect(
+      c.getByText(/Would run when writes are enabled/),
+    ).toBeVisible();
+    await expect(
+      c.queryByRole('button', { name: 'Approve change' }),
+    ).not.toBeInTheDocument();
+    await expect(c.getByText('Target system')).toBeVisible();
+  },
+};

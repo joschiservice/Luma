@@ -25,6 +25,14 @@ function stage(
   actorId: string,
   verify: string,
 ): Stage {
+  if (view.observeOnly)
+    return {
+      reason: 'approval',
+      response: 'view_only',
+      deadline: null,
+      why: 'Would run when writes are enabled. No provider change was made.',
+      consequences: [],
+    };
   if (view.state === 'uncertain')
     return {
       reason: 'recovery',
@@ -157,6 +165,7 @@ export function recoveryDecision(
       `${target.connectionId}:${tail(target.fulfillmentOrderId)}`,
       view.id,
     ),
+    observeOnly: view.observeOnly ?? false,
     kind: 'fulfillment_recovery',
     domain: 'fulfillment',
     title,
@@ -231,6 +240,7 @@ export function correctionDecision(
       `${target.positionId}:${target.connectionId}`,
       view.id,
     ),
+    observeOnly: view.observeOnly ?? false,
     kind: 'inventory_correction',
     domain: 'inventory',
     title: `Correct Shopify stock at ${before.locationName}`,

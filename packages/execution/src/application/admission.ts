@@ -81,6 +81,7 @@ const risk = { low: 0, medium: 1, high: 2 };
 export function createActionAdmission(deps: AdmissionDependencies) {
   return {
     get: deps.execution.get,
+    writeMode: deps.execution.writeMode,
     reconcile: deps.execution.reconcile,
     async execute(context: TenantContext, input: unknown) {
       const reference = deps.parseReference(input);
@@ -166,6 +167,7 @@ export function createActionAdmission(deps: AdmissionDependencies) {
 
         return previous;
       }
+      if (previous?.state === 'not_executed') return previous;
       const stillEligible = async () => {
         const current = await deps.refreshContext(fresh);
         requireTenant(current, fresh.tenantId);
@@ -193,4 +195,10 @@ export function createActionAdmission(deps: AdmissionDependencies) {
   };
 }
 
-export type ActionAdmission = ReturnType<typeof createActionAdmission>;
+export type ActionAdmission = Omit<
+  ReturnType<typeof createActionAdmission>,
+  'writeMode'
+> & {
+  /** Persistent composition provides mode reads; isolated test ports may omit them. */
+  writeMode?: ReturnType<typeof createActionAdmission>['writeMode'];
+};

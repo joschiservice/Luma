@@ -37,6 +37,20 @@ export function connectionRoutes(service?: ConnectionManagement) {
   const os = implement(apiContract.connections).$context<HttpContext>();
 
   return os.router({
+    updateWriteMode: os.updateWriteMode.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const { service, context } = use(request);
+
+        return summary(
+          await service.updateWriteMode(
+            context,
+            params.connectionId,
+            body.version,
+            body.writeMode,
+          ),
+        );
+      },
+    ),
     list: os.list.handler(async ({ context: { request } }) => {
       const { service, context } = use(request);
 

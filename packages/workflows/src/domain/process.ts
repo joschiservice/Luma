@@ -101,6 +101,7 @@ export interface ProcessStepOutput {
   stepId: string;
   kind: ProcessStep['kind'];
   state:
+    | 'not_executed'
     | 'completed'
     | 'waiting'
     | 'denied'
@@ -117,6 +118,7 @@ export interface ProcessStepOutput {
 }
 
 export type ProcessRunState =
+  | 'not_executed'
   | 'running'
   | 'awaiting_decision'
   | 'waiting'

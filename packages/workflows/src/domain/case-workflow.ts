@@ -87,6 +87,8 @@ export function caseStartable(
 /** Plain-language summary of a case run's state for readiness and Activity. */
 export function caseRunOutcome(state: string | undefined): string {
   switch (state) {
+    case 'not_executed':
+      return 'Not executed: observe-only. Would run when writes are enabled.';
     case 'verified':
       return 'The change was made and checked independently.';
     case 'ended':

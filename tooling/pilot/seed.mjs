@@ -130,6 +130,19 @@ export async function seedPilot(
       })
     ).json();
     manifest.organizationId = organization.id;
+    // Synthetic pilot scenarios deliberately exercise governed provider writes.
+    const writeMode = await app.inject({
+      method: 'PATCH',
+      url: `/v1/organizations/${organization.id}/settings/write-mode`,
+      headers: { origin: settings.baseURL, cookie },
+      payload: {
+        commandId: randomUUID(),
+        revision: 0,
+        writeMode: 'writes_enabled',
+      },
+    });
+    if (writeMode.statusCode !== 200)
+      throw new Error('Pilot write-mode setup failed');
     const context = await identity.service.resolveTenant(
       { cookie },
       organization.id,

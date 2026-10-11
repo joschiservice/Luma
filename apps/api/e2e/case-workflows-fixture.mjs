@@ -65,11 +65,11 @@ export async function caseWorkflowFixture(
     return response.json();
   };
   const actor = await f.pilot.operator();
-  const worker = await createProcessWorker(
+  let worker = await createProcessWorker(
     { ...settings, taskQueue: `${settings.taskQueue}-procurement` },
     f.pilot.caseWorkflows.activities,
   );
-  const running = worker.run();
+  let running = worker.run();
   t.onTestFinished(async () => {
     worker.shutdown();
     await running;
@@ -128,6 +128,17 @@ export async function caseWorkflowFixture(
   return {
     ...f,
     temporal,
+    /** Replaces only this fixture's worker while preserving Temporal history and storage. */
+    restartWorker: async () => {
+      worker.shutdown();
+      await running;
+      await worker.close();
+      worker = await createProcessWorker(
+        { ...settings, taskQueue: `${settings.taskQueue}-procurement` },
+        f.pilot.caseWorkflows.activities,
+      );
+      running = worker.run();
+    },
     base,
     request,
     actor,

@@ -55,5 +55,6 @@
   "connections_error_conflict": "This connection changed. Refresh the list before trying again.",
   "connections_error_invalid": "Check the connection details and enter the credentials again.",
   "connections_error_unavailable": "The connection service is unavailable. Ask your administrator to check the app setup, then refresh.",
-  "connections_error_unknown": "Luma couldn’t confirm the result. Refresh the list before trying again."
+  "connections_error_unknown": "Luma couldn’t confirm the result. Refresh the list before trying again.",
+  "connections_write_mode_inherit": "Use workspace write mode"
 }

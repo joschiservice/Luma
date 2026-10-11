@@ -285,3 +285,19 @@ describe('duration aggregation', () => {
     expect(metric(inputs, 'unresolved_age').value).toBe(7200);
   });
 });
+
+it('keeps observe-only outcomes out of verified and autonomous totals even after an unrelated passing verification', () => {
+  const observed = source({ observeOnly: true });
+  expect(classifyResolution(observed, asOf)).toMatchObject({
+    environment: 'observe_only',
+    outcome: 'pending',
+    verifiedAt: null,
+  });
+  expect(metric([observed], 'verified').items).toEqual([]);
+  const cohort = summarizeResolutionMetrics([observed], asOf, {
+    environment: 'observe_only',
+  });
+  expect(
+    cohort.find((m) => m.definition.id === 'resolution.verified')?.items,
+  ).toEqual([]);
+});

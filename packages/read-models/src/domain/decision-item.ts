@@ -44,6 +44,7 @@ export interface DecisionAssignment {
 
 /** One decision waiting on a person, as the Needs you queue presents it. */
 export interface DecisionItem {
+  observeOnly?: boolean;
   id: string;
   kind: DecisionKind;
   reason: DecisionReason;

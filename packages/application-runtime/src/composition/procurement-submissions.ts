@@ -190,6 +190,8 @@ export function createSubmissionEffects(
 
 function execution(result: ExecutionResult | null): SubmissionExecution {
   if (!result) return { state: 'not_started' };
+  if (result.state === 'not_executed')
+    return { state: 'not_executed', reason: 'observe_only' };
   if (!('record' in result))
     return {
       state: 'withheld',
@@ -227,6 +229,7 @@ export function createSubmissionAdmission(
   const step = 'submit';
 
   return {
+    writeMode: safety.execution.writeMode,
     async prepare(context, submission, action) {
       const artifact = await safety.provisioning.activate(context, {
         id: 'procurement-submission',

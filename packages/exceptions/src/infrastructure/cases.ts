@@ -36,6 +36,7 @@ function caseQuery(filter = 'true', columns = '') {
  SELECT e.document,e.version,d.document AS diagnosis${columns},
  CASE WHEN e.state='resolved' THEN NULL
  WHEN e.state='escalated' OR u.review_required THEN 'uncertainty'
+ WHEN pa.observe_only THEN 'manual_intervention'
  WHEN e.state='awaiting_approval' OR pa.document->>'outcome'='approval_required' THEN 'approval'
  WHEN d.document->>'status'='ready'
    AND (d.document->'provenance'->>'validUntil' IS NULL OR (d.document->'provenance'->>'validUntil')::timestamptz >= $2::timestamptz)
@@ -51,13 +52,16 @@ function caseQuery(filter = 'true', columns = '') {
  LEFT JOIN LATERAL (SELECT document->>'createdAt' AS at FROM case_commands WHERE tenant_id=e.tenant_id AND exception_id=e.id ORDER BY created_at DESC,id DESC LIMIT 1) command ON true
  LEFT JOIN LATERAL (
    SELECT pd.document,p.document AS proposal,
+     (EXISTS(SELECT FROM organizations WHERE id=p.tenant_id AND write_mode='observe_only')
+      OR EXISTS(SELECT FROM connector_installations WHERE tenant_id=p.tenant_id AND id=(p.document->>'connectionId')::uuid AND document->>'writeMode'='observe_only')
+      OR EXISTS(SELECT FROM execution_observe_only WHERE tenant_id=p.tenant_id AND proposal_id=p.id)) AS observe_only,
      (SELECT min(first.document->>'evaluatedAt') FROM policy_decisions first
       WHERE first.tenant_id=p.tenant_id AND first.proposal_id=p.id AND first.action_hash=p.action_hash
       AND first.document->>'outcome'='approval_required'
       AND first.document->>'policyVersion'=pd.document->>'policyVersion'
       AND first.document->>'actorId'=pd.document->>'actorId') AS requested_at
    FROM case_proposals p
-   JOIN LATERAL (SELECT * FROM policy_decisions WHERE tenant_id=p.tenant_id AND proposal_id=p.id AND action_hash=p.action_hash ORDER BY created_at DESC,id DESC LIMIT 1) pd ON true
+   LEFT JOIN LATERAL (SELECT * FROM policy_decisions WHERE tenant_id=p.tenant_id AND proposal_id=p.id AND action_hash=p.action_hash ORDER BY created_at DESC,id DESC LIMIT 1) pd ON true
    WHERE p.tenant_id=e.tenant_id AND p.exception_id=e.id AND p.diagnosis_revision=h.revision
    AND d.document->>'status'='ready'
    AND (d.document->'provenance'->>'validUntil' IS NULL OR (d.document->'provenance'->>'validUntil')::timestamptz>$2::timestamptz)
@@ -105,7 +109,7 @@ export const orderAttentionQuery = attentionQuery();
  * to decide again. Stale diagnoses keep their `summary` and `manual_step`; callers must check
  * `valid_until`. Bind `$1` to the tenant ID and `$2` to the evaluation time.
  */
-export const caseDecisionQuery = `WITH ${caseQuery("e.state<>'resolved'", ',pa.document AS policy,pa.proposal')}
+export const caseDecisionQuery = `WITH ${caseQuery("e.state<>'resolved'", ',pa.document AS policy,pa.proposal,pa.observe_only')}
  SELECT (o.document->>'id')::uuid AS exception_id,o.attention_reason AS reason,
   o.attention_at::timestamptz AS requested_at,o.document->>'severity' AS severity,
   o.document->>'exceptionClass' AS class,o.document->>'state' AS state,o.document->'subject' AS subject,
@@ -115,7 +119,7 @@ export const caseDecisionQuery = `WITH ${caseQuery("e.state<>'resolved'", ',pa.d
   (SELECT step->>'text' FROM jsonb_array_elements(o.diagnosis->'nextSteps') step
     WHERE step->>'kind'='manual_intervention' LIMIT 1) AS manual_step,
   o.diagnosis->'impact'->>'exposedQuantity' AS exposed_quantity,o.diagnosis->'impact'->>'unit' AS exposed_unit,
-  o.policy->>'actorId' AS requester_id,o.policy->>'id' AS decision_id,o.proposal
+  o.policy->>'actorId' AS requester_id,o.policy->>'id' AS decision_id,o.proposal,o.observe_only
  FROM ordered o WHERE o.attention_reason IS NOT NULL
  AND NOT (o.attention_reason='approval' AND EXISTS (
   SELECT 1 FROM case_proposals p

@@ -176,6 +176,7 @@ export const purchasingSupplierSchema = z.object({
 });
 
 export const submissionStateSchema = z.enum([
+  'not_executed',
   'approval_required',
   'approved',
   'rejected',
@@ -218,6 +219,7 @@ export const submissionSchema = z.object({
 });
 
 export const submissionViewSchema = submissionSchema.extend({
+  observeOnly: z.boolean().optional(),
   approvalOutcome: z.enum(['approved', 'rejected']).nullable(),
   canApprove: z.boolean(),
   canSend: z.boolean(),

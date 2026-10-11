@@ -52,15 +52,16 @@ describe.skipIf(!databaseUrl)('installed connections on PostgreSQL', () => {
       await lock.query(
         "SELECT pg_advisory_lock(hashtext('luma_test_role_setup'))",
       );
-      await owner.query(
-        await readFile(
-          new URL(
-            '../migrations/0004_connector_installations.sql',
-            import.meta.url,
+      for (const file of [
+        '0004_connector_installations.sql',
+        '0074_connection_write_mode_audit.sql',
+      ])
+        await owner.query(
+          await readFile(
+            new URL(`../migrations/${file}`, import.meta.url),
+            'utf8',
           ),
-          'utf8',
-        ),
-      );
+        );
     } finally {
       await lock.query(
         "SELECT pg_advisory_unlock(hashtext('luma_test_role_setup'))",

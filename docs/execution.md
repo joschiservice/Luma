@@ -38,6 +38,28 @@ process. API, deterministic-browser and sandboxed-code effect adapters all enter
 admission and reservation path; a code runner must enforce its own process and network
 isolation.
 
+## Observe-only
+
+Owners choose `observe_only` or `writes_enabled` for the workspace. New workspaces
+observe only; existing workspaces retain their prior write behavior. A connection can
+add an observe-only override or inherit the workspace. It cannot enable writes against
+an observe-only workspace. Changes use reviewed revisions, refresh owner authority and
+retain before/after audit evidence.
+
+Detection, diagnosis and immutable proposals continue in observe-only. The shared
+execution engine records a terminal `not_executed` result with reason `observe_only`
+before policy approval or dispatch reservation. It retains the proposed action and its
+evidence without making a provider write. API, worker, pilot and simulator composition
+all use this engine. Reservation shares the mode-change fence, and dispatch checks the
+mode again after audit persistence. A change after reservation withholds dispatch using
+the existing attempt's certainty model; a provider request already sent is not cancelled.
+
+Workers stop normally on the recorded result. Replays and restarts never redispatch that
+proposal, even after writes are enabled. A fresh proposal and the usual admission,
+approval and verification controls are required to act later. Existing uncertain writes
+can still be reconciled by independent reads. Observe-only outcomes belong to their own
+measurement environment and never count as verified resolutions.
+
 ## Policy and approval
 
 Policy `v0.1` lets people with the step's permission execute registered capabilities: the

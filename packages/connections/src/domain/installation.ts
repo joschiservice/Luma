@@ -23,6 +23,8 @@ export type InstallationInput = {
 };
 
 export type InstalledConnection = {
+  /** Null or absent inherits the workspace; an override can only prevent writes. */
+  writeMode?: 'observe_only' | null;
   provider?: string;
   appId?: string;
   management?: ('check' | 'rotate')[];

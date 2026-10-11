@@ -480,7 +480,9 @@ function NextStep({
     order.authority === 'luma' &&
     ['draft', 'open'].includes(order.status) &&
     (!submission ||
-      ['rejected', 'expired', 'failed'].includes(submission.state));
+      ['rejected', 'expired', 'failed', 'not_executed'].includes(
+        submission.state,
+      ));
   const system = readiness.connection?.label;
   const others = progress.attention.filter(
     (a) => !['submission_approval', 'submission_uncertain'].includes(a.kind),
@@ -496,6 +498,9 @@ function NextStep({
       </div>
       <h2 id="next-step">{progress.next.title}</h2>
       <p className="procurement-note">{progress.next.detail}</p>
+      {submission?.observeOnly ? (
+        <p>{m.issues_observe_only_proposal()}</p>
+      ) : null}
       {submission && !['submitted'].includes(submission.state) ? (
         <Alert
           tone={

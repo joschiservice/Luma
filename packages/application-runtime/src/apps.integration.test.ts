@@ -104,6 +104,7 @@ describe.skipIf(!databaseUrl)('workspace app lifecycle on PostgreSQL', () => {
         '0024_workspace_apps.sql',
         '0054_workspace_roles.sql',
         '0055_workspace_app_scopes.sql',
+        '0074_connection_write_mode_audit.sql',
       ])
         await owner.query(
           await readFile(

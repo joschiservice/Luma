@@ -41,6 +41,7 @@ const outcomes = {
   verified: m.authoring_test_outcome_verified,
   ended: m.authoring_test_outcome_ended,
   denied: m.authoring_test_outcome_denied,
+  not_executed: m.issues_observe_only_title,
   failed_verification: m.authoring_test_outcome_failed_verification,
   inconclusive_verification: m.authoring_test_outcome_inconclusive,
   escalated: m.authoring_test_outcome_escalated,
@@ -51,6 +52,7 @@ type TestStep = NonNullable<DraftTestRun['result']>['steps'][number];
 
 const stepStates = {
   completed: m.authoring_test_step_completed,
+  not_executed: m.issues_observe_only_title,
   waiting: m.authoring_test_step_waiting,
   denied: m.authoring_test_step_denied,
   failed: m.authoring_test_step_failed,

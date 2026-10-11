@@ -1,6 +1,8 @@
 import type { TenantContext } from '@luma/identity';
 import {
   IdentityError,
+  isOwner,
+  requireChangesAllowed,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
@@ -41,6 +43,13 @@ export interface SecretCipher {
 
 /** Tenant-scoped connection commands. Mutations require current `connections.manage` permission. */
 export interface ConnectionManagement {
+  /** Owners may impose observe-only or restore workspace inheritance, using the reviewed version. */
+  updateWriteMode(
+    context: TenantContext,
+    id: string,
+    version: number,
+    writeMode: 'observe_only' | null,
+  ): Promise<InstalledConnection>;
   /** Lists connections visible to the current tenant without credentials. */
   list(context: TenantContext): Promise<InstalledConnection[]>;
   /** Validates settings and stores encrypted credentials in a pending connection. */
@@ -204,6 +213,41 @@ export function createInstallationService(
   }
 
   return {
+    async updateWriteMode(context, id, version, writeMode) {
+      requireChangesAllowed(context);
+      const fresh = await authorize(context);
+      if (!isOwner(fresh))
+        throw new IdentityError(
+          403,
+          'FORBIDDEN',
+          'Only workspace owners can change write mode.',
+        );
+      if (writeMode !== null && writeMode !== 'observe_only')
+        throw new IdentityError(
+          422,
+          'CONFLICT',
+          'Invalid connection write mode',
+        );
+      const record = await get(fresh, id);
+      if (record.connection.version !== version) throw conflict();
+      if ((record.connection.writeMode ?? null) === writeMode)
+        return record.connection;
+
+      return save(
+        {
+          ...record,
+          connection: {
+            ...record.connection,
+            writeMode,
+            version: version + 1,
+            updatedAt: deps.now().toISOString(),
+          },
+        },
+        version,
+        fresh.actor.id,
+        'write_mode_changed',
+      );
+    },
     async list(context: TenantContext) {
       const fresh = await authorize(context);
 

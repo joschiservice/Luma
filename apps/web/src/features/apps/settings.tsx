@@ -20,8 +20,10 @@ import { useRef, useState } from 'react';
 
 import { ConnectionCard } from '../connections/connection-card';
 import { connectionError, connectionsOptions } from '../connections/data';
+import { contextOptions } from '../identity/data';
 import { roleName } from '../identity/permission-text';
-import { usePermissions } from '../identity/permissions';
+import { isOwnerRole, usePermissions } from '../identity/permissions';
+import { settingsOptions } from '../settings/data';
 import { syncOptions } from '../sync/data';
 import { AppAccessDialog, ScopeList } from './access';
 import {
@@ -52,6 +54,10 @@ export function AppSettings({
   const apps = useQuery(appsOptions(organizationId));
   const connections = useQuery(connectionsOptions(organizationId));
   const { can } = usePermissions(organizationId);
+  const access = useQuery(contextOptions(organizationId));
+  const settings = useQuery(settingsOptions(organizationId));
+  const owner =
+    isOwnerRole(access.data?.actor.role) && !access.data?.supportView;
   const sync = useQuery(syncOptions(organizationId));
   const client = useQueryClient();
   const navigate = useNavigate();
@@ -240,6 +246,8 @@ export function AppSettings({
                       organizationId={organizationId}
                       appAvailable={available}
                       canManage={canManage}
+                      owner={owner}
+                      workspaceWriteMode={settings.data?.workspace.writeMode}
                       refresh={refresh}
                       sync={sync.data?.connections.find(
                         (item) => item.connectionId === connection.id,

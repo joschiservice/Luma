@@ -103,7 +103,7 @@ export function summarizeOutcomes(
       ? ('verified' as const)
       : state && unresolvedStates.has(state)
         ? ('unresolved' as const)
-        : state === 'ended'
+        : state === 'ended' || state === 'not_executed'
           ? ('ended' as const)
           : ('in_progress' as const);
   const classified = runs.map((run) => ({ run, kind: classify(run.state) }));

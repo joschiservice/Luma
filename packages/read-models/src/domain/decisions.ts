@@ -79,6 +79,7 @@ export function caseDomain(
 
 /** The compact case facts selected by the exceptions owner's decision query. */
 export interface CaseDecisionFacts {
+  observe_only?: boolean;
   exception_id: string;
   reason: 'approval' | 'manual_intervention' | 'uncertainty';
   requested_at: string;
@@ -159,7 +160,8 @@ export function presentCase(
     (facts.valid_until === null ||
       Date.parse(facts.valid_until) > Date.parse(asOf));
   const summary = current ? facts.summary : null;
-  const proposal = facts.reason === 'approval' ? facts.proposal : null;
+  const proposal =
+    facts.reason === 'approval' || facts.observe_only ? facts.proposal : null;
   const action = proposal
     ? (capabilityLabels[proposal.capability] ?? humanize(proposal.capability))
     : null;
@@ -173,8 +175,9 @@ export function presentCase(
     facts.severity === 'low'
       ? facts.severity
       : 'unknown';
-  const response: DecisionResponse =
-    facts.reason !== 'approval' || !proposal
+  const response: DecisionResponse = facts.observe_only
+    ? 'view_only'
+    : facts.reason !== 'approval' || !proposal
       ? 'investigate'
       : facts.requester_id === reader.id
         ? 'awaiting_other'
@@ -187,6 +190,7 @@ export function presentCase(
   };
 
   const base = {
+    observeOnly: facts.observe_only ?? false,
     id: `case:${facts.exception_id}`,
     kind: 'case' as const,
     reason: facts.reason,
@@ -202,26 +206,34 @@ export function presentCase(
     impact: { level: impactLevel, text: exposed },
   } satisfies Partial<DecisionCandidate>;
 
-  if (facts.reason === 'approval')
+  if (facts.reason === 'approval' || facts.observe_only)
     return {
       ...base,
-      title: action ? `Approve ${action}` : `${label} needs approval`,
-      why: proposal
-        ? 'Workspace policy requires someone else who can approve changes to approve this exact proposal before Luma acts.'
-        : 'The proposal expired before anyone approved it. Open the issue to review what changed or escalate it.',
-      consequences: proposal
-        ? [
-            {
-              response: 'Approve',
-              text: 'Luma checks eligibility again, applies this one change and keeps the issue open until a fresh read verifies the result.',
-            },
-            {
-              response: 'Reject',
-              text: 'Nothing changes. The issue stays open for a different approach.',
-            },
-            escalate,
-          ]
-        : [escalate],
+      title: facts.observe_only
+        ? `Observe-only: ${action ?? label}`
+        : action
+          ? `Approve ${action}`
+          : `${label} needs approval`,
+      why: facts.observe_only
+        ? 'Would run when writes are enabled. No provider change was made.'
+        : proposal
+          ? 'Workspace policy requires someone else who can approve changes to approve this exact proposal before Luma acts.'
+          : 'The proposal expired before anyone approved it. Open the issue to review what changed or escalate it.',
+      consequences: facts.observe_only
+        ? [escalate]
+        : proposal
+          ? [
+              {
+                response: 'Approve',
+                text: 'Luma checks eligibility again, applies this one change and keeps the issue open until a fresh read verifies the result.',
+              },
+              {
+                response: 'Reject',
+                text: 'Nothing changes. The issue stays open for a different approach.',
+              },
+              escalate,
+            ]
+          : [escalate],
       change: proposal
         ? [
             { label: 'Action', value: humanize(action ?? proposal.capability) },
@@ -409,6 +421,7 @@ export function presentReplenishment(
 
 /** Something about a sent or sending purchase order that needs a person, from the procurement owner. */
 export interface SupplierCommitmentDecision {
+  observeOnly?: boolean;
   key: string;
   kind:
     | 'submission_approval'
@@ -490,18 +503,25 @@ export function presentSupplierCommitment(
       return {
         ...base,
         reason: 'approval',
-        title: `Approve sending ${item.reference} to ${item.supplierName}`,
-        why: 'Placing an order with a supplier is an external commitment. Someone who can manage procurement, other than the requester, approves the exact order first.',
-        consequences: [
-          {
-            response: 'Approve',
-            text: 'Luma checks the order and supplier link again, places it once in the purchasing system and verifies it with a separate read. The purchasing system sends it to the supplier.',
-          },
-          {
-            response: 'Reject',
-            text: 'Nothing is sent. The order stays in Luma.',
-          },
-        ],
+        observeOnly: item.observeOnly ?? false,
+        title: item.observeOnly
+          ? 'Observe-only'
+          : `Approve sending ${item.reference} to ${item.supplierName}`,
+        why: item.observeOnly
+          ? 'Would run when writes are enabled. Luma keeps this proposal and its evidence, but makes no provider changes.'
+          : 'Placing an order with a supplier is an external commitment. Someone who can manage procurement, other than the requester, approves the exact order first.',
+        consequences: item.observeOnly
+          ? []
+          : [
+              {
+                response: 'Approve',
+                text: 'Luma checks the order and supplier link again, places it once in the purchasing system and verifies it with a separate read. The purchasing system sends it to the supplier.',
+              },
+              {
+                response: 'Reject',
+                text: 'Nothing is sent. The order stays in Luma.',
+              },
+            ],
         change: [
           order,
           supplier,
@@ -522,11 +542,13 @@ export function presentSupplierCommitment(
         },
         deadline: item.expiresAt,
         evidence: { observedAt: item.dueAt, validUntil: item.expiresAt },
-        response: item.canRespond
-          ? 'decide'
-          : item.requesterId === readerId
-            ? 'awaiting_other'
-            : 'view_only',
+        response: item.observeOnly
+          ? 'view_only'
+          : item.canRespond
+            ? 'decide'
+            : item.requesterId === readerId
+              ? 'awaiting_other'
+              : 'view_only',
         group: {
           key: 'supplier:submission_approval',
           label: 'Orders waiting to be sent',
