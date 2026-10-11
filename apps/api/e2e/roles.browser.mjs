@@ -129,6 +129,14 @@ test('creates a custom role, invites with it, restricts views and applies edits 
     .waitFor();
   await page.getByRole('tab', { name: /History/ }).click();
   await page.getByText(/joined with this role/).waitFor();
+  // The saved revision arrives without resetting the editor or dropping the confirmation.
+  await page.getByText(/Granted: View inventory/).waitFor();
+  await page.getByRole('tab', { name: /Permissions/ }).click();
+  await expect(
+    page.getByText(
+      'Role saved. Changes apply from each person’s next action in Luma.',
+    ),
+  ).toBeVisible();
   await teammate.goto(`/app/${f.org.id}/inventory`);
   await teammate.reload();
   await teammate

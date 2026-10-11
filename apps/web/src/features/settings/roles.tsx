@@ -130,7 +130,7 @@ export function RolesSettings({
     return (
       <>
         <RoleEditor
-          key={`${selected.id}:${selected.revision}`}
+          key={selected.id}
           organizationId={organizationId}
           catalog={catalog}
           role={selected}

@@ -93,6 +93,15 @@ export function RoleEditor({
   const [grantedOnly, setGrantedOnly] = useState(false);
   const [reviewing, setReviewing] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  // A new revision, saved here or by someone else, replaces unsaved edits. The editor stays
+  // mounted so the save confirmation and the open tab remain.
+  const [revision, setRevision] = useState(role?.revision);
+  if (role && role.revision !== revision) {
+    setRevision(role.revision);
+    setEdits(null);
+    setReviewing(false);
+    setArchiving(false);
+  }
   const creating = !role;
   const saved: Values = role
     ? {
