@@ -12,13 +12,7 @@ import {
 } from '../dev/environment.mjs';
 import { fail, run } from '../dev/process.mjs';
 import { startTelemetry } from '../observability/runtime.mjs';
-import {
-  registerWebhooks,
-  simulatorInstances,
-  waitForRun,
-} from './connect.mjs';
 import { provisionSimulatorDatabase, simulatorPassword } from './database.mjs';
-import { configureDemoSuppliers } from './demo.mjs';
 import { createOperationsClient } from './platform-client.mjs';
 
 let simulator;
@@ -111,6 +105,10 @@ try {
     '--filter=@luma/simulator...',
     '--filter=@luma/simulator-web',
   ]);
+  // These helpers import workspace packages whose build output must exist first.
+  const { registerWebhooks, simulatorInstances, waitForRun } =
+    await import('./connect.mjs');
+  const { configureDemoSuppliers } = await import('./demo.mjs');
   const databaseUrl = await provisionSimulatorDatabase(migrationUrl, {
     database: 'luma_simulator',
     role: 'luma_simulator',
