@@ -81,7 +81,6 @@ async function heading(page, name) {
 }
 
 async function signInWithPassword(page) {
-  await page.goto('/sign-in');
   await heading(page, 'Sign in to Luma');
   await page.getByLabel('Email', { exact: true }).fill('grace@example.test');
   await page.getByLabel('Password', { exact: true }).fill(password);
