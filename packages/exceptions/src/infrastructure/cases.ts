@@ -119,7 +119,8 @@ export const caseDecisionQuery = `WITH ${caseQuery("e.state<>'resolved'", ',pa.d
   (SELECT step->>'text' FROM jsonb_array_elements(o.diagnosis->'nextSteps') step
     WHERE step->>'kind'='manual_intervention' LIMIT 1) AS manual_step,
   o.diagnosis->'impact'->>'exposedQuantity' AS exposed_quantity,o.diagnosis->'impact'->>'unit' AS exposed_unit,
-  o.policy->>'actorId' AS requester_id,o.policy->>'id' AS decision_id,o.proposal,o.observe_only
+  o.policy->>'actorId' AS requester_id,o.policy->>'id' AS decision_id,o.proposal,o.observe_only,
+  (SELECT workspace_requires_independent_approval()) AS require_independent_approval
  FROM ordered o WHERE o.attention_reason IS NOT NULL
  AND NOT (o.attention_reason='approval' AND EXISTS (
   SELECT 1 FROM case_proposals p

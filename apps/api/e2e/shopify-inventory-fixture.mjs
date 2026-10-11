@@ -125,6 +125,13 @@ export async function correctionFixture(t, origin = 'http://localhost:3000') {
   const f = await settingsFixture(t, origin, {
     connections: connectionsConfig,
   });
+  // These journeys exercise writes; new workspaces otherwise stay observe-only.
+  await f.request(
+    f.owner,
+    `${f.base}/settings/write-mode`,
+    'PATCH',
+    f.command({ revision: 0, writeMode: 'writes_enabled' }),
+  );
   await f.db.owner.query(
     `GRANT luma_connectors TO "${new URL(f.db.runtimeUrl).username}"`,
   );

@@ -29,6 +29,8 @@ const data: SettingsSnapshot = {
     timezone: 'Europe/Berlin',
     revision: 1,
     alwaysRequireApproval: false,
+    requireIndependentApproval: true,
+    activeMemberCount: 2,
     policyRevision: 0,
     writeMode: 'writes_enabled',
   },
@@ -99,12 +101,14 @@ function Preview({
   member = false,
   roleId,
   team = 'small',
+  solo = false,
 }: {
   section?: SettingsSection;
   state?: 'ready' | 'loading' | 'error' | 'mail-unavailable';
   member?: boolean;
   roleId?: string;
   team?: 'small' | 'large';
+  solo?: boolean;
 }) {
   const [client] = useState(() => {
     const value = new QueryClient({
@@ -142,7 +146,14 @@ function Preview({
               data={
                 state === 'loading' || state === 'error'
                   ? undefined
-                  : { ...data, deliveryAvailable: state !== 'mail-unavailable' }
+                  : {
+                      ...data,
+                      workspace: {
+                        ...data.workspace,
+                        activeMemberCount: solo ? 1 : 2,
+                      },
+                      deliveryAvailable: state !== 'mail-unavailable',
+                    }
               }
               loading={state === 'loading'}
               error={state === 'error' ? m.settings_load_failed() : undefined}
@@ -199,6 +210,10 @@ export const PersonalNotifications: Story = {
 };
 
 export const Approvals: Story = { args: { section: 'approvals' } };
+
+export const SoloApprovals: Story = {
+  args: { section: 'approvals', solo: true },
+};
 
 export const MemberAccess: Story = {
   args: { section: 'workspace', member: true },

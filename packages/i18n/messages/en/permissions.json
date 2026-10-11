@@ -24,7 +24,7 @@
   "permissions_workspace_settings_manage_label": "Edit workspace settings",
   "permissions_workspace_settings_manage_description": "Change the workspace name, display time zone and authoritative sources.",
   "permissions_workspace_approval_policy_manage_label": "Manage approval rules",
-  "permissions_workspace_approval_policy_manage_description": "Decide whether every allowed change needs approval from a second person.",
+  "permissions_workspace_approval_policy_manage_description": "Choose when changes need approval and whether another person must approve.",
   "permissions_members_manage_label": "Manage team members",
   "permissions_members_manage_description": "Invite people, change their role, and remove their access. People can only assign roles whose permissions they hold.",
   "permissions_roles_manage_label": "Manage roles",

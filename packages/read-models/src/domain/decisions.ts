@@ -80,6 +80,7 @@ export function caseDomain(
 /** The compact case facts selected by the exceptions owner's decision query. */
 export interface CaseDecisionFacts {
   observe_only?: boolean;
+  require_independent_approval?: boolean;
   exception_id: string;
   reason: 'approval' | 'manual_intervention' | 'uncertainty';
   requested_at: string;
@@ -142,7 +143,7 @@ export interface DecisionReader {
 /**
  * Presents a case that needs a person. Stale diagnoses keep only their identity; their summary
  * and manual step are withheld as the case inbox does. Approvals are decided by readers who can
- * respond to decisions, except the requester; the other reasons ask the reader to investigate
+ * respond to decisions under the workspace approval rules; the other reasons ask the reader to investigate
  * in the issue, which every reader of the case may open.
  */
 export function presentCase(
@@ -179,7 +180,8 @@ export function presentCase(
     ? 'view_only'
     : facts.reason !== 'approval' || !proposal
       ? 'investigate'
-      : facts.requester_id === reader.id
+      : facts.requester_id === reader.id &&
+          facts.require_independent_approval !== false
         ? 'awaiting_other'
         : reader.can('decisions.respond')
           ? 'decide'
@@ -509,7 +511,7 @@ export function presentSupplierCommitment(
           : `Approve sending ${item.reference} to ${item.supplierName}`,
         why: item.observeOnly
           ? 'Would run when writes are enabled. Luma keeps this proposal and its evidence, but makes no provider changes.'
-          : 'Placing an order with a supplier is an external commitment. Someone who can manage procurement, other than the requester, approves the exact order first.',
+          : 'Placing an order with a supplier is an external commitment. Someone who can manage procurement approves the exact order under the workspace rules first.',
         consequences: item.observeOnly
           ? []
           : [

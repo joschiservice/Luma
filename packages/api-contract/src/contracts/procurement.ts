@@ -257,7 +257,7 @@ export const procurementContract = {
       path: `${path}/submissions/{submissionId}/decision`,
       summary: 'Approve or reject sending an order',
       description:
-        'Requires `procurement.manage` and `decisions.respond`, plus any app permission the purchasing capability declares. Someone other than the requester approves or rejects the exact submission. Approval dispatches it as the requester after their membership, the order and the supplier link are checked again.',
+        'Requires `procurement.manage` and `decisions.respond`, plus any app permission the purchasing capability declares. An authorized person approves or rejects the exact submission under the workspace independent approval setting. Approval dispatches it as the requester after their membership, the order and the supplier link are checked again.',
     })
     .meta({
       access: requires('procurement.manage'),

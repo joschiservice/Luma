@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { processWorkflowId } from '@luma/workflow-temporal';
 import { Client } from 'pg';
 import { expect, it, vi } from 'vitest';
 
@@ -693,3 +694,42 @@ it('reads watched stock once per monitor pass and rereads only a refreshed posit
   spy.mockRestore();
   expect((await f.request('/runs')).items).toEqual([]);
 }, 120000);
+
+it('lets the requester approve replenishment when the team independent approval preference is off', async (t) => {
+  const f = await replenishmentFixture(t);
+  const base = `/v1/organizations/${f.manifest.organizationId}`;
+  const settings = await f.pilot.app.inject({
+    method: 'PATCH',
+    url: `${base}/settings/approvals`,
+    headers: { cookie: f.approverCookie, origin: 'http://127.0.0.1:3000' },
+    payload: {
+      commandId: randomUUID(),
+      revision: 0,
+      alwaysRequireApproval: false,
+      requireIndependentApproval: false,
+    },
+  });
+  expect(settings.statusCode, settings.body).toBe(200);
+  const rule = await f.configure();
+  const run = await f.request('/replenishment/starts', {
+    id: randomUUID(),
+    activationId: rule.id,
+  });
+  await f.waitFor(run.id, 'awaiting_decision');
+  const review = await f.request(`/replenishment/runs/${run.id}`);
+  expect(review.canRespond).toBe(true);
+  expect(
+    (await f.pilot.replenishment.pending(f.actor)).find(
+      (item) => item.runId === run.id,
+    )?.canRespond,
+  ).toBe(true);
+  await f.request(`/replenishment/runs/${run.id}/decision`, {
+    decisionId: review.decisionId,
+    outcome: 'approved',
+  });
+  await f.temporal.client.workflow
+    .getHandle(processWorkflowId(f.manifest.organizationId, run.id))
+    .signal('processDecisionChanged');
+  await f.waitFor(run.id, 'verified');
+  expect((await f.pilot.procurement.orders(f.actor)).items).toHaveLength(1);
+});

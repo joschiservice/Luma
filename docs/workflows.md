@@ -202,7 +202,7 @@ refund and payment follow-ups only reread and hand over.
   for detection to confirm them again. At most 20 runs per workflow are unfinished. The run
   persists before Temporal starts it under its stable ID. Manual starts return 409.
 - **Actions:** the Shopify adapters call the app's correction and recovery services as the
-  run's principal: persisted preview, approval by someone else with `decisions.respond`,
+  run's principal: persisted preview, approval with `decisions.respond` under the [workspace rules](workspace-settings.md#approval-preference),
   execution by the requester, claims, compare-and-set or hold identity, and
   reconciliation. A preview stays open for four hours. A preview whose change differs on a
   fresh read is replaced, at most 12 times, and Needs you keeps one item per target. A

@@ -590,3 +590,197 @@ it('defaults new workspaces to observe-only and audits owner mode commands witho
     },
   ]);
 });
+
+it('lets solo owners approve, preserves team preferences and invalidates reviews when the effective rule changes', async (t) => {
+  const f = await settingsFixture(t);
+  const { request, owner, member, outsider, base, command } = f;
+  const pool = new Pool({ connectionString: f.db.runtimeUrl });
+  t.onTestFinished(() => pool.end());
+  const policies = createPolicies(
+    createTenantDatabase(pool),
+    f.identity.service.refreshContext,
+    async () => {},
+  );
+  const context = await f.identity.service.resolveTenant(
+    { cookie: owner.cookie },
+    f.org.id,
+    randomUUID(),
+  );
+  const memberContext = await f.identity.service.resolveTenant(
+    { cookie: member.cookie },
+    f.org.id,
+    randomUUID(),
+  );
+  const expiresAt = new Date(Date.now() + 600000).toISOString();
+  const action = {
+    schemaVersion: 1,
+    id: randomUUID(),
+    tenantId: f.org.id,
+    capability: 'inventory.write',
+    capabilityVersion: '1',
+    connectionId: randomUUID(),
+    target: { kind: 'sku', id: 'sku-1' },
+    parameters: {},
+    expectedPostcondition: {},
+    preconditions: { evidenceRefs: ['evidence'], validUntil: expiresAt },
+    risk: 'high',
+    proposedBy: { kind: 'user', id: owner.id },
+    expiresAt,
+  };
+  const evaluate = () =>
+    policies.evaluate(context, action, 'c'.repeat(64), {
+      available: true,
+      minimumRisk: 'high',
+      permission: 'actions.execute',
+    });
+  expect((await request(owner, `${base}/settings`)).workspace).toMatchObject({
+    activeMemberCount: 2,
+    requireIndependentApproval: true,
+  });
+  const independentReview = await evaluate();
+  await expect(
+    policies.respond(context, independentReview.id, 'approved', expiresAt),
+  ).rejects.toMatchObject({ statusCode: 403 });
+  const change = command({
+    revision: 0,
+    alwaysRequireApproval: false,
+    requireIndependentApproval: false,
+  });
+  await request(member, `${base}/settings/approvals`, 'PATCH', change, 403);
+  await request(outsider, `${base}/settings/approvals`, 'PATCH', change, 404);
+  const saved = await request(
+    owner,
+    `${base}/settings/approvals`,
+    'PATCH',
+    change,
+  );
+  expect(
+    await request(owner, `${base}/settings/approvals`, 'PATCH', change),
+  ).toEqual(saved);
+  await request(
+    owner,
+    `${base}/settings/approvals`,
+    'PATCH',
+    command({ ...change, revision: 0, requireIndependentApproval: true }),
+    409,
+  );
+  await expect(
+    policies.respond(context, independentReview.id, 'approved', expiresAt),
+  ).rejects.toMatchObject({ statusCode: 409 });
+  const selfReview = await evaluate();
+  expect(selfReview.outcome).toBe('approval_required');
+  await expect(
+    policies.respond(memberContext, selfReview.id, 'approved', expiresAt),
+  ).rejects.toMatchObject({ statusCode: 403 });
+  const selfApproval = await policies.respond(
+    context,
+    selfReview.id,
+    'approved',
+    expiresAt,
+  );
+  expect(selfApproval.approverId).toBe(selfApproval.requesterId);
+  expect((await evaluate()).outcome).toBe('allowed');
+  const events = await f.db.owner.query(
+    "SELECT before_value,after_value FROM workspace_access_events WHERE tenant_id=$1 AND event_type='policy.updated'",
+    [f.org.id],
+  );
+  expect(events.rows).toEqual([
+    {
+      before_value: {
+        required: false,
+        requireIndependentApproval: true,
+        version: 0,
+      },
+      after_value: {
+        required: false,
+        requireIndependentApproval: false,
+        version: 1,
+      },
+    },
+  ]);
+  await request(
+    owner,
+    `${base}/settings/approvals`,
+    'PATCH',
+    command({
+      revision: 1,
+      alwaysRequireApproval: false,
+      requireIndependentApproval: true,
+    }),
+  );
+  expect((await evaluate()).outcome).toBe('approval_required');
+  await request(
+    owner,
+    `${base}/members/${f.membership.id}`,
+    'DELETE',
+    undefined,
+    204,
+  );
+  expect((await request(owner, `${base}/settings`)).workspace).toMatchObject({
+    activeMemberCount: 1,
+    requireIndependentApproval: true,
+  });
+  expect(await policies.requiresIndependentApproval(f.org.id)).toBe(false);
+  const soloReview = await evaluate();
+  await policies.respond(context, soloReview.id, 'approved', expiresAt);
+  expect((await evaluate()).outcome).toBe('allowed');
+  // An invitation does not count as a person who can enter and approve.
+  await request(
+    owner,
+    `${base}/settings/invitations`,
+    'POST',
+    command({ email: outsider.email, roleId: 'admin' }),
+  );
+  expect(await policies.requiresIndependentApproval(f.org.id)).toBe(false);
+  await request(
+    owner,
+    `${base}/members`,
+    'POST',
+    { userId: member.id, roleId: 'admin' },
+    201,
+  );
+  expect(await policies.requiresIndependentApproval(f.org.id)).toBe(true);
+  expect((await evaluate()).outcome).toBe('approval_required');
+  await expect(
+    policies.respond(context, soloReview.id, 'approved', expiresAt),
+  ).rejects.toMatchObject({ statusCode: 409 });
+  // Suspended and disabled people cannot supply the second approval.
+  await f.db.owner.query(
+    "UPDATE memberships SET status='suspended',suspended_at=now(),suspended_by_kind='customer',suspended_by=$2 WHERE tenant_id=$1 AND user_id=$3",
+    [f.org.id, owner.id, member.id],
+  );
+  expect(await policies.requiresIndependentApproval(f.org.id)).toBe(false);
+  await f.db.owner.query(
+    "UPDATE memberships SET status='active',suspended_at=NULL,suspended_by_kind=NULL,suspended_by=NULL WHERE tenant_id=$1 AND user_id=$2",
+    [f.org.id, member.id],
+  );
+  await f.db.owner.query(
+    "INSERT INTO account_disablements(user_id,disabled_by,reason_category,reason) VALUES($1,$2,'other','Fixture account unavailable')",
+    [member.id, randomUUID()],
+  );
+  expect(await policies.requiresIndependentApproval(f.org.id)).toBe(false);
+  expect(
+    (await request(owner, `${base}/settings`)).workspace.activeMemberCount,
+  ).toBe(1);
+  // Exact rejection remains binding when policy changes, including the solo exception.
+  const rejectedAction = { ...action, id: randomUUID() };
+  const rejectedReview = await policies.evaluate(
+    context,
+    rejectedAction,
+    'd'.repeat(64),
+    { available: true, minimumRisk: 'high', permission: 'actions.execute' },
+  );
+  await policies.respond(context, rejectedReview.id, 'rejected', expiresAt);
+  await f.db.owner.query('DELETE FROM account_disablements WHERE user_id=$1', [
+    member.id,
+  ]);
+  expect(
+    (
+      await policies.evaluate(context, rejectedAction, 'd'.repeat(64), {
+        available: true,
+        minimumRisk: 'high',
+        permission: 'actions.execute',
+      })
+    ).reason,
+  ).toBe('approval_rejected');
+});

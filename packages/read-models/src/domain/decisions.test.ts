@@ -183,3 +183,20 @@ it('treats evidence without a validity as unknown', () => {
   expect(evidenceState('2026-09-30T09:00:01.000Z', asOf)).toBe('fresh');
   expect(evidenceState(asOf, asOf)).toBe('stale');
 });
+
+it('allows requesters to respond in Needs you when independent approval is off, with current permission', () => {
+  expect(
+    presentCase(
+      facts({ require_independent_approval: false }),
+      reader('requester', true),
+      asOf,
+    ).response,
+  ).toBe('decide');
+  expect(
+    presentCase(
+      facts({ require_independent_approval: false }),
+      reader('requester', false),
+      asOf,
+    ).response,
+  ).toBe('view_only');
+});

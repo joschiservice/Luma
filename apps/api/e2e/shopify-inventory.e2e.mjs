@@ -320,3 +320,61 @@ test('lost write response survives reload and only reconciles, without replay', 
   assert.equal(verified.state, 'verified');
   assert.equal(mutations.length, 1);
 });
+
+test.for(['solo', 'team preference'])(
+  'allows requester approval for Shopify stock correction with %s',
+  async (mode, t) => {
+    const { f, call, target, mutations } = await correctionFixture(t);
+    if (mode === 'solo') {
+      for (const member of (await f.request(f.owner, `${f.base}/members`))
+        .items)
+        if (member.userId !== f.owner.id)
+          await f.request(
+            f.owner,
+            `${f.base}/members/${member.id}`,
+            'DELETE',
+            undefined,
+            204,
+          );
+    } else {
+      const snapshot = await f.request(f.owner, `${f.base}/settings`);
+      await f.request(
+        f.owner,
+        `${f.base}/settings/approvals`,
+        'PATCH',
+        f.command({
+          revision: snapshot.workspace.policyRevision,
+          alwaysRequireApproval: false,
+          requireIndependentApproval: false,
+        }),
+      );
+    }
+    const preview = await call(f.owner, 'preview', {
+      ...target,
+      requestId: randomUUID(),
+    });
+    assert.equal(preview.state, 'approval_required');
+    assert.equal(preview.canApprove, true);
+    const item = (
+      await f.request(f.owner, `${f.base}/decisions?domain=inventory`)
+    ).items.find((item) => item.requesterId === f.owner.id);
+    assert.equal(item.response, 'decide');
+    await call(f.owner, 'approve', { id: preview.id, outcome: 'approved' });
+    await call(f.owner, 'execute', { id: preview.id });
+    await call(f.owner, 'execute', { id: preview.id });
+    assert.equal(mutations.length, 1);
+    assert.equal(
+      (await call(f.owner, 'check', { id: preview.id })).state,
+      'verified',
+    );
+    const approval = (
+      await f.db.owner.query(
+        'SELECT document FROM policy_approvals WHERE tenant_id=$1 AND proposal_id=$2',
+        [f.org.id, preview.id],
+      )
+    ).rows[0].document;
+    assert.equal(approval.approverId, f.owner.id);
+    assert.equal(approval.requesterId, f.owner.id);
+    assert.ok(approval.policyVersion.endsWith(':self-approval'));
+  },
+);

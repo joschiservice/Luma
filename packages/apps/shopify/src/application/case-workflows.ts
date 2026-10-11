@@ -268,7 +268,7 @@ export function createShopifyCaseWorkflows(deps: {
         'Hand the case to a person when the sources are ambiguous or stale',
         'Stop when Shopify already matches the ERP',
         'Propose setting Shopify to the ERP quantity',
-        'Wait for someone else who can approve changes to approve',
+        'Wait for approval under the workspace rules',
         'Write with compare-and-set and confirm with a fresh Shopify read',
       ],
       success:
@@ -479,7 +479,7 @@ export function createShopifyCaseWorkflows(deps: {
         'Read the fulfillment order and its holds in Shopify',
         'Stop when nothing is held; hand over when several holds or a payment, address or stock hold need their cause fixed',
         'Propose releasing the hold',
-        'Wait for someone else who can approve changes to approve',
+        'Wait for approval under the workspace rules',
         'Release it and confirm in Shopify that it is gone',
       ],
       success:

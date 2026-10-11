@@ -7,7 +7,7 @@ description: Find every approval, manual step and outcome check waiting for a pe
 
 ## What appears here
 
-- **Approvals**: a proposed change that needs approval from someone other than the person who requested it, such as an issue fix, a purchase order drafted by replenishment, sending a purchase order, a Shopify stock correction or a fulfillment recovery. A supplier’s changed quantity or date waits here too, to be accepted or followed up.
+- **Approvals**: a proposed change that needs approval under your [workspace rules](/docs/workspace-settings#approvals), such as an issue fix, a purchase order drafted by replenishment, sending a purchase order, a Shopify stock correction or a fulfillment recovery. A supplier’s changed quantity or date waits here too, to be accepted or followed up.
 - **Ready to run**: an approved Shopify change that only its requester can send, before it expires.
 - **Outcome checks**: a change the connected system accepted, or whose outcome is unclear, that no separate check has confirmed yet. Accepted isn’t the same as verified.
 - **Manual steps**: work Luma can’t do itself, such as a correction in your ERP, chasing a supplier whose confirmation or delivery is overdue, or a follow-up a [Workflow](/docs/workflows) handed to a person, like a return still waiting for its refund.
@@ -35,18 +35,18 @@ Impact Luma hasn’t assessed is labeled **Impact not assessed** instead of bein
 
 ## What each status means
 
-| Status                           | What it means                                                                                   |
-| -------------------------------- | ----------------------------------------------------------------------------------------------- |
-| **Needs your approval**          | You can approve or reject this change.                                                          |
-| **Ready for you to run**         | You requested this change and it’s approved. Send it before it expires.                         |
-| **Check the outcome**            | The change was sent, but no check has confirmed its result.                                     |
-| **Needs a manual step**          | Someone has to act outside Luma or on the record.                                               |
-| **Needs review**                 | The evidence is unclear, or someone escalated the issue.                                        |
-| **Proposal expired**             | The approval window closed before anyone answered. Open the issue or record to review it again. |
-| **Waiting for another approver** | You requested this change, so someone else has to approve it. You can follow it here.           |
-| **Waiting for the requester**    | It’s approved, and only the person who requested it can run it.                                 |
-| **Waiting for an approver**      | Your role can see this decision but can’t respond to it.                                        |
-| **Outcome not confirmed**        | The result isn’t confirmed yet, and your role can’t act on it.                                  |
+| Status                           | What it means                                                                                        |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **Needs your approval**          | You can approve or reject this change.                                                               |
+| **Ready for you to run**         | You requested this change and it’s approved. Send it before it expires.                              |
+| **Check the outcome**            | The change was sent, but no check has confirmed its result.                                          |
+| **Needs a manual step**          | Someone has to act outside Luma or on the record.                                                    |
+| **Needs review**                 | The evidence is unclear, or someone escalated the issue.                                             |
+| **Proposal expired**             | The approval window closed before anyone answered. Open the issue or record to review it again.      |
+| **Waiting for another approver** | Your workspace requires another person to approve this change you requested. You can follow it here. |
+| **Waiting for the requester**    | It’s approved, and only the person who requested it can run it.                                      |
+| **Waiting for an approver**      | Your role can see this decision but can’t respond to it.                                             |
+| **Outcome not confirmed**        | The result isn’t confirmed yet, and your role can’t act on it.                                       |
 
 ## Respond to a decision
 

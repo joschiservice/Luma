@@ -25,6 +25,8 @@ export interface DeskSnapshot {
   observeOnly?: boolean;
   policyStale?: boolean;
   effectivePolicyVersion?: string;
+  /** Defaults to independent approval when a storage adapter omits the preference. */
+  requireIndependentApproval?: boolean;
   incident: Incident;
   revision: number;
   diagnosis: Diagnosis | null;
@@ -196,7 +198,8 @@ export function createDeskService(deps: DeskDependencies) {
       d.actionHash === p.actionHash &&
       d.outcome === 'approval_required' &&
       d.policyVersion === (s.effectivePolicyVersion ?? currentPolicyVersion) &&
-      d.actorId !== context.actor.id &&
+      (s.requireIndependentApproval === false ||
+        d.actorId !== context.actor.id) &&
       Date.parse(p.action.expiresAt) > deps.now().getTime() &&
       Date.parse(p.action.preconditions.validUntil) > deps.now().getTime() &&
       (s.diagnosis.provenance.validUntil === null ||

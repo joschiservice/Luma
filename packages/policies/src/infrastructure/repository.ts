@@ -1,5 +1,5 @@
 import { IdentityError } from '@luma/identity';
-import type { TenantDatabase } from '@luma/platform';
+import type { SqlTransaction, TenantDatabase } from '@luma/platform';
 
 import type { PolicyRepository } from '../application/policies.js';
 import type {
@@ -17,14 +17,7 @@ export function createPolicyRepository(db: TenantDatabase): PolicyRepository {
   return {
     workspacePolicy: (tenantId) =>
       db.transaction(tenantId, async (tx) => {
-        const row = (
-          await tx.query<{ revision: number; required: boolean }>(
-            'SELECT policy_revision AS revision,always_require_approval AS required FROM workspace_settings WHERE tenant_id=$1',
-            [tenantId],
-          )
-        ).rows[0];
-
-        return row ?? { revision: 0, required: false };
+        return readWorkspacePolicy(tx, tenantId);
       }),
     pending: (tenantId) =>
       db.transaction(tenantId, async (tx) => {
@@ -86,14 +79,13 @@ export function createPolicyRepository(db: TenantDatabase): PolicyRepository {
         await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
           `exceptions:${approval.tenantId}`,
         ]);
-        const current =
-          (
-            await tx.query<{ revision: number }>(
-              'SELECT policy_revision AS revision FROM workspace_settings WHERE tenant_id=$1',
-              [approval.tenantId],
-            )
-          ).rows[0]?.revision ?? 0;
-        if (workspacePolicyVersion(current) !== approval.policyVersion)
+        const current = await readWorkspacePolicy(tx, approval.tenantId);
+        if (
+          workspacePolicyVersion(
+            current.revision,
+            current.requireIndependentApproval,
+          ) !== approval.policyVersion
+        )
           throw new IdentityError(
             409,
             'CONFLICT',
@@ -132,4 +124,20 @@ export function createPolicyRepository(db: TenantDatabase): PolicyRepository {
         return saved;
       }),
   };
+}
+
+/** Reads the preference and membership exception in the same database snapshot. */
+async function readWorkspacePolicy(tx: SqlTransaction, tenantId: string) {
+  const result = await tx.query<{
+    revision: number;
+    required: boolean;
+    requireIndependentApproval: boolean;
+  }>(
+    `SELECT COALESCE(s.policy_revision,0) AS revision,COALESCE(s.always_require_approval,false) AS required,
+    workspace_requires_independent_approval() AS "requireIndependentApproval"
+    FROM (SELECT $1::uuid AS tenant_id) t LEFT JOIN workspace_settings s ON s.tenant_id=t.tenant_id`,
+    [tenantId],
+  );
+
+  return result.rows[0]!;
 }

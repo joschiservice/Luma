@@ -7,6 +7,9 @@ export interface WorkspaceSettings {
   timezone: string;
   revision: number;
   alwaysRequireApproval: boolean;
+  /** Team preference; the rule is off while fewer than two members have access. */
+  requireIndependentApproval: boolean;
+  activeMemberCount: number;
   policyRevision: number;
   writeMode: 'observe_only' | 'writes_enabled';
 }

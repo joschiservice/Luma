@@ -36,7 +36,7 @@ export const decisionsContract = {
       path: '/v1/organizations/{organizationId}/decisions/assignments',
       summary: 'Assign a decision',
       description:
-        'Take, hand over or release a decision in the Needs you queue. Taking an unassigned decision or releasing your own needs permission to take decisions; assigning any decision to a current member needs permission to assign decisions. Send the `revision` from the item’s assignment (0 when unassigned); a changed assignment returns 409. The decision must currently need a person. Assigning does not grant approval authority: the owner still checks permissions and requires an approver different from the requester.',
+        'Take, hand over or release a decision in the Needs you queue. Taking an unassigned decision or releasing your own needs permission to take decisions; assigning any decision to a current member needs permission to assign decisions. Send the `revision` from the item’s assignment (0 when unassigned); a changed assignment returns 409. The decision must currently need a person. Assigning does not grant approval authority: the owner still checks permissions and applies the workspace’s independent approval setting.',
     })
     .meta({
       access: requires(['decisions.self_assign', 'decisions.assign']),

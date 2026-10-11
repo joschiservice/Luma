@@ -32,8 +32,7 @@ per tenant need a maintained progress projection.
 A submission needs a Luma-owned draft or open order, a supplier linked to an active
 connection granted `purchase-orders.submit` and `purchase-orders.read`, and every line SKU
 mapped to an item on that connection. Luma stores the submission and asks Action Admission
-to bind the exact high-risk `purchase-orders.submit` action. Policy then requires someone
-else with `decisions.respond` and the purchasing capability's permission, such as
+to bind the exact high-risk `purchase-orders.submit` action. Policy then requires approval under the [workspace rules](workspace-settings.md#approval-preference), with `decisions.respond` and the purchasing capability's permission, such as
 `jtl:purchase_orders.submit`. Requests expire after 24 hours.
 
 Approval dispatches immediately as the requester through a resolved workflow context; the

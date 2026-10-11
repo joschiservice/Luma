@@ -18,7 +18,7 @@ type Stage = Pick<
   'reason' | 'response' | 'why' | 'consequences' | 'deadline'
 >;
 
-// Shared lifecycle wording for Shopify actions: a second approver, a run by the requester, then
+// Shared lifecycle wording for Shopify actions: approval, a run by the requester, then
 // an independent read. A receipt is never presented as the outcome.
 function stage(
   view: RecoveryView | CorrectionView,
@@ -66,7 +66,7 @@ function stage(
       deadline: view.expiresAt,
       why:
         view.requesterId === actorId
-          ? 'Approved by someone else. Only you, as the requester, can run it before it expires.'
+          ? 'Approved. Only you, as the requester, can run it before it expires.'
           : 'Approved. Only the person who requested it can run it before it expires.',
       consequences: [
         {
@@ -84,7 +84,7 @@ function stage(
         ? 'awaiting_other'
         : 'view_only',
     deadline: view.expiresAt,
-    why: 'Changing Shopify needs someone else who can approve changes to approve this exact action before the requester can run it.',
+    why: 'Changing Shopify needs someone with approval permission to approve this exact action under the workspace rules before the requester can run it.',
     consequences: [
       {
         response: 'Approve',

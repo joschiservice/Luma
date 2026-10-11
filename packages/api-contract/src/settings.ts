@@ -9,6 +9,9 @@ export const workspaceSettingsSchema = z.object({
   timezone: z.string(),
   revision: z.number().int(),
   alwaysRequireApproval: z.boolean(),
+  /** Team preference; ignored while fewer than two members have access. */
+  requireIndependentApproval: z.boolean(),
+  activeMemberCount: z.number().int().nonnegative(),
   policyRevision: z.number().int(),
   writeMode: z.enum(['observe_only', 'writes_enabled']),
 });

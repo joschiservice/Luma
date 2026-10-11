@@ -3,7 +3,7 @@
 The Shopify app offers two governed writes: **fulfillment recovery** (release a hold,
 reopen, or move remaining items) and **inventory corrections** (set Shopify's available
 quantity from a selected JTL ERP source). Both run as exact, persisted previews that
-another person approves, dispatch through shared policy, audit, Action Admission and
+someone with approval permission approves under the [workspace rules](workspace-settings.md#approval-preference), dispatch through shared policy, audit, Action Admission and
 execution, and count as done only after an independent Shopify read verifies the outcome.
 Code: `@luma/app-shopify`.
 

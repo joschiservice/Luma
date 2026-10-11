@@ -206,7 +206,7 @@ export const workflowsContract = {
       path: `${path}/{definitionId}/replenishment/runs/{runId}`,
       summary: 'Review a replenishment run',
       description:
-        'Returns recorded stock, supplier, policy decision, current purchase-order status and independent verification. Only someone other than the requester with `procurement.manage` and `decisions.respond` can respond to a pending proposal.',
+        'Returns recorded stock, supplier, policy decision, current purchase-order status and independent verification. Responding to a pending proposal requires `procurement.manage` and `decisions.respond` and follows the workspace independent approval setting.',
     })
     .meta({
       access: requires('procurement.read'),
@@ -220,7 +220,7 @@ export const workflowsContract = {
       path: `${path}/{definitionId}/replenishment/runs/{runId}/decision`,
       summary: 'Approve or reject a replenishment proposal',
       description:
-        'Requires `procurement.manage` and `decisions.respond`. Someone other than the requester decides on the exact proposal. Current stock, activation and policy are checked again before creating the order.',
+        'Requires `procurement.manage` and `decisions.respond`. The approver decides on the exact proposal under the workspace independent approval setting. Current stock, activation and policy are checked again before creating the order.',
     })
     .meta({
       access: requires('procurement.manage'),
@@ -337,7 +337,7 @@ export const workflowsContract = {
       path: `${path}/{definitionId}/case-activations`,
       summary: 'Turn on a case workflow',
       description:
-        'Requires `workflows.publish`. Lets a built-in workflow start a run for each new case of its issue type. Runs act as the caller; every change still needs policy approval by someone else who can approve changes. Review the exact version digest and policy version. Reuse the same ID and body after an uncertain response. A second active activation returns 409.',
+        'Requires `workflows.publish`. Lets a built-in workflow start a run for each new case of its issue type. Runs act as the caller; every change still needs policy approval under the workspace rules. Review the exact version digest and policy version. Reuse the same ID and body after an uncertain response. A second active activation returns 409.',
     })
     .meta({
       access: requires('workflows.publish'),
