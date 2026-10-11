@@ -8,6 +8,7 @@ import {
   DragOverlay,
   type DragStartEvent,
   KeyboardSensor,
+  MeasuringStrategy,
   PointerSensor,
   pointerWithin,
   rectIntersection,
@@ -307,6 +308,11 @@ export function WorkflowBuilder({
     <DndContext
       sensors={sensors}
       collisionDetection={collide}
+      // Slots grow once a drag starts, and validation results can shift the page during it, so
+      // drop targets are re-measured while dragging to keep hit areas on the slots people see.
+      measuring={{
+        droppable: { strategy: MeasuringStrategy.Always, frequency: 100 },
+      }}
       accessibility={{
         announcements,
         screenReaderInstructions: {
