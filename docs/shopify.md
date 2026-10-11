@@ -159,6 +159,21 @@ revoked ones.
    the tunnel running for webhook delivery; afterwards stop it with
    `tailscale funnel --https=443 off`.
 
+### Query cost check
+
+The Shopify contract test keeps every read query under Shopify's 1,000-point query limit using
+the simulator's cost model. `pnpm shopify:cost-check` checks that model against a real store: it
+reads every capability once at the largest page a sync requests and lists, per query, the
+requested cost Shopify reports beside the simulator's estimate. It fails when a read fails or
+the simulator estimates less than Shopify charges; then correct the model in
+`packages/simulator/shopify`. It only reads.
+
+Run it against a development store with synthetic data. Set `SHOPIFY_COST_CHECK_SHOP` to the
+store domain and `SHOPIFY_COST_CHECK_TOKEN` to an Admin API access token with the read scopes
+Luma requests, in the shell rather than a committed file. Follow-up queries for line items and
+other nested lists run only when a record has more than a first page, so include an order with
+more than eight lines. Run it after changing a read selection or the API version.
+
 Use a separate custom-distribution app only for an eligible live merchant pilot, in a
 separate database and environment. Custom distribution cannot convert to public; the
 merchant later installs the public app and reconnects.

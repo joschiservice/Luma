@@ -15,6 +15,7 @@
     "dev/environment.mjs",
     "dev/test-plan.mjs",
     "dev/affected.mjs",
-    "evaluation/state.mjs"
+    "evaluation/state.mjs",
+    "shopify/read-costs.mjs"
   ]
 }

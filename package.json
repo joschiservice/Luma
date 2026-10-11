@@ -49,6 +49,7 @@
     "observe:queries": "node tooling/observability/queries.mjs",
     "evaluate:playbook": "pnpm exec turbo run build --filter=@luma/resolution... --filter=@luma/simulator... && node tooling/evaluation/cli.mjs",
     "test:evaluation": "pnpm exec turbo run build --filter=@luma/resolution... --filter=@luma/simulator... && node --test tooling/evaluation/*.test.mjs",
+    "shopify:cost-check": "pnpm exec turbo run build --filter=@luma/tooling^... && node tooling/shopify/cost-check.mjs",
     "capture:incident": "pnpm exec turbo run build --filter=@luma/resolution... && node tooling/evaluation/capture-cli.mjs",
     "apps:sync": "node tooling/apps/generate.mjs && eslint --fix packages/app-catalog/src/generated.ts && prettier --write packages/app-catalog/src/generated.ts",
     "simulator:replenishment": "pnpm test:e2e replenishment.e2e.mjs",
