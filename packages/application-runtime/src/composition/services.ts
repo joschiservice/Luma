@@ -163,7 +163,8 @@ export function createCommerceServices(database: string | TenantDatabase) {
         ? orders.missing(context, kind, ids)
         : kind === 'customer' ||
             kind === 'supplier' ||
-            kind === 'purchase_order'
+            kind === 'purchase_order' ||
+            kind === 'return_reason'
           ? ids
           : inventory.missing(context, kind, ids),
     );

@@ -22,6 +22,7 @@ import { procurementContextContract } from './contracts/procurement-context.js';
 import { productsContract } from './contracts/products.js';
 import { connectorProvidersContract } from './contracts/providers.js';
 import { recordsContract } from './contracts/records.js';
+import { returnCasesContract } from './contracts/return-cases.js';
 import { returnsContract } from './contracts/returns.js';
 import { rolesContract } from './contracts/roles.js';
 import { settingsContract } from './contracts/settings.js';
@@ -64,6 +65,7 @@ export const apiContract = {
   products: productsContract,
   orders: ordersContract,
   returns: returnsContract,
+  returnCases: returnCasesContract,
   customers: customersContract,
   sync: syncContract,
   decisions: decisionsContract,
@@ -183,6 +185,8 @@ export * from './fulfillment.js';
 export * from './products.js';
 
 export * from './returns.js';
+
+export * from './return-cases.js';
 
 export * from './customers.js';
 

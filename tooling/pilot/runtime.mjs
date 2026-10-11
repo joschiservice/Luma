@@ -51,6 +51,7 @@ import {
   createInstallationVerifier,
   createInstalledConnections,
   createInstalledPurchaseOrderRuntime,
+  createInstalledReturnRuntime,
   createInstalledRuntime,
   createInstalledShippingMethodEffects,
 } from '../apps/providers.mjs';
@@ -454,6 +455,10 @@ export async function createPilot(
         ? {
             purchasing: {
               runtime: createInstalledPurchaseOrderRuntime(installedOptions),
+              installations,
+            },
+            returns: {
+              runtime: createInstalledReturnRuntime(installedOptions),
               installations,
             },
           }

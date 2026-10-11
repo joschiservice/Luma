@@ -11,7 +11,7 @@ export const dependencies = {
   federation: [],
   staff: ['platform', 'identity', 'federation'],
   audit: ['platform'],
-  orders: ['platform', 'identity'],
+  orders: ['platform', 'identity', 'audit', 'policies'],
   procurement: [
     'platform',
     'identity',

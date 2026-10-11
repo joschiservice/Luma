@@ -56,8 +56,9 @@ grants:
   only to simulated installations; a live installation requesting them stays degraded
   until a custom verifier backed by confirmed grants and a sandbox smoke test exists.
   Shopify installations reject these permissions. See [JTL](jtl.md#shipping-method-correction).
-- **JTL purchase-order submission** is likewise granted only to simulated installations
-  (see [JTL](jtl.md#purchase-orders)).
+- **JTL purchase-order submission** and **return creation** are likewise granted only to
+  simulated installations (see [JTL](jtl.md#purchase-orders) and
+  [JTL returns](jtl.md#returns)).
 - **Shopify fulfillment recovery and inventory corrections** need the corresponding
   Shopify write scopes; see [Shopify actions](shopify-actions.md).
 

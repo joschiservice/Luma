@@ -184,6 +184,15 @@ export const permissionCatalog = [
     introduced,
   },
   {
+    key: 'returns.manage',
+    group: 'records',
+    label: 'Manage returns',
+    description:
+      'Open return cases, record receipt and inspection, propose resolutions, and request returns in connected systems.',
+    consequential: true,
+    introduced: '2026-10-11',
+  },
+  {
     key: 'insights.read',
     group: 'records',
     label: 'View insights',

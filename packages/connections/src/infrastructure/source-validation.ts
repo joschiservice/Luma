@@ -42,6 +42,7 @@ export const sourceSchema = external
       'refund',
       'supplier',
       'purchase_order',
+      'return_reason',
     ]),
   })
   .strict();

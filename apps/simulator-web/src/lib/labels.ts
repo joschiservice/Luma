@@ -30,6 +30,9 @@ export const knownOperations = [
   'suppliers.read',
   'purchase-orders.read',
   'purchase-orders.submit',
+  'returns.options.read',
+  'returns.created.read',
+  'returns.create',
 ];
 
 /** What a planned incident waits for, by kind. */

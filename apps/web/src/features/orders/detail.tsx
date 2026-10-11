@@ -37,6 +37,7 @@ import { AppExtension } from '../apps/extension';
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
 import { recordReturnPath } from '../records/data';
+import { OrderReturnCases } from '../returns/case-entry';
 import { OrderReturns } from '../returns/order-returns';
 import { orderFilters, orderOptions, type OrdersSearch } from './data';
 import { OrderIdentityLinks } from './identity-links';
@@ -137,6 +138,19 @@ export function OrderPage() {
               : 'unavailable'
       }
       refresh={() => void query.refetch()}
+      returnCases={
+        query.data ? (
+          <OrderReturnCases
+            organizationId={organizationId}
+            orderId={query.data.order.id}
+            sourceLabel={(connectionId) =>
+              query.data.sources.find(
+                (source) => source.connectionId === connectionId,
+              )?.label ?? m.returns_source_fallback()
+            }
+          />
+        ) : null
+      }
       linkedSources={
         query.data ? (
           <OrderIdentityLinks
@@ -177,6 +191,7 @@ export function OrderDetailView({
   refresh,
   sourceContext,
   linkedSources,
+  returnCases,
 }: {
   organizationId: string;
   search: OrdersSearch;
@@ -186,6 +201,8 @@ export function OrderDetailView({
   error?: OrderError | undefined;
   refresh: () => void;
   linkedSources?: ReactNode;
+  /** The order's return cases and the control to open one. */
+  returnCases?: ReactNode;
   sourceContext?: (source: OrderSourceFacts) => ReactNode;
 }) {
   const timeZone = useContext(WorkspaceTimezone);
@@ -291,6 +308,7 @@ export function OrderDetailView({
               detail={detail}
               organizationId={organizationId}
               from={here}
+              cases={returnCases}
             />
             {contexts.map(({ source, content }) => (
               <OrderSection

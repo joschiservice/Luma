@@ -62,6 +62,7 @@ import { Route as AppOrganizationIdAppsAppIdSettingsRouteImport } from './routes
 import { Route as AppOrganizationIdExceptionsExceptionIdDetailRouteImport } from './routes/app.$organizationId.exceptions_.$exceptionId.detail'
 import { Route as AppOrganizationIdProcurementSuppliersSupplierIdRouteImport } from './routes/app.$organizationId.procurement.suppliers.$supplierId'
 import { Route as AppOrganizationIdRecordsKindRecordIdRouteImport } from './routes/app.$organizationId.records.$kind.$recordId'
+import { Route as AppOrganizationIdReturnsCasesCaseIdRouteImport } from './routes/app.$organizationId.returns.cases.$caseId'
 import { Route as AppOrganizationIdWorkflowsDraftsDraftIdRouteImport } from './routes/app.$organizationId.workflows.drafts.$draftId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -365,6 +366,12 @@ const AppOrganizationIdRecordsKindRecordIdRoute =
     path: '/records/$kind/$recordId',
     getParentRoute: () => AppOrganizationIdRoute,
   } as any)
+const AppOrganizationIdReturnsCasesCaseIdRoute =
+  AppOrganizationIdReturnsCasesCaseIdRouteImport.update({
+    id: '/returns/cases/$caseId',
+    path: '/returns/cases/$caseId',
+    getParentRoute: () => AppOrganizationIdRoute,
+  } as any)
 const AppOrganizationIdWorkflowsDraftsDraftIdRoute =
   AppOrganizationIdWorkflowsDraftsDraftIdRouteImport.update({
     id: '/workflows/drafts/$draftId',
@@ -426,6 +433,7 @@ export interface FileRoutesByFullPath {
   '/app/$organizationId/exceptions/$exceptionId/detail': typeof AppOrganizationIdExceptionsExceptionIdDetailRoute
   '/app/$organizationId/procurement/suppliers/$supplierId': typeof AppOrganizationIdProcurementSuppliersSupplierIdRoute
   '/app/$organizationId/records/$kind/$recordId': typeof AppOrganizationIdRecordsKindRecordIdRoute
+  '/app/$organizationId/returns/cases/$caseId': typeof AppOrganizationIdReturnsCasesCaseIdRoute
   '/app/$organizationId/workflows/drafts/$draftId': typeof AppOrganizationIdWorkflowsDraftsDraftIdRoute
 }
 export interface FileRoutesByTo {
@@ -481,6 +489,7 @@ export interface FileRoutesByTo {
   '/app/$organizationId/exceptions/$exceptionId/detail': typeof AppOrganizationIdExceptionsExceptionIdDetailRoute
   '/app/$organizationId/procurement/suppliers/$supplierId': typeof AppOrganizationIdProcurementSuppliersSupplierIdRoute
   '/app/$organizationId/records/$kind/$recordId': typeof AppOrganizationIdRecordsKindRecordIdRoute
+  '/app/$organizationId/returns/cases/$caseId': typeof AppOrganizationIdReturnsCasesCaseIdRoute
   '/app/$organizationId/workflows/drafts/$draftId': typeof AppOrganizationIdWorkflowsDraftsDraftIdRoute
 }
 export interface FileRoutesById {
@@ -538,6 +547,7 @@ export interface FileRoutesById {
   '/app/$organizationId/exceptions_/$exceptionId/detail': typeof AppOrganizationIdExceptionsExceptionIdDetailRoute
   '/app/$organizationId/procurement/suppliers/$supplierId': typeof AppOrganizationIdProcurementSuppliersSupplierIdRoute
   '/app/$organizationId/records/$kind/$recordId': typeof AppOrganizationIdRecordsKindRecordIdRoute
+  '/app/$organizationId/returns/cases/$caseId': typeof AppOrganizationIdReturnsCasesCaseIdRoute
   '/app/$organizationId/workflows/drafts/$draftId': typeof AppOrganizationIdWorkflowsDraftsDraftIdRoute
 }
 export interface FileRouteTypes {
@@ -596,6 +606,7 @@ export interface FileRouteTypes {
     | '/app/$organizationId/exceptions/$exceptionId/detail'
     | '/app/$organizationId/procurement/suppliers/$supplierId'
     | '/app/$organizationId/records/$kind/$recordId'
+    | '/app/$organizationId/returns/cases/$caseId'
     | '/app/$organizationId/workflows/drafts/$draftId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -651,6 +662,7 @@ export interface FileRouteTypes {
     | '/app/$organizationId/exceptions/$exceptionId/detail'
     | '/app/$organizationId/procurement/suppliers/$supplierId'
     | '/app/$organizationId/records/$kind/$recordId'
+    | '/app/$organizationId/returns/cases/$caseId'
     | '/app/$organizationId/workflows/drafts/$draftId'
   id:
     | '__root__'
@@ -707,6 +719,7 @@ export interface FileRouteTypes {
     | '/app/$organizationId/exceptions_/$exceptionId/detail'
     | '/app/$organizationId/procurement/suppliers/$supplierId'
     | '/app/$organizationId/records/$kind/$recordId'
+    | '/app/$organizationId/returns/cases/$caseId'
     | '/app/$organizationId/workflows/drafts/$draftId'
   fileRoutesById: FileRoutesById
 }
@@ -1097,6 +1110,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrganizationIdRecordsKindRecordIdRouteImport
       parentRoute: typeof AppOrganizationIdRoute
     }
+    '/app/$organizationId/returns/cases/$caseId': {
+      id: '/app/$organizationId/returns/cases/$caseId'
+      path: '/returns/cases/$caseId'
+      fullPath: '/app/$organizationId/returns/cases/$caseId'
+      preLoaderRoute: typeof AppOrganizationIdReturnsCasesCaseIdRouteImport
+      parentRoute: typeof AppOrganizationIdRoute
+    }
     '/app/$organizationId/workflows/drafts/$draftId': {
       id: '/app/$organizationId/workflows/drafts/$draftId'
       path: '/workflows/drafts/$draftId'
@@ -1159,6 +1179,7 @@ interface AppOrganizationIdRouteChildren {
   AppOrganizationIdExceptionsExceptionIdDetailRoute: typeof AppOrganizationIdExceptionsExceptionIdDetailRoute
   AppOrganizationIdProcurementSuppliersSupplierIdRoute: typeof AppOrganizationIdProcurementSuppliersSupplierIdRoute
   AppOrganizationIdRecordsKindRecordIdRoute: typeof AppOrganizationIdRecordsKindRecordIdRoute
+  AppOrganizationIdReturnsCasesCaseIdRoute: typeof AppOrganizationIdReturnsCasesCaseIdRoute
   AppOrganizationIdWorkflowsDraftsDraftIdRoute: typeof AppOrganizationIdWorkflowsDraftsDraftIdRoute
 }
 
@@ -1212,6 +1233,8 @@ const AppOrganizationIdRouteChildren: AppOrganizationIdRouteChildren = {
     AppOrganizationIdProcurementSuppliersSupplierIdRoute,
   AppOrganizationIdRecordsKindRecordIdRoute:
     AppOrganizationIdRecordsKindRecordIdRoute,
+  AppOrganizationIdReturnsCasesCaseIdRoute:
+    AppOrganizationIdReturnsCasesCaseIdRoute,
   AppOrganizationIdWorkflowsDraftsDraftIdRoute:
     AppOrganizationIdWorkflowsDraftsDraftIdRoute,
 }

@@ -54,6 +54,10 @@ const permissionText: Record<
     m.permissions_returns_read_label,
     m.permissions_returns_read_description,
   ],
+  'returns.manage': [
+    m.permissions_returns_manage_label,
+    m.permissions_returns_manage_description,
+  ],
   'insights.read': [
     m.permissions_insights_read_label,
     m.permissions_insights_read_description,
@@ -153,6 +157,10 @@ const permissionText: Record<
   'jtl:orders.shipping_method.write': [
     m.permissions_jtl_orders_shipping_method_write_label,
     m.permissions_jtl_orders_shipping_method_write_description,
+  ],
+  'jtl:returns.create': [
+    m.permissions_jtl_returns_create_label,
+    m.permissions_jtl_returns_create_description,
   ],
 };
 

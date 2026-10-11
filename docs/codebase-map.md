@@ -18,7 +18,7 @@ conventions only; it does not list files.
 | Installed connections, credentials, capabilities, observations   | `@luma/connections`                                                                      |
 | Provider apps (setup, adapters, OAuth, webhooks, app UI)         | `packages/apps/<id>`, contracts in `@luma/app-host`, registration in `@luma/app-catalog` |
 | Provider protocol clients                                        | `packages/connectors/*`                                                                  |
-| Canonical orders, fulfillment, returns, refunds                  | `@luma/orders`                                                                           |
+| Canonical orders, fulfillment, returns, refunds, return cases    | `@luma/orders`                                                                           |
 | Canonical SKUs, locations, stock, product catalog rows           | `@luma/inventory`                                                                        |
 | Customer profiles                                                | `@luma/customers`                                                                        |
 | Observation → canonical projection                               | `@luma/commerce-ingestion`                                                               |

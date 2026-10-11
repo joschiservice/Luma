@@ -42,6 +42,9 @@ export const capabilities = localized({
   'suppliers.read': m.connections_capability_suppliers_read,
   'purchase-orders.read': m.connections_capability_purchase_orders_read,
   'purchase-orders.submit': m.connections_capability_purchase_orders_submit,
+  'returns.options.read': m.connections_capability_returns_options_read,
+  'returns.created.read': m.connections_capability_returns_created_read,
+  'returns.create': m.connections_capability_returns_create,
 } satisfies Record<InstallationCapability, () => string>);
 
 export const statuses = localized({

@@ -36,6 +36,7 @@ export type {
   NoteRecord,
   OrderRecord,
   PurchaseOrderRecord,
+  ReturnRecord,
   SupplierRecord,
 } from './records.js';
 

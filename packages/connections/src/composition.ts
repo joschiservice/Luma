@@ -57,13 +57,16 @@ export { createSecretCipher, createInstallationRepository };
 
 export {
   createInstalledPurchaseOrderRuntime,
+  createInstalledReturnRuntime,
   createInstalledRuntime,
   createInstalledShippingMethodEffects,
 } from './infrastructure/installations/runtime.js';
 
 export type {
   InstalledPurchaseOrderRuntime,
+  InstalledReturnRuntime,
   InstalledRuntimeOptions,
+  ReturnCreationBinding,
 } from './infrastructure/installations/runtime.js';
 
 export type { StoredInstallation } from './application/installations.js';

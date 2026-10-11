@@ -2,6 +2,7 @@ import { customerFor } from './customers.js';
 import {
   allocate,
   cents,
+  COMPANY_ID,
   configId,
   iso,
   type JtlContext,
@@ -363,6 +364,7 @@ export function salesOrderJson(order: OrderRecord) {
     id: Number(order.id),
     salesOrderNumber: order.number,
     externalSalesOrderNumber: order.externalNumber,
+    companyId: Number(COMPANY_ID),
     customerId: order.customerId ? Number(order.customerId) : null,
     isCancelled: order.cancelled,
     deliveryStatus: deliveryStatus(order),

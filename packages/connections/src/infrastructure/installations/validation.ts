@@ -16,6 +16,9 @@ export const installationPermissions = z.enum([
   'suppliers.read',
   'purchase-orders.read',
   'purchase-orders.submit',
+  'returns.options.read',
+  'returns.created.read',
+  'returns.create',
 ]);
 
 export const installationTarget = z

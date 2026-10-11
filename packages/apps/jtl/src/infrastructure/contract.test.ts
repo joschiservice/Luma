@@ -7,6 +7,7 @@ import { cloudPayload } from './fixtures/cloud.js';
 import commerce from './fixtures/commerce.json' with { type: 'json' };
 import api from './fixtures/erp-2.2.json' with { type: 'json' };
 import { acceptanceId } from './purchase-orders.js';
+import { lumaReturnMarker, returnAcceptanceId } from './returns.js';
 import * as s from './schemas.js';
 import {
   shippingMethodResponse,
@@ -398,6 +399,136 @@ describe('JTL 2.2 published contract', () => {
     });
     expect(resolve(api.purchaseOrderCreate.request).required).toEqual(
       expect.arrayContaining(['supplierId', 'requestedDeliveryDate', 'items']),
+    );
+  });
+
+  it('pins the consumed return projections, filters and scopes', () => {
+    const id = cloudIdForContract;
+    validate(
+      s.salesOrderCompany.parse({ id, companyId: id, isCancelled: false }),
+      response('/v2/sales-orders/{salesOrderId}'),
+    );
+    validate(
+      s.warehouse.parse({ id, name: 'Hamburg', active: true }),
+      response('/v2/warehouses', true),
+    );
+    validate(
+      s.returnReason.parse({
+        id,
+        translations: [{ languageIso: 'EN', name: 'Defective' }],
+      }),
+      resolve(response('/v2/return-reasons')).items!,
+    );
+    validate(
+      s.returnRow.parse({
+        id,
+        number: 'RE-1',
+        returnDate: '2026-10-01T08:00:00Z',
+        externalNumber: 'luma-rc:case',
+        salesOrderId: id,
+        warehouseId: id,
+      }),
+      response('/v2/returns', true),
+    );
+    validate(
+      s.returnLine.parse({
+        id,
+        returnId: id,
+        quantity: 1.5,
+        returnReasonId: id,
+        salesOrderLineItemId: id,
+      }),
+      resolve(response('/v2/returns/{returnId}/line-items')).items!,
+    );
+    validate(s.returnCreated.parse({ id }), api.returnCreate.response);
+    expect(api.paths['/v2/returns'].parameters).toEqual(
+      expect.arrayContaining([
+        { name: 'salesOrderId', in: 'query' },
+        { name: 'pageNumber', in: 'query' },
+        { name: 'pageSize', in: 'query' },
+      ]),
+    );
+    // Installation probes map these provider scopes to Luma capabilities.
+    expect(api.paths['/v2/returns'].scopes).toEqual(['returns.read']);
+    expect(api.paths['/v2/return-reasons'].scopes).toEqual(['returns.read']);
+    expect(api.paths['/v2/warehouses'].scopes).toEqual(['inventory.read']);
+    expect(api.returnCreate.scopes).toEqual(['returns.write']);
+    // JTL documents no idempotency header here, so duplicates are ruled out by the marker read.
+    expect(
+      api.returnCreate.parameters.some(
+        (p) => p.name.toLowerCase() === 'idempotency-key',
+      ),
+    ).toBe(false);
+  });
+
+  it('sends a schema-valid return create', async () => {
+    const id = cloudIdForContract;
+    let body: unknown;
+    const fetch = vi.fn<typeof globalThis.fetch>(async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (init?.method === 'POST') {
+        body = JSON.parse(String(init.body));
+
+        return Response.json({ id }, { status: 201 });
+      }
+      if (path.endsWith('/line-items'))
+        return Response.json([
+          { id, salesOrderId: id, itemId: id, quantity: 3, salesUnit: 'Stück' },
+        ]);
+      if (path.endsWith(`/sales-orders/${id}`))
+        return Response.json({ id, companyId: id, isCancelled: false });
+
+      return Response.json({
+        items: [],
+        totalItems: 0,
+        pageNumber: 1,
+        pageSize: 100,
+      });
+    });
+    const connector = createJtlConnector({
+      tenantId: 'tenant-a',
+      connectionId: 'connection-a',
+      returnActions: true,
+      recordObservations: async () => {},
+      fetch,
+      connection: {
+        kind: 'cloud',
+        jtlTenantId: id,
+        accessToken: async () => 'token',
+      },
+    });
+    const receipt = await connector.capabilities['returns.create']!.run(
+      {
+        tenant: { tenantId: 'tenant-a' } as TenantContext,
+        connectionId: 'connection-a',
+        provider: 'jtl',
+        idempotencyKey: 'key',
+      },
+      {
+        lumaCaseId: 'case-1',
+        order: { externalId: id, scopeKey: '' },
+        warehouse: { externalId: id, scopeKey: '' },
+        reason: { externalId: id, scopeKey: '' },
+        lines: [
+          {
+            orderLine: { externalId: id, scopeKey: id },
+            quantity: { amount: '2', unit: 'each' },
+          },
+        ],
+      },
+    );
+    validate(body, api.returnCreate.request);
+    expect(body).toMatchObject({ externalNumber: lumaReturnMarker('case-1') });
+    expect(receipt.evidenceRefs).toEqual([
+      returnAcceptanceId('tenant-a', 'connection-a', id),
+    ]);
+    expect(resolve(api.returnCreate.request).required).toEqual(
+      expect.arrayContaining([
+        'companyId',
+        'salesOrderId',
+        'warehouseId',
+        'items',
+      ]),
     );
   });
 });

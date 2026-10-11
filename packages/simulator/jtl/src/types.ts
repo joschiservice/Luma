@@ -1,3 +1,10 @@
+/** A return reason with its English name and, optionally, its German name. */
+export interface JtlReturnReason {
+  id: string;
+  name: string;
+  germanName?: string | undefined;
+}
+
 /**
  * One simulated JTL-Wawi ERP. Use numeric IDs, as JTL does; Luma reads them as external IDs.
  * The first warehouse receives purchase-order goods by default.
@@ -5,7 +12,16 @@
 export interface JtlConfig {
   warehouses: { id: string; name: string }[];
   shippingMethods: { id: string; name: string }[];
+  /** Reasons a return line may record; `defaultReturnReasons` when omitted. */
+  returnReasons?: JtlReturnReason[] | undefined;
 }
+
+/** Return reasons of a fresh JTL-Wawi installation. */
+export const defaultReturnReasons: JtlReturnReason[] = [
+  { id: '1', name: 'Defective', germanName: 'Defekt' },
+  { id: '2', name: 'Wrong item', germanName: 'Falscher Artikel' },
+  { id: '3', name: 'No longer wanted', germanName: 'Nicht mehr gewünscht' },
+];
 
 /** How a simulated supplier answers new purchase orders. */
 export type SupplierProfile =
