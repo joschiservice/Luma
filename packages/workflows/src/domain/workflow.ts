@@ -64,7 +64,21 @@ export interface WorkflowVersion extends WorkflowSource {
 export type PublishedWorkflowVersion = WorkflowVersion | ProcessWorkflowVersion;
 
 /** A run binds an exact version, subject, actor and immutable input snapshot. */
+/** Immutable trigger configuration bound to a published process; updates add revisions. */
+export interface WorkflowSubscription {
+  id: string;
+  definitionId: string;
+  version: string;
+  versionDigest: string;
+  revision: number;
+  trigger: WorkflowTrigger;
+  active: boolean;
+  updatedBy: string;
+  updatedAt: string;
+}
+
 export interface WorkflowRun {
+  subscription?: WorkflowSubscription | undefined;
   id: string;
   tenantId: string;
   definitionId: string;
@@ -126,6 +140,7 @@ export interface WorkflowTriggerRun extends WorkflowRun {
 
 /** Supplies a version-bound signal and explicit resource; the caller identity comes from authentication. */
 export interface WorkflowTriggerRequest {
+  subscription?: { id: string; revision: number } | undefined;
   version: string;
   reviewedDigest: string;
   subject: { kind: string; id: string };

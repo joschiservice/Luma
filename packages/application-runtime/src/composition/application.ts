@@ -87,9 +87,11 @@ import type { CaseWorkflowAdapter } from '@luma/workflows';
 import {
   compilePlaybook,
   createCodeProcesses,
+  createCoordination,
   createDraftGenerations,
   createDrafts,
   createDraftTestRuns,
+  createWorkflowEventSink,
   createWorkflows,
   createWorkflowTemplates,
 } from '@luma/workflows/composition';
@@ -165,6 +167,7 @@ export interface ApplicationServices {
   replenishment: ReturnType<typeof createReplenishmentRuntime>;
   caseWorkflows: ReturnType<typeof createCaseWorkflowServices>;
   codeProcesses: ReturnType<typeof createCodeProcesses>;
+  coordination: ReturnType<typeof createCoordination>;
   procurement: ReturnType<typeof createProcurement>;
   commitments: SupplierCommitments;
   returnCases: ReturnCases;
@@ -319,6 +322,7 @@ export function createApplicationServices(
     options.verifier,
     {},
     authority(database),
+    identity,
   );
   const procurement = createProcurement(
     database,
@@ -370,6 +374,17 @@ export function createApplicationServices(
     database,
     createAuditLog,
     {
+      observed: async (db, observation) => {
+        if (observation.confirmed)
+          await createWorkflowEventSink(db)(observation.tenantId, {
+            sourceId: `supplier-acknowledgment:${observation.id}`,
+            eventType: 'supplier.acknowledged',
+            correlationKey: observation.purchaseOrderId,
+            occurredAt: observation.observedAt,
+            values: { acknowledged: true },
+            evidenceRefs: [`procurement_observation:${observation.id}`],
+          });
+      },
       purchasing: options.purchasing
         ? createPurchasingSystem(
             options.purchasing.runtime,
@@ -487,6 +502,7 @@ export function createApplicationServices(
       : {}),
     ...(options.refreshStock ? { refreshStock: options.refreshStock } : {}),
   });
+  const coordination = createCoordination(database, identity, createAuditLog);
   const codeProcesses = createCodeProcesses(
     database,
     identity,
@@ -571,10 +587,58 @@ export function createApplicationServices(
     drafts.blockers,
     caseWorkflows,
     createWorkspacePeople(database),
+    coordination,
   );
   const decisions = createDecisionQueue(database, {
     cases: caseDecisionQuery,
     providers: [
+      {
+        id: 'human-tasks',
+        label: 'Human tasks',
+        permission: 'workflows.read',
+        pending: async (context) =>
+          (await coordination.pending(context)).map((task) => ({
+            id: `human-task:${task.runId}:${task.stepId}`,
+            kind: 'human_task' as const,
+            reason: 'manual_intervention' as const,
+            domain: 'operations' as const,
+            title: task.instructions,
+            why: task.escalatedAt
+              ? 'The task is overdue and has been assigned to its fallback.'
+              : 'A workflow needs your answer and evidence to continue.',
+            consequences: [
+              {
+                response: 'Answer',
+                text: 'Record your answer and resume the workflow. Provider changes still require policy admission.',
+              },
+            ],
+            change: [{ label: 'Evidence', value: task.evidence }],
+            impact: { level: 'unknown' as const, text: null },
+            requestedAt: task.createdAt,
+            deadline: task.dueAt,
+            requesterId: null,
+            evidence: { observedAt: null, validUntil: null },
+            response: 'investigate' as const,
+            ownerAssignment: {
+              assigneeId: context.actor.id,
+              assignedBy: context.actor.id,
+              assignedAt: task.createdAt,
+              revision: 0,
+            },
+            subject: { label: task.subject.kind, detail: task.subject.id },
+            record: null,
+            owner: {
+              kind: 'human_task' as const,
+              definitionId: task.definitionId,
+              runId: task.runId,
+              stepId: task.stepId,
+            },
+            group: {
+              key: `human-task:${task.definitionId}`,
+              label: task.definitionId,
+            },
+          })),
+      },
       replenishmentDecisionProvider(replenishment.pending),
       supplierCommitmentDecisionProvider(async (context) =>
         (await commitments.pending(context)).map((item) => ({
@@ -695,6 +759,7 @@ export function createApplicationServices(
   });
 
   return {
+    coordination,
     codeProcesses,
     replenishment,
     caseWorkflows,

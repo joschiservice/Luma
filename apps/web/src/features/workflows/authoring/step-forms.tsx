@@ -9,10 +9,15 @@ import { formatList } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Input } from '@luma/ui/components/primitives/input';
+import { PersonPicker } from '@luma/ui/components/primitives/person-picker';
 import { Select } from '@luma/ui/components/primitives/select';
+import { Textarea } from '@luma/ui/components/primitives/textarea';
+import { useQuery } from '@tanstack/react-query';
+import { useParams } from '@tanstack/react-router';
 import { Plus, Trash2 } from 'lucide-react';
 import { type ReactNode, useId } from 'react';
 
+import { membersOptions } from '../../../kit/settings/data';
 import {
   emptyValue,
   type FieldType,
@@ -880,6 +885,139 @@ export function StepForm({
           />
         </div>
       );
+    case 'human_task':
+      return (
+        <div className="authoring-step-form">
+          <TaskTarget
+            label={m.authoring_coordination_assignee()}
+            value={step.assignee}
+            disabled={disabled}
+            onChange={(assignee) => set({ ...step, assignee })}
+          />
+          <Field
+            label={m.authoring_coordination_instructions()}
+            diagnostics={at('instructions')}
+          >
+            {(props) => (
+              <Textarea
+                {...props}
+                value={step.instructions}
+                disabled={disabled}
+                maxLength={2000}
+                onChange={(event) =>
+                  set({ ...step, instructions: event.target.value })
+                }
+              />
+            )}
+          </Field>
+          <Field
+            label={m.authoring_coordination_choices()}
+            diagnostics={at('choices')}
+          >
+            {(props) => (
+              <Textarea
+                {...props}
+                value={step.choices.join('\n')}
+                disabled={disabled}
+                onChange={(event) =>
+                  set({ ...step, choices: event.target.value.split('\n') })
+                }
+              />
+            )}
+          </Field>
+          <Field label={m.authoring_coordination_evidence()}>
+            {() => (
+              <Select
+                aria-label={m.authoring_coordination_evidence()}
+                value={step.evidence}
+                disabled={disabled}
+                options={[
+                  { value: 'text', label: m.authoring_coordination_text() },
+                  { value: 'link', label: m.authoring_coordination_link() },
+                  { value: 'record', label: m.authoring_coordination_record() },
+                ]}
+                onValueChange={(evidence) => {
+                  if (evidence) set({ ...step, evidence });
+                }}
+              />
+            )}
+          </Field>
+          <Duration
+            label={m.authoring_coordination_due()}
+            seconds={step.dueAfterSeconds}
+            disabled={disabled}
+            diagnostics={at('dueAfterSeconds')}
+            onChange={(dueAfterSeconds) => set({ ...step, dueAfterSeconds })}
+          />
+          <TaskTarget
+            label={m.authoring_coordination_fallback()}
+            value={step.escalationTarget}
+            disabled={disabled}
+            onChange={(escalationTarget) => set({ ...step, escalationTarget })}
+          />
+        </div>
+      );
+    case 'event_wait':
+      return (
+        <div className="authoring-step-form">
+          <Field
+            label={m.authoring_coordination_event_type()}
+            diagnostics={at('eventType')}
+          >
+            {(props) => (
+              <Input
+                {...props}
+                value={step.eventType}
+                disabled={disabled}
+                onChange={(event) =>
+                  set({ ...step, eventType: event.target.value })
+                }
+              />
+            )}
+          </Field>
+          <ValuePicker
+            label={m.authoring_coordination_correlation()}
+            type="string"
+            value={step.correlation}
+            scope={scope}
+            disabled={disabled}
+            diagnostics={at('correlation')}
+            onChange={(correlation) => set({ ...step, correlation })}
+          />
+          <FieldListEditor
+            label={m.authoring_read_fields()}
+            fields={step.fields}
+            disabled={disabled}
+            onChange={(fields) => set({ ...step, fields })}
+          />
+          <Duration
+            label={m.authoring_coordination_timeout()}
+            seconds={step.timeoutSeconds}
+            disabled={disabled}
+            diagnostics={at('timeoutSeconds')}
+            onChange={(timeoutSeconds) => set({ ...step, timeoutSeconds })}
+          />
+          <Field label={m.authoring_coordination_on_timeout()}>
+            {() => (
+              <Select
+                aria-label={m.authoring_coordination_on_timeout()}
+                value={step.onTimeout}
+                disabled={disabled}
+                options={[
+                  {
+                    value: 'escalate',
+                    label: m.authoring_coordination_escalate(),
+                  },
+                  { value: 'end', label: m.authoring_coordination_end() },
+                ]}
+                onValueChange={(onTimeout) => {
+                  if (onTimeout) set({ ...step, onTimeout });
+                }}
+              />
+            )}
+          </Field>
+        </div>
+      );
     case 'wait':
       return (
         <div className="authoring-step-form">
@@ -991,6 +1129,57 @@ export function StepForm({
               />
             )}
           </Field>
+          <Field
+            label={m.authoring_coordination_rechecks()}
+            diagnostics={at('recheck')}
+          >
+            {(props) => (
+              <Input
+                {...props}
+                type="number"
+                min="1"
+                max="10"
+                disabled={disabled}
+                value={step.recheck?.attempts ?? 1}
+                onChange={(event) => {
+                  const attempts = Number(event.target.value || 1);
+                  set({
+                    ...step,
+                    recheck:
+                      attempts > 1
+                        ? {
+                            attempts,
+                            intervalSeconds: step.recheck?.intervalSeconds ?? 5,
+                          }
+                        : undefined,
+                  });
+                }}
+              />
+            )}
+          </Field>
+          {step.recheck ? (
+            <Field label={m.authoring_coordination_recheck_interval()}>
+              {(props) => (
+                <Input
+                  {...props}
+                  type="number"
+                  min="1"
+                  max="300"
+                  disabled={disabled}
+                  value={step.recheck?.intervalSeconds ?? 5}
+                  onChange={(event) =>
+                    set({
+                      ...step,
+                      recheck: {
+                        attempts: step.recheck?.attempts ?? 2,
+                        intervalSeconds: Number(event.target.value || 1),
+                      },
+                    })
+                  }
+                />
+              )}
+            </Field>
+          ) : null}
         </div>
       );
     }
@@ -1084,4 +1273,90 @@ export function StepForm({
         </div>
       );
   }
+}
+
+/** Uses current workspace people and role identities for a human-task handoff. */
+function TaskTarget({
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: Extract<DraftStep, { kind: 'human_task' }>['assignee'];
+  disabled?: boolean | undefined;
+  onChange: (
+    value: Extract<DraftStep, { kind: 'human_task' }>['assignee'],
+  ) => void;
+}) {
+  const { organizationId } = useParams({ strict: false });
+  const members = useQuery({
+    ...membersOptions(organizationId ?? ''),
+    enabled: !!organizationId,
+  });
+  const people = (members.data ?? []).filter(
+    (member) => member.status === 'active',
+  );
+  const roles = Array.from(
+    new Map(people.map((member) => [member.role.id, member.role])).values(),
+  );
+
+  return (
+    <Field label={label}>
+      {() => (
+        <div>
+          <Select
+            aria-label={label}
+            value={value.kind}
+            disabled={disabled}
+            options={[
+              { value: 'person', label: m.authoring_coordination_person() },
+              { value: 'role', label: m.authoring_coordination_role() },
+            ]}
+            onValueChange={(kind) => {
+              if (kind)
+                onChange(
+                  kind === 'person'
+                    ? { kind, id: people[0]?.userId ?? '' }
+                    : { kind, key: 'member' },
+                );
+            }}
+          />
+          {value.kind === 'person' ? (
+            <PersonPicker
+              label={
+                people.find((person) => person.userId === value.id)?.name ??
+                m.authoring_coordination_assignee()
+              }
+              title={label}
+              people={people.map((person) => ({
+                id: person.userId,
+                name:
+                  person.name || person.email || m.decisions_member_fallback(),
+                detail: person.email,
+              }))}
+              disabled={disabled || members.isPending}
+              onSelect={(id) => onChange({ kind: 'person', id })}
+            />
+          ) : (
+            <Select
+              aria-label={label}
+              value={value.key}
+              options={roles.map((role) => ({
+                value: role.id,
+                label: role.name,
+              }))}
+              disabled={disabled}
+              onValueChange={(key) => {
+                if (key) onChange({ kind: 'role', key });
+              }}
+            />
+          )}
+          {members.isError ? (
+            <p role="alert">{m.authoring_coordination_unavailable()}</p>
+          ) : null}
+        </div>
+      )}
+    </Field>
+  );
 }

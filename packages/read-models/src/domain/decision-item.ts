@@ -7,6 +7,7 @@ type DecisionKind =
   | 'inventory_correction'
   | 'supplier_commitment'
   | 'workflow_handover'
+  | 'human_task'
   | 'message_reply';
 
 export type DecisionReason =
@@ -24,6 +25,7 @@ type DecisionRecordKind =
   'order' | 'fulfillment' | 'position' | 'sku' | 'product';
 
 export type DecisionOwner =
+  | { kind: 'human_task'; definitionId: string; runId: string; stepId: string }
   | { kind: 'case'; exceptionId: string }
   | { kind: 'workflow_run'; definitionId: string; runId: string }
   | {
@@ -81,6 +83,7 @@ export type DecisionCandidate = Omit<
   DecisionItem,
   'urgency' | 'evidence' | 'assignment' | 'record'
 > & {
+  ownerAssignment?: DecisionAssignment | undefined;
   evidence: { observedAt: string | null; validUntil: string | null };
   record:
     | { kind: DecisionRecordKind; id: string }

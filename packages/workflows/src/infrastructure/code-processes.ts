@@ -36,17 +36,26 @@ export function createCodeProcesses(
   const supported = (
     version: PublishedWorkflowVersion,
   ): version is ProcessWorkflowVersion =>
-    !!directory &&
     !!transport &&
     version.format === 'workflow/2' &&
-    version.applicability.trigger.kind !== 'schedule' &&
-    version.steps.some((step) => step.kind === 'code') &&
+    version.steps.some(
+      (step) =>
+        step.kind === 'code' ||
+        step.kind === 'human_task' ||
+        step.kind === 'event_wait',
+    ) &&
     version.steps.every(
       (step) =>
-        ['code', 'condition', 'wait', 'end', 'escalation'].includes(
-          step.kind,
-        ) &&
-        (step.kind !== 'code' || !step.grants.length),
+        [
+          'code',
+          'condition',
+          'wait',
+          'end',
+          'escalation',
+          'human_task',
+          'event_wait',
+        ].includes(step.kind) &&
+        (step.kind !== 'code' || (!!directory && !step.grants.length)),
     );
   const unavailable = async (): Promise<never> => {
     throw new Error('This capability requires an installed business adapter');
@@ -86,6 +95,9 @@ export function createCodeProcesses(
     await transport!.start(context, run, version);
   }
 
+  const coordinationReason = !transport
+    ? 'The workflow worker is unavailable.'
+    : undefined;
   const reason = !directory
     ? 'Code Steps aren’t installed on this Luma server. Whoever runs the server needs to install the Code Step runtime.'
     : !transport
@@ -98,25 +110,48 @@ export function createCodeProcesses(
     start,
     /** Describes the computation steps this adapter runs in workflows that contain a Code Step. */
     async vocabulary(): Promise<VocabularyContribution> {
-      const executable = !reason;
+      const executable = !!transport;
 
       return {
         triggers: [
           ...(['manual', 'event', 'condition', 'exception'] as const).map(
-            (kind) => ({ kind, executable, ...(reason ? { reason } : {}) }),
+            (kind) => ({
+              kind,
+              executable,
+              ...(coordinationReason ? { reason: coordinationReason } : {}),
+            }),
           ),
           {
             kind: 'schedule',
-            executable: false,
-            reason:
-              'Scheduled starts are recorded but do not run custom workflows yet.',
+            executable,
           },
         ],
         stepKinds: (
-          ['code', 'condition', 'wait', 'escalation', 'end'] as const
-        ).map((kind) => ({ kind, executable, ...(reason ? { reason } : {}) })),
-        codeSteps: {
+          [
+            'code',
+            'condition',
+            'wait',
+            'escalation',
+            'end',
+            'human_task',
+            'event_wait',
+          ] as const
+        ).map((kind) => ({
+          kind,
           executable,
+          ...(coordinationReason ? { reason: coordinationReason } : {}),
+        })),
+        subjects: [
+          {
+            kind: 'purchase_order',
+            label: 'Purchase order',
+            description: 'A purchase order recorded in Procurement.',
+            executable,
+            reason: transport ? null : 'The workflow worker is unavailable.',
+          },
+        ],
+        codeSteps: {
+          executable: !reason,
           reason: reason ?? null,
           evaluation: !!directory,
         },

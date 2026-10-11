@@ -690,7 +690,11 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
             departed={departed}
             members={memberList}
             self={self}
-            assignmentAccess={assignmentAccess}
+            assignmentAccess={
+              item.kind === 'human_task' || item.kind === 'case'
+                ? 'none'
+                : assignmentAccess
+            }
             now={now}
             assigning={assignment.isPending}
             assignError={assignError}

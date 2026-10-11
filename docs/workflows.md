@@ -45,9 +45,9 @@ verification, audit. Modes are views of a draft, not engines or permission paths
 
 A published version that no installed adapter can execute is shown as unavailable with
 the reason and cannot be activated. Trigger metadata does not install a trigger handler.
-Today the installed adapters run replenishment, the case workflows, and computation-only
-custom workflows: versions with a Code Step whose other steps are conditions, waits,
-escalations or ends, with no grants and no schedule trigger. Custom workflows that need a
+Today the installed adapters run replenishment, the case workflows, and coordination or computation
+custom workflows containing Code Steps, human tasks or event waits with conditions, timed waits,
+escalations or ends. Code Steps require an installed runtime and no business grants. Custom workflows that need a
 business read or action stay unavailable until a domain adapter installs that capability.
 
 ### Drafts and publication
@@ -92,14 +92,14 @@ verbatim, and the builder stays read-only until the author returns to the standa
 ## Process runtime
 
 `workflow/2` versions are bounded, forward-only step lists: reads, deterministic conditions,
-capability actions, decisions, waits, Code Steps, verification, escalation and end. Step IDs
+capability actions, decisions, timed waits, human tasks, correlated event waits, Code Steps, verification, escalation and end. Step IDs
 are unique within a version. An action may target a resource other than the triggering
 subject; the business adapter binds that target. Explicit decision steps are optional;
 admission still applies policy approval to every action.
 
 - The interpreter runs one exact version. Reads and verification must return their
-  declared fields and evidence references. A failed or inconclusive verification ends the
-  run in its own state.
+  declared fields and evidence references. Failed verification ends the run. Inconclusive reads
+  can use a declared bounded recheck policy; exhausting it ends as inconclusive, never verified.
 - Each activity refreshes the actor and the stored run, reloads the published version, and
   calls Action Admission with that action's `runId` and `stepId`. The capability adapter's
   `bindAction` must use the published action node, current grants, typed snapshot and
@@ -124,11 +124,36 @@ admission still applies policy approval to every action.
 The runtime never infers authorization or verified success from a trigger, a decision
 signal or a dispatch receipt.
 
+### Human tasks and correlated waits
+
+Human tasks publish a person or current role, instructions, a finite set of choices, required
+text, HTTP(S) link or typed record evidence, an optional note and a due time with a fallback.
+Answers are tenant-scoped and authorized against refreshed membership. One answer is retained
+with its actor and timestamp; identical retries are harmless and conflicting answers return 409.
+Temporal history rolls over at open coordination boundaries, preserving the deadline and earlier
+receipts without repeating actions. Overdue tasks remain answerable by the escalation target. Task creation, escalation and answers
+leave audit evidence. Cancellation or closure of a linked case removes open tasks. An answer
+is workflow input, never approval or proof of provider success.
+
+Event waits publish an event type, a string correlation key, exact typed payload fields and
+a timeout recovery outcome. Deliveries are immutable by tenant and source identity. A wait
+can consume input delivered after its run began, including input received before the wait
+activity started. Occurrence and receipt must both precede the deadline. Duplicates cannot
+change evidence; wrong keys, malformed payloads and late events cannot satisfy a wait.
+Timeouts record an ended or escalated receipt. Supplier acknowledgment events are published
+atomically with confirmed purchasing-system observations, keyed by the purchase order.
+
 ## Triggers
+
+A subscription is an immutable revision separate from workflow logic. It pins a published
+version digest and a trigger. Editing its active head requires the reviewed revision and
+changes future starts only. Each start retains its exact subscription revision. Starts and
+subscription edits serialize against the same head; historical run evidence is unchanged.
+Legacy starts continue to use the version's trigger when no subscription is supplied.
 
 Each version declares one trigger: `manual`, `schedule` (one UTC `at` time), `event` (its
 context kind is the event type), `condition` (one declared context field against a typed
-scalar) or `exception`. There is no event bus or expression language.
+scalar) or `exception`. Trigger delivery is explicit; it grants no authority.
 
 People with `workflows.triggers.manage` submit starts with the reviewed version digest, an
 explicit subject, a source ID and occurrence time, and a typed snapshot. The server binds

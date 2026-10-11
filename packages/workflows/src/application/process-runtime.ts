@@ -23,6 +23,21 @@ export type ProcessActionResult =
 
 /** Every external read, decision, action, and verification crosses an activity boundary. */
 export interface ProcessActivities {
+  /** Registers or rereads persisted coordination; signals are wakeups, never evidence. */
+  coordinate?(
+    run: ProcessRun,
+    step: Extract<ProcessStep, { kind: 'human_task' | 'event_wait' }>,
+    outputs: ProcessStepOutput[],
+    startedAt: string,
+  ): Promise<
+    | { state: 'pending'; evidenceRefs: string[] }
+    | {
+        state: 'completed';
+        values: ProcessStepOutput['values'];
+        evidenceRefs: string[];
+      }
+    | { state: 'cancelled'; evidenceRefs: string[]; record?: boolean }
+  >;
   /** Executes a sandboxed instruction using only its published capability grants. */
   code?(
     run: ProcessRun,
@@ -68,6 +83,15 @@ export interface ProcessClock {
   now(): string;
   wait(milliseconds: number): Promise<void>;
   decisionChanged(milliseconds: number): Promise<boolean>;
+  /** Rolls over durable history at an open coordination boundary without replaying earlier effects. */
+  checkpoint?(checkpoint: ProcessCheckpoint): Promise<void>;
+}
+
+/** Durable continuation state preserves the open wait's deadline and preceding immutable outputs. */
+export interface ProcessCheckpoint {
+  stepId: string;
+  startedAt: string;
+  outputs: ProcessStepOutput[];
 }
 
 export interface ProcessProgress {
@@ -83,6 +107,7 @@ export async function runProcess(
   activities: ProcessActivities,
   clock: ProcessClock,
   onProgress: (progress: ProcessProgress) => void = () => undefined,
+  checkpoint?: ProcessCheckpoint,
 ): Promise<ProcessProgress> {
   if (
     run.definitionId !== version.definition.id ||
@@ -97,7 +122,9 @@ export async function runProcess(
 
     return next;
   };
-  const outputs: ProcessStepOutput[] = [];
+  const outputs: ProcessStepOutput[] = checkpoint
+    ? [...checkpoint.outputs]
+    : [];
   const record = async (
     step: ProcessStep,
     state: ProcessStepOutput['state'],
@@ -122,7 +149,10 @@ export async function runProcess(
     outputs.push(output);
   };
 
+  let resuming = !!checkpoint;
   for (const step of processInstructions(version)) {
+    if (resuming && step.id !== checkpoint?.stepId) continue;
+    resuming = false;
     set({ state: 'running', stepId: step.id });
     switch (step.kind) {
       case 'code': {
@@ -239,7 +269,10 @@ export async function runProcess(
           .reverse()
           .find(
             (item) =>
-              (item.kind === 'read' || item.kind === 'code') &&
+              (item.kind === 'read' ||
+                item.kind === 'code' ||
+                item.kind === 'human_task' ||
+                item.kind === 'event_wait') &&
               Object.hasOwn(item.values, step.field),
           );
         const passes =
@@ -385,6 +418,83 @@ export async function runProcess(
         ]);
         break;
       }
+      case 'human_task':
+      case 'event_wait': {
+        if (!activities.coordinate)
+          throw new Error('Workflow coordination is unavailable');
+        const startedAt =
+          checkpoint?.stepId === step.id ? checkpoint.startedAt : clock.now();
+        const deadline =
+          Date.parse(startedAt) +
+          (step.kind === 'human_task'
+            ? step.dueAfterSeconds
+            : step.timeoutSeconds) *
+            1000;
+        let recorded = outputs.some(
+          (output) => output.stepId === step.id && output.state === 'waiting',
+        );
+        while (true) {
+          const result = await activities.coordinate(
+            run,
+            step,
+            outputs,
+            startedAt,
+          );
+          if (result.state === 'cancelled') {
+            if (result.record)
+              await record(
+                step,
+                'ended',
+                {},
+                result.evidenceRefs,
+                'coordination_cancelled',
+              );
+
+            return set({
+              state: 'ended',
+              stepId: step.id,
+              reason: 'coordination_cancelled',
+            });
+          }
+          if (result.state === 'completed') {
+            await record(step, 'completed', result.values, result.evidenceRefs);
+            break;
+          }
+          const remaining = deadline - Date.parse(clock.now());
+          if (step.kind === 'event_wait' && remaining <= 0) {
+            await record(
+              step,
+              step.onTimeout === 'end' ? 'ended' : 'escalated',
+              {},
+              result.evidenceRefs,
+              'event_wait_timeout',
+            );
+
+            return set({
+              state: step.onTimeout === 'end' ? 'ended' : 'escalated',
+              stepId: step.id,
+              reason: 'event_wait_timeout',
+            });
+          }
+          set({
+            state: 'waiting',
+            stepId: step.id,
+            reason:
+              step.kind === 'human_task' && remaining <= 0
+                ? 'human_task_overdue'
+                : step.kind,
+          });
+          if (!recorded) {
+            await record(step, 'waiting', {}, result.evidenceRefs);
+            recorded = true;
+          }
+          await clock.decisionChanged(
+            remaining > 0 ? Math.min(remaining, 30_000) : 30_000,
+          );
+          await clock.checkpoint?.({ stepId: step.id, startedAt, outputs });
+        }
+        break;
+      }
       case 'wait': {
         set({ state: 'waiting', stepId: step.id });
         await record(step, 'waiting', {}, [`temporal:${run.id}:${step.id}`]);
@@ -394,7 +504,25 @@ export async function runProcess(
       }
       case 'verification': {
         const startedAt = Date.parse(clock.now());
-        const result = await activities.verify(run, step, outputs);
+        let result = await activities.verify(run, step, outputs);
+        const evidenceRefs = new Set(result.evidenceRefs);
+        for (
+          let attempt = 1;
+          result.state === 'inconclusive' &&
+          attempt < (step.recheck?.attempts ?? 1);
+          attempt++
+        ) {
+          const delay = (step.recheck?.intervalSeconds ?? 0) * 1000;
+          if (
+            Date.parse(clock.now()) + delay >=
+            startedAt + step.maxDurationSeconds * 1000
+          )
+            break;
+          await clock.wait(delay);
+          result = await activities.verify(run, step, outputs);
+          for (const reference of result.evidenceRefs)
+            evidenceRefs.add(reference);
+        }
         if (
           !result.evidenceRefs.length ||
           Object.keys(result.values).length !==
@@ -418,7 +546,7 @@ export async function runProcess(
           step,
           state === 'verified' ? 'completed' : state,
           result.values,
-          result.evidenceRefs,
+          [...evidenceRefs],
           state !== result.state ? 'verification_window_exceeded' : undefined,
         );
         if (state !== 'verified')

@@ -12,6 +12,7 @@ const decisionKindSchema = z.enum([
   'inventory_correction',
   'supplier_commitment',
   'workflow_handover',
+  'human_task',
   'message_reply',
 ]);
 
@@ -54,6 +55,12 @@ const decisionViewSchema = z.enum(['all', 'mine', 'unassigned']);
 
 /** Where the authoritative decision controls live. Every surface acts on this same owner. */
 const decisionOwnerSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('human_task'),
+    definitionId: z.string(),
+    runId: z.string().uuid(),
+    stepId: z.string(),
+  }),
   z.object({ kind: z.literal('case'), exceptionId: z.string().uuid() }),
   z.object({
     kind: z.literal('workflow_run'),

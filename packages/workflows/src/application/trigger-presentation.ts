@@ -7,61 +7,66 @@ export function presentTriggerRun(
   processSteps: ProcessStepOutput[] = [],
 ) {
   const latest = processSteps.at(-1);
-  const processState: ProcessRunState | undefined = !latest
-    ? undefined
-    : latest.state === 'waiting'
-      ? latest.kind === 'wait'
-        ? 'waiting'
-        : 'awaiting_decision'
-      : latest.state === 'not_executed'
-        ? 'not_executed'
-        : latest.state === 'denied'
-          ? 'denied'
-          : latest.state === 'failed'
-            ? 'failed_verification'
-            : latest.state === 'inconclusive'
-              ? 'inconclusive_verification'
-              : latest.state === 'ended'
-                ? 'ended'
-                : latest.state === 'escalated'
-                  ? 'escalated'
-                  : latest.kind === 'end'
-                    ? processSteps.some(
-                        (step) =>
-                          step.state === 'completed' &&
-                          (step.kind === 'verification' ||
-                            (step.code?.verifiedActions ?? 0) > 0),
-                      )
-                      ? 'verified'
-                      : 'ended'
-                    : 'running';
+  const processState: ProcessRunState | undefined =
+    run.state === 'cancelled' && latest
+      ? 'ended'
+      : !latest
+        ? undefined
+        : latest.state === 'waiting'
+          ? ['wait', 'human_task', 'event_wait'].includes(latest.kind)
+            ? 'waiting'
+            : 'awaiting_decision'
+          : latest.state === 'not_executed'
+            ? 'not_executed'
+            : latest.state === 'denied'
+              ? 'denied'
+              : latest.state === 'failed'
+                ? 'failed_verification'
+                : latest.state === 'inconclusive'
+                  ? 'inconclusive_verification'
+                  : latest.state === 'ended'
+                    ? 'ended'
+                    : latest.state === 'escalated'
+                      ? 'escalated'
+                      : latest.kind === 'end'
+                        ? processSteps.some(
+                            (step) =>
+                              step.state === 'completed' &&
+                              (step.kind === 'verification' ||
+                                (step.code?.verifiedActions ?? 0) > 0),
+                          )
+                          ? 'verified'
+                          : 'ended'
+                        : 'running';
   const reason =
-    processState === 'not_executed'
-      ? 'Not executed: observe-only. Would run when writes are enabled.'
-      : processState === 'verified'
-        ? 'The expected result was verified.'
-        : processState === 'ended'
-          ? latest?.kind === 'condition'
-            ? 'The current conditions do not require an action.'
-            : 'The workflow finished without a verification step.'
-          : processState === 'failed_verification'
-            ? 'Verification found a different result. Operator review is required.'
-            : processState === 'inconclusive_verification'
-              ? 'Verification could not confirm the result. Operator review is required.'
-              : processState === 'escalated'
-                ? 'The run needs operator review.'
-                : processState === 'denied'
-                  ? 'The decision denied this run.'
-                  : processState === 'waiting'
-                    ? 'The workflow is waiting before its next step.'
-                    : processState === 'awaiting_decision'
-                      ? 'The workflow is waiting for a decision.'
-                      : processState === 'running'
-                        ? 'The workflow is progressing through its steps.'
-                        : run.state === 'scheduled'
-                          ? 'Waiting for the scheduled time.'
-                          : run.state === 'cancelled'
-                            ? 'The scheduled start was cancelled.'
+    run.state === 'cancelled'
+      ? run.trigger.kind === 'schedule'
+        ? 'The scheduled start was cancelled.'
+        : 'The workflow handoff was cancelled.'
+      : processState === 'not_executed'
+        ? 'Not executed: observe-only. Would run when writes are enabled.'
+        : processState === 'verified'
+          ? 'The expected result was verified.'
+          : processState === 'ended'
+            ? latest?.kind === 'condition'
+              ? 'The current conditions do not require an action.'
+              : 'The workflow finished without a verification step.'
+            : processState === 'failed_verification'
+              ? 'Verification found a different result. Operator review is required.'
+              : processState === 'inconclusive_verification'
+                ? 'Verification could not confirm the result. Operator review is required.'
+                : processState === 'escalated'
+                  ? 'The run needs operator review.'
+                  : processState === 'denied'
+                    ? 'The decision denied this run.'
+                    : processState === 'waiting'
+                      ? 'The workflow is waiting before its next step.'
+                      : processState === 'awaiting_decision'
+                        ? 'The workflow is waiting for a decision.'
+                        : processState === 'running'
+                          ? 'The workflow is progressing through its steps.'
+                          : run.state === 'scheduled'
+                            ? 'Waiting for the scheduled time.'
                             : run.state === 'skipped'
                               ? 'The scheduled time passed while the workspace was suspended, so this start was skipped.'
                               : 'Trigger received. Execution requires a separate activation and admission.';
@@ -92,6 +97,7 @@ export function presentTriggerRun(
             ? 'inconclusive'
             : 'not_verified',
     reason,
+    ...(run.subscription ? { subscription: run.subscription } : {}),
     trigger: run.trigger,
     subject: run.subject,
     actor: run.actor,
@@ -99,7 +105,9 @@ export function presentTriggerRun(
     steps: [],
     processSteps,
     ...(processState ? { processState } : {}),
-    ...(processSteps.length ? {} : { triggerState: run.state }),
+    ...(processSteps.length && run.state !== 'cancelled'
+      ? {}
+      : { triggerState: run.state }),
     triggerEvidence: run.evidence,
     triggeredAt: run.triggeredAt,
     story: {

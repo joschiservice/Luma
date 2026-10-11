@@ -9,6 +9,7 @@ import {
   createSupplierCommitments,
 } from './application/commitments.js';
 import { createProcurementService } from './application/procurement.js';
+import type { PurchasingObservation } from './domain/commitments.js';
 import { createCommitmentStore } from './infrastructure/commitment-store.js';
 import { extractionOutput } from './infrastructure/extraction-schema.js';
 import { createProcurementStore } from './infrastructure/store.js';
@@ -83,12 +84,17 @@ export function createSupplierCommitmentService(
   > & {
     model: Omit<CommitmentDependencies['model'], 'output'>;
     retentionDays?: number;
+    /** Publishes newly persisted provider observations atomically with procurement storage. */
+    observed?: (
+      db: TenantDatabase,
+      observation: PurchasingObservation,
+    ) => Promise<void>;
   },
 ) {
   return createSupplierCommitments({
     ...deps,
     model: { ...deps.model, output: extractionOutput },
-    store: createCommitmentStore(db, audit),
+    store: createCommitmentStore(db, audit, deps.observed),
     verifiedDrafts: (context, runIds) =>
       db.transaction(
         context.tenantId,

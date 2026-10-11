@@ -375,6 +375,9 @@ importers:
       '@luma/app-shopify':
         specifier: workspace:*
         version: link:../../packages/apps/shopify
+      '@luma/audit':
+        specifier: workspace:*
+        version: link:../../packages/audit
       '@luma/connections':
         specifier: workspace:*
         version: link:../../packages/connections

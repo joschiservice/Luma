@@ -36,7 +36,49 @@ const value = z.discriminatedUnion('source', [
 ]);
 const values = z.record(key, value);
 const base = z.object({ id: key });
+const assignee = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('person'), id: z.string().uuid() }).strict(),
+  z.object({ kind: z.literal('role'), key: text }).strict(),
+]);
+const coordinationSteps = [
+  base
+    .extend({
+      kind: z.literal('human_task'),
+      assignee,
+      instructions: z.string().min(1).max(2000),
+      choices: z
+        .array(z.string().min(1).max(200))
+        .min(1)
+        .max(20)
+        .refine(
+          (items) => new Set(items).size === items.length,
+          'Response choices must be unique.',
+        ),
+      evidence: z.enum(['text', 'link', 'record']),
+      dueAfterSeconds: z.number().int().min(1).max(2592000),
+      escalationTarget: assignee,
+    })
+    .strict(),
+  base
+    .extend({
+      kind: z.literal('event_wait'),
+      eventType: text,
+      correlation: value,
+      fields,
+      timeoutSeconds: z.number().int().min(1).max(2592000),
+      onTimeout: z.enum(['escalate', 'end']),
+    })
+    .strict(),
+] as const;
+const recheck = z
+  .object({
+    attempts: z.number().int().min(2).max(10),
+    intervalSeconds: z.number().int().min(1).max(300),
+  })
+  .strict()
+  .optional();
 const plainSteps = [
+  ...coordinationSteps,
   base.extend({ kind: z.literal('read'), source: text, fields }).strict(),
   base
     .extend({
@@ -79,6 +121,7 @@ const plainSteps = [
       forStep: key,
       evaluatorVersion: text,
       maxDurationSeconds: z.number().int().min(1).max(300),
+      recheck,
       fields,
     })
     .strict(),
@@ -163,26 +206,49 @@ const looseKey = z.string().max(80);
 const looseFields = z
   .record(looseKey, z.enum(['string', 'number', 'boolean', 'null']))
   .refine((items) => Object.keys(items).length <= 64);
+const looseValue = z.discriminatedUnion('source', [
+  z.object({ source: z.literal('input'), field: looseKey }).strict(),
+  z.object({ source: z.literal('evidence'), field: looseKey }).strict(),
+  z.object({ source: z.literal('literal'), value: scalar }).strict(),
+  z
+    .object({
+      source: z.literal('step'),
+      stepId: looseKey,
+      field: looseKey,
+    })
+    .strict(),
+]);
 const looseValues = z
-  .record(
-    looseKey,
-    z.discriminatedUnion('source', [
-      z.object({ source: z.literal('input'), field: looseKey }).strict(),
-      z.object({ source: z.literal('evidence'), field: looseKey }).strict(),
-      z.object({ source: z.literal('literal'), value: scalar }).strict(),
-      z
-        .object({
-          source: z.literal('step'),
-          stepId: looseKey,
-          field: looseKey,
-        })
-        .strict(),
-    ]),
-  )
+  .record(looseKey, looseValue)
   .refine((items) => Object.keys(items).length <= 64);
 const looseNumber = z.number().finite();
 const looseBase = z.object({ id: looseKey });
+const looseAssignee = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('person'), id: looseText }).strict(),
+  z.object({ kind: z.literal('role'), key: looseText }).strict(),
+]);
 const looseStep = z.discriminatedUnion('kind', [
+  looseBase
+    .extend({
+      kind: z.literal('human_task'),
+      assignee: looseAssignee,
+      instructions: looseText,
+      choices: z.array(looseText).max(20),
+      evidence: z.enum(['text', 'link', 'record']),
+      dueAfterSeconds: looseNumber,
+      escalationTarget: looseAssignee,
+    })
+    .strict(),
+  looseBase
+    .extend({
+      kind: z.literal('event_wait'),
+      eventType: looseText,
+      correlation: looseValue,
+      fields: looseFields,
+      timeoutSeconds: looseNumber,
+      onTimeout: z.enum(['escalate', 'end']),
+    })
+    .strict(),
   looseBase
     .extend({
       kind: z.literal('code'),
@@ -235,6 +301,7 @@ const looseStep = z.discriminatedUnion('kind', [
       forStep: looseKey,
       evaluatorVersion: looseText,
       maxDurationSeconds: looseNumber,
+      recheck,
       fields: looseFields,
     })
     .strict(),
@@ -490,6 +557,36 @@ function processRules(contract: ProcessSource): WorkflowDiagnostic[] {
         'forStep',
       );
       pendingApproval = null;
+    }
+    if (step.kind === 'human_task')
+      available.set(step.id, {
+        choice: 'string',
+        note: 'string',
+        actorId: 'string',
+        evidence: 'string',
+      });
+    if (step.kind === 'event_wait') {
+      available.set(step.id, step.fields);
+      const value = step.correlation;
+      const type =
+        value.source === 'literal'
+          ? typeof value.value
+          : value.source === 'step'
+            ? available.get(value.stepId)?.[value.field]
+            : value.source === 'input'
+              ? contract.inputs[value.field]
+              : contract.context.fields[value.field];
+      if (
+        type !== 'string' ||
+        (value.source === 'step' && value.stepId === step.id)
+      )
+        add(
+          'event_correlation',
+          'Choose an earlier string value for event correlation.',
+          'Event correlation must be a declared string value',
+          index,
+          'correlation',
+        );
     }
     if (step.kind === 'read' && !internal.has(step.id))
       available.set(step.id, step.fields);

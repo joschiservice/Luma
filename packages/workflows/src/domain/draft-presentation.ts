@@ -79,6 +79,13 @@ export function describeStep(
         title,
         description: `Someone who can approve changes decides on ${step.forStep ? `“${step.forStep}”` : 'the next action'} within ${duration(step.expiresAfterSeconds)}.`,
       };
+    case 'human_task':
+      return { title, description: step.instructions };
+    case 'event_wait':
+      return {
+        title,
+        description: `Wait for ${step.eventType} within ${duration(step.timeoutSeconds)}.`,
+      };
     case 'wait':
       return { title, description: `Wait ${duration(step.seconds)}.` };
     case 'verification': {

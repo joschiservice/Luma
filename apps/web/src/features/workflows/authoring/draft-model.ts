@@ -24,6 +24,8 @@ const bases: Record<StepKind, string> = {
   capability: 'action',
   approval: 'approval',
   wait: 'wait',
+  human_task: 'task',
+  event_wait: 'event',
   verification: 'verify',
   escalation: 'escalate',
   end: 'finish',
@@ -124,6 +126,31 @@ export function createSteps(
     }
     case 'approval':
       return [{ id, kind, forStep: '', expiresAfterSeconds: 86_400 }];
+    case 'human_task':
+      return [
+        {
+          id,
+          kind,
+          assignee: { kind: 'role', key: 'member' },
+          instructions: '',
+          choices: ['Confirmed'],
+          evidence: 'text',
+          dueAfterSeconds: 86400,
+          escalationTarget: { kind: 'role', key: 'admin' },
+        },
+      ];
+    case 'event_wait':
+      return [
+        {
+          id,
+          kind,
+          eventType: '',
+          correlation: { source: 'literal', value: '' },
+          fields: {},
+          timeoutSeconds: 86400,
+          onTimeout: 'escalate',
+        },
+      ];
     case 'wait':
       return [{ id, kind, seconds: 300 }];
     case 'verification':
@@ -376,6 +403,8 @@ const groups: Record<StepKind, PaletteGroup> = {
   condition: 'decide',
   approval: 'decide',
   wait: 'decide',
+  human_task: 'decide',
+  event_wait: 'decide',
   capability: 'act',
   verification: 'act',
   code: 'compute',

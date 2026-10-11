@@ -248,6 +248,17 @@ it('places an approved order once, follows supplier confirmation and receipt, an
   await f.pilot.followUp();
   record = await call(`/purchase-orders/${order.id}/record`);
   expect(record.stage).toBe('changed');
+  const acknowledgments = await f.db.owner.query(
+    "SELECT document FROM workflow_events WHERE tenant_id=$1 AND event_type='supplier.acknowledged' AND correlation_key=$2",
+    [org, order.id],
+  );
+  expect(acknowledgments.rows.length).toBeGreaterThan(0);
+  for (const { document: event } of acknowledgments.rows) {
+    expect(event.values).toEqual({ acknowledged: true });
+    expect(event.evidenceRefs).toEqual([
+      `procurement_observation:${event.sourceId.slice('supplier-acknowledgment:'.length)}`,
+    ]);
+  }
   expect(
     record.commitments.filter((c) => c.source.kind === 'purchasing_system'),
   ).toHaveLength(2);

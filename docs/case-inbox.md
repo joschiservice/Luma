@@ -25,7 +25,7 @@ filter and pagination state lives in validated search parameters.
 
 ## Lists and pagination
 
-Lists filter by view, class, severity and state, with 25 items per page by default and at
+Lists filter by view, class, severity, state and responsible person (including unassigned), with 25 items per page by default and at
 most 100. Keyset order is severity descending, attention time (or detection time)
 ascending, then ID. List items omit diagnosis evidence. Cursors bind the tenant, filters
 and page size. Cases move between pages as their state changes, so refresh restarts from
@@ -56,3 +56,10 @@ never describes connection coverage.
 Reads reuse identity guards and PostgreSQL RLS through the API login's SELECT-only case
 reader role (see [database roles](development.md#database-roles)). The worker keeps its
 separate write permissions.
+
+## Responsibility
+
+Case owners can be assigned, reassigned or cleared by someone with `decisions.assign`.
+The chosen person must be an active workspace member. Writes carry the current ownership
+revision and append audit history atomically; stale revisions return 409. Ownership appears
+in case detail, lists and Needs you. It grants no approval or execution permission.

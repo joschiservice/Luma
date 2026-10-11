@@ -136,7 +136,7 @@ describe('authoring vocabulary', () => {
     expect(vocabulary.capabilities[0]).toEqual(
       expect.objectContaining({ executable: false, reason: 'Built-in only.' }),
     );
-    expect(vocabulary.stepKinds).toHaveLength(9);
+    expect(vocabulary.stepKinds).toHaveLength(11);
     expect(vocabulary.codeSteps).toEqual(
       expect.objectContaining({ executable: true, evaluation: true, limits }),
     );

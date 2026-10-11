@@ -1,8 +1,13 @@
 import type { TenantContext } from '@luma/identity';
+import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
+import { canonicalJson } from '@luma/platform';
 
 import type { WorkflowTriggerStore } from '../application/triggers.js';
-import type { WorkflowTriggerRun } from '../domain/workflow.js';
+import type {
+  WorkflowSubscription,
+  WorkflowTriggerRun,
+} from '../domain/workflow.js';
 import { resolutionWorkflow } from '../domain/workflow.js';
 import { compilePlaybook } from './playbooks/schema.js';
 import { compileProcessWorkflow } from './process-schema.js';
@@ -29,6 +34,87 @@ export function createWorkflowTriggerStore(
   pending(context: TenantContext, id: string): Promise<WorkflowTriggerRun[]>;
 } {
   return {
+    subscription: (context, id) =>
+      db.transaction(
+        context.tenantId,
+        async (tx) =>
+          (
+            await tx.query<{ document: WorkflowSubscription }>(
+              'SELECT document FROM workflow_subscription_heads h JOIN workflow_subscription_revisions r USING(tenant_id,id,revision) WHERE h.tenant_id=$1 AND h.id=$2',
+              [context.tenantId, id],
+            )
+          ).rows[0]?.document ?? null,
+      ),
+    subscriptions: (context, id) =>
+      db.transaction(context.tenantId, async (tx) =>
+        (
+          await tx.query<{ document: WorkflowSubscription }>(
+            'SELECT r.document FROM workflow_subscription_heads h JOIN workflow_subscription_revisions r USING(tenant_id,id,revision) WHERE h.tenant_id=$1 AND r.definition_id=$2 ORDER BY h.id LIMIT 100',
+            [context.tenantId, id],
+          )
+        ).rows.map((row) => row.document),
+      ),
+    saveSubscription: (context, input, expected) =>
+      db.transaction(context.tenantId, async (tx) => {
+        await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+          `workflow-subscription:${context.tenantId}:${input.id}`,
+        ]);
+        const head = (
+          await tx.query<{ revision: number }>(
+            'SELECT revision FROM workflow_subscription_heads WHERE tenant_id=$1 AND id=$2',
+            [context.tenantId, input.id],
+          )
+        ).rows[0];
+        if ((head?.revision ?? 0) !== expected) {
+          const prior = (
+            await tx.query<{ document: WorkflowSubscription }>(
+              'SELECT document FROM workflow_subscription_revisions WHERE tenant_id=$1 AND id=$2 AND revision=$3',
+              [context.tenantId, input.id, input.revision],
+            )
+          ).rows[0]?.document;
+          if (
+            prior &&
+            canonicalJson({ ...prior, updatedAt: input.updatedAt }) ===
+              canonicalJson(input)
+          )
+            return prior;
+          throw new IdentityError(
+            409,
+            'CONFLICT',
+            'This subscription changed. Refresh before saving.',
+          );
+        }
+        if (
+          head &&
+          !(
+            await tx.query(
+              'SELECT 1 FROM workflow_subscription_revisions WHERE tenant_id=$1 AND id=$2 AND revision=$3 AND definition_id=$4',
+              [context.tenantId, input.id, head.revision, input.definitionId],
+            )
+          ).rowCount
+        )
+          throw new IdentityError(
+            409,
+            'CONFLICT',
+            'Subscription belongs to another workflow.',
+          );
+        await tx.query(
+          'INSERT INTO workflow_subscription_revisions(tenant_id,id,revision,definition_id,document) VALUES($1,$2,$3,$4,$5)',
+          [
+            context.tenantId,
+            input.id,
+            input.revision,
+            input.definitionId,
+            input,
+          ],
+        );
+        await tx.query(
+          'INSERT INTO workflow_subscription_heads(tenant_id,id,revision) VALUES($1,$2,$3) ON CONFLICT(tenant_id,id) DO UPDATE SET revision=EXCLUDED.revision',
+          [context.tenantId, input.id, input.revision],
+        );
+
+        return input;
+      }),
     pending: (context, id) =>
       db.transaction(context.tenantId, async (tx) => {
         const rows = await tx.query<Row>(
@@ -83,6 +169,26 @@ export function createWorkflowTriggerStore(
       }),
     insert: (context, key, run) =>
       db.transaction(context.tenantId, async (tx) => {
+        if (run.subscription) {
+          await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+            `workflow-subscription:${context.tenantId}:${run.subscription.id}`,
+          ]);
+          const head = (
+            await tx.query<{ document: WorkflowSubscription }>(
+              'SELECT r.document FROM workflow_subscription_heads h JOIN workflow_subscription_revisions r USING(tenant_id,id,revision) WHERE h.tenant_id=$1 AND h.id=$2',
+              [context.tenantId, run.subscription.id],
+            )
+          ).rows[0]?.document;
+          if (
+            !head?.active ||
+            canonicalJson(head) !== canonicalJson(run.subscription)
+          )
+            throw new IdentityError(
+              409,
+              'CONFLICT',
+              'Subscription changed before this start. Refresh and retry.',
+            );
+        }
         await tx.query(
           `INSERT INTO workflow_trigger_runs(tenant_id,id,definition_id,version,version_digest,dedupe_key,request_digest,document,state,due_at,triggered_at)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(tenant_id,dedupe_key) DO NOTHING`,
@@ -122,7 +228,7 @@ export function createWorkflowTriggerStore(
       db.transaction(context.tenantId, async (tx) => {
         const row = (
           await tx.query<Row>(
-            "UPDATE workflow_trigger_runs SET state='cancelled' WHERE tenant_id=$1 AND definition_id=$2 AND id=$3 AND state IN ('scheduled','cancelled') RETURNING document,state,triggered_at",
+            "UPDATE workflow_trigger_runs SET state='cancelled' WHERE tenant_id=$1 AND definition_id=$2 AND id=$3 AND (state IN ('scheduled','cancelled') OR (state='awaiting_admission' AND (SELECT waiting.state='waiting' AND waiting.document->>'kind' IN ('human_task','event_wait') FROM workflow_process_steps waiting WHERE waiting.tenant_id=workflow_trigger_runs.tenant_id AND waiting.run_id=workflow_trigger_runs.id ORDER BY waiting.sequence DESC LIMIT 1) AND NOT EXISTS(SELECT 1 FROM workflow_process_steps s WHERE s.tenant_id=workflow_trigger_runs.tenant_id AND s.run_id=workflow_trigger_runs.id AND (s.document->>'kind'='end' OR s.state IN ('denied','failed','inconclusive','ended','escalated'))))) RETURNING document,state,triggered_at",
             [context.tenantId, id, runId],
           )
         ).rows[0];

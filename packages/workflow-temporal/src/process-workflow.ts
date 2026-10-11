@@ -1,5 +1,6 @@
 import {
   type ProcessActivities,
+  type ProcessCheckpoint,
   type ProcessProgress,
   type ProcessRun,
   type ProcessWorkflowVersion,
@@ -8,11 +9,13 @@ import {
 import {
   ActivityCancellationType,
   condition,
+  continueAsNew,
   defineQuery,
   defineSignal,
   proxyActivities,
   setHandler,
   sleep,
+  workflowInfo,
 } from '@temporalio/workflow';
 
 import { pauseWhileInactive } from './workspace-pause.js';
@@ -23,7 +26,7 @@ const processDecisionChanged = defineSignal('processDecisionChanged');
 
 // Every activity pauses the run while its workspace is suspended or closed.
 const activities = pauseWhileInactive(
-  proxyActivities<ProcessActivities>({
+  proxyActivities<Required<ProcessActivities>>({
     startToCloseTimeout: '1 minute',
     scheduleToCloseTimeout: '5 minutes',
     retry: {
@@ -63,6 +66,7 @@ const code = pauseWhileInactive(
 export async function processWorkflow(
   run: ProcessRun,
   version: ProcessWorkflowVersion,
+  checkpoint?: ProcessCheckpoint,
 ): Promise<ProcessProgress> {
   let progress: ProcessProgress = { state: 'running', stepId: null };
   let wake = false;
@@ -77,6 +81,7 @@ export async function processWorkflow(
     {
       code: code.code,
       read: activities.read,
+      coordinate: activities.coordinate,
       decision: activities.decision,
       action: action.action,
       verify: activities.verify,
@@ -85,6 +90,10 @@ export async function processWorkflow(
     {
       now: () => new Date().toISOString(),
       wait: sleep,
+      checkpoint: async (next) => {
+        if (workflowInfo().continueAsNewSuggested)
+          await continueAsNew<typeof processWorkflow>(run, version, next);
+      },
       decisionChanged: async (milliseconds) => {
         const changed = await condition(() => wake, milliseconds);
         wake = false;
@@ -95,5 +104,6 @@ export async function processWorkflow(
     (next) => {
       progress = next;
     },
+    checkpoint,
   );
 }

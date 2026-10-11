@@ -26,6 +26,7 @@ import type {
 import { resolutionWorkflow } from '../domain/workflow.js';
 import type { CaseWorkflows } from './case-workflows.js';
 import type { createCodeEvaluations } from './code-evaluations.js';
+import type { createWorkflowCoordination } from './coordination.js';
 import type { PlaybookOutcome, PlaybookRun } from './playbook.js';
 import type { PlaybookLibrary } from './playbook-library.js';
 import type {
@@ -104,6 +105,7 @@ export type WorkflowPeople = (
 
 /** Combines native definitions and existing resolution definitions under one authorized catalog. */
 export function createWorkflowCatalog(deps: {
+  coordination?: ReturnType<typeof createWorkflowCoordination>;
   codeProcesses?: {
     supported(version: PublishedWorkflowVersion): boolean;
     start(context: TenantContext, run: WorkflowTriggerRun): Promise<void>;
@@ -465,6 +467,9 @@ export function createWorkflowCatalog(deps: {
     deps.people ? deps.people(context, ids) : [];
 
   return {
+    coordination: deps.coordination,
+    subscriptions: deps.triggers.subscriptions,
+    configureSubscription: deps.triggers.configureSubscription,
     /** Runs a fixture evaluation without access to production capabilities. */
     async evaluateCode(
       context: TenantContext,

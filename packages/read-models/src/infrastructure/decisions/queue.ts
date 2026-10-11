@@ -86,15 +86,16 @@ function queueSql(cases: string) {
     (c.proposal->'preconditions'->>'validUntil')::timestamptz,c.valid_until) END AS deadline,
    CASE WHEN c.subject->>'subjectKind' IN ('order','fulfillment','sku','product') THEN c.subject->>'subjectKind' END AS record_kind,
    NULL::text AS record_id,c.subject->'scope'->>0 AS record_connection,c.subject->>'subjectId' AS record_external,
-   to_jsonb(c) AS facts
+   to_jsonb(c) AS facts,
+   CASE WHEN to_jsonb(c)->'owner'->>'userId' IS NOT NULL THEN jsonb_build_object('assigneeId',to_jsonb(c)->'owner'->'userId','assignedBy',to_jsonb(c)->'owner'->'assignedBy','assignedAt',to_jsonb(c)->'owner'->'assignedAt','revision',to_jsonb(c)->'owner'->'revision') END AS owner_assignment
   FROM case_rows c WHERE $15::boolean),
  external AS (
   SELECT x.id,x.reason,x.domain,x.impact,x.requested_at,x.deadline,x.record_kind,x.record_id,
-   x.record_connection,x.record_external,NULL::jsonb AS facts
+   x.record_connection,x.record_external,NULL::jsonb AS facts,x.owner_assignment
   FROM jsonb_to_recordset($3::jsonb) AS x(id text,reason text,domain text,impact text,requested_at timestamptz,
-   deadline timestamptz,record_kind text,record_id text,record_connection text,record_external text)),
+   deadline timestamptz,record_kind text,record_id text,record_connection text,record_external text,owner_assignment jsonb)),
  ranked AS (
-  SELECT c.*,a.assignee_id,a.assigned_by,a.assigned_at,a.revision,
+  SELECT c.*,CASE WHEN c.facts IS NOT NULL THEN (c.owner_assignment->>'assigneeId')::uuid ELSE COALESCE((c.owner_assignment->>'assigneeId')::uuid,a.assignee_id) END AS assignee_id,CASE WHEN c.facts IS NOT NULL THEN (c.owner_assignment->>'assignedBy')::uuid ELSE COALESCE((c.owner_assignment->>'assignedBy')::uuid,a.assigned_by) END AS assigned_by,CASE WHEN c.facts IS NOT NULL THEN (c.owner_assignment->>'assignedAt')::timestamptz ELSE COALESCE((c.owner_assignment->>'assignedAt')::timestamptz,a.assigned_at) END AS assigned_at,CASE WHEN c.facts IS NOT NULL THEN (c.owner_assignment->>'revision')::integer ELSE COALESCE((c.owner_assignment->>'revision')::integer,a.revision) END AS revision,
    CASE WHEN c.deadline IS NOT NULL AND c.deadline<=$2::timestamptz+make_interval(mins=>$4::integer) THEN 0
     WHEN c.impact='high' THEN 1 ELSE 2 END AS rank,
    COALESCE(c.deadline,'infinity'::timestamptz) AS deadline_key
@@ -217,6 +218,7 @@ export function createDecisionQueue(
     });
     const rows = [...external.values()].map((item) => ({
       id: item.id,
+      owner_assignment: item.ownerAssignment ?? null,
       reason: item.reason,
       domain: item.domain,
       impact: item.impact.level,

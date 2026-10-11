@@ -32,5 +32,9 @@
   "vocabulary_subject_inventory_position_label": "Bestandsposition",
   "vocabulary_subject_inventory_position_description": "Eine verknüpfte SKU an einem Lagerort.",
   "vocabulary_subject_purchase_order_label": "Lieferantenbestellung",
-  "vocabulary_subject_purchase_order_description": "Eine in der Beschaffung erfasste Lieferantenbestellung."
+  "vocabulary_subject_purchase_order_description": "Eine in der Beschaffung erfasste Lieferantenbestellung.",
+  "vocabulary_step_human_task_label": "Eine Person fragen",
+  "vocabulary_step_human_task_description": "Weise Arbeit zu, sammle Nachweise und fahre nach der Antwort fort.",
+  "vocabulary_step_event_wait_label": "Auf ein Ereignis warten",
+  "vocabulary_step_event_wait_description": "Warte innerhalb einer Frist auf ein zugeordnetes Geschäftsereignis."
 }

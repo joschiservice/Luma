@@ -32,5 +32,9 @@
   "vocabulary_subject_inventory_position_label": "Stock position",
   "vocabulary_subject_inventory_position_description": "A linked SKU at one inventory location.",
   "vocabulary_subject_purchase_order_label": "Purchase order",
-  "vocabulary_subject_purchase_order_description": "A purchase order recorded in Procurement."
+  "vocabulary_subject_purchase_order_description": "A purchase order recorded in Procurement.",
+  "vocabulary_step_human_task_label": "Ask a person",
+  "vocabulary_step_human_task_description": "Assign work, collect evidence and continue when answered.",
+  "vocabulary_step_event_wait_label": "Wait for an event",
+  "vocabulary_step_event_wait_description": "Wait for a correlated business event within a deadline."
 }

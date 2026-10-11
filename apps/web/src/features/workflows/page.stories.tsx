@@ -4,6 +4,7 @@ import type {
   WorkflowSummary,
 } from '@luma/api-contract';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
   createRootRoute,
@@ -440,6 +441,9 @@ function RoutedPreview({
 }: {
   state: Parameters<typeof Preview>[0]['state'];
 }) {
+  const [queryClient] = useState(
+    () => new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+  );
   const [router] = useState(() =>
     createRouter({
       history: createMemoryHistory(),
@@ -449,7 +453,11 @@ function RoutedPreview({
     }),
   );
 
-  return <RouterProvider router={router} />;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  );
 }
 
 const meta = {

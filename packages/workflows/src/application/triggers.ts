@@ -1,6 +1,7 @@
 import type { Permission, TenantContext } from '@luma/identity';
 import {
   IdentityError,
+  requireChangesAllowed,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
@@ -9,12 +10,28 @@ import type { PlaybookSnapshot } from '../domain/playbook.js';
 import { validateTriggerSignal } from '../domain/trigger.js';
 import type {
   PublishedWorkflowVersion,
+  WorkflowSubscription,
+  WorkflowTrigger,
   WorkflowTriggerRequest,
   WorkflowTriggerRun,
 } from '../domain/workflow.js';
 
 /** Persists immutable trigger evidence with atomic deduplication per version, source and subject. */
 export interface WorkflowTriggerStore {
+  subscription?(
+    context: TenantContext,
+    id: string,
+  ): Promise<WorkflowSubscription | null>;
+  subscriptions?(
+    context: TenantContext,
+    definitionId: string,
+  ): Promise<WorkflowSubscription[]>;
+  saveSubscription?(
+    context: TenantContext,
+    input: WorkflowSubscription,
+    expected: number,
+  ): Promise<WorkflowSubscription>;
+
   version(
     context: TenantContext,
     id: string,
@@ -51,6 +68,8 @@ export function createWorkflowTriggers(deps: {
     const fresh = await deps.refreshContext(context);
     requireTenant(fresh, context.tenantId);
     requirePermission(fresh, permission);
+    if (permission === 'workflows.triggers.manage')
+      requireChangesAllowed(fresh);
     if (fresh.actor.id !== context.actor.id)
       throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
 
@@ -69,6 +88,86 @@ export function createWorkflowTriggers(deps: {
   }
 
   return {
+    /** Lists current subscriptions; historical revisions remain bound to their runs. */
+    async subscriptions(context: TenantContext, id: string) {
+      context = await authorize(context, 'workflows.read');
+      if (!deps.store.subscriptions)
+        throw new IdentityError(
+          503,
+          'SERVICE_UNAVAILABLE',
+          'Subscriptions are unavailable.',
+        );
+
+      return deps.store.subscriptions(context, id);
+    },
+    /** Adds an immutable revision without changing published logic or historical runs. */
+    async configureSubscription(
+      context: TenantContext,
+      id: string,
+      input: {
+        id: string;
+        revision: number;
+        version: string;
+        reviewedDigest: string;
+        trigger: WorkflowTrigger;
+        active: boolean;
+      },
+    ) {
+      context = await authorize(context, 'workflows.triggers.manage');
+      if (!deps.store.saveSubscription)
+        throw new IdentityError(
+          503,
+          'SERVICE_UNAVAILABLE',
+          'Subscriptions are unavailable.',
+        );
+      const version = await deps.store.version(context, id, input.version);
+      if (!version || version.digest !== input.reviewedDigest)
+        throw new IdentityError(
+          409,
+          'CONFLICT',
+          'Review the current workflow version.',
+        );
+      if (
+        version.format !== 'workflow/2' ||
+        version.applicability.trigger.kind === 'exception'
+      )
+        throw new IdentityError(
+          409,
+          'CONFLICT',
+          'This workflow uses its domain activation.',
+        );
+      if (
+        input.trigger.kind === 'exception' ||
+        (input.trigger.kind === 'condition' &&
+          version.context.fields[input.trigger.field] !==
+            (input.trigger.equals === null
+              ? 'null'
+              : typeof input.trigger.equals)) ||
+        (input.trigger.kind === 'schedule' &&
+          Date.parse(input.trigger.at) <= deps.now().getTime())
+      )
+        throw new IdentityError(
+          422,
+          'VALIDATION_ERROR',
+          'The subscription does not match this workflow’s context or schedule.',
+        );
+
+      return deps.store.saveSubscription(
+        context,
+        {
+          id: input.id,
+          definitionId: id,
+          version: version.version,
+          versionDigest: version.digest,
+          revision: input.revision + 1,
+          trigger: input.trigger,
+          active: input.active,
+          updatedBy: context.actor.id,
+          updatedAt: deps.now().toISOString(),
+        },
+        input.revision,
+      );
+    },
     /** Records a signal exactly once. Retrying cannot change the bound evidence or version. */
     async fire(
       context: TenantContext,
@@ -89,12 +188,29 @@ export function createWorkflowTriggers(deps: {
           'CONFLICT',
           'The reviewed version changed. Reload the workflow.',
         );
-      const trigger = version.applicability.trigger;
+      const subscription = request.subscription
+        ? await deps.store.subscription?.(context, request.subscription.id)
+        : null;
+      if (
+        request.subscription &&
+        (!subscription ||
+          !subscription.active ||
+          subscription.definitionId !== id ||
+          subscription.revision !== request.subscription.revision ||
+          subscription.versionDigest !== version.digest)
+      )
+        throw new IdentityError(
+          409,
+          'CONFLICT',
+          'This subscription changed. Review it again.',
+        );
+      const trigger = subscription?.trigger ?? version.applicability.trigger;
       const key = deps.hash([
         context.tenantId,
         id,
         version.digest,
         request.subject,
+        ...(subscription ? [subscription.id, subscription.revision] : []),
         trigger.kind,
         trigger.kind === 'schedule' ? trigger.at : request.signal.sourceId,
       ]);
@@ -109,7 +225,12 @@ export function createWorkflowTriggers(deps: {
       try {
         snapshot = deps.parseSnapshot(request.context, version);
         validateTriggerSignal(
-          version,
+          subscription
+            ? {
+                ...version,
+                applicability: { ...version.applicability, trigger },
+              }
+            : version,
           request.subject,
           request.signal,
           snapshot,
@@ -125,6 +246,7 @@ export function createWorkflowTriggers(deps: {
         );
       }
       const run: WorkflowTriggerRun = {
+        ...(subscription ? { subscription } : {}),
         activationId: null,
         artifactDigest: null,
         id: deps.id(),

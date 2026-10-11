@@ -181,6 +181,19 @@ export const workflowRunViewSchema = playbookRunViewSchema
       action: text,
       verification: text,
     }),
+    subscription: z
+      .object({
+        id: z.string().uuid(),
+        definitionId: z.string(),
+        version: z.string(),
+        versionDigest: z.string(),
+        revision: z.number().int().positive(),
+        trigger: workflowTriggerSchema,
+        active: z.boolean(),
+        updatedBy: z.string().uuid(),
+        updatedAt: z.string().datetime(),
+      })
+      .optional(),
     trigger: workflowTriggerSchema,
     subject: z.object({ kind: text, id: text }),
     actor: workflowActorSchema,
@@ -225,6 +238,8 @@ export const workflowRunViewSchema = playbookRunViewSchema
             'capability',
             'approval',
             'wait',
+            'human_task',
+            'event_wait',
             'verification',
             'escalation',
             'end',
@@ -302,6 +317,10 @@ const scalar = z.union([
 /** Supply an immutable source ID and reuse the complete request when retrying. */
 export const fireWorkflowSchema = z
   .object({
+    subscription: z
+      .object({ id: z.string().uuid(), revision: z.number().int().positive() })
+      .strict()
+      .optional(),
     version: z.string().min(1).max(200),
     reviewedDigest: z.string().regex(/^[a-f0-9]{64}$/),
     subject: z

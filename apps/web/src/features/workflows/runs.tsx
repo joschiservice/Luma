@@ -245,12 +245,18 @@ export function WorkflowRuns({
                     {run.reason}
                   </Alert>
                 ) : null}
-                {run.triggerState === 'scheduled' && detail.canManage ? (
+                {(run.triggerState === 'scheduled' ||
+                  (run.processState === 'waiting' &&
+                    ['human_task', 'event_wait'].includes(
+                      run.processSteps?.at(-1)?.kind ?? '',
+                    ))) &&
+                detail.canManage ? (
                   <CancelScheduledStart
                     organizationId={organizationId}
                     definitionId={definitionId}
                     runId={run.id}
                     refresh={refresh}
+                    coordination={run.processState === 'waiting'}
                   />
                 ) : null}
                 {RunContext ? (

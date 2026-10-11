@@ -137,6 +137,14 @@ const stepLabels: Record<StepKindEntry['kind'], [string, string]> = {
     'Wait for someone who can approve changes to decide on the next action.',
   ],
   wait: ['Wait', 'Pause for a fixed time before continuing.'],
+  human_task: [
+    'Ask a person',
+    'Assign work, collect evidence and continue when answered.',
+  ],
+  event_wait: [
+    'Wait for an event',
+    'Wait for a correlated business event within a deadline.',
+  ],
   verification: [
     'Check the result',
     'Read the data again, independently, to confirm the change worked.',
@@ -265,7 +273,20 @@ export function stepScopes(content: WorkflowDraftContent): ValueOption[][] {
   const earlier: ValueOption[] = [];
   for (const step of content.steps) {
     scopes.push([...base, ...earlier]);
-    if ((step.kind === 'read' && !owned.has(step.id)) || step.kind === 'code')
+    if (step.kind === 'human_task')
+      earlier.push(
+        ...['choice', 'note', 'actorId', 'evidence'].map((field) => ({
+          source: 'step' as const,
+          stepId: step.id,
+          field,
+          type: 'string' as const,
+        })),
+      );
+    if (
+      (step.kind === 'read' && !owned.has(step.id)) ||
+      step.kind === 'code' ||
+      step.kind === 'event_wait'
+    )
       earlier.push(
         ...Object.entries(step.fields).map(([field, type]) => ({
           source: 'step' as const,

@@ -16,6 +16,7 @@ import { Button } from '@luma/ui/components/primitives/button';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { Pagination } from '@luma/ui/components/primitives/pagination';
 import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
+import { Select } from '@luma/ui/components/primitives/select';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Link,
@@ -29,6 +30,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { connectionsOptions } from '../../kit/connections/data';
 import { IdentityError } from '../../kit/identity/data';
+import { membersOptions } from '../../kit/settings/data';
 import { overviewOptions } from '../overview/data';
 import { IssueActions } from './actions';
 import { casesKey, casesOptions, type InboxSearch, matchesView } from './data';
@@ -56,6 +58,7 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
   const search = useSearch({ from: '/app/$organizationId/exceptions' });
   const navigate = useNavigate({ from: '/app/$organizationId/exceptions' });
   const client = useQueryClient();
+  const members = useQuery(membersOptions(organizationId));
   const list = useQuery(casesOptions(organizationId, search));
   const observation = useCaseObservation(organizationId, exceptionId ?? '');
   const detail = observation.snapshot;
@@ -67,6 +70,7 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
   const filterKey = JSON.stringify([
     search.view,
     search.class,
+    search.ownerId,
     search.state,
     search.severity,
   ]);
@@ -187,6 +191,25 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
           />
         }
       />
+      <Select
+        aria-label={m.authoring_coordination_owner()}
+        value={search.ownerId ?? ''}
+        options={[
+          { value: '', label: m.authoring_coordination_owner_all() },
+          { value: 'unassigned', label: m.authoring_coordination_unassigned() },
+          ...(members.data ?? []).map((member) => ({
+            value: member.userId,
+            label: member.name || member.email || m.decisions_member_fallback(),
+          })),
+        ]}
+        onValueChange={(ownerId) =>
+          update({
+            ...search,
+            ownerId: ownerId || undefined,
+            cursor: undefined,
+          })
+        }
+      />
       {overview.isError && (
         <CaseNotice title={m.exceptions_summary_unavailable_title()}>
           {m.exceptions_summary_unavailable_text()}
@@ -288,6 +311,12 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                           }}
                         >
                           <CaseRow item={row} />
+                          {row.owner?.name ? (
+                            <small>
+                              {m.authoring_coordination_owner()}:{' '}
+                              {row.owner.name}
+                            </small>
+                          ) : null}
                         </Link>
                       </li>
                     ))}
