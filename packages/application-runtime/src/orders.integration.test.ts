@@ -676,7 +676,8 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
       fulfillment: 'unfulfilled',
       open: true,
       overdue: null,
-      differs: true,
+      differs: false,
+      comparisonState: 'inconclusive',
       lineCount: 1,
     });
     expect(first.issueIds).toHaveLength(1);
@@ -728,7 +729,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     expect(await ids({ view: 'outstanding' })).toEqual([a, c]);
     expect(await ids({ view: 'overdue' })).toEqual([c]);
     expect(await ids({ view: 'needs_you' })).toEqual([a]);
-    expect(await ids({ view: 'differs' })).toEqual([a]);
+    expect(await ids({ view: 'differs' })).toEqual([]);
 
     // The views count exactly the orders behind the shared order metrics.
     const metrics = createOperationalMetrics(
@@ -948,7 +949,8 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     expect(detail.order).toMatchObject({
       id: a,
       displayNumber: 'SO-10',
-      differs: true,
+      differs: false,
+      comparisonState: 'inconclusive',
       issueIds: [issueId],
     });
     const shop = detail.sources.find((item) => item.connectionId === shopify)!;
@@ -973,6 +975,9 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     ).toMatchObject({ selected: true, fulfillment: 'unfulfilled' });
     expect(detail.differences.map((item) => item.field)).toEqual([
       'paymentStatus',
+      'fulfilledQuantity',
+      'remainingQuantity',
+      'fulfillment',
     ]);
     expect(detail.fulfillments).toMatchObject([
       {
@@ -1342,7 +1347,14 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
         limit: 50,
         count: 'exact',
       }),
-    ).toEqual(expected);
+    ).toEqual({
+      ...expected,
+      items: expected.items.map((item) => ({
+        ...item,
+        differs: false,
+        comparisonState: 'inconclusive',
+      })),
+    });
     const rebuild = createOrderListRebuilder(createTenantDatabase(writer));
     let after = await rebuild(context(), undefined, 1);
     expect(after).not.toBeNull();
@@ -1666,6 +1678,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
                 query: async (sql, values) => {
                   if (
                     sql.startsWith('WITH sources AS') ||
+                    sql.startsWith('WITH comparisons AS') ||
                     sql.startsWith('WITH search_values AS') ||
                     sql.startsWith('WITH inserted AS')
                   ) {
@@ -1722,6 +1735,147 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
       );
     }
   }, 1800000);
+  it('persists change times across polls and agrees on pending, confirmed and stale list/detail comparisons', async () => {
+    const base = {
+      connectionId: shopify,
+      external: 'lag-shop',
+      key: 'lag-order',
+      updatedAt: '2026-09-20T11:59:00Z',
+      data: {},
+      lines: [
+        {
+          external: 'lag-line',
+          key: 'lag-line',
+          quantity: '2',
+          current: '2',
+          sku: { external: 'lag-sku', key: 'lag-sku' },
+        },
+      ],
+    };
+    const erp = { ...base, connectionId: jtl, external: 'lag-erp' };
+    const id = await seedOrder(base);
+    await seedOrder(erp);
+    const changed = {
+      ...base,
+      updatedAt: '2026-09-20T12:00:00Z',
+      lines: [{ ...base.lines[0]!, current: '1', cancelled: '1' }],
+    };
+    await seedOrder(changed);
+    const orders = workspace();
+    const query = {
+      q: '',
+      view: 'differs' as const,
+      sort: 'updated' as const,
+      direction: 'desc' as const,
+      limit: 50,
+    };
+    const pending = (await orders.get(context(), id))!;
+    expect(pending.order).toMatchObject({
+      differs: false,
+      comparisonState: 'pending',
+    });
+    expect(pending.differences.map((item) => item.field)).toEqual([
+      'currentQuantity',
+      'cancelledQuantity',
+      'remainingQuantity',
+    ]);
+    expect(pending.differences[0]?.authority).toMatchObject({
+      connectionId: shopify,
+      state: 'resolved',
+    });
+    expect(pending.differences[0]?.values).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          connectionId: shopify,
+          value: '1',
+          evidence: [
+            expect.objectContaining({ observedAt: '2026-09-20T12:00:00Z' }),
+          ],
+        }),
+      ]),
+    );
+    expect((await orders.list(context(), query)).items).toEqual([]);
+    const previous = (
+      await owner.query(
+        'SELECT comparison_changed_at FROM orders_list WHERE tenant_id=$1 AND entity_id=$2 AND connection_id=$3',
+        [tenant, id, shopify],
+      )
+    ).rows[0];
+    clock = new Date('2026-09-20T12:16:00Z');
+    await seedOrder({ ...changed, updatedAt: clock.toISOString() });
+    expect((await orders.get(context(), id))?.order.comparisonState).toBe(
+      'inconclusive',
+    );
+    await seedOrder({ ...erp, updatedAt: clock.toISOString() });
+    expect(
+      (
+        await owner.query(
+          'SELECT comparison_changed_at FROM orders_list WHERE tenant_id=$1 AND entity_id=$2 AND connection_id=$3',
+          [tenant, id, shopify],
+        )
+      ).rows[0],
+    ).toEqual(previous);
+    expect((await orders.get(context(), id))?.order).toMatchObject({
+      differs: true,
+      comparisonState: 'confirmed',
+    });
+    expect(
+      (await orders.list(context(), query)).items.map((item) => item.id),
+    ).toEqual([id]);
+    // A newer partial collection page makes the comparison inconclusive without rewriting order evidence.
+    await owner.query(
+      `INSERT INTO connector_read_checks(tenant_id,connection_id,capability,observed_at,succeeded,document)
+      VALUES($1,$2,'fulfillment.read',$3,true,$4)`,
+      [
+        tenant,
+        jtl,
+        clock.toISOString(),
+        {
+          ok: true,
+          value: { completeness: 'partial', nextCursor: null, items: [] },
+        },
+      ],
+    );
+    expect((await orders.get(context(), id))?.order).toMatchObject({
+      differs: false,
+      comparisonState: 'inconclusive',
+    });
+    expect((await orders.list(context(), query)).items).toEqual([]);
+    await owner.query(
+      `INSERT INTO connector_read_checks(tenant_id,connection_id,capability,observed_at,succeeded,document)
+      VALUES($1,$2,'fulfillment.read',$3,true,$4)`,
+      [
+        tenant,
+        jtl,
+        clock.toISOString(),
+        {
+          ok: true,
+          value: { completeness: 'complete', nextCursor: null, items: [] },
+        },
+      ],
+    );
+    expect((await orders.get(context(), id))?.order.comparisonState).toBe(
+      'confirmed',
+    );
+    clock = new Date('2026-09-20T12:22:00Z');
+    expect((await orders.get(context(), id))?.order).toMatchObject({
+      differs: false,
+      comparisonState: 'inconclusive',
+    });
+    expect((await orders.list(context(), query)).items).toEqual([]);
+    clock = new Date('2026-09-20T12:23:00Z');
+    await seedOrder({ ...changed, updatedAt: clock.toISOString() });
+    await seedOrder({
+      ...erp,
+      updatedAt: clock.toISOString(),
+      lines: changed.lines,
+    });
+    expect((await orders.get(context(), id))?.order).toMatchObject({
+      differs: false,
+      comparisonState: 'matching',
+    });
+  });
+
   it('compares current units, ignores removed SKU groups and keeps earlier snapshots immutable', async () => {
     const source = {
       connectionId: shopify,
@@ -1770,7 +1924,9 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
       cancelledQuantity: '1',
       remainingQuantity: '1',
     });
-    expect(edited.differences.map((d) => d.field)).toEqual(['lines']);
+    // ERP reductions are unknown; ordered units cannot substitute for current units.
+    expect(edited.differences).toEqual([]);
+    expect(edited.order.comparisonState).toBe('inconclusive');
     expect(
       edited.sources.find((s) => s.connectionId === jtl)?.lines[0],
     ).toMatchObject({

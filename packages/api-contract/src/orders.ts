@@ -73,6 +73,7 @@ export const orderListItemSchema = z.object({
   dueAt: timestamp.nullable(),
   issueIds: z.array(z.string().uuid()),
   differs: z.boolean(),
+  comparisonState: z.enum(['matching', 'pending', 'confirmed', 'inconclusive']),
   sources: z.array(orderSourceSchema),
   observedAt: timestamp,
   sourceUpdatedAt: timestamp.nullable(),
@@ -119,6 +120,7 @@ export const orderListQuerySchema = z
 export const orderLineSchema = z.object({
   id: z.string().uuid(),
   skuId: z.string().uuid().nullable(),
+  comparisonKey: z.string().uuid().nullable(),
   skuCode: z.string().nullable(),
   title: z.string().nullable(),
   quantity: z
@@ -156,9 +158,35 @@ export const orderSourceFactsSchema = orderSourceSchema.extend({
 });
 
 export const orderDifferenceSchema = z.object({
-  field: z.enum(['status', 'paymentStatus', 'total', 'lines']),
+  field: z.enum([
+    'status',
+    'paymentStatus',
+    'total',
+    'lines',
+    'orderedQuantity',
+    'currentQuantity',
+    'cancelledQuantity',
+    'fulfilledQuantity',
+    'remainingQuantity',
+    'fulfillment',
+    'location',
+    'overfulfillment',
+    'unit',
+  ]),
+  lineKey: z.string().uuid().nullable(),
+  authority: factAuthoritySchema.nullable(),
   values: z.array(
-    z.object({ connectionId: z.string().uuid(), value: z.string().nullable() }),
+    z.object({
+      connectionId: z.string().uuid(),
+      value: z.string().nullable(),
+      evidence: z.array(
+        z.object({
+          snapshotId: z.string().uuid(),
+          observationId: z.string().uuid(),
+          observedAt: timestamp,
+        }),
+      ),
+    }),
   ),
 });
 
@@ -167,6 +195,11 @@ export const orderFulfillmentSchema = z.object({
   connectionId: z.string().uuid(),
   externalId: z.string().nullable(),
   status: z.string(),
+  kind: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Shipment or fulfillment work, when reported by the source.'),
   lastProgressAt: timestamp.nullable(),
   failureCode: z.string().nullable(),
   deleted: z.boolean(),

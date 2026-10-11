@@ -156,6 +156,7 @@ export async function listOrders(
       dueAt: iso(row.dueAt),
       issueIds: row.issueIds,
       differs: row.differs,
+      comparisonState: row.comparisonState,
       sources: row.sources.map(source),
       observedAt: iso(row.observedAt)!,
       sourceUpdatedAt: iso(row.sourceUpdatedAt),

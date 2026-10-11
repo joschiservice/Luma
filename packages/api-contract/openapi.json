@@ -72181,6 +72181,15 @@
                           "differs": {
                             "type": "boolean"
                           },
+                          "comparisonState": {
+                            "enum": [
+                              "matching",
+                              "pending",
+                              "confirmed",
+                              "inconclusive"
+                            ],
+                            "type": "string"
+                          },
                           "sources": {
                             "type": "array",
                             "items": {
@@ -72281,6 +72290,7 @@
                           "dueAt",
                           "issueIds",
                           "differs",
+                          "comparisonState",
                           "sources",
                           "observedAt",
                           "sourceUpdatedAt"
@@ -72566,6 +72576,15 @@
                         "differs": {
                           "type": "boolean"
                         },
+                        "comparisonState": {
+                          "enum": [
+                            "matching",
+                            "pending",
+                            "confirmed",
+                            "inconclusive"
+                          ],
+                          "type": "string"
+                        },
                         "sources": {
                           "type": "array",
                           "items": {
@@ -72666,6 +72685,7 @@
                         "dueAt",
                         "issueIds",
                         "differs",
+                        "comparisonState",
                         "sources",
                         "observedAt",
                         "sourceUpdatedAt"
@@ -72859,6 +72879,17 @@
                                     }
                                   ]
                                 },
+                                "comparisonKey": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
                                 "skuCode": {
                                   "anyOf": [
                                     {
@@ -72925,6 +72956,7 @@
                               "required": [
                                 "id",
                                 "skuId",
+                                "comparisonKey",
                                 "skuCode",
                                 "title",
                                 "quantity",
@@ -72971,9 +73003,109 @@
                               "status",
                               "paymentStatus",
                               "total",
-                              "lines"
+                              "lines",
+                              "orderedQuantity",
+                              "currentQuantity",
+                              "cancelledQuantity",
+                              "fulfilledQuantity",
+                              "remainingQuantity",
+                              "fulfillment",
+                              "location",
+                              "overfulfillment",
+                              "unit"
                             ],
                             "type": "string"
+                          },
+                          "lineKey": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "authority": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "group": {
+                                    "enum": [
+                                      "order_lines",
+                                      "order_lifecycle",
+                                      "order_fulfillment",
+                                      "order_tracking",
+                                      "inventory_stock",
+                                      "inventory_selling"
+                                    ],
+                                    "type": "string"
+                                  },
+                                  "state": {
+                                    "enum": [
+                                      "resolved",
+                                      "unknown",
+                                      "conflicting"
+                                    ],
+                                    "type": "string"
+                                  },
+                                  "basis": {
+                                    "enum": ["default", "override"],
+                                    "type": "string"
+                                  },
+                                  "connectionId": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "overrideConnectionId": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "candidateIds": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    }
+                                  },
+                                  "eligibleIds": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "group",
+                                  "state",
+                                  "basis",
+                                  "connectionId",
+                                  "overrideConnectionId",
+                                  "candidateIds",
+                                  "eligibleIds"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           "values": {
                             "type": "array",
@@ -72993,13 +73125,38 @@
                                       "type": "null"
                                     }
                                   ]
+                                },
+                                "evidence": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "snapshotId": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      },
+                                      "observationId": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      },
+                                      "observedAt": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                      }
+                                    },
+                                    "required": [
+                                      "snapshotId",
+                                      "observationId",
+                                      "observedAt"
+                                    ]
+                                  }
                                 }
                               },
-                              "required": ["connectionId", "value"]
+                              "required": ["connectionId", "value", "evidence"]
                             }
                           }
                         },
-                        "required": ["field", "values"]
+                        "required": ["field", "lineKey", "authority", "values"]
                       }
                     },
                     "fulfillments": {
@@ -73027,6 +73184,17 @@
                           },
                           "status": {
                             "type": "string"
+                          },
+                          "kind": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Shipment or fulfillment work, when reported by the source."
                           },
                           "lastProgressAt": {
                             "anyOf": [
@@ -73921,6 +74089,17 @@
                                           }
                                         ]
                                       },
+                                      "comparisonKey": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "format": "uuid"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
                                       "skuCode": {
                                         "anyOf": [
                                           {
@@ -73963,6 +74142,7 @@
                                     "required": [
                                       "id",
                                       "skuId",
+                                      "comparisonKey",
                                       "skuCode",
                                       "title",
                                       "quantity",
@@ -74062,6 +74242,17 @@
                                   },
                                   "status": {
                                     "type": "string"
+                                  },
+                                  "kind": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Shipment or fulfillment work, when reported by the source."
                                   },
                                   "lastProgressAt": {
                                     "anyOf": [

@@ -66,7 +66,9 @@ export function listSql(
    view === 'outstanding' || view === 'overdue'
      ? `((o.state_valid_from <= $2 AND o.open IS TRUE) OR (o.state_valid_from > $2 AND EXISTS
      (SELECT 1 FROM order_state f WHERE f.entity_id=o.entity_id AND f.connection_id=o.connection_id AND f.open IS TRUE)))${view === 'overdue' ? ' AND o.due_at < $2' : ''}`
-     : viewFilters[view]
+     : view === 'differs'
+       ? `o.differs AND (${queries.state.comparisonState('o')})='confirmed'`
+       : viewFilters[view]
  }
 ), page AS MATERIALIZED (
  SELECT *,${rank} AS sort_rank,${key} AS sort_key FROM (
@@ -78,8 +80,8 @@ export function listSql(
     ($11=1 AND (${key},entity_id) ${op} ($12 COLLATE "C",$13::uuid)))
    ORDER BY ${key} ${direction},entity_id ${direction} LIMIT $10)
  ) candidates ORDER BY ${order} LIMIT $10
-), ${view !== 'needs_you' ? `${attention},` : ''} rows AS (
- SELECT p.*,CASE WHEN p.state_valid_from>$2 THEN f.open ELSE p.open END AS current_open,
+), ${view !== 'needs_you' ? `${attention},` : ''} rows AS MATERIALIZED (
+ SELECT p.*,${queries.state.comparisonState('p')} AS current_comparison_state,CASE WHEN p.state_valid_from>$2 THEN f.open ELSE p.open END AS current_open,
  CASE WHEN p.state_valid_from>$2 THEN f.fulfillment ELSE p.fulfillment END AS current_fulfillment
  FROM page p LEFT JOIN order_state f ON f.entity_id=p.entity_id AND f.connection_id=p.connection_id
 ), items AS (
@@ -88,7 +90,7 @@ SELECT o.entity_id AS id,o.display_number AS "displayNumber",o.placed_at AS "pla
  o.line_count AS "lineCount",o.current_open AS open,
  CASE WHEN o.current_open=false THEN false WHEN o.current_open IS NULL OR o.due_at IS NULL THEN NULL ELSE o.due_at < $2 END AS overdue,o.due_at AS "dueAt",
  CASE WHEN o.deleted THEN '{}'::uuid[] ELSE COALESCE(a.issue_ids,'{}'::uuid[]) END AS "issueIds",
- o.differs,src.sources,o.observed_at AS "observedAt",o.source_updated_at AS "sourceUpdatedAt",
+ o.current_comparison_state='confirmed' AS differs,o.current_comparison_state AS "comparisonState",src.sources,o.observed_at AS "observedAt",o.source_updated_at AS "sourceUpdatedAt",
  o.sort_rank AS "sortRank",o.sort_key AS "sortKey"
 FROM rows o
 LEFT JOIN attention a ON a.order_id=o.entity_id

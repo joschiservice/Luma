@@ -55,6 +55,11 @@ function orderColumns(
             {order.overdue ? (
               <Badge tone="danger">{m.orders_flag_overdue()}</Badge>
             ) : null}
+            {order.comparisonState === 'pending' ? (
+              <Badge>{m.orders_comparison_pending()}</Badge>
+            ) : order.comparisonState === 'inconclusive' ? (
+              <Badge>{m.orders_comparison_inconclusive()}</Badge>
+            ) : null}
             {order.differs ? (
               <Badge tone="warning">{m.orders_flag_differs()}</Badge>
             ) : null}
