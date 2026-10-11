@@ -20,6 +20,7 @@ import {
   type RecordQuery,
   type SimulatorApi,
 } from './api';
+import { refreshAfterChange } from './lib/refresh';
 
 /** Run lists and the selected run's clock refresh this often. */
 const runInterval = 2_000;
@@ -241,7 +242,7 @@ export function useControl(id: string) {
     mutationFn: (control: Control) => api.control(id, control),
     onSuccess: (run: RunDetail) => {
       client.setQueryData(keys.run(id), run);
-      void client.invalidateQueries({ queryKey: keys.runs });
+      void refreshAfterChange(client, [keys.runs]);
     },
   });
 }
@@ -254,7 +255,7 @@ export function useCreateRun() {
   return useMutation({
     mutationFn: (body: Partial<CreateRun> & { id: string }) =>
       api.createRun(body),
-    onSuccess: () => client.invalidateQueries({ queryKey: keys.runs }),
+    onSuccess: () => refreshAfterChange(client, [keys.runs]),
   });
 }
 
@@ -267,7 +268,7 @@ export function useDeleteRun() {
     mutationFn: (id: string) => api.deleteRun(id),
     onSuccess: (_, id) => {
       client.removeQueries({ queryKey: keys.run(id) });
-      void client.invalidateQueries({ queryKey: keys.runs });
+      void refreshAfterChange(client, [keys.runs]);
     },
   });
 }
@@ -279,10 +280,8 @@ export function useInjectIncident(id: string) {
 
   return useMutation({
     mutationFn: (body: InjectIncident) => api.injectIncident(id, body),
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: keys.incidents(id) });
-      void client.invalidateQueries({ queryKey: keys.scorecard(id) });
-    },
+    onSuccess: () =>
+      refreshAfterChange(client, [keys.incidents(id), keys.scorecard(id)]),
   });
 }
 
@@ -293,11 +292,12 @@ export function useRunScenario(id: string) {
 
   return useMutation({
     mutationFn: (body: RunScenario) => api.runScenario(id, body),
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: keys.incidents(id) });
-      void client.invalidateQueries({ queryKey: keys.scorecard(id) });
-      void client.invalidateQueries({ queryKey: keys.run(id) });
-    },
+    onSuccess: () =>
+      refreshAfterChange(client, [
+        keys.incidents(id),
+        keys.scorecard(id),
+        keys.run(id),
+      ]),
   });
 }
 
@@ -308,10 +308,8 @@ export function useRecoverIncident(id: string) {
 
   return useMutation({
     mutationFn: (incident: string) => api.recoverIncident(id, incident),
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: keys.incidents(id) });
-      void client.invalidateQueries({ queryKey: keys.scorecard(id) });
-    },
+    onSuccess: () =>
+      refreshAfterChange(client, [keys.incidents(id), keys.scorecard(id)]),
   });
 }
 

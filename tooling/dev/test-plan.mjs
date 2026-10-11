@@ -1,3 +1,4 @@
+// The simulator serves its control panel from the panel's build output.
 const build = [
   'exec',
   'turbo',
@@ -6,6 +7,7 @@ const build = [
   '--filter=@luma/api...',
   '--filter=@luma/worker...',
   '--filter=@luma/simulator...',
+  '--filter=@luma/simulator-web',
   '--filter=@luma/staff-api...',
 ];
 
