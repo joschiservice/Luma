@@ -10,6 +10,7 @@ export function presentReturnCase(item: {
     stage: string;
     openedAt: string;
     updatedAt: string;
+    revision?: number;
   };
   creation: {
     state: string;
@@ -27,6 +28,12 @@ export function presentReturnCase(item: {
     revision: number;
   } | null;
   canManage: boolean;
+  waiting?: {
+    dueAt: string;
+    reason: string;
+    observedAt: string | null;
+    ownerId: string;
+  };
 }): DecisionCandidate {
   const { case: value, creation } = item;
   const approval = creation?.state === 'approval_required';
@@ -50,7 +57,9 @@ export function presentReturnCase(item: {
       ? 'The return action needs an independent approval.'
       : uncertain
         ? 'The return action is unconfirmed. Check the source before taking another action.'
-        : 'The return needs receipt, inspection or settlement by its owner.',
+        : item.waiting
+          ? `Return progress needs its owner: ${item.waiting.reason.replaceAll('_', ' ')}.`
+          : 'The return needs receipt, inspection or settlement by its owner.',
     consequences: [
       {
         response: 'Open return case',
@@ -63,10 +72,10 @@ export function presentReturnCase(item: {
     ],
     impact: { level: 'unknown', text: null },
     requestedAt: creation?.requestedAt ?? value.openedAt,
-    deadline: approval ? creation.expiresAt : null,
+    deadline: approval ? creation.expiresAt : (item.waiting?.dueAt ?? null),
     requesterId: creation?.requestedBy.id ?? null,
     evidence: {
-      observedAt: value.updatedAt,
+      observedAt: item.waiting?.observedAt ?? value.updatedAt,
       validUntil: approval ? creation.expiresAt : null,
     },
     response: !item.canManage
@@ -82,7 +91,18 @@ export function presentReturnCase(item: {
           : uncertain
             ? 'check'
             : 'investigate',
-    ...(item.assignment ? { ownerAssignment: item.assignment } : {}),
+    ...(item.assignment
+      ? { ownerAssignment: item.assignment }
+      : item.waiting
+        ? {
+            ownerAssignment: {
+              assigneeId: item.waiting.ownerId,
+              assignedBy: item.waiting.ownerId,
+              assignedAt: value.openedAt,
+              revision: value.revision ?? 0,
+            },
+          }
+        : {}),
     subject: { label: value.orderNumber ?? value.id, detail: null },
     record: { kind: 'order', id: value.orderId },
     owner: { kind: 'return_case', caseId: value.id },

@@ -45,6 +45,7 @@ import { messagingRoutes } from '@luma/messaging/http';
 import type {
   ReturnActions,
   ReturnCases,
+  ReturnDeadlines,
   ReturnExchanges,
 } from '@luma/orders/composition';
 import { returnCaseRoutes } from '@luma/orders/http';
@@ -160,6 +161,7 @@ export interface AppDependencies {
   returnCases?: ReturnCases;
   returnActions?: ReturnActions;
   returnExchanges?: ReturnExchanges;
+  returnDeadlines?: ReturnDeadlines;
   customers?: CustomerWorkspace;
   orders?: OrderWorkspace;
   sales?: SalesService;
@@ -456,6 +458,7 @@ export function buildApp(
         dependencies.returnCases,
         dependencies.returnActions,
         dependencies.returnExchanges,
+        dependencies.returnDeadlines,
       ),
       customers: customerRoutes(dependencies.customers),
       sync: syncRoutes(dependencies.sync),

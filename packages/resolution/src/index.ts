@@ -83,3 +83,7 @@ export {
 } from './application/follow-ups.js';
 
 export { createStockRefresh } from './application/stock-refresh.js';
+
+export { returnStepFollowUpSource } from './domain/follow-ups.js';
+
+export { createReturnStepFollowUp } from './application/return-step-follow-up.js';

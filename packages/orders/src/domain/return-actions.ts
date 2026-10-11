@@ -21,7 +21,7 @@ export type ReturnActionPlan =
 /** An independent provider read. Acceptance and pending money do not establish success. */
 export interface ReturnActionProof {
   outcome: 'passed' | 'failed' | 'inconclusive';
-  payment: 'pending' | 'failed' | 'paid' | null;
+  payment: 'pending' | 'failed' | 'partial' | 'paid' | null;
   observedAt: string;
   evidenceRefs: string[];
 }

@@ -41,7 +41,7 @@ export interface ReturnSettlementWrite {
 /** Independently observed financial or stock outcome, with persisted source evidence. */
 export interface ReturnSettlementProof {
   outcome: 'passed' | 'failed' | 'inconclusive';
-  payment: 'pending' | 'failed' | 'paid' | null;
+  payment: 'pending' | 'failed' | 'partial' | 'paid' | null;
   observedAt: string;
   evidenceRefs: string[];
 }

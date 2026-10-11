@@ -21,6 +21,11 @@ import {
   returnCreationOptionsSchema,
 } from '../return-cases.js';
 import {
+  configureReturnDeadlinesSchema,
+  returnDeadlinePolicySchema,
+  returnWaitingViewSchema,
+} from '../return-deadlines.js';
+import {
   exchangeChoiceInputSchema,
   exchangeRequestSchema,
   exchangeStepSchema,
@@ -69,6 +74,55 @@ function caseCommand<T extends z.ZodTypeAny>(
 const actionParams = caseParams.extend({ actionId: z.string().uuid() });
 
 export const returnCasesContract = {
+  deadlines: endpoint
+    .route({
+      method: 'GET',
+      path: `${path}/return-deadlines`,
+      summary: 'Read merchant return deadlines',
+      description:
+        'Reads configured hours anchored to recorded case events. Configuration alone does not turn on automatic monitoring.',
+    })
+    .meta({ access: requires('returns.read'), errors: [401, 403, 503] })
+    .input(z.object({ params: organizationParamsSchema }))
+    .output(returnDeadlinePolicySchema),
+  configureDeadlines: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-deadlines`,
+      summary: 'Configure merchant return deadlines',
+      description:
+        'Saves a revision-checked policy. Exact command retries retain the original version. Activate Return step follow-up in Workflows to monitor automatically.',
+    })
+    .meta(writes)
+    .input(
+      z.object({
+        params: organizationParamsSchema,
+        body: configureReturnDeadlinesSchema,
+      }),
+    )
+    .output(returnDeadlinePolicySchema),
+  waiting: endpoint
+    .route({
+      method: 'GET',
+      path: `${path}/return-cases/{caseId}/waiting`,
+      summary: 'Read durable return waiting',
+      description:
+        'Reads owned waits, escalation and earlier occurrences without refreshing provider evidence.',
+    })
+    .meta({ access: requires('returns.read'), errors: [401, 403, 404, 503] })
+    .input(z.object({ params: caseParams }))
+    .output(returnWaitingViewSchema),
+  checkWaiting: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-cases/{caseId}/waiting/check`,
+      summary: 'Check return progress',
+      description:
+        'Independently rereads financial evidence and records actual receipt and inspection progress. It executes no provider write.',
+    })
+    .meta(writes)
+    .input(z.object({ params: caseParams, body: empty }))
+    .output(returnWaitingViewSchema),
   exchanges: endpoint
     .route({
       method: 'GET',

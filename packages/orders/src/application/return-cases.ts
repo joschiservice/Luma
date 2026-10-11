@@ -356,6 +356,12 @@ export interface ReturnCaseList {
 
 /** Persisted work and creation controls currently waiting on a person. */
 export interface ReturnCaseAttention {
+  waiting?: {
+    dueAt: string;
+    reason: string;
+    observedAt: string | null;
+    ownerId: string;
+  };
   case: ReturnCaseSummary & { orderNumber: string | null; revision: number };
   creation: CreationView | null;
   canManage: boolean;

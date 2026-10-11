@@ -194,3 +194,8 @@ export { shopifyAccessSchema } from './apps.js';
 export type { ReturnActionView, ReturnActionList } from './return-actions.js';
 
 export type { ReturnExchangesView } from './return-exchanges.js';
+
+export type {
+  ReturnDeadlinePolicyView,
+  ReturnWaitingView,
+} from './return-deadlines.js';

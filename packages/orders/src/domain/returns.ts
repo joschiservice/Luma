@@ -294,6 +294,13 @@ export function settlementRefundProgress(
   approved: { amount: string; currency: string },
 ) {
   const progress = refundProgress(value);
+  if (
+    progress.currency === approved.currency &&
+    progress.refunded !== null &&
+    toUnits(progress.refunded) > 0n &&
+    toUnits(progress.refunded) < toUnits(approved.amount)
+  )
+    return 'partial' as const;
   if (progress.refund === 'pending') return 'pending' as const;
   if (progress.refund === 'failed') return 'failed' as const;
   if (

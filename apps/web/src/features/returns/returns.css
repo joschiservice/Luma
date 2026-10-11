@@ -536,3 +536,18 @@
     transition: none;
   }
 }
+
+.returns-deadlines {
+  margin-block: 1rem;
+}
+.returns-deadlines summary {
+  cursor: pointer;
+}
+.returns-deadlines form {
+  max-width: 36rem;
+  margin-block: 1rem;
+}
+.returns-deadlines label {
+  display: grid;
+  gap: 0.375rem;
+}

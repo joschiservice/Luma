@@ -259,7 +259,7 @@ export function createShopifySettlementCapabilities(
       (r) => r.note === marker(input.operationId),
     );
     let outcome: 'passed' | 'failed' | 'inconclusive' = 'inconclusive',
-      payment: 'paid' | 'failed' | 'pending' | null = null;
+      payment: 'paid' | 'failed' | 'pending' | 'partial' | null = null;
     let details: unknown = null;
     // At the provider bound we cannot prove a complete absence or uniqueness.
     if (order.refunds.length < 100 && matches.length === 1) {

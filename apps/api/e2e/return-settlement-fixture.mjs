@@ -6,9 +6,14 @@ import { setupSimulator } from './simulator-fixture.mjs';
 /** Creates a reviewed Shopify/Wawi return with two received units and one approved resale unit. */
 export async function settlementFixture(
   t,
-  { origin = 'http://127.0.0.1:3000', resolution = 'refund' } = {},
+  {
+    origin = 'http://127.0.0.1:3000',
+    resolution = 'refund',
+    prepare = 'proposed',
+    environment,
+  } = {},
 ) {
-  const f = await setupSimulator(t, { origin });
+  const f = environment ?? (await setupSimulator(t, { origin }));
   const org = f.manifest.organizationId,
     connectionId = f.manifest.connections.shopify;
   const root = `/v1/organizations/${org}`;
@@ -147,6 +152,22 @@ export async function settlementFixture(
     note: 'Warehouse counted two units; one damaged',
     link: null,
   };
+  if (prepare === 'opened')
+    return {
+      ...f,
+      org,
+      connectionId,
+      root,
+      requester,
+      approver,
+      request,
+      command,
+      providerOrderId,
+      detail,
+      path,
+      lines,
+      evidence,
+    };
   detail = await request(`${path}/receipt`, {
     commandId: randomUUID(),
     expectedRevision: detail.case.revision,

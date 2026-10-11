@@ -40,6 +40,7 @@ const stateLabels = {
 };
 const paymentLabels = {
   not_required: () => m.returns_exchange_even(),
+  partial: () => m.returns_exchange_payment_partial(),
   pending: () => m.returns_exchange_payment_pending(),
   failed: () => m.returns_exchange_payment_failed(),
   paid: () => m.returns_exchange_payment_paid(),

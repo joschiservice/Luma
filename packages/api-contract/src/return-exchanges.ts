@@ -130,7 +130,14 @@ const exchangeProofSchema = z
     fulfillmentOrderId: z.string().nullable(),
     paymentHoldId: z.string().nullable(),
     fulfillmentReady: z.boolean(),
-    payment: z.enum(['not_required', 'pending', 'failed', 'paid', 'unknown']),
+    payment: z.enum([
+      'not_required',
+      'pending',
+      'failed',
+      'partial',
+      'paid',
+      'unknown',
+    ]),
     financial: financial.nullable(),
   })
   .strict();

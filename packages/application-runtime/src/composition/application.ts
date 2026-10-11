@@ -32,10 +32,12 @@ import {
   createOrderMetricReader,
   createReturnActionService,
   createReturnCaseService,
+  createReturnDeadlineService,
   createReturnExchangeService,
   orderStateQueries,
   type ReturnActions,
   type ReturnCases,
+  type ReturnDeadlines,
   type ReturnExchanges,
 } from '@luma/orders/composition';
 import type {
@@ -73,7 +75,9 @@ import {
   workflowHandoverDecisionProvider,
 } from '@luma/read-models/composition';
 import {
+  createReturnStepFollowUp,
   createShippingMethodTemplate,
+  returnStepFollowUpSource,
   shippingMethodPlaybook,
   shippingMethodVocabulary,
 } from '@luma/resolution';
@@ -91,6 +95,7 @@ import {
 import type { CaseWorkflowAdapter } from '@luma/workflows';
 import {
   compilePlaybook,
+  compileProcessWorkflow,
   createCodeProcesses,
   createCoordination,
   createDraftGenerations,
@@ -188,6 +193,7 @@ export interface ApplicationServices {
   returnCases: ReturnCases;
   returnActions: ReturnActions;
   returnExchanges: ReturnExchanges;
+  returnDeadlines: ReturnDeadlines;
   library: ReturnType<typeof createPersistentPlaybookLibrary>;
   messaging: ReturnType<typeof createMessaging>;
   http: {
@@ -220,6 +226,7 @@ export interface ApplicationServices {
     returnCases: ReturnCases;
     returnActions: ReturnActions;
     returnExchanges: ReturnExchanges;
+    returnDeadlines: ReturnDeadlines;
     customers: ReturnType<typeof createCustomerWorkspace>;
     orders: ReturnType<typeof createOrderWorkspace>;
     sales: ReturnType<typeof createSalesRuntime>;
@@ -544,6 +551,48 @@ export function createApplicationServices(
       principal: identity.resolveWorkflowContext,
     },
   );
+  const returnDeadlines = createReturnDeadlineService(
+    database,
+    createAuditLog,
+    {
+      refreshContext: identity.refreshContext,
+      source: {
+        async money(context, value, refund, exchange) {
+          const step = value.proposal?.kind === 'exchange' ? exchange : refund;
+          if (!step?.sent)
+            return {
+              state: 'not_requested',
+              readable: true,
+              complete: true,
+              observedAt: value.proposal?.at ?? null,
+              evidenceRefs: [`case:${value.id}:${value.revision}`],
+              requestedAt: step?.requestedAt ?? null,
+            };
+          if (!options.returns)
+            throw new Error('Return financial reads unavailable');
+          const proof =
+            value.proposal?.kind === 'exchange' && exchange
+              ? await returnExchanges.observe(context, value.id, exchange.id)
+              : refund
+                ? await returnActions.observe(context, value.id, refund.id)
+                : null;
+
+          return {
+            state: proof?.payment ?? 'unknown',
+            readable: true,
+            complete:
+              !!proof &&
+              proof.payment !== null &&
+              proof.payment !== 'unknown' &&
+              proof.evidenceRefs.length > 0,
+            observedAt: proof?.observedAt ?? null,
+            evidenceRefs: proof?.evidenceRefs ?? [],
+            requestedAt: step.requestedAt,
+          };
+        },
+      },
+    },
+  );
   const desk = createDeskServices(
     database,
     identity,
@@ -580,6 +629,14 @@ export function createApplicationServices(
     policies: safety.policies,
     sources: [
       ...(options.workflowSources ?? []),
+      createReturnStepFollowUp({
+        version: compileProcessWorkflow(returnStepFollowUpSource),
+        configured: async (context) =>
+          (await returnDeadlines.policy(context)).policy?.enabled === true,
+        tick: (context) => returnDeadlines.tick(context),
+        pending: (context) => returnDeadlines.pending(context),
+        get: (context, id) => returnDeadlines.occurrence(context, id),
+      }),
       // Orders and returns are composed below; follow-ups read them only once runs start.
       ...createFollowUpWorkflows({
         commitments,
@@ -705,7 +762,18 @@ export function createApplicationServices(
           })),
       },
       replenishmentDecisionProvider(replenishment.pending),
-      returnCaseDecisionProvider(returnCases.pending),
+      returnCaseDecisionProvider(async (context) => {
+        const [cases, waits] = await Promise.all([
+          returnCases.pending(context),
+          returnDeadlines.pending(context),
+        ]);
+
+        return cases.map((value) => {
+          const waiting = waits.find((w) => w.caseId === value.case.id);
+
+          return waiting ? { ...value, waiting } : value;
+        });
+      }),
       supplierCommitmentDecisionProvider(async (context) =>
         (await commitments.pending(context)).map((item) => ({
           key: item.attention.key,
@@ -844,6 +912,7 @@ export function createApplicationServices(
     returnCases,
     returnActions,
     returnExchanges,
+    returnDeadlines,
     detection,
     safety,
     desk,
@@ -896,6 +965,7 @@ export function createApplicationServices(
       returnCases,
       returnActions,
       returnExchanges,
+      returnDeadlines,
       customers: createCustomerWorkspace(database),
       records: createRecordExplorer(database, hiddenOrderSources),
       orders,

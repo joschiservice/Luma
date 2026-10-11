@@ -912,6 +912,22 @@ export const journeyAreas = {
     ...webShell,
     ...webReturns,
   ],
+  'return-deadlines.e2e.mjs': [
+    ...simulator,
+    ...returns,
+    ...returnCases,
+    ...decisions,
+    ...commerce,
+  ],
+  'return-deadlines.browser.mjs': [
+    ...simulator,
+    ...returns,
+    ...returnCases,
+    ...decisions,
+    ...commerce,
+    ...webShell,
+    ...webReturns,
+  ],
   'return-exchange.e2e.mjs': [
     ...simulator,
     ...returns,

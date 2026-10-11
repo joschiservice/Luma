@@ -548,6 +548,11 @@ export function createShopifyExchangeCapabilities(
       )
         return 'paid';
       if (paid > toUnits(expected.amount)) return 'unknown';
+      if (paid > 0n && paid < toUnits(expected.amount))
+        return toUnits(value.totalOutstandingSet.presentmentMoney.amount) ===
+          toUnits(expected.amount) - paid
+          ? 'partial'
+          : 'unknown';
       if (
         relevant.some(
           (t) => t.status === 'PENDING' || t.status === 'AWAITING_RESPONSE',
@@ -648,9 +653,11 @@ export function createShopifyExchangeCapabilities(
       ? 'paid'
       : state === 'failed'
         ? 'failed'
-        : state === 'pending'
-          ? 'pending'
-          : 'unknown';
+        : state === 'partial'
+          ? 'partial'
+          : state === 'pending'
+            ? 'pending'
+            : 'unknown';
   }
 
   async function proof(input: ReturnExchangeRead) {

@@ -79,6 +79,7 @@ it('saves, validates and publishes tenant drafts without activating them', async
     ['connection-sync-check', 'case'],
     ['shopify-stock-correction', 'case'],
     ['shopify-hold-release', 'case'],
+    ['return-case-follow-up', 'case'],
     ['supplier-follow-up', 'case'],
     ['refund-follow-up', 'case'],
     ['payment-follow-up', 'case'],

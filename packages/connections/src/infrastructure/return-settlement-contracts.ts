@@ -60,7 +60,7 @@ export const returnSettlementWriteSchema = z
 export const returnSettlementProofSchema = z
   .object({
     outcome: z.enum(['passed', 'failed', 'inconclusive']),
-    payment: z.enum(['pending', 'failed', 'paid']).nullable(),
+    payment: z.enum(['pending', 'failed', 'partial', 'paid']).nullable(),
     observedAt: z.string().datetime(),
     evidenceRefs: z.array(z.string().uuid()),
   })

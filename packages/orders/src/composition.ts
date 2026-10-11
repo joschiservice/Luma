@@ -9,9 +9,11 @@ import {
   createReturnCases,
   type ReturnCaseDependencies,
 } from './application/return-cases.js';
+import { createReturnDeadlines } from './application/return-deadlines.js';
 import { createReturnExchanges } from './application/return-exchanges.js';
 import { createReturnActionStore } from './infrastructure/return-action-store.js';
 import { createReturnCaseStore } from './infrastructure/return-case-store.js';
+import { createReturnDeadlineStore } from './infrastructure/return-deadline-store.js';
 import { createReturnExchangeStore } from './infrastructure/return-exchange-store.js';
 
 export { createCommerceProjections } from './infrastructure/projections.js';
@@ -114,3 +116,23 @@ export type {
   ReturnExchangeSystem,
   ReturnExchangeAdmission,
 } from './application/return-exchanges.js';
+
+/** Composes tenant-owned deadline configuration and durable waiting, with read-only source evidence. */
+export function createReturnDeadlineService(
+  db: TenantDatabase,
+  audit: (db: TenantDatabase) => AuditLog,
+  deps: Omit<
+    Parameters<typeof createReturnDeadlines>[0],
+    'store' | 'uuid' | 'digest' | 'now'
+  > & { now?: () => Date },
+) {
+  return createReturnDeadlines({
+    ...deps,
+    store: createReturnDeadlineStore(db, audit),
+    digest,
+    uuid: nameUuid,
+    now: deps.now ?? (() => new Date()),
+  });
+}
+
+export type { ReturnDeadlines } from './application/return-deadlines.js';

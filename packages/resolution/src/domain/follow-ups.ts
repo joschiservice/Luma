@@ -70,7 +70,7 @@ function followUp(input: {
 
 /**
  * Hands a return to a person when its items arrived but no refund was recorded within the
- * waiting window. It never refunds: Luma has no governed refund action yet.
+ * waiting window. It never submits a refund automatically.
  */
 export const refundFollowUpSource = followUp({
   id: 'refund-follow-up',
@@ -98,4 +98,17 @@ export const paymentFollowUpSource = followUp({
   subjectKind: 'order',
   read: { id: 'payment', source: 'orders.payment', open: 'pending' },
   outcome: 'The payment settled before anyone needed to step in',
+});
+
+/** Follows configured case steps while their owner reports a durable unresolved wait. */
+export const returnStepFollowUpSource = followUp({
+  id: 'return-case-follow-up',
+  name: 'Follow up on overdue return steps',
+  intent:
+    'Read configured receipt, inspection and financial deadlines, verify progress independently and hand overdue steps to the return case owner.',
+  category: 'returns',
+  eventType: 'return_step_overdue',
+  subjectKind: 'return',
+  read: { id: 'return', source: 'orders.return-waiting', open: 'waiting' },
+  outcome: 'The case owner reported independently verified progress',
 });

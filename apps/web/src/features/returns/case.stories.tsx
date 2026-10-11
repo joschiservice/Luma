@@ -2,6 +2,7 @@ import type {
   ReturnActionList,
   ReturnCaseDetail,
   ReturnExchangesView,
+  ReturnWaitingView,
 } from '@luma/api-contract';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -18,6 +19,7 @@ import appStyles from '../../styles.css?inline';
 import { ReturnCaseView } from './case';
 import { ReturnExchange } from './case-exchange';
 import { ReturnSettlement } from './case-settlement';
+import { ReturnWaiting } from './case-waiting';
 import { detail as sourceDetail } from './returns-fixtures';
 
 const org = '99999999-9999-4999-8999-999999999999';
@@ -467,13 +469,72 @@ function exchange(
   };
 }
 
+function waits(
+  reason: ReturnWaitingView['episodes'][number]['reason'],
+): ReturnWaitingView {
+  const base = {
+    caseId: proposed.case.id,
+    orderId: proposed.order.id,
+    connectionId: proposed.case.connectionId,
+    policyRevision: 1,
+    occurrence: 1,
+    state: 'escalated' as const,
+    ownerId: sam.id,
+    evidenceRefs: ['source-observation'],
+    openedAt: proposed.case.openedAt,
+    updatedAt: proposed.asOf,
+    endedAt: null,
+    observedAt: proposed.asOf,
+  };
+
+  return {
+    policy: {
+      revision: 1,
+      enabled: true,
+      receiptHours: 24,
+      inspectionHours: 4,
+      financialHours: 8,
+      sourceMaxAgeSeconds: 300,
+      updatedBy: alex.id,
+      updatedAt: proposed.case.openedAt,
+    },
+    ownerId: sam.id,
+    canManage: true,
+    asOf: proposed.asOf,
+    episodes: [
+      {
+        ...base,
+        id: '00000000-0000-4000-8000-000000000001',
+        phase: 'receipt',
+        anchorAt: proposed.case.openedAt,
+        anchorOrigin: 'case_opened',
+        dueAt: '2026-10-09T09:12:00.000Z',
+        reason: 'missing_units',
+        units: 1,
+      },
+      {
+        ...base,
+        id: '00000000-0000-4000-8000-000000000002',
+        phase: 'financial',
+        anchorAt: proposed.proposal!.at,
+        anchorOrigin: 'resolution_proposed',
+        dueAt: '2026-10-09T19:00:00.000Z',
+        reason,
+        units: null,
+      },
+    ],
+  };
+}
+
 function Preview({
   state = 'open',
   evidence,
   settlementState,
   exchangeState,
+  waitingState,
 }: {
   state?: string;
+  waitingState?: ReturnWaitingView['episodes'][number]['reason'];
   evidence?: 'fresh' | 'stale' | 'loading' | 'unavailable';
   settlementState?: 'pending' | 'failed' | 'stale' | 'approval' | 'unavailable';
   exchangeState?:
@@ -505,12 +566,19 @@ function Preview({
                     }
                   : details[state]
               }
+              waiting={waitingState ? waits(waitingState) : undefined}
               settlementStarted={
                 (!!settlementState && settlementState !== 'approval') ||
                 (!!exchangeState && exchangeState !== 'approval')
               }
               settlement={
-                exchangeState ? (
+                waitingState ? (
+                  <ReturnWaiting
+                    organizationId={org}
+                    detail={proposed}
+                    data={waits(waitingState)}
+                  />
+                ) : exchangeState ? (
                   <ReturnExchange
                     organizationId={org}
                     detail={{
@@ -793,5 +861,27 @@ export const ExchangeNarrow: Story = {
 
 export const ExchangeDark: Story = {
   args: { state: 'proposed', exchangeState: 'pending' },
+  globals: { theme: 'dark' },
+};
+
+export const WaitingPartial: Story = {
+  args: { state: 'proposed', waitingState: 'partial_money' },
+};
+
+export const WaitingFailed: Story = {
+  args: { state: 'proposed', waitingState: 'failed_money' },
+};
+
+export const WaitingStale: Story = {
+  args: { state: 'proposed', waitingState: 'stale_evidence' },
+};
+
+export const WaitingNarrow: Story = {
+  args: { state: 'proposed', waitingState: 'pending_money' },
+  globals: { viewport: { value: 'mobile1' } },
+};
+
+export const WaitingDark: Story = {
+  args: { state: 'proposed', waitingState: 'unavailable_evidence' },
   globals: { theme: 'dark' },
 };

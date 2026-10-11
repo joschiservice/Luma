@@ -206,7 +206,7 @@ describe('case refund settlement', () => {
     ).toBe('paid');
     expect(
       settlementRefundProgress(aRefund([payment('success', '24')]), eur('48')),
-    ).toBe('unknown');
+    ).toBe('partial');
     expect(
       settlementRefundProgress(aRefund([payment('success')]), {
         amount: '48',
@@ -219,7 +219,7 @@ describe('case refund settlement', () => {
         aRefund([payment('success', '24'), payment('pending', '24')]),
         eur('48'),
       ),
-    ).toBe('pending');
+    ).toBe('partial');
     expect(
       settlementRefundProgress(aRefund([payment('failed')]), eur('48')),
     ).toBe('failed');

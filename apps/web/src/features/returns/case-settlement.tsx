@@ -162,6 +162,9 @@ export function ReturnSettlement({
                       {m.returns_settlement_requested()}{' '}
                       <WorkspaceDate value={action.requestedAt} />
                     </span>
+                    {action.proof?.payment === 'partial' ? (
+                      <Alert>{m.returns_settlement_partial()}</Alert>
+                    ) : null}
                     {action.proof ? (
                       <span>
                         {m.returns_settlement_checked()}{' '}

@@ -161,6 +161,41 @@ describe('Shopify settlement boundary', () => {
     await f.send(quoted.plan);
     expect(f.writes()).toBe(1);
   });
+  it('distinguishes an exactly bound partial refund from fully settled money', async () => {
+    const f = fixture(),
+      quoted = await f.quote();
+    const other = 'gid://shopify/OrderTransaction/5';
+    const plan = {
+      ...quoted.plan,
+      transactions: [
+        { parentId: parent, gateway: 'shopify_payments', amount: '24' },
+        { parentId: other, gateway: 'shopify_payments', amount: '24' },
+      ],
+    };
+    const source = refund();
+    source.transactions = page([
+      {
+        ...source.transactions.nodes[0]!,
+        amountSet: { presentmentMoney: { amount: '24', currencyCode: 'EUR' } },
+      },
+      {
+        ...source.transactions.nodes[0]!,
+        status: 'PENDING',
+        parentTransaction: { id: other },
+        amountSet: { presentmentMoney: { amount: '24', currencyCode: 'EUR' } },
+      },
+    ]);
+    f.setRefunds([source]);
+    expect(await f.proof(plan)).toMatchObject({
+      outcome: 'inconclusive',
+      payment: 'partial',
+    });
+    source.transactions.nodes[1]!.status = 'SUCCESS';
+    expect(await f.proof(plan)).toMatchObject({
+      outcome: 'passed',
+      payment: 'paid',
+    });
+  });
   it('requires one complete exact refund and successful captured-payment transactions', async () => {
     const f = fixture(),
       quoted = await f.quote();

@@ -203,3 +203,27 @@ cancellation proof. A processed or uncertain processing attempt cannot be replac
 handoff preserves inspected resale stock quantities and still requires separate refund approval.
 Wawi allocation remains owned work: native Shopify intent is not proof of an ERP reservation or
 replacement order. Neither prepared fulfillment nor a paid difference alone closes the case.
+
+## Owned return deadlines
+
+Merchant deadline configuration is versioned and disabled until reviewed. Receipt waits start
+at case opening; inspection waits start at the recorded receipt; proposal waits start at
+inspection. Financial waits start at the proposal, then the actual action request once one
+exists. Missing physical units can wait alongside inspection of the units that arrived.
+Unobserved store transitions never supply an inferred timestamp.
+
+The return step follow-up must be activated in Workflows for automatic monitoring. Its bounded
+passes use a persisted cursor and reread each case no more than once per minute. Explicit progress checks use the same service and make no
+provider writes. Each phase has one live occurrence; repeated observations update it rather
+than opening duplicate cases. Policy or anchor changes supersede earlier occurrences. Disabled
+policies and cancelled cases pause their waits without claiming verification.
+
+Pending, failed and partial money remain unresolved. Only complete independent evidence no more
+than five minutes old can verify financial progress. Unavailable access, missing evidence and
+stale observations remain separate waiting reasons. Later recurrence creates a new occurrence
+and preserves the earlier verified or escalated history. Case assignment controls ownership;
+the workflow hands overdue steps to that owner rather than duplicating the Needs you item.
+
+The existing imported-return refund follow-up requires a reported receipt timestamp. Latest
+activity is not a substitute. A pending or failed stage never ends that follow-up; complete,
+fresh evidence of the refunded units and settled money is required.

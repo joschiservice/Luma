@@ -26,6 +26,10 @@ const refund = (overrides: Partial<RefundCandidate> = {}): RefundCandidate => ({
   receivedAt: ago(50),
   activityAt: ago(50),
   value: '40.00 EUR',
+  observedAt: now.toISOString(),
+  readable: true,
+  complete: true,
+  financialSettled: false,
   ...overrides,
 });
 
@@ -67,9 +71,35 @@ describe('refund follow-up', () => {
         record: { kind: 'order', id: 'o1' },
       }),
     ]);
-    items[0] = refund({ stage: 'refunded' });
+    items[0] = refund({ stage: 'refunded', financialSettled: true });
     expect((await f.signals!.get(context, 'return:r1'))?.open).toBe(false);
     expect(await f.signals!.get(context, 'order:r1')).toBeNull();
+  });
+
+  it('keeps pending, failed, partial and stale money open and never invents a receipt', async () => {
+    const values = [
+      refund({ stage: 'refund_pending' }),
+      refund({ id: 'failed', stage: 'refund_failed' }),
+      refund({ id: 'partial', stage: 'ready_to_close' }),
+      refund({ id: 'stale', financialSettled: true, observedAt: ago(1) }),
+      refund({ id: 'no-receipt', receivedAt: null }),
+    ];
+    const f = adapter(values);
+    expect((await f.signals!.open(context)).map((s) => s.id)).toEqual([
+      'return:r1',
+      'return:failed',
+      'return:partial',
+      'return:stale',
+    ]);
+    expect(
+      (
+        await f.read(
+          context,
+          { signal: { id: 'return:stale' } } as never,
+          {} as never,
+        )
+      ).values,
+    ).toEqual({ ready: false, waiting: true });
   });
 
   it('reads only its declared fields and names the missing access', async () => {

@@ -8,6 +8,7 @@ import type { FastifyRequest } from 'fastify';
 
 import type { ReturnActions } from '../application/return-actions.js';
 import type { ReturnCases } from '../application/return-cases.js';
+import type { ReturnDeadlines } from '../application/return-deadlines.js';
 import type { ReturnExchanges } from '../application/return-exchanges.js';
 
 /** Registers tenant-authenticated return case reads and permission-gated changes. */
@@ -15,6 +16,7 @@ export function returnCaseRoutes(
   service?: ReturnCases,
   actions?: ReturnActions,
   exchanges?: ReturnExchanges,
+  deadlines?: ReturnDeadlines,
 ) {
   function use(request: FastifyRequest) {
     if (!request.tenantContext)
@@ -55,7 +57,41 @@ export function returnCaseRoutes(
     return { context: current.context, service: exchanges };
   }
 
+  function waiting(request: FastifyRequest) {
+    const current = use(request);
+    if (!deadlines)
+      throw new IdentityError(
+        503,
+        'SERVICE_UNAVAILABLE',
+        'Return waiting is unavailable',
+      );
+
+    return { context: current.context, service: deadlines };
+  }
+
   return os.router({
+    deadlines: os.deadlines.handler(({ context: { request } }) => {
+      const s = waiting(request);
+
+      return s.service.policy(s.context);
+    }),
+    configureDeadlines: os.configureDeadlines.handler(
+      ({ context: { request }, input }) => {
+        const s = waiting(request);
+
+        return s.service.configure(s.context, input.body);
+      },
+    ),
+    waiting: os.waiting.handler(({ context: { request }, input }) => {
+      const s = waiting(request);
+
+      return s.service.get(s.context, input.params.caseId);
+    }),
+    checkWaiting: os.checkWaiting.handler(({ context: { request }, input }) => {
+      const s = waiting(request);
+
+      return s.service.check(s.context, input.params.caseId);
+    }),
     exchanges: os.exchanges.handler(({ context: { request }, input }) => {
       const s = exchange(request);
 

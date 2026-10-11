@@ -4,6 +4,7 @@ import type {
   DecisionEvidence,
   ReturnCaseDetail,
   ReturnDetail,
+  ReturnWaitingView,
 } from '@luma/api-contract';
 import { formatNumber } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
@@ -44,6 +45,7 @@ import {
   returnCaseOptions,
   returnExchangeOptions,
   returnSettlementOptions,
+  returnWaitingOptions,
 } from './case-data';
 import {
   CancelDialog,
@@ -67,6 +69,7 @@ import {
 } from './case-presentation';
 import { ReturnServiceSummary, ReturnServiceTimeline } from './case-service';
 import { ReturnSettlement } from './case-settlement';
+import { ReturnWaiting, returnWaitReasons } from './case-waiting';
 import { returnOptions } from './data';
 
 export type ReturnCaseLoadError = 'missing' | 'access' | 'unavailable';
@@ -86,6 +89,10 @@ export function ReturnCasePage() {
   });
   const exchanges = useQuery({
     ...returnExchangeOptions(organizationId, caseId),
+    enabled: !!query.data,
+  });
+  const waiting = useQuery({
+    ...returnWaitingOptions(organizationId, caseId),
     enabled: !!query.data,
   });
   const members = useQuery({
@@ -110,9 +117,17 @@ export function ReturnCasePage() {
       sourceDetail={sourceId ? source.data : undefined}
       sourceLoading={!!sourceId && source.isPending}
       sourceUnavailable={!!sourceId && source.isError}
+      waiting={waiting.isError ? undefined : waiting.data}
       settlement={
         query.data ? (
           <>
+            <ReturnWaiting
+              data={waiting.data}
+              loading={waiting.isPending}
+              error={waiting.error}
+              organizationId={organizationId}
+              detail={query.data}
+            />
             <ReturnExchange
               organizationId={organizationId}
               detail={query.data}
@@ -568,6 +583,7 @@ export function ReturnCaseView({
   sourceUnavailable = false,
   settlement,
   settlementStarted = false,
+  waiting,
 }: {
   organizationId: string;
   detail?: ReturnCaseDetail | undefined;
@@ -581,6 +597,7 @@ export function ReturnCaseView({
   sourceUnavailable?: boolean;
   settlement?: ReactNode;
   settlementStarted?: boolean;
+  waiting?: ReturnWaitingView | undefined;
 }) {
   const now = new Date(useNow()).toISOString();
   const [dialog, setDialog] = useState<CaseDialogKind | null>(null);
@@ -596,6 +613,9 @@ export function ReturnCaseView({
       client.invalidateQueries({ queryKey: returnCaseKey(organizationId) }),
   });
   const item = detail?.case;
+  const currentWait = waiting?.episodes
+    .filter((e) => ['waiting', 'escalated'].includes(e.state))
+    .sort((a, b) => a.dueAt.localeCompare(b.dueAt))[0];
   const open = item?.state === 'open';
   const canAssign = !!detail?.canManage && open;
   const manage = canAssign && !settlementStarted;
@@ -708,7 +728,9 @@ export function ReturnCaseView({
                 <dd>
                   {item.assignee
                     ? personName(item.assignee)
-                    : m.returns_service_unassigned()}
+                    : currentWait
+                      ? personName(detail.case.openedBy)
+                      : m.returns_service_unassigned()}
                 </dd>
               </div>
               <div>
@@ -718,15 +740,17 @@ export function ReturnCaseView({
                     ? m.returns_service_cancelled_wait()
                     : detail.creation?.state === 'approval_required'
                       ? m.returns_service_waiting_approver()
-                      : detail.creation?.state === 'uncertain' ||
-                          detail.creation?.state === 'sending'
-                        ? m.returns_service_waiting_check()
-                        : item.stage === 'awaiting_receipt'
-                          ? m.returns_service_waiting_customer()
-                          : item.stage === 'proposed' &&
-                              sourceDetail?.item.refund.state === 'pending'
-                            ? m.returns_service_waiting_payment()
-                            : m.returns_service_waiting_operator()}
+                      : currentWait
+                        ? returnWaitReasons[currentWait.reason]()
+                        : detail.creation?.state === 'uncertain' ||
+                            detail.creation?.state === 'sending'
+                          ? m.returns_service_waiting_check()
+                          : item.stage === 'awaiting_receipt'
+                            ? m.returns_service_waiting_customer()
+                            : item.stage === 'proposed' &&
+                                sourceDetail?.item.refund.state === 'pending'
+                              ? m.returns_service_waiting_payment()
+                              : m.returns_service_waiting_operator()}
                 </dd>
               </div>
               {open ? (
@@ -750,6 +774,8 @@ export function ReturnCaseView({
                 <dd>
                   {detail.creation?.state === 'approval_required' ? (
                     <WorkspaceDate value={detail.creation.expiresAt} />
+                  ) : currentWait ? (
+                    <WorkspaceDate value={currentWait.dueAt} />
                   ) : (
                     m.returns_service_due_unset()
                   )}

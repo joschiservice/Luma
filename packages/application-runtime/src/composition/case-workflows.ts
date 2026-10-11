@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { createAuditLog } from '@luma/audit/composition';
 import type { DetectionService, Incident } from '@luma/exceptions';
 import type { IdentityService, TenantContext } from '@luma/identity';
+import { toUnits } from '@luma/orders';
 import type { TenantDatabase } from '@luma/platform';
 import type { PolicyService } from '@luma/policies';
 import {
@@ -113,10 +114,6 @@ const stableId = (value: string) => {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 };
 
-type ReturnListItem = Awaited<
-  ReturnType<ReturnWorkspace['list']>
->['items'][number];
-
 type OrderListItem = Awaited<
   ReturnType<OrderWorkspace['list']>
 >['items'][number];
@@ -148,17 +145,52 @@ export function createFollowUpWorkflows(deps: {
 }): CaseWorkflowAdapter[] {
   const timing = deps.timing ?? {};
   const refund = (
-    item: ReturnListItem,
-    receivedAt: string | null,
+    detail: NonNullable<Awaited<ReturnType<ReturnWorkspace['get']>>>,
   ): RefundCandidate => ({
-    id: item.id,
-    connectionId: item.connectionId,
-    name: item.name,
-    order: item.order,
-    stage: item.stage,
-    receivedAt,
-    activityAt: item.activityAt,
-    value: money(item.value),
+    id: detail.item.id,
+    connectionId: detail.item.connectionId,
+    name: detail.item.name,
+    order: detail.item.order,
+    stage: detail.item.stage,
+    receivedAt: detail.timeline.receivedAt,
+    activityAt: detail.item.activityAt,
+    value: money(detail.item.value),
+    observedAt: new Date(
+      Math.min(
+        ...[
+          detail.item.observedAt,
+          ...detail.refunds.map((r) => r.observedAt),
+          ...(detail.source?.fullReadAt ? [detail.source.fullReadAt] : []),
+        ].map((v) => Date.parse(v)),
+      ),
+    ).toISOString(),
+    readable:
+      detail.source?.access === 'granted' && detail.source.status === 'active',
+    complete:
+      !!detail.source?.fullReadAt &&
+      !detail.source.failing &&
+      !detail.source.importing &&
+      !detail.history.truncated &&
+      !detail.item.deleted,
+    financialSettled:
+      detail.refunds.length > 0 &&
+      detail.refunds.every(
+        (r) =>
+          r.total !== null &&
+          r.transactions.length > 0 &&
+          r.transactions.every(
+            (t) =>
+              t.status === 'success' && t.amount.currency === r.total!.currency,
+          ) &&
+          r.transactions.reduce(
+            (sum, t) => sum + toUnits(t.amount.amount),
+            0n,
+          ) === toUnits(r.total.amount),
+      ) &&
+      detail.item.refund.state === 'refunded' &&
+      detail.item.refundedUnits !== null &&
+      detail.item.quantity !== null &&
+      Number(detail.item.refundedUnits) >= Number(detail.item.quantity),
   });
   const payment = (item: OrderListItem): PaymentCandidate => ({
     id: item.id,
@@ -186,22 +218,33 @@ export function createFollowUpWorkflows(deps: {
     createRefundFollowUp({
       version: compileProcessWorkflow(refundFollowUpSource),
       waitMs: timing.refundWaitMs ?? 48 * 3_600_000,
-      // The oldest activity is never later than the receipt, so the first page holds the oldest.
-      candidates: async (context) =>
-        (
-          await deps.returns().list(context, {
-            q: '',
-            view: 'all',
-            stage: 'awaiting_refund',
-            sort: 'activity',
-            direction: 'asc',
-            limit: 50,
-          })
-        ).items.map((item) => refund(item, null)),
+      candidates: async (context) => {
+        const pages = await Promise.all(
+          ['action', 'waiting'].map((view) =>
+            deps.returns().list(context, {
+              q: '',
+              view: view as 'action' | 'waiting',
+              sort: 'activity',
+              direction: 'asc',
+              limit: 50,
+            }),
+          ),
+        );
+        const ids = [
+          ...new Set(
+            pages.flatMap((page) => page.items.map((item) => item.id)),
+          ),
+        ];
+        const details = await Promise.all(
+          ids.map((id) => deps.returns().get(context, id)),
+        );
+
+        return details.flatMap((detail) => (detail ? [refund(detail)] : []));
+      },
       get: async (context, id) => {
         const detail = await deps.returns().get(context, id);
 
-        return detail ? refund(detail.item, detail.timeline.receivedAt) : null;
+        return detail ? refund(detail) : null;
       },
       returnsShared: async (context) =>
         (

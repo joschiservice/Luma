@@ -1081,6 +1081,17 @@ export function createReturnExchanges(deps: Dependencies) {
         await check(context, await load(context, caseId, id)),
       );
     },
+    /** Refreshes an already sent operation for owned monitoring; it cannot request or dispatch a write. */
+    async observe(context: TenantContext, caseId: string, id: string) {
+      context = await authorize(context);
+      const value = await check(context, await load(context, caseId, id));
+      if (
+        ['source_unavailable', 'stale_evidence'].includes(value.failure ?? '')
+      )
+        throw new Error('Fresh financial proof unavailable');
+
+      return value.proof;
+    },
     /** Resolves only an exact tenant-owned execution intent. */
     async forAction(context: TenantContext, id: string) {
       context = await authorize(context, true);

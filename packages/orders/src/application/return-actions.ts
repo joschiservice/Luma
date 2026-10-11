@@ -363,7 +363,7 @@ export function createReturnActions(deps: Dependencies) {
         ? 'verified'
         : proof.outcome === 'failed'
           ? 'failed'
-          : proof.payment === 'pending'
+          : proof.payment === 'pending' || proof.payment === 'partial'
             ? 'pending'
             : 'uncertain';
     const result = await save(
@@ -756,6 +756,17 @@ export function createReturnActions(deps: Dependencies) {
         context,
         await check(context, await load(context, caseId, id)),
       );
+    },
+    /** Refreshes an already sent operation for owned monitoring; it cannot request or dispatch a write. */
+    async observe(context: TenantContext, caseId: string, id: string) {
+      context = await authorize(context);
+      const value = await check(context, await load(context, caseId, id));
+      if (
+        ['source_unavailable', 'stale_evidence'].includes(value.failure ?? '')
+      )
+        throw new Error('Fresh financial proof unavailable');
+
+      return value.proof;
     },
     /** Resolves only a tenant-owned exact intent for the execution gateway. */
     async forAction(context: TenantContext, id: string) {

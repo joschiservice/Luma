@@ -57,7 +57,7 @@ export const returnActionSchema = z.object({
   proof: z
     .object({
       outcome: z.enum(['passed', 'failed', 'inconclusive']),
-      payment: z.enum(['pending', 'failed', 'paid']).nullable(),
+      payment: z.enum(['pending', 'failed', 'partial', 'paid']).nullable(),
       observedAt: z.string(),
       evidenceRefs: z.array(z.string()),
     })

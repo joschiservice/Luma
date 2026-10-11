@@ -214,3 +214,33 @@ export function exchangeCommands(organizationId: string, caseId: string) {
       api.checkExchange({ params: { ...params, actionId }, body: {} }),
   };
 }
+
+/** Loads durable waits without refreshing a provider. */
+export function returnWaitingOptions(organizationId: string, caseId: string) {
+  return queryOptions({
+    ...privateQueryDefaults,
+    queryKey: [...returnCaseKey(organizationId), caseId, 'waiting'],
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: 'always',
+    queryFn: ({ signal }) =>
+      api.waiting({ params: { organizationId, caseId } }, { signal }),
+  });
+}
+
+/** Reads merchant deadline configuration. */
+export function returnDeadlineOptions(organizationId: string) {
+  return queryOptions({
+    ...privateQueryDefaults,
+    queryKey: [...returnCaseKey(organizationId), 'deadlines'],
+    queryFn: ({ signal }) =>
+      api.deadlines({ params: { organizationId } }, { signal }),
+  });
+}
+
+/** Saves one immutable policy command and explicitly checks read-only return progress. */
+export const returnDeadlineCommands = (organizationId: string) => ({
+  configure: (body: Parameters<typeof api.configureDeadlines>[0]['body']) =>
+    api.configureDeadlines({ params: { organizationId }, body }),
+  check: (caseId: string) =>
+    api.checkWaiting({ params: { organizationId, caseId }, body: {} }),
+});

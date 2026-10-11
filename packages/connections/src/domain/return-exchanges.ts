@@ -81,7 +81,8 @@ export interface ReturnExchangeProof {
   fulfillmentOrderId: string | null;
   paymentHoldId: string | null;
   fulfillmentReady: boolean;
-  payment: 'not_required' | 'pending' | 'failed' | 'paid' | 'unknown';
+  payment:
+    'not_required' | 'pending' | 'failed' | 'partial' | 'paid' | 'unknown';
   financial: ReturnExchangeFinancial | null;
 }
 
