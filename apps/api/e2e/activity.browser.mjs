@@ -161,6 +161,8 @@ test('filters, expands, returns, paginates and recovers workspace activity on de
   const older = page.url();
   await page.reload();
   expect(page.url()).toBe(older);
+  // A refresh during the first load joins that read; the late event must arrive after it.
+  await expect.poll(() => page.locator('.activity-event').count()).toBe(6);
   await page
     .getByRole('button', { name: 'Refresh activity', exact: true })
     .click();
