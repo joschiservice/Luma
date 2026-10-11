@@ -9,6 +9,7 @@ import { AppExtension } from '../apps/extension';
 import { connectionsOptions } from '../connections/data';
 import { useCaseObservation } from '../exceptions/observation';
 import { CaseResolution } from '../exceptions/resolution';
+import { ThreadReview } from '../inbox/thread';
 import { PurchaseOrderReview } from '../procurement/detail';
 import { workflowRunsOptions } from '../workflows/data';
 import { ReplenishmentRunReview } from '../workflows/replenishment';
@@ -91,6 +92,15 @@ export function OwnerReview({
           key={owner.purchaseOrderId}
           organizationId={organizationId}
           purchaseOrderId={owner.purchaseOrderId}
+        />
+      );
+    case 'message_thread':
+      return (
+        <ThreadReview
+          key={owner.threadId}
+          organizationId={organizationId}
+          threadId={owner.threadId}
+          onChange={onChange}
         />
       );
   }

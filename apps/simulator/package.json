@@ -19,6 +19,7 @@
     "@luma/simulator-commerce": "workspace:*",
     "@luma/simulator-contract": "workspace:*",
     "@luma/simulator-core": "workspace:*",
+    "@luma/simulator-gmail": "workspace:*",
     "@luma/simulator-jtl": "workspace:*",
     "@luma/simulator-shopify": "workspace:*",
     "fastify": "catalog:",

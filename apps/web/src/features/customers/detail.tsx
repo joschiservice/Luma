@@ -24,6 +24,7 @@ import { type ReactNode, useSyncExternalStore } from 'react';
 
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
+import { RecordMessages } from '../inbox/record-messages';
 import { formatMoney } from '../orders/presentation';
 import { systemName } from '../products/presentation';
 import { customerOptions } from './data';
@@ -74,6 +75,20 @@ export function CustomerPage() {
               : 'unavailable'
       }
       refresh={() => void query.refetch()}
+      messages={
+        detail ? (
+          <RecordMessages
+            organizationId={organizationId}
+            kind="customer"
+            recordId={detail.item.id}
+            frame={(content) => (
+              <Section title={m.messaging_record_section_title()}>
+                {content}
+              </Section>
+            )}
+          />
+        ) : null
+      }
       history={
         detail ? (
           <CustomerOrders
@@ -138,6 +153,7 @@ export function CustomerDetailView({
   offline = false,
   refresh,
   history,
+  messages,
 }: {
   organizationId: string;
   detail?: CustomerDetail | undefined;
@@ -148,6 +164,8 @@ export function CustomerDetailView({
   refresh: () => void;
   /** The customer's order history. */
   history?: ReactNode;
+  /** Message threads linked to the customer. */
+  messages?: ReactNode;
 }) {
   const item = detail?.item;
   const store = detail?.source ? systemName(detail.source.system) : null;
@@ -236,6 +254,7 @@ export function CustomerDetailView({
             >
               {history}
             </Section>
+            {messages}
           </div>
           <aside
             className="customers-inspector"

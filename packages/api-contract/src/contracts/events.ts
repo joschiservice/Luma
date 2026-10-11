@@ -40,6 +40,7 @@ export const workspaceTopics = [
   'procurement',
   'resolution',
   'decisions',
+  'messaging',
 ] as const;
 
 export const workspaceTopicSchema = z.enum(workspaceTopics);

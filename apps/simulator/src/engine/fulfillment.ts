@@ -6,6 +6,7 @@ import {
 } from '@luma/simulator-core';
 import { readItemStock, readOrder as readErpOrder } from '@luma/simulator-jtl';
 
+import { customerDelayMail, supplierConfirmationMail } from './mail.js';
 import { orderIncident, type WorldOrder, worldOrder } from './orders.js';
 import {
   type EngineEvents,
@@ -267,6 +268,20 @@ export async function carrierUpdate(
     fulfillment: payload.fulfillment,
     status: payload.status,
   });
+  if (payload.status === 'DELAYED') {
+    // Some customers write to the shop when tracking stalls.
+    const order = await worldOrder(world, payload.shop, payload.order);
+    if (
+      order &&
+      keyedRandom(
+        world.run.seed,
+        'delay-mail',
+        payload.shop,
+        payload.order,
+      ).chance(0.5)
+    )
+      await customerDelayMail(world, order, 'carrier');
+  }
   if (payload.status !== 'DELIVERED') return;
   world.metric('orders.delivered', 1, payload.shop);
   const order = await worldOrder(world, payload.shop, payload.order);
@@ -491,5 +506,13 @@ export async function supplierAnswer(
       world.model.erp.name,
       String(command.orderId ?? ''),
     );
+
+    return;
   }
+  // The supplier also answers by email from the account that received the order.
+  if (command.kind === 'purchase-order-confirm')
+    await supplierConfirmationMail(
+      world,
+      command as Parameters<typeof supplierConfirmationMail>[1],
+    );
 }

@@ -11,6 +11,7 @@ import {
   House,
   Inbox,
   type LucideIcon,
+  Mail,
   Package,
   Receipt,
   Settings,
@@ -31,6 +32,7 @@ export type DestinationPath =
   | 'exceptions'
   | 'activity'
   | 'insights'
+  | 'inbox'
   | 'orders'
   | 'customers'
   | 'products'
@@ -150,6 +152,16 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     shortcut: 'm',
     permission: 'insights.read',
     area: m.identity_nav_insights_area,
+  }),
+  destination({
+    path: 'inbox',
+    label: m.identity_nav_inbox,
+    Icon: Mail,
+    description: m.identity_nav_inbox_description,
+    group: 'operations',
+    shortcut: 'e',
+    permission: 'messages.read',
+    area: m.identity_nav_inbox_area,
   }),
   destination({
     path: 'orders',

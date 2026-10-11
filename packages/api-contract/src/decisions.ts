@@ -12,6 +12,7 @@ export const decisionKindSchema = z.enum([
   'inventory_correction',
   'supplier_commitment',
   'workflow_handover',
+  'message_reply',
 ]);
 
 /**
@@ -75,6 +76,7 @@ export const decisionOwnerSchema = z.discriminatedUnion('kind', [
     kind: z.literal('purchase_order'),
     purchaseOrderId: z.string().uuid(),
   }),
+  z.object({ kind: z.literal('message_thread'), threadId: z.string().uuid() }),
 ]);
 
 export const decisionAssignmentSchema = z.object({

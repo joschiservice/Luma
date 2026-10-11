@@ -27,6 +27,7 @@ conventions only; it does not list files.
 | Case desk, proposals, learning, measurement, activity            | `@luma/resolution`                                                                       |
 | Workflow definitions, versions, activations, runs, authoring     | `@luma/workflows`; durable execution in `@luma/workflow-temporal`                        |
 | Suppliers, purchase orders, replenishment, commitments           | `@luma/procurement`                                                                      |
+| Mailboxes, message threads, links, documents and replies         | `@luma/messaging`                                                                        |
 | Cross-owner read-only views (workspaces, metrics, Needs you)     | `@luma/read-models`                                                                      |
 | Ask Luma                                                         | `@luma/assistant`                                                                        |
 | Service composition, process runtimes, migrations                | `@luma/application-runtime`                                                              |

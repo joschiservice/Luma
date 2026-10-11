@@ -21,6 +21,8 @@ export const dependencies = {
     'policies',
     'workflows',
   ],
+  // Reads mailboxes through composed ports; other owners' records only through ports.
+  messaging: ['platform', 'identity', 'audit'],
   inventory: ['platform', 'identity'],
   customers: ['platform', 'identity'],
   connectors: ['platform', 'identity'],
@@ -78,6 +80,7 @@ export const domainPackages = {
   audit: 'audit',
   orders: 'orders',
   procurement: 'procurement',
+  messaging: 'messaging',
   inventory: 'inventory',
   connections: 'connectors',
   policies: 'policies',

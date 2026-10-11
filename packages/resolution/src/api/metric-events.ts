@@ -26,6 +26,7 @@ const topicPermissions: Record<WorkspaceTopic, Permission | null> = {
   procurement: 'procurement.read',
   resolution: 'insights.read',
   decisions: null,
+  messaging: 'messages.read',
 };
 
 /** Lists the areas a member may hear about. */

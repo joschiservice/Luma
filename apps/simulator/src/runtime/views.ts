@@ -98,6 +98,13 @@ export async function detail(pool: Pool, run: RunRecord): Promise<RunDetail> {
         name,
         picksPerHour,
       })),
+      mailboxes: [
+        {
+          instance: model.mailbox.name,
+          address: model.mailbox.config.address,
+          name: model.mailbox.config.name,
+        },
+      ],
     },
     faults: faults.rows.map(({ rule }) => ({
       id: rule.id,

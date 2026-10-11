@@ -76,7 +76,7 @@ Evidence dates shift together from the fixture corpus to the run's creation time
 
 ## What is synthetic
 
-Both connection labels begin with **SIMULATED** and report no live health, so the overview shows unobserved connection coverage; a healthy synthetic workload never implies healthy connected systems. Every seeded evidence document carries `synthetic: true`, and the organization name identifies the simulation. The inventory mismatch pairs JTL availability with a Shopify fixture location by assumption, not through a discovered mapping.
+Both connection labels begin with **SIMULATED** and report no live health, so the overview shows unobserved connection coverage; a healthy synthetic workload never implies healthy connected systems. Simulator runs also connect a synthetic [operations mailbox](simulator.md#operations-mailbox) with the same label; Luma reads its mail by polling because Gmail push is not simulated. Every seeded evidence document carries `synthetic: true`, and the organization name identifies the simulation. The inventory mismatch pairs JTL availability with a Shopify fixture location by assumption, not through a discovered mapping.
 
 Disconnecting or revoking the seeded JTL connection disables approval and prevents dispatch, even for an already approved action. Simulated health checks accept only this run's seeded connections; other connections are rejected without changing their stored health or lifecycle history.
 

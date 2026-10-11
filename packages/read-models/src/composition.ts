@@ -22,7 +22,9 @@ export { createInsights } from './infrastructure/insights/workspace.js';
 
 export {
   appDecisionProvider,
+  messageReplyDecisionProvider,
   replenishmentDecisionProvider,
+  replySendDecisionProvider,
   supplierCommitmentDecisionProvider,
   workflowHandoverDecisionProvider,
 } from './infrastructure/decisions/providers.js';

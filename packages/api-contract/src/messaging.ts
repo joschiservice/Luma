@@ -178,6 +178,8 @@ export const threadSummarySchema = z.object({
   status: threadStatusSchema,
   ownerId: z.string().nullable(),
   replyDueAt: instant.nullable(),
+  /** `manual`: set by a person; `automatic`: from the mailbox's reply hours. Null without a deadline. */
+  replyDueSource: z.enum(['automatic', 'manual']).nullable(),
   overdue: z.boolean(),
   /** Inbound message newer than the latest reply. */
   awaitingReply: z.boolean(),
@@ -242,16 +244,27 @@ export const threadEventSchema = z.object({
     'linked',
     'unlinked',
     'note_added',
+    /** An inbound supplier message was recorded on its purchase order; `details.outcome` says how. */
+    'handed_off',
     'reply_requested',
     'reply_approved',
     'reply_rejected',
     'reply_withheld',
     'text_removed',
+    /** Someone confirmed, corrected or rejected a document fact; `details.outcome` says which. */
+    'fact_reviewed',
   ]),
   actor: z.object({
     kind: z.enum(['user', 'luma']),
     id: z.string(),
   }),
+  /**
+   * Stable keys for people-facing text: `ownerId` (assigned; absent when unassigned),
+   * `replyDueAt` and `automatic` (deadline_set), `status` and `reason` (status_changed),
+   * `record` (a display label, absent when the reader can't read it) for linked, unlinked and
+   * handed_off, `outcome` for handed_off and fact_reviewed, `documentId`, `factId` and `kind` for fact_reviewed, and
+   * `reason` for reply_withheld.
+   */
   details: z.record(z.string(), z.string()),
   occurredAt: instant,
 });
@@ -613,47 +626,89 @@ export const outboundDecisionInputSchema = z
   .strict();
 
 export type MessageAddress = z.infer<typeof messageAddressSchema>;
+
 export type RuleParty = z.infer<typeof rulePartySchema>;
+
 export type MailboxRuleKind = z.infer<typeof mailboxRuleKindSchema>;
+
 export type MailboxRuleInput = z.infer<typeof mailboxRuleInputSchema>;
+
 export type MailboxRule = z.infer<typeof mailboxRuleSchema>;
+
 export type MailboxSettings = z.infer<typeof mailboxSettingsSchema>;
+
 export type MailboxSettingsInput = z.infer<typeof mailboxSettingsInputSchema>;
+
 export type MailboxSyncState = z.infer<typeof mailboxSyncStateSchema>;
+
 export type Mailbox = z.infer<typeof mailboxSchema>;
+
 export type LinkedRecordKind = z.infer<typeof linkedRecordKindSchema>;
+
 export type RecordRef = z.infer<typeof recordRefSchema>;
+
 export type LinkMethod = z.infer<typeof linkMethodSchema>;
+
 export type ThreadLink = z.infer<typeof threadLinkSchema>;
+
 export type ThreadStatus = z.infer<typeof threadStatusSchema>;
+
 export type ThreadSummary = z.infer<typeof threadSummarySchema>;
+
 export type Attachment = z.infer<typeof attachmentSchema>;
+
 export type Message = z.infer<typeof messageSchema>;
+
 export type Note = z.infer<typeof noteSchema>;
+
 export type ThreadEvent = z.infer<typeof threadEventSchema>;
+
 export type FactMoney = z.infer<typeof factMoneySchema>;
+
 export type FactValue = z.infer<typeof factValueSchema>;
+
 export type FactLocator = z.infer<typeof factLocatorSchema>;
+
 export type FactMatch = z.infer<typeof factMatchSchema>;
+
 export type Fact = z.infer<typeof factSchema>;
+
 export type DocumentState = z.infer<typeof documentStateSchema>;
+
 export type DocumentSummary = z.infer<typeof documentSummarySchema>;
+
 export type DocumentRepresentation = z.infer<
   typeof documentRepresentationSchema
 >;
+
 export type DocumentDetail = z.infer<typeof documentDetailSchema>;
+
 export type Citation = z.infer<typeof citationSchema>;
+
 export type OutboundState = z.infer<typeof outboundStateSchema>;
+
 export type Outbound = z.infer<typeof outboundSchema>;
+
 export type ThreadDetail = z.infer<typeof threadDetailSchema>;
+
 export type ThreadView = z.infer<typeof threadViewSchema>;
+
 export type ThreadQuery = z.infer<typeof threadQuerySchema>;
+
 export type AssignInput = z.infer<typeof assignInputSchema>;
+
 export type DeadlineInput = z.infer<typeof deadlineInputSchema>;
+
 export type StatusInput = z.infer<typeof statusInputSchema>;
+
 export type NoteInput = z.infer<typeof noteInputSchema>;
+
 export type ThreadLinkInput = z.infer<typeof threadLinkInputSchema>;
+
 export type FactInput = z.infer<typeof factInputSchema>;
+
 export type FactReviewInput = z.infer<typeof factReviewInputSchema>;
+
 export type OutboundInput = z.infer<typeof outboundInputSchema>;
+
 export type OutboundDecisionInput = z.infer<typeof outboundDecisionInputSchema>;

@@ -51,6 +51,7 @@ export type {
   MailboxFilter,
   MessageAddress,
   MessageAttachmentRef,
+  MessageReadCapability,
   MessageSnapshot,
   Money,
   Observation,

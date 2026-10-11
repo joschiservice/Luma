@@ -133,6 +133,15 @@ function RecordLinks({
         >
           {m.decisions_open_run()} <ArrowUpRight aria-hidden="true" />
         </Link>
+      ) : owner.kind === 'message_thread' ? (
+        <Link
+          className={link}
+          to="/app/$organizationId/inbox"
+          params={{ organizationId }}
+          search={{ thread: owner.threadId, view: 'all' }}
+        >
+          {m.decisions_open_thread()} <ArrowUpRight aria-hidden="true" />
+        </Link>
       ) : null}
     </div>
   );

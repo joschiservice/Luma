@@ -11,6 +11,11 @@ import {
   type RecordStore,
 } from '@luma/simulator-core';
 import {
+  gmail,
+  type GmailCommand,
+  type GmailCommandResult,
+} from '@luma/simulator-gmail';
+import {
   jtl,
   type JtlCommand,
   type JtlCommandResult,
@@ -22,7 +27,12 @@ import {
 } from '@luma/simulator-shopify';
 
 import { cin7 } from './cin7.js';
-import type { ErpInstance, Instance, WorldModel } from './model.js';
+import type {
+  ErpInstance,
+  Instance,
+  MailboxInstance,
+  WorldModel,
+} from './model.js';
 
 export type HealthStatus =
   'healthy' | 'rate-limited' | 'unavailable' | 'unauthorized';
@@ -140,6 +150,15 @@ export function erpContext(world: World, events: ProviderEvent[] = []) {
   ) as ProviderContext<ErpInstance['config']>;
 }
 
+/** The operations mailbox's context; Gmail notifications are not delivered anywhere. */
+export function mailContext(world: World, events: ProviderEvent[] = []) {
+  return providerContext(
+    world,
+    world.model.mailbox.name,
+    events,
+  ) as ProviderContext<MailboxInstance['config']>;
+}
+
 /**
  * An ERP sales order or item as an incident resource, identified as Luma reads it through the
  * ERP's API, so the scorecard can find it in case evidence.
@@ -191,6 +210,8 @@ export interface EngineEvents {
     lines?: { lineItem: string; quantity: number }[] | undefined;
   };
   supplier: { command: Record<string, unknown> };
+  /** The ERP emails a new purchase order to its supplier from the operations mailbox. */
+  'purchase-order-mail': { purchaseOrder: string };
 }
 
 /** A stored engine event. */
@@ -225,10 +246,13 @@ export async function handleEvents(
   events: ProviderEvent[],
 ) {
   for (const event of events) {
-    if (instance(world, name).kind === 'shopify') {
+    const kind = instance(world, name).kind;
+    if (kind === 'shopify') {
       world.webhook(name, event);
       continue;
     }
+    // Gmail push goes through Google Pub/Sub, which is not simulated; Luma polls the mailbox.
+    if (kind === 'gmail') continue;
     // The ERP sends no webhooks; stock changes feed the merchant's stock connector.
     if (
       event.topic === 'items/stock' &&
@@ -237,6 +261,10 @@ export async function handleEvents(
       await world
         .store(worldInstance)
         .put('dirty', event.resource, {}, { updatedAt: world.now });
+    if (event.topic === 'purchase-orders/create')
+      await schedule(world, world.now + 5_000, 'purchase-order-mail', {
+        purchaseOrder: event.resource,
+      });
     const supplierEvents = event.payload.supplierEvents;
     if (
       event.topic === 'purchase-orders/create' &&
@@ -293,6 +321,14 @@ export async function erp(
       });
 
   return result;
+}
+
+/** Applies a command to the operations mailbox, such as delivering a supplier's email. */
+export async function mail(
+  world: World,
+  command: GmailCommand,
+): Promise<GmailCommandResult> {
+  return gmail.command(mailContext(world), command);
 }
 
 /** Records a ground-truth incident; Luma never reads it. */

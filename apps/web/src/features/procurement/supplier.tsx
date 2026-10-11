@@ -21,10 +21,11 @@ import { quantityWithUnit } from '@luma/ui/lib/units';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { Building2, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
+import { RecordMessages } from '../inbox/record-messages';
 import { stockQuantity } from '../inventory/presentation';
 import {
   procurementError,
@@ -63,6 +64,25 @@ export function SupplierPage() {
         void record.refetch();
         void context.refetch();
       }}
+      messages={
+        <RecordMessages
+          organizationId={organizationId}
+          kind="supplier"
+          recordId={supplierId}
+          frame={(content) => (
+            <Card
+              as="section"
+              className="procurement-side"
+              aria-labelledby="supplier-inbox-threads"
+            >
+              <h2 id="supplier-inbox-threads">
+                {m.messaging_record_section_title()}
+              </h2>
+              {content}
+            </Card>
+          )}
+        />
+      }
     />
   );
 }
@@ -93,6 +113,7 @@ export function SupplierRecordView({
   refreshing = false,
   error,
   reload,
+  messages,
 }: {
   organizationId: string;
   record?: SupplierRecord | undefined;
@@ -101,6 +122,8 @@ export function SupplierRecordView({
   refreshing?: boolean;
   error?: string | undefined;
   reload: () => void;
+  /** Inbox threads linked to the supplier, framed as an aside card. */
+  messages?: ReactNode;
 }) {
   const [dialog, setDialog] = useState<'link' | 'order' | null>(null);
   const navigate = useNavigate();
@@ -422,6 +445,7 @@ export function SupplierRecordView({
                   </p>
                 )}
               </Card>
+              {messages}
               {context?.issues.length ? (
                 <Card
                   as="section"

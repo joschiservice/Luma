@@ -8,6 +8,7 @@ import {
   ConnectorError,
   type CustomerSnapshot,
   type ExternalId,
+  type MessageReadCapability,
   type Observation,
   type ProductSnapshot,
   type ReadCapability,
@@ -108,6 +109,7 @@ export function createJtlConnector(
       | 'returns.read'
       | 'suppliers.read'
       | 'purchase-orders.read'
+      | MessageReadCapability
     >,
   >(capability: K): CapabilityHandler<K> {
     return {

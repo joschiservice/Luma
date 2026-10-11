@@ -32,12 +32,16 @@ import Fastify from 'fastify';
 import pg from 'pg';
 import { z } from 'zod';
 
-import { jtlCommandSchema, shopifyCommandSchema } from './commands.js';
+import {
+  gmailCommandSchema,
+  jtlCommandSchema,
+  shopifyCommandSchema,
+} from './commands.js';
 import { advanceWorld } from './engine/advance.js';
 import { injectIncident, recoverIncident } from './engine/incidents.js';
 import { forgetModel, worldModel } from './engine/model.js';
 import { placeOrder } from './engine/orders.js';
-import { erp, type Incident, shop, type World } from './engine/world.js';
+import { erp, type Incident, mail, shop, type World } from './engine/world.js';
 import { createDispatcher } from './runtime/dispatch.js';
 import { clearRun, provisionRun } from './runtime/provision.js';
 import {
@@ -405,7 +409,9 @@ export async function createApp(options: SimulatorOptions) {
             (item) => item.name === input.instance,
           );
           if (!target) throw notFound('Unknown instance');
-          if (target.kind !== 'shopify')
+          if (target.kind === 'gmail')
+            await mail(world, gmailCommandSchema.parse(input.command));
+          else if (target.kind !== 'shopify')
             await erp(
               world,
               jtlCommandSchema.parse(input.command) as JtlCommand,
@@ -525,7 +531,10 @@ export async function createApp(options: SimulatorOptions) {
       async ({ client, run, world }) => {
         if (run.status !== 'ready') throw new Error('The run is not ready');
         await advanceWorld(world, actionTime(run));
-        const shop = world.model.shops[0]!.name;
+        const targets = {
+          shop: world.model.shops[0]!.name,
+          mailbox: world.model.mailbox.name,
+        };
         const started: Incident[] = [];
         for (const [index, step] of scenario.steps.entries()) {
           const origin = `${input.id}:${index}`;
@@ -535,7 +544,7 @@ export async function createApp(options: SimulatorOptions) {
               run,
               world,
               {
-                instance: shop,
+                instance: targets[step.on],
                 operation: step.operation,
                 kind: step.fault,
                 occurrence: 1,
@@ -549,7 +558,7 @@ export async function createApp(options: SimulatorOptions) {
               await injectIncident(world, {
                 id: scenarioIncidentId(origin),
                 kind: step.incident,
-                instance: shop,
+                instance: targets[step.on],
               }),
             );
         }

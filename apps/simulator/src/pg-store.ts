@@ -12,6 +12,7 @@ export const recordTables = [
   'sim_shopify_records',
   'sim_jtl_records',
   'sim_cin7_records',
+  'sim_gmail_records',
   'sim_world_records',
 ] as const;
 

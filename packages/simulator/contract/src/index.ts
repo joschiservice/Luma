@@ -257,7 +257,7 @@ export interface RunSummary {
   chaos: { preset: string };
   instances: {
     name: string;
-    kind: 'shopify' | 'jtl' | 'cin7';
+    kind: 'shopify' | 'jtl' | 'cin7' | 'gmail';
     label: string;
     health: z.infer<typeof serviceHealthSchema>;
   }[];
@@ -281,6 +281,8 @@ export interface RunDetail extends RunSummary {
       location: string;
     }[];
     warehouses: { id: string; name: string; picksPerHour: number }[];
+    /** Shared operations mailboxes; Luma reads them through the Gmail app. */
+    mailboxes: { instance: string; address: string; name: string }[];
   };
   faults: {
     id: string;

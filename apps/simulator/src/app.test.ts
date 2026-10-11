@@ -94,6 +94,7 @@ describe.skipIf(!adminUrl)('simulator host', () => {
       instances: [
         { name: 'jtl', kind: 'jtl', health: 'healthy' },
         { name: 'shopify', kind: 'shopify', health: 'healthy' },
+        { name: 'gmail', kind: 'gmail', health: 'healthy' },
       ],
       counts: { orders: 2, activeIncidents: 0 },
       merchant: { variants: 2 },
@@ -267,6 +268,84 @@ describe.skipIf(!adminUrl)('simulator host', () => {
       }),
     ]);
     await call(`runs/host/incidents/${incident!.id}/recover`, {});
+  });
+
+  it('serves the mailbox, accepts mail commands and counts repeated sends', async () => {
+    const gmail = (path: string, method = 'GET', body: unknown = null) =>
+      call<{
+        status: number;
+        body: {
+          emailAddress: string;
+          messages: { id: string; threadId: string }[];
+          threadId: string;
+        };
+      }>('runs/host/providers/gmail/request', {
+        url: `https://gmail.googleapis.com/gmail/v1/users/me/${path}`,
+        method,
+        headers: {
+          authorization: 'Bearer ya29.test',
+          'content-type': 'application/json',
+        },
+        body: body === null ? null : JSON.stringify(body),
+      });
+    expect((await gmail('profile')).body).toMatchObject({
+      emailAddress: 'einkauf@luma-goods.example',
+    });
+    await call('runs/host/control', {
+      action: 'command',
+      instance: 'gmail',
+      command: {
+        kind: 'deliver',
+        from: { address: 'kunde@customer.example', name: 'Kunde' },
+        subject: 'Bestellung #SIM-1',
+        text: 'Wo bleibt meine Bestellung #SIM-1?',
+        messageId: '<kunde-1@customer.example>',
+      },
+    });
+    const listed = await gmail('messages?q=from:@customer.example');
+    expect(listed.body.messages).toHaveLength(1);
+    const raw = Buffer.from(
+      [
+        'To: kunde@customer.example',
+        'Subject: Re: Bestellung #SIM-1',
+        'Message-ID: <luma.host-test@luma-goods.example>',
+        'In-Reply-To: <kunde-1@customer.example>',
+        '',
+        'Ihre Bestellung ist unterwegs.',
+      ].join('\r\n'),
+    ).toString('base64url');
+    const send = { raw, threadId: listed.body.messages[0]!.threadId };
+    const sent = await gmail('messages/send', 'POST', send);
+    expect(sent.body.threadId).toBe(send.threadId);
+    await gmail('messages/send', 'POST', send);
+    const card = await call<{ repeatedWrites: unknown[] }>(
+      'runs/host/scorecard',
+    );
+    expect(JSON.stringify(card)).toContain('messages.send');
+    await expect(
+      call('runs/host/control', {
+        action: 'command',
+        instance: 'gmail',
+        command: {
+          kind: 'deliver',
+          from: { address: 'not-an-address' },
+          text: 'x',
+        },
+      }),
+    ).rejects.toThrow('400');
+    const token = await call<{ status: number; body: unknown }>(
+      'runs/host/providers/gmail/request',
+      {
+        url: 'https://oauth2.googleapis.com/token',
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: 'grant_type=refresh_token&refresh_token=1%2F%2Fx&client_id=c',
+      },
+    );
+    expect(token).toMatchObject({
+      status: 200,
+      body: { token_type: 'Bearer' },
+    });
   });
 
   it('delivers signed webhooks, including duplicates of the same event', async () => {

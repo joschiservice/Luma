@@ -1,0 +1,38 @@
+{
+  "name": "@luma/app-gmail",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "luma-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@luma/app-host": "workspace:*",
+    "@luma/connections": "workspace:*",
+    "@luma/connector-gmail": "workspace:*",
+    "@luma/i18n": "workspace:*",
+    "@luma/identity": "workspace:*",
+    "@luma/platform": "workspace:*",
+    "@luma/ui": "workspace:*",
+    "@tanstack/react-form": "catalog:",
+    "fastify": "catalog:",
+    "jose": "6.2.12",
+    "react": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@luma/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "vitest": "catalog:"
+  }
+}

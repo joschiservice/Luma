@@ -56,13 +56,16 @@ export function createInstallationService(
 export { createSecretCipher, createInstallationRepository };
 
 export {
+  createInstalledMessageRuntime,
   createInstalledPurchaseOrderRuntime,
   createInstalledRuntime,
   createInstalledShippingMethodEffects,
 } from './infrastructure/installations/runtime.js';
 
 export type {
+  InstalledMessageRuntime,
   InstalledPurchaseOrderRuntime,
+  MessageSendBinding,
   InstalledRuntimeOptions,
 } from './infrastructure/installations/runtime.js';
 

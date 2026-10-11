@@ -6,7 +6,8 @@ export type DecisionKind =
   | 'fulfillment_recovery'
   | 'inventory_correction'
   | 'supplier_commitment'
-  | 'workflow_handover';
+  | 'workflow_handover'
+  | 'message_reply';
 
 export type DecisionReason =
   'approval' | 'run' | 'recovery' | 'manual_intervention' | 'uncertainty';
@@ -33,7 +34,8 @@ export type DecisionOwner =
       fulfillmentId: string;
     }
   | { kind: 'app_inventory'; appId: string; positionId: string }
-  | { kind: 'purchase_order'; purchaseOrderId: string };
+  | { kind: 'purchase_order'; purchaseOrderId: string }
+  | { kind: 'message_thread'; threadId: string };
 
 export interface DecisionAssignment {
   assigneeId: string | null;

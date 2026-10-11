@@ -42,6 +42,10 @@ export const capabilities = localized({
   'suppliers.read': m.connections_capability_suppliers_read,
   'purchase-orders.read': m.connections_capability_purchase_orders_read,
   'purchase-orders.submit': m.connections_capability_purchase_orders_submit,
+  'messages.read': m.connections_capability_messages_read,
+  'message-threads.read': m.connections_capability_message_threads_read,
+  'message-attachments.read': m.connections_capability_message_attachments_read,
+  'messages.send': m.connections_capability_messages_send,
 } satisfies Record<InstallationCapability, () => string>);
 
 export const statuses = localized({
@@ -69,6 +73,7 @@ export function connectionKindName(kind: string) {
   if (kind === 'jtl-cloud') return 'JTL Cloud';
   if (kind === 'jtl-onprem') return m.connections_kind_jtl_onprem();
   if (kind === 'cin7-core') return 'Cin7 Core';
+  if (kind === 'gmail') return 'Gmail';
 
   return kind;
 }

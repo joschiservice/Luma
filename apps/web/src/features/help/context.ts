@@ -4,6 +4,7 @@
  */
 export const helpTopics = [
   'needs-you',
+  'inbox',
   'issues',
   'issues/investigate',
   'issues/resolve',

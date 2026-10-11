@@ -14,7 +14,11 @@ import {
   createIdentityReader,
   createSyncStore,
 } from '@luma/commerce-sync/composition';
-import type { CommerceSyncConfig, ConnectionsConfig } from '@luma/config';
+import type {
+  CommerceSyncConfig,
+  ConnectionsConfig,
+  ModelGatewayConfig,
+} from '@luma/config';
 import type { ConnectionManagement } from '@luma/connections';
 import {
   createInstalledRuntime,
@@ -25,10 +29,14 @@ import type { IdentityService } from '@luma/identity';
 import { createIdentity } from '@luma/identity/composition';
 import type { Observability, TenantDatabase } from '@luma/platform';
 import { createFailureLog } from '@luma/platform';
-import { createTenantDatabase } from '@luma/platform/composition';
+import {
+  createModelGateway,
+  createTenantDatabase,
+} from '@luma/platform/composition';
 import { Pool } from 'pg';
 
 import { createDetectionWorker } from './detection-worker.js';
+import { createMailboxSyncWorker } from './mailbox-sync.js';
 import { createResourceScope } from './resources.js';
 import { createCommerceServices } from './services.js';
 import { createSupplierFollowUpWorker } from './supplier-follow-up.js';
@@ -149,19 +157,29 @@ export function createCommerceSyncService(
 
 /**
  * Starts the commerce sync process: identity for resolving who each sync runs as, the
- * worker database pool, the runner loop, supplier follow-up and scheduled detection. Failures
+ * worker database pool, the runner loop, supplier follow-up, mailbox reading and scheduled
+ * detection. Failures
  * are written to stderr and reported through `observability` when supplied. Close it after
- * `run` resolves.
+ * `run` resolves. With `modelSettings` and `observability`, mailbox reading extracts facts from
+ * documents and supplier messages through the configured EU routes.
  */
 export async function createDefaultCommerceSyncWorker(
   identitySettings: Parameters<typeof createIdentity>[0],
   settings: CommerceSyncConfig,
   env: Readonly<Record<string, string | undefined>> = process.env,
-  observability?: Pick<Observability, 'captureError'>,
+  observability?: Observability,
+  modelSettings?: ModelGatewayConfig,
 ) {
   const resources = createResourceScope();
   const log = createFailureLog(observability);
   try {
+    const model =
+      modelSettings && observability
+        ? {
+            gateway: createModelGateway(modelSettings, observability),
+            settings: modelSettings,
+          }
+        : undefined;
     const identity = createIdentity(identitySettings);
     resources.add(identity.close);
     const pool = new Pool({
@@ -189,6 +207,17 @@ export async function createDefaultCommerceSyncWorker(
       log,
     });
 
+    const mailboxes = createMailboxSyncWorker({
+      database: createTenantDatabase(pool),
+      identity: identity.service,
+      connections: settings.connections,
+      env,
+      retentionDays: settings.messaging.retentionDays,
+      pollMs: settings.messaging.pollMs,
+      ...(model ? { model } : {}),
+      log,
+    });
+
     const detection = createDetectionWorker({
       database: createTenantDatabase(pool),
       pool,
@@ -201,11 +230,17 @@ export async function createDefaultCommerceSyncWorker(
 
     return {
       run: async () => {
-        await Promise.all([worker.run(), followUp.run(), detection.run()]);
+        await Promise.all([
+          worker.run(),
+          followUp.run(),
+          mailboxes.run(),
+          detection.run(),
+        ]);
       },
       shutdown: () => {
         worker.shutdown();
         followUp.shutdown();
+        mailboxes.shutdown();
         detection.shutdown();
       },
       close: resources.close,

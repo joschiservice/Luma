@@ -8,7 +8,7 @@ as verified success.
 
 Code: the capability contract and runtime live in `@luma/connections`, shared transport
 and errors in `@luma/connector-core`, and provider adapters in the workspace apps
-([Shopify](shopify.md), [JTL](jtl.md), [Cin7](cin7.md)). Tenant setup, encrypted credentials and
+([Shopify](shopify.md), [JTL](jtl.md), [Cin7](cin7.md), [Gmail](gmail.md)). Tenant setup, encrypted credentials and
 permission-gated composition are covered in [installed connections](installed-connections.md).
 
 ## Contract

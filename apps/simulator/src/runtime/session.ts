@@ -5,12 +5,13 @@ import {
   type ProviderEvent,
   type RecordStore,
 } from '@luma/simulator-core';
+import { gmail } from '@luma/simulator-gmail';
 import { jtl } from '@luma/simulator-jtl';
 import { shopify } from '@luma/simulator-shopify';
 import type { Pool, PoolClient } from 'pg';
 
 import { cin7 } from '../engine/cin7.js';
-import { worldModel } from '../engine/model.js';
+import { mailboxName, worldModel } from '../engine/model.js';
 import { type World, worldInstance } from '../engine/world.js';
 import { createPgStore, type RecordTable } from '../pg-store.js';
 import { readRun, type RunRecord, saveRun } from './runs.js';
@@ -49,6 +50,7 @@ export const createSinks = (): Sinks => ({
 /** The record table each provider kind owns. */
 export function tableFor(run: RunRecord, name: string): RecordTable {
   if (name === worldInstance) return 'sim_world_records';
+  if (name === mailboxName) return gmail.table as RecordTable;
   const erp = run.profile.erp ?? 'jtl';
   const kind =
     name === erp

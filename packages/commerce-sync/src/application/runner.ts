@@ -755,7 +755,12 @@ function redact(
   capability: ReadCapability,
   result: CapabilityResult<ReadCapability>,
 ): CapabilityResult<ReadCapability> {
-  if (!result.ok || capability === 'products.read') return result;
+  if (
+    !result.ok ||
+    capability === 'products.read' ||
+    !('items' in result.value)
+  )
+    return result;
 
   return {
     ok: true,

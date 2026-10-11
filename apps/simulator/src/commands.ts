@@ -191,3 +191,47 @@ export const jtlCommandSchema = z.discriminatedUnion('kind', [
     profile: z.enum(supplierProfiles),
   }),
 ]);
+
+const mailAddress = z.object({
+  address: z.string().email().max(254),
+  name: z.string().max(120).optional(),
+});
+
+/** Mailbox actions accepted from the control API: seeding and mail from external senders. */
+export const gmailCommandSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('seed-mailbox'),
+    address: z.string().email().max(254),
+    name: z.string().min(1).max(120),
+    labels: z.array(z.string().min(1).max(100)).max(50).optional(),
+  }),
+  z.object({
+    kind: z.literal('deliver'),
+    from: mailAddress,
+    to: z.array(mailAddress).min(1).max(20).optional(),
+    cc: z.array(mailAddress).max(20).optional(),
+    subject: z.string().max(250).optional(),
+    text: z.string().max(100_000),
+    html: z.string().max(200_000).optional(),
+    threadOf: z.string().min(1).max(300).optional(),
+    inReplyTo: z.string().min(1).max(300).optional(),
+    messageId: z
+      .string()
+      .regex(/^<?[^<>\s@]+@[^<>\s@]+>?$/)
+      .optional(),
+    labels: z.array(z.string().min(1).max(100)).max(20).optional(),
+    attachments: z
+      .array(
+        z.object({
+          filename: z.string().min(1).max(200),
+          mimeType: z.string().regex(/^[\w.+-]+\/[\w.+-]+$/),
+          base64: z
+            .string()
+            .max(14_000_000)
+            .regex(/^[A-Za-z0-9+/]*={0,2}$/),
+        }),
+      )
+      .max(10)
+      .optional(),
+  }),
+]);

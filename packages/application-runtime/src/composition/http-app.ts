@@ -36,6 +36,12 @@ import {
   rolesRoutes,
   settingsRoutes,
 } from '@luma/identity/http';
+import type {
+  DocumentService,
+  MessagingService,
+  Replies,
+} from '@luma/messaging';
+import { messagingRoutes } from '@luma/messaging/http';
 import type { ModelGateway, Observability, Observation } from '@luma/platform';
 import { describeError } from '@luma/platform';
 import type { ProcurementService } from '@luma/procurement';
@@ -127,6 +133,9 @@ export interface AppDependencies {
   workflowGeneration?: DraftGeneration;
   procurement?: ProcurementService;
   commitments?: SupplierCommitments;
+  messaging?: MessagingService;
+  messagingReplies?: Replies;
+  messagingDocuments?: DocumentService;
   learning?: LearningService;
   measurements?: MeasurementService;
   desk?: DeskService;
@@ -358,6 +367,11 @@ export function buildApp(
       procurement: procurementRoutes(
         dependencies.procurement,
         dependencies.commitments,
+      ),
+      messaging: messagingRoutes(
+        dependencies.messaging,
+        dependencies.messagingReplies,
+        dependencies.messagingDocuments,
       ),
       exceptions: caseRoutes(dependencies.cases),
       caseDesk: deskRoutes(dependencies.desk),

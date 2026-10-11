@@ -17,6 +17,7 @@ const scopeFunctions = [
   'case_workflow_worker_scopes',
   'code_process_worker_scopes',
   'procurement_submission_scopes',
+  'messaging_sync_scopes',
 ] as const;
 
 describe.skipIf(!databaseUrl)(
@@ -148,9 +149,23 @@ describe.skipIf(!databaseUrl)(
           { id: submission, tenantId: tenant, purchaseOrderId: order },
         ],
       );
+      await mailbox(client, tenant, 'operator');
       await version(client, tenant, 'compute', [{ kind: 'code' }]);
       await start(client, tenant, 'compute', { kind: 'manual' });
       await version(client, tenant, 'scheduled', [{ kind: 'end' }]);
+    }
+
+    /** A due mailbox read as `principal`; discovery reads routing columns only. */
+    async function mailbox(
+      client: PoolClient,
+      tenant: string,
+      principal: string,
+    ) {
+      await client.query(
+        `INSERT INTO messaging_mailboxes(tenant_id,connection_id,principal_id,document,due_at,revision,created_at,updated_at)
+        VALUES($1,$2,$3,'{}',now()-interval '1 minute',1,now(),now())`,
+        [tenant, randomUUID(), principal],
+      );
     }
 
     const digest = (definition: string) =>
@@ -262,6 +277,7 @@ describe.skipIf(!databaseUrl)(
             { id: submission, tenantId: tenant, purchaseOrderId: order },
           ],
         );
+        await mailbox(client, tenant, principal);
         const run = randomUUID();
         await client.query(
           `INSERT INTO workflow_trigger_runs(tenant_id,id,definition_id,version,version_digest,dedupe_key,request_digest,document,state)
@@ -356,6 +372,7 @@ describe.skipIf(!databaseUrl)(
         case_workflow_worker_scopes: expect.arrayContaining([member]),
         code_process_worker_scopes: expect.arrayContaining([member]),
         procurement_submission_scopes: expect.arrayContaining([member]),
+        messaging_sync_scopes: expect.arrayContaining([member]),
       });
       await owner.query(
         "UPDATE memberships SET status='suspended',suspended_at=now(),suspended_by_kind='customer',suspended_by=$2 WHERE tenant_id=$1 AND user_id=$2",

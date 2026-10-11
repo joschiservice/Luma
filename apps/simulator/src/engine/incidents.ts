@@ -1,14 +1,25 @@
 import type { InjectIncident } from '@luma/simulator-contract';
 import { type IncidentKindName, incidentKinds } from '@luma/simulator-core';
-import type { SupplierProfile } from '@luma/simulator-jtl';
+import {
+  kinds as erpKinds,
+  type PurchaseOrderRecord,
+  type SupplierProfile,
+  type SupplierRecord,
+} from '@luma/simulator-jtl';
 
 import { syncShipment } from './fulfillment.js';
+import {
+  customerDelayMail,
+  purchaseOrderMail,
+  splitDeliveryMail,
+} from './mail.js';
 import { shippingMethods } from './model.js';
 import {
   importOrder,
   placeOrder,
   saveWorldOrder,
   settlePayment,
+  type WorldOrder,
   worldOrder,
 } from './orders.js';
 import { driftStock, recoverDrift } from './stock.js';
@@ -126,6 +137,9 @@ export async function injectIncident(world: World, input: InjectIncident) {
     return incident;
   }
   if (kind === 'refund-missing') return refundMissing(world, input);
+  if (kind === 'supplier-split-delivery-mail')
+    return supplierSplitMail(world, input);
+  if (kind === 'customer-delay-mail') return customerMail(world, input);
   if (kind === 'payment-stuck') {
     const shopName = firstShop(world, input.instance).name;
     const order = await placeOrder(world, shopName, {
@@ -269,6 +283,131 @@ async function refundMissing(world: World, input: InjectIncident) {
 }
 
 /**
+ * The newest purchase order its supplier has left unanswered for a minute, so no planned
+ * confirmation contradicts the email. Without one, the merchant orders the first shop's
+ * bestseller from its supplier, whose own answers are suppressed for this order.
+ */
+async function silentPurchaseOrder(world: World) {
+  const store = erpContext(world).store;
+  const recent = await store.page<PurchaseOrderRecord>({
+    kind: erpKinds.purchaseOrder,
+    reverse: true,
+    limit: 200,
+  });
+  const open = recent.items.find(
+    (item) =>
+      !item.data.isConfirmed &&
+      item.data.status !== 500 &&
+      item.data.lineItems.every((line) => line.deliveredQuantity === 0) &&
+      world.now - item.updatedAt >= 60_000,
+  );
+  if (open) return open.data.purchaseOrderId;
+  const variant = targetVariant(world, firstShop(world).name);
+  const supplier = (
+    await store.get<SupplierRecord>(erpKinds.supplier, variant.supplierId)
+  )?.data;
+  if (!supplier) throw new Error('The bestseller has no supplier');
+  await erp(world, {
+    kind: 'supplier-profile',
+    supplierId: supplier.id,
+    profile: 'silent',
+  });
+  const placed = await erp(world, {
+    kind: 'purchase-order',
+    supplierId: supplier.id,
+    deliveryDate: new Date(world.now + 7 * 86_400_000)
+      .toISOString()
+      .slice(0, 10),
+    lines: [{ itemId: variant.id, quantity: 100 }],
+  });
+  await erp(world, {
+    kind: 'supplier-profile',
+    supplierId: supplier.id,
+    profile: supplier.profile,
+  });
+
+  return placed.id;
+}
+
+/** A supplier emails a split delivery for an open purchase order; the ERP stays unchanged. */
+async function supplierSplitMail(world: World, input: InjectIncident) {
+  const purchaseOrder = await silentPurchaseOrder(world);
+  // The order email comes first, so the answer threads with it.
+  await purchaseOrderMail(world, purchaseOrder);
+  const { order, supplier, lines, result } = await splitDeliveryMail(
+    world,
+    purchaseOrder,
+    input.id.slice(0, 8),
+  );
+  const mailbox = world.model.mailbox;
+
+  return openIncident(world, {
+    id: input.id,
+    kind: 'supplier-split-delivery-mail',
+    origin: 'injected',
+    instance: mailbox.name,
+    summary: `${supplier.companyName} emails that ${order.orderNumber} ships in two parts.`,
+    resources: [
+      {
+        instance: world.model.erp.name,
+        kind: 'PurchaseOrder',
+        id: order.purchaseOrderId,
+        label: order.orderNumber,
+      },
+      {
+        instance: mailbox.name,
+        kind: 'Message',
+        id: result.kind === 'message' ? result.id : '',
+        label: `Split delivery ${order.orderNumber}`,
+      },
+    ],
+    detail: {
+      purchaseOrder: order.purchaseOrderId,
+      orderNumber: order.orderNumber,
+      lines: lines.map((line) => ({
+        sku: line.sku,
+        now: line.now,
+        nowDate: line.nowDate,
+        rest: line.rest,
+        restDate: line.restDate,
+      })),
+    },
+  });
+}
+
+/** The customer of the first shop's newest order with a customer account emails about it. */
+async function customerMail(world: World, input: InjectIncident) {
+  const shopName = firstShop(world).name;
+  const recent = await world
+    .store(worldInstance)
+    .page<WorldOrder>({ kind: 'order', reverse: true, limit: 500 });
+  const order = recent.items
+    .map((item) => item.data)
+    .find((item) => item.shop === shopName && item.customer);
+  if (!order) throw new Error(`${shopName} has no order with a customer yet`);
+  const result = await customerDelayMail(world, order, input.id.slice(0, 8));
+  const mailbox = world.model.mailbox;
+
+  return openIncident(world, {
+    id: input.id,
+    kind: 'customer-delay-mail',
+    origin: 'injected',
+    instance: mailbox.name,
+    summary: `A customer asks where ${order.name} is.`,
+    resources: [
+      orderResource(shopName, order.order, order.name),
+      {
+        instance: mailbox.name,
+        kind: 'Message',
+        id: result?.kind === 'message' ? result.id : '',
+        label: `Customer email about ${order.name}`,
+      },
+    ],
+    detail: { order: order.order },
+  });
+}
+
+/**
  * Repairs an incident the way the merchant would and records it as recovered. Stock sync
  * resumes, outages end, held or dropped orders continue, and wrong shipping methods are fixed.
  */
@@ -299,7 +438,11 @@ export async function recoverIncident(world: World, id: string) {
         supplierId,
         profile,
       });
-  else if (incident.kind === 'refund-missing' && order)
+  else if (incident.kind === 'supplier-split-delivery-mail')
+    await bookSplitConfirmation(world, incident);
+  else if (incident.kind === 'customer-delay-mail') {
+    // Answering the customer is the merchant's part; the provider has nothing to repair.
+  } else if (incident.kind === 'refund-missing' && order)
     await shop(world, shopName, { kind: 'refund', order, outcome: 'success' });
   else if (incident.kind === 'payment-stuck' && order)
     await settlePayment(world, shopName, order, true);
@@ -348,4 +491,41 @@ export async function recoverIncident(world: World, id: string) {
   }
 
   return closeIncident(world, id, 'Recovered from the control panel');
+}
+
+/** The merchant books the supplier's emailed split confirmation in the ERP. */
+async function bookSplitConfirmation(world: World, incident: Incident) {
+  const id = incident.detail.purchaseOrder as string | undefined;
+  const lines = (incident.detail.lines ?? []) as {
+    sku: string;
+    now: number;
+    nowDate: string;
+  }[];
+  if (!id) return;
+  const order = (
+    await erpContext(world).store.get<PurchaseOrderRecord>(
+      erpKinds.purchaseOrder,
+      id,
+    )
+  )?.data;
+  if (!order || order.isConfirmed) return;
+  const confirmed = order.lineItems.flatMap((line) => {
+    const emailed = lines.find((item) => item.sku === line.itemNumber);
+
+    return emailed
+      ? [
+          {
+            lineItemId: line.lineItemId,
+            quantity: emailed.now,
+            deliveryDate: emailed.nowDate,
+          },
+        ]
+      : [];
+  });
+  if (confirmed.length)
+    await erp(world, {
+      kind: 'purchase-order-confirm',
+      orderId: id,
+      lines: confirmed,
+    });
 }

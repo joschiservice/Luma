@@ -82,6 +82,15 @@ test('control panel creates runs, changes health and chaos, and arms fault rules
     await page.getByRole('tab', { name: 'Journal' }).click();
     await page.getByText('control').first().waitFor();
 
+    // A supplier's email delivered from the panel appears as a thread in the mailbox.
+    await page.getByRole('tab', { name: 'Mailbox' }).click();
+    await page.getByLabel('Subject').fill('Teillieferung BE-00001');
+    await page.getByLabel('Message').fill('60 Stück folgen am Freitag.');
+    await page.getByRole('button', { name: 'Deliver mail' }).click();
+    await page.getByText('Delivered.', { exact: false }).waitFor();
+    await page.getByRole('button', { name: 'Teillieferung BE-00001' }).click();
+    await page.getByText('60 Stück folgen am Freitag.').waitFor();
+
     await page.setViewportSize({ width: 390, height: 844 });
     assert.equal(
       await page.evaluate(

@@ -13,6 +13,7 @@ import {
   supplierAnswer,
   syncShipment,
 } from './fulfillment.js';
+import { purchaseOrderMail } from './mail.js';
 import {
   cancelOrder,
   importOrder,
@@ -80,6 +81,8 @@ async function apply(world: World, event: EngineEvent) {
       return returnStep(world, event.payload);
     case 'supplier':
       return supplierAnswer(world, event.payload.command);
+    case 'purchase-order-mail':
+      return purchaseOrderMail(world, event.payload.purchaseOrder);
   }
 }
 
@@ -141,7 +144,10 @@ async function providerIncidents(world: World) {
       kind,
       world.now,
     );
-    const target = random.pick(world.model.instances);
+    // Outages and revoked access hit the commerce systems; the mailbox keeps the original draw.
+    const target = random.pick(
+      world.model.instances.filter((item) => item.kind !== 'gmail'),
+    );
     if (world.run.health[target.name]) continue;
     const duration =
       kind === 'auth-revoked' ? 60 * minute : random.int(20, 40) * minute;

@@ -7,11 +7,17 @@ import type {
   SupplierCommitmentDecisionReader,
 } from '../../application/decisions.js';
 import {
+  type MessageReplyDecision,
+  presentMessageReply,
   presentReplenishment,
   presentSupplierCommitment,
   presentWorkflowHandover,
   type WorkflowHandoverDecision,
 } from '../../domain/decisions.js';
+import {
+  presentReplySend,
+  type ReplySendDecision,
+} from '../../domain/reply-decisions.js';
 
 /** Adapts the procurement owner's pending purchase-order proposals to the queue. */
 export function replenishmentDecisionProvider(
@@ -69,5 +75,30 @@ export function workflowHandoverDecisionProvider(
     label: 'Workflow follow-ups',
     pending: async (context) =>
       (await pending(context)).map(presentWorkflowHandover),
+  };
+}
+
+/** Adapts the messaging owner's due replies to the queue. */
+export function messageReplyDecisionProvider(
+  pending: (context: TenantContext) => Promise<MessageReplyDecision[]>,
+): DecisionProvider {
+  return {
+    id: 'message-replies',
+    label: 'Inbox',
+    permission: 'messages.read',
+    pending: async (context) =>
+      (await pending(context)).map(presentMessageReply),
+  };
+}
+
+/** Adapts the messaging owner's replies awaiting approval, sending or a check to the queue. */
+export function replySendDecisionProvider(
+  pending: (context: TenantContext) => Promise<ReplySendDecision[]>,
+): DecisionProvider {
+  return {
+    id: 'message-sends',
+    label: 'Replies',
+    permission: 'messages.read',
+    pending: async (context) => (await pending(context)).map(presentReplySend),
   };
 }

@@ -79,6 +79,16 @@ Suppliers, purchase orders, and replenishment.
 | View procurement | `procurement.read` | See suppliers, purchase orders, supplier commitments, and replenishment. |  | Yes | Yes | Yes |
 | Manage procurement | `procurement.manage` | Edit suppliers and purchase orders, review supplier commitments, and set up replenishment. | Yes | Yes | Yes |  |
 
+## Operations inbox
+
+Message threads from connected mailboxes, their documents, and replies.
+
+| Permission | Key | Description | Sensitive | Owner | Admin | Member |
+| --- | --- | --- | --- | --- | --- | --- |
+| View message threads | `messages.read` | Read message threads from connected mailboxes, their attachments, and the records they are linked to. | Yes | Yes | Yes | Yes |
+| Work on message threads | `messages.manage` | Assign threads, write internal notes, set reply deadlines, link records, review document facts, and choose which messages Luma reads. | Yes | Yes | Yes |  |
+| Send replies | `messages.send` | Draft replies and send them, or request approval when they make commitments. | Yes | Yes | Yes |  |
+
 ## Connections and apps
 
 Connected systems, imports, and installed apps.

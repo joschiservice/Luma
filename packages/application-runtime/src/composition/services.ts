@@ -163,7 +163,9 @@ export function createCommerceServices(database: string | TenantDatabase) {
         ? orders.missing(context, kind, ids)
         : kind === 'customer' ||
             kind === 'supplier' ||
-            kind === 'purchase_order'
+            kind === 'purchase_order' ||
+            // Messages are stored by messaging, never as commerce observations.
+            kind === 'message'
           ? ids
           : inventory.missing(context, kind, ids),
     );

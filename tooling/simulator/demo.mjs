@@ -79,9 +79,48 @@ export async function configureDemoSuppliers(call, manifest) {
 }
 
 /**
+ * The inbox rules the demo adds to the simulated mailbox: one per demo supplier's order address,
+ * linked to its Procurement supplier, and catch-alls for every other supplier and for customers.
+ * All simulated suppliers write from `supplier.example` and customers from `customer.example`.
+ * @param {{ id: string, email: string }[]} suppliers demo suppliers with their simulator IDs
+ * @param {(simulatorId: string) => string | undefined} supplierId Luma supplier of a simulator supplier
+ */
+export function demoInboxRules(runId, suppliers, supplierId) {
+  return [
+    ...suppliers.flatMap((supplier) => {
+      const id = supplierId(supplier.id);
+
+      return id
+        ? [
+            {
+              id: stableId(`${runId}:inbox-rule:supplier:${supplier.id}`),
+              kind: 'sender_address',
+              value: supplier.email,
+              party: { kind: 'supplier', supplierId: id },
+            },
+          ]
+        : [];
+    }),
+    {
+      id: stableId(`${runId}:inbox-rule:suppliers`),
+      kind: 'sender_domain',
+      value: 'supplier.example',
+      party: { kind: 'other' },
+    },
+    {
+      id: stableId(`${runId}:inbox-rule:customers`),
+      kind: 'sender_domain',
+      value: 'customer.example',
+      party: { kind: 'customer' },
+    },
+  ];
+}
+
+/**
  * Configures the simulated merchant's workflows once their records are imported, as a merchant
- * would: case workflows on, suppliers linked to the ERP, and stock rules for the most-demanded
- * linked SKUs. It acts as the workspace owner, so the admin who signs in approves the changes.
+ * would: case workflows on, suppliers linked to the ERP, stock rules for the most-demanded
+ * linked SKUs and, when the workspace has the operations inbox and a simulated mailbox, inbox
+ * rules for supplier and customer mail. It acts as the workspace owner, so the admin who signs in approves the changes.
  * Two rules start just above current stock so a proposal follows the next fresh stock read.
  * Each pass does what is still missing and is safe to repeat.
  */
@@ -91,7 +130,12 @@ export function createWorkflowDemo({ application, manifest, owner }) {
   const plan = demoPlan(manifest);
   const runId = manifest.simulator.runId;
   const erp = erpOf(manifest);
-  const done = { workflows: new Set(), suppliers: new Map(), rules: new Set() };
+  const done = {
+    workflows: new Set(),
+    suppliers: new Map(),
+    rules: new Set(),
+    inbox: new Set(),
+  };
   const conflict = (error) => [404, 409, 503].includes(error?.statusCode);
 
   async function workflows(context) {
@@ -185,12 +229,42 @@ export function createWorkflowDemo({ application, manifest, owner }) {
     }
   }
 
+  /**
+   * Adds the demo's inbox rules to the mailbox once its suppliers exist. Listing mailboxes
+   * creates the mailbox for the new connection; stable rule IDs make repeats no-ops.
+   */
+  async function inboxRules(context) {
+    const mailboxId = manifest.connections?.gmail;
+    const messaging = application.messaging?.service;
+    if (!mailboxId || !messaging) return;
+    const wanted = demoInboxRules(runId, plan.suppliers, (id) =>
+      done.suppliers.get(id),
+    );
+    if (wanted.every((rule) => done.inbox.has(rule.id))) return;
+    await messaging.mailboxes(context);
+    for (const rule of wanted) {
+      if (done.inbox.has(rule.id)) continue;
+      try {
+        await messaging.addRule(context, mailboxId, rule);
+      } catch (error) {
+        // An equal rule someone added already covers it; other conflicts retry next pass.
+        if (error?.statusCode !== 409) {
+          if (conflict(error)) return;
+          throw error;
+        }
+      }
+      done.inbox.add(rule.id);
+    }
+  }
+
   return {
     async pass() {
       const context = await owner();
       await workflows(context);
       await suppliers(context);
       if (done.suppliers.size) await rules(context);
+      if (done.suppliers.size === plan.suppliers.length)
+        await inboxRules(context);
 
       return {
         workflows: done.workflows.size,

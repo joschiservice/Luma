@@ -233,6 +233,9 @@ catalogs:
     fastify:
       specifier: 5.12.5
       version: 5.12.5
+    fflate:
+      specifier: 0.8.3
+      version: 0.8.3
     graphql:
       specifier: ^16.14.2
       version: 16.14.2
@@ -257,6 +260,9 @@ catalogs:
     tsx:
       specifier: ^4.20.0
       version: 4.23.13
+    unpdf:
+      specifier: 1.8.1
+      version: 1.8.1
     vite:
       specifier: 8.3.0
       version: 8.3.0
@@ -296,6 +302,9 @@ importers:
       '@luma/app-cin7':
         specifier: workspace:*
         version: link:packages/apps/cin7
+      '@luma/app-gmail':
+        specifier: workspace:*
+        version: link:packages/apps/gmail
       '@luma/app-host':
         specifier: workspace:*
         version: link:packages/app-host
@@ -483,6 +492,9 @@ importers:
       '@luma/simulator-core':
         specifier: workspace:*
         version: link:../../packages/simulator/core
+      '@luma/simulator-gmail':
+        specifier: workspace:*
+        version: link:../../packages/simulator/gmail
       '@luma/simulator-jtl':
         specifier: workspace:*
         version: link:../../packages/simulator/jtl
@@ -766,6 +778,9 @@ importers:
       '@luma/app-cin7':
         specifier: workspace:*
         version: link:../apps/cin7
+      '@luma/app-gmail':
+        specifier: workspace:*
+        version: link:../apps/gmail
       '@luma/app-host':
         specifier: workspace:*
         version: link:../app-host
@@ -873,6 +888,9 @@ importers:
       '@luma/inventory':
         specifier: workspace:*
         version: link:../inventory
+      '@luma/messaging':
+        specifier: workspace:*
+        version: link:../messaging
       '@luma/orders':
         specifier: workspace:*
         version: link:../orders
@@ -976,6 +994,58 @@ importers:
       '@tanstack/react-form':
         specifier: 'catalog:'
         version: 1.33.5(@tanstack/react-start@1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.8)))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      react:
+        specifier: 'catalog:'
+        version: 19.3.0
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.5
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.3.0
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
+
+  packages/apps/gmail:
+    dependencies:
+      '@luma/app-host':
+        specifier: workspace:*
+        version: link:../../app-host
+      '@luma/connections':
+        specifier: workspace:*
+        version: link:../../connections
+      '@luma/connector-gmail':
+        specifier: workspace:*
+        version: link:../../connectors/gmail
+      '@luma/i18n':
+        specifier: workspace:*
+        version: link:../../i18n
+      '@luma/identity':
+        specifier: workspace:*
+        version: link:../../identity
+      '@luma/platform':
+        specifier: workspace:*
+        version: link:../../platform
+      '@luma/ui':
+        specifier: workspace:*
+        version: link:../../ui
+      '@tanstack/react-form':
+        specifier: 'catalog:'
+        version: 1.33.5(@tanstack/react-start@1.168.54(esbuild@0.28.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.8)(supports-color@8.1.1)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))(webpack@5.111.0(@swc/core@1.16.2)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.8)))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      fastify:
+        specifier: 'catalog:'
+        version: 5.12.5
+      jose:
+        specifier: 6.2.12
+        version: 6.2.12
       react:
         specifier: 'catalog:'
         version: 19.3.0
@@ -1278,6 +1348,25 @@ importers:
         specifier: workspace:*
         version: link:../../typescript-config
 
+  packages/connectors/gmail:
+    dependencies:
+      '@luma/connector-core':
+        specifier: workspace:*
+        version: link:../core
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.5
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
+
   packages/connectors/jtl:
     dependencies:
       '@luma/connector-core':
@@ -1511,6 +1600,46 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.5
+
+  packages/messaging:
+    dependencies:
+      '@luma/api-contract':
+        specifier: workspace:*
+        version: link:../api-contract
+      '@luma/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@luma/identity':
+        specifier: workspace:*
+        version: link:../identity
+      '@luma/platform':
+        specifier: workspace:*
+        version: link:../platform
+      '@orpc/server':
+        specifier: 'catalog:'
+        version: 1.15.5(@opentelemetry/api@1.9.1)(fastify@5.12.5)(ws@8.21.3)
+      fastify:
+        specifier: 'catalog:'
+        version: 5.12.5
+      fflate:
+        specifier: 'catalog:'
+        version: 0.8.3
+      unpdf:
+        specifier: 'catalog:'
+        version: 1.8.1
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.5
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
 
   packages/orders:
     dependencies:
@@ -1798,6 +1927,16 @@ importers:
         version: link:../../typescript-config
 
   packages/simulator/core:
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
+
+  packages/simulator/gmail:
+    dependencies:
+      '@luma/simulator-core':
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       '@luma/typescript-config':
         specifier: workspace:*
@@ -8043,6 +8182,15 @@ packages:
 
   unist-util-visit@5.1.0:
     resolution: {integrity: sha512-m+vIdyeCOpdr/QeQCu2EzxX/ohgS8KbnPDgFni4dQsfSCtpz8UqDyY5GjRru8PDKuYn7Fq19j1CQ+nJSsGKOzg==}
+
+  unpdf@1.8.1:
+    resolution: {integrity: sha512-xkURhy2SoGpOIH0a1gLHNkASPIQYonadDJs2AQwPEfUakafeD9EA1WTWWsaR++gfTCXJpV27W7tU1nXuk82UKQ==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      '@napi-rs/canvas': ^0.1.69 || ^1.0.0
+    peerDependenciesMeta:
+      '@napi-rs/canvas':
+        optional: true
 
   unplugin@2.3.11:
     resolution: {integrity: sha512-5uKD0nqiYVzlmCRs01Fhs2BdkEgBS3SAVP6ndrBsuK42iC2+JHyxM05Rm9G8+5mkmRtzMZGY8Ct5+mliZxU/Ww==}
@@ -14664,6 +14812,8 @@ snapshots:
       '@types/unist': 3.0.3
       unist-util-is: 6.0.1
       unist-util-visit-parents: 6.0.2
+
+  unpdf@1.8.1: {}
 
   unplugin@2.3.11:
     dependencies:

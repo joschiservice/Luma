@@ -1,5 +1,6 @@
 import { assistantModelProfile } from '@luma/assistant/composition';
 import type { ModelGatewayConfig } from '@luma/config';
+import { documentExtractionProfile } from '@luma/messaging/composition';
 import { authoringModelProfile } from '@luma/platform';
 import { supplierExtractionProfile } from '@luma/procurement/composition';
 
@@ -38,6 +39,23 @@ export function supplierExtractionAvailability(
     supplierExtractionProfile,
     'Reading supplier messages needs an EU model route with zero data retention.',
     'supplier-extraction',
+  );
+}
+
+/**
+ * Decides whether documents attached to messages may be read by a model. Documents contain
+ * tenant and personal data, so the same EU zero-retention Bedrock requirement applies.
+ */
+export function documentExtractionAvailability(
+  settings: ModelGatewayConfig | undefined,
+  gatewayInstalled: boolean,
+) {
+  return euAvailability(
+    settings,
+    gatewayInstalled,
+    documentExtractionProfile,
+    'Reading documents needs an EU model route with zero data retention.',
+    'document-extraction',
   );
 }
 

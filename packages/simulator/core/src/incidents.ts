@@ -1,6 +1,12 @@
 /** Where Luma is expected to show an operational incident. */
 export type IncidentSurface =
-  'case' | 'fulfillment' | 'returns' | 'orders' | 'procurement' | 'connections';
+  | 'case'
+  | 'fulfillment'
+  | 'returns'
+  | 'orders'
+  | 'procurement'
+  | 'connections'
+  | 'inbox';
 
 export interface IncidentKind {
   label: string;
@@ -127,6 +133,22 @@ export const incidentKinds = {
     unit: 'day',
     exceptionClass: 'sync_failure',
     surface: 'connections',
+  },
+  'supplier-split-delivery-mail': {
+    label: 'Split delivery by email',
+    description:
+      'A supplier emails that it ships part of an open purchase order soon and the rest a week later. The ERP still shows the order unconfirmed.',
+    unit: 'day',
+    exceptionClass: null,
+    surface: 'inbox',
+  },
+  'customer-delay-mail': {
+    label: 'Customer asks about a late order',
+    description:
+      'A customer emails the shop about an order that has not arrived and quotes its order number.',
+    unit: 'day',
+    exceptionClass: null,
+    surface: 'inbox',
   },
   'auth-revoked': {
     label: 'Access revoked',

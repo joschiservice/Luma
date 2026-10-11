@@ -1,0 +1,102 @@
+/*
+ * Source views: document text and spreadsheet cells beside the facts that cite them. Cited parts
+ * are tinted; the selected one carries an outline as well, so it never relies on color alone.
+ */
+.lu-source-text {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--foreground);
+}
+
+.lu-source-text mark {
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--state-approval) 22%, transparent);
+  color: inherit;
+  cursor: pointer;
+  box-decoration-break: clone;
+}
+
+.lu-source-text mark[data-selected] {
+  background: color-mix(in srgb, var(--signal) 24%, transparent);
+  outline: 2px solid var(--signal);
+  outline-offset: 1px;
+}
+
+.lu-source-sheet {
+  max-height: 70vh;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  outline: none;
+}
+
+.lu-source-sheet:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.lu-source-sheet table {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.lu-source-sheet th,
+.lu-source-sheet td {
+  min-width: 64px;
+  max-width: 280px;
+  padding: 4px 8px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.lu-source-sheet thead th,
+.lu-source-sheet thead td {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-sunken);
+}
+
+.lu-source-sheet th {
+  color: var(--foreground-subtle);
+  font-weight: 500;
+}
+
+.lu-source-sheet tbody th {
+  position: sticky;
+  left: 0;
+  min-width: 40px;
+  background: var(--surface-sunken);
+  text-align: right;
+}
+
+.lu-source-sheet td[data-marked] {
+  background: color-mix(in srgb, var(--state-approval) 22%, transparent);
+  cursor: pointer;
+}
+
+.lu-source-sheet td[data-selected] {
+  background: color-mix(in srgb, var(--signal) 24%, transparent);
+  box-shadow: inset 0 0 0 2px var(--signal);
+}
+
+.lu-source-sheet td[data-picked] {
+  box-shadow: inset 0 0 0 2px var(--foreground-muted);
+}
+
+.lu-source-note {
+  margin: 0;
+  padding: 8px;
+  color: var(--foreground-subtle);
+  font-size: 12px;
+}

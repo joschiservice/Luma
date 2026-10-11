@@ -19,6 +19,14 @@ import {
 } from '../apps/providers.mjs';
 import { detectionRequest, jtl, newManifest, readJson } from './fixtures.mjs';
 
+/** What the pilot's mailbox connection may do: read relevant mail and send governed replies. */
+const mailboxPermissions = [
+  'messages.read',
+  'message-threads.read',
+  'message-attachments.read',
+  'messages.send',
+];
+
 /** Builds identity-service settings from the pilot's environment. */
 export const identitySettings = (env) => ({
   databaseUrl: env.IDENTITY_DATABASE_URL,
@@ -188,18 +196,27 @@ export async function seedPilot(
     ).name;
     for (const instance of instances) {
       const target =
-        instance.kind === 'jtl'
-          ? {
-              kind: 'jtl-onprem',
-              baseUrl: 'https://jtl.synthetic.invalid/api/eazybusiness/',
-              appId: 'LumaSyntheticPilot',
-              appVersion: '1',
-            }
-          : instance.kind === 'cin7'
-            ? { kind: 'cin7-core', accountId: instance.accountId }
-            : { kind: 'shopify', shop: instance.shop };
+        instance.kind === 'gmail'
+          ? { kind: 'gmail', emailAddress: instance.emailAddress }
+          : instance.kind === 'jtl'
+            ? {
+                kind: 'jtl-onprem',
+                baseUrl: 'https://jtl.synthetic.invalid/api/eazybusiness/',
+                appId: 'LumaSyntheticPilot',
+                appVersion: '1',
+              }
+            : instance.kind === 'cin7'
+              ? { kind: 'cin7-core', accountId: instance.accountId }
+              : { kind: 'shopify', shop: instance.shop };
       const appId = instance.kind;
       const apps = await connections.apps.list(context);
+      // The mailbox needs the Gmail app; checkouts without it run without an inbox.
+      if (!apps.catalog.some((app) => app.id === appId)) {
+        console.warn(
+          `Pilot: app ${appId} is not available; ${instance.name} is not connected.`,
+        );
+        continue;
+      }
       const appState = apps.installations.find((app) => app.appId === appId);
       if (appState?.status !== 'installed')
         await connections.apps.install(
@@ -211,40 +228,43 @@ export async function seedPilot(
       const connection = await connections.install(context, {
         label: `SIMULATED ${instance.label.toUpperCase()} · no live health`,
         target,
-        permissions: [
-          'orders.read',
-          'inventory.read',
-          'fulfillment.read',
-          ...(simulator
-            ? [
-                'products.read',
-                ...(instance.kind === 'shopify'
+        permissions:
+          instance.kind === 'gmail'
+            ? mailboxPermissions
+            : [
+                'orders.read',
+                'inventory.read',
+                'fulfillment.read',
+                ...(simulator
                   ? [
-                      'inventory.available.reconcile',
-                      'returns.read',
-                      'customers.read',
-                      'fulfillment.hold.release',
-                      'fulfillment.open',
-                      'fulfillment.move',
+                      'products.read',
+                      ...(instance.kind === 'shopify'
+                        ? [
+                            'inventory.available.reconcile',
+                            'returns.read',
+                            'customers.read',
+                            'fulfillment.hold.release',
+                            'fulfillment.open',
+                            'fulfillment.move',
+                          ]
+                        : instance.kind === 'cin7'
+                          ? [
+                              'returns.read',
+                              'customers.read',
+                              'suppliers.read',
+                              'purchase-orders.read',
+                            ]
+                          : [
+                              'customers.read',
+                              'orders.shipping-method.read',
+                              'orders.shipping-method.write',
+                              'suppliers.read',
+                              'purchase-orders.read',
+                              'purchase-orders.submit',
+                            ]),
                     ]
-                  : instance.kind === 'cin7'
-                    ? [
-                        'returns.read',
-                        'customers.read',
-                        'suppliers.read',
-                        'purchase-orders.read',
-                      ]
-                    : [
-                        'customers.read',
-                        'orders.shipping-method.read',
-                        'orders.shipping-method.write',
-                        'suppliers.read',
-                        'purchase-orders.read',
-                        'purchase-orders.submit',
-                      ]),
-              ]
-            : []),
-        ],
+                  : []),
+              ],
         credentials: {
           token: 'synthetic-not-a-provider-secret',
           ...(instance.kind === 'jtl' ? { challengeCode: 'synthetic' } : {}),

@@ -62,6 +62,7 @@ export const surfaceLabels: Record<string, string> = {
   orders: 'Orders view',
   procurement: 'Supplier orders',
   connections: 'Connection status',
+  inbox: 'Operations inbox',
 };
 
 /** Names a Luma exception class. */

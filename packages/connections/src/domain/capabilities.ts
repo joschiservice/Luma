@@ -635,6 +635,10 @@ export type ReadCapability = Extract<Capability, `${string}.read`>;
 
 export type WriteCapability = Exclude<Capability, ReadCapability>;
 
+/** Mailbox reads. They return personal data and never become commerce observations. */
+export type MessageReadCapability =
+  'messages.read' | 'message-threads.read' | 'message-attachments.read';
+
 export type CapabilityInput<K extends Capability> =
   CapabilityContract[K]['input'];
 

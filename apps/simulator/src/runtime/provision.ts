@@ -5,7 +5,7 @@ import type { Pool } from 'pg';
 
 import { advanceWorld } from '../engine/advance.js';
 import { importOrder, placeOrder } from '../engine/orders.js';
-import { erp, shop, type World } from '../engine/world.js';
+import { erp, mail, shop, type World } from '../engine/world.js';
 import { createPgStore } from '../pg-store.js';
 import { type RunRecord, saveProgress, saveRun } from './runs.js';
 import { createSinks, createWorld, flushSinks, tableFor } from './session.js';
@@ -151,6 +151,11 @@ export async function buildWorld(
     world.model.catalog.variants.length,
   );
   await seedProviders(world);
+  await mail(world, {
+    kind: 'seed-mailbox',
+    ...world.model.mailbox.config,
+    labels: ['Lieferanten', 'Kunden'],
+  });
   await seedFixtures(world);
   for (let hourIndex = 0; hourIndex < historyHours; hourIndex++) {
     await progress('simulating order history', hourIndex, historyHours);
@@ -235,6 +240,7 @@ export async function clearRun(pool: Pool, runId: string) {
     'sim_shopify_records',
     'sim_jtl_records',
     'sim_cin7_records',
+    'sim_gmail_records',
     'sim_world_records',
     'sim_sequences',
     'sim_journal',
