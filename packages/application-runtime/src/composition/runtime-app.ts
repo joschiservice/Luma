@@ -11,6 +11,7 @@ import {
   createInstallationRepository,
   createInstalledMessageRuntime,
   createInstalledPurchaseOrderRuntime,
+  createInstalledReturnRuntime,
   createInstalledRuntime,
 } from '@luma/connections/composition';
 import type { IdentityService, TenantContext } from '@luma/identity';
@@ -187,6 +188,16 @@ export async function buildRuntimeApp(
                 installations: installedConnections.connections,
                 providers: installedConnections.registry.providers(),
                 // Procurement stores the purchase-order observations it uses as evidence.
+                record: async () => undefined,
+                recordObservations: async () => undefined,
+              }),
+              installations: installedConnections.connections,
+            },
+            returns: {
+              runtime: createInstalledReturnRuntime({
+                installations: installedConnections.connections,
+                providers: installedConnections.registry.providers(),
+                // Return cases keep the creation evidence they use.
                 record: async () => undefined,
                 recordObservations: async () => undefined,
               }),

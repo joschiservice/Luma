@@ -60,6 +60,8 @@ export function createInstallationVerifier(options: {
       path: string;
       schema: z.ZodTypeAny;
       capabilities: InstallationCapability[];
+      /** A plain-array list the capabilities also read. */
+      list?: { path: string; schema: z.ZodTypeAny };
     }[] = [
       {
         path: 'sales-orders',
@@ -91,11 +93,28 @@ export function createInstallationVerifier(options: {
         schema: jtl.purchaseOrderListItem,
         capabilities: ['purchase-orders.read'],
       },
+      {
+        path: 'warehouses',
+        schema: jtl.warehouse,
+        capabilities: ['returns.options.read'],
+        list: { path: 'return-reasons', schema: jtl.returnReason },
+      },
+      {
+        path: 'returns',
+        schema: jtl.returnRow,
+        capabilities: ['returns.created.read'],
+      },
     ];
 
-    // Reads one overview page; missing grants or endpoints mean the capability stays unavailable.
-    async function readable(path: string, schema: z.ZodTypeAny) {
+    // Reads one overview page, or a whole plain-array list; missing grants or endpoints mean
+    // the capability stays unavailable.
+    async function readable(path: string, schema: z.ZodTypeAny, list = false) {
       try {
+        if (list) {
+          jtlParse(z.array(schema), await client.request(path));
+
+          return true;
+        }
         const page = jtlParse(
           jtl.page(schema),
           await client.request(path, { pageNumber: '1', pageSize: '1' }),
@@ -122,7 +141,11 @@ export function createInstallationVerifier(options: {
     for (const probe of probes) {
       if (!probe.capabilities.some((c) => connection.permissions.includes(c)))
         continue;
-      if (await readable(probe.path, probe.schema))
+      if (
+        (await readable(probe.path, probe.schema)) &&
+        (!probe.list ||
+          (await readable(probe.list.path, probe.list.schema, true)))
+      )
         granted.push(...probe.capabilities);
     }
 
@@ -140,6 +163,15 @@ export function createInstallationVerifier(options: {
       (await readable('items', jtl.item))
     )
       granted.push('purchase-orders.submit');
+    // Creation checks the sales order and finds earlier returns, so it needs all three reads.
+    if (
+      simulated &&
+      connection.permissions.includes('returns.create') &&
+      granted.includes('returns.options.read') &&
+      granted.includes('returns.created.read') &&
+      (await readable('sales-orders', jtl.order))
+    )
+      granted.push('returns.create');
 
     return granted;
   };

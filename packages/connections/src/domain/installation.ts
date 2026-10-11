@@ -5,6 +5,7 @@ export type InstallationCapability =
   | 'inventory.available.reconcile'
   | 'orders.shipping-method.write'
   | 'purchase-orders.submit'
+  | 'returns.create'
   | 'fulfillment.hold.release'
   | 'fulfillment.open'
   | 'fulfillment.move'

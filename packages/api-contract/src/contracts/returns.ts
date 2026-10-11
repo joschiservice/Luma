@@ -27,7 +27,7 @@ export const returnsContract = {
       path: '/v1/organizations/{organizationId}/returns/{returnId}',
       summary: 'Inspect a return',
       description:
-        'Read one return with its items, reasons, receipt and refund quantities, refunds with every payment attempt, the order it belongs to, other returns of that order and up to 50 observed snapshots. The ID of a refund that settles a return resolves to that return. Returns are read-only: approve, receive and refund them in the source store.',
+        'Read one return with its items, reasons, receipt and refund quantities, refunds with every payment attempt, the order it belongs to, other returns of that order and up to 50 observed snapshots. The ID of a refund that settles a return resolves to that return. Store returns are read-only here; work them in a return case, and approve, receive and refund them in the source store.',
     })
     .meta({ access: requires('returns.read'), errors: [401, 404, 503] })
     .input(

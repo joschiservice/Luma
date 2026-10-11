@@ -164,6 +164,7 @@ export function createCommerceServices(database: string | TenantDatabase) {
         : kind === 'customer' ||
             kind === 'supplier' ||
             kind === 'purchase_order' ||
+            kind === 'return_reason' ||
             // Messages are stored by messaging, never as commerce observations.
             kind === 'message'
           ? ids

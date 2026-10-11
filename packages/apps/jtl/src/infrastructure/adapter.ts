@@ -20,6 +20,7 @@ import { z } from 'zod';
 
 import { adapterVersion, outputs } from './outputs.js';
 import { createJtlPurchaseOrderCapabilities } from './purchase-orders.js';
+import { createJtlReturnCapabilities } from './returns.js';
 import * as s from './schemas.js';
 import { createJtlShippingMethodCapabilities } from './shipping-method.js';
 
@@ -66,6 +67,8 @@ export interface JtlConnectorOptions extends JtlTransportOptions {
   shippingMethodActions?: boolean;
   /** Enable only after confirming purchase-order write and item read grants and endpoint support. */
   purchaseOrderActions?: boolean;
+  /** Enable only after confirming return write, return read and sales-order read grants. */
+  returnActions?: boolean;
   /**
    * Reads customers and reports which customer placed each order. Set only when the connection
    * grants `customers.read`.
@@ -110,6 +113,8 @@ export function createJtlConnector(
       | 'suppliers.read'
       | 'purchase-orders.read'
       | MessageReadCapability
+      | 'returns.options.read'
+      | 'returns.created.read'
     >,
   >(capability: K): CapabilityHandler<K> {
     return {
@@ -619,6 +624,7 @@ export function createJtlConnector(
         ? createJtlShippingMethodCapabilities(options)
         : {}),
       ...createJtlPurchaseOrderCapabilities(options),
+      ...createJtlReturnCapabilities(options),
       'orders.read': handler('orders.read'),
       'products.read': handler('products.read'),
       'inventory.read': handler('inventory.read'),

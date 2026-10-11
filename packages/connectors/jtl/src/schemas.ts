@@ -235,3 +235,75 @@ export const purchaseOrder = z
   }));
 
 export const purchaseOrderCreated = z.object({ purchaseOrderId: id });
+
+/** Sales-order detail facts a return needs: its company and whether it is cancelled. */
+export const salesOrderCompany = z.object({
+  id,
+  companyId: id,
+  isCancelled: z.boolean(),
+});
+
+/** Warehouse overview row; a malformed name or activity becomes unknown. */
+export const warehouse = z.object({
+  id,
+  name: z.string().nullable().optional().catch(null),
+  active: z.boolean().optional().catch(undefined),
+});
+
+/** Return reason with its translated names; malformed translations leave the name unknown. */
+export const returnReason = z.object({
+  id,
+  translations: z
+    .array(
+      z.object({
+        languageIso: z.string(),
+        name: z.string().nullable().optional().catch(null),
+      }),
+    )
+    .nullable()
+    .optional()
+    .catch(null),
+});
+
+// JTL reports a missing reference as null, zero or the empty UUID.
+const optionalReference = z
+  .union([
+    id,
+    z.literal(0),
+    z.literal('00000000-0000-0000-0000-000000000000'),
+    z.null(),
+  ])
+  .optional()
+  .transform((value) =>
+    value === undefined ||
+    value === null ||
+    value === 0 ||
+    value === '00000000-0000-0000-0000-000000000000'
+      ? null
+      : value,
+  );
+
+/**
+ * Return as listed and created. Only identity, order, warehouse, date, number and the external
+ * number that carries Luma's marker are read; comments, contact and customer are never kept.
+ */
+export const returnRow = z.object({
+  id,
+  number: z.string().nullable().optional().catch(null),
+  returnDate: timestamp.nullable().optional().catch(null),
+  externalNumber: z.string().nullable().optional().catch(null),
+  salesOrderId: id,
+  warehouseId: optionalReference.catch(null),
+});
+
+/** Return line; its sales-order line and reason are optional references. */
+export const returnLine = z.object({
+  id,
+  returnId: id,
+  quantity: decimal,
+  returnReasonId: optionalReference,
+  salesOrderLineItemId: optionalReference,
+});
+
+/** The created return in a 201 response; only its ID is consumed. */
+export const returnCreated = z.object({ id });

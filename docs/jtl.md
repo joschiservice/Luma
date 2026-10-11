@@ -2,8 +2,8 @@
 
 The JTL app reads sales orders, items, stock, delivery notes, suppliers, purchase orders
 and, when the connection opts in, customers from JTL ERP API **2.2**, for on-premise (JTL-Wawi) and cloud connections with
-shared normalization. It also offers two governed writes: shipping-method correction and
-purchase-order submission. Absence of data is never treated as evidence of shipment,
+shared normalization. It also offers three governed writes: shipping-method correction,
+purchase-order submission and return creation. Absence of data is never treated as evidence of shipment,
 deletion or confirmation. Code: `@luma/app-jtl`, with the protocol client in
 `@luma/connector-jtl`.
 
@@ -18,8 +18,8 @@ deletion or confirmation. Code: `@luma/app-jtl`, with the protocol client in
 - **Cloud:** requests go to the fixed JTL Cloud host with a bearer token and `X-Tenant-ID`.
 
 Credentials are resolved on every request, allowing rotation. Register read access for
-sales orders and lines, items, warehouse stock, delivery notes and lines, suppliers,
-purchase orders and, for customer import, customers. A licence or permission failure returns `permission_denied`, never an
+sales orders and lines, items, warehouses and their stock, delivery notes and lines,
+suppliers, purchase orders, returns and return reasons and, for customer import, customers. A licence or permission failure returns `permission_denied`, never an
 empty page. Older API versions are not interchangeable; confirm the installation supports
 the 2.2 endpoints before activation. Requests reject redirects and time out after 15
 seconds by default.
@@ -196,5 +196,50 @@ reads before writing. Quantities must be positive and in `each`.
 The verifier grants `suppliers.read` and `purchase-orders.read` from read probes. Probes
 cannot establish the `purchaseorders.write` grant, so only simulated installations that
 pass the purchase-order and item probes receive `purchase-orders.submit`. On-premise
-connections allow `POST` through the pinned transport only for this capability. See
+connections allow `POST` through the pinned transport only for this capability and return
+creation. See
 [supplier commitments](supplier-commitments.md) for how Luma uses these reads.
+
+## Returns
+
+JTL returns serve Luma return cases. Luma's return case owns inspection and resolution;
+JTL returns are not imported into the Returns list, and `returns.read` is not offered.
+
+`returns.options.read` lists the choices a return needs: every active warehouse (resource
+`location`, at most ten pages of 100; more is `partial`) and every return reason (resource
+`return_reason`). A reason's name is its English translation, else German, else the first.
+
+`returns.created.read` finds the returns created for one Luma return case. It scans the
+order's returns, at most 500 within five pages, for the exact marker
+`luma-rc:<lumaCaseId>` in `externalNumber`, which JTL accepts only at creation and never
+changes. A longer scan, or more matches than `limit`, is `partial`. Each match reports its
+number, date, warehouse and lines; a line's order line uses the sales-order ID as scope
+key, as in `orders.read`, and its quantity is in `each`. Comments, contact and customer
+fields are never read. The result is verification evidence, not a canonical return.
+
+`returns.create` creates one return (**high** minimum risk, `provider_key` idempotency, a
+single attempt) for one order, warehouse and reason; the reason applies to every line.
+
+- Every line must be a line of the order, counted in `each`, with a positive quantity no
+  larger than the ordered quantity. A cancelled order, a quantity above the ordered
+  quantity or a line in another unit refuses with `conflict`; a line outside the order
+  with `invalid_input`.
+- It refuses with `conflict` if a return marked for the same case exists or that scan is
+  incomplete. Pre-dispatch read failures keep their code and are marked `not_dispatched`.
+- The body carries the order's company, the order, warehouse, marker, the internal comment
+  `Created by Luma` and one item per line with `credit: false`, so JTL books no credit. No
+  customer text is sent.
+- The `Idempotency-Key` is derived as for shipping-method corrections. ERP 2.2 does not
+  document the header for this endpoint, so duplicates are ruled out only by the marker
+  check. A 201 returns the JTL return ID as the only evidence reference; it means JTL
+  recorded the return, not that any item came back.
+- Rejections (400, 401, 403, 404, 409, 412) have no effect. A timeout, network loss,
+  throttling, server error or malformed response after dispatch has an unknown effect;
+  reconcile by reading `returns.created.read` with the case ID. Never redispatch an
+  uncertain creation.
+
+The verifier grants `returns.options.read` when the warehouse and return-reason probes
+pass and `returns.created.read` when the return probe passes. Probes cannot establish the
+`returns.write` grant, so only simulated installations that pass both return probes and
+the sales-order probe receive `returns.create` until an installation-specific sandbox
+smoke test exists.

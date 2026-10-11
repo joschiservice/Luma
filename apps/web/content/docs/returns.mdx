@@ -1,9 +1,9 @@
 ---
 title: Follow returns and refunds
-description: See which returns need you, follow each one from request to refund, and tell a requested refund from money returned.
+description: See which returns need you, follow each one from request to refund, work it in a return case and tell a requested refund from money returned.
 ---
 
-Returns shows every return a connected store shares with Luma, and every refund that no return settles. Each return keeps its order, items, reasons, refunds and the evidence Luma read. Luma reads returns; it doesn’t approve, receive or refund them. You do that in your store, and Luma reads the result on its next sync. Open **Returns** in the sidebar or press **G**, then **T**.
+Returns shows every return a connected store shares with Luma, and every refund that no return settles. Each return keeps its order, items, reasons, refunds and the evidence Luma read. Luma reads your store’s returns; it doesn’t approve, receive or refund them there. You do that in your store, and Luma reads the result on its next sync. To record what arrived, how it was judged and how to settle it, work the return in a [return case](#work-a-return-in-a-case). Open **Returns** in the sidebar or press **G**, then **T**.
 
 ## Find returns that need you
 
@@ -50,15 +50,46 @@ While a return is **Waiting for items**, its next step says how many units are s
 
 If the store doesn’t report received items, the step says so rather than assuming the items arrived. Check the return in your store before you refund it.
 
+## Work a return in a case
+
+A return case is Luma’s own record of a return: the units the customer sends back, what arrived, how each unit was judged and how you propose to settle it. Your store’s record of the return stays as it is.
+
+- To work a store return, open it and select **Work this return in a case**. Its lines are prefilled.
+- To start without a store return, open the order and select **Open return case** under **Returns and refunds**. Choose the lines, the units and a reason for each. If the order comes from more than one system, choose the source the items belong to.
+
+Each unit counts once. Units already in another case, or in a store return that no case works, can’t be added again, so partial returns of one order never add up to more than was ordered.
+
+Work the case in three steps:
+
+1. **Record receipt**: enter the units that arrived back for each line. Units that didn’t arrive count as missing.
+2. **Record inspection**: judge every received unit as resellable or damaged.
+3. **Propose resolution**: choose a refund, exchange, store credit or rejection, and how many resellable units go back to stock. Damaged and missing units can’t be restocked, and a rejection restocks nothing.
+
+A proposal doesn’t refund, restock or exchange anything. Add a note, or a link to a photo or document, as evidence with each step. Recording an earlier step again replaces it and clears the steps after it. **History** keeps every decision with who made it and when.
+
+Under **Receives and inspects**, assign the person who handles the parcel. Only people who can manage returns can be assigned. **Cancel case** keeps the case in the history and makes its units returnable again.
+
+## Create the return in JTL-Wawi
+
+For an order from JTL-Wawi, a case can create the return in JTL-Wawi, so your warehouse can receive it there:
+
+1. On the case, select **Create return in**, followed by your connection’s name. Choose the warehouse that receives the items and the return reason, then select **Request approval**.
+2. Someone else approves the request on the case. They need **Manage returns**, **Approve or reject changes** and **Create returns in JTL**. Luma then creates the return once.
+3. Luma reads JTL-Wawi again and shows the return number once it finds exactly the approved return.
+
+Luma creates the return without a credit; a refund stays a separate decision in JTL-Wawi. A request expires after 24 hours. If JTL-Wawi doesn’t confirm the request, the case shows **Not confirmed**: select **Check**, followed by your connection’s name, to read it again. Luma never sends the request a second time. In an observe-only workspace, Luma records the request and sends nothing.
+
+The JTL-Wawi connection needs access to returns. A connection set up before returns were available must be reconnected; see [Apps and connections](/docs/apps-and-connections#change-or-reconnect-a-connection). Shopify and Cin7 Core can’t create returns from Luma.
+
 ## When returns are missing
 
 Returns appear only from connections that share them:
 
 - **No connection shares returns yet** means none of your connected stores shares returns and refunds with Luma.
 - A Shopify store connected before Luma could read returns must be reconnected to share returns and refunds. The Returns page names each store that needs it. Someone with **Manage connections** can reconnect it; see [Apps and connections](/docs/apps-and-connections#change-or-reconnect-a-connection).
-- JTL-Wawi doesn’t share returns with Luma. Returns handled only in JTL-Wawi don’t appear here.
+- JTL-Wawi doesn’t share returns with Luma. Returns handled only in JTL-Wawi don’t appear here; a return Luma created in JTL-Wawi shows its number on the return case.
 - Shopify shares returns for orders from the last 60 days unless access to older orders is on for the store.
 
 Luma checks for new and changed returns regularly and reads every return again once a day. [Data sync](/docs/data-sync) shows the progress for each store.
 
-Viewing returns needs **View returns**. Without it, Returns is hidden from the sidebar and search.
+Viewing returns and return cases needs **View returns**. Without it, Returns is hidden from the sidebar and search. Opening and working return cases needs **Manage returns**.

@@ -50,7 +50,41 @@ const page = <T extends z.ZodTypeAny>(item: T) =>
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
+const option = (kind: 'warehouse' | 'reason') =>
+  z.object({ kind: z.literal(kind), name: text }).strict();
+
 export const outputs = {
+  'returns.options.read': page(
+    z.union([
+      observation('location', option('warehouse')),
+      observation('return_reason', option('reason')),
+    ]),
+  ),
+  'returns.created.read': page(
+    observation(
+      'return',
+      z
+        .object({
+          order: externalId,
+          number: text,
+          lumaCaseId: z.string().min(1).max(128),
+          createdAt: timestamp.nullable(),
+          warehouse: externalId.nullable(),
+          lines: z.array(
+            z
+              .object({
+                orderLine: externalId.nullable(),
+                quantity: z
+                  .object({ amount: decimal, unit: z.literal('each') })
+                  .strict(),
+                reason: externalId.nullable(),
+              })
+              .strict(),
+          ),
+        })
+        .strict(),
+    ),
+  ),
   'suppliers.read': page(
     observation(
       'supplier',

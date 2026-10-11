@@ -125,3 +125,94 @@ describe('JTL customer grants', () => {
     ).toEqual([]);
   });
 });
+
+describe('JTL return grants', () => {
+  const returns = {
+    ...purchasing,
+    permissions: [
+      'orders.read' as const,
+      'returns.options.read' as const,
+      'returns.created.read' as const,
+      'returns.create' as const,
+    ],
+  };
+  // Return reasons are a plain array rather than a page.
+  const answering = (denied: string[]) =>
+    vi.fn<typeof globalThis.fetch>(async (url) => {
+      const path = new URL(String(url)).pathname;
+      if (denied.some((value) => path.endsWith(`/${value}`)))
+        return new Response(null, { status: 403 });
+
+      return path.endsWith('/return-reasons')
+        ? Response.json([{ id: '1', translations: [] }])
+        : Response.json(empty);
+    });
+
+  it('grants return reads from read probes, never creation', async () => {
+    const fetch = answering([]);
+    expect(
+      await createInstallationVerifier({ fetch, jtlEndpoints: [] })(
+        returns,
+        credentials,
+      ),
+    ).toEqual(['orders.read', 'returns.options.read', 'returns.created.read']);
+    expect(
+      fetch.mock.calls.map(([url]) => new URL(String(url)).pathname),
+    ).toEqual([
+      '/erp/v2/sales-orders',
+      '/erp/v2/warehouses',
+      '/erp/v2/return-reasons',
+      '/erp/v2/returns',
+    ]);
+    expect(fetch.mock.calls.every(([, init]) => init?.method === 'GET')).toBe(
+      true,
+    );
+  });
+
+  it.each([
+    [
+      [],
+      [
+        'orders.read',
+        'returns.options.read',
+        'returns.created.read',
+        'orders.shipping-method.read',
+        'orders.shipping-method.write',
+        'returns.create',
+      ],
+    ],
+    [
+      ['return-reasons'],
+      [
+        'orders.read',
+        'returns.created.read',
+        'orders.shipping-method.read',
+        'orders.shipping-method.write',
+      ],
+    ],
+    [
+      ['returns'],
+      [
+        'orders.read',
+        'returns.options.read',
+        'orders.shipping-method.read',
+        'orders.shipping-method.write',
+      ],
+    ],
+    [['sales-orders'], ['returns.options.read', 'returns.created.read']],
+  ])(
+    'grants simulated creation only with order and return reads (denied %j)',
+    async (denied, expected) => {
+      const fetch = answering(denied);
+      expect(
+        await createInstallationVerifier({
+          simulation: () => fetch,
+          jtlEndpoints: [],
+        })({ ...returns, label: 'SIMULATED ERP' }, credentials),
+      ).toEqual(expected);
+      expect(fetch.mock.calls.every(([, init]) => init?.method === 'GET')).toBe(
+        true,
+      );
+    },
+  );
+});

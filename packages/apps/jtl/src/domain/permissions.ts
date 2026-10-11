@@ -2,4 +2,5 @@
 export const jtlPermissions = {
   purchaseOrders: 'jtl:purchase_orders.submit',
   shippingMethod: 'jtl:orders.shipping_method.write',
+  returns: 'jtl:returns.create',
 } as const;

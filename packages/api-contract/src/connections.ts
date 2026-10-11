@@ -20,6 +20,9 @@ export const installationPermissions = z.enum([
   'message-threads.read',
   'message-attachments.read',
   'messages.send',
+  'returns.options.read',
+  'returns.created.read',
+  'returns.create',
 ]);
 
 const header = z

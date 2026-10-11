@@ -34,9 +34,30 @@ describe('JTL installation input', () => {
           'suppliers.read',
           'purchase-orders.read',
           'purchase-orders.submit',
+          'returns.options.read',
+          'returns.created.read',
+          'returns.create',
         ]),
       ).permissions,
-    ).toHaveLength(10);
+    ).toHaveLength(13);
+  });
+
+  it('requires the order and return reads that return creation performs first', () => {
+    expect(() =>
+      installationInput.parse(
+        input(['orders.read', 'returns.created.read', 'returns.create']),
+      ),
+    ).toThrow();
+    expect(() =>
+      installationInput.parse(
+        input([
+          'orders.read',
+          'returns.options.read',
+          'returns.created.read',
+          'returns.create',
+        ]),
+      ),
+    ).not.toThrow();
   });
 
   it('rejects capabilities JTL does not offer', () => {

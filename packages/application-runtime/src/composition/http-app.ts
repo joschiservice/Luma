@@ -42,6 +42,8 @@ import type {
   Replies,
 } from '@luma/messaging';
 import { messagingRoutes } from '@luma/messaging/http';
+import type { ReturnCases } from '@luma/orders/composition';
+import { returnCaseRoutes } from '@luma/orders/http';
 import type { ModelGateway, Observability, Observation } from '@luma/platform';
 import { describeError } from '@luma/platform';
 import type { ProcurementService } from '@luma/procurement';
@@ -149,6 +151,7 @@ export interface AppDependencies {
   procurementContext?: ProcurementContextReader;
   fulfillment?: FulfillmentWorkspace;
   returns?: ReturnWorkspace;
+  returnCases?: ReturnCases;
   customers?: CustomerWorkspace;
   orders?: OrderWorkspace;
   decisions?: DecisionQueue;
@@ -436,6 +439,7 @@ export function buildApp(
       fulfillment: fulfillmentRoutes(dependencies.fulfillment),
       orders: orderRoutes(dependencies.orders),
       returns: returnRoutes(dependencies.returns),
+      returnCases: returnCaseRoutes(dependencies.returnCases),
       customers: customerRoutes(dependencies.customers),
       sync: syncRoutes(dependencies.sync),
       decisions: decisionRoutes(

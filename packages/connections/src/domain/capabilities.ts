@@ -29,7 +29,8 @@ export interface SourceIdentity extends ExternalId {
     | 'refund'
     | 'supplier'
     | 'purchase_order'
-    | 'message';
+    | 'message'
+    | 'return_reason';
 }
 
 export interface Observation<T> {
@@ -428,6 +429,45 @@ export interface PurchaseOrderSubmission {
   lines: { sku: ExternalId; quantity: Quantity }[];
 }
 
+/** A choice the source requires when a return is created there. Descriptive only. */
+export interface ReturnOptionSnapshot {
+  /** Resource `location` for warehouses, `return_reason` for reasons. */
+  kind: 'warehouse' | 'reason';
+  name: string | null;
+}
+
+/**
+ * A return found again at the source for a Luma return case. It is verification evidence,
+ * not a canonical return record.
+ */
+export interface CreatedReturnSnapshot {
+  order: ExternalId;
+  /** The source's own return number. */
+  number: string | null;
+  /** The Luma return case this return was created for. */
+  lumaCaseId: string;
+  createdAt: string | null;
+  warehouse: ExternalId | null;
+  lines: {
+    /** Null when the source line is not tied to an order line. */
+    orderLine: ExternalId | null;
+    quantity: Quantity;
+    reason: ExternalId | null;
+  }[];
+}
+
+/** Creates one return at the source for a Luma return case. */
+export interface ReturnCreation {
+  /** The Luma return case ID; the adapter stores it so the return can be found again. */
+  lumaCaseId: string;
+  order: ExternalId;
+  /** The source warehouse that receives the returned items. */
+  warehouse: ExternalId;
+  /** The source return reason recorded on every line. */
+  reason: ExternalId;
+  lines: { orderLine: ExternalId; quantity: Quantity }[];
+}
+
 export interface ShippingMethodSnapshot {
   orderStatus: 'open' | 'shipped' | 'cancelled' | 'unknown';
   shippingMethod: ExternalId;
@@ -605,6 +645,18 @@ export interface CapabilityContract {
   };
   'products.read': { input: PageQuery; output: Page<ProductSnapshot> };
   'customers.read': { input: PageQuery; output: Page<CustomerSnapshot> };
+  /** Warehouses and return reasons to choose from when creating a return at the source. */
+  'returns.options.read': {
+    input: PageQuery;
+    output: Page<ReturnOptionSnapshot>;
+  };
+  /** Finds the returns created at the source for a Luma return case. Resource `return`. */
+  'returns.created.read': {
+    input: PageQuery & { order: ExternalId; lumaCaseId: string };
+    output: Page<CreatedReturnSnapshot>;
+  };
+  /** Acceptance means the source recorded the return, not that any item came back. */
+  'returns.create': { input: ReturnCreation; output: WriteReceipt };
   /** Returns and refunds per order; the observation resource is `return` or `refund`. */
   'returns.read': {
     input: PageQuery & { order?: ExternalId };

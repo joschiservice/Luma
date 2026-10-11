@@ -6,6 +6,7 @@ import { createApp as shopify, createShopifyProvider } from '@luma/app-shopify';
 import {
   createInstalledMessageRuntime as mailboxes,
   createInstalledPurchaseOrderRuntime as purchaseOrders,
+  createInstalledReturnRuntime as returns,
   createInstalledRuntime as runtime,
   createInstalledShippingMethodEffects as effects,
 } from '@luma/connections/composition';
@@ -82,4 +83,9 @@ export function createInstalledPurchaseOrderRuntime(options) {
 /** Builds simulator mailbox reads and reply send effects with explicit providers. */
 export function createInstalledMessageRuntime(options) {
   return mailboxes({ ...options, providers: fixtureProviders(options) });
+}
+
+/** Builds simulator return reads and return-creation effects with explicit providers. */
+export function createInstalledReturnRuntime(options) {
+  return returns({ ...options, providers: fixtureProviders(options) });
 }

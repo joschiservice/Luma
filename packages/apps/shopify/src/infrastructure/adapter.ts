@@ -252,6 +252,8 @@ export function createShopifyConnector(
       | 'suppliers.read'
       | 'purchase-orders.read'
       | MessageReadCapability
+      | 'returns.options.read'
+      | 'returns.created.read'
     >,
   >(capability: K): CapabilityHandler<K> {
     return {

@@ -46,6 +46,9 @@ export const capabilities = localized({
   'message-threads.read': m.connections_capability_message_threads_read,
   'message-attachments.read': m.connections_capability_message_attachments_read,
   'messages.send': m.connections_capability_messages_send,
+  'returns.options.read': m.connections_capability_returns_options_read,
+  'returns.created.read': m.connections_capability_returns_created_read,
+  'returns.create': m.connections_capability_returns_create,
 } satisfies Record<InstallationCapability, () => string>);
 
 export const statuses = localized({
