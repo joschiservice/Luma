@@ -102,14 +102,25 @@ test('migration command installs, reruns unchanged, and rejects a changed applie
   const names = (await readdir(join(runtimeDirectory, 'migrations')))
     .filter((name) => name.endsWith('.sql'))
     .sort();
+  // Installed apps ship their own migrations, recorded under the app's name.
+  const appsDirectory = join(runtimeDirectory, '../apps');
+  const appNames = [];
+  for (const app of (await readdir(appsDirectory)).sort())
+    appNames.push(
+      ...(await readdir(join(appsDirectory, app, 'migrations')).catch(() => []))
+        .filter((name) => name.endsWith('.sql'))
+        .sort()
+        .map((name) => `app:${app}/${name}`),
+    );
   const output = await db.migrate();
-  for (const name of names) assert.ok(output.includes(`Applied ${name}`));
+  for (const name of [...names, ...appNames])
+    assert.ok(output.includes(`Applied ${name}`));
   const before = (
     await db.owner.query('SELECT * FROM identity_migrations ORDER BY name')
   ).rows;
   assert.deepStrictEqual(
-    before.map((row) => row.name),
-    names,
+    before.map((row) => row.name).sort(),
+    [...names, ...appNames].sort(),
   );
   await db.owner.query(
     "INSERT INTO users(id, name, email, created_at, updated_at) VALUES ('00000000-0000-4000-8000-000000000001', 'Migration user', 'migration@example.test', now(), now())",
