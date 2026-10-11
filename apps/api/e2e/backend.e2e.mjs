@@ -79,7 +79,8 @@ test('built API supports the identity lifecycle over HTTP and survives restart',
   assert.deepStrictEqual(
     (await api.request('/v1/organizations', { cookie: alice.cookie })).body
       .items,
-    [organization],
+    // The list adds the caller's membership status to each workspace.
+    [{ ...organization, membershipStatus: 'active' }],
   );
   await api.request(contextPath, { cookie: alice.cookie });
   await api.request('/auth/sign-out', {
@@ -188,6 +189,19 @@ test('SIGKILL after a committed effect recovers in a fresh worker without redeli
       status: 201,
     })
   ).body;
+  // This journey exercises a provider write; new workspaces otherwise stay observe-only.
+  await api.request(
+    `/v1/organizations/${organization.id}/settings/write-mode`,
+    {
+      method: 'PATCH',
+      cookie: actor.cookie,
+      body: {
+        commandId: randomUUID(),
+        revision: 0,
+        writeMode: 'writes_enabled',
+      },
+    },
+  );
   const directory = await temporaryDirectory(t);
   const ledger = join(directory, 'provider-effects.jsonl');
   const action = {
