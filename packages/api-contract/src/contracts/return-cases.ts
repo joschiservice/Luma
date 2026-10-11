@@ -27,6 +27,7 @@ import {
 } from '../return-deadlines.js';
 import {
   exchangeChoiceInputSchema,
+  exchangeConsistencySchema,
   exchangeRequestSchema,
   exchangeStepSchema,
   returnExchangeSchema,
@@ -134,6 +135,17 @@ export const returnCasesContract = {
     .meta({ access: requires('returns.read'), errors: [401, 403, 404, 503] })
     .input(z.object({ params: caseParams }))
     .output(returnExchangesSchema),
+  completeExchange: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-cases/{caseId}/exchange/complete`,
+      summary: 'Verify exchange consistency in both systems',
+      description:
+        'Independently reads Shopify and Wawi. Completes the case only when returned stock, exactly one replacement order, its reservation, price and actual payment agree. A failed later check reopens owned work. Executes no provider write.',
+    })
+    .meta(writes)
+    .input(z.object({ params: caseParams, body: empty }))
+    .output(exchangeConsistencySchema),
   requestExchange: endpoint
     .route({
       method: 'POST',

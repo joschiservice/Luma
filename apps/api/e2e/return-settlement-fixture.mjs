@@ -10,6 +10,8 @@ export async function settlementFixture(
     origin = 'http://127.0.0.1:3000',
     resolution = 'refund',
     prepare = 'proposed',
+    resellable = 1,
+    fulfillment = 'manual',
     environment,
   } = {},
 ) {
@@ -78,13 +80,49 @@ export async function settlementFixture(
   const providerOrderId = (
     await f.call('runs/operations/records/shopify?kind=Order&limit=100')
   ).items.find((o) => !old.has(o.id)).id;
-  await command({
-    kind: 'fulfill',
-    order: providerOrderId,
-    carrier: 'DHL',
-    trackingNumber: 'settlement-test',
-    trackingUrl: 'https://example.test/tracking',
-  });
+  if (fulfillment === 'pipeline') {
+    await f.call('runs/operations/control', {
+      action: 'advance',
+      milliseconds: 10_000,
+    });
+    const shopOrder = (
+      await f.call('runs/operations/records/shopify?kind=Order&limit=100')
+    ).items.find((o) => o.id === providerOrderId);
+    const erp = (
+      await f.call('runs/operations/records/jtl?kind=sales-order&limit=100')
+    ).items.find(
+      (o) => o.data.externalNumber === shopOrder.data.name.replace(/^#/, ''),
+    );
+    assert.ok(
+      erp,
+      'The real order integration must import the Shopify order into Wawi',
+    );
+    await f.call('runs/operations/control', {
+      action: 'command',
+      instance: 'jtl',
+      command: {
+        kind: 'ship',
+        id: erp.id,
+        warehouse: erp.data.warehouse,
+        trackingNumber: 'completion-original',
+        trackingUrl: 'https://example.test/tracking',
+      },
+    });
+    await command({
+      kind: 'fulfill',
+      order: providerOrderId,
+      carrier: 'DHL',
+      trackingNumber: 'completion-original',
+      trackingUrl: 'https://example.test/tracking',
+    });
+  } else
+    await command({
+      kind: 'fulfill',
+      order: providerOrderId,
+      carrier: 'DHL',
+      trackingNumber: 'settlement-test',
+      trackingUrl: 'https://example.test/tracking',
+    });
   await f.pilot.observe({ check: false });
   await f.pilot.link();
   const skuSources = (
@@ -149,7 +187,10 @@ export async function settlementFixture(
   const path = `/return-cases/${detail.case.id}`,
     lines = detail.lines;
   const evidence = {
-    note: 'Warehouse counted two units; one damaged',
+    note:
+      resellable === 2
+        ? 'Warehouse counted and inspected two resale units'
+        : 'Warehouse counted two units; one damaged',
     link: null,
   };
   if (prepare === 'opened')
@@ -179,28 +220,32 @@ export async function settlementFixture(
     expectedRevision: detail.case.revision,
     lines: lines.map((l) => ({
       orderLineId: l.orderLineId,
-      resellable: 1,
-      damaged: 1,
+      resellable,
+      damaged: 2 - resellable,
     })),
     evidence,
   });
-  await request(
-    `${path}/proposal`,
-    {
-      commandId: randomUUID(),
-      expectedRevision: detail.case.revision,
-      kind: 'refund',
-      lines: lines.map((l) => ({ orderLineId: l.orderLineId, restock: 2 })),
-      evidence,
-    },
-    requester,
-    409,
-  );
+  if (resellable < 2)
+    await request(
+      `${path}/proposal`,
+      {
+        commandId: randomUUID(),
+        expectedRevision: detail.case.revision,
+        kind: 'refund',
+        lines: lines.map((l) => ({ orderLineId: l.orderLineId, restock: 2 })),
+        evidence,
+      },
+      requester,
+      409,
+    );
   detail = await request(`${path}/proposal`, {
     commandId: randomUUID(),
     expectedRevision: detail.case.revision,
     kind: resolution,
-    lines: lines.map((l) => ({ orderLineId: l.orderLineId, restock: 1 })),
+    lines: lines.map((l) => ({
+      orderLineId: l.orderLineId,
+      restock: resellable,
+    })),
     evidence,
   });
 

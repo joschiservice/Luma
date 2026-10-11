@@ -163,3 +163,24 @@ inspection, pending money, failed money and unavailable or stale evidence stay s
 Only fresh financial evidence ends a payment wait. Repeated checks retain the same waiting
 occurrence; a later recurrence keeps its earlier history. Reassign the case when another person
 should own the next step.
+
+### Complete an exchange
+
+In the exchange case, open **Completion across both systems**. Record the actual warehouse receipt
+in Shopify. Create one paid replacement order in Wawi using the **Replacement order reference**
+shown in the case, the mapped replacement item and its exact quantity. Reserve those units for that
+order. After Shopify processing, **Check both systems** shows the actual replacement total to use in
+Wawi. It also identifies any stock, price, payment or reservation step that still needs attention.
+
+Approve resale restocking separately. Wait for the actual price-difference payment or refund to
+settle, and approve any payment hold release separately. Then check both systems again. Luma completes
+the case only when its recorded units, source receipt, physical resale stock, one replacement order,
+reservation and settled money agree. Pending money and an accepted action do not complete it.
+
+An unresolved check stays with the case owner in Needs you. Review duplicate Wawi references and
+connection access before retrying. Damaged units need a confirmed physical disposal; this system pair
+cannot prove that disposal yet, so those cases remain owned and open. New stock movements may need
+review before the final check can confirm the warehouse total.
+
+You can check a completed exchange again. If fresh source evidence no longer agrees, Luma reopens the
+case and keeps the earlier completion in its history.

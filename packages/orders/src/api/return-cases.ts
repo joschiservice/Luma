@@ -97,6 +97,13 @@ export function returnCaseRoutes(
 
       return s.service.list(s.context, input.params.caseId);
     }),
+    completeExchange: os.completeExchange.handler(
+      ({ context: { request }, input }) => {
+        const s = exchange(request);
+
+        return s.service.complete(s.context, input.params.caseId);
+      },
+    ),
     requestExchange: os.requestExchange.handler(
       ({ context: { request }, input }) => {
         const s = exchange(request);

@@ -16,6 +16,7 @@ const reads = [
   'products.read',
   'inventory.read',
   'fulfillment.read',
+  'returns.exchange.reservation.read',
 ] as const;
 
 /**

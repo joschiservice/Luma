@@ -74,5 +74,7 @@
   "connections_capability_exchange_request": "Ersatzartikel anfragen",
   "connections_capability_exchange_process": "Umtausch verarbeiten",
   "connections_capability_exchange_cancel": "Unverarbeiteten Umtausch stornieren",
-  "connections_capability_exchange_release": "Bezahlten Umtausch freigeben"
+  "connections_capability_exchange_release": "Bezahlten Umtausch freigeben",
+  "connections_capability_exchange_price": "Nachweis des Ersatzpreises",
+  "connections_capability_exchange_reservation": "Nachweis von Ersatzauftrag und Reservierung"
 }

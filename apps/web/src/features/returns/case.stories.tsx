@@ -532,8 +532,10 @@ function Preview({
   settlementState,
   exchangeState,
   waitingState,
+  completionState,
 }: {
   state?: string;
+  completionState?: 'verified' | 'unresolved' | 'stale';
   waitingState?: ReturnWaitingView['episodes'][number]['reason'];
   evidence?: 'fresh' | 'stale' | 'loading' | 'unavailable';
   settlementState?: 'pending' | 'failed' | 'stale' | 'approval' | 'unavailable';
@@ -593,7 +595,11 @@ function Preview({
                       },
                       proposal: { ...proposed.proposal!, kind: 'exchange' },
                     }}
-                    data={exchange(exchangeState)}
+                    data={
+                      completionState
+                        ? completedExchange(completionState)
+                        : exchange(exchangeState)
+                    }
                     loading={false}
                     unavailable={false}
                     retry={() => {}}
@@ -883,5 +889,91 @@ export const WaitingNarrow: Story = {
 
 export const WaitingDark: Story = {
   args: { state: 'proposed', waitingState: 'unavailable_evidence' },
+  globals: { theme: 'dark' },
+};
+
+function completedExchange(
+  state: 'verified' | 'unresolved' | 'stale',
+): ReturnExchangesView {
+  const data = exchange('paid');
+  data.operation!.completion = {
+    state: state === 'unresolved' ? 'unresolved' : 'verified',
+    checkedAt:
+      state === 'stale' ? '2026-01-01T00:00:00Z' : new Date().toISOString(),
+    ownerId: sam.id,
+    caseRevision: proposed.case.revision,
+    evidenceRefs: [data.operation!.id],
+    replacementOrder: { externalId: '101', scopeKey: '' },
+    replacementTotal: { amount: '46', currency: 'EUR' },
+    checks: (
+      [
+        'receipt',
+        'inspection',
+        'stock',
+        'replacement',
+        'reservation',
+        'payment',
+        'fulfillment',
+      ] as const
+    ).map((id) => ({
+      id,
+      verified: state !== 'unresolved' || id !== 'reservation',
+      reason: 'reservation_missing',
+    })),
+  };
+
+  return data;
+}
+
+export const ExchangeCompleted: Story = {
+  args: {
+    state: 'proposed',
+    exchangeState: 'paid',
+    completionState: 'verified',
+  },
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).getByText('Exchange consistency verified'),
+    ).toBeVisible();
+    await expect(
+      within(canvasElement).queryByText(/Wawi allocation needs the case owner/),
+    ).not.toBeInTheDocument();
+  },
+};
+
+export const ExchangeUnresolved: Story = {
+  args: {
+    state: 'proposed',
+    exchangeState: 'paid',
+    completionState: 'unresolved',
+  },
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).getByText(
+        'Exchange unresolved · case owner must follow up',
+      ),
+    ).toBeVisible();
+  },
+};
+
+export const ExchangeCompletionStale: Story = {
+  args: { state: 'proposed', exchangeState: 'paid', completionState: 'stale' },
+};
+
+export const ExchangeCompletionNarrow: Story = {
+  args: {
+    state: 'proposed',
+    exchangeState: 'paid',
+    completionState: 'unresolved',
+  },
+  globals: { viewport: { value: 'mobile1', isRotated: false } },
+};
+
+export const ExchangeCompletionDark: Story = {
+  args: {
+    state: 'proposed',
+    exchangeState: 'paid',
+    completionState: 'verified',
+  },
   globals: { theme: 'dark' },
 };

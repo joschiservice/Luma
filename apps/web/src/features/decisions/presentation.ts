@@ -237,7 +237,13 @@ export function localizeReturnDecision(item: DecisionItem): DecisionItem {
         ? m.returns_service_queue_approval()
         : item.reason === 'uncertainty'
           ? m.returns_service_queue_uncertain()
-          : m.returns_service_queue_manual(),
+          : item.change.some(
+                (fact) =>
+                  fact.label === 'Exchange completion' &&
+                  fact.value === 'unresolved',
+              )
+            ? m.returns_exchange_complete_unresolved()
+            : m.returns_service_queue_manual(),
     consequences: [
       {
         response: m.returns_service_open_case(),
@@ -255,7 +261,12 @@ export function localizeReturnDecision(item: DecisionItem): DecisionItem {
                   ([key]) => key === stage,
                 )?.[1] ?? m.common_not_reported(),
             }
-          : fact,
+          : fact.label === 'Exchange completion'
+            ? {
+                label: m.returns_exchange_consistency_title(),
+                value: m.returns_exchange_complete_unresolved(),
+              }
+            : fact,
     ),
     group: { ...item.group, label: m.returns_service_cases() },
   };

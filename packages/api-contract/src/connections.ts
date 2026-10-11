@@ -26,6 +26,8 @@ const installationPermissions = z.enum([
   'returns.exchange.options.read',
   'returns.exchange.quote.read',
   'returns.exchange.proof.read',
+  'returns.exchange.price.read',
+  'returns.exchange.reservation.read',
   'returns.exchange.request',
   'returns.exchange.process',
   'returns.exchange.cancel',

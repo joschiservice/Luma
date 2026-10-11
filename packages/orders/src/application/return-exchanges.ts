@@ -10,7 +10,12 @@ import {
 import { canonicalJson } from '@luma/platform';
 import type { PolicyDecision, ProposedAction } from '@luma/policies';
 
+import type { ReturnAction } from '../domain/return-actions.js';
 import type { ReturnCase } from '../domain/return-cases.js';
+import {
+  exchangeConsistency,
+  type ExchangeConsistencyEvidence,
+} from '../domain/return-consistency.js';
 import type {
   ExchangeProof,
   ExchangeReplacement,
@@ -48,6 +53,8 @@ export interface ReturnExchangeStore {
       insert(value: ExchangeStep): Promise<void>;
       choices(value: ReturnCase): Promise<ExchangeChoice[]>;
       refundFallback(value: ReturnCase, event: ReturnCaseEvent): Promise<void>;
+      stockActions(caseId: string): Promise<ReturnAction[]>;
+      finishCase(value: ReturnCase, event: ReturnCaseEvent): Promise<void>;
       audit(entry: AuditEntry): Promise<void>;
     }) => Promise<T>,
   ): Promise<T>;
@@ -55,6 +62,14 @@ export interface ReturnExchangeStore {
 
 /** Source reads provide replacement identities, current availability and native financial outcomes. */
 export interface ReturnExchangeSystem {
+  /** Rereads each leg without a provider write. Missing evidence remains unresolved. */
+  consistency?(
+    context: TenantContext,
+    value: ReturnCase,
+    root: ReturnExchange,
+    process: ExchangeStep | null,
+    actions: ReturnAction[],
+  ): Promise<ExchangeConsistencyEvidence>;
   choices(
     context: TenantContext,
     connectionId: string,
@@ -967,6 +982,177 @@ export function createReturnExchanges(deps: Dependencies) {
         return next;
       });
     },
+    /** Independently checks both systems, completes only consistent cases and reopens a failed later check. */
+    async complete(context: TenantContext, caseId: string) {
+      context = await authorize(context, true);
+      const data = await deps.store.transaction(
+        context.tenantId,
+        async (tx) => {
+          const value =
+            (await tx.lock(caseId)) ?? fail(404, 'Return case not found');
+          const root =
+            (await tx.root(caseId)) ?? fail(404, 'Exchange not found');
+          if (
+            value.state === 'cancelled' ||
+            value.proposal?.kind !== 'exchange'
+          )
+            fail(409, 'This case does not have an active exchange');
+          const steps = await tx.list(caseId);
+
+          return {
+            value,
+            root,
+            process:
+              steps.find((s) => s.plan.kind === 'process' && s.sent) ?? null,
+            actions: await tx.stockActions(caseId),
+          };
+        },
+      );
+      if (!deps.system?.consistency)
+        fail(503, 'Exchange consistency unavailable');
+      const evidence = await deps.system.consistency(
+        context,
+        data.value,
+        data.root,
+        data.process,
+        data.actions,
+      );
+      context = await authorize(context, true);
+
+      return deps.store.transaction(context.tenantId, async (tx) => {
+        const value =
+            (await tx.lock(caseId)) ?? fail(404, 'Return case not found'),
+          root = (await tx.root(caseId)) ?? fail(404, 'Exchange not found');
+        if (
+          value.revision !== data.value.revision ||
+          root.revision !== data.root.revision
+        )
+          fail(
+            409,
+            'The exchange changed while its systems were read. Check again.',
+          );
+        const choices = await tx.choices(value);
+        if (
+          !choices.some(
+            (c) =>
+              c.skuId === root.request.replacement.skuId &&
+              c.wawiConnectionId ===
+                root.request.replacement.wawiConnectionId &&
+              deps.digest(c.mappingIds) ===
+                deps.digest(root.request.replacement.mappingIds),
+          )
+        ) {
+          evidence.shopify = null;
+          evidence.wawi = null;
+        }
+        const currentProcess = data.process
+          ? await tx.get(data.process.id)
+          : null;
+        // A concurrent source check may have learned more while the remaining systems were read.
+        if (
+          evidence.shopify &&
+          currentProcess?.proof &&
+          Date.parse(currentProcess.proof.observedAt) >
+            Date.parse(evidence.shopify.observedAt)
+        )
+          evidence.shopify = currentProcess.proof;
+        const at = deps.now(),
+          report = exchangeConsistency(value, root, data.process, evidence, at);
+        const next = {
+          ...root,
+          completion: report,
+          ownerId: value.assigneeId ?? value.openedBy,
+          revision: root.revision + 1,
+          updatedAt: at.toISOString(),
+        };
+        await tx.saveRoot(next);
+        if (
+          data.process &&
+          evidence.shopify &&
+          fresh(
+            evidence.shopify.observedAt,
+            evidence.shopify.evidenceRefs,
+            data.process.requestedAt,
+          )
+        ) {
+          if (
+            currentProcess &&
+            (!currentProcess.proof ||
+              Date.parse(currentProcess.proof.observedAt) <=
+                Date.parse(evidence.shopify.observedAt))
+          ) {
+            const state =
+              evidence.shopify.outcome === 'passed'
+                ? 'verified'
+                : evidence.shopify.outcome === 'failed'
+                  ? 'failed'
+                  : 'uncertain';
+            const step = {
+              ...currentProcess,
+              proof: evidence.shopify,
+              state,
+              failure: state === 'failed' ? 'provider_failed' : null,
+              updatedAt: report.checkedAt,
+            } satisfies ExchangeStep;
+            await tx.save(step);
+            await tx.audit(audit(context, step, `return.exchange.${state}`));
+          }
+        }
+        const state = report.state === 'verified' ? 'completed' : 'open';
+        if (state !== value.state) {
+          const updated = {
+            ...value,
+            state,
+            revision: value.revision + 1,
+            updatedAt: report.checkedAt,
+          } satisfies ReturnCase;
+          await tx.finishCase(updated, {
+            id: deps.uuid(`exchange-check-event:${root.id}:${next.revision}`),
+            tenantId: context.tenantId,
+            caseId,
+            commandId: deps.uuid(
+              `exchange-check-command:${root.id}:${next.revision}`,
+            ),
+            digest: deps.digest(report),
+            kind:
+              state === 'completed'
+                ? 'exchange_completed'
+                : 'exchange_reopened',
+            actorId: context.actor.id,
+            revision: updated.revision,
+            occurredAt: report.checkedAt,
+            evidence: null,
+            details: {
+              reason: report.checks
+                .filter((c) => !c.verified)
+                .map((c) => c.id)
+                .join(', '),
+            },
+          });
+        }
+        await tx.audit({
+          id: deps.uuid(`exchange-check-audit:${root.id}:${next.revision}`),
+          tenantId: context.tenantId,
+          eventKey: `orders:exchange-consistency:${root.id}:${next.revision}`,
+          eventType: `return.exchange.consistency.${report.state}`,
+          schemaVersion: 1,
+          occurredAt: report.checkedAt,
+          actor: { kind: 'user', id: context.actor.id },
+          correlationId: caseId,
+          proposalId: root.id,
+          actionHash: deps.digest(report),
+          evidenceRefs: report.evidenceRefs,
+          details: {
+            operationId: root.id,
+            ownerId: report.ownerId,
+            checks: JSON.stringify(report.checks),
+          },
+        });
+
+        return report;
+      });
+    },
+
     /** Converts only a freshly cancelled, unprocessed exchange to the existing governed refund path. */
     async fallbackRefund(
       context: TenantContext,

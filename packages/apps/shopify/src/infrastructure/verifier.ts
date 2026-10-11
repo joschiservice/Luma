@@ -71,6 +71,7 @@ export function createInstallationVerifier(options: {
       granted.push(
         'returns.exchange.quote.read',
         'returns.exchange.proof.read',
+        'returns.exchange.price.read',
       );
     if (
       has('orders') &&

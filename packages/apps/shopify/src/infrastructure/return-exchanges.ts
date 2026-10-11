@@ -10,12 +10,13 @@ import type {
 } from '@luma/connections';
 import { ConnectorError } from '@luma/connections';
 import {
+  exchangePriceSchema,
   returnExchangeProofSchema,
   returnExchangeQuotedSchema,
   returnExchangeReadSchema,
 } from '@luma/connections/adapters';
 import { API_VERSION, createClient, parse } from '@luma/connector-shopify';
-import { settlementRefundProgress, toUnits } from '@luma/orders';
+import { fromUnits, settlementRefundProgress, toUnits } from '@luma/orders';
 import { canonicalJson } from '@luma/platform';
 import { z } from 'zod';
 
@@ -106,7 +107,8 @@ export function createShopifyExchangeCapabilities(
     capability:
       | 'returns.exchange.options.read'
       | 'returns.exchange.quote.read'
-      | 'returns.exchange.proof.read',
+      | 'returns.exchange.proof.read'
+      | 'returns.exchange.price.read',
     externalId: string,
     data: unknown,
     observedAt: string,
@@ -1061,6 +1063,88 @@ export function createShopifyExchangeCapabilities(
       return proof(input);
     },
   };
+  const price: CapabilityHandler<'returns.exchange.price.read'> = {
+    descriptor,
+    parseInput: (v) => returnExchangeReadSchema.parse(v),
+    parseOutput: (v) => exchangePriceSchema.parse(v),
+    async run(c, input) {
+      check(c);
+      const plan = input.plan;
+      if (plan.kind !== 'process' && plan.kind !== 'release') withheld();
+      const observedAt = now().toISOString();
+      const raw = await request(
+        'query LumaExchangePrice($id:ID!) { node(id:$id) { ... on Return { id order { id taxesIncluded } exchangeLineItems(first:10,includeRemovedItems:true) { nodes { id variantId quantity processedQuantity lineItems { id quantity discountedTotalSet(withCodeDiscounts:true) { presentmentMoney { amount currencyCode } } taxLines { priceSet { presentmentMoney { amount currencyCode } } } } } pageInfo { hasNextPage } } } } }',
+        { id: plan.returnId },
+      );
+      const result = parse(
+        z.object({
+          id: gid('Return'),
+          order: z.object({ id: gid('Order'), taxesIncluded: z.boolean() }),
+          exchangeLineItems: connection(
+            z.object({
+              id: gid('ExchangeLineItem'),
+              variantId: gid('ProductVariant').nullable(),
+              quantity: z.number().int().positive(),
+              processedQuantity: z.number().int().nonnegative(),
+              lineItems: z
+                .array(
+                  z.object({
+                    id: gid('LineItem'),
+                    quantity: z.number().int().positive(),
+                    discountedTotalSet: bag,
+                    taxLines: z.array(z.object({ priceSet: bag })).max(20),
+                  }),
+                )
+                .max(20)
+                .nullable(),
+            }),
+          ),
+        }),
+        raw.node,
+      );
+      const e = result.exchangeLineItems.nodes[0];
+      let total: { amount: string; currency: string } | null = null;
+      if (
+        result.id === plan.returnId &&
+        result.order.id === plan.order.externalId &&
+        !result.exchangeLineItems.pageInfo.hasNextPage &&
+        result.exchangeLineItems.nodes.length === 1 &&
+        e?.id === plan.exchangeLine.id &&
+        e.variantId === plan.replacement.variantId &&
+        e.quantity === plan.replacement.quantity &&
+        e.processedQuantity === e.quantity &&
+        e.lineItems?.length &&
+        new Set(e.lineItems.map((l) => l.id)).size === e.lineItems.length &&
+        e.lineItems.reduce((n, l) => n + l.quantity, 0) === e.quantity
+      ) {
+        const amounts = e.lineItems.flatMap((l) => [
+          l.discountedTotalSet.presentmentMoney,
+          ...(result.order.taxesIncluded
+            ? []
+            : l.taxLines.map((t) => t.priceSet.presentmentMoney)),
+        ]);
+        if (amounts.every((m) => m.currencyCode === plan.financial.currency))
+          total = {
+            amount: fromUnits(
+              amounts.reduce((n, m) => n + toUnits(m.amount), 0n),
+            ),
+            currency: plan.financial.currency,
+          };
+      }
+
+      return {
+        total,
+        observedAt,
+        evidenceRefs: await evidence(
+          'returns.exchange.price.read',
+          plan.order.externalId,
+          { operationId: input.operationId, total },
+          observedAt,
+        ),
+      };
+    },
+  };
+
   const choices: CapabilityHandler<'returns.exchange.options.read'> = {
     descriptor,
     parseInput: (v) =>
@@ -1161,6 +1245,7 @@ export function createShopifyExchangeCapabilities(
     'returns.exchange.options.read': choices,
     'returns.exchange.quote.read': quoted,
     'returns.exchange.proof.read': proven,
+    'returns.exchange.price.read': price,
     'returns.exchange.request': writer('request'),
     'returns.exchange.process': writer('process'),
     'returns.exchange.cancel': writer('cancel'),

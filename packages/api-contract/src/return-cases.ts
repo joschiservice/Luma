@@ -24,6 +24,7 @@ const returnCaseStageSchema = z.enum([
   'awaiting_inspection',
   'awaiting_proposal',
   'proposed',
+  'completed',
   'cancelled',
 ]);
 
@@ -48,6 +49,7 @@ const returnCreationFailureSchema = z.enum([
 ]);
 
 const returnCreationBlockerSchema = z.enum([
+  'completed',
   'cancelled',
   'execution_disabled',
   'unsupported',
@@ -187,7 +189,7 @@ const returnCaseSummarySchema = z.object({
   orderId: z.string().uuid(),
   connectionId: z.string().uuid(),
   sourceReturnId: z.string().uuid().nullable(),
-  state: z.enum(['open', 'cancelled']),
+  state: z.enum(['open', 'completed', 'cancelled']),
   stage: returnCaseStageSchema,
   units: z.number().int(),
   assignee: personSchema.nullable(),
@@ -301,6 +303,8 @@ export const returnCaseDetailSchema = z.object({
         'creation_approved',
         'creation_rejected',
         'creation_created',
+        'exchange_completed',
+        'exchange_reopened',
       ]),
       actor: personSchema,
       at: z.string(),

@@ -47,6 +47,9 @@ export const capabilities = localized({
   'returns.exchange.options.read': m.connections_capability_exchange_options,
   'returns.exchange.quote.read': m.connections_capability_exchange_quote,
   'returns.exchange.proof.read': m.connections_capability_exchange_proof,
+  'returns.exchange.price.read': m.connections_capability_exchange_price,
+  'returns.exchange.reservation.read':
+    m.connections_capability_exchange_reservation,
   'returns.exchange.request': m.connections_capability_exchange_request,
   'returns.exchange.process': m.connections_capability_exchange_process,
   'returns.exchange.cancel': m.connections_capability_exchange_cancel,

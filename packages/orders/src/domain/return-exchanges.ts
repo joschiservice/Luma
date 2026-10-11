@@ -1,3 +1,4 @@
+import type { ExchangeConsistencyReport } from './return-consistency.js';
 import type { SourceRef } from './return-creations.js';
 
 /** One explicitly mapped replacement in the store and Wawi's reported availability pool. */
@@ -147,5 +148,6 @@ export interface ReturnExchange {
   } | null;
   /** Once processing could have been sent, a second replacement intent is forbidden. */
   processingStarted: boolean;
+  completion?: ExchangeConsistencyReport;
   updatedAt: string;
 }

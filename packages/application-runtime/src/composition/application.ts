@@ -144,10 +144,10 @@ import {
   createReturnCreationEffects,
   createReturnSystem,
 } from './return-cases.js';
+import { createReturnConsistencySystem } from './return-consistency.js';
 import {
   createReturnExchangeAdmission,
   createReturnExchangeEffects,
-  createReturnExchangeSystem,
 } from './return-exchanges.js';
 import {
   createReturnSettlementAdmission,
@@ -541,7 +541,7 @@ export function createApplicationServices(
     createAuditLog,
     {
       system: options.returns
-        ? createReturnExchangeSystem(options.returns.runtime)
+        ? createReturnConsistencySystem(options.returns.runtime)
         : null,
       admission:
         options.execution.kind === 'enabled' && options.returns

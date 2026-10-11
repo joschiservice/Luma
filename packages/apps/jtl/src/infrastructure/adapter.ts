@@ -18,6 +18,7 @@ import type { JtlTransportOptions } from '@luma/connector-jtl';
 import { API_VERSION, createClient, fail, parse } from '@luma/connector-jtl';
 import { z } from 'zod';
 
+import { createExchangeReservation } from './exchange-reservation.js';
 import { adapterVersion, outputs } from './outputs.js';
 import { createJtlPurchaseOrderCapabilities } from './purchase-orders.js';
 import { createJtlSettlementCapabilities } from './return-settlement.js';
@@ -121,6 +122,8 @@ export function createJtlConnector(
       | 'returns.exchange.options.read'
       | 'returns.exchange.quote.read'
       | 'returns.exchange.proof.read'
+      | 'returns.exchange.price.read'
+      | 'returns.exchange.reservation.read'
       | 'returns.settlement.quote.read'
       | 'returns.settlement.proof.read'
     >,
@@ -652,6 +655,7 @@ export function createJtlConnector(
       ...createJtlPurchaseOrderCapabilities(options),
       ...createJtlReturnCapabilities(options),
       ...createJtlSettlementCapabilities(options),
+      'returns.exchange.reservation.read': createExchangeReservation(options),
       'orders.read': handler('orders.read'),
       'products.read': handler('products.read'),
       'inventory.read': handler('inventory.read'),

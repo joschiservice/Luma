@@ -21,6 +21,30 @@ import { useNow } from '../../kit/live/now';
 import { formatMoney } from '../../shared/orders/presentation';
 import { exchangeCommands, returnCaseError, returnCaseKey } from './case-data';
 
+const consistencyLabels = {
+  receipt: () => m.returns_exchange_check_receipt(),
+  inspection: () => m.returns_exchange_check_inspection(),
+  stock: () => m.returns_exchange_check_stock(),
+  replacement: () => m.returns_exchange_check_replacement(),
+  reservation: () => m.returns_exchange_check_reservation(),
+  payment: () => m.returns_exchange_check_payment(),
+  fulfillment: () => m.returns_exchange_check_fulfillment(),
+};
+const consistencyReasons: Record<string, () => string> = {
+  source_unavailable: m.returns_exchange_reason_source_unavailable,
+  missing_receipt: m.returns_exchange_reason_missing_receipt,
+  source_receipt_unverified:
+    m.returns_exchange_reason_source_receipt_unverified,
+  uninspected: m.returns_exchange_reason_uninspected,
+  stock_unverified: m.returns_exchange_reason_stock_unverified,
+  writeoff_unverified: m.returns_exchange_reason_writeoff_unverified,
+  duplicate_replacement: m.returns_exchange_reason_duplicate_replacement,
+  replacement_missing: m.returns_exchange_reason_replacement_missing,
+  reservation_missing: m.returns_exchange_reason_reservation_missing,
+  price_mismatch: m.returns_exchange_reason_price_mismatch,
+  money_unsettled: m.returns_exchange_reason_money_unsettled,
+  fulfillment_not_ready: m.returns_exchange_reason_fulfillment_not_ready,
+};
 const stepLabels = {
   request: () => m.returns_exchange_step_request(),
   process: () => m.returns_exchange_step_process(),
@@ -89,7 +113,9 @@ export function ReturnExchange({
         s.plan.marker === root.request.marker,
     );
   const fresh = (at: string) =>
-    Number.isFinite(Date.parse(at)) && now - Date.parse(at) <= 300_000;
+    Number.isFinite(Date.parse(at)) &&
+    Date.parse(at) <= now &&
+    now - Date.parse(at) <= 300_000;
   const held = (kind: 'request' | 'process' | 'cancel' | 'release') =>
     data?.steps.some(
       (s) =>
@@ -174,6 +200,77 @@ export function ReturnExchange({
                 {detail.case.assignee?.name ?? detail.case.openedBy.name} ·{' '}
                 <WorkspaceDate value={root.startedAt} />
               </p>
+            ) : null}
+            {root && detail.proposal?.kind === 'exchange' ? (
+              <section
+                aria-label={m.returns_exchange_consistency_title()}
+                className="returns-cell"
+              >
+                <h3>{m.returns_exchange_consistency_title()}</h3>
+                <p className="returns-note">
+                  {m.returns_exchange_consistency_description()}
+                </p>
+                <Input
+                  aria-label={m.returns_exchange_reference()}
+                  readOnly
+                  value={`luma-ex:${root.id}`}
+                  onFocus={(e) => e.currentTarget.select()}
+                />
+                {root.completion ? (
+                  <>
+                    <StatePill
+                      state={
+                        root.completion.state === 'verified'
+                          ? 'verified'
+                          : 'attention'
+                      }
+                    >
+                      {root.completion.state === 'verified'
+                        ? m.returns_exchange_complete_verified()
+                        : m.returns_exchange_complete_unresolved()}
+                    </StatePill>
+                    <p>
+                      <WorkspaceDate value={root.completion.checkedAt} />
+                    </p>
+                    {!fresh(root.completion.checkedAt) ? (
+                      <Alert>{m.returns_service_source_stale()}</Alert>
+                    ) : null}
+                    {root.completion.replacementTotal ? (
+                      <p>
+                        {m.returns_exchange_expected_total()}:{' '}
+                        {formatMoney(root.completion.replacementTotal)}
+                      </p>
+                    ) : null}
+                    <ul className="returns-case-lines">
+                      {root.completion.checks.map((check) => (
+                        <li key={check.id} className="returns-cell">
+                          <StatePill
+                            state={check.verified ? 'verified' : 'attention'}
+                          >
+                            {consistencyLabels[check.id]()}
+                          </StatePill>
+                          {!check.verified ? (
+                            <p className="returns-note">
+                              {(
+                                consistencyReasons[check.reason] ??
+                                m.returns_exchange_reason_source_unavailable
+                              )()}
+                            </p>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : null}
+                {detail.canManage && detail.case.state !== 'cancelled' ? (
+                  <Button
+                    disabled={mutation.isPending}
+                    onClick={() => run(() => command.complete())}
+                  >
+                    {m.returns_exchange_check_both()}
+                  </Button>
+                ) : null}
+              </section>
             ) : null}
             {data.steps.length ? (
               <ul className="returns-case-lines">
@@ -296,7 +393,11 @@ export function ReturnExchange({
                 })}
               </ul>
             ) : null}
-            {processed ? (
+            {processed &&
+            !(
+              root?.completion?.state === 'verified' &&
+              fresh(root.completion.checkedAt)
+            ) ? (
               <Alert>{m.returns_exchange_wawi_handoff()}</Alert>
             ) : null}
             {enabled ? (

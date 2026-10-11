@@ -309,3 +309,11 @@ export const returnLine = z.object({
 
 /** The created return in a 201 response; only its ID is consumed. */
 export const returnCreated = z.object({ id });
+
+/** Native ERP order-specific reservation. Customer and free-text fields are deliberately excluded. */
+export const stockReservation = z.object({
+  itemId: id,
+  salesOrderId: id,
+  amount: decimal.refine((v) => Number(v) >= 0),
+  createdAt: timestamp,
+});

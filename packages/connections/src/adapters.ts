@@ -14,4 +14,7 @@ export {
   returnExchangeReadSchema,
   returnExchangeQuotedSchema,
   returnExchangeProofSchema,
+  exchangePriceSchema,
+  exchangeReservationInputSchema,
+  exchangeReservationSchema,
 } from './infrastructure/return-exchange-contracts.js';

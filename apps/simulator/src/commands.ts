@@ -119,6 +119,24 @@ export const shopifyCommandSchema = z.discriminatedUnion('kind', [
 
 /** Manual ERP, warehouse and supplier actions accepted from the control API. */
 export const jtlCommandSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('order'),
+    externalNumber: z.string().trim().min(1).max(255).optional(),
+    lines: z
+      .array(
+        z.object({
+          itemId: id,
+          quantity: positive,
+          price: z.number().finite().nonnegative().max(1_000_000_000),
+        }),
+      )
+      .min(1)
+      .max(500),
+    paid: z.boolean(),
+    currency: z.string().regex(/^[A-Z]{3}$/),
+    shippingMethodId: z.enum(['7', '8', '9']),
+    warehouse: id.optional(),
+  }),
   z.object({ kind: z.literal('paid'), id }),
   z.object({ kind: z.literal('cancel'), id }),
   z.object({ kind: z.literal('delete-customer'), id }),

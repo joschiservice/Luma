@@ -200,6 +200,7 @@ export function exchangeCommands(organizationId: string, caseId: string) {
   const params = { organizationId, caseId };
 
   return {
+    complete: () => api.completeExchange({ params, body: {} }),
     request: (body: Body<'requestExchange'>) =>
       api.requestExchange({ params, body }),
     choose: (body: Body<'chooseExchange'>) =>

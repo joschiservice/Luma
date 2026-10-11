@@ -291,6 +291,7 @@ export function createShopifyOAuth(
     'returns.exchange.options.read' as const,
     'returns.exchange.quote.read' as const,
     'returns.exchange.proof.read' as const,
+    'returns.exchange.price.read' as const,
     'returns.exchange.request' as const,
     'returns.exchange.process' as const,
     'returns.exchange.cancel' as const,

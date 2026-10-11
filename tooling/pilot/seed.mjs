@@ -248,6 +248,7 @@ export async function seedPilot(
                             'returns.exchange.options.read',
                             'returns.exchange.quote.read',
                             'returns.exchange.proof.read',
+                            'returns.exchange.price.read',
                             'returns.exchange.request',
                             'returns.exchange.process',
                             'returns.exchange.cancel',
@@ -281,6 +282,7 @@ export async function seedPilot(
 
                               'returns.settlement.quote.read',
                               'returns.settlement.proof.read',
+                              'returns.exchange.reservation.read',
                               'returns.restock',
                             ]),
                     ]

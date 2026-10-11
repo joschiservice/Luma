@@ -724,6 +724,33 @@ interface CapabilityContract {
     };
   };
   /** Independently reconciles the operation's native return, replacement fulfillment and money. */
+  /** Reads the native price of the processed replacement, including discounts and tax. */
+  'returns.exchange.price.read': {
+    input: ReturnExchangeRead;
+    output: {
+      total: { amount: string; currency: string } | null;
+      observedAt: string;
+      evidenceRefs: string[];
+    };
+  };
+  /** Finds exact ERP replacement orders and order-specific native reservations. */
+  'returns.exchange.reservation.read': {
+    input: { operationId: string; item: ExternalId };
+    output: {
+      complete: boolean;
+      observedAt: string;
+      evidenceRefs: string[];
+      orders: {
+        id: ExternalId;
+        total: { amount: string; currency: string } | null;
+        paid: boolean;
+        cancelled: boolean;
+        exactLines: boolean;
+        quantity: string;
+        reserved: string | null;
+      }[];
+    };
+  };
   'returns.exchange.proof.read': {
     input: ReturnExchangeRead;
     output: ReturnExchangeProof;

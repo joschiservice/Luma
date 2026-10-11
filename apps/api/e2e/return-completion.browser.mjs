@@ -1,0 +1,188 @@
+/* global document, innerWidth */
+import { expect, test } from './browser-fixtures.mjs';
+import { availablePort, startProcess } from './helpers.mjs';
+import { completionFixture } from './return-completion-fixture.mjs';
+
+test('records receipt and inspection, approves stock and exchange separately, then completes only after both systems agree', async ({
+  resources: t,
+}) => {
+  const port = await availablePort(),
+    origin = `http://127.0.0.1:${port}`;
+  const f = await completionFixture(t, { origin });
+  const replacement = (await f.request(`${f.path}/exchange`)).choices[0];
+  const variant = (
+    await f.call(
+      'runs/operations/records/shopify?kind=ProductVariant&limit=100',
+    )
+  ).items.find(
+    (v) => replacement.variantId === `gid://shopify/ProductVariant/${v.id}`,
+  );
+  await f.command({
+    kind: 'product-update',
+    product: variant.data.product,
+    price: ((variant.data.price - 100) / 100).toFixed(2),
+  });
+  const web = startProcess(
+    t,
+    'e2e/web-server.mjs',
+    { TEST_API_ORIGIN: f.apiOrigin, TEST_WEB_PORT: String(port) },
+    true,
+  );
+  await web.message('listening');
+
+  async function pageFor(cookie) {
+    const context = await t.newContext({
+      baseURL: origin,
+      viewport: { width: 390, height: 844 },
+      reducedMotion: 'reduce',
+    });
+    await context.addCookies(
+      cookie.split('; ').map((v) => {
+        const [name, ...rest] = v.split('=');
+
+        return { name, value: rest.join('='), url: origin };
+      }),
+    );
+    const page = await context.newPage();
+    page.setDefaultTimeout(15000);
+    await page.goto(`/app/${f.org}/returns/cases/${f.detail.case.id}`);
+
+    return page;
+  }
+
+  const requester = await pageFor(f.requester);
+
+  async function saveDialog(button, title, save) {
+    await requester.getByRole('button', { name: button, exact: true }).click();
+    const dialog = requester.getByRole('dialog', { name: title });
+    await dialog
+      .getByRole('textbox', { name: 'Note', exact: false })
+      .fill('Warehouse counted and inspected both returned units');
+
+    return {
+      dialog,
+      save: async () => {
+        await dialog.getByRole('button', { name: save, exact: true }).click();
+        await expect(dialog).not.toBeVisible();
+      },
+    };
+  }
+
+  await (
+    await saveDialog('Record receipt', 'Record receipt', 'Save receipt')
+  ).save();
+  await (
+    await saveDialog(
+      'Record inspection',
+      'Record inspection',
+      'Save inspection',
+    )
+  ).save();
+  const proposal = await saveDialog(
+    'Propose resolution',
+    'Propose a resolution',
+    'Save proposal',
+  );
+  await proposal.dialog.getByRole('combobox', { name: 'Resolution' }).click();
+  await requester
+    .getByRole('option', { name: 'Exchange', exact: true })
+    .click();
+  await proposal.save();
+  const section = requester.getByRole('region', {
+    name: 'Exchange',
+    exact: true,
+  });
+  const select = section.getByRole('combobox', { name: 'Replacement item' });
+  await select.focus();
+  await requester.keyboard.press('Enter');
+  await expect(requester.getByRole('option').first()).toBeVisible();
+  await requester.keyboard.press('Home');
+  await requester.keyboard.press('Enter');
+  await section.getByRole('spinbutton').fill('2');
+  await section
+    .getByRole('button', { name: 'Request replacement approval' })
+    .click();
+  await expect(
+    section.getByText('Waiting for approval', { exact: true }),
+  ).toBeVisible();
+  const approver = await pageFor(f.approver),
+    review = approver.getByRole('region', { name: 'Exchange', exact: true });
+  await review.getByRole('button', { name: 'Approve and send' }).click();
+  await expect(
+    review.getByText('Independently verified', { exact: true }),
+  ).toBeVisible();
+  await f.command({ kind: 'return-receive', order: f.providerOrderId });
+  await requester.reload();
+  const stock = requester.getByRole('region', { name: 'Stock and refund' });
+  await stock
+    .getByRole('button', { name: /Request restock approval:/ })
+    .first()
+    .click();
+  await expect(
+    stock.getByText('Waiting for approval', { exact: true }),
+  ).toBeVisible();
+  await approver.reload();
+  await approver
+    .getByRole('region', { name: 'Stock and refund' })
+    .getByRole('button', { name: 'Approve and send' })
+    .click();
+  await expect(
+    approver
+      .getByRole('region', { name: 'Stock and refund' })
+      .getByText('Independently verified', { exact: true }),
+  ).toBeVisible();
+  await requester.reload();
+  await section
+    .getByRole('button', { name: 'Request processing approval' })
+    .click();
+  await expect(
+    section.getByText('Waiting for approval', { exact: true }),
+  ).toBeVisible();
+  await approver.reload();
+  await review.getByRole('button', { name: 'Approve and send' }).click();
+  await expect(
+    review.getByText('Price difference payment pending', { exact: true }),
+  ).toBeVisible();
+  await review.getByRole('button', { name: 'Check both systems' }).click();
+  await expect(
+    review.getByText('Exchange unresolved · case owner must follow up', {
+      exact: true,
+    }),
+  ).toBeVisible();
+  const report = (await f.request(`${f.path}/exchange`)).operation;
+  await expect(
+    review.getByRole('textbox', { name: 'Replacement order reference' }),
+  ).toHaveValue(`luma-ex:${report.id}`);
+  await f.createWawi(
+    report.id,
+    replacement,
+    report.completion.replacementTotal,
+  );
+  await f.command({ kind: 'refund-settle', order: f.providerOrderId });
+  await review.getByRole('button', { name: 'Check both systems' }).focus();
+  await approver.keyboard.press('Enter');
+  await expect(
+    review.getByText('Exchange consistency verified', { exact: true }),
+  ).toBeVisible();
+  expect((await f.request(f.path)).case.state).toBe('completed');
+  await expect(
+    review.getByText('Price difference payment verified', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    review.getByText('Price difference payment pending', { exact: true }),
+  ).not.toBeVisible();
+  expect(
+    await approver.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await approver.screenshot({
+    path: '/tmp/luma196-completed-light.png',
+    fullPage: true,
+  });
+  await approver.evaluate(() => document.documentElement.classList.add('dark'));
+  await approver.screenshot({
+    path: '/tmp/luma196-completed-dark.png',
+    fullPage: true,
+  });
+});

@@ -28,6 +28,12 @@ export function presentReturnCase(item: {
     revision: number;
   } | null;
   canManage: boolean;
+  completion?: {
+    state: string;
+    ownerId: string;
+    checkedAt: string;
+    checks: { id: string; verified: boolean }[];
+  };
   waiting?: {
     dueAt: string;
     reason: string;
@@ -57,9 +63,14 @@ export function presentReturnCase(item: {
       ? 'The return action needs an independent approval.'
       : uncertain
         ? 'The return action is unconfirmed. Check the source before taking another action.'
-        : item.waiting
-          ? `Return progress needs its owner: ${item.waiting.reason.replaceAll('_', ' ')}.`
-          : 'The return needs receipt, inspection or settlement by its owner.',
+        : item.completion?.state === 'unresolved'
+          ? `Exchange consistency needs its owner: ${item.completion.checks
+              .filter((c) => !c.verified)
+              .map((c) => c.id)
+              .join(', ')}.`
+          : item.waiting
+            ? `Return progress needs its owner: ${item.waiting.reason.replaceAll('_', ' ')}.`
+            : 'The return needs receipt, inspection or settlement by its owner.',
     consequences: [
       {
         response: 'Open return case',
@@ -69,13 +80,19 @@ export function presentReturnCase(item: {
     change: [
       { label: 'Units', value: String(value.units) },
       { label: 'Stage', value: value.stage },
+      ...(item.completion?.state === 'unresolved'
+        ? [{ label: 'Exchange completion', value: 'unresolved' }]
+        : []),
     ],
     impact: { level: 'unknown', text: null },
     requestedAt: creation?.requestedAt ?? value.openedAt,
     deadline: approval ? creation.expiresAt : (item.waiting?.dueAt ?? null),
     requesterId: creation?.requestedBy.id ?? null,
     evidence: {
-      observedAt: item.waiting?.observedAt ?? value.updatedAt,
+      observedAt:
+        item.completion?.checkedAt ??
+        item.waiting?.observedAt ??
+        value.updatedAt,
       validUntil: approval ? creation.expiresAt : null,
     },
     response: !item.canManage
@@ -93,16 +110,25 @@ export function presentReturnCase(item: {
             : 'investigate',
     ...(item.assignment
       ? { ownerAssignment: item.assignment }
-      : item.waiting
+      : item.completion?.state === 'unresolved'
         ? {
             ownerAssignment: {
-              assigneeId: item.waiting.ownerId,
-              assignedBy: item.waiting.ownerId,
+              assigneeId: item.completion.ownerId,
+              assignedBy: item.completion.ownerId,
               assignedAt: value.openedAt,
               revision: value.revision ?? 0,
             },
           }
-        : {}),
+        : item.waiting
+          ? {
+              ownerAssignment: {
+                assigneeId: item.waiting.ownerId,
+                assignedBy: item.waiting.ownerId,
+                assignedAt: value.openedAt,
+                revision: value.revision ?? 0,
+              },
+            }
+          : {}),
     subject: { label: value.orderNumber ?? value.id, detail: null },
     record: { kind: 'order', id: value.orderId },
     owner: { kind: 'return_case', caseId: value.id },

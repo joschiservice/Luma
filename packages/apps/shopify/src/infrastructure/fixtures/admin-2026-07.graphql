@@ -876,6 +876,7 @@ type FulfillmentOrderLineItem implements Node {
 
 type LineItem implements Node {
   currentQuantity: Int!
+  discountedTotalSet(withCodeDiscounts: Boolean = false): MoneyBag!
   id: ID!
   name: String!
   originalUnitPriceSet: MoneyBag!
@@ -886,6 +887,7 @@ type LineItem implements Node {
 }
 
 type TaxLine {
+  priceSet: MoneyBag!
   rate: Float
 }
 

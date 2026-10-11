@@ -74,5 +74,7 @@
   "connections_capability_exchange_request": "Request exchange replacement",
   "connections_capability_exchange_process": "Process exchange replacement",
   "connections_capability_exchange_cancel": "Cancel an unprocessed exchange",
-  "connections_capability_exchange_release": "Release a paid exchange hold"
+  "connections_capability_exchange_release": "Release a paid exchange hold",
+  "connections_capability_exchange_price": "Replacement price evidence",
+  "connections_capability_exchange_reservation": "Replacement order and reservation evidence"
 }

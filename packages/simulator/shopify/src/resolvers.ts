@@ -417,12 +417,32 @@ const resolvers: Record<string, TypeResolvers> = {
   Order: orderResolvers,
   LineItem: on<LineItemData>({
     currentQuantity: (line) => line.data.currentQuantity ?? line.data.quantity,
+    discountedTotalSet: (line, _args, context) =>
+      moneyBag(
+        line.data.price * line.data.quantity,
+        context.shop.config.currency,
+      ),
     originalUnitPriceSet: (line, _args, context) =>
       moneyBag(line.data.price, context.shop.config.currency),
     taxLines: (_line, _args, context) =>
       context.shop.config.taxRate === undefined
         ? []
-        : [{ rate: context.shop.config.taxRate }],
+        : [
+            {
+              rate: context.shop.config.taxRate,
+              priceSet: moneyBag(
+                Math.round(
+                  (_line.data.price *
+                    _line.data.quantity *
+                    context.shop.config.taxRate) /
+                    (context.shop.config.taxesIncluded
+                      ? 1 + context.shop.config.taxRate
+                      : 1),
+                ),
+                context.shop.config.currency,
+              ),
+            },
+          ],
     variant: (line, _args, context) =>
       load(context, 'ProductVariant', line.data.variant),
   }),

@@ -89942,6 +89942,8 @@
                                 "returns.exchange.options.read",
                                 "returns.exchange.quote.read",
                                 "returns.exchange.proof.read",
+                                "returns.exchange.price.read",
+                                "returns.exchange.reservation.read",
                                 "returns.exchange.request",
                                 "returns.exchange.process",
                                 "returns.exchange.cancel",
@@ -89983,6 +89985,8 @@
                                 "returns.exchange.options.read",
                                 "returns.exchange.quote.read",
                                 "returns.exchange.proof.read",
+                                "returns.exchange.price.read",
+                                "returns.exchange.reservation.read",
                                 "returns.exchange.request",
                                 "returns.exchange.process",
                                 "returns.exchange.cancel",
@@ -90195,7 +90199,7 @@
                   "permissions": {
                     "type": "array",
                     "minItems": 1,
-                    "maxItems": 33,
+                    "maxItems": 35,
                     "items": {
                       "enum": [
                         "orders.read",
@@ -90223,6 +90227,8 @@
                         "returns.exchange.options.read",
                         "returns.exchange.quote.read",
                         "returns.exchange.proof.read",
+                        "returns.exchange.price.read",
+                        "returns.exchange.reservation.read",
                         "returns.exchange.request",
                         "returns.exchange.process",
                         "returns.exchange.cancel",
@@ -90347,6 +90353,8 @@
                           "returns.exchange.options.read",
                           "returns.exchange.quote.read",
                           "returns.exchange.proof.read",
+                          "returns.exchange.price.read",
+                          "returns.exchange.reservation.read",
                           "returns.exchange.request",
                           "returns.exchange.process",
                           "returns.exchange.cancel",
@@ -90388,6 +90396,8 @@
                           "returns.exchange.options.read",
                           "returns.exchange.quote.read",
                           "returns.exchange.proof.read",
+                          "returns.exchange.price.read",
+                          "returns.exchange.reservation.read",
                           "returns.exchange.request",
                           "returns.exchange.process",
                           "returns.exchange.cancel",
@@ -90699,6 +90709,8 @@
                           "returns.exchange.options.read",
                           "returns.exchange.quote.read",
                           "returns.exchange.proof.read",
+                          "returns.exchange.price.read",
+                          "returns.exchange.reservation.read",
                           "returns.exchange.request",
                           "returns.exchange.process",
                           "returns.exchange.cancel",
@@ -90740,6 +90752,8 @@
                           "returns.exchange.options.read",
                           "returns.exchange.quote.read",
                           "returns.exchange.proof.read",
+                          "returns.exchange.price.read",
+                          "returns.exchange.reservation.read",
                           "returns.exchange.request",
                           "returns.exchange.process",
                           "returns.exchange.cancel",
@@ -91040,6 +91054,8 @@
                           "returns.exchange.options.read",
                           "returns.exchange.quote.read",
                           "returns.exchange.proof.read",
+                          "returns.exchange.price.read",
+                          "returns.exchange.reservation.read",
                           "returns.exchange.request",
                           "returns.exchange.process",
                           "returns.exchange.cancel",
@@ -91081,6 +91097,8 @@
                           "returns.exchange.options.read",
                           "returns.exchange.quote.read",
                           "returns.exchange.proof.read",
+                          "returns.exchange.price.read",
+                          "returns.exchange.reservation.read",
                           "returns.exchange.request",
                           "returns.exchange.process",
                           "returns.exchange.cancel",
@@ -91395,6 +91413,8 @@
                           "returns.exchange.options.read",
                           "returns.exchange.quote.read",
                           "returns.exchange.proof.read",
+                          "returns.exchange.price.read",
+                          "returns.exchange.reservation.read",
                           "returns.exchange.request",
                           "returns.exchange.process",
                           "returns.exchange.cancel",
@@ -91436,6 +91456,8 @@
                           "returns.exchange.options.read",
                           "returns.exchange.quote.read",
                           "returns.exchange.proof.read",
+                          "returns.exchange.price.read",
+                          "returns.exchange.reservation.read",
                           "returns.exchange.request",
                           "returns.exchange.process",
                           "returns.exchange.cancel",
@@ -91737,6 +91759,8 @@
                           "returns.exchange.options.read",
                           "returns.exchange.quote.read",
                           "returns.exchange.proof.read",
+                          "returns.exchange.price.read",
+                          "returns.exchange.reservation.read",
                           "returns.exchange.request",
                           "returns.exchange.process",
                           "returns.exchange.cancel",
@@ -91778,6 +91802,8 @@
                           "returns.exchange.options.read",
                           "returns.exchange.quote.read",
                           "returns.exchange.proof.read",
+                          "returns.exchange.price.read",
+                          "returns.exchange.reservation.read",
                           "returns.exchange.request",
                           "returns.exchange.process",
                           "returns.exchange.cancel",
@@ -106860,6 +106886,123 @@
                             "processingStarted": {
                               "type": "boolean"
                             },
+                            "completion": {
+                              "type": "object",
+                              "properties": {
+                                "state": {
+                                  "enum": ["verified", "unresolved"],
+                                  "type": "string"
+                                },
+                                "checkedAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "ownerId": {
+                                  "type": "string"
+                                },
+                                "caseRevision": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "exclusiveMinimum": 0
+                                },
+                                "evidenceRefs": {
+                                  "type": "array",
+                                  "maxItems": 1000,
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "replacementOrder": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "externalId": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 200
+                                        },
+                                        "scopeKey": {
+                                          "type": "string",
+                                          "maxLength": 1024
+                                        }
+                                      },
+                                      "required": ["externalId", "scopeKey"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "replacementTotal": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "amount": {
+                                          "type": "string",
+                                          "pattern": "^\\d{1,14}(?:\\.\\d{1,6})?$"
+                                        },
+                                        "currency": {
+                                          "type": "string",
+                                          "pattern": "^[A-Z]{3}$"
+                                        }
+                                      },
+                                      "required": ["amount", "currency"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "checks": {
+                                  "type": "array",
+                                  "minItems": 7,
+                                  "maxItems": 7,
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "enum": [
+                                          "receipt",
+                                          "inspection",
+                                          "stock",
+                                          "replacement",
+                                          "reservation",
+                                          "payment",
+                                          "fulfillment"
+                                        ],
+                                        "type": "string"
+                                      },
+                                      "verified": {
+                                        "type": "boolean"
+                                      },
+                                      "reason": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 100
+                                      }
+                                    },
+                                    "required": ["id", "verified", "reason"],
+                                    "additionalProperties": false
+                                  }
+                                }
+                              },
+                              "required": [
+                                "state",
+                                "checkedAt",
+                                "ownerId",
+                                "caseRevision",
+                                "evidenceRefs",
+                                "replacementOrder",
+                                "replacementTotal",
+                                "checks"
+                              ],
+                              "additionalProperties": false
+                            },
                             "updatedAt": {
                               "type": "string"
                             }
@@ -108178,6 +108321,271 @@
           },
           "415": {
             "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/return-cases/{caseId}/exchange/complete": {
+      "post": {
+        "operationId": "returnCases.completeExchange",
+        "summary": "Verify exchange consistency in both systems",
+        "description": "Independently reads Shopify and Wawi. Completes the case only when returned stock, exactly one replacement order, its reservation, price and actual payment agree. A failed later check reopens owned work. Executes no provider write.",
+        "tags": ["returnCases"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "caseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "state": {
+                      "enum": ["verified", "unresolved"],
+                      "type": "string"
+                    },
+                    "checkedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "ownerId": {
+                      "type": "string"
+                    },
+                    "caseRevision": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "exclusiveMinimum": 0
+                    },
+                    "evidenceRefs": {
+                      "type": "array",
+                      "maxItems": 1000,
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "replacementOrder": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "externalId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 200
+                            },
+                            "scopeKey": {
+                              "type": "string",
+                              "maxLength": 1024
+                            }
+                          },
+                          "required": ["externalId", "scopeKey"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "replacementTotal": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "string",
+                              "pattern": "^\\d{1,14}(?:\\.\\d{1,6})?$"
+                            },
+                            "currency": {
+                              "type": "string",
+                              "pattern": "^[A-Z]{3}$"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "checks": {
+                      "type": "array",
+                      "minItems": 7,
+                      "maxItems": 7,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "enum": [
+                              "receipt",
+                              "inspection",
+                              "stock",
+                              "replacement",
+                              "reservation",
+                              "payment",
+                              "fulfillment"
+                            ],
+                            "type": "string"
+                          },
+                          "verified": {
+                            "type": "boolean"
+                          },
+                          "reason": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          }
+                        },
+                        "required": ["id", "verified", "reason"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "state",
+                    "checkedAt",
+                    "ownerId",
+                    "caseRevision",
+                    "evidenceRefs",
+                    "replacementOrder",
+                    "replacementTotal",
+                    "checks"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "422",
             "content": {
               "application/json": {
                 "schema": {
@@ -110379,6 +110787,123 @@
                     },
                     "processingStarted": {
                       "type": "boolean"
+                    },
+                    "completion": {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "enum": ["verified", "unresolved"],
+                          "type": "string"
+                        },
+                        "checkedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "ownerId": {
+                          "type": "string"
+                        },
+                        "caseRevision": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "exclusiveMinimum": 0
+                        },
+                        "evidenceRefs": {
+                          "type": "array",
+                          "maxItems": 1000,
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "replacementOrder": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "externalId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                },
+                                "scopeKey": {
+                                  "type": "string",
+                                  "maxLength": 1024
+                                }
+                              },
+                              "required": ["externalId", "scopeKey"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "replacementTotal": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "amount": {
+                                  "type": "string",
+                                  "pattern": "^\\d{1,14}(?:\\.\\d{1,6})?$"
+                                },
+                                "currency": {
+                                  "type": "string",
+                                  "pattern": "^[A-Z]{3}$"
+                                }
+                              },
+                              "required": ["amount", "currency"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "checks": {
+                          "type": "array",
+                          "minItems": 7,
+                          "maxItems": 7,
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "enum": [
+                                  "receipt",
+                                  "inspection",
+                                  "stock",
+                                  "replacement",
+                                  "reservation",
+                                  "payment",
+                                  "fulfillment"
+                                ],
+                                "type": "string"
+                              },
+                              "verified": {
+                                "type": "boolean"
+                              },
+                              "reason": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100
+                              }
+                            },
+                            "required": ["id", "verified", "reason"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "checkedAt",
+                        "ownerId",
+                        "caseRevision",
+                        "evidenceRefs",
+                        "replacementOrder",
+                        "replacementTotal",
+                        "checks"
+                      ],
+                      "additionalProperties": false
                     },
                     "updatedAt": {
                       "type": "string"
@@ -116963,7 +117488,7 @@
                             ]
                           },
                           "state": {
-                            "enum": ["open", "cancelled"],
+                            "enum": ["open", "completed", "cancelled"],
                             "type": "string"
                           },
                           "stage": {
@@ -116972,6 +117497,7 @@
                               "awaiting_inspection",
                               "awaiting_proposal",
                               "proposed",
+                              "completed",
                               "cancelled"
                             ],
                             "type": "string"
@@ -117358,7 +117884,7 @@
                             ]
                           },
                           "state": {
-                            "enum": ["open", "cancelled"],
+                            "enum": ["open", "completed", "cancelled"],
                             "type": "string"
                           },
                           "stage": {
@@ -117367,6 +117893,7 @@
                               "awaiting_inspection",
                               "awaiting_proposal",
                               "proposed",
+                              "completed",
                               "cancelled"
                             ],
                             "type": "string"
@@ -117679,7 +118206,7 @@
                           ]
                         },
                         "state": {
-                          "enum": ["open", "cancelled"],
+                          "enum": ["open", "completed", "cancelled"],
                           "type": "string"
                         },
                         "stage": {
@@ -117688,6 +118215,7 @@
                             "awaiting_inspection",
                             "awaiting_proposal",
                             "proposed",
+                            "completed",
                             "cancelled"
                           ],
                           "type": "string"
@@ -118270,7 +118798,9 @@
                               "creation_requested",
                               "creation_approved",
                               "creation_rejected",
-                              "creation_created"
+                              "creation_created",
+                              "exchange_completed",
+                              "exchange_reopened"
                             ],
                             "type": "string"
                           },
@@ -118698,6 +119228,7 @@
                           "anyOf": [
                             {
                               "enum": [
+                                "completed",
                                 "cancelled",
                                 "execution_disabled",
                                 "unsupported",
@@ -118925,7 +119456,7 @@
                           ]
                         },
                         "state": {
-                          "enum": ["open", "cancelled"],
+                          "enum": ["open", "completed", "cancelled"],
                           "type": "string"
                         },
                         "stage": {
@@ -118934,6 +119465,7 @@
                             "awaiting_inspection",
                             "awaiting_proposal",
                             "proposed",
+                            "completed",
                             "cancelled"
                           ],
                           "type": "string"
@@ -119516,7 +120048,9 @@
                               "creation_requested",
                               "creation_approved",
                               "creation_rejected",
-                              "creation_created"
+                              "creation_created",
+                              "exchange_completed",
+                              "exchange_reopened"
                             ],
                             "type": "string"
                           },
@@ -119944,6 +120478,7 @@
                           "anyOf": [
                             {
                               "enum": [
+                                "completed",
                                 "cancelled",
                                 "execution_disabled",
                                 "unsupported",
@@ -120185,7 +120720,7 @@
                           ]
                         },
                         "state": {
-                          "enum": ["open", "cancelled"],
+                          "enum": ["open", "completed", "cancelled"],
                           "type": "string"
                         },
                         "stage": {
@@ -120194,6 +120729,7 @@
                             "awaiting_inspection",
                             "awaiting_proposal",
                             "proposed",
+                            "completed",
                             "cancelled"
                           ],
                           "type": "string"
@@ -120776,7 +121312,9 @@
                               "creation_requested",
                               "creation_approved",
                               "creation_rejected",
-                              "creation_created"
+                              "creation_created",
+                              "exchange_completed",
+                              "exchange_reopened"
                             ],
                             "type": "string"
                           },
@@ -121204,6 +121742,7 @@
                           "anyOf": [
                             {
                               "enum": [
+                                "completed",
                                 "cancelled",
                                 "execution_disabled",
                                 "unsupported",
@@ -121510,7 +122049,7 @@
                           ]
                         },
                         "state": {
-                          "enum": ["open", "cancelled"],
+                          "enum": ["open", "completed", "cancelled"],
                           "type": "string"
                         },
                         "stage": {
@@ -121519,6 +122058,7 @@
                             "awaiting_inspection",
                             "awaiting_proposal",
                             "proposed",
+                            "completed",
                             "cancelled"
                           ],
                           "type": "string"
@@ -122101,7 +122641,9 @@
                               "creation_requested",
                               "creation_approved",
                               "creation_rejected",
-                              "creation_created"
+                              "creation_created",
+                              "exchange_completed",
+                              "exchange_reopened"
                             ],
                             "type": "string"
                           },
@@ -122529,6 +123071,7 @@
                           "anyOf": [
                             {
                               "enum": [
+                                "completed",
                                 "cancelled",
                                 "execution_disabled",
                                 "unsupported",
@@ -122840,7 +123383,7 @@
                           ]
                         },
                         "state": {
-                          "enum": ["open", "cancelled"],
+                          "enum": ["open", "completed", "cancelled"],
                           "type": "string"
                         },
                         "stage": {
@@ -122849,6 +123392,7 @@
                             "awaiting_inspection",
                             "awaiting_proposal",
                             "proposed",
+                            "completed",
                             "cancelled"
                           ],
                           "type": "string"
@@ -123431,7 +123975,9 @@
                               "creation_requested",
                               "creation_approved",
                               "creation_rejected",
-                              "creation_created"
+                              "creation_created",
+                              "exchange_completed",
+                              "exchange_reopened"
                             ],
                             "type": "string"
                           },
@@ -123859,6 +124405,7 @@
                           "anyOf": [
                             {
                               "enum": [
+                                "completed",
                                 "cancelled",
                                 "execution_disabled",
                                 "unsupported",
@@ -124170,7 +124717,7 @@
                           ]
                         },
                         "state": {
-                          "enum": ["open", "cancelled"],
+                          "enum": ["open", "completed", "cancelled"],
                           "type": "string"
                         },
                         "stage": {
@@ -124179,6 +124726,7 @@
                             "awaiting_inspection",
                             "awaiting_proposal",
                             "proposed",
+                            "completed",
                             "cancelled"
                           ],
                           "type": "string"
@@ -124761,7 +125309,9 @@
                               "creation_requested",
                               "creation_approved",
                               "creation_rejected",
-                              "creation_created"
+                              "creation_created",
+                              "exchange_completed",
+                              "exchange_reopened"
                             ],
                             "type": "string"
                           },
@@ -125189,6 +125739,7 @@
                           "anyOf": [
                             {
                               "enum": [
+                                "completed",
                                 "cancelled",
                                 "execution_disabled",
                                 "unsupported",
@@ -125444,7 +125995,7 @@
                           ]
                         },
                         "state": {
-                          "enum": ["open", "cancelled"],
+                          "enum": ["open", "completed", "cancelled"],
                           "type": "string"
                         },
                         "stage": {
@@ -125453,6 +126004,7 @@
                             "awaiting_inspection",
                             "awaiting_proposal",
                             "proposed",
+                            "completed",
                             "cancelled"
                           ],
                           "type": "string"
@@ -126035,7 +126587,9 @@
                               "creation_requested",
                               "creation_approved",
                               "creation_rejected",
-                              "creation_created"
+                              "creation_created",
+                              "exchange_completed",
+                              "exchange_reopened"
                             ],
                             "type": "string"
                           },
@@ -126463,6 +127017,7 @@
                           "anyOf": [
                             {
                               "enum": [
+                                "completed",
                                 "cancelled",
                                 "execution_disabled",
                                 "unsupported",
@@ -126921,7 +127476,7 @@
                           ]
                         },
                         "state": {
-                          "enum": ["open", "cancelled"],
+                          "enum": ["open", "completed", "cancelled"],
                           "type": "string"
                         },
                         "stage": {
@@ -126930,6 +127485,7 @@
                             "awaiting_inspection",
                             "awaiting_proposal",
                             "proposed",
+                            "completed",
                             "cancelled"
                           ],
                           "type": "string"
@@ -127512,7 +128068,9 @@
                               "creation_requested",
                               "creation_approved",
                               "creation_rejected",
-                              "creation_created"
+                              "creation_created",
+                              "exchange_completed",
+                              "exchange_reopened"
                             ],
                             "type": "string"
                           },
@@ -127940,6 +128498,7 @@
                           "anyOf": [
                             {
                               "enum": [
+                                "completed",
                                 "cancelled",
                                 "execution_disabled",
                                 "unsupported",
@@ -128198,7 +128757,7 @@
                           ]
                         },
                         "state": {
-                          "enum": ["open", "cancelled"],
+                          "enum": ["open", "completed", "cancelled"],
                           "type": "string"
                         },
                         "stage": {
@@ -128207,6 +128766,7 @@
                             "awaiting_inspection",
                             "awaiting_proposal",
                             "proposed",
+                            "completed",
                             "cancelled"
                           ],
                           "type": "string"
@@ -128789,7 +129349,9 @@
                               "creation_requested",
                               "creation_approved",
                               "creation_rejected",
-                              "creation_created"
+                              "creation_created",
+                              "exchange_completed",
+                              "exchange_reopened"
                             ],
                             "type": "string"
                           },
@@ -129217,6 +129779,7 @@
                           "anyOf": [
                             {
                               "enum": [
+                                "completed",
                                 "cancelled",
                                 "execution_disabled",
                                 "unsupported",
@@ -129464,7 +130027,7 @@
                           ]
                         },
                         "state": {
-                          "enum": ["open", "cancelled"],
+                          "enum": ["open", "completed", "cancelled"],
                           "type": "string"
                         },
                         "stage": {
@@ -129473,6 +130036,7 @@
                             "awaiting_inspection",
                             "awaiting_proposal",
                             "proposed",
+                            "completed",
                             "cancelled"
                           ],
                           "type": "string"
@@ -130055,7 +130619,9 @@
                               "creation_requested",
                               "creation_approved",
                               "creation_rejected",
-                              "creation_created"
+                              "creation_created",
+                              "exchange_completed",
+                              "exchange_reopened"
                             ],
                             "type": "string"
                           },
@@ -130483,6 +131049,7 @@
                           "anyOf": [
                             {
                               "enum": [
+                                "completed",
                                 "cancelled",
                                 "execution_disabled",
                                 "unsupported",
@@ -130730,7 +131297,7 @@
                           ]
                         },
                         "state": {
-                          "enum": ["open", "cancelled"],
+                          "enum": ["open", "completed", "cancelled"],
                           "type": "string"
                         },
                         "stage": {
@@ -130739,6 +131306,7 @@
                             "awaiting_inspection",
                             "awaiting_proposal",
                             "proposed",
+                            "completed",
                             "cancelled"
                           ],
                           "type": "string"
@@ -131321,7 +131889,9 @@
                               "creation_requested",
                               "creation_approved",
                               "creation_rejected",
-                              "creation_created"
+                              "creation_created",
+                              "exchange_completed",
+                              "exchange_reopened"
                             ],
                             "type": "string"
                           },
@@ -131749,6 +132319,7 @@
                           "anyOf": [
                             {
                               "enum": [
+                                "completed",
                                 "cancelled",
                                 "execution_disabled",
                                 "unsupported",

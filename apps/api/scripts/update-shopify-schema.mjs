@@ -113,9 +113,10 @@ const fields = {
     'refunds',
     'events',
   ],
-  TaxLine: ['rate'],
+  TaxLine: ['rate', 'priceSet'],
   LineItem: [
     'originalUnitPriceSet',
+    'discountedTotalSet',
     'taxLines',
     'id',
     'name',

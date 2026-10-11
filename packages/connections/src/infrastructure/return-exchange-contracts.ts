@@ -161,3 +161,50 @@ export const returnExchangeProofSchema = z
     financial: financial.nullable(),
   })
   .strict();
+
+/** Validates the processed replacement price without equating a quote with actual settlement. */
+export const exchangePriceSchema = z
+  .object({
+    total: z
+      .object({ amount, currency: z.string().regex(/^[A-Z]{3}$/) })
+      .strict()
+      .nullable(),
+    observedAt: z.string().datetime(),
+    evidenceRefs: z.array(z.string().uuid()).min(1),
+  })
+  .strict();
+
+/** Validates a tenant-bound operation lookup in the ERP stock owner. */
+export const exchangeReservationInputSchema = z
+  .object({ operationId: z.string().uuid(), item: ref })
+  .strict();
+
+/** Native marked orders and their reservations; incomplete scans never prove uniqueness. */
+export const exchangeReservationSchema = z
+  .object({
+    complete: z.boolean(),
+    observedAt: z.string().datetime(),
+    evidenceRefs: z.array(z.string().uuid()).min(1),
+    orders: z
+      .array(
+        z
+          .object({
+            id: ref,
+            total: z
+              .object({ amount, currency: z.string().regex(/^[A-Z]{3}$/) })
+              .strict()
+              .nullable(),
+            paid: z.boolean(),
+            cancelled: z.boolean(),
+            exactLines: z.boolean(),
+            quantity: z.string().regex(/^\d{1,14}(?:\.\d{1,6})?$/),
+            reserved: z
+              .string()
+              .regex(/^\d{1,14}(?:\.\d{1,6})?$/)
+              .nullable(),
+          })
+          .strict(),
+      )
+      .max(2),
+  })
+  .strict();

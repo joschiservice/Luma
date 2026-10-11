@@ -10,6 +10,7 @@ import type {
   SourceReturnRecord,
 } from '../application/return-cases.js';
 import type { ReturnCase } from '../domain/return-cases.js';
+import type { ExchangeConsistencyReport } from '../domain/return-consistency.js';
 import type { ReturnCreation, SourceRef } from '../domain/return-creations.js';
 
 type OrderData = Extract<CommerceData, { type: 'order' }>;
@@ -74,9 +75,11 @@ export function createReturnCaseStore(
               orderNumber: string | null;
               creation: ReturnCreation | null;
               assignment: ReturnCaseEvent | null;
+              completion: ExchangeConsistencyReport | null;
             }>(
-              `SELECT c.document,cr.document AS creation,ce.document AS assignment,s.document->'data'->>'displayNumber' AS "orderNumber"
+              `SELECT c.document,ex.document->'completion' AS completion,cr.document AS creation,ce.document AS assignment,s.document->'data'->>'displayNumber' AS "orderNumber"
               FROM orders_return_cases c
+              LEFT JOIN orders_return_exchanges ex ON ex.tenant_id=c.tenant_id AND ex.case_id=c.id
               LEFT JOIN orders_entity_redirects red ON red.tenant_id=c.tenant_id AND red.entity_id=c.order_id
               LEFT JOIN LATERAL (SELECT document FROM orders_return_creations WHERE tenant_id=c.tenant_id AND case_id=c.id ORDER BY created_at DESC,id DESC LIMIT 1) cr ON true
               LEFT JOIN LATERAL (SELECT document FROM orders_return_case_events WHERE tenant_id=c.tenant_id AND case_id=c.id AND kind='assigned' ORDER BY occurred_at DESC,revision DESC LIMIT 1) ce ON true
@@ -109,6 +112,7 @@ export function createReturnCaseStore(
               orderNumber: row.orderNumber,
               creation: row.creation,
               assignment: row.assignment,
+              completion: row.completion,
             }));
           },
           lockOrder: async (orderId) => {

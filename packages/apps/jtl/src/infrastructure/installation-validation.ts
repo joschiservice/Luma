@@ -16,6 +16,7 @@ const installationPermissions = z.enum([
   'returns.create',
   'returns.settlement.quote.read',
   'returns.settlement.proof.read',
+  'returns.exchange.reservation.read',
   'returns.restock',
 ]);
 

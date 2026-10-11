@@ -5,6 +5,7 @@ import type {
   ExchangeChoice,
   ReturnExchangeStore,
 } from '../application/return-exchanges.js';
+import type { ReturnAction } from '../domain/return-actions.js';
 import type { ReturnCase } from '../domain/return-cases.js';
 import type {
   ExchangeStep,
@@ -149,6 +150,48 @@ export function createReturnExchangeStore(
               'UPDATE orders_return_cases SET source_return_id=NULL,revision=$3,document=$4,updated_at=$5 WHERE tenant_id=$1 AND id=$2',
               [tenantId, value.id, next.revision, next, at],
             );
+            await tx.query(
+              'INSERT INTO orders_return_case_events(tenant_id,id,case_id,command_id,digest,kind,actor_id,revision,document,occurred_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+              [
+                tenantId,
+                event.id,
+                event.caseId,
+                event.commandId,
+                event.digest,
+                event.kind,
+                event.actorId,
+                event.revision,
+                event,
+                event.occurredAt,
+              ],
+            );
+          },
+          stockActions: async (caseId) =>
+            (
+              await tx.query<{ document: ReturnAction }>(
+                "SELECT document FROM orders_return_actions WHERE tenant_id=$1 AND case_id=$2 AND kind='restock' AND sent ORDER BY requested_at,id LIMIT 101",
+                [tenantId, caseId],
+              )
+            ).rows.map((r) => r.document),
+          finishCase: async (value, event) => {
+            const changed = await tx.query(
+              "UPDATE orders_return_cases SET state=$3,revision=$4,document=$5,updated_at=$6 WHERE tenant_id=$1 AND id=$2 AND revision=$4-1 AND state IN ('open','completed') AND document->'receipt'=$5::jsonb->'receipt' AND document->'inspection'=$5::jsonb->'inspection' AND document->'proposal'=$5::jsonb->'proposal'",
+              [
+                tenantId,
+                value.id,
+                value.state,
+                value.revision,
+                value,
+                value.updatedAt,
+              ],
+            );
+            if (changed.rowCount !== 1)
+              throw new Error('Return case changed during consistency check');
+            if (value.state === 'completed')
+              await tx.query(
+                "UPDATE orders_return_waits w SET state='verified',document=w.document || jsonb_build_object('state','verified','updatedAt',$3::text,'endedAt',$3::text,'observedAt',$3::text,'evidenceRefs',e.document->'completion'->'evidenceRefs') FROM orders_return_exchanges e WHERE w.tenant_id=$1 AND w.case_id=$2 AND w.state IN ('waiting','escalated') AND e.tenant_id=w.tenant_id AND e.case_id=w.case_id AND e.document->'completion'->>'state'='verified'",
+                [tenantId, value.id, value.updatedAt],
+              );
             await tx.query(
               'INSERT INTO orders_return_case_events(tenant_id,id,case_id,command_id,digest,kind,actor_id,revision,document,occurred_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
               [

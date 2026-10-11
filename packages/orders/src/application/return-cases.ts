@@ -29,6 +29,7 @@ import {
   returnCaseStage,
   type StoreReturn,
 } from '../domain/return-cases.js';
+import type { ExchangeConsistencyReport } from '../domain/return-consistency.js';
 import {
   type CreationFailure,
   type CreationState,
@@ -68,7 +69,9 @@ export type ReturnCaseEventKind =
   | 'creation_requested'
   | 'creation_approved'
   | 'creation_rejected'
-  | 'creation_created';
+  | 'creation_created'
+  | 'exchange_completed'
+  | 'exchange_reopened';
 
 /** One append-only entry of a case's history, keyed by the command that caused it. */
 export interface ReturnCaseEvent {
@@ -121,6 +124,7 @@ export interface ReturnCaseTransaction {
       orderNumber: string | null;
       creation: ReturnCreation | null;
       assignment: ReturnCaseEvent | null;
+      completion?: ExchangeConsistencyReport | null;
     }[]
   >;
   /** Serializes case changes of one order until the transaction ends. */
@@ -295,6 +299,7 @@ export interface OpenCaseInput {
 
 /** Why a case's return can't be created in its order's system now; null when it can. */
 export type CreationBlocker =
+  | 'completed'
   | 'cancelled'
   | 'execution_disabled'
   | 'unsupported'
@@ -356,6 +361,7 @@ export interface ReturnCaseList {
 
 /** Persisted work and creation controls currently waiting on a person. */
 export interface ReturnCaseAttention {
+  completion?: ExchangeConsistencyReport;
   waiting?: {
     dueAt: string;
     reason: string;
@@ -461,6 +467,8 @@ const auditSummaries: Record<ReturnCaseEventKind, string> = {
   creation_approved: 'Creating the return approved',
   creation_rejected: 'Creating the return rejected',
   creation_created: 'Return created and verified',
+  exchange_completed: 'Exchange independently verified across both systems',
+  exchange_reopened: 'Exchange reopened after an unresolved source check',
 };
 
 const conflict = (message: string): never => {
@@ -770,6 +778,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         ? { id: connection.id, label: connection.label }
         : null,
     });
+    if (value.state === 'completed') return result('completed');
     if (value.state === 'cancelled') return result('cancelled');
     if (!connection?.offersCreation) return result('unsupported');
     if (!deps.admission) return result('execution_disabled');
@@ -1185,7 +1194,8 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
               status: r.status,
               caseId:
                 cases.find(
-                  (c) => c.sourceReturnId === r.entityId && c.state === 'open',
+                  (c) =>
+                    c.sourceReturnId === r.entityId && c.state !== 'cancelled',
                 )?.id ?? null,
             })),
           };
@@ -1330,7 +1340,13 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         },
       );
       const result = [];
-      for (const { value, orderNumber, creation, assignment } of data.items)
+      for (const {
+        value,
+        orderNumber,
+        creation,
+        assignment,
+        completion,
+      } of data.items)
         result.push({
           case: {
             ...summary(value, creation ? [creation] : [], data.people),
@@ -1338,6 +1354,14 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
             revision: value.revision,
           },
           assignment,
+          ...(completion?.state === 'unresolved'
+            ? {
+                completion: {
+                  ...completion,
+                  ownerId: value.assigneeId ?? value.openedBy,
+                },
+              }
+            : {}),
           creation: creation
             ? await creationView(context, creation, data.people)
             : null,
@@ -1392,13 +1416,11 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
             if (
               cases.some(
                 (c) =>
-                  c.state === 'open' &&
+                  c.state !== 'cancelled' &&
                   c.sourceReturnId === input.sourceReturnId,
               )
             )
-              conflict(
-                'Another open return case already works this store return.',
-              );
+              conflict('Another return case already works this store return.');
           }
           const storeReturns = (await tx.storeReturns(orderId)).filter(
             (r) =>

@@ -185,6 +185,14 @@ export function createInstallationVerifier(options: {
         'returns.restock',
       );
 
+    if (
+      connection.permissions.includes('returns.exchange.reservation.read') &&
+      granted.includes('orders.read') &&
+      granted.includes('inventory.read') &&
+      (await readable('stocks/reservations', jtl.stockReservation))
+    )
+      granted.push('returns.exchange.reservation.read');
+
     return granted;
   };
 }

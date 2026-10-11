@@ -184,6 +184,41 @@ export const exchangeStepSchema = z.object({
   canCheck: z.boolean(),
 });
 
+/** Final independently observed consistency across the store and physical stock owner. */
+export const exchangeConsistencySchema = z
+  .object({
+    state: z.enum(['verified', 'unresolved']),
+    checkedAt: z.string().datetime(),
+    ownerId: z.string(),
+    caseRevision: z.number().int().positive(),
+    evidenceRefs: z.array(z.string()).max(1000),
+    replacementOrder: ref.nullable(),
+    replacementTotal: z
+      .object({ amount, currency: z.string().regex(/^[A-Z]{3}$/) })
+      .strict()
+      .nullable(),
+    checks: z
+      .array(
+        z
+          .object({
+            id: z.enum([
+              'receipt',
+              'inspection',
+              'stock',
+              'replacement',
+              'reservation',
+              'payment',
+              'fulfillment',
+            ]),
+            verified: z.boolean(),
+            reason: z.string().min(1).max(100),
+          })
+          .strict(),
+      )
+      .length(7),
+  })
+  .strict();
+
 /** One operation retains all explicit choices and financial/fulfillment waits. */
 export const returnExchangeSchema = z.object({
   id: z.string().uuid(),
@@ -212,6 +247,7 @@ export const returnExchangeSchema = z.object({
     })
     .nullable(),
   processingStarted: z.boolean(),
+  completion: exchangeConsistencySchema.optional(),
   updatedAt: z.string(),
 });
 

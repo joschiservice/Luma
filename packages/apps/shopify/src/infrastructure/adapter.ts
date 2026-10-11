@@ -260,6 +260,8 @@ export function createShopifyConnector(
       | 'returns.exchange.options.read'
       | 'returns.exchange.quote.read'
       | 'returns.exchange.proof.read'
+      | 'returns.exchange.price.read'
+      | 'returns.exchange.reservation.read'
       | 'returns.settlement.quote.read'
       | 'returns.settlement.proof.read'
     >,

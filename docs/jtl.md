@@ -253,3 +253,13 @@ marker on the stock movement. The pinned API provides no stock-write idempotency
 uncertain attempt is never replayed. Independent proof requires one exact movement and the expected
 warehouse total; incomplete movement history or concurrent stock changes remain uncertain. Live
 installations do not receive this write grant until their endpoint behavior is verified.
+
+### Exchange replacement reservations
+
+`returns.exchange.reservation.read` is a read-only capability. It requires successful sales-order,
+item and native stock-reservation probes. An operator creates a replacement sales order in Wawi with
+the exact reference shown in its Luma case; Luma does not create that ERP order. The read scans orders
+and `/stocks/reservations`, at most 500 records each, and requires complete pagination to establish
+one matching order. It reads that order's lines, gross total, payment status and reservations linked
+to its sales-order and item IDs. Customer fields and descriptive reservation text are not retained.
+Incomplete history, duplicate references or an unknown unit never establish a correct replacement.

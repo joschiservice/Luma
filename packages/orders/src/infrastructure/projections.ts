@@ -715,10 +715,10 @@ async function refresh(
         AND m.external_id=r.document->'externalReturn'->>'externalId' AND m.scope_key=''
       JOIN orders_returns imported ON imported.tenant_id=m.tenant_id AND imported.connection_id=m.connection_id
         AND imported.entity_id=m.canonical_id AND imported.order_id=$2 AND NOT imported.deleted
-      WHERE c.tenant_id=$1 AND c.order_id=$2 AND c.state='open' AND c.source_return_id IS NULL
+      WHERE c.tenant_id=$1 AND c.order_id=$2 AND c.state IN('open','completed') AND c.source_return_id IS NULL
         AND r.tenant_id=c.tenant_id AND r.case_id=c.id AND r.state='created'
         AND NOT EXISTS (SELECT 1 FROM orders_return_cases other WHERE other.tenant_id=c.tenant_id
-          AND other.source_return_id=m.canonical_id AND other.state='open' AND other.id<>c.id)`,
+          AND other.source_return_id=m.canonical_id AND other.state IN('open','completed') AND other.id<>c.id)`,
       [tenantId, orderId],
     );
     await tx.query(
@@ -731,13 +731,13 @@ async function refresh(
         AND m.resource='return' AND m.external_id=s.document->'proof'->>'returnId' AND m.scope_key=''
       JOIN orders_returns imported ON imported.tenant_id=m.tenant_id AND imported.connection_id=m.connection_id
         AND imported.entity_id=m.canonical_id AND imported.order_id=$2 AND NOT imported.deleted AND imported.status NOT IN ('cancelled','declined')
-      WHERE c.tenant_id=$1 AND c.order_id=$2 AND c.state='open' AND x.tenant_id=c.tenant_id AND x.case_id=c.id
+      WHERE c.tenant_id=$1 AND c.order_id=$2 AND c.state IN('open','completed') AND x.tenant_id=c.tenant_id AND x.case_id=c.id
         AND x.document->'choice'='null'::jsonb AND c.source_return_id IS DISTINCT FROM m.canonical_id
         AND (c.source_return_id IS NULL OR EXISTS(SELECT 1 FROM orders_return_exchange_steps cancelled JOIN connector_source_mappings old
           ON old.tenant_id=cancelled.tenant_id AND old.connection_id=(cancelled.document->>'connectionId')::uuid AND old.resource='return'
           AND old.external_id=cancelled.document->'proof'->>'returnId' AND old.canonical_id=c.source_return_id
           WHERE cancelled.tenant_id=c.tenant_id AND cancelled.case_id=c.id AND cancelled.kind='cancel' AND cancelled.state='verified'))
-        AND NOT EXISTS(SELECT 1 FROM orders_return_cases other WHERE other.tenant_id=c.tenant_id AND other.source_return_id=m.canonical_id AND other.state='open' AND other.id<>c.id)`,
+        AND NOT EXISTS(SELECT 1 FROM orders_return_cases other WHERE other.tenant_id=c.tenant_id AND other.source_return_id=m.canonical_id AND other.state IN('open','completed') AND other.id<>c.id)`,
       [tenantId, orderId],
     );
   }

@@ -98,7 +98,9 @@ export function identify(request: ProviderRequest): ProviderTarget {
     root === 'stocks'
       ? write
         ? 'returns.restock'
-        : 'returns.settlement.proof.read'
+        : id === 'reservations'
+          ? 'returns.exchange.reservation.read'
+          : 'returns.settlement.proof.read'
       : root === 'sales-orders'
         ? request.method === 'PATCH'
           ? 'orders.shipping-method.write'
@@ -620,6 +622,39 @@ async function stocks(
       ),
       committed: true,
     };
+  }
+  if (
+    request.method === 'GET' &&
+    path.length === 1 &&
+    path[0] === 'reservations'
+  ) {
+    const rows = [];
+    const count = await context.store.count({ kind: kinds.order });
+    if (count > 10_000) throw new JtlError(503, 'Reservation scan unavailable');
+    for (let offset = 0; offset < count; offset += 1000)
+      for (const record of (
+        await context.store.page<OrderRecord>({
+          kind: kinds.order,
+          offset,
+          limit: 1000,
+        })
+      ).items) {
+        if (record.data.cancelled) continue;
+        for (const line of record.data.lines)
+          if (line.quantity > line.shipped)
+            rows.push({
+              itemId: configId(line.itemId),
+              salesOrderId: configId(record.data.id),
+              customerId: record.data.customerId
+                ? configId(record.data.customerId)
+                : 0,
+              amount: line.quantity - line.shipped,
+              createdAt: record.data.date,
+              platform: 'Luma simulator',
+            });
+      }
+
+    return memoryPage(rows, page);
   }
   if (request.method === 'GET' && path.length === 1 && path[0] === 'changes') {
     const itemId = url.searchParams.get('itemId');

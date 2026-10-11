@@ -227,3 +227,23 @@ the workflow hands overdue steps to that owner rather than duplicating the Needs
 The existing imported-return refund follow-up requires a reported receipt timestamp. Latest
 activity is not a substitute. A pending or failed stage never ends that follow-up; complete,
 fresh evidence of the refunded units and settled money is required.
+
+### Independent exchange completion
+
+The final check reads the configured Shopify and Wawi installations again. It compares source receipt
+and stock disposition with the case, the exact approved Wawi restock movement and warehouse total,
+the native processed replacement price, and actual payment or refund transactions. In Wawi, an
+operator creates one paid replacement sales order with the operation reference shown in the case.
+The read checks the exact mapped item, quantity and gross total, plus native reservations tied to
+that sales order. Reported item availability is never used as proof of reservation.
+
+Order and reservation scans stop at 500 records, with complete pagination required to prove uniqueness.
+Missing access, incomplete scans, duplicate references, unsettled money, price disagreement and
+concurrent stock movements leave the case open with its current owner and a specific handover in
+Needs you. Each verdict retains source observation references in the audit log. Damaged units remain
+unresolved because this pair cannot independently prove disposal in the physical stock owner.
+
+Only a complete fresh verdict closes the case and retires its active return waits. A later explicit
+check reads both sources again; if they no longer agree, it reopens the case, preserves its owner and
+adds a history event. Past verification is a point-in-time result. The final check dispatches no
+provider write and never replays uncertain exchange or stock actions.
