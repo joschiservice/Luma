@@ -173,6 +173,8 @@ that order reads report are stored separately (see [Commerce sync](commerce-sync
 Order schema version 4 adds optional source-reported line unit prices and fractional tax
 rates. JTL's net price and percentage tax rate and Shopify's original shop-currency unit
 price and unambiguous tax line are retained without converting currencies or estimating
-missing facts. Price tax inclusion remains the source's convention; these facts do not
-establish an invoice total. Internal record publication uses the same owner transaction as
+missing facts. Version 5 records whether each unit price includes tax as the source states
+it: Shopify's order setting, and false for JTL's net prices. Prices are never converted
+between net and gross, because a rate can be missing or split across jurisdictions; an
+unstated or earlier-version flag is unknown. These facts do not establish an invoice total. Internal record publication uses the same owner transaction as
 Sales, unlike replay recovery across independent external observations.

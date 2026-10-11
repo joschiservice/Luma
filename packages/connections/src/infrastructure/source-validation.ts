@@ -271,6 +271,7 @@ export const commerceSchema = z.discriminatedUnion('capability', [
                     .strict()
                     .nullable(),
                   unitPrice: money.nullable().optional(),
+                  taxIncluded: z.boolean().nullable().optional(),
                   taxRate: decimal
                     .refine((v) => !v.startsWith('-') && Number(v) <= 1)
                     .nullable()

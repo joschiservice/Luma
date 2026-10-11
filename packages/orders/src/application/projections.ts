@@ -27,10 +27,12 @@ export type CommerceData =
         currentQuantity?: string | null;
         cancelledQuantity: string | null;
         unit: string;
-        /** Source SKU text. Descriptive only; `skuId` carries the mapped identity. */
         unitPrice?: { amount: string; currency: string } | null;
+        /** Whether the source's unit price includes tax, or unknown. */
+        taxIncluded?: boolean | null;
         /** Fractional source tax rate, or unknown. */
         taxRate?: string | null;
+        /** Source SKU text. Descriptive only; `skuId` carries the mapped identity. */
         skuCode?: string | null;
         title?: string | null;
       }[];
@@ -70,11 +72,12 @@ export type CommerceData =
 
 export interface CanonicalSnapshot {
   /**
-   * Order snapshots use version 4 for optional unit prices and fractional tax rates.
+   * Order snapshots use version 5 for whether unit prices include tax, and version 4 for
+   * optional unit prices and fractional tax rates.
    * Order and fulfillment snapshots use version 3 for current and remaining line quantities.
    * Stored versions 1 and 2 remain readable. Return and refund snapshots use version 1.
    */
-  schemaVersion: 1 | 2 | 3 | 4;
+  schemaVersion: 1 | 2 | 3 | 4 | 5;
   entityId: string;
   kind: EntityKind;
   connectionId: string;

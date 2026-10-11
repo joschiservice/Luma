@@ -92498,6 +92498,17 @@
                                     }
                                   ]
                                 },
+                                "taxIncluded": {
+                                  "anyOf": [
+                                    {
+                                      "type": "boolean"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Whether the unit price includes tax, as the source states it."
+                                },
                                 "taxRate": {
                                   "anyOf": [
                                     {
@@ -93737,6 +93748,17 @@
                                           }
                                         ]
                                       },
+                                      "taxIncluded": {
+                                        "anyOf": [
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ],
+                                        "description": "Whether the unit price includes tax, as the source states it."
+                                      },
                                       "taxRate": {
                                         "anyOf": [
                                           {
@@ -94651,6 +94673,16 @@
                                   }
                                 ]
                               },
+                              "taxIncluded": {
+                                "anyOf": [
+                                  {
+                                    "type": "boolean"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
                               "taxRate": {
                                 "anyOf": [
                                   {
@@ -94672,6 +94704,7 @@
                               "currentQuantity",
                               "unit",
                               "unitPrice",
+                              "taxIncluded",
                               "taxRate"
                             ],
                             "additionalProperties": false
@@ -95207,6 +95240,16 @@
                               }
                             ]
                           },
+                          "taxIncluded": {
+                            "anyOf": [
+                              {
+                                "type": "boolean"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "taxRate": {
                             "anyOf": [
                               {
@@ -95228,6 +95271,7 @@
                           "currentQuantity",
                           "unit",
                           "unitPrice",
+                          "taxIncluded",
                           "taxRate"
                         ],
                         "additionalProperties": false
@@ -95661,6 +95705,16 @@
                               }
                             ]
                           },
+                          "taxIncluded": {
+                            "anyOf": [
+                              {
+                                "type": "boolean"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "taxRate": {
                             "anyOf": [
                               {
@@ -95682,6 +95736,7 @@
                           "currentQuantity",
                           "unit",
                           "unitPrice",
+                          "taxIncluded",
                           "taxRate"
                         ],
                         "additionalProperties": false

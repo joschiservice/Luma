@@ -137,6 +137,11 @@ export interface OrderSnapshot {
     skuCode?: string | null;
     /** Source unit price; absent or null when not reported. */
     unitPrice?: Money | null;
+    /**
+     * Whether `unitPrice` includes tax, as the source states it; absent or null when unknown.
+     * Prices are never converted between net and gross, because a rate can be missing or split.
+     */
+    taxIncluded?: boolean | null;
     /** Fractional tax rate (0.19 means 19%); absent or null when not reported. */
     taxRate?: string | null;
     /** Line title at the source when the order was read. */

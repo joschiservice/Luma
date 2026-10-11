@@ -56,6 +56,7 @@ const config = {
   name: 'Luma Contract',
   currency: 'EUR',
   taxRate: 0.19,
+  taxesIncluded: true,
   orderPrefix: 'C',
   locations: [
     { id: '1', name: 'Hamburg Hub' },
@@ -441,6 +442,7 @@ test('every read capability returns complete, parsed snapshots', async () => {
         cancelledQuantity: { amount: '0', unit: 'each' },
         skuCode: 'TOTE-NAT',
         unitPrice: { amount: '24.0', currency: 'EUR' },
+        taxIncluded: true,
         taxRate: '0.19',
         title: 'Canvas tote - Natural',
       },
@@ -455,6 +457,7 @@ test('every read capability returns complete, parsed snapshots', async () => {
         cancelledQuantity: { amount: '0', unit: 'each' },
         skuCode: 'TOTE-BLK',
         unitPrice: { amount: '26.5', currency: 'EUR' },
+        taxIncluded: true,
         taxRate: '0.19',
         title: 'Canvas tote - Black',
       },

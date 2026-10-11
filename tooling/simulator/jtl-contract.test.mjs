@@ -284,6 +284,7 @@ const orderLine = (id, order, sku, quantity, code, title, net) => ({
   cancelledQuantity: null,
   skuCode: code,
   unitPrice: { amount: net, currency: 'EUR' },
+  taxIncluded: false,
   taxRate: '0.19',
   title,
 });

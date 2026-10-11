@@ -16,6 +16,8 @@ export interface SalesLine {
   currentQuantity: string;
   unit: string;
   unitPrice: string | null;
+  /** Whether `unitPrice` includes tax, as the source order stated it; null when unknown. */
+  taxIncluded: boolean | null;
   taxRate: string | null;
 }
 
@@ -104,6 +106,7 @@ export function publishedOrder(order: SalesOrder) {
         line.unitPrice === null
           ? null
           : { amount: line.unitPrice, currency: order.currency },
+      taxIncluded: line.unitPrice === null ? null : (line.taxIncluded ?? null),
       taxRate: line.taxRate,
     })),
   };

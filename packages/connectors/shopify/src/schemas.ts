@@ -59,6 +59,7 @@ export const order = z.object({
     .nullable()
     .optional()
     .catch(null),
+  taxesIncluded: z.boolean().nullable().optional().catch(null),
   // Requested only with customer access; null for orders without a customer.
   customer: z
     .object({ id: gid('Customer') })

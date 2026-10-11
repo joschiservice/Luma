@@ -86,6 +86,8 @@ export async function readSourceFacts(
                 currency: String(object(line.unitPrice).currency),
               }
             : null,
+          taxIncluded:
+            typeof line.taxIncluded === 'boolean' ? line.taxIncluded : null,
           taxRate: text(line.taxRate),
           skuCode: text(line.skuCode),
           title: text(line.title),

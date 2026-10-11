@@ -103,6 +103,8 @@ export interface OrderSourceFacts extends OrderSource {
     skuId: string | null;
     comparisonKey: string | null;
     unitPrice?: { amount: string; currency: string } | null;
+    /** Whether `unitPrice` includes tax, as the source states it; null when unknown. */
+    taxIncluded?: boolean | null;
     taxRate?: string | null;
     skuCode: string | null;
     title: string | null;

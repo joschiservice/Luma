@@ -22,7 +22,14 @@ export function createSalesStore(
         [tenantId, order.id],
       );
 
-      return { ...order, lines: lines.rows.map((row) => row.document) };
+      // Lines stored before tax inclusion was recorded have it as unknown.
+      return {
+        ...order,
+        lines: lines.rows.map((row) => ({
+          ...row.document,
+          taxIncluded: row.document.taxIncluded ?? null,
+        })),
+      };
     },
     async save(order: SalesOrder) {
       const { lines, ...document } = order;
@@ -56,8 +63,8 @@ export function createSalesStore(
         );
       for (const [position, line] of lines.entries())
         await tx.query(
-          `INSERT INTO sales_order_lines(tenant_id,sales_order_id,id,position,sku_id,quantity,current_quantity,unit_price,tax_rate,document)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(tenant_id,sales_order_id,id) DO UPDATE SET
+          `INSERT INTO sales_order_lines(tenant_id,sales_order_id,id,position,sku_id,quantity,current_quantity,unit_price,tax_included,tax_rate,document)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(tenant_id,sales_order_id,id) DO UPDATE SET
         current_quantity=EXCLUDED.current_quantity,document=EXCLUDED.document`,
           [
             tenantId,
@@ -68,6 +75,7 @@ export function createSalesStore(
             line.quantity,
             line.currentQuantity,
             line.unitPrice,
+            line.taxIncluded,
             line.taxRate,
             line,
           ],

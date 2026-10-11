@@ -44,6 +44,7 @@ const line = z
     cancelledQuantity: decimal.nullable(),
     unit,
     unitPrice: money.nullable().optional(),
+    taxIncluded: z.boolean().nullable().optional(),
     taxRate: count
       .refine((v) => Number(v) <= 1)
       .nullable()
@@ -283,6 +284,7 @@ export const snapshotSchema = z.union([
         z.literal(2),
         z.literal(3),
         z.literal(4),
+        z.literal(5),
       ]),
       kind: z.literal('order'),
       data: order,

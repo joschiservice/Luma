@@ -5,7 +5,7 @@ const connection = (field: string, size: number, fields: string) =>
   `${field}(first: ${size}) { nodes { ${fields} } ${pageInfo} }`;
 
 const order =
-  'id updatedAt createdAt name cancelledAt closed displayFinancialStatus currentTotalPriceSet { shopMoney { amount currencyCode } }';
+  'id updatedAt createdAt name cancelledAt closed displayFinancialStatus taxesIncluded currentTotalPriceSet { shopMoney { amount currencyCode } }';
 const orderLine =
   'id quantity currentQuantity name sku originalUnitPriceSet { shopMoney { amount currencyCode } } taxLines { rate } variant { inventoryItem { id } }';
 

@@ -140,7 +140,7 @@ describe('JTL read adapter', () => {
             {
               source: { provider: 'jtl', externalId: key(10) },
               sourceUpdatedAt: null,
-              adapterVersion: 'jtl/6',
+              adapterVersion: 'jtl/7',
               data: {
                 externalOrderNumber: '#1001',
                 status: 'open',
@@ -152,6 +152,7 @@ describe('JTL read adapter', () => {
                     id: { externalId: key(101), scopeKey: key(10) },
                     quantity: { amount: '3.5', unit: 'each' },
                     unitPrice: { amount: '25.5', currency: 'EUR' },
+                    taxIncluded: false,
                     taxRate: '0.19',
                     skuCode: 'Mixed-Case-SKU',
                     title: 'Rolled oats',
@@ -161,6 +162,7 @@ describe('JTL read adapter', () => {
                     skuCode: null,
                     title: null,
                     unitPrice: null,
+                    taxIncluded: null,
                     taxRate: null,
                   },
                 ],

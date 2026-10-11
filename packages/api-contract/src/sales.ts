@@ -23,6 +23,8 @@ const salesLineSchema = z
     currentQuantity: decimal,
     unit: z.string().min(1).max(64),
     unitPrice: decimal.nullable(),
+    /** Whether `unitPrice` includes tax, as the source order stated it; null when unknown. */
+    taxIncluded: z.boolean().nullable(),
     taxRate: decimal.nullable(),
   })
   .strict();

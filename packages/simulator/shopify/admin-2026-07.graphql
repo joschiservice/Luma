@@ -707,6 +707,7 @@ type Order implements Node {
     reverse: Boolean = false
     query: String
   ): ReturnConnection!
+  taxesIncluded: Boolean!
   totalOutstandingSet: MoneyBag!
   transactions(
     first: Int

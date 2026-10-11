@@ -104,10 +104,12 @@ export function createSalesPersistence(
               ? unknownQuantity()
               : subtract(line.quantity, line.cancelledQuantity)),
           unit: line.unit,
-          unitPrice:
-            line.unitPrice && line.unitPrice.currency === data.total?.currency
-              ? line.unitPrice.amount
-              : null,
+          ...(line.unitPrice && line.unitPrice.currency === data.total?.currency
+            ? {
+                unitPrice: line.unitPrice.amount,
+                taxIncluded: line.taxIncluded ?? null,
+              }
+            : { unitPrice: null, taxIncluded: null }),
           taxRate: line.taxRate ?? null,
         })),
       };
@@ -255,9 +257,9 @@ export function createSalesPersistence(
         entityId: order.orderId,
         connectionId: order.connectionId,
         observationId,
-        schemaVersion: 4,
+        schemaVersion: 5,
         kind: 'order',
-        normalizerVersion: 'commerce/4',
+        normalizerVersion: 'commerce/5',
         mappingVersion: hash(
           JSON.stringify([
             order.orderId,

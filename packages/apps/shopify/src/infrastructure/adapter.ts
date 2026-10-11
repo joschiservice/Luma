@@ -679,13 +679,17 @@ export function createShopifyConnector(
                 cancelledQuantity: quantity(
                   line.quantity - line.currentQuantity,
                 ),
-                unitPrice: line.originalUnitPriceSet?.shopMoney
+                ...(line.originalUnitPriceSet?.shopMoney
                   ? {
-                      amount: line.originalUnitPriceSet.shopMoney.amount,
-                      currency:
-                        line.originalUnitPriceSet.shopMoney.currencyCode,
+                      unitPrice: {
+                        amount: line.originalUnitPriceSet.shopMoney.amount,
+                        currency:
+                          line.originalUnitPriceSet.shopMoney.currencyCode,
+                      },
+                      // The shop setting the order was placed under.
+                      taxIncluded: order.taxesIncluded ?? null,
                     }
-                  : null,
+                  : { unitPrice: null, taxIncluded: null }),
                 // Multiple tax jurisdictions do not establish one tax rate.
                 taxRate:
                   line.taxLines?.length === 1 && line.taxLines[0]?.rate != null

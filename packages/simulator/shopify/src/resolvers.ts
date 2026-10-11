@@ -315,6 +315,8 @@ const root: TypeResolvers = {
 };
 
 const orderResolvers = on<OrderData>({
+  taxesIncluded: (_order, _args, context) =>
+    context.shop.config.taxesIncluded ?? false,
   customer: (order, _args, context) =>
     load(context, 'Customer', order.data.customer),
   currentTotalPriceSet: (order) =>

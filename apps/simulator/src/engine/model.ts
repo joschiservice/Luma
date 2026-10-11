@@ -102,8 +102,9 @@ export function instancesFor(profile: MerchantProfile): Instance[] {
         shop: shop.domain,
         name: shop.name,
         currency: shop.currency,
+        // The profiles' European shops list prices including tax.
         ...(Object.hasOwn(standardTaxRates, shop.country)
-          ? { taxRate: standardTaxRates[shop.country] }
+          ? { taxRate: standardTaxRates[shop.country], taxesIncluded: true }
           : {}),
         orderPrefix: profile.name === 'test' ? 'SIM-' : shop.country,
         locations: [

@@ -6,6 +6,8 @@ export interface ShopifyConfig {
   currency: string;
   /** Standard tax rate on every line as a fraction, such as 0.19; omit for a shop that charges none. */
   taxRate?: number;
+  /** Whether prices include tax, as in most European shops; defaults to false. */
+  taxesIncluded?: boolean;
   /** Prefix of order names, such as `DE` for `#DE1001`. */
   orderPrefix: string;
   /** Shop locations; numeric IDs become `gid://shopify/Location/<id>`. */

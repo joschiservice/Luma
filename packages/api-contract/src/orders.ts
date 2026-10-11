@@ -125,6 +125,11 @@ const orderLineSchema = z.object({
     .object({ amount: z.string(), currency: z.string() })
     .nullable()
     .optional(),
+  taxIncluded: z
+    .boolean()
+    .nullable()
+    .optional()
+    .describe('Whether the unit price includes tax, as the source states it.'),
   taxRate: z.string().nullable().optional(),
   skuCode: z.string().nullable(),
   title: z.string().nullable(),

@@ -6,6 +6,7 @@
     "cancelledAt": null,
     "closed": false,
     "displayFinancialStatus": "PAID",
+    "taxesIncluded": true,
     "createdAt": "2026-09-14T08:30:00Z",
     "currentTotalPriceSet": {
       "shopMoney": {

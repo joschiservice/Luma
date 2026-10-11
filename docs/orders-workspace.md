@@ -207,7 +207,8 @@ An unchanged document or an address-only edit writes no snapshot. Quantity chang
 the imported total because discounts, shipping and tax adjustments are not recalculated.
 Cancellation preserves original units and publishes zero current units; reopening is refused.
 
-Line unit price and fractional tax rates use canonical order schema version 4. They are
-source-reported facts, not invoices. Missing prices and ambiguous tax rates remain unknown.
+Line unit price and fractional tax rates use canonical order schema version 4; version 5
+adds whether the unit price includes tax. They are source-reported facts, not invoices.
+Missing prices, ambiguous tax rates and unstated tax inclusion remain unknown.
 Stored earlier schema versions remain readable. See
 [ADR-012](architecture/012-native-order-records.md) for ownership and retention.
