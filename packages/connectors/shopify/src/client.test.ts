@@ -38,3 +38,30 @@ describe('Shopify client retries', () => {
     expect(f.fetch).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('Shopify client errors', () => {
+  it('keeps the provider code of a rejected query for diagnosis', async () => {
+    const f = fixture();
+    f.fetch.mockResolvedValueOnce(
+      Response.json({
+        errors: [
+          {
+            message: 'Query cost is 1352, which exceeds the limit (1000).',
+            extensions: { code: 'MAX_COST_EXCEEDED', cost: 1352 },
+          },
+        ],
+      }),
+    );
+
+    await expect(
+      f.request('query Orders { orders(first: 25) { nodes { id } } }', {}),
+    ).rejects.toMatchObject({
+      failure: {
+        code: 'invalid_response',
+        providerCode: 'MAX_COST_EXCEEDED',
+        retry: 'never',
+      },
+    });
+    expect(f.fetch).toHaveBeenCalledTimes(1);
+  });
+});

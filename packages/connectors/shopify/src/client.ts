@@ -179,7 +179,12 @@ export function createClient(options: ShopifyTransportOptions): {
         );
       }
       if (codes.includes('INTERNAL_SERVER_ERROR')) fail('transient', 1000);
-      fail('invalid_response');
+      // Validation and cost errors mean Luma's query is wrong; the code tells them from drift.
+      fail(
+        'invalid_response',
+        undefined,
+        codes.find((code) => typeof code === 'string'),
+      );
     }
     if (!envelope.data) fail('invalid_response');
 

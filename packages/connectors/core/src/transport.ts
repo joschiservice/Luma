@@ -4,11 +4,18 @@ import { ConnectorError, type ConnectorErrorCode } from './index.js';
 
 /**
  * Throws a connector failure with no recorded effect; supplying a delay marks it retryable
- * after that delay.
+ * after that delay. A provider code is kept only when it is a plain identifier.
  */
-export function fail(code: ConnectorErrorCode, retryAfterMs?: number): never {
+export function fail(
+  code: ConnectorErrorCode,
+  retryAfterMs?: number,
+  providerCode?: string,
+): never {
   throw new ConnectorError({
     code,
+    ...(providerCode && /^[A-Za-z][A-Za-z0-9_.-]{0,63}$/.test(providerCode)
+      ? { providerCode }
+      : {}),
     effect: 'none',
     retry: retryAfterMs === undefined ? 'never' : 'after_delay',
     ...(retryAfterMs === undefined ? {} : { retryAfterMs }),

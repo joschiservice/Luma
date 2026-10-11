@@ -55,6 +55,7 @@ const config = {
   shop: domain,
   name: 'Luma Contract',
   currency: 'EUR',
+  taxRate: 0.19,
   orderPrefix: 'C',
   locations: [
     { id: '1', name: 'Hamburg Hub' },
@@ -439,6 +440,8 @@ test('every read capability returns complete, parsed snapshots', async () => {
         currentQuantity: { amount: '2', unit: 'each' },
         cancelledQuantity: { amount: '0', unit: 'each' },
         skuCode: 'TOTE-NAT',
+        unitPrice: { amount: '24.0', currency: 'EUR' },
+        taxRate: '0.19',
         title: 'Canvas tote - Natural',
       },
       {
@@ -451,6 +454,8 @@ test('every read capability returns complete, parsed snapshots', async () => {
         currentQuantity: { amount: '1', unit: 'each' },
         cancelledQuantity: { amount: '0', unit: 'each' },
         skuCode: 'TOTE-BLK',
+        unitPrice: { amount: '26.5', currency: 'EUR' },
+        taxRate: '0.19',
         title: 'Canvas tote - Black',
       },
     ],
@@ -649,6 +654,29 @@ test('every read capability returns complete, parsed snapshots', async () => {
     tags: [],
     shared: { contact: true, address: true },
   });
+});
+
+test('every read capability requests its largest page within the query cost limit', async () => {
+  const shop = createShop();
+  await seed(shop);
+  const page = pages(shop);
+  const capabilities = Object.keys(
+    createShopifyConnector({
+      tenantId,
+      connectionId,
+      shop: domain,
+      accessToken: async () => 'synthetic',
+      fetch: shop.fetch,
+      customerAccess: { contact: true, address: true },
+    }).capabilities,
+  ).filter((capability) => capability.endsWith('.read'));
+  assert.ok(capabilities.includes('orders.read'));
+  for (const capability of capabilities) {
+    // 100 is the largest limit a read accepts.
+    const result = await page(capability, { limit: 100 });
+    assert.equal(result.ok, true, `${capability}: ${JSON.stringify(result)}`);
+  }
+  assert.ok(shop.maxCost <= 1000, `Requested cost reached ${shop.maxCost}`);
 });
 
 test('incremental reads see only records changed since the last sync', async () => {

@@ -60,15 +60,21 @@ export function readSelection(
   }
 }
 
-/** Root bounds keep worst-case requested cost below Shopify's 1,000-point query ceiling. */
+// Largest root pages whose worst-case requested cost stays under Shopify's 1,000-point query
+// limit; the simulator contract test reads every capability at these sizes. An order costs
+// about 55 points with its first eight lines, so 15 orders fit.
+const rootPageSizes: Partial<Record<ReadCapability, number>> = {
+  'orders.read': 15,
+  'fulfillment.read': 5,
+  'returns.read': 5,
+};
+
+/** Bounds a requested root page to the capability's largest page within the query cost limit. */
 export function readPageSize(
   capability: ReadCapability,
   requested: number,
 ): number {
-  return Math.min(
-    requested,
-    capability === 'returns.read' || capability === 'fulfillment.read' ? 5 : 25,
-  );
+  return Math.min(requested, rootPageSizes[capability] ?? 25);
 }
 
 /**

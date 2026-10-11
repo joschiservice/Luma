@@ -42,6 +42,13 @@ const shopifyScopes = [
   'read_customers',
 ];
 
+// Standard VAT rates of the profiles' shop countries; Shopify reports them per order line.
+const standardTaxRates: Record<string, number> = {
+  AT: 0.2,
+  CH: 0.081,
+  DE: 0.19,
+};
+
 /** Derives the provider instances a profile runs: one ERP and one store per shop. */
 export function instancesFor(profile: MerchantProfile): Instance[] {
   const erp = {
@@ -75,6 +82,9 @@ export function instancesFor(profile: MerchantProfile): Instance[] {
         shop: shop.domain,
         name: shop.name,
         currency: shop.currency,
+        ...(Object.hasOwn(standardTaxRates, shop.country)
+          ? { taxRate: standardTaxRates[shop.country] }
+          : {}),
         orderPrefix: profile.name === 'test' ? 'SIM-' : shop.country,
         locations: [
           {

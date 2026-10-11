@@ -18,6 +18,12 @@ export interface ConnectorFailure {
   dispatch?: 'not_dispatched' | 'dispatched' | 'uncertain';
   providerRequestId?: string;
   code: ConnectorErrorCode;
+  /**
+   * The provider's own error code, such as Shopify's `MAX_COST_EXCEEDED`, kept for diagnosis.
+   * It distinguishes causes that share a normalized `code`, such as provider drift and a query
+   * the adapter built wrongly.
+   */
+  providerCode?: string;
   effect: 'none' | 'unknown';
   retry: 'never' | 'after_delay' | 'reconcile';
   retryAfterMs?: number;
