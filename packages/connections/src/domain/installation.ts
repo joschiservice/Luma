@@ -7,7 +7,8 @@ export type InstallationCapability =
   | 'purchase-orders.submit'
   | 'fulfillment.hold.release'
   | 'fulfillment.open'
-  | 'fulfillment.move';
+  | 'fulfillment.move'
+  | 'messages.send';
 
 /** Public provider settings; each app validates its own fields. */
 export type InstallationTarget = { kind: string; [key: string]: string };

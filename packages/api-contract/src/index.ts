@@ -13,6 +13,7 @@ import { identityContract } from './contracts/identity.js';
 import { insightsContract } from './contracts/insights.js';
 import { inventoryContract } from './contracts/inventory.js';
 import { resolutionLearningContract } from './contracts/learning.js';
+import { messagingContract } from './contracts/messaging.js';
 import { metricsContract } from './contracts/metrics.js';
 import { ordersContract } from './contracts/orders.js';
 import { operationsContract } from './contracts/overview.js';
@@ -46,6 +47,7 @@ export const apiContract = {
   draftTests: draftTestsContract,
   procurement: procurementContract,
   procurementContext: procurementContextContract,
+  messaging: messagingContract,
   resolutionLearning: resolutionLearningContract,
   caseDesk: caseDeskContract,
   operations: operationsContract,
@@ -193,3 +195,4 @@ export * from './decisions.js';
 export * from './insights.js';
 
 export * from './assistant.js';
+export * from './messaging.js';

@@ -37,7 +37,7 @@ export interface AppManifest {
   name: string;
   description: string;
   version: string;
-  category: 'storefront' | 'erp' | 'utility';
+  category: 'storefront' | 'erp' | 'communication' | 'utility';
   ui: AppSlot[];
   connectionTypes: { kind: string; name: string }[];
   /** Permissions this app owns. */

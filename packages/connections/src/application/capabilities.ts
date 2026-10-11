@@ -191,8 +191,12 @@ export function createCapabilityRuntime(deps: CapabilityDependencies) {
       );
       try {
         const value = handler.parseOutput(output);
-        if (!write) {
-          const page = value as CapabilityOutput<ReadCapability>;
+        // Attachment reads return content, not observations, so only pages carry provenance.
+        if (!write && typeof value === 'object' && 'items' in value) {
+          const page = value as Extract<
+            CapabilityOutput<ReadCapability>,
+            { items: unknown }
+          >;
           if (
             page.items.some(
               ({ source, adapterVersion, schemaVersion }) =>

@@ -18,6 +18,7 @@ export function createReadChecks(db: TenantDatabase) {
     requirePermission(context, 'sync.manage');
     if (
       result.ok &&
+      'items' in result.value &&
       result.value.items.some(
         ({ source }) =>
           source.tenantId !== context.tenantId ||

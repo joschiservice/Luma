@@ -28,7 +28,8 @@ export interface SourceIdentity extends ExternalId {
     | 'return'
     | 'refund'
     | 'supplier'
-    | 'purchase_order';
+    | 'purchase_order'
+    | 'message';
 }
 
 export interface Observation<T> {
@@ -442,6 +443,90 @@ export interface FulfillmentRecoveryInput {
   locationId?: string;
 }
 
+/**
+ * Which messages a mailbox read returns. A message matches when any condition matches; an
+ * empty filter matches nothing. Adapters apply it at the provider, so Luma never receives
+ * messages outside it.
+ */
+export interface MailboxFilter {
+  /** Lower-case sender domains; subdomains match too. */
+  senderDomains: string[];
+  /** Lower-case sender addresses. */
+  senderAddresses: string[];
+  /** Lower-case recipient addresses (to or cc), such as an alias delivered to the mailbox. */
+  recipientAddresses: string[];
+  /** Provider label or folder names. */
+  labels: string[];
+  /** Also return messages the mailbox sent to the listed domains and addresses. */
+  includeSent: boolean;
+}
+
+export interface MessageAddress {
+  /** Lower-case address. */
+  address: string;
+  name: string | null;
+}
+
+export interface MessageAttachmentRef {
+  attachment: ExternalId;
+  filename: string;
+  mimeType: string;
+  size: number;
+}
+
+/**
+ * One message as the mailbox holds it. Messages are personal data: they are stored only by the
+ * messaging owner, never as commerce observations.
+ */
+export interface MessageSnapshot {
+  thread: ExternalId;
+  /** RFC 5322 Message-ID without angle brackets. */
+  rfcMessageId: string | null;
+  inReplyTo: string | null;
+  references: string[];
+  /** Relative to the connected mailbox. */
+  direction: 'inbound' | 'outbound';
+  from: MessageAddress;
+  to: MessageAddress[];
+  cc: MessageAddress[];
+  replyTo: MessageAddress[];
+  subject: string;
+  /** Plain text; HTML-only bodies are converted. At most 100,000 characters. */
+  text: string;
+  truncated: boolean;
+  /** The Date header, or the provider's time when the header is missing or invalid. */
+  sentAt: string;
+  /** When the mailbox received or sent the message, on the provider's clock. */
+  receivedAt: string;
+  labels: string[];
+  attachments: MessageAttachmentRef[];
+}
+
+export interface AttachmentContent {
+  filename: string;
+  mimeType: string;
+  size: number;
+  /** Lower-case hex SHA-256 of the decoded content. */
+  sha256: string;
+  base64: string;
+}
+
+/** A reply or new message Luma asks the mailbox to send. */
+export interface OutboundMessage {
+  /**
+   * Luma's outbound ID. Adapters derive the RFC Message-ID from it and refuse to send when the
+   * mailbox already holds a message with that ID.
+   */
+  outboundId: string;
+  thread: ExternalId | null;
+  inReplyTo: string | null;
+  references: string[];
+  to: MessageAddress[];
+  cc: MessageAddress[];
+  subject: string;
+  text: string;
+}
+
 export interface CapabilityContract {
   /** Corrects one approved item/location's available stock using provider CAS and idempotency. */
   'inventory.available.reconcile': {
@@ -525,6 +610,23 @@ export interface CapabilityContract {
     input: PageQuery & { order?: ExternalId };
     output: Page<ReturnSnapshot | RefundSnapshot>;
   };
+  /** Messages matching `filter` received at or after `receivedSince`. Resource `message`. */
+  'messages.read': {
+    input: PageQuery & { filter: MailboxFilter; receivedSince: string };
+    output: Page<MessageSnapshot>;
+  };
+  /** Every message of one thread, for refreshing a thread and verifying sends. */
+  'message-threads.read': {
+    input: PageQuery & { thread: ExternalId };
+    output: Page<MessageSnapshot>;
+  };
+  /** Reads one attachment; fails with `invalid_request` above `maxBytes`. */
+  'message-attachments.read': {
+    input: { message: ExternalId; attachment: ExternalId; maxBytes: number };
+    output: AttachmentContent;
+  };
+  /** Acceptance means the provider accepted the message, not that anyone received it. */
+  'messages.send': { input: OutboundMessage; output: WriteReceipt };
 }
 
 export type Capability = keyof CapabilityContract;

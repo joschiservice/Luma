@@ -174,11 +174,14 @@ export function createAppHost(
     providerCatalog: createProviderCatalog(
       registry
         .list()
-        .filter((a) => a.category !== 'utility')
+        .filter(
+          (a): a is typeof a & { category: 'storefront' | 'erp' } =>
+            a.category === 'storefront' || a.category === 'erp',
+        )
         .map((a) => ({
           id: a.id,
           name: a.name,
-          category: a.category as 'storefront' | 'erp',
+          category: a.category,
         })),
     ),
   };
