@@ -541,7 +541,7 @@ const resolvers: Record<string, TypeResolvers> = {
     processedQuantity: (line) => line.data.processedQuantity ?? 0,
     processableQuantity: (line) =>
       line.data.quantity - (line.data.processedQuantity ?? 0),
-    returnReasonNote: (line) => line.data.returnReasonNote ?? null,
+    returnReasonNote: (line) => line.data.returnReasonNote ?? '',
     fulfillmentLineItem: (line, _args, context) =>
       load(context, 'FulfillmentLineItem', line.data.fulfillmentLineItem),
     withCodeDiscountedTotalPriceSet: (line, _args, context) =>

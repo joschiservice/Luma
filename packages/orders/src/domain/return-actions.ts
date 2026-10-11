@@ -28,6 +28,8 @@ export interface ReturnActionProof {
 
 /** One immutable settlement request; sent requests permanently hold their case/line slot. */
 export interface ReturnAction {
+  /** Version 2 binds a plan digest; older persisted approvals keep their original action shape. */
+  intentVersion?: 2;
   id: string;
   tenantId: string;
   caseId: string;

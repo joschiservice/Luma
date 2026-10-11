@@ -152,7 +152,10 @@ const facts = (value: ReturnCase) => [
 ];
 
 /** Immutable Action Admission intent for a case's stock or financial step. */
-function returnSettlementAction(value: ReturnAction): ProposedAction {
+function returnSettlementAction(
+  value: ReturnAction,
+  digest: (value: unknown) => string,
+): ProposedAction {
   return {
     schemaVersion: 1,
     id: value.actionId,
@@ -162,7 +165,9 @@ function returnSettlementAction(value: ReturnAction): ProposedAction {
     connectionId: value.connectionId,
     target: { kind: 'return_case_settlement', id: value.id },
     parameters: {
-      plan: canonicalJson(value.plan),
+      ...(value.intentVersion === 2
+        ? { planDigest: digest(value.plan) }
+        : { plan: canonicalJson(value.plan) }),
       caseDigest: value.caseDigest,
     },
     preconditions: {
@@ -325,7 +330,7 @@ export function createReturnActions(deps: Dependencies) {
       evidenceRefs: value.proof?.evidenceRefs ?? value.quote.evidenceRefs,
       correlationId: value.caseId,
       proposalId: value.actionId,
-      actionHash: deps.digest(returnSettlementAction(value)),
+      actionHash: deps.digest(returnSettlementAction(value, deps.digest)),
       details: { kind: value.kind, caseId: value.caseId },
     };
   }
@@ -447,7 +452,7 @@ export function createReturnActions(deps: Dependencies) {
       decision = await deps.admission!.prepare(
         context,
         value,
-        returnSettlementAction(value),
+        returnSettlementAction(value, deps.digest),
       );
     } catch {
       await save(context, value, {
@@ -632,6 +637,7 @@ export function createReturnActions(deps: Dependencies) {
       const now = deps.now();
       const value: ReturnAction = {
         id: input.id,
+        intentVersion: 2,
         tenantId: context.tenantId,
         caseId,
         connectionId: target?.connectionId ?? c.connectionId,
@@ -758,7 +764,9 @@ export function createReturnActions(deps: Dependencies) {
         tx.get(id),
       );
 
-      return value ? { value, action: returnSettlementAction(value) } : null;
+      return value
+        ? { value, action: returnSettlementAction(value, deps.digest) }
+        : null;
     },
     /** Rechecks current case facts and authority immediately before dispatch. */
     async eligible(
@@ -819,7 +827,7 @@ export function createReturnActions(deps: Dependencies) {
           deps.digest(facts(c)) === value.caseDigest &&
           Date.parse(value.expiresAt) > deps.now().getTime() &&
           ['approval_required', 'approved', 'sending'].includes(value.state) &&
-          canonicalJson(returnSettlementAction(value)) ===
+          canonicalJson(returnSettlementAction(value, deps.digest)) ===
             canonicalJson(step.action)
         );
       });

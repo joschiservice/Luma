@@ -153,7 +153,10 @@ function fail(status: 404 | 409 | 503, message: string): never {
 }
 
 /** Freezes one exact source effect and its case evidence for Action Admission. */
-function action(value: ExchangeStep): ProposedAction {
+function action(
+  value: ExchangeStep,
+  digest: (value: unknown) => string,
+): ProposedAction {
   return {
     schemaVersion: 1,
     id: value.actionId,
@@ -164,7 +167,9 @@ function action(value: ExchangeStep): ProposedAction {
     target: { kind: 'return_case_exchange', id: value.id },
     parameters: {
       operationId: value.operationId,
-      plan: canonicalJson(value.plan),
+      ...(value.intentVersion === 2
+        ? { planDigest: digest(value.plan) }
+        : { plan: canonicalJson(value.plan) }),
       caseDigest: value.caseDigest,
     },
     preconditions: {
@@ -226,7 +231,7 @@ export function createReturnExchanges(deps: Dependencies) {
       evidenceRefs: value.proof?.evidenceRefs ?? value.quote.evidenceRefs,
       correlationId: value.caseId,
       proposalId: value.actionId,
-      actionHash: deps.digest(action(value)),
+      actionHash: deps.digest(action(value, deps.digest)),
       details: { operationId: value.operationId, kind: value.plan.kind },
     };
   }
@@ -439,7 +444,11 @@ export function createReturnExchanges(deps: Dependencies) {
     if (!deps.admission) fail(503, 'Exchange approval unavailable');
     let decision: PolicyDecision;
     try {
-      decision = await deps.admission.prepare(context, value, action(value));
+      decision = await deps.admission.prepare(
+        context,
+        value,
+        action(value, deps.digest),
+      );
     } catch {
       await save(context, value, {
         state: 'failed',
@@ -852,6 +861,7 @@ export function createReturnExchanges(deps: Dependencies) {
       const now = deps.now(),
         value: ExchangeStep = {
           id: input.id,
+          intentVersion: 2,
           actionId: deps.uuid(
             `return-exchange:${context.tenantId}:${input.id}`,
           ),
@@ -1078,7 +1088,7 @@ export function createReturnExchanges(deps: Dependencies) {
         tx.get(id),
       );
 
-      return value ? { value, action: action(value) } : null;
+      return value ? { value, action: action(value, deps.digest) } : null;
     },
     /** Rechecks current facts, mappings, root choice and trusted requester before dispatch. */
     async eligible(
@@ -1118,7 +1128,8 @@ export function createReturnExchanges(deps: Dependencies) {
           deps.digest(facts(c)) !== value.caseDigest ||
           Date.parse(value.expiresAt) <= deps.now().getTime() ||
           !['approval_required', 'approved', 'sending'].includes(value.state) ||
-          canonicalJson(action(value)) !== canonicalJson(step.action)
+          canonicalJson(action(value, deps.digest)) !==
+            canonicalJson(step.action)
         )
           return false;
         if ('marker' in value.plan && value.plan.marker !== root.request.marker)

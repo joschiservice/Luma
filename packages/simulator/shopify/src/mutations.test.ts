@@ -579,13 +579,17 @@ it('creates marked returns and approves the exact customer request through the A
     reason: 'Wrong size',
   });
   const approved = await send(
-    `mutation($input: ReturnApproveRequestInput!) { returnApproveRequest(input: $input) { return { id status } userErrors { message } } }`,
+    `mutation($input: ReturnApproveRequestInput!) { returnApproveRequest(input: $input) { return { id status returnLineItems(first:10) { nodes { returnReasonNote } } } userErrors { message } } }`,
     { input: { id: requested.gid, notifyCustomer: false } },
   );
   expect(approved.body).toMatchObject({
     data: {
       returnApproveRequest: {
-        return: { id: requested.gid, status: 'OPEN' },
+        return: {
+          id: requested.gid,
+          status: 'OPEN',
+          returnLineItems: { nodes: [{ returnReasonNote: '' }] },
+        },
         userErrors: [],
       },
     },

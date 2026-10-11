@@ -54,8 +54,11 @@ test('requests a replacement by keyboard and verifies charge payment before appr
     section = requester.getByRole('region', { name: 'Exchange' });
   const select = section.getByRole('combobox', { name: 'Replacement item' });
   await select.focus();
-  await requester.keyboard.press('ArrowDown');
   await requester.keyboard.press('Enter');
+  await expect(requester.getByRole('option').first()).toBeVisible();
+  await requester.keyboard.press('Home');
+  await requester.keyboard.press('Enter');
+  await expect(select).toContainText(replacement.label);
   await section.getByRole('spinbutton').fill('2');
   const requestButton = section.getByRole('button', {
     name: 'Request replacement approval',

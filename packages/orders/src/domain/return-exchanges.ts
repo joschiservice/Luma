@@ -87,6 +87,8 @@ export interface ExchangeProof {
 
 /** A persisted approval and execution identity; sent writes are reconciled without redispatch. */
 export interface ExchangeStep {
+  /** Version 2 binds a plan digest within admission's bounded scalar parameters. */
+  intentVersion?: 2;
   id: string;
   actionId: string;
   operationId: string;
