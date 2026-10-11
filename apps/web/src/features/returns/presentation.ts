@@ -55,7 +55,7 @@ const stageDescriptionMessages = {
 } satisfies Record<ReturnStage, () => string>;
 
 /** Reads each message when accessed, so labels follow the active language. */
-function localized<K extends string>(
+export function localized<K extends string>(
   messages: Record<K, () => string>,
 ): Record<K, string> {
   const labels = {} as Record<K, string>;

@@ -1,6 +1,6 @@
 # @luma/simulator-jtl
 
-Simulates a JTL-Wawi ERP behind the ERP REST API 2.2 that Luma's JTL adapter uses: sales orders, items with warehouse stock, delivery notes, shipping methods, suppliers and purchase orders.
+Simulates a JTL-Wawi ERP behind the ERP REST API 2.2 that Luma's JTL adapter uses: sales orders, items with warehouse stock, delivery notes, shipping methods, suppliers, purchase orders and returns.
 
 The package implements `ProviderSimulator` from simulator-core. The host owns transport, persistence, failure injection, rate-limit buckets and scheduling; this package owns JTL records, the HTTP surface and merchant, warehouse and supplier commands. Records live in the context's `RecordStore`, scoped to one ERP instance; the host table is `sim_jtl_records`. Canonical Luma models and cross-provider scenarios belong outside this package. Exports point to compiled `dist` output.
 
@@ -11,6 +11,7 @@ The package implements `ProviderSimulator` from simulator-core. The host owns tr
 - **`ship`** books one delivery note with one package for the given line quantities, or every open unit, from one warehouse. Physical stock there and the reservation decrease. It refuses quantities above the open quantity and shipments the warehouse cannot cover. Orders may have several delivery notes.
 - **`cancel`** releases reservations and is refused once any unit has shipped. Shipping-method changes, through the command or `PATCH`, refuse cancelled orders and unknown methods and offer no compare-and-swap or idempotency.
 - **Purchase orders** use statuses 0, 5, 20, 30, 50 and 500. Lines are numbered order ID × 1,000 plus position. Creation time is the later of simulation and wall-clock time. A `POST` with a known `Idempotency-Key` returns the recorded order. Goods receipts add stock to the order's warehouse (the first configured warehouse) unless the command names another.
+- **Returns** belong to the single company `1` that every sales order reports. A `POST` must name lines of an uncancelled order, a configured warehouse and configured return reasons (`returnReasons`, by default Defective, Wrong item and No longer wanted); a line's returned units across all returns cannot exceed its ordered quantity. Returns are numbered `RE-` plus the zero-padded return ID, keep `externalNumber` as created and list per order with `salesOrderId`. A `POST` with a known `Idempotency-Key` returns the recorded return.
 - **Suppliers** carry a profile that plans confirmations and receipts for orders placed afterwards (`supplierEvents`).
 - **`seed-catalog`** inserts items, warehouse stock, suppliers and assignments in one `putMany`; items and suppliers must be new.
 
@@ -19,7 +20,7 @@ Lists page by `pageNumber` and `pageSize` (at most 1,000) in creation order. `to
 ## Host integration
 
 - Schedule `supplierEvents` from the merchant `purchase-order` command result, and from the `purchase-orders/create` event payload for orders created through the API.
-- Other events (`sales-orders/create`, `sales-orders/update`, `delivery-notes/create`, `items/stock`, `items/seed`, `purchase-orders/update`) are for the journal; JTL sends no webhooks.
+- Other events (`sales-orders/create`, `sales-orders/update`, `delivery-notes/create`, `items/stock`, `items/seed`, `purchase-orders/update`, `returns/create`) are for the journal; JTL sends no webhooks.
 - `readOrder`, `openOrders`, `readItemStock` and `itemsPage` serve the merchant engine. Open orders carry the store key `open`, so they can be queried without scanning all orders.
 - Refusals throw `JtlError`; its `status` is the HTTP answer for the same condition.
 

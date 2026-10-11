@@ -35,6 +35,7 @@ import {
   statusLabels,
 } from '../orders/presentation';
 import { recordReturnPath } from '../records/data';
+import { StoreReturnCase } from './case-entry';
 import { returnFilters, returnOptions, type ReturnsSearch } from './data';
 import {
   nextStep,
@@ -106,6 +107,11 @@ export function ReturnPage() {
               : 'unavailable'
       }
       refresh={() => void query.refetch()}
+      returnCase={
+        detail ? (
+          <StoreReturnCase organizationId={organizationId} detail={detail} />
+        ) : null
+      }
       orderContext={
         detail?.order?.externalId && appId && recordApp ? (
           <AppExtension
@@ -482,6 +488,7 @@ export function ReturnDetailView({
   offline = false,
   refresh,
   orderContext,
+  returnCase,
 }: {
   organizationId: string;
   search?: ReturnsSearch;
@@ -493,6 +500,8 @@ export function ReturnDetailView({
   refresh: () => void;
   /** Live customer and payment context for the order from its source app. */
   orderContext?: ReactNode;
+  /** The return case working this return, or the control to open one. */
+  returnCase?: ReactNode;
 }) {
   const from = recordReturnPath(organizationId, search.from);
   const item = detail?.item;
@@ -618,6 +627,14 @@ export function ReturnDetailView({
           {item.kind === 'return' ? <ReturnProgress detail={detail} /> : null}
           <div className="returns-layout">
             <div className="returns-main">
+              {item.kind === 'return' && returnCase ? (
+                <Section
+                  title={m.returns_case_store_title()}
+                  description={m.returns_case_store_section_description()}
+                >
+                  {returnCase}
+                </Section>
+              ) : null}
               {item.kind === 'return' ? (
                 <Items detail={detail} organizationId={organizationId} />
               ) : null}

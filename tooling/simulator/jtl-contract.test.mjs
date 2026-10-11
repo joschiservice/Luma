@@ -195,6 +195,7 @@ async function createEnvironment() {
     recordObservations: async () => {},
     shippingMethodActions: true,
     purchaseOrderActions: true,
+    returnActions: true,
     now: () => new Date(observedAt),
     id: () =>
       `00000000-0000-4000-8000-${String(++observation).padStart(12, '0')}`,
@@ -753,6 +754,95 @@ test('purchase-orders submit once per provider key and read through receipt', as
   assert.equal(stock.items[0].data.onHand, '108');
 });
 
+test('returns are created once per case and found again by their marker', async () => {
+  const jtlEnv = await createEnvironment();
+  const options = await jtlEnv.read('returns.options.read', { limit: 100 });
+  assert.equal(options.completeness, 'complete');
+  assert.deepEqual(
+    options.items.map(({ source, data }) => [
+      source.resource,
+      source.externalId,
+      data,
+    ]),
+    [
+      ['location', '1', { kind: 'warehouse', name: 'Hamburg' }],
+      ['location', '2', { kind: 'warehouse', name: 'Leipzig' }],
+      ['return_reason', '1', { kind: 'reason', name: 'Defective' }],
+      ['return_reason', '2', { kind: 'reason', name: 'Wrong item' }],
+      ['return_reason', '3', { kind: 'reason', name: 'No longer wanted' }],
+    ],
+  );
+
+  const caseId = '7f9c2c8e-3b1a-4c55-9e0a-2f7d8b6a1c00';
+  const creation = {
+    lumaCaseId: caseId,
+    order: ref('1'),
+    warehouse: ref('1'),
+    reason: ref('1'),
+    lines: [{ orderLine: ref('1', '1'), quantity: each('2') }],
+  };
+  const created = await jtlEnv.write('returns.create', creation, 'return-1');
+  assert.equal(created.ok, true, JSON.stringify(created));
+  assert.equal(created.value.evidenceRefs.length, 1);
+  // The same provider key replays the recorded return instead of creating another.
+  const replayed = await jtlEnv.write(
+    'returns.create',
+    { ...creation, lumaCaseId: 'another-case' },
+    'return-1',
+  );
+  assert.equal(replayed.ok, true, JSON.stringify(replayed));
+  assert.deepEqual(replayed.value.evidenceRefs, created.value.evidenceRefs);
+  // A new key for a case JTL already holds a return for is refused before dispatch.
+  const duplicate = await jtlEnv.write('returns.create', creation, 'return-2');
+  assert.equal(duplicate.ok, false);
+  assert.equal(duplicate.error.code, 'conflict');
+  assert.equal(duplicate.error.dispatch, 'not_dispatched');
+  assert.deepEqual(
+    jtlEnv.requests.filter((r) => r.method === 'POST'),
+    [
+      { method: 'POST', path: 'returns', status: 201, committed: true },
+      { method: 'POST', path: 'returns', status: 201, committed: false },
+    ],
+  );
+
+  const found = await jtlEnv.read('returns.created.read', {
+    limit: 5,
+    order: ref('1'),
+    lumaCaseId: caseId,
+  });
+  assert.equal(found.completeness, 'complete');
+  assert.deepEqual(observations(found, 'return'), [
+    {
+      source: ref('1'),
+      sourceUpdatedAt: null,
+      data: {
+        order: ref('1'),
+        number: 'RE-00001',
+        lumaCaseId: caseId,
+        createdAt: iso(start + 2000),
+        warehouse: ref('1'),
+        lines: [
+          { orderLine: ref('1', '1'), quantity: each('2'), reason: ref('1') },
+        ],
+      },
+    },
+  ]);
+
+  // JTL refuses more units than remain on the line; nothing is created.
+  const excess = await jtlEnv.write(
+    'returns.create',
+    {
+      ...creation,
+      lumaCaseId: 'case-2',
+      lines: [{ orderLine: ref('1', '1'), quantity: each('2') }],
+    },
+    'return-3',
+  );
+  assert.equal(excess.ok, false);
+  assert.equal(excess.error.code, 'invalid_input');
+  assert.equal(excess.error.effect, 'none');
+});
+
 test('installation verification grants every probed read through the simulation transport', async () => {
   const jtlEnv = await createEnvironment();
   const transport = createTransport((request) =>
@@ -779,6 +869,9 @@ test('installation verification grants every probed read through the simulation 
         'suppliers.read',
         'purchase-orders.read',
         'purchase-orders.submit',
+        'returns.options.read',
+        'returns.created.read',
+        'returns.create',
       ],
       granted: [],
       status: 'pending',
@@ -796,8 +889,11 @@ test('installation verification grants every probed read through the simulation 
     'fulfillment.read',
     'suppliers.read',
     'purchase-orders.read',
+    'returns.options.read',
+    'returns.created.read',
     'orders.shipping-method.read',
     'orders.shipping-method.write',
     'purchase-orders.submit',
+    'returns.create',
   ]);
 });

@@ -812,6 +812,10 @@ function sourceLocalEntity(
     throw new Error('Customer profiles have no canonical mapping');
   if (resource === 'supplier' || resource === 'purchase_order')
     throw new Error('Procurement owns supplier and purchase-order records');
+  if (resource === 'return_reason')
+    throw new Error(
+      'Return reasons are choices for creating returns, not records',
+    );
   if (resource === 'order' || resource === 'order_line')
     return { owner: 'orders', entity: { kind: resource, reconciliationKey } };
   if (

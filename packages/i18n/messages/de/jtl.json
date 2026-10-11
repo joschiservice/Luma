@@ -19,6 +19,7 @@
   "jtl_setup_read_access": "Luma fordert Lesezugriff auf Bestellungen, Produkte, Bestand und Fulfillment an. Prüfe nach dem Speichern den Zugriff, um zu sehen, was JTL erteilt.",
   "jtl_setup_shipping_write": "Korrekturen der Versandart erlauben. Erfordert Lese- und Schreibzugriff auf Aufträge in JTL.",
   "jtl_setup_purchasing": "Senden genehmigter Lieferantenbestellungen erlauben. Erfordert Zugriff auf Lieferanten, Lieferantenbestellungen und Artikel in JTL.",
+  "jtl_setup_returns": "Anlegen genehmigter Retouren für Retourenfälle erlauben. Erfordert Zugriff auf Aufträge, Lager und Retouren in JTL.",
   "jtl_setup_customers": "Kunden importieren, einschließlich Namen, Kontaktdaten und Adressen, und ihren Bestellungen zuordnen. Erfordert Lesezugriff auf Kunden in JTL.",
   "jtl_setup_uncertain": "Luma konnte nicht bestätigen, ob die Eingaben gespeichert wurden. Schließe dieses Formular und aktualisiere die Liste, bevor du es erneut versuchst.",
   "jtl_setup_confirm_replacement": "Ersetzen bestätigen",

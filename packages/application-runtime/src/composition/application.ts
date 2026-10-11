@@ -12,6 +12,7 @@ import {
   createPlaybookGrantReader,
   createSourceAuthority,
   type InstalledPurchaseOrderRuntime,
+  type InstalledReturnRuntime,
 } from '@luma/connections/composition';
 import type { VerificationEvaluator } from '@luma/exceptions';
 import {
@@ -25,7 +26,9 @@ import {
 import type { IdentityService, TenantContext } from '@luma/identity';
 import {
   createOrderMetricReader,
+  createReturnCaseService,
   orderStateQueries,
+  type ReturnCases,
 } from '@luma/orders/composition';
 import type {
   ModelGateway,
@@ -103,6 +106,11 @@ import {
   type ReplenishmentTransport,
 } from './replenishment.js';
 import {
+  createReturnCreationAdmission,
+  createReturnCreationEffects,
+  createReturnSystem,
+} from './return-cases.js';
+import {
   createDeskServices,
   createDetectionServices,
   createResolutionPlaybooks,
@@ -136,6 +144,7 @@ export interface ApplicationServices {
   codeProcesses: ReturnType<typeof createCodeProcesses>;
   procurement: ReturnType<typeof createProcurement>;
   commitments: SupplierCommitments;
+  returnCases: ReturnCases;
   library: ReturnType<typeof createPersistentPlaybookLibrary>;
   http: {
     shadow: ReturnType<typeof createShadowEvaluations>;
@@ -161,6 +170,7 @@ export interface ApplicationServices {
     procurementContext: ReturnType<typeof createProcurementContext>;
     fulfillment: ReturnType<typeof createFulfillmentWorkspace>;
     returns: ReturnType<typeof createReturnWorkspace>;
+    returnCases: ReturnCases;
     customers: ReturnType<typeof createCustomerWorkspace>;
     orders: ReturnType<typeof createOrderWorkspace>;
     sourceAuthority: ReturnType<typeof createSourceAuthority>;
@@ -198,6 +208,11 @@ export interface ApplicationOptions {
   /** Installed purchasing-system connections. Without them, orders cannot be sent from Luma. */
   purchasing?: {
     runtime: InstalledPurchaseOrderRuntime;
+    installations: Pick<ConnectionManagement, 'list'>;
+  };
+  /** Installed connections returns can be created in. Without them, cases still work locally. */
+  returns?: {
+    runtime: InstalledReturnRuntime;
     installations: Pick<ConnectionManagement, 'list'>;
   };
   /** Whether the gateway has an EU zero-retention route for reading supplier messages. */
@@ -249,10 +264,16 @@ export function createApplicationServices(
     options.execution.kind === 'enabled' && options.purchasing
       ? createSubmissionEffects(options.purchasing.runtime, () => commitments)
       : { resolve: async () => null };
+  // Creating a return in the order's system is an external effect, so it needs enabled execution.
+  const returnCreationEffects =
+    options.execution.kind === 'enabled' && options.returns
+      ? createReturnCreationEffects(options.returns.runtime, () => returnCases)
+      : { resolve: async () => null };
   const combinedEffects: EffectRegistry = {
     resolve: async (context, intent) =>
       (await procurementEffects.resolve(context, intent)) ??
       (await submissionEffects.resolve(context, intent)) ??
+      (await returnCreationEffects.resolve(context, intent)) ??
       effects.resolve(context, intent),
   };
   const resolutionEligible = createAdmissionEligibility(detection.diagnoses);
@@ -260,9 +281,11 @@ export function createApplicationServices(
     eligible: (context, step) =>
       step.subject?.kind === 'purchase_order_submission'
         ? commitments.eligible(context, step)
-        : step.subject
-          ? replenishment.eligible(context, step)
-          : resolutionEligible(context, step),
+        : step.subject?.kind === 'return_case_creation'
+          ? returnCases.eligible(context, step)
+          : step.subject
+            ? replenishment.eligible(context, step)
+            : resolutionEligible(context, step),
   });
   const commitments: SupplierCommitments = createSupplierCommitmentService(
     database,
@@ -299,6 +322,24 @@ export function createApplicationServices(
       ...(options.supplierMessageRetentionDays
         ? { retentionDays: options.supplierMessageRetentionDays }
         : {}),
+    },
+  );
+  const returnCases: ReturnCases = createReturnCaseService(
+    database,
+    createAuditLog,
+    {
+      system: options.returns
+        ? createReturnSystem(
+            options.returns.runtime,
+            options.returns.installations,
+          )
+        : null,
+      admission:
+        options.execution.kind === 'enabled' && options.returns
+          ? createReturnCreationAdmission(safety, combinedEffects)
+          : null,
+      refreshContext: identity.refreshContext,
+      principal: identity.resolveWorkflowContext,
     },
   );
   const desk = createDeskServices(
@@ -524,6 +565,7 @@ export function createApplicationServices(
     templates,
     procurement,
     commitments,
+    returnCases,
     detection,
     safety,
     desk,
@@ -568,6 +610,7 @@ export function createApplicationServices(
       products: createProductWorkspace(database),
       procurementContext: createProcurementContext(database),
       returns,
+      returnCases,
       customers: createCustomerWorkspace(database),
       records: createRecordExplorer(database),
       orders,

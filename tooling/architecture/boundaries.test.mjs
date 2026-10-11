@@ -279,15 +279,15 @@ new RuleTester({ languageOptions: { parser: tseslint.parser } }).run(
       ),
       invalid(
         moduleFile('orders'),
-        "const policy = import('../../policies/index.js');",
+        "const policy = import('../../execution/index.js');",
       ),
       invalid(
         moduleFile('orders'),
-        "const policy = require('../../policies/index.js');",
+        "const policy = require('../../execution/index.js');",
       ),
       invalid(
         moduleFile('orders'),
-        "type Policy = import('../../policies/index.js').Policy;",
+        "type Policy = import('../../execution/index.js').Policy;",
       ),
       invalid(moduleFile('orders'), 'const adapter = import(name);'),
       invalid(moduleFile('orders'), "import x from '#internal/orders';"),

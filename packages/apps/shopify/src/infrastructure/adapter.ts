@@ -247,7 +247,11 @@ export function createShopifyConnector(
   function handler<
     K extends Exclude<
       ReadCapability,
-      'orders.shipping-method.read' | 'suppliers.read' | 'purchase-orders.read'
+      | 'orders.shipping-method.read'
+      | 'suppliers.read'
+      | 'purchase-orders.read'
+      | 'returns.options.read'
+      | 'returns.created.read'
     >,
   >(capability: K): CapabilityHandler<K> {
     return {

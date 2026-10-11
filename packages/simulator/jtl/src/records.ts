@@ -19,7 +19,14 @@ export const kinds = {
   customer: 'customer',
   /** Recorded purchase-order POST results, by Idempotency-Key. */
   purchaseOrderKey: 'purchase-order-key',
+  /** Returns; parent is the sales-order ID. */
+  return: 'return',
+  /** Recorded return POST results, by Idempotency-Key. */
+  returnKey: 'return-key',
 } as const;
+
+/** The single company every simulated sales order and return belongs to. */
+export const COMPANY_ID = '1';
 
 /** Store key that marks sales orders with open units. */
 export const OPEN = 'open';
@@ -163,6 +170,31 @@ export interface PurchaseOrderRecord {
   /** Warehouse that receives the goods. */
   warehouseId: string;
   lineItems: PurchaseOrderLine[];
+}
+
+export interface ReturnLineRecord {
+  id: string;
+  orderLineId: string;
+  itemId: string;
+  sku: string;
+  name: string;
+  quantity: number;
+  reasonId: string;
+  credit: boolean;
+}
+
+/** A return of sales-order lines into a warehouse. */
+export interface ReturnRecord {
+  id: string;
+  number: string;
+  orderId: string;
+  customerId: string | null;
+  warehouse: string;
+  /** Set only at creation; JTL never changes it afterwards. */
+  externalNumber: string | null;
+  internalComment: string | null;
+  date: string;
+  lines: ReturnLineRecord[];
 }
 
 /** A provider refusal with the HTTP status the API answers with; commands surface the message. */

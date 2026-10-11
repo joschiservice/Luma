@@ -2,10 +2,13 @@
 
 Returns lists the returns a connected store shares, and refunds that no return settles, with
 their stage, refund state, order and evidence. Returns and refunds are imported through
-commerce sync into the Orders owner's projections. The workspace only reads: approving,
+commerce sync into the Orders owner's projections. Store records are only read: approving,
 receiving and refunding happen in the store, and Luma reads the result on its next sync.
+People record their own receipt, inspection and resolution decisions in
+[return cases](#return-cases), which link to store records without changing them.
 
-Code: `@luma/orders` (stage and money rules, `orders_returns`), `@luma/read-models` (reads).
+Code: `@luma/orders` (stage and money rules, `orders_returns`, return cases),
+`@luma/read-models` (reads).
 
 ## Model
 
@@ -66,6 +69,58 @@ The list and detail each read one read-only snapshot. The list returns counts pe
 stage plus every commerce connection with its returns access and sync state, so the page can
 explain missing coverage. Its keyset cursor is bound to the filters. A refund ID that settles a
 return resolves to that return.
+
+## Return cases
+
+A return case is Luma's record of one return: lines of one source's order with whole units,
+a reason and a note, and people's decisions on them. Store facts stay in `orders_returns` and
+the canonical snapshots; a case refers to one store return at most (`sourceReturnId`) and
+never rewrites it. `returns.read` reads cases; `returns.manage` (Owner and Admin by default)
+changes them.
+
+### Counting units
+
+Returnable units of an order line are the ordered units minus units the source cancelled
+before fulfillment, minus units in the order's non-cancelled cases, minus units in store
+returns that no open case works. Declined and cancelled store returns count nothing. A case
+that works a store return counts its own lines, so that return is not counted a second time.
+A case binds to the lines of one connection; linked orders keep separate lines per source,
+so units are never compared across sources. Opening a case takes a per-order transaction
+lock, which keeps concurrent cases from claiming the same units. One open case can work a
+store return; a partial unique index enforces it.
+
+### Decisions
+
+Receipt records received units per line (at most the requested units); requested units that
+did not arrive are missing. Inspection splits each line's received units into resellable and
+damaged and requires a receipt. A proposal names a refund, exchange, store credit or rejection
+and the units to restock per line, which can't exceed the resellable units; a rejection
+restocks nothing. A proposal is never executed: refunds, restocking and exchanges are separate
+governed actions. Recording an earlier step again replaces it and clears the later ones.
+
+Every change names a command ID and the expected revision. An exact retry by the same actor
+changes nothing; a reused ID with another request, or a stale revision, is a conflict. The
+case row, an append-only history entry with the decision, its actor and evidence, and an
+audit entry commit together. Evidence is a note and an http(s) link; files are not stored.
+An assignee must be a current member who can manage returns. Cancelling refuses while a
+creation request is approved, sending or uncertain, and ends one awaiting approval.
+
+### Creating the return in the order's system
+
+When the case's connection grants `returns.create` with `returns.options.read` and
+`returns.created.read`, a person can request the return there. The request fixes the
+warehouse, one return reason and the case lines with their mapped source IDs; a line without
+exactly one source mapping blocks it. It follows the purchase-order submission path in
+[supplier commitments](supplier-commitments.md#submission): Action Admission binds the exact
+high-risk action, another person with `decisions.respond` and the app permission approves,
+and Luma dispatches once as the requester. Observe-only records `not_executed`.
+
+Success needs an independent read through `returns.created.read` that finds exactly one
+return for the case with the approved lines and units; more than one, or different lines,
+fails the request and nothing is sent again. An uncertain dispatch only reconciles by
+reading. One request per case can be live or created. Approval requests expire after 24
+hours. Requests are not in Needs you yet; approvers open the case. JTL-Wawi is the only
+provider that creates returns; see [JTL](jtl.md#returns).
 
 ## Limits
 

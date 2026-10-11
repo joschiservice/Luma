@@ -59,6 +59,8 @@ export default function JtlSettings({
       purchasing:
         suppliedConnection?.permissions.includes('purchase-orders.submit') ??
         false,
+      returns:
+        suppliedConnection?.permissions.includes('returns.create') ?? false,
       customers:
         suppliedConnection?.permissions.includes('customers.read') ?? false,
     },
@@ -96,6 +98,13 @@ export default function JtlSettings({
                 'suppliers.read',
                 'purchase-orders.read',
                 'purchase-orders.submit',
+              ] as const)
+            : []),
+          ...(value.returns
+            ? ([
+                'returns.options.read',
+                'returns.created.read',
+                'returns.create',
               ] as const)
             : []),
           ...(value.customers ? (['customers.read'] as const) : []),
@@ -250,6 +259,19 @@ export default function JtlSettings({
                   disabled={pending}
                 />
                 {m.jtl_setup_purchasing()}
+              </label>
+            )}
+          </form.Field>
+          <form.Field name="returns">
+            {(field) => (
+              <label className="connection-checkbox">
+                <input
+                  type="checkbox"
+                  checked={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.checked)}
+                  disabled={pending}
+                />
+                {m.jtl_setup_returns()}
               </label>
             )}
           </form.Field>

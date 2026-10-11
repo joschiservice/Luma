@@ -1,6 +1,6 @@
 {
   "sourceUrl": "https://developer.jtl-software.com/openapi/erp/2.2.json",
-  "sourceSha256": "ea871864c99b19856ccd9f80b1519c4c64983abca4cb3e3ed33041c10932a064",
+  "sourceSha256": "a904b73626629e09e4b0adb2bdc331ee3d49d1e0e5d7b612f5b1aabced67d5f0",
   "version": "2.2",
   "paths": {
     "/v2/sales-orders": {
@@ -553,6 +553,120 @@
       "response": {
         "$ref": "#/components/schemas/JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.PurchaseOrder"
       }
+    },
+    "/v2/warehouses": {
+      "parameters": [
+        {
+          "name": "pageNumber",
+          "in": "query"
+        },
+        {
+          "name": "pageSize",
+          "in": "query"
+        },
+        {
+          "name": "sortBy",
+          "in": "query"
+        },
+        {
+          "name": "sortDescending",
+          "in": "query"
+        },
+        {
+          "name": "x-tenant-id",
+          "in": "header"
+        }
+      ],
+      "scopes": ["inventory.read"],
+      "response": {
+        "$ref": "#/components/schemas/JTL.Framework.Api.Abstraction.Models.PagedListOfJTL.Wawi.Warenlagerverwaltung.PublicApi.DataTransferObjects.V2.Warehouses.WarehouseListItem"
+      }
+    },
+    "/v2/return-reasons": {
+      "parameters": [
+        {
+          "name": "x-companyid",
+          "in": "header"
+        },
+        {
+          "name": "x-tenant-id",
+          "in": "header"
+        }
+      ],
+      "scopes": ["returns.read"],
+      "response": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/JTL.Wawi.Rest.Contracts.Models.V1.ReturnReason.ReturnReason"
+        }
+      }
+    },
+    "/v2/returns": {
+      "parameters": [
+        {
+          "name": "returnNumber",
+          "in": "query"
+        },
+        {
+          "name": "customerId",
+          "in": "query"
+        },
+        {
+          "name": "IsExisting",
+          "in": "query"
+        },
+        {
+          "name": "salesOrderId",
+          "in": "query"
+        },
+        {
+          "name": "returnStateId",
+          "in": "query"
+        },
+        {
+          "name": "pageNumber",
+          "in": "query"
+        },
+        {
+          "name": "pageSize",
+          "in": "query"
+        },
+        {
+          "name": "x-companyid",
+          "in": "header"
+        },
+        {
+          "name": "x-tenant-id",
+          "in": "header"
+        }
+      ],
+      "scopes": ["returns.read"],
+      "response": {
+        "$ref": "#/components/schemas/JTL.Wawi.Rest.Contracts.Models.PagedListOfJTL.Wawi.Rest.Contracts.Models.V1.Return.Return"
+      }
+    },
+    "/v2/returns/{returnId}/line-items": {
+      "parameters": [
+        {
+          "name": "returnId",
+          "in": "path"
+        },
+        {
+          "name": "x-companyid",
+          "in": "header"
+        },
+        {
+          "name": "x-tenant-id",
+          "in": "header"
+        }
+      ],
+      "scopes": ["returns.read"],
+      "response": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/JTL.Wawi.Rest.Contracts.Models.V1.Return.ReturnLineItem"
+        }
+      }
     }
   },
   "shippingMethodWrite": {
@@ -598,6 +712,25 @@
     },
     "response": {
       "$ref": "#/components/schemas/JTL.Wawi.PurchaseOrders.PublicApi.DataTransferObjects.V2.PurchaseOrderDomain.CreatePurchaseOrderCommandResponse"
+    }
+  },
+  "returnCreate": {
+    "parameters": [
+      {
+        "name": "x-companyid",
+        "in": "header"
+      },
+      {
+        "name": "x-tenant-id",
+        "in": "header"
+      }
+    ],
+    "scopes": ["returns.write"],
+    "request": {
+      "$ref": "#/components/schemas/JTL.Wawi.Rest.Contracts.Models.V1.Return.CreateReturn"
+    },
+    "response": {
+      "$ref": "#/components/schemas/JTL.Wawi.Rest.Contracts.Models.V1.Return.Return"
     }
   },
   "schemas": {
@@ -3810,6 +3943,295 @@
         }
       }
     },
+    "JTL.Framework.Api.Abstraction.Models.PagedListOfJTL.Wawi.Warenlagerverwaltung.PublicApi.DataTransferObjects.V2.Warehouses.WarehouseListItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalItems", "pageNumber", "pageSize", "items"],
+      "properties": {
+        "totalItems": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "pageNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "pageSize": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JTL.Wawi.Warenlagerverwaltung.PublicApi.DataTransferObjects.V2.Warehouses.WarehouseListItem"
+          }
+        },
+        "totalPages": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "hasPreviousPage": {
+          "type": "boolean"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "nextPageNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "previousPageNumber": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "JTL.Wawi.Warenlagerverwaltung.PublicApi.DataTransferObjects.V2.Warehouses.WarehouseListItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "active"],
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.WarenlagerKey"
+        },
+        "name": {
+          "type": "string"
+        },
+        "active": {
+          "type": "boolean"
+        }
+      }
+    },
+    "JTL.Wawi.Rest.Contracts.Models.V1.ReturnReason.ReturnReason": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "translations"],
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.RueckgabegrundKey"
+        },
+        "translations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JTL.Wawi.Rest.Contracts.Models.V1.Common.Translation"
+          }
+        }
+      }
+    },
+    "JTL.Data.Contracts.Keys.RueckgabegrundKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Wawi.Rest.Contracts.Models.V1.Common.Translation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["languageIso", "name"],
+      "properties": {
+        "languageIso": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "JTL.Wawi.Rest.Contracts.Models.PagedListOfJTL.Wawi.Rest.Contracts.Models.V1.Return.Return": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalItems", "pageNumber", "pageSize", "items"],
+      "properties": {
+        "totalItems": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "pageNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "pageSize": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JTL.Wawi.Rest.Contracts.Models.V1.Return.Return"
+          }
+        },
+        "totalPages": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "hasPreviousPage": {
+          "type": "boolean"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "nextPageNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "previousPageNumber": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "JTL.Wawi.Rest.Contracts.Models.V1.Return.Return": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "number",
+        "returnDate",
+        "customerId",
+        "externalNumber",
+        "origin",
+        "companyId",
+        "salesOrderId",
+        "stateId",
+        "warehouseId",
+        "externalComment",
+        "internalComment",
+        "contact",
+        "transmitToSalesChannel"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.RetoureKey"
+        },
+        "number": {
+          "type": "string"
+        },
+        "returnDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "customerId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.KundeKey"
+        },
+        "externalNumber": {
+          "type": "string"
+        },
+        "origin": {
+          "$ref": "#/components/schemas/JTL.Wawi.Rest.Contracts.Models.V1.Return.ReturnOrigin"
+        },
+        "companyId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.FirmaKey"
+        },
+        "salesOrderId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VerkaufAuftragKey"
+        },
+        "stateId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.RetoureStatusKey"
+        },
+        "warehouseId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.WarenlagerKey"
+        },
+        "externalComment": {
+          "type": "string"
+        },
+        "internalComment": {
+          "type": "string"
+        },
+        "contact": {
+          "type": "string"
+        },
+        "transmitToSalesChannel": {
+          "type": "boolean"
+        }
+      }
+    },
+    "JTL.Data.Contracts.Keys.RetoureKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Wawi.Rest.Contracts.Models.V1.Return.ReturnOrigin": {
+      "type": "integer",
+      "format": "int32",
+      "enum": [0, 1, 2, 3, 4, 5, 6, 7]
+    },
+    "JTL.Data.Contracts.Keys.RetoureStatusKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
+    "JTL.Wawi.Rest.Contracts.Models.V1.Return.ReturnLineItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "returnId",
+        "stateId",
+        "itemId",
+        "name",
+        "sKU",
+        "quantity",
+        "returnReasonId",
+        "conditionId",
+        "conditionComment",
+        "credit",
+        "salesOrderId",
+        "salesOrderLineItemId",
+        "deliveryNoteLineItemId"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.RetourePosKey"
+        },
+        "returnId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.RetoureKey"
+        },
+        "stateId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.RetoureStatusKey"
+        },
+        "itemId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.ArtikelKey"
+        },
+        "name": {
+          "type": "string"
+        },
+        "sKU": {
+          "type": "string"
+        },
+        "quantity": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "returnReasonId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.RueckgabegrundKey"
+        },
+        "returnReasonComment": {
+          "type": "string"
+        },
+        "conditionId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.ZustandKey"
+        },
+        "conditionComment": {
+          "type": "string"
+        },
+        "credit": {
+          "type": "boolean"
+        },
+        "salesOrderId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VerkaufAuftragKey"
+        },
+        "salesOrderLineItemId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VerkaufAuftragPositionKey"
+        },
+        "deliveryNoteLineItemId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.LieferscheinPosKey"
+        }
+      }
+    },
+    "JTL.Data.Contracts.Keys.RetourePosKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
     "JTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.UpdateSalesOrderCommandRequest": {
       "type": "object",
       "additionalProperties": false,
@@ -4409,6 +4831,95 @@
       "properties": {
         "purchaseOrderId": {
           "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.LieferantenBestellungKey"
+        }
+      }
+    },
+    "JTL.Wawi.Rest.Contracts.Models.V1.Return.CreateReturn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["companyId", "salesOrderId", "warehouseId", "items"],
+      "properties": {
+        "returnDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "externalNumber": {
+          "type": "string"
+        },
+        "companyId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.FirmaKey"
+        },
+        "salesOrderId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VerkaufAuftragKey"
+        },
+        "warehouseId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.WarenlagerKey"
+        },
+        "externalComment": {
+          "type": "string"
+        },
+        "internalComment": {
+          "type": "string"
+        },
+        "contact": {
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JTL.Wawi.Rest.Contracts.Models.V1.Return.CreateReturnLineItem"
+          }
+        },
+        "packages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JTL.Wawi.Rest.Contracts.Models.V1.Return.CreateReturnPackage"
+          }
+        },
+        "transmitToSalesChannel": {
+          "type": "boolean"
+        }
+      }
+    },
+    "JTL.Wawi.Rest.Contracts.Models.V1.Return.CreateReturnLineItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["quantity", "returnReasonId"],
+      "properties": {
+        "quantity": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "returnReasonId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.RueckgabegrundKey"
+        },
+        "returnReasonComment": {
+          "type": "string"
+        },
+        "credit": {
+          "type": "boolean"
+        },
+        "salesOrderLineItemId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VerkaufAuftragPositionKey"
+        },
+        "deliveryNoteLineItemId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.LieferscheinPosKey"
+        }
+      }
+    },
+    "JTL.Wawi.Rest.Contracts.Models.V1.Return.CreateReturnPackage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trackingID"],
+      "properties": {
+        "trackingID": {
+          "type": "string"
+        },
+        "shippingMethodId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VersandartKey"
+        },
+        "shippingMethodCustom": {
+          "type": "string"
         }
       }
     }

@@ -37,6 +37,7 @@ const writeMethods: Partial<
 > = {
   'orders.shipping-method.write': { writeMethod: 'PATCH' },
   'purchase-orders.submit': { writeMethod: 'POST' },
+  'returns.create': { writeMethod: 'POST' },
 };
 
 const writeReads: Partial<
@@ -44,6 +45,7 @@ const writeReads: Partial<
 > = {
   'orders.shipping-method.write': 'orders.shipping-method.read',
   'purchase-orders.submit': 'purchase-orders.read',
+  'returns.create': 'returns.created.read',
 };
 
 /** Creates the JTL connector contribution with deployment-approved network destinations. */
@@ -131,6 +133,7 @@ export function createJtlProvider(options: {
         ...(fetch ? { fetch } : {}),
         shippingMethodActions: true,
         purchaseOrderActions: true,
+        returnActions: true,
         customers: current.connection.granted.includes('customers.read'),
         connection:
           target.kind === 'jtl-cloud'
@@ -161,7 +164,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
       id: 'jtl',
       name: 'JTL',
       description:
-        'Connect JTL Cloud or JTL-Wawi to read commerce data, correct shipping methods, and send approved purchase orders.',
+        'Connect JTL Cloud or JTL-Wawi to read commerce data, correct shipping methods, send approved purchase orders, and create approved returns.',
       version: '1.0.0',
       category: 'erp',
       ui: ['connections', 'settings'],
@@ -182,6 +185,13 @@ export function createApp(context: AppFactoryContext): AppDefinition {
           label: 'Change JTL shipping methods',
           description:
             'Propose, approve, and apply shipping method corrections to JTL orders. Approving also needs the permission to approve changes.',
+          consequential: true,
+        },
+        {
+          key: jtlPermissions.returns,
+          label: 'Create returns in JTL',
+          description:
+            'Propose, approve, and create returns in JTL for return cases. Approving also needs the permission to approve changes.',
           consequential: true,
         },
       ],

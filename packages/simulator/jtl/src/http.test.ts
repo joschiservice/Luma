@@ -349,6 +349,23 @@ describe('JTL ERP API', () => {
       operation: 'purchase-orders.read',
       resource: '4',
     });
+    expect(target('returns', 'POST')).toEqual({
+      operation: 'returns.create',
+      resource: undefined,
+      write: true,
+    });
+    expect(target('returns/3/line-items')).toMatchObject({
+      operation: 'returns.created.read',
+      resource: '3',
+      write: false,
+    });
+    expect(target('returns?salesOrderId=4')).toMatchObject({
+      operation: 'returns.created.read',
+    });
+    expect(target('return-reasons')).toMatchObject({
+      operation: 'returns.options.read',
+      write: false,
+    });
     expect(target('unknown')).toMatchObject({ operation: 'unknown' });
   });
 
