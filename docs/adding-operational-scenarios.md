@@ -86,5 +86,6 @@ Put engine behavior in [engine.test.ts](../apps/simulator/src/engine/engine.test
 rule edge cases in colocated unit tests; follow
 [simulator.browser.mjs](../apps/api/e2e/simulator.browser.mjs) for the visible journey and
 case link. A new test file or application package must be added to the explicit suite
-selection in `tooling/dev/test-plan.mjs` and `tooling/dev/verify-feature.mjs`, then run
+selection in `tooling/dev/test-plan.mjs` and `tooling/dev/verify-feature.mjs`, and a new
+journey mapped in `apps/api/e2e/journey-areas.mjs`, then run
 `pnpm verify:feature simulator` (see [feature validation](development.md#feature-validation)).

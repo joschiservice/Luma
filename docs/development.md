@@ -93,6 +93,7 @@ Start with the smallest check that proves the change, then widen:
 | One rule or service | `pnpm --filter @luma/resolution test inventory-monitor.test.ts` |
 | One backend journey | `pnpm test:e2e returns.e2e.mjs`                                 |
 | One browser journey | `pnpm test:browser returns.browser.mjs`                         |
+| Your branch         | `pnpm test:affected`                                            |
 | Shared components   | `pnpm test:ui`                                                  |
 | A feature area      | `pnpm verify:feature <simulator\|workflows\|orders>`            |
 | Before review       | `pnpm check`                                                    |
@@ -134,6 +135,51 @@ suites cannot run. Report that limitation when relying on it.
   timeout to speed up tests.
 - Use `pnpm run test --filter=<package>` (with `run`) so pnpm forwards the filter to the
   database runner.
+
+### Cached and affected tests
+
+Turbo caches each package's `test` result. The hash covers the package's files, the builds
+of its workspace dependencies, extra inputs declared in the package's `turbo.json`, and
+`LUMA_TEST_CAPABILITIES`. The test runner sets that variable to the optional dependencies
+present: PostgreSQL and the Code Step runtime. A run that skipped database suites is
+therefore never reused for a run that can execute them. The database URL is not hashed,
+because each run gets a new container. Run tests through the `pnpm test*` scripts.
+Running `turbo run test` directly with `TEST_DATABASE_URL` set bypasses the marker. Add
+`--force` to rerun cached results.
+
+The root `package.json` must not depend on workspace packages. Turbo adds the sources of
+root dependencies to every task hash, so a change to any of them would miss every cache
+and select every task. Scripts under `tooling/` declare the packages they import in
+`tooling/package.json`; `pnpm test:architecture` checks this.
+
+A test that reads a file outside its package and that package's dependencies must list
+the file in the package's `turbo.json` test `inputs`. Otherwise a change to that file
+replays a stale result. `pnpm test:architecture` finds such relative paths and fails until
+they are declared.
+
+`pnpm test:affected` compares the working tree, including uncommitted and untracked files,
+with the merge base of `main` (override with `TURBO_SCM_BASE`). It runs:
+
+- unit tests whose task inputs changed;
+- the backend and browser journeys that exercise the changes.
+
+`TURBO_SCM_BASE=HEAD pnpm test:affected` selects only for uncommitted changes, which keeps
+iterations small on a branch that already touches shared code. `pnpm test:e2e --affected`
+and `pnpm test:browser --affected` apply the same selection to one suite. Journeys are selected from [journey-areas.mjs](../apps/api/e2e/journey-areas.mjs):
+
+- A changed journey, or a module it imports by relative path, selects that journey.
+- Ignored paths select nothing.
+- A shared path selects every journey.
+- A path a journey declares selects that journey.
+- Any other path selects every journey, and the runner prints it.
+
+When a full run names an unmapped path, map it to the journeys that exercise it rather than
+marking it shared. Every journey file must be mapped; `pnpm test:tooling` checks this and
+that every pattern still matches a file.
+
+Pull requests in CI use affected selection for unit tests and journeys. Pushes to `main`
+run every journey, so a missing mapping still fails there. Selection trades coverage for
+speed: run the full journey suites when a change alters behavior shared across features.
 
 CI runs the same gates as `pnpm test:full` in parallel jobs. A regression test compares
 the two; update both when adding a gate. The required `Quality gates` check passes only

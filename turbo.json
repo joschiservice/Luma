@@ -1,6 +1,9 @@
 {
   "$schema": "https://v2-11-7.turborepo.dev/schema.json",
   "globalDependencies": [".env", "**/.env", "**/.env.*"],
+  "futureFlags": {
+    "affectedUsingTaskInputs": true
+  },
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
@@ -13,8 +16,8 @@
     "test": {
       "dependsOn": ["^build"],
       "outputs": [],
-      "env": ["TEST_DATABASE_URL"],
-      "cache": false
+      "env": ["LUMA_TEST_CAPABILITIES"],
+      "passThroughEnv": ["TEST_DATABASE_URL"]
     },
     "dev": {
       "dependsOn": ["^build"],

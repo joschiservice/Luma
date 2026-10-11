@@ -1,0 +1,13 @@
+{
+  "$schema": "https://v2-11-7.turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/tooling/code-runtime/**",
+        "$TURBO_ROOT$/tooling/evaluation/fixtures/code-corpus.json"
+      ]
+    }
+  }
+}

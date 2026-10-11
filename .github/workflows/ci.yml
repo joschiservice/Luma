@@ -17,6 +17,8 @@ jobs:
     env:
       # Package tasks each start their own workers; avoid ten tasks on two CPUs.
       TURBO_CONCURRENCY: '100%'
+      # Pull requests test what their changes affect; pushes to main run every test.
+      AFFECTED: ${{ github.event_name == 'pull_request' && '--affected' || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -27,7 +29,7 @@ jobs:
           - name: Main tests
             cache: tests
             # Forward --filter to our database runner, not pnpm's recursive test shortcut.
-            command: pnpm run test --filter=!@luma/ui
+            command: pnpm run test --filter=!@luma/ui $AFFECTED
           - name: UI component tests
             cache: ui
             browser: '@luma/ui'
@@ -41,28 +43,32 @@ jobs:
             command: pnpm test:evaluation && pnpm evaluate:playbook && pnpm evaluate:code
           - name: Backend E2E (1/2)
             cache: e2e-1
-            command: pnpm test:e2e --shard=1/2
+            command: pnpm test:e2e $AFFECTED --shard=1/2
           - name: Backend E2E (2/2)
             cache: e2e-2
-            command: pnpm test:e2e --shard=2/2
+            command: pnpm test:e2e $AFFECTED --shard=2/2
           - name: Browser E2E (1/4)
             cache: browser-1
             browser: '@luma/api'
-            command: pnpm test:browser --shard=1/4
+            command: pnpm test:browser $AFFECTED --shard=1/4
           - name: Browser E2E (2/4)
             cache: browser-2
             browser: '@luma/api'
-            command: pnpm test:browser --shard=2/4
+            command: pnpm test:browser $AFFECTED --shard=2/4
           - name: Browser E2E (3/4)
             cache: browser-3
             browser: '@luma/api'
-            command: pnpm test:browser --shard=3/4
+            command: pnpm test:browser $AFFECTED --shard=3/4
           - name: Browser E2E (4/4)
             cache: browser-4
             browser: '@luma/api'
-            command: pnpm test:browser --shard=4/4
+            command: pnpm test:browser $AFFECTED --shard=4/4
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Affected selection compares against the merge base with the pull request base.
+          fetch-depth: 0
+          filter: blob:none
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:

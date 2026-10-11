@@ -60,7 +60,8 @@ with scheduled detection), `apps/web` (product UI), `apps/simulator` and
 - **Tests:** unit tests sit next to the code. Database integration tests are
   `packages/application-runtime/src/*.integration.test.ts`. Backend journeys are
   `apps/api/e2e/*.e2e.mjs`, browser journeys `*.browser.mjs`, and both share fixtures in
-  that directory. Stories sit next to components.
+  that directory; `journey-areas.mjs` maps them to the source they exercise. Stories sit
+  next to components.
 - **Docs:** feature guides are listed in the [docs index](README.md); product guides
   are in `apps/web/content/docs`.
 

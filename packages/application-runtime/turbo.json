@@ -1,0 +1,14 @@
+{
+  "$schema": "https://v2-11-7.turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/api/src/**",
+        "$TURBO_ROOT$/packages/apps/*/package.json",
+        "$TURBO_ROOT$/tooling/shopify/**"
+      ]
+    }
+  }
+}

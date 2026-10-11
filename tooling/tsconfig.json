@@ -10,5 +10,10 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["dev/process.mjs", "dev/environment.mjs", "dev/test-plan.mjs"]
+  "include": [
+    "dev/process.mjs",
+    "dev/environment.mjs",
+    "dev/test-plan.mjs",
+    "dev/affected.mjs"
+  ]
 }
