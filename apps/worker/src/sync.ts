@@ -2,6 +2,7 @@ import { createDefaultCommerceSyncWorker } from '@luma/application-runtime/sync'
 import {
   readCommerceSyncConfig,
   readIdentityConfig,
+  readModelGatewayConfig,
   readObservabilityConfig,
 } from '@luma/config';
 import {
@@ -13,15 +14,21 @@ import {
 export async function main(
   localTelemetry?: Awaited<ReturnType<typeof startLocalTelemetry>>,
 ) {
-  const observability = createObservability(
-    readObservabilityConfig(process.env),
-  );
+  // Mailbox reading sends documents and supplier messages to the configured EU model routes.
+  const modelSettings = readModelGatewayConfig(process.env);
+  const observability = createObservability({
+    ...readObservabilityConfig(process.env),
+    approvedModels: Object.values(modelSettings.routes).map(
+      (route) => route.model,
+    ),
+  });
   try {
     const worker = await createDefaultCommerceSyncWorker(
       readIdentityConfig(process.env),
       readCommerceSyncConfig(process.env),
       process.env,
       observability,
+      modelSettings,
     );
     const shutdown = () => worker.shutdown();
     for (const signal of ['SIGINT', 'SIGTERM'] as const)

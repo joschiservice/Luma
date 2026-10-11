@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "node tooling/dev/cli.mjs dev",
     "build": "turbo run build build:storybook",
-    "typecheck": "pnpm typecheck:tooling && turbo run typecheck",
+    "typecheck": "turbo run typecheck",
     "lint": "eslint . --max-warnings 0 && pnpm lint:ui",
     "lint:fix": "eslint . --fix --max-warnings 0",
     "test": "node tooling/dev/test.mjs test",
@@ -60,7 +60,7 @@
     "test:browser:report": "pnpm --filter @luma/api exec playwright show-report ../../.luma/playwright/report",
     "knip": "knip",
     "knip:check": "knip --include files,dependencies,unlisted,unresolved --no-config-hints && knip --exports --include-entry-exports --no-config-hints",
-    "typecheck:tooling": "tsc -p tooling/tsconfig.json",
+    "typecheck:tooling": "turbo run typecheck --filter=@luma/tooling",
     "lint:ui": "node tooling/style/check-ui.mjs",
     "dev:staff": "node tooling/dev/cli.mjs staff"
   },

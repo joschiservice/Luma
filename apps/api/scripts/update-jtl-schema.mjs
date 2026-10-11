@@ -77,6 +77,10 @@ for (const path of [
   '/v2/items/{itemId}/suppliers',
   '/v2/purchase-orders',
   '/v2/purchase-orders/{purchaseOrderId}',
+  '/v2/warehouses',
+  '/v2/return-reasons',
+  '/v2/returns',
+  '/v2/returns/{returnId}/line-items',
 ]) {
   const get = api.paths[path].get;
   paths[path] = {
@@ -105,21 +109,28 @@ const shippingMethodWrite = {
   response: schema(patch.responses['200'].content['application/json'].schema),
 };
 
-const post = api.paths['/v2/purchase-orders'].post;
+// Describes a consumed create endpoint: its parameters, scopes, request and 201 response.
+function create(path) {
+  const post = api.paths[path].post;
 
-const purchaseOrderCreate = {
-  parameters: post.parameters.map(({ name, in: location }) => ({
-    name,
-    in: location,
-  })),
-  scopes: [
-    ...new Set(
-      (post.security ?? []).flatMap((entry) => Object.values(entry).flat()),
-    ),
-  ],
-  request: schema(post.requestBody.content['application/json'].schema),
-  response: schema(post.responses['201'].content['application/json'].schema),
-};
+  return {
+    parameters: post.parameters.map(({ name, in: location }) => ({
+      name,
+      in: location,
+    })),
+    scopes: [
+      ...new Set(
+        (post.security ?? []).flatMap((entry) => Object.values(entry).flat()),
+      ),
+    ],
+    request: schema(post.requestBody.content['application/json'].schema),
+    response: schema(post.responses['201'].content['application/json'].schema),
+  };
+}
+
+const purchaseOrderCreate = create('/v2/purchase-orders');
+
+const returnCreate = create('/v2/returns');
 
 await writeFile(
   new URL(
@@ -134,6 +145,7 @@ await writeFile(
       paths,
       shippingMethodWrite,
       purchaseOrderCreate,
+      returnCreate,
       schemas,
     },
     null,

@@ -1,0 +1,621 @@
+import { randomUUID } from 'node:crypto';
+import { readdir, readFile } from 'node:fs/promises';
+
+import { createAuditLog } from '@luma/audit/composition';
+import type { EffectAdapter, EffectRegistry } from '@luma/connections';
+import type { MessageSendBinding } from '@luma/connections/composition';
+import type { TenantContext } from '@luma/identity';
+import {
+  builtInMembership,
+  makeTenantContext,
+} from '@luma/identity/composition';
+import type {
+  MailboxConnection,
+  MessageData,
+  MessageReader,
+  RecordStates,
+} from '@luma/messaging';
+import { createMessaging } from '@luma/messaging/composition';
+import { createTenantDatabase } from '@luma/platform/composition';
+import { Pool } from 'pg';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+
+import { createRecordDirectory } from './composition/messaging.js';
+import {
+  createReplyAdmission,
+  createReplyEffects,
+} from './composition/messaging-replies.js';
+import { createSafetyServices } from './composition/services.js';
+
+const databaseUrl = process.env.TEST_DATABASE_URL;
+
+describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
+  const name = `replies_${randomUUID().replaceAll('-', '')}`;
+  const admin = new Pool({ connectionString: databaseUrl });
+  let owner: Pool;
+  let runtime: Pool;
+  const tenant = randomUUID();
+  const otherTenant = randomUUID();
+  const connectionId = randomUUID();
+  const aliceId = randomUUID();
+  const bobId = randomUUID();
+  const memberId = randomUUID();
+  const outsiderId = randomUUID();
+  const orderId = randomUUID();
+
+  const context = (
+    userId: string,
+    role: 'admin' | 'member',
+    organization = tenant,
+  ): TenantContext =>
+    makeTenantContext(
+      { userId, sessionId: `session-${userId}` },
+      {
+        id: organization,
+        name: 'Shop',
+        slug: `shop-${organization}`,
+        dataRegion: 'EU',
+        status: 'active',
+      },
+      builtInMembership(
+        { id: `membership-${userId}`, organizationId: organization, userId },
+        role,
+      ),
+      randomUUID(),
+    );
+  const alice = () => context(aliceId, 'admin');
+  const bob = () => context(bobId, 'admin');
+
+  /** The provider mailbox: stored messages per thread, and every send that reached it. */
+  const mailbox: { providerMessageId: string; data: MessageData }[] = [];
+  const sends: string[] = [];
+  let loseResponse = false;
+  const ops = { address: 'ops@shop.example', name: null };
+  const anna = { address: 'anna@acme.example', name: 'Anna' };
+  mailbox.push({
+    providerMessageId: 'm1',
+    data: {
+      thread: { externalId: 't1', scopeKey: '' },
+      rfcMessageId: 'm1@acme.example',
+      inReplyTo: null,
+      references: [],
+      direction: 'inbound',
+      from: anna,
+      to: [ops],
+      cc: [],
+      replyTo: [],
+      subject: 'Order 1001',
+      text: 'Hello, when will order 1001 arrive? Thanks',
+      truncated: false,
+      sentAt: new Date(Date.now() - 3_600_000).toISOString(),
+      receivedAt: new Date(Date.now() - 3_600_000).toISOString(),
+      labels: ['INBOX'],
+      attachments: [],
+    },
+  });
+  const reader: MessageReader = {
+    async messages(_context, _connection, input) {
+      return {
+        ok: true,
+        items: mailbox.filter((m) => m.data.receivedAt >= input.receivedSince),
+        nextCursor: null,
+      };
+    },
+    async thread(_context, _connection, input) {
+      return {
+        ok: true,
+        items: mailbox.filter(
+          (m) => m.data.thread.externalId === input.thread.externalId,
+        ),
+        nextCursor: null,
+      };
+    },
+  };
+  /**
+   * Sends like the Gmail adapter: the Message-ID derives from the outbound ID and a message with
+   * that ID is never sent twice. `loseResponse` drops the response after the send happened.
+   */
+  const sender = {
+    sendEffects: (binding: MessageSendBinding): EffectRegistry => ({
+      async resolve(ctx, intent) {
+        const input = await binding.map(ctx, intent);
+        if (!input) return null;
+        const adapter: EffectAdapter = {
+          dispatchIdentity: 'fake-mailbox/1',
+          capability: 'messages.send',
+          version: '0',
+          minimumRisk: 'low',
+          permission: 'gmail:messages.send',
+          mechanism: 'api',
+          executor: { kind: 'connector', id: 'fake-mailbox' },
+          checkPreconditions: (action) =>
+            binding.checkPreconditions(ctx, action),
+          async execute() {
+            const messageId = `luma.${input.outboundId}@shop.example`;
+            if (!mailbox.some((m) => m.data.rfcMessageId === messageId)) {
+              sends.push(input.outboundId);
+              const at = new Date().toISOString();
+              mailbox.push({
+                providerMessageId: `sent-${sends.length}`,
+                data: {
+                  thread: input.thread ?? { externalId: 'new', scopeKey: '' },
+                  rfcMessageId: messageId,
+                  inReplyTo: input.inReplyTo,
+                  references: input.references,
+                  direction: 'outbound',
+                  from: ops,
+                  to: input.to,
+                  cc: input.cc,
+                  replyTo: [],
+                  subject: input.subject,
+                  text: input.text,
+                  truncated: false,
+                  sentAt: at,
+                  receivedAt: at,
+                  labels: ['SENT'],
+                  attachments: [],
+                },
+              });
+            }
+            if (loseResponse) throw new Error('connection lost after send');
+
+            return { evidenceRefs: [randomUUID()] };
+          },
+          verify: (action) => binding.verify(ctx, action),
+        };
+
+        return adapter;
+      },
+    }),
+  };
+  const connection: MailboxConnection = {
+    id: connectionId,
+    label: 'Operations mailbox',
+    provider: 'gmail',
+    status: 'active',
+    version: 1,
+    address: 'ops@shop.example',
+    canRead: true,
+    canSend: true,
+    installerId: aliceId,
+  };
+  const records: RecordStates = {
+    async read(ctx, refs) {
+      return new Map(
+        refs
+          .filter(
+            (r) => r.kind === 'order' && ctx.permissions.has('orders.read'),
+          )
+          .map((r) => [
+            `order:${r.id}`,
+            {
+              kind: 'order' as const,
+              label: '1001',
+              observedAt: new Date().toISOString(),
+              status: 'open',
+              paymentStatus: 'paid',
+              fulfillment: 'unfulfilled' as const,
+              dueAt: null,
+              tracking: [],
+            },
+          ]),
+      );
+    },
+  };
+  let messaging: ReturnType<typeof createMessaging>;
+  let safety: ReturnType<typeof createSafetyServices>;
+  let threadId: string;
+
+  beforeAll(async () => {
+    await admin.query(`CREATE DATABASE "${name}"`);
+    const url = new URL(databaseUrl!);
+    url.pathname = `/${name}`;
+    owner = new Pool({ connectionString: url.toString() });
+    // Dropping the database at the end terminates idle connections.
+    owner.on('error', () => undefined);
+    const setup = await admin.connect();
+    try {
+      await setup.query(
+        "SELECT pg_advisory_lock(hashtext('luma_test_role_setup'))",
+      );
+      for (const file of (
+        await readdir(new URL('../migrations/', import.meta.url))
+      ).sort())
+        if (file.endsWith('.sql'))
+          await owner.query(
+            await readFile(
+              new URL(`../migrations/${file}`, import.meta.url),
+              'utf8',
+            ),
+          );
+    } finally {
+      await setup.query(
+        "SELECT pg_advisory_unlock(hashtext('luma_test_role_setup'))",
+      );
+      setup.release();
+    }
+    const password = randomUUID();
+    await admin.query(
+      `CREATE ROLE "${name}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
+    );
+    // The API login's messaging and safety roles, never the owner's.
+    await admin.query(
+      `GRANT luma_desk,luma_policies,luma_execution,luma_audit TO "${name}"`,
+    );
+    url.username = name;
+    url.password = password;
+    runtime = new Pool({ connectionString: url.toString(), max: 8 });
+    runtime.on('error', () => undefined);
+
+    for (const id of [tenant, otherTenant])
+      await owner.query(
+        "INSERT INTO organizations(id,name,slug,status,created_at,write_mode) VALUES($1,'Shop',$2,'active',now(),'writes_enabled')",
+        [id, `shop-${id}`],
+      );
+    await owner.query(
+      "INSERT INTO connector_installations(tenant_id,id,version,document,secret) VALUES($1,$2,1,$3,'secret')",
+      [
+        tenant,
+        connectionId,
+        { tenantId: tenant, id: connectionId, version: 1, status: 'active' },
+      ],
+    );
+
+    const database = createTenantDatabase(runtime);
+    const effects = createReplyEffects(sender, () => messaging.replies);
+    safety = createSafetyServices(
+      database,
+      { refreshContext: async (c) => c },
+      effects,
+      { eligible: (c, step) => messaging.replies.eligible(c, step) },
+    );
+    const contexts = new Map<string, () => TenantContext>([
+      [aliceId, alice],
+      [bobId, bob],
+    ]);
+    messaging = createMessaging(database, {
+      audit: createAuditLog,
+      refreshContext: async (c) => c,
+      resolveContext: async (userId, tenantId) => {
+        const make = contexts.get(userId);
+        if (!make || tenantId !== tenant) throw new Error('unknown');
+
+        return make();
+      },
+      connections: {
+        list: async (c) => (c.tenantId === tenant ? [connection] : []),
+      },
+      directory: createRecordDirectory(database),
+      members: { canReadMessages: async () => true },
+      reader,
+      records,
+      replyAdmission: createReplyAdmission(safety, effects),
+    });
+
+    await messaging.service.mailboxes(alice());
+    await messaging.service.addRule(alice(), connectionId, {
+      id: randomUUID(),
+      kind: 'sender_domain',
+      value: 'acme.example',
+      party: { kind: 'other' },
+    });
+    for (const scope of await messaging.sync!.scopes())
+      await messaging.sync!.tick(scope);
+    threadId = (
+      await owner.query<{ id: string }>(
+        "SELECT id FROM messaging_threads WHERE tenant_id=$1 AND provider_thread_id='t1'",
+        [tenant],
+      )
+    ).rows[0]!.id;
+  }, 60_000);
+
+  beforeEach(() => {
+    loseResponse = false;
+  });
+
+  afterAll(async () => {
+    await safety?.close();
+    await runtime?.end();
+    await owner?.end();
+    await admin.query(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
+    await admin.query(`DROP ROLE IF EXISTS "${name}"`);
+    await admin.end();
+  });
+
+  /** Drafts a reply as Alice and replaces its text. */
+  async function draft(text: string) {
+    const drafted = await messaging.replies.draft(alice(), threadId, {
+      id: randomUUID(),
+    });
+
+    return messaging.replies.update(alice(), drafted.id, {
+      expectedRevision: drafted.revision,
+      to: drafted.to.map((a) => a.address),
+      cc: [],
+      subject: drafted.subject,
+      text,
+    });
+  }
+
+  async function sendCount(outboundId: string) {
+    return sends.filter((id) => id === outboundId).length;
+  }
+
+  it('drafts from linked records with citations', async () => {
+    // Order projections belong to another owner; the link is what drafting reads.
+    await owner.query(
+      `INSERT INTO messaging_links(tenant_id,id,thread_id,record_kind,record_id,method,state,evidence,created_by,created_at)
+      VALUES($1,$2,$3,'order',$4,'manual','active',$5,$6,now())`,
+      [
+        tenant,
+        randomUUID(),
+        threadId,
+        orderId,
+        { messageId: null, ruleId: null, text: null, span: null },
+        aliceId,
+      ],
+    );
+    const drafted = await messaging.replies.draft(alice(), threadId, {
+      id: randomUUID(),
+    });
+
+    expect(drafted).toMatchObject({
+      state: 'draft',
+      to: [{ address: 'anna@acme.example', name: 'Anna' }],
+      subject: 'Re: Order 1001',
+      consequential: [],
+      canEdit: true,
+      canRequest: true,
+    });
+    expect(drafted.text).toContain('Hello Anna,');
+    expect(drafted.text).toContain('Order 1001 has not shipped yet.');
+    expect(drafted.citations).toEqual([
+      expect.objectContaining({
+        record: { kind: 'order', id: orderId, label: null },
+        freshness: 'fresh',
+      }),
+    ]);
+    // Bob sees the draft but cannot change or send Alice's reply.
+    expect(
+      (await messaging.service.thread(bob(), threadId)).outbound.find(
+        (o) => o.id === drafted.id,
+      ),
+    ).toMatchObject({ canEdit: false, canRequest: false });
+    await expect(
+      messaging.replies.request(bob(), drafted.id, { id: randomUUID() }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it('sends a low-risk reply once and verifies it by reading the thread', async () => {
+    const reply = await draft('Thanks, we are checking this for you.');
+    const command = randomUUID();
+    const sent = await messaging.replies.request(alice(), reply.id, {
+      id: command,
+    });
+
+    expect(sent).toMatchObject({ state: 'sent', consequential: [] });
+    expect(await sendCount(reply.id)).toBe(1);
+    expect(
+      await messaging.replies.request(alice(), reply.id, { id: command }),
+    ).toMatchObject({ state: 'sent' });
+    expect(
+      await messaging.replies.send(alice(), reply.id, { id: randomUUID() }),
+    ).toMatchObject({ state: 'sent' });
+    expect(await sendCount(reply.id)).toBe(1);
+
+    const detail = await messaging.service.thread(alice(), threadId);
+    const message = detail.messages.find((m) => m.id === sent.sentMessageId);
+    expect(message).toMatchObject({
+      direction: 'outbound',
+      origin: 'luma',
+      source: { rfcMessageId: `luma.${reply.id}@shop.example` },
+    });
+    expect(detail.thread).toMatchObject({
+      awaitingReply: false,
+      replyDueAt: null,
+    });
+    expect(detail.events.map((e) => e.type)).toEqual(
+      expect.arrayContaining(['reply_requested', 'sent']),
+    );
+    expect(
+      (await safety.execution.get(alice(), (await action(reply.id))!))?.state,
+    ).toBe('succeeded');
+  });
+
+  it('needs someone else to approve a consequential reply before sending it', async () => {
+    const reply = await draft('We refund 20 EUR and ship on Monday.');
+    expect(reply.consequential).toEqual(['date', 'money']);
+    await expect(
+      messaging.replies.update(alice(), reply.id, {
+        expectedRevision: reply.revision - 1,
+        to: ['anna@acme.example'],
+        cc: [],
+        subject: reply.subject,
+        text: 'Changed',
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    const requested = await messaging.replies.request(alice(), reply.id, {
+      id: randomUUID(),
+    });
+    expect(requested).toMatchObject({
+      state: 'approval_required',
+      canApprove: false,
+      canEdit: false,
+    });
+    expect(requested.decisionId).toBeTruthy();
+    expect(await sendCount(reply.id)).toBe(0);
+    await expect(
+      messaging.replies.update(alice(), reply.id, {
+        expectedRevision: requested.revision,
+        to: ['anna@acme.example'],
+        cc: [],
+        subject: reply.subject,
+        text: 'Changed after the request',
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    await expect(
+      messaging.replies.decide(alice(), reply.id, {
+        decisionId: requested.decisionId!,
+        outcome: 'approved',
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    await expect(
+      messaging.replies.decide(context(memberId, 'member'), reply.id, {
+        decisionId: requested.decisionId!,
+        outcome: 'approved',
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(
+      (await messaging.replies.pending(bob())).find(
+        (p) => p.outboundId === reply.id,
+      ),
+    ).toMatchObject({ state: 'approval_required', response: 'decide' });
+    expect(
+      (await messaging.replies.pending(alice())).find(
+        (p) => p.outboundId === reply.id,
+      ),
+    ).toMatchObject({ response: 'awaiting_other' });
+
+    const approved = await messaging.replies.decide(bob(), reply.id, {
+      decisionId: requested.decisionId!,
+      outcome: 'approved',
+    });
+    expect(approved).toMatchObject({ state: 'sent', approverId: bobId });
+    expect(await sendCount(reply.id)).toBe(1);
+    expect(
+      (await messaging.service.thread(alice(), threadId)).events.map(
+        (e) => e.type,
+      ),
+    ).toContain('reply_approved');
+    expect(
+      (await messaging.replies.pending(bob())).map((p) => p.outboundId),
+    ).not.toContain(reply.id);
+  });
+
+  it('withholds a reply whose stored text changed after the request', async () => {
+    const reply = await draft('We confirm 40 units.');
+    const requested = await messaging.replies.request(alice(), reply.id, {
+      id: randomUUID(),
+    });
+    await owner.query(
+      `UPDATE messaging_outbound SET document=jsonb_set(document,'{text}','"We confirm 400 units."')
+      WHERE tenant_id=$1 AND id=$2`,
+      [tenant, reply.id],
+    );
+    const decided = await messaging.replies.decide(bob(), reply.id, {
+      decisionId: requested.decisionId!,
+      outcome: 'approved',
+    });
+
+    expect(decided).toMatchObject({
+      state: 'withheld',
+      stateReason: expect.stringContaining('Nothing was sent'),
+    });
+    expect(await sendCount(reply.id)).toBe(0);
+  });
+
+  it('reconciles a lost response by reading and never sends twice', async () => {
+    const reply = await draft('Thanks, noted.');
+    loseResponse = true;
+    const uncertain = await messaging.replies.request(alice(), reply.id, {
+      id: randomUUID(),
+    });
+
+    expect(uncertain).toMatchObject({ state: 'uncertain', canCheck: true });
+    expect(await sendCount(reply.id)).toBe(1);
+    loseResponse = false;
+    expect(
+      await messaging.replies.send(alice(), reply.id, { id: randomUUID() }),
+    ).toMatchObject({ state: 'uncertain' });
+    expect(
+      (await messaging.replies.pending(alice())).find(
+        (p) => p.outboundId === reply.id,
+      ),
+    ).toMatchObject({ state: 'uncertain', response: 'check' });
+
+    const checked = await messaging.replies.check(alice(), reply.id);
+    expect(checked).toMatchObject({ state: 'sent' });
+    expect(checked.sentMessageId).toBeTruthy();
+    await messaging.replies.check(alice(), reply.id);
+    await messaging.replies.pass(alice());
+    expect(await sendCount(reply.id)).toBe(1);
+  });
+
+  it('settles an uncertain send in the background pass by reading only', async () => {
+    const reply = await draft('Thanks again.');
+    loseResponse = true;
+    await messaging.replies.request(alice(), reply.id, { id: randomUUID() });
+    loseResponse = false;
+    await messaging.replies.pass(alice());
+
+    expect(
+      (await messaging.service.thread(alice(), threadId)).outbound.find(
+        (o) => o.id === reply.id,
+      ),
+    ).toMatchObject({ state: 'sent' });
+    expect(await sendCount(reply.id)).toBe(1);
+  });
+
+  it('records an observe-only send as withheld without contacting the mailbox', async () => {
+    await owner.query(
+      "UPDATE organizations SET write_mode='observe_only' WHERE id=$1",
+      [tenant],
+    );
+    try {
+      const reply = await draft('Thanks, we are on it.');
+      const withheld = await messaging.replies.request(alice(), reply.id, {
+        id: randomUUID(),
+      });
+
+      expect(withheld).toMatchObject({
+        state: 'withheld',
+        stateReason: expect.stringContaining('Observe-only'),
+      });
+      expect(await sendCount(reply.id)).toBe(0);
+      expect(
+        (await messaging.service.thread(alice(), threadId)).events.map(
+          (e) => e.type,
+        ),
+      ).toContain('reply_withheld');
+      expect(
+        await safety.execution.get(alice(), (await action(reply.id))!),
+      ).toMatchObject({ state: 'not_executed', reason: 'observe_only' });
+    } finally {
+      await owner.query(
+        "UPDATE organizations SET write_mode='writes_enabled' WHERE id=$1",
+        [tenant],
+      );
+    }
+  });
+
+  it('discards drafts and keeps replies inside their workspace and roles', async () => {
+    const reply = await draft('Draft to drop.');
+    expect(
+      await messaging.replies.discard(alice(), reply.id, { id: randomUUID() }),
+    ).toMatchObject({ state: 'discarded', canRequest: false });
+
+    await expect(
+      messaging.replies.draft(context(memberId, 'member'), threadId, {
+        id: randomUUID(),
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    const outsider = context(outsiderId, 'admin', otherTenant);
+    await expect(
+      messaging.replies.draft(outsider, threadId, { id: randomUUID() }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    await expect(
+      messaging.replies.request(outsider, reply.id, { id: randomUUID() }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(await messaging.replies.pending(outsider)).toEqual([]);
+  });
+
+  async function action(outboundId: string) {
+    return (
+      await owner.query<{ action_id: string }>(
+        'SELECT action_id FROM messaging_outbound WHERE tenant_id=$1 AND id=$2',
+        [tenant, outboundId],
+      )
+    ).rows[0]?.action_id;
+  }
+});

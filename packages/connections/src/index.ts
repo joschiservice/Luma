@@ -15,6 +15,7 @@ export type {
 } from './application/authority.js';
 
 export type {
+  EffectAdapter,
   EffectIntent,
   EffectRegistry,
   VerificationResult,
@@ -27,23 +28,30 @@ export type {
   CapabilityOutput,
   CapabilityResult,
   ConnectorFailure,
+  AttachmentContent,
   CustomerSnapshot,
   ExternalId,
   FulfillmentSnapshot,
   HistoryLimit,
   InventorySnapshot,
+  MailboxFilter,
+  MessageReadCapability,
+  MessageSnapshot,
   Observation,
   OrderSnapshot,
   Page,
+  CreatedReturnSnapshot,
   ProductSnapshot,
   ReadCapability,
   RefundSnapshot,
+  ReturnOptionSnapshot,
   ReturnSnapshot,
   SourceIdentity,
   SupplierOrderSnapshot,
   SupplierOrderStatus,
   SupplierSnapshot,
   WriteCapability,
+  WriteReceipt,
 } from './domain/capabilities.js';
 
 export type {
@@ -72,6 +80,7 @@ export type {
 } from './application/playbook-grants.js';
 
 export type {
+  CapabilityDescriptor,
   CapabilityHandler,
   ConnectorConnection,
   InvocationContext,

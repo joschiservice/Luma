@@ -55,6 +55,12 @@ export const permissionGroups = [
     description: 'Suppliers, purchase orders, and replenishment.',
   },
   {
+    id: 'messaging',
+    label: 'Operations inbox',
+    description:
+      'Message threads from connected mailboxes, their documents, and replies.',
+  },
+  {
     id: 'connections',
     label: 'Connections and apps',
     description: 'Connected systems, imports, and installed apps.',
@@ -193,6 +199,15 @@ export const permissionCatalog = [
     introduced,
   },
   {
+    key: 'returns.manage',
+    group: 'records',
+    label: 'Manage returns',
+    description:
+      'Open return cases, record receipt and inspection, propose resolutions, and request returns in connected systems.',
+    consequential: true,
+    introduced: '2026-10-11',
+  },
+  {
     key: 'insights.read',
     group: 'records',
     label: 'View insights',
@@ -319,6 +334,33 @@ export const permissionCatalog = [
       'Edit suppliers and purchase orders, review supplier commitments, and set up replenishment.',
     consequential: true,
     introduced,
+  },
+  {
+    key: 'messages.read',
+    group: 'messaging',
+    label: 'View message threads',
+    description:
+      'Read message threads from connected mailboxes, their attachments, and the records they are linked to.',
+    consequential: true,
+    introduced: '2026-10-11',
+  },
+  {
+    key: 'messages.manage',
+    group: 'messaging',
+    label: 'Work on message threads',
+    description:
+      'Assign threads, write internal notes, set reply deadlines, link records, review document facts, and choose which messages Luma reads.',
+    consequential: true,
+    introduced: '2026-10-11',
+  },
+  {
+    key: 'messages.send',
+    group: 'messaging',
+    label: 'Send replies',
+    description:
+      'Draft replies and send them, or request approval when they make commitments.',
+    consequential: true,
+    introduced: '2026-10-11',
   },
   {
     key: 'connections.manage',

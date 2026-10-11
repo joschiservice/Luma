@@ -176,11 +176,21 @@ export function createSyncService(deps: SyncServiceDependencies) {
     return {
       connections: connections
         .filter((connection) => !policy.hidden.includes(connection.id))
-        .filter(
-          (connection) =>
-            !['disconnected', 'revoked'].includes(connection.status) ||
-            data.streams.some((s) => s.connectionId === connection.id),
-        )
+        .filter((connection) => {
+          const streamed = data.streams.some(
+            (s) => s.connectionId === connection.id,
+          );
+          // Connections without commerce records, such as mailboxes, have nothing to import.
+          const imports = recordTypes.some((recordType) =>
+            connection.permissions.includes(recordCapabilities[recordType]),
+          );
+
+          return (
+            streamed ||
+            (imports &&
+              !['disconnected', 'revoked'].includes(connection.status))
+          );
+        })
         .map((connection): SyncConnectionView => {
           const streams = data.streams.filter(
             (stream) => stream.connectionId === connection.id,

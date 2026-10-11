@@ -5,9 +5,11 @@ export type InstallationCapability =
   | 'inventory.available.reconcile'
   | 'orders.shipping-method.write'
   | 'purchase-orders.submit'
+  | 'returns.create'
   | 'fulfillment.hold.release'
   | 'fulfillment.open'
-  | 'fulfillment.move';
+  | 'fulfillment.move'
+  | 'messages.send';
 
 /** Public provider settings; each app validates its own fields. */
 export type InstallationTarget = { kind: string; [key: string]: string };

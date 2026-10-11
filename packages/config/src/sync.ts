@@ -9,6 +9,13 @@ export interface CommerceSyncConfig {
   /** Bounded pages per workspace and concurrent streams per connection. */
   workspaceConcurrency: number;
   connectionConcurrency: number;
+  /** Mailbox reading in the same process. */
+  messaging: {
+    /** Days message text and attachment content are kept after receipt. */
+    retentionDays: number;
+    /** Time between reads of a current mailbox. */
+    pollMs: number;
+  };
 }
 
 /**
@@ -53,11 +60,27 @@ export function readCommerceSyncConfig(
     4,
   );
 
+  const retentionDays = Number(env.MESSAGING_RETENTION_DAYS ?? '365');
+  if (
+    !Number.isInteger(retentionDays) ||
+    retentionDays < 30 ||
+    retentionDays > 3650
+  )
+    throw new Error(
+      'MESSAGING_RETENTION_DAYS must be an integer from 30 to 3650',
+    );
+  const pollSeconds = Number(env.MESSAGING_POLL_SECONDS ?? '120');
+  if (!Number.isInteger(pollSeconds) || pollSeconds < 30 || pollSeconds > 3600)
+    throw new Error(
+      'MESSAGING_POLL_SECONDS must be an integer from 30 to 3600',
+    );
+
   return {
     databaseUrl,
     connections,
     concurrency,
     workspaceConcurrency,
     connectionConcurrency,
+    messaging: { retentionDays, pollMs: pollSeconds * 1000 },
   };
 }

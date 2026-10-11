@@ -16,6 +16,13 @@ const installationPermissions = z.enum([
   'suppliers.read',
   'purchase-orders.read',
   'purchase-orders.submit',
+  'messages.read',
+  'message-threads.read',
+  'message-attachments.read',
+  'messages.send',
+  'returns.options.read',
+  'returns.created.read',
+  'returns.create',
 ]);
 
 const header = z

@@ -217,7 +217,10 @@ export async function environment(saved, workflows = false, observing = false) {
   const localOrigin = `http://localhost:${saved.webPort}`;
   const loopbackOrigin = `http://127.0.0.1:${saved.webPort}`;
   const webOrigin =
-    apiEnv.SHOPIFY_WEB_ORIGIN || apiEnv.BETTER_AUTH_URL || localOrigin;
+    apiEnv.SHOPIFY_WEB_ORIGIN ||
+    apiEnv.GMAIL_WEB_ORIGIN ||
+    apiEnv.BETTER_AUTH_URL ||
+    localOrigin;
   if (
     new URL(webOrigin).origin !== webOrigin ||
     !['http:', 'https:'].includes(new URL(webOrigin).protocol)

@@ -61,12 +61,19 @@ export { createOrderSourceVisibility } from './infrastructure/source-visibility.
 export { createInternalOrderSource } from './infrastructure/internal-source.js';
 
 export {
+  createInstalledMessageRuntime,
   createInstalledPurchaseOrderRuntime,
+  createInstalledReturnRuntime,
   createInstalledRuntime,
   createInstalledShippingMethodEffects,
 } from './infrastructure/installations/runtime.js';
 
-export type { InstalledPurchaseOrderRuntime } from './infrastructure/installations/runtime.js';
+export type {
+  InstalledMessageRuntime,
+  InstalledPurchaseOrderRuntime,
+  MessageSendBinding,
+  InstalledReturnRuntime,
+} from './infrastructure/installations/runtime.js';
 
 export type { StoredInstallation } from './application/installations.js';
 

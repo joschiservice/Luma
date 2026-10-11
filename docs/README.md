@@ -40,6 +40,8 @@ for Luma's users live in `apps/web/content/docs`.
 - [Shopify connector](shopify.md), [Shopify actions](shopify-actions.md) and
   [Shopify partner readiness](shopify-production.md).
 - [JTL-Wawi connector](jtl.md) and [Cin7 Core connector](cin7.md).
+- [Gmail connector](gmail.md): Google authorization, rule-scoped mailbox reads, sends and
+  push.
 - [Canonical commerce projections](commerce-projections.md) and
   [commerce sync](commerce-sync.md).
 
@@ -62,6 +64,8 @@ for Luma's users live in `apps/web/content/docs`.
   [legacy Resolution workflow format](resolution-playbooks.md).
 - [Replenishment](replenishment.md), [procurement records](procurement.md) and
   [supplier commitments](supplier-commitments.md).
+- [Operations inbox](messaging.md): mailbox rules, reading, thread work, links and the
+  procurement handoff.
 - [Ask Luma assistant](assistant.md).
 
 **Workspaces and metrics**

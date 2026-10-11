@@ -9,6 +9,7 @@ import {
   type ExternalId,
   type FulfillmentSnapshot,
   type HistoryLimit,
+  type MessageReadCapability,
   type Observation,
   type OrderSnapshot,
   type Page,
@@ -247,7 +248,12 @@ export function createShopifyConnector(
   function handler<
     K extends Exclude<
       ReadCapability,
-      'orders.shipping-method.read' | 'suppliers.read' | 'purchase-orders.read'
+      | 'orders.shipping-method.read'
+      | 'suppliers.read'
+      | 'purchase-orders.read'
+      | MessageReadCapability
+      | 'returns.options.read'
+      | 'returns.created.read'
     >,
   >(capability: K): CapabilityHandler<K> {
     return {

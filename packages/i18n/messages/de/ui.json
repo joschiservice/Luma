@@ -85,5 +85,6 @@
   "ui_unit_piece_one": "Stück",
   "ui_unit_piece_other": "Stück",
   "ui_unit_of_measure_piece": "Stück",
-  "ui_quantity_with_unit": "{quantity} {unit}"
+  "ui_quantity_with_unit": "{quantity} {unit}",
+  "ui_source_rows_limited": "Angezeigt werden die ersten {shown} von {total} Zeilen."
 }

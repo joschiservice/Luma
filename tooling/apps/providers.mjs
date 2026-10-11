@@ -1,9 +1,12 @@
 import { createAppHost } from '@luma/app-catalog';
 import { createApp as cin7, createCin7Provider } from '@luma/app-cin7';
+import { createApp as gmail, createGmailProvider } from '@luma/app-gmail';
 import { createApp as jtl, createJtlProvider } from '@luma/app-jtl';
 import { createApp as shopify, createShopifyProvider } from '@luma/app-shopify';
 import {
+  createInstalledMessageRuntime as mailboxes,
   createInstalledPurchaseOrderRuntime as purchaseOrders,
+  createInstalledReturnRuntime as returns,
   createInstalledRuntime as runtime,
   createInstalledShippingMethodEffects as effects,
 } from '@luma/connections/composition';
@@ -14,6 +17,11 @@ function fixtureProviders(options) {
     createJtlProvider({ ...options, jtlEndpoints: options.jtlEndpoints ?? [] }),
     createShopifyProvider(options),
     createCin7Provider(options),
+    // Token-based mailbox access through the simulator; no Google OAuth or push in fixtures.
+    createGmailProvider({
+      ...(options.simulation ? { simulation: options.simulation } : {}),
+      ...(options.fetch ? { fetch: options.fetch } : {}),
+    }),
   ];
 }
 
@@ -33,17 +41,19 @@ export function createInstalledConnections(db, options) {
   const host = createAppHost(db, {
     ...options,
     env: options.env ?? {},
-    factories: [jtl, shopify, cin7].map((factory, index) => (context) => {
-      const definition = factory(context);
+    factories: [jtl, shopify, cin7, gmail].map(
+      (factory, index) => (context) => {
+        const definition = factory(context);
 
-      return {
-        ...definition,
-        connector: {
-          ...providers[index],
-          ...(options.verify ? { verify: options.verify } : {}),
-        },
-      };
-    }),
+        return {
+          ...definition,
+          connector: {
+            ...providers[index],
+            ...(options.verify ? { verify: options.verify } : {}),
+          },
+        };
+      },
+    ),
   });
 
   return {
@@ -68,4 +78,14 @@ export function createInstalledShippingMethodEffects(options, binding) {
 /** Builds simulator purchase-order reads and submission effects with explicit providers. */
 export function createInstalledPurchaseOrderRuntime(options) {
   return purchaseOrders({ ...options, providers: fixtureProviders(options) });
+}
+
+/** Builds simulator mailbox reads and reply send effects with explicit providers. */
+export function createInstalledMessageRuntime(options) {
+  return mailboxes({ ...options, providers: fixtureProviders(options) });
+}
+
+/** Builds simulator return reads and return-creation effects with explicit providers. */
+export function createInstalledReturnRuntime(options) {
+  return returns({ ...options, providers: fixtureProviders(options) });
 }

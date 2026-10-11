@@ -1,6 +1,6 @@
 # Commerce simulator
 
-The simulator plays a merchant's commerce systems: several Shopify stores and one ERP (JTL-Wawi, or Cin7 Core with `--erp cin7`), the integration between them, a warehouse, carriers, customers and suppliers. Luma connects to it only through its real installed adapters, the commerce sync runner and the Shopify webhook route; it never reads simulator data any other way. The simulator also records ground truth about the incidents it causes, so it can score what Luma detected.
+The simulator plays a merchant's commerce systems: several Shopify stores, one ERP (JTL-Wawi, or Cin7 Core with `--erp cin7`) and a shared Gmail mailbox, the integration between them, a warehouse, carriers, customers and suppliers. Luma connects to it only through its real installed adapters, the commerce sync runner and the Shopify webhook route; it never reads simulator data any other way. The simulator also records ground truth about the incidents it causes, so it can score what Luma detected.
 
 ## Start it
 
@@ -29,6 +29,7 @@ A profile and seed generate a deterministic world that behaves like a real setup
 - **Warehouse:** each warehouse picks the oldest orders within staffed hours and hourly capacity. Lines without stock wait as backorders; lines in stock ship separately.
 - **Carriers and returns:** delivered lines come back at category-specific rates, and returns move through approval, receipt, refund and closing. Received units return to JTL stock.
 - **Suppliers:** the merchant reorders low items in JTL. Suppliers answer purchase orders, including those Luma submits, by their profile: `full`, `partial`, `delayed`, `short` or `silent`.
+- **Mail:** the ERP emails each purchase order from the operations mailbox, and suppliers answer by email as they confirm. Customers write when their parcel is delayed. See [operations mailbox](#operations-mailbox).
 
 The `test` profile holds the fixed fixtures that platform tests rely on and does nothing on its own: orders, shipments and stock change only through controls.
 
@@ -37,6 +38,19 @@ The `test` profile holds the fixed fixtures that platform tests rely on and does
 With `--erp cin7` the same ERP model (orders, shipments, stock, purchasing and suppliers) answers through Cin7 Core's API, and Luma connects through the read-only Cin7 app. Records keep their numeric IDs inside the simulator and appear to Luma as stable GUIDs. Warehouses are Cin7 locations. The ERP model reserves stock per item, not per warehouse, so the stock report spreads each item's reservations over its locations in configured order, up to each location's stock, and puts the rest on the first location. The simulated stock sync pushes the same per-location number to the shop that sells that warehouse, so linked stock compares like for like.
 
 Cin7 holds no credit notes here, because returns happen in the shops. Luma sends nothing to Cin7, so supplier links and stock rules work but purchase-order proposals stay unsent, and the shipping-method approval example does not apply. Cin7 allows 60 requests per minute, so the first import of the `large` profile takes hours; use `--profile small` for a quick loop.
+
+## Operations mailbox
+
+Every run has one Gmail mailbox, `einkauf@luma-goods.example`, instance `gmail`. Its reserved `.example` domain means mail can never reach a real recipient. Luma reads it through the real Gmail app with a token connection; the simulator also answers Google's token endpoint, so OAuth refresh can be exercised against it.
+
+The merchant world writes the mail:
+
+- **Purchase orders:** a few seconds after a purchase order is recorded, the ERP's email `Bestellung BE-…` leaves the mailbox with the order as a PDF. Suppliers reply in the same thread when they confirm: in full with an order-confirmation PDF, with a split delivery and a CSV delivery schedule when they confirm less than ordered (`partial`), or with a new date (`delayed`). Silent suppliers write nothing. Suppliers in German-speaking countries write German, the others English. Texts depend only on the seed and the order, so they repeat.
+- **Customers:** when a carrier reports a parcel delayed, the customer writes in about half of the cases, quoting the order name such as `#DE1001`.
+
+The **Mailbox** tab lists threads and messages and delivers mail as a supplier, customer or anyone else, optionally as a reply in the selected thread. The control API accepts the same `deliver` and `seed-mailbox` commands for instance `gmail`.
+
+Gmail push is not simulated: `watch` succeeds, but no Pub/Sub notification reaches Luma, which needs Google-signed tokens. Luma finds new mail by polling, so it appears on the next mailbox read rather than at once. Search lags behind new mail like the other providers' search, and a message sent twice is stored twice, so duplicate sends show in the mailbox and in the scorecard's repeated writes.
 
 ## Time
 
@@ -85,9 +99,13 @@ The API completes the setup once records are imported and linked, retrying on ea
 
 **Workflow scenarios** in the panel start a reproducible situation and state what Luma should do; their definitions and expected outcomes live in `@luma/simulator-core`. Repeating a request with the same ID starts nothing new. The incident list links each case to its latest workflow run.
 
+Two scenarios act through the mailbox and record scenario-only incidents that never emerge on their own. **Supplier split delivery by email** answers the newest purchase order its supplier has left unanswered for a minute; without one, the merchant orders the first shop's bestseller and suppresses that supplier's own answer. The email ships about 60% in three days and the rest a week later, and the ERP stays unconfirmed until **Recover** books the emailed quantities. **Customer asks about a late order** has the customer of the first shop's newest order write about it.
+
+The demo also adds inbox rules once its suppliers exist: each demo supplier's order address, linked to its Procurement supplier, and catch-alls for `supplier.example` and `customer.example`. The workspace needs the operations inbox for this step.
+
 ## Luma wiring
 
-The pilot provisions one connection per instance (the ERP, then one per shop) with all read capabilities and the write capabilities each provider supports. The manifest `.luma/simulator/pilot.json` binds each connection to its run and instance. The transport selector checks tenant, connection, provider and target, and fails closed for unbound synthetic installations. Simulation is rejected in production.
+The pilot provisions one connection per instance (the ERP, one per shop and the mailbox) with all read capabilities and the write capabilities each provider supports; the mailbox may read messages, threads and attachments and send. A checkout without the Gmail app skips the mailbox. The manifest `.luma/simulator/pilot.json` binds each connection to its run and instance. The transport selector checks tenant, connection, provider and target, and fails closed for unbound synthetic installations. Simulation is rejected in production.
 
 - **Sync:** the pilot API runs the real commerce sync runner with its normal backfill, incremental and reconcile schedule. Orders are imported source-local; Luma suggests cross-source links from the shop order name, and people confirm them.
 - **Webhooks:** the simulator delivers signed Shopify webhooks for every change to Luma's real change route. The pilot configures a synthetic Shopify app whose client secret is the run's webhook secret; its settings point to an `.invalid` origin that is never contacted.
@@ -104,7 +122,7 @@ The control API at `/api` requires the bearer token (`LUMA_SIMULATOR_TOKEN`), an
 
 ## Extending and testing
 
-- **Provider behavior** belongs to `@luma/simulator-shopify`, `@luma/simulator-jtl` and `@luma/simulator-cin7`. Simulator packages depend only on simulator core, so the host composes the Cin7 account with the JTL package's ERP model. Shopify serves GraphQL through a schema built for the queries Luma sends, so unknown fields fail validation like the real API. Simulator compatibility does not prove live-provider compatibility.
+- **Provider behavior** belongs to `@luma/simulator-shopify`, `@luma/simulator-jtl`, `@luma/simulator-cin7` and `@luma/simulator-gmail`. Simulator packages depend only on simulator core, so the host composes the Cin7 account with the JTL package's ERP model. Shopify serves GraphQL through a schema built for the queries Luma sends, so unknown fields fail validation like the real API. Simulator compatibility does not prove live-provider compatibility.
 - **Merchant behavior** belongs to the simulator engine, profile data to `@luma/simulator-commerce` and failure decisions to `@luma/simulator-core`.
 - **New incident kinds** need a kind entry, a start in the engine, a recovery, and an expected case class once a detector exists. Follow the [operational scenario recipe](adding-operational-scenarios.md).
 

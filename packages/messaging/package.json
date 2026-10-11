@@ -1,0 +1,44 @@
+{
+  "name": "@luma/messaging",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "luma-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./composition": {
+      "luma-source": "./src/composition.ts",
+      "types": "./dist/composition.d.ts",
+      "default": "./dist/composition.js"
+    },
+    "./http": {
+      "luma-source": "./src/http.ts",
+      "types": "./dist/http.d.ts",
+      "default": "./dist/http.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@luma/api-contract": "workspace:*",
+    "@luma/audit": "workspace:*",
+    "@luma/identity": "workspace:*",
+    "@luma/platform": "workspace:*",
+    "@orpc/server": "catalog:",
+    "fastify": "catalog:",
+    "fflate": "catalog:",
+    "unpdf": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@luma/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
+    "vitest": "catalog:"
+  }
+}

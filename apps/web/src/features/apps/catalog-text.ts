@@ -16,6 +16,7 @@ const descriptions: Record<string, () => string> = {
   shopify: m.catalog_app_shopify_description,
   jtl: m.catalog_app_jtl_description,
   cin7: m.catalog_app_cin7_description,
+  gmail: m.catalog_app_gmail_description,
 };
 
 /** Returns an app manifest with known descriptions and permissions in the interface language. */

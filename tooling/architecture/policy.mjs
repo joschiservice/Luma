@@ -11,7 +11,7 @@ export const dependencies = {
   federation: [],
   staff: ['platform', 'identity', 'federation'],
   audit: ['platform'],
-  orders: ['platform', 'identity'],
+  orders: ['platform', 'identity', 'audit', 'policies'],
   sales: ['platform', 'identity', 'audit', 'orders', 'connectors'],
   procurement: [
     'platform',
@@ -22,6 +22,8 @@ export const dependencies = {
     'policies',
     'workflows',
   ],
+  // Reads mailboxes through composed ports; other owners' records only through ports.
+  messaging: ['platform', 'identity', 'audit'],
   inventory: ['platform', 'identity'],
   customers: ['platform', 'identity'],
   connectors: ['platform', 'identity'],
@@ -80,6 +82,7 @@ export const domainPackages = {
   orders: 'orders',
   sales: 'sales',
   procurement: 'procurement',
+  messaging: 'messaging',
   inventory: 'inventory',
   connections: 'connectors',
   policies: 'policies',

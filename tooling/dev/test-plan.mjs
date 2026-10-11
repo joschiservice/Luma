@@ -89,8 +89,14 @@ const suites = {
       'test:e2e',
       'simulator.e2e.mjs',
       'case-workflows.e2e.mjs',
+      'inbox.e2e.mjs',
     ],
     ['--filter', '@luma/api', 'test:browser', 'simulator.browser.mjs'],
+  ],
+  // The operations inbox against the simulated mailbox, used by verify:feature.
+  inbox: [
+    ['--filter', '@luma/api', 'test:e2e', 'inbox.e2e.mjs'],
+    ['--filter', '@luma/api', 'test:browser', 'inbox.browser.mjs'],
   ],
 };
 

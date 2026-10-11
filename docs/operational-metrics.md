@@ -173,7 +173,7 @@ Traps:
 ### Topics
 
 `workspaceTopics` in the API contract lists the areas: `orders`, `connections`, `issues`,
-`inventory`, `workflows`, `procurement`, `resolution` and `decisions`. Every table that feeds
+`inventory`, `workflows`, `procurement`, `resolution`, `decisions` and `messaging`. Every table that feeds
 Needs you also carries `decisions`. Each consumer declares its topics: order metrics use
 orders, issues and connections; operational metrics use issues, inventory, procurement and
 connections; resolution outcomes use issues, resolution and connections. A view that reads a
@@ -203,8 +203,8 @@ does not prove complete provider coverage.
 ### Stream access and bounds
 
 Any workspace member may open the stream. Each topic requires its area's read permission
-(`orders.read`, `issues.read`, `inventory.read`, `workflows.read`, `procurement.read`, and
-`insights.read` for resolution); `connections` and `decisions` go to every member because
+(`orders.read`, `issues.read`, `inventory.read`, `workflows.read`, `procurement.read`,
+`messages.read` for messaging, and `insights.read` for resolution); `connections` and `decisions` go to every member because
 their readers filter records themselves. Changes only in unreadable areas send nothing.
 
 The session and membership are resolved again on the five-second heartbeat and before any

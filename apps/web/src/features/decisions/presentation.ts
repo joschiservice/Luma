@@ -39,6 +39,7 @@ export const kindLabels: Record<DecisionKind, () => string> = {
   inventory_correction: m.decisions_kind_inventory_correction,
   supplier_commitment: m.decisions_kind_supplier_commitment,
   workflow_handover: m.decisions_kind_workflow_handover,
+  message_reply: m.decisions_kind_message_reply,
 };
 
 /** The landmark shown for a decision's operational area. */

@@ -30,6 +30,9 @@ export const knownOperations = [
   'suppliers.read',
   'purchase-orders.read',
   'purchase-orders.submit',
+  'returns.options.read',
+  'returns.created.read',
+  'returns.create',
 ];
 
 /** What a planned incident waits for, by kind. */
@@ -62,6 +65,7 @@ export const surfaceLabels: Record<string, string> = {
   orders: 'Orders view',
   procurement: 'Supplier orders',
   connections: 'Connection status',
+  inbox: 'Operations inbox',
 };
 
 /** Names a Luma exception class. */

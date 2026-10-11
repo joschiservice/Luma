@@ -42,6 +42,7 @@ import { type ReactNode, useRef, useState, useSyncExternalStore } from 'react';
 
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
+import { RecordMessages } from '../inbox/record-messages';
 import { stockQuantity } from '../inventory/presentation';
 import { WorkflowCoverageCard } from '../workflows/coverage';
 import {
@@ -165,6 +166,26 @@ export function PurchaseOrderPage() {
         void record.refetch();
         void context.refetch();
       }}
+      messages={
+        <RecordMessages
+          organizationId={organizationId}
+          kind="purchase_order"
+          recordId={purchaseOrderId}
+          frame={(content) => (
+            <section
+              className="procurement-section"
+              aria-labelledby="purchase-order-inbox"
+            >
+              <div className="procurement-section-heading">
+                <h2 id="purchase-order-inbox">
+                  {m.messaging_record_section_title()}
+                </h2>
+              </div>
+              {content}
+            </section>
+          )}
+        />
+      }
     />
   );
 }
@@ -180,6 +201,7 @@ function PurchaseOrderRecordView({
   offline = false,
   error,
   reload,
+  messages,
 }: {
   organizationId: string;
   record?: PurchaseOrderRecord | undefined;
@@ -191,6 +213,8 @@ function PurchaseOrderRecordView({
   /** `missing`, or a message for an unavailable record. */
   error?: string | undefined;
   reload: () => void;
+  /** Inbox threads linked to the order, framed as a record section. */
+  messages?: ReactNode;
 }) {
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const client = useQueryClient();
@@ -342,6 +366,7 @@ function PurchaseOrderRecordView({
                 record={record}
                 open={setDialog}
               />
+              {messages}
               <CommitmentHistory record={record} open={setDialog} />
               <Lifecycle record={record} />
             </div>

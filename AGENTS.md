@@ -112,7 +112,7 @@ Start with the smallest meaningful proof. Test observable behavior and important
 - Backend journey: `pnpm test:e2e <file.e2e.mjs>`. Browser journey: `pnpm test:browser <file.browser.mjs>`.
 - Branch check: `pnpm test:affected` runs the unit tests and backend/browser journeys affected by changes since `main`, including uncommitted files. Prefer it to whole suites while iterating; `TURBO_SCM_BASE=HEAD` limits it to uncommitted changes. It prints the path that forces a run of every journey; map that path in `apps/api/e2e/journey-areas.mjs` when it belongs to specific journeys.
 - Shared UI: `pnpm test:ui`; inspect relevant stories and test the integrated journey when routing, authentication or live data changes.
-- Feature checks: `pnpm verify:feature <simulator|workflows|orders>`. Extend the explicit test selection when adding scenarios.
+- Feature checks: `pnpm verify:feature <simulator|workflows|orders|inbox>`. Extend the explicit test selection when adding scenarios.
 - Before review of code changes, run `pnpm check` and `pnpm test:affected`. Package test results are cached; declare files a test reads from outside its package and dependencies in that package's `turbo.json` test `inputs`. Map new journey files in `apps/api/e2e/journey-areas.mjs`. Documentation-only changes need `pnpm format:check` and `pnpm test:architecture`, which checks links and paths.
 - `pnpm test:full` prepares the Code Step runtime and runs all CI gates, including simulator tooling and release evaluations, with a shared disposable PostgreSQL server. Its command coverage is checked against [CI](.github/workflows/ci.yml).
 - `pnpm test:local` does not provision PostgreSQL and can skip database integration tests. Report that limitation when using it.

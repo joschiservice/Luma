@@ -21,6 +21,7 @@
     "@luma/platform": "workspace:*",
     "@luma/app-host": "workspace:*",
     "@luma/app-cin7": "workspace:*",
+    "@luma/app-gmail": "workspace:*",
     "@luma/app-jtl": "workspace:*",
     "@luma/app-shopify": "workspace:*"
   },

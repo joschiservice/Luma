@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { createWorkspaceAssistant } from '@luma/assistant/composition';
 import { createAuditLog } from '@luma/audit/composition';
 import type {
+  CapabilityReader,
   ConnectionManagement,
   EffectRegistry,
   ProviderCatalog,
@@ -12,7 +13,9 @@ import {
   createOrderSourceVisibility,
   createPlaybookGrantReader,
   createSourceAuthority,
+  type InstalledMessageRuntime,
   type InstalledPurchaseOrderRuntime,
+  type InstalledReturnRuntime,
 } from '@luma/connections/composition';
 import type { VerificationEvaluator } from '@luma/exceptions';
 import {
@@ -24,9 +27,12 @@ import {
   orderAttentionQuery,
 } from '@luma/exceptions/composition';
 import type { IdentityService, TenantContext } from '@luma/identity';
+import { createMessaging } from '@luma/messaging/composition';
 import {
   createOrderMetricReader,
+  createReturnCaseService,
   orderStateQueries,
+  type ReturnCases,
 } from '@luma/orders/composition';
 import type {
   ModelGateway,
@@ -55,7 +61,9 @@ import {
   createProductWorkspace,
   createRecordExplorer,
   createReturnWorkspace,
+  messageReplyDecisionProvider,
   replenishmentDecisionProvider,
+  replySendDecisionProvider,
   supplierCommitmentDecisionProvider,
   workflowHandoverDecisionProvider,
 } from '@luma/read-models/composition';
@@ -92,6 +100,22 @@ import {
   createFollowUpWorkflows,
   type FollowUpTiming,
 } from './case-workflows.js';
+import {
+  createMailboxConnections,
+  createMemberDirectory,
+  createMessageReader,
+  createProcurementHandoff,
+  createRecordDirectory,
+} from './messaging.js';
+import {
+  createAttachmentReader,
+  createDocumentDirectory,
+} from './messaging-documents.js';
+import {
+  createRecordStates,
+  createReplyAdmission,
+  createReplyEffects,
+} from './messaging-replies.js';
 import { createPersistentPlaybookLibrary } from './playbook-library.js';
 import { createProcurementEffects } from './procurement-effects.js';
 import {
@@ -103,6 +127,11 @@ import {
   createReplenishmentRuntime,
   type ReplenishmentTransport,
 } from './replenishment.js';
+import {
+  createReturnCreationAdmission,
+  createReturnCreationEffects,
+  createReturnSystem,
+} from './return-cases.js';
 import { createSalesRuntime } from './sales.js';
 import {
   createDeskServices,
@@ -138,7 +167,9 @@ export interface ApplicationServices {
   codeProcesses: ReturnType<typeof createCodeProcesses>;
   procurement: ReturnType<typeof createProcurement>;
   commitments: SupplierCommitments;
+  returnCases: ReturnCases;
   library: ReturnType<typeof createPersistentPlaybookLibrary>;
+  messaging: ReturnType<typeof createMessaging>;
   http: {
     shadow: ReturnType<typeof createShadowEvaluations>;
     cases: ReturnType<typeof createDetectionServices>['cases'];
@@ -150,6 +181,9 @@ export interface ApplicationServices {
     workflowTemplates: ReturnType<typeof createWorkflowTemplates>;
     procurement: ReturnType<typeof createProcurement>;
     commitments: SupplierCommitments;
+    messaging: ReturnType<typeof createMessaging>['service'];
+    messagingReplies: ReturnType<typeof createMessaging>['replies'];
+    messagingDocuments: ReturnType<typeof createMessaging>['documents'];
     playbooks: ReturnType<typeof createPersistentPlaybookLibrary>;
     activity: ReturnType<typeof createWorkspaceActivity>;
     measurements: ReturnType<typeof createResolutionMeasurements>;
@@ -163,6 +197,7 @@ export interface ApplicationServices {
     procurementContext: ReturnType<typeof createProcurementContext>;
     fulfillment: ReturnType<typeof createFulfillmentWorkspace>;
     returns: ReturnType<typeof createReturnWorkspace>;
+    returnCases: ReturnCases;
     customers: ReturnType<typeof createCustomerWorkspace>;
     orders: ReturnType<typeof createOrderWorkspace>;
     sales: ReturnType<typeof createSalesRuntime>;
@@ -203,14 +238,36 @@ export interface ApplicationOptions {
     runtime: InstalledPurchaseOrderRuntime;
     installations: Pick<ConnectionManagement, 'list'>;
   };
+  /** Installed connections returns can be created in. Without them, cases still work locally. */
+  returns?: {
+    runtime: InstalledReturnRuntime;
+    installations: Pick<ConnectionManagement, 'list'>;
+  };
   /** Whether the gateway has an EU zero-retention route for reading supplier messages. */
   supplierExtraction?: { available: boolean; reason: string | null };
   /** Days supplier message text is kept; defaults to 365. */
   supplierMessageRetentionDays?: number;
   /** Whether the gateway has an EU zero-retention route for the workspace assistant. */
   assistant?: { available: boolean; reason: string | null };
+  /** Whether the gateway has an EU zero-retention route for reading message attachments. */
+  documentExtraction?: { available: boolean; reason: string | null };
   /** Records assistant and tool spans. Without it, the assistant runs untraced. */
   observability?: Observability;
+  /**
+   * Installed mailboxes. Without `reader`, mailboxes and threads are managed but not read;
+   * without `installations`, no mailboxes are listed.
+   */
+  messaging?: {
+    installations?: Pick<ConnectionManagement, 'list'>;
+    reader?: CapabilityReader;
+    /** Sends replies through installed mailboxes; needs enabled execution. */
+    sender?: Pick<InstalledMessageRuntime, 'sendEffects'>;
+    /** Days message text and attachment content are kept; defaults to 365. */
+    retentionDays?: number;
+    /** Time between reads of a current mailbox. */
+    pollMs?: number;
+    log?: (message: string, error?: unknown) => void;
+  };
 }
 
 /**
@@ -277,10 +334,23 @@ export function createApplicationServices(
     options.execution.kind === 'enabled' && options.purchasing
       ? createSubmissionEffects(options.purchasing.runtime, () => commitments)
       : { resolve: async () => null };
+  // Sending replies is an external effect too; replies are composed below.
+  const sender = options.messaging?.sender;
+  const replyEffects =
+    options.execution.kind === 'enabled' && sender
+      ? createReplyEffects(sender, () => messaging.replies)
+      : { resolve: async () => null };
+  // Creating a return in the order's system is an external effect, so it needs enabled execution.
+  const returnCreationEffects =
+    options.execution.kind === 'enabled' && options.returns
+      ? createReturnCreationEffects(options.returns.runtime, () => returnCases)
+      : { resolve: async () => null };
   const combinedEffects: EffectRegistry = {
     resolve: async (context, intent) =>
       (await procurementEffects.resolve(context, intent)) ??
       (await submissionEffects.resolve(context, intent)) ??
+      (await replyEffects.resolve(context, intent)) ??
+      (await returnCreationEffects.resolve(context, intent)) ??
       effects.resolve(context, intent),
   };
   const resolutionEligible = createAdmissionEligibility(detection.diagnoses);
@@ -288,9 +358,13 @@ export function createApplicationServices(
     eligible: (context, step) =>
       step.subject?.kind === 'purchase_order_submission'
         ? commitments.eligible(context, step)
-        : step.subject
-          ? replenishment.eligible(context, step)
-          : resolutionEligible(context, step),
+        : step.subject?.kind === 'message_outbound'
+          ? messaging.replies.eligible(context, step)
+          : step.subject?.kind === 'return_case_creation'
+            ? returnCases.eligible(context, step)
+            : step.subject
+              ? replenishment.eligible(context, step)
+              : resolutionEligible(context, step),
   });
   const commitments: SupplierCommitments = createSupplierCommitmentService(
     database,
@@ -327,6 +401,67 @@ export function createApplicationServices(
       ...(options.supplierMessageRetentionDays
         ? { retentionDays: options.supplierMessageRetentionDays }
         : {}),
+    },
+  );
+  const directory = createRecordDirectory(database);
+  const messaging = createMessaging(database, {
+    audit: createAuditLog,
+    refreshContext: identity.refreshContext,
+    resolveContext: identity.resolveWorkflowContext,
+    connections: createMailboxConnections(
+      database,
+      options.messaging?.installations ?? { list: async () => [] },
+    ),
+    directory,
+    members: createMemberDirectory(identity),
+    reader: options.messaging?.reader
+      ? createMessageReader(options.messaging.reader)
+      : undefined,
+    handoff: createProcurementHandoff(() => commitments),
+    // The order workspace is composed below; drafts read it only once requests arrive.
+    records: createRecordStates({
+      orders: () => orders,
+      commitments: () => commitments,
+      directory,
+    }),
+    replyAdmission:
+      options.execution.kind === 'enabled' && sender
+        ? createReplyAdmission(safety, combinedEffects)
+        : null,
+    // Attachments are read through the same installed runtime as messages.
+    documents: {
+      attachments: options.messaging?.reader
+        ? createAttachmentReader(options.messaging.reader)
+        : undefined,
+      directory: createDocumentDirectory(database),
+      extraction: {
+        gateway: options.modelGateway ?? null,
+        available: options.documentExtraction?.available ?? false,
+        reason:
+          options.documentExtraction?.reason ??
+          'Reading documents automatically isn’t set up on this server.',
+      },
+    },
+    retentionDays: options.messaging?.retentionDays,
+    pollMs: options.messaging?.pollMs,
+    log: options.messaging?.log,
+  });
+  const returnCases: ReturnCases = createReturnCaseService(
+    database,
+    createAuditLog,
+    {
+      system: options.returns
+        ? createReturnSystem(
+            options.returns.runtime,
+            options.returns.installations,
+          )
+        : null,
+      admission:
+        options.execution.kind === 'enabled' && options.returns
+          ? createReturnCreationAdmission(safety, combinedEffects)
+          : null,
+      refreshContext: identity.refreshContext,
+      principal: identity.resolveWorkflowContext,
     },
   );
   const desk = createDeskServices(
@@ -494,6 +629,22 @@ export function createApplicationServices(
           record: item.signal.record,
         })),
       ),
+      messageReplyDecisionProvider(async (context) =>
+        (await messaging.service.dueReplies(context)).map((item) => ({
+          threadId: item.threadId,
+          subject: item.subject,
+          correspondent: item.correspondent?.name
+            ? `${item.correspondent.name} <${item.correspondent.address}>`
+            : (item.correspondent?.address ?? null),
+          mailboxLabel: item.mailboxLabel,
+          replyDueAt: item.replyDueAt,
+          receivedAt: item.lastInboundAt ?? item.lastMessageAt,
+          canRespond: item.canRespond,
+        })),
+      ),
+      replySendDecisionProvider((context) =>
+        messaging.replies.pending(context),
+      ),
       ...(options.decisionSources ?? []).map(appDecisionProvider),
     ],
     refreshContext: identity.refreshContext,
@@ -554,12 +705,17 @@ export function createApplicationServices(
     templates,
     procurement,
     commitments,
+    returnCases,
     detection,
     safety,
     desk,
     playbooks,
     library,
+    messaging,
     http: {
+      messaging: messaging.service,
+      messagingReplies: messaging.replies,
+      messagingDocuments: messaging.documents,
       workflows,
       workflowDrafts: drafts,
       draftTests,
@@ -599,6 +755,7 @@ export function createApplicationServices(
       products: createProductWorkspace(database),
       procurementContext: createProcurementContext(database),
       returns,
+      returnCases,
       customers: createCustomerWorkspace(database),
       records: createRecordExplorer(database, hiddenOrderSources),
       orders,

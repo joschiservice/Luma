@@ -32,14 +32,16 @@ export async function waitForRun(
 }
 
 /**
- * Describes a ready run for pilot provisioning: one connection per provider instance, the SKU
- * pair the inventory monitor compares (ERP item 2 and its first shop listing), and the catalog
- * and shop locations a merchant links for stock detection.
+ * Describes a ready run for pilot provisioning: one connection per provider instance, including
+ * the operations mailbox, the SKU pair the inventory monitor compares (ERP item 2 and its first
+ * shop listing), and the catalog and shop locations a merchant links for stock detection.
  * @param {any} run detail from `GET /api/runs/:id`
  */
 export function simulatorInstances(run) {
   const shops = run.merchant.shops;
-  const erp = run.instances.find((instance) => instance.kind !== 'shopify');
+  const erp = run.instances.find(
+    (instance) => instance.kind === 'jtl' || instance.kind === 'cin7',
+  );
 
   return {
     erp: { name: erp.name, kind: erp.kind },
@@ -57,6 +59,12 @@ export function simulatorInstances(run) {
         kind: 'shopify',
         label: shop.name,
         shop: shop.domain,
+      })),
+      ...(run.merchant.mailboxes ?? []).map((mailbox) => ({
+        name: mailbox.instance,
+        kind: 'gmail',
+        label: 'Gmail',
+        emailAddress: mailbox.address,
       })),
     ],
     inventory: {

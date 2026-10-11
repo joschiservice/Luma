@@ -24,6 +24,10 @@ it('finds the destination that owns a workspace URL', () => {
   expect(
     destinationFor('/app/org/needs-you?item=case%3Aabc&view=mine').path,
   ).toBe('needs-you');
+  expect(destinationFor('/app/org/inbox?thread=7f3c&view=mine').path).toBe(
+    'inbox',
+  );
+  expect(destinationFor('/app/org/inbox/documents/5a1d').path).toBe('inbox');
   expect(destinationFor('/app/org/overview').path).toBe('home');
   expect(destinationFor('/app/org/connections').path).toBe('apps');
   expect(destinationFor('/app/org/unknown').path).toBe('home');

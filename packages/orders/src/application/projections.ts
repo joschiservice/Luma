@@ -6,7 +6,7 @@ export type { RefundData, ReturnData } from '../domain/returns.js';
 
 type EntityKind = 'order' | 'order_line' | 'fulfillment' | 'return' | 'refund';
 
-type CommerceData =
+export type CommerceData =
   | {
       type: 'order';
       displayNumber: string | null;

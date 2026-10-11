@@ -19,7 +19,7 @@ conventions only; it does not list files.
 | Provider apps (setup, adapters, OAuth, webhooks, app UI)         | `packages/apps/<id>`, contracts in `@luma/app-host`, registration in `@luma/app-catalog` |
 | Provider protocol clients                                        | `packages/connectors/*`                                                                  |
 | Editable Luma order records                                      | `@luma/sales`                                                                            |
-| Canonical orders, fulfillment, returns, refunds                  | `@luma/orders`                                                                           |
+| Canonical orders, fulfillment, returns, refunds, return cases    | `@luma/orders`                                                                           |
 | Canonical SKUs, locations, stock, product catalog rows           | `@luma/inventory`                                                                        |
 | Customer profiles                                                | `@luma/customers`                                                                        |
 | Observation → canonical projection                               | `@luma/commerce-ingestion`                                                               |
@@ -28,6 +28,7 @@ conventions only; it does not list files.
 | Case desk, proposals, learning, measurement, activity            | `@luma/resolution`                                                                       |
 | Workflow definitions, versions, activations, runs, authoring     | `@luma/workflows`; durable execution in `@luma/workflow-temporal`                        |
 | Suppliers, purchase orders, replenishment, commitments           | `@luma/procurement`                                                                      |
+| Mailboxes, message threads, links, documents and replies         | `@luma/messaging`                                                                        |
 | Cross-owner read-only views (workspaces, metrics, Needs you)     | `@luma/read-models`                                                                      |
 | Ask Luma                                                         | `@luma/assistant`                                                                        |
 | Service composition, process runtimes, migrations                | `@luma/application-runtime`                                                              |

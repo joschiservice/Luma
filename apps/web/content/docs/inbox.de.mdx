@@ -1,0 +1,65 @@
+---
+title: E-Mails von Lieferanten und Kunden bearbeiten
+description: Verbinde ein gemeinsames Postfach, lege fest, welche Nachrichten Luma liest, und bearbeite Threads mit Verantwortlichen, Fristen, verknüpften Datensätzen, Dokumentprüfung und freigegebenen Antworten.
+---
+
+Der **Posteingang** holt die operativen E-Mails eines gemeinsamen Postfachs wie orders@ oder einkauf@ in Luma. Jeder Thread zeigt, wer verantwortlich ist, wann eine Antwort fällig ist und um welche Bestellungen, Kunden, Lieferanten oder Lieferantenbestellungen es geht. Öffne ihn in der Seitenleiste oder drücke **G** und dann **E**.
+
+## Ein Postfach verbinden [#connect-a-mailbox]
+
+1. Öffne **Apps** und verbinde **Gmail** mit dem Google-Konto des gemeinsamen Postfachs.
+2. Öffne **Posteingang** und dann **Postfächer** und füge die Regeln hinzu, die festlegen, was Luma liest.
+
+Solange ein Postfach keine Regel hat, liest Luma nichts daraus. Ein Postfach kann nur zu einem Workspace gehören.
+
+## Festlegen, was Luma liest [#choose-what-luma-reads]
+
+Luma liest nur Nachrichten, die zu einer Regel passen, und die Antworten, die dein Team an dieselben Kontakte sendet. Alles andere im Postfach liest Luma nicht. Füge eine Regel hinzu für:
+
+- **Absenderdomain**: alle Nachrichten von der Domain eines Lieferanten, etwa `northstar.example`. Subdomains passen ebenfalls.
+- **Absenderadresse**: eine einzelne Adresse, etwa `orders@northstar.example`.
+- **Empfängeradresse (Alias)**: Nachrichten an eine Adresse, die in diesem Postfach ankommt, etwa `einkauf@deinshop.example`.
+- **Label**: Nachrichten mit einem Label oder in einem Ordner des Postfachs.
+
+Jede Regel sagt, wer der Kontakt ist: ein **Lieferant**, den du auswählst, **Kunden** oder **Andere**. Regeln für einen Lieferanten verknüpfen dessen Threads automatisch. Wenn du eine Regel hinzufügst, liest Luma auch passende Nachrichten aus dem Zeitraum **Rückwirkend lesen**, standardmäßig 30 Tage. Wenn du eine Regel entfernst, liest Luma keine neuen passenden Nachrichten mehr; bereits gelesene Threads bleiben.
+
+**Postfächer** zeigt, ob ein Postfach aktuell ist, wann es zuletzt gelesen wurde und bis wann seine Nachrichten gelesen sind. Ist das Lesen **Blockiert**, etwa weil der Google-Zugriff widerrufen wurde, verbinde das Postfach unter **Apps** neu. **Lesen pausieren** stoppt das Lesen, bis du fortsetzt.
+
+Nachrichtentexte werden für begrenzte Zeit aufbewahrt und dann entfernt; Absender, Zeitpunkt, Verknüpfungen und geprüfte Fakten bleiben erhalten. Wer Threads bearbeiten darf, kann den Text einer Nachricht unter **Quelldetails** auch früher entfernen.
+
+## Einen Thread bearbeiten [#work-a-thread]
+
+Wähle eine Ansicht: **Offen**, **Meine**, **Nicht zugewiesen**, **Überfällig**, **Zu prüfen** (Dokumentfakten, die auf Prüfung warten), **Geschlossen** oder **Alle**. Suche nach Betreff, Absender oder Referenz. Mit **J** und **K** bewegst du dich durch die Liste, mit **Esc** schließt du einen Thread.
+
+- **Verantwortlich**: Weise den Thread einer Person aus deinem Team zu oder übernimm ihn selbst.
+- **Status**: **Offen**, **Wartet** auf die Gegenseite oder **Geschlossen**. Eine neue Nachricht öffnet einen geschlossenen Thread wieder.
+- **Antwortfrist**: Luma setzt nach einer unbeantworteten Nachricht eine Frist, standardmäßig 24 Stunden. Setze eine eigene Frist oder kehre zu **Automatisch** zurück. Überfällige Threads sind mit **Antwort überfällig** markiert, und die verantwortliche Person findet sie unter [Wartet auf dich](/docs/needs-you).
+- **Interne Notizen**: Notizen für dein Team. Sie bleiben in Luma und werden nie gesendet.
+
+Der Verlauf zeigt, wer wann was geändert hat.
+
+## Verknüpfte Datensätze [#linked-records]
+
+Luma verknüpft einen Thread, wenn der Nachweis eindeutig ist: eine Lieferantenregel, die E-Mail-Adresse eines Kunden oder eine Bestell- oder Lieferantenbestellnummer in der Nachricht. Jede Verknüpfung zeigt, wie sie gefunden wurde. Eine Referenz, die zu mehreren Datensätzen passt, ist nur ein **Vorschlag**; bestätige den richtigen oder verwirf ihn. Mit **Datensatz verknüpfen** fügst du selbst eine Verknüpfung hinzu, mit **Verknüpfung entfernen** entfernst du eine; Luma fügt eine entfernte Verknüpfung nicht erneut hinzu.
+
+Verknüpfte Datensätze zeigen ihre Threads auf ihrer eigenen Seite unter **Posteingang-Threads**. Eine Lieferantennachricht, die mit genau einer Lieferantenbestellung verknüpft ist, wird auch bei dieser Bestellung erfasst, wo ihre Zusagen geprüft werden.
+
+## Dokumente prüfen [#review-documents]
+
+Luma liest PDF-, Tabellen-, CSV- und Textanhänge bis 10 MB. Öffne einen Anhang, um das Dokument neben den Fakten zu sehen, die Luma daraus vorschlägt: Parteien, Referenzen, Positionen, Daten und Beträge. Wähle einen Fakt aus, um den Text oder die Zellen hervorzuheben, aus denen er stammt.
+
+- **Bestätige** einen richtigen Fakt, **korrigiere** ihn oder **lehne** ihn **ab**.
+- Fakten mit **Geringer Sicherheit** oder solche, die zu mehreren Datensätzen passen, musst du korrigieren, bevor du sie bestätigen kannst; wähle beim Korrigieren den richtigen Datensatz.
+- Markiere Text oder Zellen (mit Umschalttaste für einen Bereich) und wähle **Fakt hinzufügen**, um selbst einen hinzuzufügen, etwa wenn Luma für ein Dokument keine Fakten vorschlägt.
+- Kommt eine neue Version einer Datei an, zeigen Fakten, ob sie **Neu** oder **Geändert** sind, und Fakten, die nicht mehr in der Datei stehen, erscheinen unter **Nicht in dieser Version**.
+
+Eine Datei, die bereits früher ankam, ist als **Duplikat** markiert; prüfe sie im Original. Bestätigte Fakten sind Vorschläge für spätere Arbeit. Sie ändern keine Bestellung und senden nichts von selbst.
+
+## Antworten und Freigabe [#reply-and-approval]
+
+Wähle **Antwort entwerfen**, um eine Antwort aus dem aktuellen Stand der verknüpften Datensätze zu erhalten. **Quellen** listet jeden Datensatz, auf den sich der Entwurf stützt, und wann er gelesen wurde. Angaben, die älter als ein Tag sind oder nicht gelesen werden konnten, nennt der Entwurf ausdrücklich und ergänzt sie nie. Bearbeite Empfänger, Betreff und Text und speichere deine Änderungen.
+
+- Eine Antwort, die ein Datum oder eine Menge bestätigt oder Geldbeträge nennt, braucht eine Freigabe von einer anderen Person; das gilt für jede Antwort, wenn das Postfach eine Freigabe für alle Antworten verlangt. Die Antwort sagt, warum. Wähle **Freigabe anfragen**; die freigebende Person findet sie unter Wartet auf dich oder im Thread, und du sendest sie, sobald sie freigegeben ist.
+- Andere Antworten werden gesendet, sobald du **Senden** wählst.
+
+Eine Antwort gilt erst als **Gesendet und bestätigt**, wenn Luma den Thread erneut liest und sie im Postfach findet. Kann Luma nicht feststellen, ob das Postfach eine Antwort gesendet hat, zeigt es **Ergebnis unbekannt**. Wähle **Postfach prüfen**: Luma liest den Thread nur, um das herauszufinden, und sendet die Antwort nie ein zweites Mal.

@@ -32,9 +32,9 @@ provider options are never request parameters.
 ### Local setup
 
 Managed commands do not generate model settings; put them in `apps/api/.env`. Until a
-`bedrock-eu` route exists, describing workflows, reading supplier messages and Ask Luma
-report why they are unavailable and call no model. Seeded and simulator data is synthetic,
-so the processing-path review does not block local use.
+`bedrock-eu` route exists, describing workflows, reading supplier messages and documents,
+and Ask Luma report why they are unavailable and call no model. Seeded and simulator data is
+synthetic, so the processing-path review does not block local use.
 
 To enable them, create a dedicated IAM principal with the permissions under
 [Bedrock EU adapter](#bedrock-eu-adapter), set the account's retention mode to `none` in the
@@ -70,7 +70,7 @@ retry explicitly under the same policy. Redirects are rejected.
 
 ## Profiles
 
-The three tenant-data profiles share one rule: the feature is available only when its
+The tenant-data profiles share one rule: the feature is available only when its
 profile routes to `bedrock-eu` with `zeroDataRetention: true` and Bedrock settings exist.
 Otherwise the feature reports the reason and calls no model. Each sends `sensitive`, EU,
 zero-retention requests.
@@ -101,6 +101,17 @@ prompts and answers stay out of logs and traces.
 `supplier-extraction` ([Supplier commitments](supplier-commitments.md#supplier-messages))
 reads supplier messages. Without a route, messages are stored and people record facts by
 selecting text.
+
+### Document extraction profile
+
+`document-extraction` ([Operations inbox](messaging.md#facts)) reads documents attached to
+messages: PDF and plain-text pages, and spreadsheet rows the table parser did not cover. It
+sends the file name and at most 60,000 characters of content, one call per document.
+Documents are read in the sync process, which reads the same `MODEL_GATEWAY_*` settings as
+the API; the `supplier-extraction` route applies there too, to supplier messages handed to
+procurement. The model must quote the document; facts whose quote is not found are dropped.
+Without a route, people add facts by selecting text or cells, and spreadsheets still get
+their table facts.
 
 ### Assistant profile
 

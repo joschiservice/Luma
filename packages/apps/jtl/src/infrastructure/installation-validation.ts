@@ -11,6 +11,9 @@ const installationPermissions = z.enum([
   'suppliers.read',
   'purchase-orders.read',
   'purchase-orders.submit',
+  'returns.options.read',
+  'returns.created.read',
+  'returns.create',
 ]);
 
 const header = z
@@ -81,4 +84,12 @@ export const installationInput = z
     (v) =>
       !v.permissions.includes('purchase-orders.submit') ||
       v.permissions.includes('purchase-orders.read'),
+  )
+  // Return creation checks the order and finds earlier returns before it writes.
+  .refine(
+    (v) =>
+      !v.permissions.includes('returns.create') ||
+      (
+        ['orders.read', 'returns.options.read', 'returns.created.read'] as const
+      ).every((read) => v.permissions.includes(read)),
   );

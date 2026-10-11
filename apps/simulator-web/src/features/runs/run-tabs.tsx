@@ -10,6 +10,7 @@ import { useSearchParam } from '../../lib/location';
 import { ChaosView } from '../chaos/chaos-view';
 import { IncidentsView } from '../incidents/incidents-view';
 import { JournalView } from '../journal/journal-view';
+import { MailboxView } from '../mailbox/mailbox-view';
 import { OverviewView } from '../overview/overview-view';
 import { ProvidersView } from '../providers/providers-view';
 import { ScorecardView } from '../scorecard/scorecard-view';
@@ -20,6 +21,7 @@ const tabs = [
   { value: 'incidents', label: 'Incidents' },
   { value: 'scorecard', label: 'Scorecard' },
   { value: 'providers', label: 'Providers' },
+  { value: 'mailbox', label: 'Mailbox' },
   { value: 'journal', label: 'Journal' },
 ] as const;
 
@@ -68,6 +70,9 @@ export function RunTabs({ run }: { run: RunDetail }) {
       </TabsContent>
       <TabsContent value="providers">
         <ProvidersView run={run} />
+      </TabsContent>
+      <TabsContent value="mailbox">
+        <MailboxView run={run} />
       </TabsContent>
       <TabsContent value="journal">
         <JournalView run={run} />

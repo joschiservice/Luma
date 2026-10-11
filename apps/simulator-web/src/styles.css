@@ -624,3 +624,32 @@
     flex-direction: column;
   }
 }
+
+/* Mailbox messages read like a conversation: sender line, recipients, then the body as sent. */
+.sim-mail-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sim-mail {
+  display: grid;
+  gap: 4px;
+  padding-block-end: 12px;
+  border-block-end: 1px solid var(--line);
+}
+
+.sim-mail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.sim-mail-body {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

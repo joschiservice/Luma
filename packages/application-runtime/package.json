@@ -41,6 +41,7 @@
     "@luma/execution": "workspace:*",
     "@luma/identity": "workspace:*",
     "@luma/inventory": "workspace:*",
+    "@luma/messaging": "workspace:*",
     "@luma/orders": "workspace:*",
     "@luma/platform": "workspace:*",
     "@luma/policies": "workspace:*",

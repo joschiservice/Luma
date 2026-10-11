@@ -263,6 +263,8 @@ describe('JTL read adapter', () => {
         'orders.read',
         'products.read',
         'purchase-orders.read',
+        'returns.created.read',
+        'returns.options.read',
         'suppliers.read',
       ]);
     },

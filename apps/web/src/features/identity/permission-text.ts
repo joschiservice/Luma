@@ -58,6 +58,10 @@ const permissionText: Record<
     m.permissions_returns_read_label,
     m.permissions_returns_read_description,
   ],
+  'returns.manage': [
+    m.permissions_returns_manage_label,
+    m.permissions_returns_manage_description,
+  ],
   'insights.read': [
     m.permissions_insights_read_label,
     m.permissions_insights_read_description,
@@ -118,6 +122,18 @@ const permissionText: Record<
     m.permissions_procurement_manage_label,
     m.permissions_procurement_manage_description,
   ],
+  'messages.read': [
+    m.permissions_messages_read_label,
+    m.permissions_messages_read_description,
+  ],
+  'messages.manage': [
+    m.permissions_messages_manage_label,
+    m.permissions_messages_manage_description,
+  ],
+  'messages.send': [
+    m.permissions_messages_send_label,
+    m.permissions_messages_send_description,
+  ],
   'connections.manage': [
     m.permissions_connections_manage_label,
     m.permissions_connections_manage_description,
@@ -158,6 +174,14 @@ const permissionText: Record<
     m.permissions_jtl_orders_shipping_method_write_label,
     m.permissions_jtl_orders_shipping_method_write_description,
   ],
+  'gmail:messages.send': [
+    m.permissions_gmail_messages_send_label,
+    m.permissions_gmail_messages_send_description,
+  ],
+  'jtl:returns.create': [
+    m.permissions_jtl_returns_create_label,
+    m.permissions_jtl_returns_create_description,
+  ],
 };
 
 const groupText: Record<string, readonly [label: Text, description: Text]> = {
@@ -188,6 +212,10 @@ const groupText: Record<string, readonly [label: Text, description: Text]> = {
   procurement: [
     m.permissions_group_procurement_label,
     m.permissions_group_procurement_description,
+  ],
+  messaging: [
+    m.permissions_group_messaging_label,
+    m.permissions_group_messaging_description,
   ],
   connections: [
     m.permissions_group_connections_label,

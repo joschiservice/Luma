@@ -9,7 +9,9 @@ import type {
 import type { ConnectionManagement } from '@luma/connections';
 import {
   createInstallationRepository,
+  createInstalledMessageRuntime,
   createInstalledPurchaseOrderRuntime,
+  createInstalledReturnRuntime,
   createInstalledRuntime,
 } from '@luma/connections/composition';
 import type { IdentityService, TenantContext } from '@luma/identity';
@@ -32,6 +34,7 @@ import { createApplicationServices } from './application.js';
 import {
   assistantAvailability,
   authoringAvailability,
+  documentExtractionAvailability,
   supplierExtractionAvailability,
 } from './authoring.js';
 import { createCommerceSyncService } from './commerce-sync.js';
@@ -142,6 +145,15 @@ export async function buildRuntimeApp(
         )
       : undefined;
     if (processClient) resources.add(processClient.close);
+    const mailboxRuntime =
+      connections && 'registry' in installedConnections
+        ? createInstalledMessageRuntime({
+            installations: installedConnections.connections,
+            providers: installedConnections.registry.providers(),
+            record: async () => undefined,
+            recordObservations: async () => undefined,
+          })
+        : undefined;
     const application = createApplicationServices({
       database: tenantDatabase(),
       identity: identity.service,
@@ -165,6 +177,10 @@ export async function buildRuntimeApp(
         !!modelGateway,
       ),
       assistant: assistantAvailability(modelSettings, !!modelGateway),
+      documentExtraction: documentExtractionAvailability(
+        modelSettings,
+        !!modelGateway,
+      ),
       ...(observability ? { observability } : {}),
       ...(connections && 'registry' in installedConnections
         ? {
@@ -177,6 +193,28 @@ export async function buildRuntimeApp(
                 recordObservations: async () => undefined,
               }),
               installations: installedConnections.connections,
+            },
+            returns: {
+              runtime: createInstalledReturnRuntime({
+                installations: installedConnections.connections,
+                providers: installedConnections.registry.providers(),
+                // Return cases keep the creation evidence they use.
+                record: async () => undefined,
+                recordObservations: async () => undefined,
+              }),
+              installations: installedConnections.connections,
+            },
+          }
+        : {}),
+      // Mailboxes are listed from installed connections; threads are reread on demand.
+      ...(connectionService
+        ? {
+            messaging: {
+              installations: connectionService,
+              // Replies are sent through the same runtime when execution is enabled.
+              ...(mailboxRuntime
+                ? { reader: mailboxRuntime, sender: mailboxRuntime }
+                : {}),
             },
           }
         : {}),

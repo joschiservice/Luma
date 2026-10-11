@@ -38,8 +38,15 @@ import {
   type OrderRecord,
   type PurchaseOrderRecord,
   recordId,
+  type ReturnRecord,
   type SupplierRecord,
 } from './records.js';
+import {
+  createReturn,
+  returnJson,
+  returnLinesJson,
+  returnReasonsJson,
+} from './returns.js';
 import { itemJson } from './stock.js';
 
 const roots = new Set([
@@ -51,6 +58,8 @@ const roots = new Set([
   'suppliers',
   'customers',
   'purchase-orders',
+  'returns',
+  'return-reasons',
 ]);
 
 const MAX_PAGE_SIZE = 1000;
@@ -105,7 +114,13 @@ export function identify(request: ProviderRequest): ProviderTarget {
                   ? write
                     ? 'purchase-orders.submit'
                     : 'purchase-orders.read'
-                  : 'unknown';
+                  : root === 'returns'
+                    ? write
+                      ? 'returns.create'
+                      : 'returns.created.read'
+                    : root === 'return-reasons'
+                      ? 'returns.options.read'
+                      : 'unknown';
 
   return { operation, resource, write };
 }
@@ -330,6 +345,7 @@ async function warehouses(
       context.config.warehouses.map((w) => ({
         id: configId(w.id),
         name: w.name,
+        active: true,
       })),
       page,
     );
@@ -478,6 +494,46 @@ async function purchaseOrders(
   );
 }
 
+async function returns(
+  context: JtlContext,
+  request: ProviderRequest,
+  url: URL,
+  page: PageRequest,
+  [id, child, ...rest]: string[],
+) {
+  if (rest.length) return undefined;
+  if (request.method === 'POST' && !id) {
+    const result = await createReturn(
+      context,
+      body(request),
+      request.headers['idempotency-key'],
+    );
+
+    return {
+      ...json(returnJson(result.record), 201),
+      ...(result.created ? { committed: true } : {}),
+    };
+  }
+  if (request.method !== 'GET') return undefined;
+  if (id) {
+    const record = await detail<ReturnRecord>(context, kinds.return, id);
+    if (!child) return json(returnJson(record));
+
+    return child === 'line-items' ? json(returnLinesJson(record)) : undefined;
+  }
+  const filter = url.searchParams.get('salesOrderId');
+  const orderId = filter === null ? undefined : recordId(filter);
+  if (filter !== null && !orderId)
+    throw new JtlError(400, 'Invalid salesOrderId');
+
+  return storedPage<ReturnRecord>(
+    context,
+    page,
+    { kind: kinds.return, ...(orderId ? { parent: orderId } : {}) },
+    (rows) => rows.map((row) => returnJson(row.data)),
+  );
+}
+
 async function route(context: JtlContext, request: ProviderRequest) {
   const url = new URL(request.url);
   const [root, ...path] = resourcePath(request.url) ?? [];
@@ -486,12 +542,15 @@ async function route(context: JtlContext, request: ProviderRequest) {
   if (root === 'sales-orders') return salesOrders(context, request, page, path);
   if (root === 'purchase-orders')
     return purchaseOrders(context, request, url, page, path);
+  if (root === 'returns') return returns(context, request, url, page, path);
   if (request.method !== 'GET') return undefined;
   if (root === 'items') return items(context, page, path);
   if (root === 'warehouses') return warehouses(context, page, path);
   if (root === 'delivery-notes') return deliveryNotes(context, url, page, path);
   if (root === 'suppliers') return suppliers(context, page, path);
   if (root === 'customers') return customers(context, url, page, path);
+  if (root === 'return-reasons' && !path.length)
+    return json(returnReasonsJson(context));
   if (root === 'shipping-methods' && !path.length)
     return memoryPage(
       context.config.shippingMethods.map((m) => ({

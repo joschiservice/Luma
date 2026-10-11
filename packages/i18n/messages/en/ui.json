@@ -85,5 +85,6 @@
   "ui_unit_piece_one": "unit",
   "ui_unit_piece_other": "units",
   "ui_unit_of_measure_piece": "units",
-  "ui_quantity_with_unit": "{quantity} {unit}"
+  "ui_quantity_with_unit": "{quantity} {unit}",
+  "ui_source_rows_limited": "Showing the first {shown} of {total} rows."
 }

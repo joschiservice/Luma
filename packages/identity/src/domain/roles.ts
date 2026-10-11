@@ -40,6 +40,7 @@ const memberPermissions = [
   'decisions.self_assign',
   'workflows.read',
   'procurement.read',
+  'messages.read',
   'assistant.use',
   'activity.read',
 ] as const satisfies readonly Permission[];

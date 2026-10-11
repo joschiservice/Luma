@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "description": "Development, validation and evaluation scripts run from the repository root.",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
   "devDependencies": {
     "@luma/app-catalog": "workspace:*",
     "@luma/app-host": "workspace:*",
@@ -28,6 +31,7 @@
     "@luma/workflows": "workspace:*",
     "playwright": "catalog:",
     "@luma/app-cin7": "workspace:*",
+    "@luma/app-gmail": "workspace:*",
     "@luma/app-jtl": "workspace:*",
     "@luma/app-shopify": "workspace:*"
   }

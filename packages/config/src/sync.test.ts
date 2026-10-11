@@ -34,4 +34,25 @@ describe('commerce sync configuration', () => {
         key!,
       );
   });
+
+  it('reads mailbox retention and polling with bounds', () => {
+    expect(readCommerceSyncConfig(env).messaging).toEqual({
+      retentionDays: 365,
+      pollMs: 120_000,
+    });
+    expect(
+      readCommerceSyncConfig({
+        ...env,
+        MESSAGING_RETENTION_DAYS: '90',
+        MESSAGING_POLL_SECONDS: '60',
+      }).messaging,
+    ).toEqual({ retentionDays: 90, pollMs: 60_000 });
+    for (const [key, invalid] of [
+      ['MESSAGING_RETENTION_DAYS', '7'],
+      ['MESSAGING_POLL_SECONDS', '5'],
+    ])
+      expect(() => readCommerceSyncConfig({ ...env, [key!]: invalid })).toThrow(
+        key!,
+      );
+  });
 });

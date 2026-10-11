@@ -20,6 +20,7 @@
 | Supporting detail                         | `Disclosure`                    | Evidence, audit events, metadata and technical details                          |
 | Record lists and fact tables              | `DataTable`, `DataTableRowLink` | See [tables](#tables)                                                           |
 | Counts over time or by category           | `BarChart`, `ChartLegend`       | Pair with a table of the same values                                            |
+| Source text or cells beside cited facts   | `SourceText`, `SourceSheet`     | Facts list stays the keyboard path; highlights are click shortcuts              |
 
 Interaction primitives (`Button`, `Field`, `Select`, `SearchableSelect`, `Dialog`, `DropdownMenu`, `Tabs`, `Pagination`, `SectionNavigation` and others) cover forms and navigation. Give link-styled buttons `buttonVariants()` on the link itself so link semantics survive. Coarse pointers get 44px targets automatically; don't shrink them. `Pagination` omits the total when a source does not report one, so never invent a count.
 

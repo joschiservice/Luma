@@ -295,6 +295,20 @@ const sales = [
   'packages/application-runtime/src/composition/sales.ts',
   'packages/api-contract/src/**/sales.ts',
 ];
+const messaging = [
+  'packages/messaging/**',
+  'packages/apps/gmail/**',
+  'packages/connectors/gmail/**',
+  'packages/api-contract/src/**/messaging.ts',
+  'packages/application-runtime/src/composition/{mailbox-sync,messaging,messaging-documents,messaging-replies}.ts',
+  'packages/read-models/src/domain/reply-decisions.ts',
+  'packages/i18n/messages/*/{gmail,messaging}.json',
+];
+const returnCases = [
+  'packages/orders/**',
+  'packages/api-contract/src/**/return-cases.ts',
+  'packages/application-runtime/src/composition/return-cases.ts',
+];
 const sync = [
   'packages/commerce-sync/**',
   'packages/api-contract/src/**/sync.ts',
@@ -355,7 +369,13 @@ const pilot = [
   ...temporalWorker,
   'packages/application-runtime/src/infrastructure/metric-listener.ts',
 ];
-const simulator = [...pilot, 'apps/simulator/**', 'packages/simulator/**'];
+// Simulated merchants also run an operations mailbox, which the sync worker reads.
+const simulator = [
+  ...pilot,
+  ...messaging,
+  'apps/simulator/**',
+  'packages/simulator/**',
+];
 
 // Web
 const webShell = [
@@ -535,6 +555,11 @@ const webSync = [
   'apps/web/src/routes/app.$organizationId.sync.tsx',
   'packages/i18n/messages/*/{connections,settings,sync}.json',
 ];
+const webInbox = [
+  'apps/web/src/features/inbox/**',
+  'apps/web/src/routes/app.$organizationId.inbox.*',
+  'packages/i18n/messages/*/messaging.json',
+];
 const webWorkflows = [
   'apps/web/src/features/settings/{data.ts,roles-data.ts}',
   'apps/web/src/features/shadow/{data.ts,report.tsx,result.tsx,shadow.css}',
@@ -661,6 +686,15 @@ export const journeyAreas = {
     ...webSettings,
     ...webApps,
   ],
+  'inbox.browser.mjs': [
+    ...simulator,
+    ...procurement,
+    ...decisions,
+    ...webShell,
+    ...webInbox,
+    ...webNeedsYou,
+  ],
+  'inbox.e2e.mjs': [...simulator, ...procurement, ...decisions],
   'insights.browser.mjs': [
     ...ordersFixture,
     ...detectionFixture,
@@ -849,6 +883,12 @@ export const journeyAreas = {
     ...webShell,
     ...webHome,
     ...webCases,
+  ],
+  'return-cases.e2e.mjs': [
+    ...simulator,
+    ...returns,
+    ...returnCases,
+    ...decisions,
   ],
   'returns.browser.mjs': [
     ...commerce,

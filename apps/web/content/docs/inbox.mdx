@@ -1,0 +1,65 @@
+---
+title: Work supplier and customer email
+description: Connect a shared mailbox, choose which messages Luma reads, and work threads with owners, deadlines, linked records, document review and approved replies.
+---
+
+The **Inbox** brings the operational email of a shared mailbox, such as orders@ or purchasing@, into Luma. Each thread shows who owns it, when a reply is due and which orders, customers, suppliers or purchase orders it's about. Open it from the sidebar, or press **G** then **E**.
+
+## Connect a mailbox
+
+1. Open **Apps** and connect **Gmail** with the shared mailbox's Google account.
+2. Open **Inbox**, then **Mailboxes**, and add the rules that decide what Luma reads.
+
+Until a mailbox has at least one rule, Luma reads nothing from it. A mailbox can belong to one workspace only.
+
+## Choose what Luma reads
+
+Luma reads only messages that match a rule, and the replies your team sends to the same correspondents. Everything else in the mailbox stays unread by Luma. Add a rule for:
+
+- **Sender domain**: every message from a supplier's domain, such as `northstar.example`. Subdomains match too.
+- **Sender address**: one address, such as `orders@northstar.example`.
+- **Recipient address (alias)**: messages sent to an address that arrives in this mailbox, such as `purchasing@yourshop.example`.
+- **Label**: messages with a label or in a folder of the mailbox.
+
+Each rule says who the correspondent is: a **supplier** you choose, **customers** or **other**. Rules for a supplier link that supplier's threads automatically. When you add a rule, Luma also reads matching messages from the **read back** period, 30 days unless you change it. Removing a rule stops new reads; threads already read stay.
+
+**Mailboxes** shows whether each mailbox is up to date, when it was last read and how far its messages are covered. If reading is **Blocked**, for example because Google access was revoked, reconnect the mailbox in **Apps**. **Pause reading** stops reading until you resume.
+
+Message text is kept for a limited time and then removed; sender, time, links and reviewed facts remain. People who can work on threads can also remove a message's text sooner from **Source details**.
+
+## Work a thread
+
+Choose a view: **Open**, **Mine**, **Unassigned**, **Overdue**, **To review** (document facts waiting for review), **Closed** or **All**. Search by subject, sender or reference. Use **J** and **K** to move through the list and **Esc** to close a thread.
+
+- **Owner**: assign the thread to a teammate, or take it yourself.
+- **Status**: **Open**, **Waiting** for the other side, or **Closed**. A new message reopens a closed thread.
+- **Reply deadline**: Luma sets a deadline after an unanswered message, 24 hours unless the mailbox says otherwise. Set your own deadline, or return to **Automatic**. Overdue threads are labeled **Reply overdue**, and their owner finds them in [Needs you](/docs/needs-you).
+- **Internal notes**: notes for your team. They stay in Luma and are never sent.
+
+The timeline records who changed what and when.
+
+## Linked records
+
+Luma links a thread when the evidence is exact: a supplier rule, a customer's email address, or an order or purchase order number in the message. Each link shows how it was found. A reference that matches several records is only **Suggested**; confirm the right one or dismiss it. Use **Link record** to add a link yourself, and **Remove link** to remove one; Luma doesn't add a removed link again.
+
+Linked records show their threads on their own page under **Inbox threads**. A supplier message linked to exactly one purchase order is also recorded on that purchase order, where its commitments are reviewed.
+
+## Review documents
+
+Luma reads PDF, spreadsheet, CSV and text attachments up to 10 MB. Open an attachment to see the document beside the facts Luma proposes from it: parties, references, lines, dates and amounts. Select a fact to highlight the text or cells it comes from.
+
+- **Confirm** a fact that's correct, **Correct** it, or **Reject** it.
+- Facts with **Low confidence**, or that match several records, need a correction before you can confirm them; choose the right record while correcting.
+- Select text or cells (Shift-click for a range) and choose **Add fact** to add one yourself, for example when Luma doesn't propose facts for a document.
+- When a new version of a file arrives, facts show whether they're **New** or **Changed**, and facts no longer in the file are listed under **Not in this version**.
+
+A file that arrived before is marked **Duplicate**; review it on the original. Confirmed facts are proposals for later work. They never change an order or send anything by themselves.
+
+## Reply and approval
+
+Choose **Draft reply** to get a reply built from the current state of the linked records. **Sources** lists each record the draft relies on, and when it was read. Information older than a day or that couldn't be read is stated in the draft, never filled in. Edit the recipients, subject and text, then save your changes.
+
+- A reply that confirms a date or a quantity, or mentions money, needs approval from someone else; so does every reply when the mailbox requires approval for all replies. The reply says why. Choose **Request approval**; the approver finds it in Needs you or on the thread, and you send it once it's approved.
+- Other replies are sent when you choose **Send**.
+
+A reply counts as **Sent and confirmed** only after Luma reads the thread again and finds it in the mailbox. If Luma can't tell whether the mailbox sent a reply, it shows **Outcome unknown**. Choose **Check the mailbox**: Luma only reads the thread to find out and never sends the reply a second time.

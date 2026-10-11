@@ -22,6 +22,13 @@ import type { JtlConnectorOptions } from './adapter.js';
 import { adapterVersion, outputs } from './outputs.js';
 import * as s from './schemas.js';
 
+/** Derives a version-5-shaped UUID from the given parts; equal parts give equal IDs. */
+export function stableUuid(parts: readonly string[]) {
+  const hex = createHash('sha256').update(JSON.stringify(parts)).digest('hex');
+
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${((parseInt(hex.slice(16, 18), 16) & 0x3f) | 0x80).toString(16)}${hex.slice(18, 20)}-${hex.slice(20, 32)}`;
+}
+
 /**
  * Names the accepted creation of one JTL purchase order as a stable UUID, because execution
  * evidence references are UUIDs. The JTL order itself is found again by an independent read.
@@ -31,19 +38,13 @@ export function acceptanceId(
   connectionId: string,
   purchaseOrderId: string,
 ) {
-  const hex = createHash('sha256')
-    .update(
-      JSON.stringify([
-        'jtl',
-        'purchase-order',
-        tenantId,
-        connectionId,
-        purchaseOrderId,
-      ]),
-    )
-    .digest('hex');
-
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${((parseInt(hex.slice(16, 18), 16) & 0x3f) | 0x80).toString(16)}${hex.slice(18, 20)}-${hex.slice(20, 32)}`;
+  return stableUuid([
+    'jtl',
+    'purchase-order',
+    tenantId,
+    connectionId,
+    purchaseOrderId,
+  ]);
 }
 
 type PurchaseOrder = z.infer<typeof s.purchaseOrder>;

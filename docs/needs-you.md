@@ -14,6 +14,8 @@ decisions.
 | Cases (`case:`)                  | Exceptions: the inbox attention rules (approval, manual step, uncertainty), minus approvals whose current proposal already has a response                                                                  | Case desk review and decisions                                          |
 | Replenishment (`replenishment:`) | Procurement: runs awaiting a decision whose proposal is bound, unexpired and unanswered, with the same `canRespond` rule as the run review                                                                 | The workflow run's replenishment decision                               |
 | Supplier orders (`supplier:`)    | Procurement: order-progress attention (submission approvals, uncertain sends, facts to review, changed commitments, overdue confirmations and deliveries)                                                  | The purchase order's own review                                         |
+| Message replies (`message:`)     | Messaging: open threads whose reply deadline passed or falls within 30 minutes, owned by the reader or unassigned                                                                                          | The thread: reply, change the deadline or close it                      |
+| Reply sends (`message-send:`)    | Messaging: replies awaiting approval, approved replies for their requester, and sends not yet confirmed by a thread read                                                                                   | The thread: approve or reject, send, or check the reply                 |
 | Apps (`<appId>:<kind>:`)         | `AppDefinition.decisions`. Shopify lists stock corrections and fulfillment recoveries awaiting approval, awaiting a run by their requester, or accepted/uncertain without a verified outcome (last 7 days) | The app's own commands through its `inventory` or `fulfillment` UI slot |
 
 Owners present their decisions: why, consequences (what each response causes), the exact
@@ -54,7 +56,7 @@ Every table the queue reads for its items carries the `decisions` topic on the s
 [workspace change stream](operational-metrics.md#live-delivery): case, proposal and policy
 tables, admission steps, workflow process steps, replenishment activations, purchase orders,
 supplier submissions, commitments and follow-ups, executed actions, the Shopify recovery and
-claim tables, and assignments. Record links and handover signals from orders refresh with the
+claim tables, message threads, document facts and replies, and assignments. Record links and handover signals from orders refresh with the
 stream's 30-second reconciliation. The web queue and the sidebar count refetch when an event
 lists `decisions`, coalescing bursts over 500 ms and letting active reads finish, and poll
 every 30 seconds as a fallback.

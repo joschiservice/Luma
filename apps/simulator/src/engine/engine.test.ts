@@ -5,7 +5,13 @@ import {
   type MerchantProfileName,
 } from '@luma/simulator-commerce';
 import { chaosPreset, type ChaosPresetName } from '@luma/simulator-core';
-import { readItemStock, readOrder as readErpOrder } from '@luma/simulator-jtl';
+import { gmail, type MessageRecord } from '@luma/simulator-gmail';
+import {
+  kinds as erpKinds,
+  type PurchaseOrderRecord,
+  readItemStock,
+  readOrder as readErpOrder,
+} from '@luma/simulator-jtl';
 import { readOrder, readStock } from '@luma/simulator-shopify';
 import { describe, expect, it } from 'vitest';
 
@@ -15,7 +21,14 @@ import { advanceWorld } from './advance.js';
 import { injectIncident, recoverIncident } from './incidents.js';
 import { forgetModel } from './model.js';
 import { placeOrder } from './orders.js';
-import { erpContext, type Incident, shopContext } from './world.js';
+import {
+  erp,
+  erpContext,
+  type Incident,
+  mailContext,
+  shopContext,
+  type World,
+} from './world.js';
 
 const start = Date.parse('2026-10-05T06:00:00Z');
 const hour = 3_600_000;
@@ -219,4 +232,177 @@ describe('merchant world', () => {
       lines: [expect.objectContaining({ quantity: 3 })],
     });
   });
+});
+
+interface MailPart {
+  filename: string;
+  mimeType: string;
+  headers: { name: string; value: string }[];
+  body: { data: string };
+  parts: MailPart[];
+}
+
+/** The Gmail message fields these tests read. */
+interface Mail {
+  threadId: string;
+  labelIds: string[];
+  payload: MailPart;
+}
+
+/** Reads the mailbox through the simulated Gmail API, as Luma's adapter does. */
+async function mailbox(world: World, query: string): Promise<Mail[]> {
+  const call = async (path: string) =>
+    (
+      await gmail.handle(mailContext(world), {
+        url: `https://gmail.googleapis.com/gmail/v1/users/me/${path}`,
+        method: 'GET',
+        headers: { authorization: 'Bearer test' },
+        body: null,
+      })
+    ).body;
+  const list = (await call(`messages?q=${encodeURIComponent(query)}`)) as {
+    messages?: { id: string }[];
+  };
+
+  return Promise.all(
+    (list.messages ?? []).map(
+      async ({ id }) => (await call(`messages/${id}`)) as Mail,
+    ),
+  );
+}
+
+/** The newest message matching a search; fails when there is none. */
+async function firstMail(world: World, query: string) {
+  const [message] = await mailbox(world, query);
+  if (!message) throw new Error(`No message matches ${query}`);
+
+  return message;
+}
+
+const headerOf = (message: Mail, name: string) =>
+  message.payload.headers.find((item) => item.name === name)?.value;
+
+describe('operations mailbox', () => {
+  it('emails purchase orders and threads the supplier’s split-delivery answer', async () => {
+    const { world } = await buildWorld(testRun('test'));
+    world.live = true;
+    const supplier = world.model.variant('1').supplierId;
+    await erp(world, {
+      kind: 'supplier-profile',
+      supplierId: supplier,
+      profile: 'partial',
+    });
+    const placed = await erp(world, {
+      kind: 'purchase-order',
+      supplierId: supplier,
+      deliveryDate: '2026-10-12',
+      lines: [{ itemId: '1', quantity: 100 }],
+    });
+    await advanceWorld(world, world.now + 2 * 60_000);
+    const order = (await erpContext(world).store.get<PurchaseOrderRecord>(
+      erpKinds.purchaseOrder,
+      placed.id,
+    ))!.data;
+    const sent = await firstMail(world, 'in:sent');
+    expect(headerOf(sent, 'Subject')).toBe(`Bestellung ${order.orderNumber}`);
+    const answer = await firstMail(
+      world,
+      'from:@supplier.example label:Lieferanten',
+    );
+    expect(answer.threadId).toBe(sent.threadId);
+    expect(headerOf(answer, 'In-Reply-To')).toBe(
+      `<po.${order.orderNumber.toLowerCase()}@luma-goods.example>`,
+    );
+    const text = Buffer.from(
+      answer.payload.parts[0]!.body.data,
+      'base64url',
+    ).toString();
+    expect(text).toContain(`${order.orderNumber}`);
+    expect(text).toMatch(/60 (units|Stück)/);
+    expect(text).toMatch(/(remaining|restlichen) 40/);
+    expect(answer.payload.parts[1]).toMatchObject({
+      filename: `Lieferplan-${order.orderNumber}.csv`,
+      mimeType: 'text/csv',
+    });
+
+    // The same seed writes the same mail.
+    const again = await buildWorld(testRun('test'));
+    again.world.live = true;
+    await erp(again.world, {
+      kind: 'supplier-profile',
+      supplierId: supplier,
+      profile: 'partial',
+    });
+    await erp(again.world, {
+      kind: 'purchase-order',
+      supplierId: supplier,
+      deliveryDate: '2026-10-12',
+      lines: [{ itemId: '1', quantity: 100 }],
+    });
+    await advanceWorld(again.world, again.world.now + 2 * 60_000);
+    const repeated = await firstMail(again.world, 'from:@supplier.example');
+    expect(
+      Buffer.from(repeated.payload.parts[0]!.body.data, 'base64url').toString(),
+    ).toBe(text);
+  }, 60_000);
+
+  it('injects a split-delivery email for an open order and books it on recovery', async () => {
+    const { world } = await buildWorld(testRun('test'));
+    world.live = true;
+    const id = randomUUID();
+    const incident = await injectIncident(world, {
+      id,
+      kind: 'supplier-split-delivery-mail',
+      instance: 'gmail',
+    });
+    expect(incident).toMatchObject({ status: 'active', instance: 'gmail' });
+    expect(incident.resources.map((resource) => resource.kind)).toEqual([
+      'PurchaseOrder',
+      'Message',
+    ]);
+    expect(
+      await injectIncident(world, { id, kind: 'supplier-split-delivery-mail' }),
+    ).toEqual(incident);
+    const purchaseOrder = (incident.detail as Record<string, unknown>)
+      .purchaseOrder as string;
+    const message = await mailContext(world).store.get<MessageRecord>(
+      'message',
+      incident.resources[1]!.id,
+    );
+    expect(message?.data.attachments[0]?.filename).toMatch(
+      /^Lieferplan-BE-\d{5}\.csv$/,
+    );
+    // The supplier's own answers stay suppressed, so the ERP still shows no confirmation.
+    await advanceWorld(world, world.now + 5 * 60_000);
+    const store = erpContext(world).store;
+    expect(
+      (
+        await store.get<PurchaseOrderRecord>(
+          erpKinds.purchaseOrder,
+          purchaseOrder,
+        )
+      )?.data.isConfirmed,
+    ).toBe(false);
+    await recoverIncident(world, id);
+    const booked = (await store.get<PurchaseOrderRecord>(
+      erpKinds.purchaseOrder,
+      purchaseOrder,
+    ))!.data;
+    expect(booked.isConfirmed).toBe(true);
+    expect(booked.lineItems[0]?.confirmedQuantity).toBe(60);
+  }, 60_000);
+
+  it('injects a customer email quoting the order name', async () => {
+    const { world } = await buildWorld(testRun('test'));
+    world.live = true;
+    await placeOrder(world, 'shopify', { identity: 'mail-1' });
+    const incident = await injectIncident(world, {
+      id: randomUUID(),
+      kind: 'customer-delay-mail',
+    });
+    const order = incident.resources[0]!;
+    const message = await firstMail(world, 'from:@customer.example');
+    expect(headerOf(message, 'Subject')).toContain(order.label);
+    expect(message.labelIds).toEqual(['INBOX', 'UNREAD', 'Label_2']);
+  }, 60_000);
 });

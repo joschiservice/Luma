@@ -30,7 +30,7 @@ const refundStateSchema = z.enum([
   'refunded',
 ]);
 
-const returnStatusSchema = z.enum([
+export const returnStatusSchema = z.enum([
   'requested',
   'open',
   'closed',

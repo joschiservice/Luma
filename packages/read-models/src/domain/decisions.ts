@@ -744,3 +744,60 @@ export function presentWorkflowHandover(
     },
   };
 }
+
+/** An open message thread whose reply is due within 30 minutes or overdue. */
+export interface MessageReplyDecision {
+  threadId: string;
+  subject: string;
+  /** The correspondent as written, such as `Anna <anna@supplier.example>`. */
+  correspondent: string | null;
+  mailboxLabel: string;
+  replyDueAt: string;
+  /** When the unanswered message arrived. */
+  receivedAt: string;
+  canRespond: boolean;
+}
+
+/** Presents a reply that is due. It leaves the queue once someone replies, closes the thread or moves the deadline. */
+export function presentMessageReply(
+  item: MessageReplyDecision,
+): DecisionCandidate {
+  return {
+    id: `message:${item.threadId}`,
+    kind: 'message_reply',
+    reason: 'manual_intervention',
+    domain: 'operations',
+    title: item.subject || '(no subject)',
+    why: 'A message is waiting for a reply and its reply deadline is reached. Luma does not answer on its own.',
+    consequences: [
+      {
+        response: 'Reply',
+        text: 'Answer from the thread. Replies that commit to dates, quantities or money need approval first.',
+      },
+      {
+        response: 'Change the deadline',
+        text: 'Set a later deadline or close the thread when no reply is needed.',
+      },
+    ],
+    change: [
+      ...(item.correspondent
+        ? [{ label: 'From', value: item.correspondent }]
+        : []),
+      { label: 'Mailbox', value: item.mailboxLabel },
+      { label: 'Reply due', value: item.replyDueAt },
+    ],
+    impact: { level: 'unknown', text: null },
+    requestedAt: item.receivedAt,
+    deadline: item.replyDueAt,
+    requesterId: null,
+    evidence: { observedAt: item.receivedAt, validUntil: null },
+    response: item.canRespond ? 'investigate' : 'view_only',
+    subject: {
+      label: item.subject || '(no subject)',
+      detail: item.correspondent,
+    },
+    record: null,
+    owner: { kind: 'message_thread', threadId: item.threadId },
+    group: { key: 'message:reply', label: 'Replies due' },
+  };
+}

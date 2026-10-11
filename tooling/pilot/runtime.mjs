@@ -52,7 +52,9 @@ import { Pool } from 'pg';
 import {
   createInstallationVerifier,
   createInstalledConnections,
+  createInstalledMessageRuntime,
   createInstalledPurchaseOrderRuntime,
+  createInstalledReturnRuntime,
   createInstalledRuntime,
   createInstalledShippingMethodEffects,
 } from '../apps/providers.mjs';
@@ -443,6 +445,12 @@ export async function createPilot(
         )
       : undefined;
     if (processClient) resources.add(processClient.close);
+    const mailboxRuntime = simulation
+      ? createInstalledMessageRuntime({
+          ...installedOptions,
+          record: async () => undefined,
+        })
+      : undefined;
     const application = createApplicationServices({
       observability,
       ...(processClient ? { replenishmentTransport: processClient } : {}),
@@ -462,6 +470,22 @@ export async function createPilot(
             purchasing: {
               runtime: createInstalledPurchaseOrderRuntime(installedOptions),
               installations,
+            },
+            returns: {
+              runtime: createInstalledReturnRuntime(installedOptions),
+              installations,
+            },
+          }
+        : {}),
+      // Simulated mailboxes are read through the installed capability runtime, as in the worker.
+      ...(simulation
+        ? {
+            messaging: {
+              installations,
+              // Replies are sent through the same runtime, as in the API and worker.
+              reader: mailboxRuntime,
+              sender: mailboxRuntime,
+              log: failureLog,
             },
           }
         : {}),
@@ -813,6 +837,20 @@ export async function createPilot(
           ),
         );
     };
+    /**
+     * Runs mailbox reading passes as the sync worker does, until no mailbox is due or `passes`
+     * ran. Message text past its retention is removed first.
+     */
+    const readMailboxes = async ({ passes = 5 } = {}) => {
+      const sync = application.messaging.sync;
+      if (!sync) return;
+      await pool.query('SELECT purge_expired_messaging(200)');
+      for (let pass = 0; pass < passes; pass++) {
+        const scopes = await sync.scopes();
+        if (!scopes.length) break;
+        for (const scope of scopes) await sync.tick(scope);
+      }
+    };
     if (role === 'worker' && simulation) {
       const timer = setInterval(() => {
         followUp().catch((error) =>
@@ -820,6 +858,12 @@ export async function createPilot(
         );
       }, 10_000);
       resources.add(() => clearInterval(timer));
+      const mailboxTimer = setInterval(() => {
+        readMailboxes({ passes: 1 }).catch((error) =>
+          console.error('Reading mailboxes failed; retrying.', error),
+        );
+      }, 10_000);
+      resources.add(() => clearInterval(mailboxTimer));
     }
 
     return {
@@ -832,6 +876,12 @@ export async function createPilot(
       procurementContext: application.http.procurementContext,
       decisions: application.http.decisions,
       followUp,
+      /** The operations inbox, its replies and a `sync()` that reads due mailboxes now. */
+      messaging: {
+        service: application.messaging.service,
+        replies: application.messaging.replies,
+        sync: readMailboxes,
+      },
       context,
       operator,
       detection,

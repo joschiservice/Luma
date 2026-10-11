@@ -1,7 +1,7 @@
 # Installed connections
 
 An installed connection binds a workspace to one provider account (a Shopify shop, a JTL
-Cloud tenant, a JTL-Wawi on-premise API or a Cin7 Core account) with encrypted credentials and verified
+Cloud tenant, a JTL-Wawi on-premise API, a Cin7 Core account or a Gmail mailbox) with encrypted credentials and verified
 permissions. Capabilities are usable only while the connection is active and the
 provider has confirmed them, and every credential read rechecks tenant membership,
 installation and status. Code: `@luma/connections`; provider verification and setup live
@@ -23,10 +23,12 @@ each request, and requires a list refresh after an uncertain result before resub
 Target identity is immutable; create a new installation to change account or endpoint.
 Shopify targets are a lowercase `*.myshopify.com` hostname, JTL Cloud targets the provider
 tenant UUID, JTL on-premise targets an HTTPS API root with trailing slash, app ID and
-app version (the challenge code is stored with the encrypted credentials), and Cin7 Core
-targets the account ID (the API application key is the credential). Shopify
-connections are normally created through [OAuth](shopify.md#authorization-and-recovery-guarantees);
-manual token setup remains for internal fixtures and deployments without OAuth.
+app version (the challenge code is stored with the encrypted credentials), Cin7 Core
+targets the account ID (the API application key is the credential), and Gmail targets the
+lower-case mailbox address. Shopify and Gmail connections are normally created through OAuth
+([Shopify](shopify.md#authorization-and-recovery-guarantees),
+[Gmail](gmail.md#authorization-and-recovery-guarantees)); manual token setup remains for
+internal fixtures and deployments without OAuth.
 
 ## Verification and permissions
 
@@ -56,8 +58,9 @@ grants:
   only to simulated installations; a live installation requesting them stays degraded
   until a custom verifier backed by confirmed grants and a sandbox smoke test exists.
   Shopify installations reject these permissions. See [JTL](jtl.md#shipping-method-correction).
-- **JTL purchase-order submission** is likewise granted only to simulated installations
-  (see [JTL](jtl.md#purchase-orders)).
+- **JTL purchase-order submission** and **return creation** are likewise granted only to
+  simulated installations (see [JTL](jtl.md#purchase-orders) and
+  [JTL returns](jtl.md#returns)).
 - **Shopify fulfillment recovery and inventory corrections** need the corresponding
   Shopify write scopes; see [Shopify actions](shopify-actions.md).
 

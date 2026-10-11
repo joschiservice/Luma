@@ -105,3 +105,61 @@ export const purchaseOrderInputs = {
     })
     .strict(),
 };
+
+/** Luma return-case IDs as stored in the JTL external-number marker. */
+const lumaCaseId = lumaOrderId;
+
+// Return quantities are countable units of a sales-order line.
+const eachQuantity = z
+  .object({
+    amount: z
+      .string()
+      .regex(/^\d{1,9}(\.\d{1,6})?$/)
+      .refine((value) => Number(value) > 0),
+    unit: z.literal('each'),
+  })
+  .strict();
+
+export const returnInputs = {
+  // Every option is returned at once, so no cursor is accepted.
+  'returns.options.read': z
+    .object({ limit: z.number().int().min(1).max(100) })
+    .strict(),
+  'returns.created.read': z
+    .object({
+      limit: z.number().int().min(1).max(25),
+      order: ref,
+      lumaCaseId,
+    })
+    .strict(),
+  'returns.create': z
+    .object({
+      lumaCaseId,
+      order: ref,
+      warehouse: ref,
+      reason: ref,
+      lines: z
+        .array(
+          z
+            .object({
+              // Sales-order lines are scoped by their order, as `orders.read` reports them.
+              orderLine: z
+                .object({ externalId, scopeKey: externalId })
+                .strict(),
+              quantity: eachQuantity,
+            })
+            .strict(),
+        )
+        .min(1)
+        .max(100),
+    })
+    .strict()
+    .refine(
+      (value) =>
+        value.lines.every(
+          (line) => line.orderLine.scopeKey === value.order.externalId,
+        ) &&
+        new Set(value.lines.map((line) => line.orderLine.externalId)).size ===
+          value.lines.length,
+    ),
+};

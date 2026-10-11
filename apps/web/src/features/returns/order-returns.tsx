@@ -5,6 +5,7 @@ import { m } from '@luma/i18n/messages';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { Link } from '@tanstack/react-router';
 import { ChevronRight, Undo2 } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import { OrderSection } from '../orders/order-section';
 import {
@@ -14,15 +15,20 @@ import {
   stageStates,
 } from './presentation';
 
-/** Lists an order's returns and refunds with their stage; each opens its return. */
+/**
+ * Lists an order's returns and refunds with their stage; each opens its return. `cases` shows
+ * Luma's return cases for the order below the store's records.
+ */
 export function OrderReturns({
   detail,
   organizationId,
   from,
+  cases,
 }: {
   detail: OrderDetail;
   organizationId: string;
   from: string;
+  cases?: ReactNode;
 }) {
   const label = (connectionId: string) =>
     detail.sources.find((source) => source.connectionId === connectionId)
@@ -77,6 +83,7 @@ export function OrderReturns({
       ) : (
         <p className="order-note">{m.returns_order_section_empty()}</p>
       )}
+      {cases}
     </OrderSection>
   );
 }

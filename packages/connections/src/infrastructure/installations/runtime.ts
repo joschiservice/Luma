@@ -172,3 +172,75 @@ export function createInstalledPurchaseOrderRuntime(
 export type InstalledPurchaseOrderRuntime = ReturnType<
   typeof createInstalledPurchaseOrderRuntime
 >;
+
+/** Maps, prechecks and verifies message sends; the runtime fixes the capability. */
+export interface MessageSendBinding {
+  map(
+    context: TenantContext,
+    intent: EffectIntent,
+  ): Promise<CapabilityInput<'messages.send'> | null>;
+  checkPreconditions(
+    context: TenantContext,
+    intent: EffectIntent,
+  ): Promise<boolean>;
+  verify(
+    context: TenantContext,
+    intent: EffectIntent,
+  ): Promise<VerificationResult>;
+}
+
+/**
+ * Supplies mailbox reads and send effects through the same installation-gated runtime. Sends
+ * are dispatched only by execution adapters bound to Action Admission.
+ */
+export function createInstalledMessageRuntime(
+  options: InstalledRuntimeOptions,
+) {
+  const runtime = installedRuntime(options);
+
+  return Object.freeze({
+    read: runtime.read,
+    discover: runtime.discover,
+    sendEffects: (binding: MessageSendBinding) =>
+      runtime.effects({ capability: 'messages.send', ...binding }),
+  });
+}
+
+export type InstalledMessageRuntime = ReturnType<
+  typeof createInstalledMessageRuntime
+>;
+
+/** Maps, prechecks and verifies return creation; the runtime fixes the capability. */
+export interface ReturnCreationBinding {
+  map(
+    context: TenantContext,
+    intent: EffectIntent,
+  ): Promise<CapabilityInput<'returns.create'> | null>;
+  checkPreconditions(
+    context: TenantContext,
+    intent: EffectIntent,
+  ): Promise<boolean>;
+  verify(
+    context: TenantContext,
+    intent: EffectIntent,
+  ): Promise<VerificationResult>;
+}
+
+/**
+ * Supplies return reads and return-creation effects through the same installation-gated
+ * runtime. Creation is dispatched only by execution adapters bound to Action Admission.
+ */
+export function createInstalledReturnRuntime(options: InstalledRuntimeOptions) {
+  const runtime = installedRuntime(options);
+
+  return Object.freeze({
+    read: runtime.read,
+    discover: runtime.discover,
+    creationEffects: (binding: ReturnCreationBinding) =>
+      runtime.effects({ capability: 'returns.create', ...binding }),
+  });
+}
+
+export type InstalledReturnRuntime = ReturnType<
+  typeof createInstalledReturnRuntime
+>;

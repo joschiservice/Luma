@@ -1,12 +1,18 @@
 import type { FaultKind } from './faults.js';
 import type { IncidentKindName } from './incidents.js';
 
-/** One provider change a scenario makes. `shop` is the run's first shop. */
+/**
+ * Where a scenario step applies: `shop` is the run's first shop, `mailbox` the merchant's
+ * operations mailbox.
+ */
+type ScenarioTarget = 'shop' | 'mailbox';
+
+/** One provider change a scenario makes. */
 type ScenarioStep =
-  | { kind: 'incident'; incident: IncidentKindName; on: 'shop' }
+  | { kind: 'incident'; incident: IncidentKindName; on: ScenarioTarget }
   | {
       kind: 'fault';
-      on: 'shop';
+      on: ScenarioTarget;
       operation: string;
       fault: FaultKind;
       remaining: number;
@@ -112,6 +118,30 @@ export const workflowScenarios = {
     expected:
       'Luma revokes the connection and a sync-failure case opens for lost access. Check a failing connection hands it to a person at once with Reconnect. The case closes only after the store is reconnected and completes a fresh scan.',
     steps: [{ kind: 'incident', incident: 'auth-revoked', on: 'shop' }],
+  },
+  'supplier-split-delivery-mail': {
+    label: 'Supplier split delivery by email',
+    description:
+      'A supplier answers the newest open purchase order by email: part ships in three days, the rest a week later, with a delivery schedule attached. The ERP is not updated.',
+    expected:
+      'The email reaches the operations inbox on the next mailbox read and links to the purchase order by its number. The attached schedule becomes facts to review beside the document. Confirmed facts feed the purchase order’s supplier commitment, so the follow-up waits for the remaining quantity instead of treating the order as confirmed in full.',
+    steps: [
+      {
+        kind: 'incident',
+        incident: 'supplier-split-delivery-mail',
+        on: 'mailbox',
+      },
+    ],
+  },
+  'customer-delay-mail': {
+    label: 'Customer asks about a late order',
+    description:
+      'The customer of the first shop’s newest order emails that it has not arrived.',
+    expected:
+      'The thread appears in the operations inbox, linked to the customer by address and to the order by its number, with a reply deadline. A drafted reply cites the order’s current state; one that promises a date or money needs approval before Luma sends it, and the sent reply is verified by reading the mailbox again.',
+    steps: [
+      { kind: 'incident', incident: 'customer-delay-mail', on: 'mailbox' },
+    ],
   },
 } satisfies Record<string, WorkflowScenario>;
 

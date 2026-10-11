@@ -25,6 +25,8 @@ const realisticIncidents = {
   'refund-missing': 0,
   'payment-stuck': 0,
   'supplier-silent': 0,
+  'supplier-split-delivery-mail': 0,
+  'customer-delay-mail': 0,
   'shipping-method-mismatch': 0.5,
   'provider-outage': 0.5,
   'auth-revoked': 0.05,

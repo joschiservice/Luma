@@ -9,6 +9,7 @@ import {
   type ShopProfile,
 } from '@luma/simulator-commerce';
 import type { Random } from '@luma/simulator-core';
+import type { GmailConfig } from '@luma/simulator-gmail';
 import type { JtlConfig } from '@luma/simulator-jtl';
 import type { ShopifyConfig } from '@luma/simulator-shopify';
 
@@ -21,13 +22,29 @@ export type Instance =
       label: string;
       config: ShopifyConfig;
       shop: ShopProfile;
-    };
+    }
+  | { name: string; kind: 'gmail'; label: string; config: GmailConfig };
 
 /** JTL shipping methods: Standard, Express and Pickup, as in the seeded fixtures. */
 export const shippingMethods = { standard: '7', express: '8', pickup: '9' };
 
 /** The ERP instance a merchant runs; each run has exactly one. */
 export type ErpInstance = Extract<Instance, { kind: 'jtl' | 'cin7' }>;
+
+/** The merchant's shared operations mailbox; each run has exactly one. */
+export type MailboxInstance = Extract<Instance, { kind: 'gmail' }>;
+
+/** Instance name of the merchant's operations mailbox in every run. */
+export const mailboxName = 'gmail';
+
+/**
+ * The simulated operations mailbox. Its `.example` domain is reserved, so mail can never reach a
+ * real recipient.
+ */
+const merchantMailbox: GmailConfig = {
+  address: 'einkauf@luma-goods.example',
+  name: 'Luma Goods Einkauf',
+};
 
 const shopifyScopes = [
   'read_orders',
@@ -49,7 +66,10 @@ const standardTaxRates: Record<string, number> = {
   DE: 0.19,
 };
 
-/** Derives the provider instances a profile runs: one ERP and one store per shop. */
+/**
+ * Derives the provider instances a profile runs: one ERP, one store per shop and the merchant's
+ * operations mailbox.
+ */
 export function instancesFor(profile: MerchantProfile): Instance[] {
   const erp = {
     warehouses: profile.warehouses.map(({ id, name }) => ({ id, name })),
@@ -97,6 +117,12 @@ export function instancesFor(profile: MerchantProfile): Instance[] {
         scopes: shopifyScopes,
       },
     })),
+    {
+      name: mailboxName,
+      kind: 'gmail',
+      label: 'Gmail',
+      config: merchantMailbox,
+    },
   ];
 }
 
@@ -108,6 +134,7 @@ export interface WorldModel {
   /** The merchant's ERP instance. */
   erp: ErpInstance;
   shops: Extract<Instance, { kind: 'shopify' }>[];
+  mailbox: MailboxInstance;
   variant(id: string): CatalogVariant;
   product(id: string): CatalogProduct;
   variantBySku(sku: string): CatalogVariant | undefined;
@@ -152,15 +179,21 @@ export function worldModel(
     (profile.basket.lineWeights.reduce((sum, w, i) => sum + w * (i + 1), 0) /
       profile.basket.lineWeights.reduce((sum, w) => sum + w, 0));
   const erp = instances.find(
-    (instance): instance is ErpInstance => instance.kind !== 'shopify',
+    (instance): instance is ErpInstance =>
+      instance.kind === 'jtl' || instance.kind === 'cin7',
   );
   if (!erp) throw new Error('A merchant runs one ERP');
+  const mailbox = instances.find(
+    (instance): instance is MailboxInstance => instance.kind === 'gmail',
+  );
+  if (!mailbox) throw new Error('A merchant runs one mailbox');
   const model: WorldModel = {
     profile,
     catalog,
     instances,
     erp,
     shops,
+    mailbox,
     variant(id) {
       const variant = byId.get(id);
       if (!variant) throw new Error(`Unknown variant ${id}`);

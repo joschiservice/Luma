@@ -16,6 +16,8 @@ const names = entries
   .sort();
 const imports = [];
 const dependencies = {};
+/** Package name of each app directory. */
+const packages = {};
 for (const name of names) {
   const pkg = JSON.parse(
     await readFile(new URL(`packages/apps/${name}/package.json`, root), 'utf8'),
@@ -24,6 +26,7 @@ for (const name of names) {
     `import { createApp as app${imports.length} } from '${pkg.name}';`,
   );
   dependencies[pkg.name] = 'workspace:*';
+  packages[name] = pkg.name;
 }
 await writeFile(
   new URL('packages/app-catalog/src/generated.ts', root),
@@ -36,10 +39,22 @@ for (const name of Object.keys(pkg.dependencies))
     delete pkg.dependencies[name];
 Object.assign(pkg.dependencies, dependencies);
 await writeFile(path, JSON.stringify(pkg, null, 2) + '\n');
-// Provider fixtures follow the app packages present in this checkout.
-for (const file of [
-  'tooling/package.json',
-  'packages/application-runtime/package.json',
+// Typechecking and test collection include only suites whose app fixtures are present.
+const suites = JSON.parse(
+  await readFile(
+    new URL('packages/application-runtime/app-test-suites.json', root),
+    'utf8',
+  ),
+);
+// Provider fixtures follow the app packages present in this checkout: tooling loads every app,
+// and the runtime's suites only the apps they list.
+const fixtureApps = new Set(suites.flatMap((suite) => suite.apps));
+for (const [file, apps] of [
+  ['tooling/package.json', names],
+  [
+    'packages/application-runtime/package.json',
+    names.filter((name) => fixtureApps.has(name)),
+  ],
 ]) {
   const path = new URL(file, root);
   const pkg = JSON.parse(await readFile(path, 'utf8'));
@@ -49,17 +64,9 @@ for (const file of [
       !['@luma/app-host', '@luma/app-catalog'].includes(key)
     )
       delete pkg.devDependencies[key];
-  Object.assign(pkg.devDependencies, dependencies);
+  for (const name of apps) pkg.devDependencies[packages[name]] = 'workspace:*';
   await writeFile(path, JSON.stringify(pkg, null, 2) + '\n');
 }
-
-// Typechecking and test collection include only suites whose app fixtures are present.
-const suites = JSON.parse(
-  await readFile(
-    new URL('packages/application-runtime/app-test-suites.json', root),
-    'utf8',
-  ),
-);
 await writeFile(
   new URL('packages/application-runtime/tsconfig.apps.json', root),
   JSON.stringify(

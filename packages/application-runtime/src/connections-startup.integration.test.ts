@@ -128,6 +128,19 @@ describe.skipIf(!databaseUrl)('connections through the API CLI', () => {
               'utf8',
             ),
           );
+      // Readiness checks every installed app's tables, so apply app migrations as deployments do.
+      const apps = new URL('../../apps/', import.meta.url);
+      for (const app of (await readdir(apps)).sort())
+        for (const migration of (
+          await readdir(new URL(`${app}/migrations/`, apps)).catch(() => [])
+        ).sort())
+          if (migration.endsWith('.sql'))
+            await owner.query(
+              await readFile(
+                new URL(`${app}/migrations/${migration}`, apps),
+                'utf8',
+              ),
+            );
     } finally {
       await lock.query(
         "SELECT pg_advisory_unlock(hashtext('luma_test_role_setup'))",

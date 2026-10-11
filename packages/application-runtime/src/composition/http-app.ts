@@ -36,6 +36,14 @@ import {
   rolesRoutes,
   settingsRoutes,
 } from '@luma/identity/http';
+import type {
+  DocumentService,
+  MessagingService,
+  Replies,
+} from '@luma/messaging';
+import { messagingRoutes } from '@luma/messaging/http';
+import type { ReturnCases } from '@luma/orders/composition';
+import { returnCaseRoutes } from '@luma/orders/http';
 import type { ModelGateway, Observability, Observation } from '@luma/platform';
 import { describeError } from '@luma/platform';
 import type { ProcurementService } from '@luma/procurement';
@@ -129,6 +137,9 @@ export interface AppDependencies {
   workflowGeneration?: DraftGeneration;
   procurement?: ProcurementService;
   commitments?: SupplierCommitments;
+  messaging?: MessagingService;
+  messagingReplies?: Replies;
+  messagingDocuments?: DocumentService;
   learning?: LearningService;
   measurements?: MeasurementService;
   desk?: DeskService;
@@ -142,6 +153,7 @@ export interface AppDependencies {
   procurementContext?: ProcurementContextReader;
   fulfillment?: FulfillmentWorkspace;
   returns?: ReturnWorkspace;
+  returnCases?: ReturnCases;
   customers?: CustomerWorkspace;
   orders?: OrderWorkspace;
   sales?: SalesService;
@@ -362,6 +374,11 @@ export function buildApp(
         dependencies.procurement,
         dependencies.commitments,
       ),
+      messaging: messagingRoutes(
+        dependencies.messaging,
+        dependencies.messagingReplies,
+        dependencies.messagingDocuments,
+      ),
       exceptions: caseRoutes(dependencies.cases),
       caseDesk: deskRoutes(dependencies.desk),
       resolutionLearning: learningRoutes(dependencies.learning),
@@ -429,6 +446,7 @@ export function buildApp(
       orders: orderRoutes(dependencies.orders),
       sales: salesRoutes(dependencies.sales),
       returns: returnRoutes(dependencies.returns),
+      returnCases: returnCaseRoutes(dependencies.returnCases),
       customers: customerRoutes(dependencies.customers),
       sync: syncRoutes(dependencies.sync),
       decisions: decisionRoutes(

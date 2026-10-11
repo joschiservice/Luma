@@ -19,6 +19,7 @@ import {
   Inbox,
   Info,
   type LucideIcon,
+  Mail,
   PackageOpen,
   Radio,
   Trash2,
@@ -36,7 +37,9 @@ import { appsOptions } from '../apps/data';
 import { AppExtension } from '../apps/extension';
 import { SignInRedirect } from '../identity/common';
 import { IdentityError } from '../identity/data';
+import { RecordMessages } from '../inbox/record-messages';
 import { recordReturnPath } from '../records/data';
+import { OrderReturnCases } from '../returns/case-entry';
 import { OrderReturns } from '../returns/order-returns';
 import { orderFilters, orderOptions, type OrdersSearch } from './data';
 import { OrderIdentityLinks } from './identity-links';
@@ -138,6 +141,36 @@ export function OrderPage() {
               : 'unavailable'
       }
       refresh={() => void query.refetch()}
+      messages={
+        query.data ? (
+          <RecordMessages
+            organizationId={organizationId}
+            kind="order"
+            recordId={query.data.order.id}
+            frame={(content) => (
+              <OrderSection
+                title={m.messaging_record_section_title()}
+                icon={Mail}
+              >
+                {content}
+              </OrderSection>
+            )}
+          />
+        ) : null
+      }
+      returnCases={
+        query.data ? (
+          <OrderReturnCases
+            organizationId={organizationId}
+            orderId={query.data.order.id}
+            sourceLabel={(connectionId) =>
+              query.data.sources.find(
+                (source) => source.connectionId === connectionId,
+              )?.label ?? m.returns_source_fallback()
+            }
+          />
+        ) : null
+      }
       linkedSources={
         query.data ? (
           <>
@@ -181,6 +214,8 @@ export function OrderDetailView({
   refresh,
   sourceContext,
   linkedSources,
+  messages,
+  returnCases,
 }: {
   organizationId: string;
   search: OrdersSearch;
@@ -190,6 +225,10 @@ export function OrderDetailView({
   error?: OrderError | undefined;
   refresh: () => void;
   linkedSources?: ReactNode;
+  /** Message threads linked to the order, framed as an order section. */
+  messages?: ReactNode;
+  /** The order's return cases and the control to open one. */
+  returnCases?: ReactNode;
   sourceContext?: (source: OrderSourceFacts) => ReactNode;
 }) {
   const timeZone = useContext(WorkspaceTimezone);
@@ -295,7 +334,9 @@ export function OrderDetailView({
               detail={detail}
               organizationId={organizationId}
               from={here}
+              cases={returnCases}
             />
+            {messages}
             {contexts.map(({ source, content }) => (
               <OrderSection
                 key={source.connectionId}

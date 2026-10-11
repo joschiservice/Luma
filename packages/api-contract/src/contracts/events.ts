@@ -40,6 +40,7 @@ export const workspaceTopics = [
   'procurement',
   'resolution',
   'decisions',
+  'messaging',
 ] as const;
 
 export type WorkspaceTopic = (typeof workspaceTopics)[number];
