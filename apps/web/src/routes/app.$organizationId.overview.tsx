@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 
-import { homeSearch } from '../features/home/preferences';
+import { homeSearch } from '../kit/home/preferences';
 
 export const Route = createFileRoute('/app/$organizationId/overview')({
   validateSearch: homeSearch,

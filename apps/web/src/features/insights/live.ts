@@ -5,7 +5,7 @@ import {
   changesAny,
   liveRefreshDelay,
   subscribeToWorkspaceMetrics,
-} from '../overview/metric-subscription';
+} from '../../kit/live/metric-subscription';
 import { insightsKey } from './data';
 
 const chartTopics: readonly WorkspaceTopic[] = [

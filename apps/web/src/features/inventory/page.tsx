@@ -22,10 +22,10 @@ import {
 import { Boxes, Plug } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
-import { connectionsOptions } from '../connections/data';
-import { SignInRedirect } from '../identity/common';
-import { IdentityError } from '../identity/data';
-import { connectionStatusLabel } from '../orders/presentation';
+import { connectionsOptions } from '../../kit/connections/data';
+import { SignInRedirect } from '../../kit/identity/common';
+import { IdentityError } from '../../kit/identity/data';
+import { connectionStatusLabel } from '../../shared/orders/presentation';
 import { recordReturnPath } from '../records/data';
 import { SyncCoverage } from '../sync/coverage';
 import { inventoryOptions, type InventorySearch } from './data';

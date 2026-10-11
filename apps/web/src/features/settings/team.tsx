@@ -19,18 +19,25 @@ import { Link } from '@tanstack/react-router';
 import { Mail, MoreHorizontal, Search, UserPlus, Users } from 'lucide-react';
 import { useState } from 'react';
 
-import { Failure } from '../identity/common';
-import { IdentityError } from '../identity/data';
-import { roleName } from '../identity/permission-text';
-import { isOwnerRole, usePermissions } from '../identity/permissions';
+import { Failure } from '../../kit/identity/common';
+import { IdentityError } from '../../kit/identity/data';
+import { roleName } from '../../kit/identity/permission-text';
+import { isOwnerRole, usePermissions } from '../../kit/identity/permissions';
+import {
+  invitationsOptions,
+  membersOptions,
+  settingsApi,
+} from '../../kit/settings/data';
+import {
+  rolesOptions,
+  type WorkspaceRole,
+} from '../../kit/settings/roles-data';
 import {
   CommandFeedback,
   useSettingsCommand,
   useSettingsOnline,
 } from './command';
-import { invitationsOptions, membersOptions, settingsApi } from './data';
 import { type RoleChoice, RolePicker } from './role-picker';
-import { rolesOptions, type WorkspaceRole } from './roles-data';
 
 const teamPageSize = 25;
 

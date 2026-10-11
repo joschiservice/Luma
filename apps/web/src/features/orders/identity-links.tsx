@@ -8,10 +8,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useCallback, useDeferredValue, useState } from 'react';
 
+import { formatMoney, orderLabel } from '../../shared/orders/presentation';
 import { identityOptions } from '../sync/data';
 import { IdentityLinks, type IdentitySuggestion } from '../sync/identity-links';
 import { ordersOptions } from './data';
-import { formatMoney, orderLabel } from './presentation';
 
 /** Links order sources and refreshes orders, Home and Insights after the worker completes. */
 export function OrderIdentityLinks({

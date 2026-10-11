@@ -9,7 +9,7 @@ import { Link } from '@tanstack/react-router';
 import { ArrowRight, BookOpen } from 'lucide-react';
 import { Suspense } from 'react';
 
-import { Brand } from '../identity/common';
+import { Brand } from '../../kit/identity/common';
 import { DocArticle } from './article';
 import { DocsSearch } from './search';
 import { docSections } from './source';

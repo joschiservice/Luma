@@ -13,8 +13,8 @@ import {
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import type { ReactNode } from 'react';
 
+import { formatQuantity } from '../../shared/orders/presentation';
 import { authorityLabel } from './authority';
-import { formatQuantity } from './presentation';
 
 type Field = OrderDetail['differences'][number]['field'];
 

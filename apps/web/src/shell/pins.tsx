@@ -5,8 +5,8 @@ import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { useLocation, useNavigate } from '@tanstack/react-router';
 import { Pin, PinOff, X } from 'lucide-react';
 
-import { destinationFor } from '../identity/workspace-destinations';
-import { useWorkspaceLayout } from './data';
+import { useWorkspaceLayout } from '../kit/layout/data';
+import { destinationFor } from './workspace-destinations';
 
 const maxPins = 12;
 

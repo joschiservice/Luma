@@ -30,9 +30,9 @@ import {
   Workflow,
 } from 'lucide-react';
 
-import { SignInRedirect } from '../identity/common';
-import { IdentityError } from '../identity/data';
-import { usePermissions } from '../identity/permissions';
+import { SignInRedirect } from '../../kit/identity/common';
+import { IdentityError } from '../../kit/identity/data';
+import { usePermissions } from '../../kit/identity/permissions';
 import { draftsOptions } from './authoring/data';
 import { workflowError, workflowsOptions } from './data';
 import { OfflineNotice } from './offline';

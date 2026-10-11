@@ -42,8 +42,8 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 
-import { SignInRedirect } from '../identity/common';
-import { IdentityError } from '../identity/data';
+import { SignInRedirect } from '../../kit/identity/common';
+import { IdentityError } from '../../kit/identity/data';
 import {
   ordersOptions,
   procurementError,

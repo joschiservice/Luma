@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 
 import { resolutionReview } from '../../../../../packages/ui/src/components/issues/resolution-fixtures';
-import { IdentityError } from '../identity/data';
+import { IdentityError } from '../../kit/identity/data';
 import {
   decisionCommand,
   decisionError,

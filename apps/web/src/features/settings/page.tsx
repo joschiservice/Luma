@@ -28,19 +28,19 @@ import {
 } from 'lucide-react';
 import { useId, useState } from 'react';
 
-import { Failure } from '../identity/common';
-import { contextOptions, IdentityError } from '../identity/data';
+import { Failure } from '../../kit/identity/common';
+import { contextOptions, IdentityError } from '../../kit/identity/data';
 import {
   isOwnerRole,
   usePermissionLabel,
   usePermissions,
-} from '../identity/permissions';
+} from '../../kit/identity/permissions';
+import { settingsApi, settingsOptions } from '../../kit/settings/data';
 import {
   CommandFeedback,
   useSettingsCommand,
   useSettingsOnline,
 } from './command';
-import { settingsApi, settingsOptions } from './data';
 import { AppearanceSettings, HomeSidebarSettings } from './personal';
 import { RolesSettings } from './roles';
 import { SectionHeading } from './section-heading';

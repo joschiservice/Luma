@@ -36,12 +36,12 @@ import {
   useSyncExternalStore,
 } from 'react';
 
-import { askLuma } from '../../lib/assistant-panel';
-import { usesCommandKey } from '../../lib/keyboard';
-import { setThemePreference, type ThemePreference } from '../../lib/theme';
-import { ordersOptions, suppliersOptions } from '../procurement/data';
-import { recordsOptions } from '../records/data';
-import { usePermissions } from './permissions';
+import { ordersOptions, suppliersOptions } from '../features/procurement/data';
+import { recordsOptions } from '../features/records/data';
+import { usePermissions } from '../kit/identity/permissions';
+import { askLuma } from '../lib/assistant-panel';
+import { usesCommandKey } from '../lib/keyboard';
+import { setThemePreference, type ThemePreference } from '../lib/theme';
 import { workspaceDestinations } from './workspace-destinations';
 
 const subscribePlatform = () => () => undefined;

@@ -33,13 +33,13 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { ArrowUpRight, RefreshCw } from 'lucide-react';
 
-import { signalLabels } from '../fulfillment/presentation';
-import { orderStatuses } from '../orders/data';
 import {
   formatMoney,
   fulfillmentLabels,
   statusLabels,
-} from '../orders/presentation';
+} from '../../shared/orders/presentation';
+import { signalLabels } from '../fulfillment/presentation';
+import { orderStatuses } from '../orders/data';
 import { stages } from '../procurement/presentation';
 import type { Selection } from './chart-card';
 import {

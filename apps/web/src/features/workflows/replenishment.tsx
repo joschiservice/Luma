@@ -35,7 +35,7 @@ import { Link, useLocation } from '@tanstack/react-router';
 import { ArrowRight, PackageCheck, Plus, ShieldCheck } from 'lucide-react';
 import { useContext, useEffect, useState } from 'react';
 
-import { IdentityError } from '../identity/data';
+import { IdentityError } from '../../kit/identity/data';
 import {
   decideReplenishment,
   replenishmentOptions,

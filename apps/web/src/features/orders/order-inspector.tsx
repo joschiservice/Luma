@@ -22,12 +22,12 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import { linkMethodLabel } from '../sync/presentation';
 import {
   connectionStatusLabel,
   issueStateLabel,
   runStateLabel,
-} from './presentation';
+} from '../../shared/orders/presentation';
+import { linkMethodLabel } from '../sync/presentation';
 
 function InspectorCard({
   title,

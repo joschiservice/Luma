@@ -2,8 +2,8 @@ import { m } from '@luma/i18n/messages';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 
-import { usePermissions } from '../identity/permissions';
-import { appsOptions } from './data';
+import { appsOptions } from '../../kit/apps/data';
+import { usePermissions } from '../../kit/identity/permissions';
 
 /** Adds a sidebar section for installed apps that contribute workspace pages. */
 export function AppNavigation({

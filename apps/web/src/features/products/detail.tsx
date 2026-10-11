@@ -25,15 +25,15 @@ import { Link, useParams, useSearch } from '@tanstack/react-router';
 import { PackageX } from 'lucide-react';
 import { type ReactNode, useSyncExternalStore } from 'react';
 
-import { SignInRedirect } from '../identity/common';
-import { IdentityError } from '../identity/data';
-import { stockQuantity, StockState } from '../inventory/presentation';
+import { SignInRedirect } from '../../kit/identity/common';
+import { IdentityError } from '../../kit/identity/data';
 import {
   formatSourceNumber,
   issueStateLabel,
   purchaseOrderLabels,
   statusLabels as orderStatusLabels,
-} from '../orders/presentation';
+} from '../../shared/orders/presentation';
+import { stockQuantity, StockState } from '../inventory/presentation';
 import { recordReturnPath } from '../records/data';
 import { IdentityLinks } from '../sync/identity-links';
 import { productFilters, productOptions, type ProductsSearch } from './data';

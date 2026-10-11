@@ -4,8 +4,8 @@ import { Button } from '@luma/ui/components/primitives/button';
 import { onlineManager, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState, useSyncExternalStore } from 'react';
 
-import { IdentityError } from '../identity/data';
-import { settingsApi } from './data';
+import { IdentityError } from '../../kit/identity/data';
+import { settingsApi } from '../../kit/settings/data';
 
 const subscribe = (changed: () => void) => onlineManager.subscribe(changed);
 

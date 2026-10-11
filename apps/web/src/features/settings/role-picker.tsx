@@ -2,7 +2,7 @@ import { m } from '@luma/i18n/messages';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { useId } from 'react';
 
-import type { WorkspaceRole } from './roles-data';
+import type { WorkspaceRole } from '../../kit/settings/roles-data';
 
 /** A role offered in a picker, with the reason it can't be chosen when disabled. */
 export interface RoleChoice {

@@ -13,12 +13,12 @@ import {
 } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 
-import { IdentityError } from '../identity/data';
+import { IdentityError } from '../../kit/identity/data';
 import {
   changesAny,
   liveRefreshDelay,
   subscribeToWorkspaceMetrics,
-} from './metric-subscription';
+} from '../../kit/live/metric-subscription';
 import {
   metricSummaryKey,
   metricSummaryOptions,

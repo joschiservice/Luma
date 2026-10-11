@@ -31,9 +31,9 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
-import { SignInRedirect } from '../../identity/common';
-import { IdentityError } from '../../identity/data';
-import { usePermissions } from '../../identity/permissions';
+import { SignInRedirect } from '../../../kit/identity/common';
+import { IdentityError } from '../../../kit/identity/data';
+import { usePermissions } from '../../../kit/identity/permissions';
 import { workflowError } from '../data';
 import { OfflineNotice } from '../offline';
 import { createDraft, draftsKey, templatesOptions } from './data';

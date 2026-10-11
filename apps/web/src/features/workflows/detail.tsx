@@ -26,9 +26,8 @@ import {
 } from '@tanstack/react-router';
 import { type ReactNode, useEffect, useState } from 'react';
 
-import { SignInRedirect } from '../identity/common';
-import { contextOptions, IdentityError } from '../identity/data';
-import { ShadowReport } from '../shadow/report';
+import { SignInRedirect } from '../../kit/identity/common';
+import { contextOptions, IdentityError } from '../../kit/identity/data';
 import { ActivationForm } from './activation';
 import { EditWorkflowButton } from './authoring/edit-workflow';
 import { WorkflowCodeSteps } from './code-steps';
@@ -49,6 +48,7 @@ import { type WorkflowFilters, WorkflowLoading } from './library';
 import { OfflineNotice } from './offline';
 import { ReadinessPills } from './readiness';
 import { WorkflowRuns } from './runs';
+import { ShadowReport } from './shadow/report';
 import { WorkflowTriggers } from './triggers';
 
 /** Loads a shareable workflow, resetting private form state when the workspace or workflow changes. */

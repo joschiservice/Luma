@@ -18,20 +18,23 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { ArrowLeft, ArrowRight, ChevronRight, Plug } from 'lucide-react';
 import { useRef, useState } from 'react';
 
-import { ConnectionCard } from '../connections/connection-card';
-import { connectionError, connectionsOptions } from '../connections/data';
-import { contextOptions } from '../identity/data';
-import { roleName } from '../identity/permission-text';
-import { isOwnerRole, usePermissions } from '../identity/permissions';
-import { settingsOptions } from '../settings/data';
-import { syncOptions } from '../sync/data';
-import { AppAccessDialog, ScopeList } from './access';
 import {
   type AppResult,
   approveAppScopes,
   appsOptions,
   changeApp,
-} from './data';
+} from '../../kit/apps/data';
+import {
+  connectionError,
+  connectionsOptions,
+} from '../../kit/connections/data';
+import { contextOptions } from '../../kit/identity/data';
+import { roleName } from '../../kit/identity/permission-text';
+import { isOwnerRole, usePermissions } from '../../kit/identity/permissions';
+import { settingsOptions } from '../../kit/settings/data';
+import { syncOptions } from '../sync/data';
+import { AppAccessDialog, ScopeList } from './access';
+import { ConnectionCard } from './connection-card';
 import { AppExtension } from './extension';
 
 const appResults = {

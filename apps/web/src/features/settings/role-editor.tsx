@@ -33,23 +33,23 @@ import {
 } from 'lucide-react';
 import { useId, useMemo, useState } from 'react';
 
-import { permissionLabel } from '../identity/permission-text';
-import { usePermissions } from '../identity/permissions';
-import {
-  CommandFeedback,
-  useSettingsCommand,
-  useSettingsOnline,
-} from './command';
-import { membersOptions, settingsApi } from './data';
-import type { RoleDraft } from './role-create';
-import { RoleHistory, RolePeople } from './role-history';
-import { RoleMark } from './roles';
+import { permissionLabel } from '../../kit/identity/permission-text';
+import { usePermissions } from '../../kit/identity/permissions';
+import { membersOptions, settingsApi } from '../../kit/settings/data';
 import {
   isNewForRole,
   permissionChanges,
   type PermissionDefinition,
   type WorkspaceRole,
-} from './roles-data';
+} from '../../kit/settings/roles-data';
+import {
+  CommandFeedback,
+  useSettingsCommand,
+  useSettingsOnline,
+} from './command';
+import type { RoleDraft } from './role-create';
+import { RoleHistory, RolePeople } from './role-history';
+import { RoleMark } from './roles';
 
 type Values = { name: string; description: string; permissions: string[] };
 

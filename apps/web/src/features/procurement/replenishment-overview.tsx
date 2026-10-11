@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { ArrowUpRight, Workflow } from 'lucide-react';
 
-import { IdentityError } from '../identity/data';
+import { IdentityError } from '../../kit/identity/data';
 import { workflowError, workflowOptions } from '../workflows/data';
 import {
   coverageLabel,

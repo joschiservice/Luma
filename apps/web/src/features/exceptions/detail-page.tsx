@@ -12,7 +12,7 @@ import {
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { z } from 'zod';
 
-import { connectionsOptions } from '../connections/data';
+import { connectionsOptions } from '../../kit/connections/data';
 import { IssueActions } from './actions';
 import { useCaseObservation } from './observation';
 import { LiveCaseDetail } from './progress';

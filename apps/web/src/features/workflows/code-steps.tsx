@@ -28,8 +28,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Braces, Check, Copy, Play, ShieldCheck, Square } from 'lucide-react';
 import { useId, useState } from 'react';
 
-import { IdentityError } from '../identity/data';
-import { useCan } from '../identity/permissions';
+import { IdentityError } from '../../kit/identity/data';
+import { useCan } from '../../kit/identity/permissions';
 import {
   cancelCodeEvaluation,
   codeEvaluationOptions,

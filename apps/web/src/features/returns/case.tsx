@@ -29,9 +29,9 @@ import { Link, useParams } from '@tanstack/react-router';
 import { ArrowRight, RefreshCw, Send, Undo2 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
-import { SignInRedirect } from '../identity/common';
-import { IdentityError } from '../identity/data';
-import { membersOptions } from '../settings/data';
+import { SignInRedirect } from '../../kit/identity/common';
+import { IdentityError } from '../../kit/identity/data';
+import { membersOptions } from '../../kit/settings/data';
 import {
   caseCommands,
   returnCaseError,

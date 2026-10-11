@@ -11,8 +11,8 @@ import { Select } from '@luma/ui/components/primitives/select';
 import { Textarea } from '@luma/ui/components/primitives/textarea';
 import { useState } from 'react';
 
-import { usePermissions } from '../identity/permissions';
-import type { WorkspaceRole } from './roles-data';
+import { usePermissions } from '../../kit/identity/permissions';
+import type { WorkspaceRole } from '../../kit/settings/roles-data';
 
 /** A role being created: its details and the permissions it starts with. */
 export interface RoleDraft {

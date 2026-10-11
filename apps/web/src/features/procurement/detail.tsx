@@ -40,9 +40,9 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useRef, useState, useSyncExternalStore } from 'react';
 
-import { SignInRedirect } from '../identity/common';
-import { IdentityError } from '../identity/data';
-import { RecordMessages } from '../inbox/record-messages';
+import { SignInRedirect } from '../../kit/identity/common';
+import { IdentityError } from '../../kit/identity/data';
+import { RecordMessages } from '../../kit/record-messages';
 import { stockQuantity } from '../inventory/presentation';
 import { WorkflowCoverageCard } from '../workflows/coverage';
 import {

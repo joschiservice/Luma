@@ -13,8 +13,8 @@ import { queryOptions, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { z } from 'zod';
 
+import { auth, clearPrivate, IdentityError } from '../../kit/identity/data';
 import { privateQueryDefaults } from '../../lib/private-query';
-import { auth, clearPrivate, IdentityError } from '../identity/data';
 import { securityActivityKey } from './security-activity';
 
 export const accountSessionsKey = ['private', 'account-sessions'] as const;

@@ -13,7 +13,6 @@ import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { Link } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 
-import { orderFilters, type OrdersSearch } from './data';
 import {
   formatMoney,
   fulfillmentLabel,
@@ -22,7 +21,8 @@ import {
   sortLabels,
   statusLabels,
   viewLabels,
-} from './presentation';
+} from '../../shared/orders/presentation';
+import { orderFilters, type OrdersSearch } from './data';
 
 function orderColumns(
   organizationId: string,

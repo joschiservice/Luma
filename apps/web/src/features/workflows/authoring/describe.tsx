@@ -22,7 +22,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 
-import { IdentityError } from '../../identity/data';
+import { IdentityError } from '../../../kit/identity/data';
 import { workflowError } from '../data';
 import {
   acceptProposal,

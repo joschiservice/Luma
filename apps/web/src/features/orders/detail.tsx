@@ -33,11 +33,16 @@ import {
   useSyncExternalStore,
 } from 'react';
 
-import { appsOptions } from '../apps/data';
+import { appsOptions } from '../../kit/apps/data';
+import { SignInRedirect } from '../../kit/identity/common';
+import { IdentityError } from '../../kit/identity/data';
+import { RecordMessages } from '../../kit/record-messages';
+import { OrderSection } from '../../shared/orders/order-section';
+import {
+  orderSummary,
+  type SummaryKind,
+} from '../../shared/orders/presentation';
 import { AppExtension } from '../apps/extension';
-import { SignInRedirect } from '../identity/common';
-import { IdentityError } from '../identity/data';
-import { RecordMessages } from '../inbox/record-messages';
 import { recordReturnPath } from '../records/data';
 import { OrderReturnCases } from '../returns/case-entry';
 import { OrderReturns } from '../returns/order-returns';
@@ -45,13 +50,11 @@ import { orderFilters, orderOptions, type OrdersSearch } from './data';
 import { OrderIdentityLinks } from './identity-links';
 import { OrderHeader } from './order-header';
 import { OrderInspector } from './order-inspector';
-import { OrderSection } from './order-section';
 import {
   LumaActivity,
   ObservedHistory,
   OrderFulfillments,
 } from './order-timeline';
-import { orderSummary, type SummaryKind } from './presentation';
 import { SalesRecord } from './sales-record';
 import { OrderLines, SourceComparison } from './source-facts';
 

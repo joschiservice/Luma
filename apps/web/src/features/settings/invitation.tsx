@@ -12,14 +12,14 @@ import {
 import { MailCheck } from 'lucide-react';
 import { useState } from 'react';
 
-import { EntryFrame } from '../identity/common';
-import { organizationsOptions } from '../identity/data';
+import { EntryFrame } from '../../kit/identity/common';
+import { organizationsOptions } from '../../kit/identity/data';
 import {
   forgetInvitationToken,
   invitationToken,
-} from '../identity/invitation-return';
-import { roleName } from '../identity/permission-text';
-import { settingsApi } from './data';
+} from '../../kit/identity/invitation-return';
+import { roleName } from '../../kit/identity/permission-text';
+import { settingsApi } from '../../kit/settings/data';
 
 /** Reviews an email-bound invitation and reconciles acceptance before opening the workspace. */
 export function AcceptInvitation() {

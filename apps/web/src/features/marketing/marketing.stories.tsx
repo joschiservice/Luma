@@ -13,14 +13,14 @@ import {
 import { type ReactNode, useState } from 'react';
 import { expect, within } from 'storybook/test';
 
+import { homeSearch } from '../../kit/home/preferences';
+import { sessionKey } from '../../kit/identity/data';
+import { HomePage } from '../../shell/home/page';
+import { StoryShell } from '../../shell/storybook-shell';
 import appStyles from '../../styles.css?inline';
 import type { NeedsYouSearch } from '../decisions/data';
 import { DecisionInspector } from '../decisions/inspector';
 import { NeedsYouView } from '../decisions/page';
-import { HomePage } from '../home/page';
-import { homeSearch } from '../home/preferences';
-import { sessionKey } from '../identity/data';
-import { StoryShell } from '../identity/storybook-shell';
 import { OrderDetailView } from '../orders/detail';
 import {
   activeCases,

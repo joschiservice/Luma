@@ -51,13 +51,14 @@ export const sharedPaths = [
   'packages/api-contract/src/contracts/{identity,system}.ts',
   'packages/i18n/src/**',
   'packages/i18n/messages/*/{common,layout,ui}.json',
-  // The web shell and shared components.
+  // The web shell, its platform kit and shared components.
+  'apps/web/src/kit/**',
+  'apps/web/src/shell/**',
   'packages/ui/**',
   'apps/web/src/lib/**',
   'apps/web/src/routes/{__root,app.$organizationId}.tsx',
   'apps/web/src/{router.tsx,server.ts,styles.css,home.tsx}',
   'apps/web/src/styles/**',
-  'apps/web/src/features/{layout,identity}/**',
 ];
 
 // Read models
@@ -380,12 +381,11 @@ const simulator = [
 // Web
 const webShell = [
   'apps/web/src/routes/{index,app,app.index,app.workspaces.index,app.workspaces.new,sign-in,sign-up,sign-out}.tsx',
-  'apps/web/src/features/apps/{catalog-text.ts,data.ts,navigation.tsx}',
+  'apps/web/src/features/apps/navigation.tsx',
   'apps/web/src/features/assistant/**',
   'apps/web/src/features/decisions/data.ts',
   'apps/web/src/features/help/{article.tsx,context-help.tsx,context.ts,help-reader.tsx,search.tsx,source.ts}',
   'apps/web/src/features/{procurement,records}/data.ts',
-  'apps/web/src/features/settings/{data.ts,roles-data.ts}',
   'packages/i18n/messages/*/{identity,permissions,apps,catalog,assistant,help,docs,procurement,settings}.json',
   'packages/api-contract/src/**/{decisions,apps,roles,settings}.ts',
   // The shell's Needs you badge reads decisions on every workspace page.
@@ -400,12 +400,20 @@ const webHome = [
   'apps/web/src/features/decisions/{data.ts,live.ts,presentation.ts}',
   'apps/web/src/features/exceptions/data.ts',
   'apps/web/src/features/fulfillment/{data.ts,presentation.ts}',
-  'apps/web/src/features/home/**',
-  'apps/web/src/features/orders/presentation.ts',
-  'apps/web/src/features/overview/{data.ts,metric-subscription.ts,metric-summary-data.ts,metric-text.ts,metrics-data.ts,metrics-live.ts,operational-metrics-data.ts,operational-metrics.css,operational-metrics.tsx,order-metrics.css,order-metrics.tsx,resolution-evidence.tsx}',
+  'apps/web/src/shared/orders/presentation.ts',
+  'apps/web/src/features/overview/data.ts',
+  'apps/web/src/features/overview/metric-summary-data.ts',
+  'apps/web/src/features/overview/metric-text.ts',
+  'apps/web/src/features/overview/metrics-data.ts',
+  'apps/web/src/features/overview/metrics-live.ts',
+  'apps/web/src/features/overview/operational-metrics-data.ts',
+  'apps/web/src/features/overview/operational-metrics.css',
+  'apps/web/src/features/overview/operational-metrics.tsx',
+  'apps/web/src/features/overview/order-metrics.css',
+  'apps/web/src/features/overview/order-metrics.tsx',
+  'apps/web/src/features/overview/resolution-evidence.tsx',
   'apps/web/src/features/products/{data.ts,presentation.ts}',
   'apps/web/src/features/returns/{data.ts,presentation.ts}',
-  'apps/web/src/features/settings/data.ts',
   'apps/web/src/features/sync/presentation.ts',
   'apps/web/src/routes/app.$organizationId.home.tsx',
   'apps/web/src/routes/app.$organizationId.overview.tsx',
@@ -413,7 +421,6 @@ const webHome = [
 ];
 const webActivity = [
   'apps/web/src/features/activity/**',
-  'apps/web/src/features/connections/data.ts',
   'apps/web/src/features/sync/presentation.ts',
   'apps/web/src/routes/app.$organizationId.activity.tsx',
   'packages/i18n/messages/*/{activity,connections,sync}.json',
@@ -421,92 +428,88 @@ const webActivity = [
 const webApps = [
   'apps/web/src/features/apps/**',
   'apps/web/src/features/connections/**',
-  'apps/web/src/features/settings/{data.ts,roles-data.ts}',
   'apps/web/src/features/sync/{data.ts,presentation.ts}',
   'apps/web/src/routes/app.$organizationId.{apps.*,connections.tsx}',
   'packages/i18n/messages/*/{apps,catalog,connections,issues,settings,sync}.json',
 ];
 const webCustomers = [
   'apps/web/src/features/customers/**',
-  'apps/web/src/features/orders/{data.ts,list-table.tsx,orders.css,presentation.ts}',
+  'apps/web/src/features/orders/data.ts',
+  'apps/web/src/features/orders/list-table.tsx',
+  'apps/web/src/features/orders/orders.css',
+  'apps/web/src/shared/orders/presentation.ts',
   'apps/web/src/features/products/presentation.ts',
   'apps/web/src/features/sync/{coverage.tsx,data.ts,presentation.ts,sync.css}',
   'apps/web/src/routes/app.$organizationId.customers.*',
   'packages/i18n/messages/*/{customers,issues,orders,products,sync}.json',
 ];
 const webCases = [
-  'apps/web/src/features/connections/data.ts',
   'apps/web/src/features/exceptions/**',
   'apps/web/src/features/overview/data.ts',
-  'apps/web/src/features/settings/{data.ts,roles-data.ts}',
-  'apps/web/src/features/shadow/{case.tsx,data.ts,result.tsx,review-fields.tsx,review.tsx,shadow.css}',
+  'apps/web/src/features/exceptions/shadow/case.tsx',
+  'apps/web/src/features/workflows/shadow/data.ts',
+  'apps/web/src/features/workflows/shadow/result.tsx',
+  'apps/web/src/features/exceptions/shadow/review-fields.tsx',
+  'apps/web/src/features/exceptions/shadow/review.tsx',
+  'apps/web/src/features/workflows/shadow/shadow.css',
   'apps/web/src/features/workflows/data.ts',
   'apps/web/src/routes/app.$organizationId.exceptions{,_}.*',
   'packages/i18n/messages/*/{connections,exceptions,settings,shadow,workflows}.json',
 ];
 const webFulfillment = [
   'apps/web/src/features/activity/presentation.ts',
-  'apps/web/src/features/apps/{catalog-text.ts,data.ts,extension.tsx}',
-  'apps/web/src/features/connections/data.ts',
+  'apps/web/src/features/apps/extension.tsx',
   'apps/web/src/features/fulfillment/**',
-  'apps/web/src/features/orders/presentation.ts',
+  'apps/web/src/shared/orders/presentation.ts',
   'apps/web/src/features/records/data.ts',
-  'apps/web/src/features/settings/{data.ts,roles-data.ts}',
   'apps/web/src/features/sync/{coverage.tsx,data.ts,presentation.ts,sync.css}',
   'apps/web/src/routes/app.$organizationId.fulfillment.*',
   'packages/i18n/messages/*/{activity,apps,catalog,connections,fulfillment,issues,orders,settings,sync}.json',
 ];
 const webInsights = [
-  'apps/web/src/features/connections/data.ts',
   'apps/web/src/features/fulfillment/presentation.ts',
   'apps/web/src/features/insights/**',
-  'apps/web/src/features/orders/{data.ts,presentation.ts}',
+  'apps/web/src/features/orders/data.ts',
+  'apps/web/src/shared/orders/presentation.ts',
   'apps/web/src/features/overview/**',
   'apps/web/src/features/procurement/presentation.tsx',
   'apps/web/src/routes/app.$organizationId.insights.tsx',
   'packages/i18n/messages/*/{connections,fulfillment,insights,issues,metrics,orders,overview,procurement}.json',
 ];
 const webInventory = [
-  'apps/web/src/features/apps/{catalog-text.ts,data.ts,extension.tsx}',
-  'apps/web/src/features/connections/data.ts',
+  'apps/web/src/features/apps/extension.tsx',
   'apps/web/src/features/inventory/**',
-  'apps/web/src/features/orders/presentation.ts',
+  'apps/web/src/shared/orders/presentation.ts',
   'apps/web/src/features/records/data.ts',
-  'apps/web/src/features/settings/{data.ts,roles-data.ts}',
   'apps/web/src/features/sync/{coverage.tsx,data.ts,identity-links.tsx,presentation.ts,sync.css}',
   'apps/web/src/features/workflows/{coverage.tsx,data.ts,readiness.css,readiness.tsx}',
   'apps/web/src/routes/app.$organizationId.inventory.*',
   'packages/i18n/messages/*/{apps,catalog,connections,inventory,issues,orders,settings,sync,workflows}.json',
 ];
 const webNeedsYou = [
-  'apps/web/src/features/apps/{catalog-text.ts,data.ts,extension.tsx}',
-  'apps/web/src/features/connections/data.ts',
+  'apps/web/src/features/apps/extension.tsx',
   'apps/web/src/features/decisions/**',
   'apps/web/src/features/exceptions/{data.ts,observation-data.ts,observation.ts,resolution-data.ts,resolution.tsx}',
   'apps/web/src/features/inventory/presentation.tsx',
-  'apps/web/src/features/orders/presentation.ts',
-  'apps/web/src/features/overview/metric-subscription.ts',
+  'apps/web/src/shared/orders/presentation.ts',
   'apps/web/src/features/procurement/{data.ts,detail.tsx,forms.tsx,presentation.tsx,procurement.css,record-dialogs.tsx}',
-  'apps/web/src/features/settings/{data.ts,roles-data.ts}',
   'apps/web/src/features/workflows/{coverage.tsx,data.ts,readiness.css,readiness.tsx,replenishment-setup.tsx,replenishment.css,replenishment.tsx,workflows.css}',
   'apps/web/src/routes/app.$organizationId.needs-you.tsx',
   'packages/i18n/messages/*/{apps,catalog,connections,decisions,exceptions,inventory,issues,orders,procurement,settings,workflows}.json',
 ];
 const webOrders = [
   'apps/web/src/features/activity/presentation.ts',
-  'apps/web/src/features/apps/{catalog-text.ts,data.ts,extension.tsx}',
-  'apps/web/src/features/connections/data.ts',
+  'apps/web/src/features/apps/extension.tsx',
   'apps/web/src/features/orders/**',
   'apps/web/src/features/records/data.ts',
   'apps/web/src/features/returns/{order-returns.tsx,presentation.ts,returns.css}',
-  'apps/web/src/features/settings/{data.ts,roles-data.ts}',
   'apps/web/src/features/sync/{coverage.tsx,data.ts,identity-links.tsx,presentation.ts,sync.css}',
   'apps/web/src/routes/app.$organizationId.orders.*',
   'packages/i18n/messages/*/{activity,apps,catalog,connections,issues,orders,records,returns,settings,sync}.json',
 ];
 const webProcurement = [
   'apps/web/src/features/inventory/presentation.tsx',
-  'apps/web/src/features/orders/presentation.ts',
+  'apps/web/src/shared/orders/presentation.ts',
   'apps/web/src/features/procurement/**',
   'apps/web/src/features/workflows/{coverage.tsx,data.ts,readiness.css,readiness.tsx}',
   'apps/web/src/routes/app.$organizationId.procurement.*',
@@ -514,7 +517,7 @@ const webProcurement = [
 ];
 const webProducts = [
   'apps/web/src/features/inventory/presentation.tsx',
-  'apps/web/src/features/orders/presentation.ts',
+  'apps/web/src/shared/orders/presentation.ts',
   'apps/web/src/features/products/**',
   'apps/web/src/features/records/data.ts',
   'apps/web/src/features/sync/{coverage.tsx,data.ts,identity-links.tsx,presentation.ts,sync.css}',
@@ -522,25 +525,21 @@ const webProducts = [
   'packages/i18n/messages/*/{inventory,issues,orders,products,sync}.json',
 ];
 const webRecords = [
-  'apps/web/src/features/connections/data.ts',
   'apps/web/src/features/records/**',
   'apps/web/src/features/sync/presentation.ts',
   'apps/web/src/routes/app.$organizationId.records.*',
   'packages/i18n/messages/*/{connections,records,sync}.json',
 ];
 const webReturns = [
-  'apps/web/src/features/apps/{catalog-text.ts,data.ts,extension.tsx}',
-  'apps/web/src/features/connections/data.ts',
-  'apps/web/src/features/orders/presentation.ts',
+  'apps/web/src/features/apps/extension.tsx',
+  'apps/web/src/shared/orders/presentation.ts',
   'apps/web/src/features/records/data.ts',
   'apps/web/src/features/returns/**',
-  'apps/web/src/features/settings/{data.ts,roles-data.ts}',
   'apps/web/src/features/sync/{coverage.tsx,data.ts,presentation.ts,sync.css}',
   'apps/web/src/routes/app.$organizationId.returns.*',
   'packages/i18n/messages/*/{apps,catalog,connections,issues,orders,returns,settings,sync}.json',
 ];
 const webSettings = [
-  'apps/web/src/features/home/preferences.ts',
   'apps/web/src/features/orders/authority.ts',
   'apps/web/src/features/settings/**',
   'apps/web/src/routes/app.$organizationId.settings.$section.tsx',
@@ -549,8 +548,6 @@ const webSettings = [
   'packages/i18n/messages/*/{home,issues,orders,settings}.json',
 ];
 const webSync = [
-  'apps/web/src/features/connections/{presentation.ts,provider-icon.tsx}',
-  'apps/web/src/features/settings/{data.ts,roles-data.ts}',
   'apps/web/src/features/sync/**',
   'apps/web/src/routes/app.$organizationId.sync.tsx',
   'packages/i18n/messages/*/{connections,settings,sync}.json',
@@ -561,8 +558,10 @@ const webInbox = [
   'packages/i18n/messages/*/messaging.json',
 ];
 const webWorkflows = [
-  'apps/web/src/features/settings/{data.ts,roles-data.ts}',
-  'apps/web/src/features/shadow/{data.ts,report.tsx,result.tsx,shadow.css}',
+  'apps/web/src/features/workflows/shadow/data.ts',
+  'apps/web/src/features/workflows/shadow/report.tsx',
+  'apps/web/src/features/workflows/shadow/result.tsx',
+  'apps/web/src/features/workflows/shadow/shadow.css',
   'apps/web/src/features/workflows/**',
   'apps/web/src/routes/app.$organizationId.{workflows,playbooks}.*',
   'packages/i18n/messages/*/{authoring,issues,settings,shadow,vocabulary,workflows}.json',

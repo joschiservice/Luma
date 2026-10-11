@@ -3,7 +3,7 @@ import type { LiveConnection } from '@luma/ui/components/issues/case-timeline';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 
-import { IdentityError } from '../identity/data';
+import { IdentityError } from '../../kit/identity/data';
 import { casesKey } from './data';
 import { historyOptions, observationOptions } from './observation-data';
 

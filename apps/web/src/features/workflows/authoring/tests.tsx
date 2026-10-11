@@ -23,7 +23,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Play, Plus, Trash2 } from 'lucide-react';
 import { useContext, useEffect, useRef, useState } from 'react';
 
-import { IdentityError } from '../../identity/data';
+import { IdentityError } from '../../../kit/identity/data';
 import { workflowError } from '../data';
 import {
   cancelDraftTest,

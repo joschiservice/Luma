@@ -35,8 +35,8 @@ import {
 import { ArrowRight, Database, Plug } from 'lucide-react';
 import { useState } from 'react';
 
-import { connectionsOptions } from '../connections/data';
-import { IdentityError } from '../identity/data';
+import { connectionsOptions } from '../../kit/connections/data';
+import { IdentityError } from '../../kit/identity/data';
 import { linkMethodLabel } from '../sync/presentation';
 import {
   recordListError,

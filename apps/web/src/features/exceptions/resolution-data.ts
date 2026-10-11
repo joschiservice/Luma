@@ -5,8 +5,8 @@ import {
 } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 
+import { IdentityError } from '../../kit/identity/data';
 import { createWebApiClient } from '../../lib/api-client';
-import { IdentityError } from '../identity/data';
 
 const api = createWebApiClient();
 

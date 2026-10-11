@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import {
   changesAny,
   subscribeToWorkspaceMetrics,
-} from '../overview/metric-subscription';
+} from '../../kit/live/metric-subscription';
 import { messagingKey } from './data';
 
 export type InboxUpdates = 'connecting' | 'live' | 'interrupted';

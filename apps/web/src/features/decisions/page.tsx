@@ -52,11 +52,12 @@ import {
   useSyncExternalStore,
 } from 'react';
 
+import { SignInRedirect } from '../../kit/identity/common';
+import { contextOptions, IdentityError } from '../../kit/identity/data';
+import { usePermissions } from '../../kit/identity/permissions';
+import { useNow } from '../../kit/live/now';
+import { membersOptions } from '../../kit/settings/data';
 import { isTypingTarget } from '../../lib/keyboard';
-import { SignInRedirect } from '../identity/common';
-import { contextOptions, IdentityError } from '../identity/data';
-import { usePermissions } from '../identity/permissions';
-import { membersOptions } from '../settings/data';
 import {
   assignDecision,
   decisionOptions,
@@ -66,7 +67,7 @@ import {
   type NeedsYouSearch,
 } from './data';
 import { DecisionDeadline, DecisionInspector, type Member } from './inspector';
-import { useDecisionUpdates, useNow } from './live';
+import { useDecisionUpdates } from './live';
 import { OwnerReview } from './owner-review';
 import {
   actionable,

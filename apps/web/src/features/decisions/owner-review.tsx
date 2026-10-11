@@ -5,8 +5,8 @@ import { caseLabel } from '@luma/ui/components/issues/case-investigation';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 
+import { connectionsOptions } from '../../kit/connections/data';
 import { AppExtension } from '../apps/extension';
-import { connectionsOptions } from '../connections/data';
 import { useCaseObservation } from '../exceptions/observation';
 import { CaseResolution } from '../exceptions/resolution';
 import { ThreadReview } from '../inbox/thread';

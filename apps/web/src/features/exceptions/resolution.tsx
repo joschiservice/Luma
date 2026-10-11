@@ -8,7 +8,7 @@ import { ResolutionReview } from '@luma/ui/components/issues/resolution-review';
 import { Button } from '@luma/ui/components/primitives/button';
 import { useEffect, useRef, useState } from 'react';
 
-import { IdentityError } from '../identity/data';
+import { IdentityError } from '../../kit/identity/data';
 import type { CaseObservation } from './observation';
 import {
   decisionCommand,

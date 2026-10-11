@@ -34,23 +34,30 @@ import {
 } from 'lucide-react';
 import { useContext } from 'react';
 
-import { activityOptions } from '../activity/data';
-import { activityLabel, activityState } from '../activity/presentation';
-import { decisionsOptions } from '../decisions/data';
-import { useNow } from '../decisions/live';
+import { activityOptions } from '../../features/activity/data';
+import {
+  activityLabel,
+  activityState,
+} from '../../features/activity/presentation';
+import { decisionsOptions } from '../../features/decisions/data';
 import {
   decisionStatus,
   domainIcons,
   timeLeft,
-} from '../decisions/presentation';
-import { casesOptions } from '../exceptions/data';
-import { fulfillmentsOptions } from '../fulfillment/data';
-import { viewLabels as fulfillmentViewLabels } from '../fulfillment/presentation';
-import { productSummaryOptions } from '../products/data';
-import { viewLabels } from '../products/presentation';
-import { returnSummaryOptions } from '../returns/data';
-import { stageLabels, stageStates, workStages } from '../returns/presentation';
-import { homeModules } from './preferences';
+} from '../../features/decisions/presentation';
+import { casesOptions } from '../../features/exceptions/data';
+import { fulfillmentsOptions } from '../../features/fulfillment/data';
+import { viewLabels as fulfillmentViewLabels } from '../../features/fulfillment/presentation';
+import { productSummaryOptions } from '../../features/products/data';
+import { viewLabels } from '../../features/products/presentation';
+import { returnSummaryOptions } from '../../features/returns/data';
+import {
+  stageLabels,
+  stageStates,
+  workStages,
+} from '../../features/returns/presentation';
+import { homeModules } from '../../kit/home/preferences';
+import { useNow } from '../../kit/live/now';
 
 type Connection = OperationsOverview['connections'][number];
 

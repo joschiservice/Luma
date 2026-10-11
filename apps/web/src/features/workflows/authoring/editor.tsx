@@ -44,9 +44,9 @@ import {
   useState,
 } from 'react';
 
-import { SignInRedirect } from '../../identity/common';
-import { contextOptions, IdentityError } from '../../identity/data';
-import { usePermissions } from '../../identity/permissions';
+import { SignInRedirect } from '../../../kit/identity/common';
+import { contextOptions, IdentityError } from '../../../kit/identity/data';
+import { usePermissions } from '../../../kit/identity/permissions';
 import { workflowError, workflowsKey } from '../data';
 import { WorkflowLoading } from '../library';
 import { OfflineNotice } from '../offline';

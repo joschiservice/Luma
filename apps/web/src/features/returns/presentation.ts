@@ -10,7 +10,7 @@ import { formatNumber } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import type { OperationalState } from '@luma/ui/components/primitives/state';
 
-import { formatMoney } from '../orders/presentation';
+import { formatMoney } from '../../shared/orders/presentation';
 
 /** The system a return comes from, for messages that name it. */
 export type ReturnSystem = 'shopify' | 'jtl' | 'cin7' | 'other';

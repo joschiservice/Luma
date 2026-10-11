@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { IdentityError } from '../identity/data';
+import { IdentityError } from '../../kit/identity/data';
 import { parseAddresses } from './composer';
 import {
   commandError,

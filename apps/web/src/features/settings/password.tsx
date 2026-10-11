@@ -12,7 +12,7 @@ import { useForm } from '@tanstack/react-form';
 import { useQueryClient } from '@tanstack/react-query';
 import { useId, useState } from 'react';
 
-import { auth, sessionKey } from '../identity/data';
+import { auth, sessionKey } from '../../kit/identity/data';
 import { securityActivityKey } from './security-activity';
 import { accountSessionsKey } from './sessions';
 

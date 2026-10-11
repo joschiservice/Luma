@@ -10,7 +10,7 @@ import {
 import { useState } from 'react';
 import { expect, userEvent, within } from 'storybook/test';
 
-import { StoryShell } from '../identity/storybook-shell';
+import { StoryShell } from '../../shell/storybook-shell';
 import { AssistantPanel } from './panel';
 
 type State = 'available' | 'unavailable' | 'failed';

@@ -10,7 +10,12 @@ import { KeyRound } from 'lucide-react';
 import { type ReactNode, useRef, useState } from 'react';
 import { z } from 'zod';
 
-import { auth, clearPrivate, returnPath, usePasskeySupport } from './data';
+import {
+  auth,
+  clearPrivate,
+  returnPath,
+  usePasskeySupport,
+} from '../../kit/identity/data';
 import { SecondFactorForm } from './second-factor';
 import { ResolutionStory } from './story';
 

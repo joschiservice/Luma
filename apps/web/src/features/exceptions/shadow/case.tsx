@@ -1,4 +1,4 @@
-import './shadow.css';
+import '../../workflows/shadow/shadow.css';
 
 import { m } from '@luma/i18n/messages';
 import { CaseNotice } from '@luma/ui/components/issues/case-investigation';
@@ -11,17 +11,17 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useId, useRef, useState } from 'react';
 
-import { contextOptions, IdentityError } from '../identity/data';
-import { useCan } from '../identity/permissions';
-import { resolutionWorkflowsOptions } from '../workflows/data';
+import { contextOptions, IdentityError } from '../../../kit/identity/data';
+import { useCan } from '../../../kit/identity/permissions';
+import { resolutionWorkflowsOptions } from '../../workflows/data';
 import {
   evaluateShadow,
   shadowAccessDenied,
   shadowError,
   shadowKey,
   shadowLatestOptions,
-} from './data';
-import { ShadowResult } from './result';
+} from '../../workflows/shadow/data';
+import { ShadowResult } from '../../workflows/shadow/result';
 import { ShadowReviewForm } from './review';
 
 /** Adds Shadow evaluation to a case for authorized operators, with isolated per-case state. */

@@ -10,9 +10,9 @@ import type {
 import { m } from '@luma/i18n/messages';
 import { queryOptions } from '@tanstack/react-query';
 
+import { IdentityError } from '../../kit/identity/data';
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
-import { IdentityError } from '../identity/data';
 
 /** A rejected procurement request, with the server's explanation when it sent one. */
 export class ProcurementError extends IdentityError {

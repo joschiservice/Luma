@@ -18,14 +18,18 @@ import {
 } from 'lucide-react';
 import { useId } from 'react';
 
+import {
+  defaultHome,
+  homeModules,
+  moveModule,
+} from '../../kit/home/preferences';
+import { useWorkspaceLayout } from '../../kit/layout/data';
 import { setSidebarCollapsed, useSidebarCollapsed } from '../../lib/sidebar';
 import {
   setThemePreference,
   type ThemePreference,
   useThemePreference,
 } from '../../lib/theme';
-import { defaultHome, homeModules, moveModule } from '../home/preferences';
-import { useWorkspaceLayout } from '../layout/data';
 import { SectionHeading } from './section-heading';
 
 const themes: {

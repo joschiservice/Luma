@@ -13,7 +13,7 @@ import { Link } from '@tanstack/react-router';
 import { Check, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
 
-import { contextOptions } from '../../identity/data';
+import { contextOptions } from '../../../kit/identity/data';
 import { ActivationForm } from '../activation';
 import { CaseActivationForm } from '../case';
 import {

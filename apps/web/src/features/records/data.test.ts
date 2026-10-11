@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 
-import { IdentityError } from '../identity/data';
+import { IdentityError } from '../../kit/identity/data';
 import { recordListError, recordReturnPath, recordsSearch } from './data';
 
 it('keeps record return links within the selected workspace', () => {

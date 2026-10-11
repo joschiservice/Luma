@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { Protected } from '../features/identity/protected';
+import { Protected } from '../kit/identity/protected';
 
 export const Route = createFileRoute('/app')({
   ssr: false,

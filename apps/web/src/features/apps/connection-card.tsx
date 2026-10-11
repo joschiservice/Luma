@@ -22,20 +22,20 @@ import { Link } from '@tanstack/react-router';
 import { Check, Minus, ShieldCheck, Unplug } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
-import { AppExtension } from '../apps/extension';
-import { connectionSummary } from '../sync/presentation';
 import {
   changeConnection,
   changeConnectionWriteMode,
   connectionError,
-} from './data';
+} from '../../kit/connections/data';
 import {
   capabilities,
   connectionKindName,
   connectionSystem,
   statuses,
-} from './presentation';
-import { ProviderIcon } from './provider-icon';
+} from '../../kit/connections/presentation';
+import { ProviderIcon } from '../../kit/connections/provider-icon';
+import { connectionSummary } from '../sync/presentation';
+import { AppExtension } from './extension';
 
 /**
  * Shows a connection's verified permissions and management actions, refreshing the list

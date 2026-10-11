@@ -11,13 +11,13 @@ import {
 import { useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 
+import { contextFixture } from '../../kit/identity/context.fixture';
+import { contextOptions, sessionOptions } from '../../kit/identity/data';
+import { invitationsOptions, membersOptions } from '../../kit/settings/data';
+import { rolesOptions } from '../../kit/settings/roles-data';
 import appStyles from '../../styles.css?inline';
-import { contextFixture } from '../identity/context.fixture';
-import { contextOptions, sessionOptions } from '../identity/data';
-import { invitationsOptions, membersOptions } from './data';
 import { type SettingsSection, SettingsView } from './page';
 import { membersFixture, rolesFixture } from './roles.fixture';
-import { rolesOptions } from './roles-data';
 
 const organizationId = '11111111-1111-4111-8111-111111111111';
 

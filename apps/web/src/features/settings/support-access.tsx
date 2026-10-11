@@ -8,9 +8,9 @@ import { queryOptions, useQuery } from '@tanstack/react-query';
 import { Check, LifeBuoy } from 'lucide-react';
 import { useId, useState } from 'react';
 
+import { settingsApi } from '../../kit/settings/data';
 import { privateQueryDefaults } from '../../lib/private-query';
 import { CommandFeedback, useSettingsCommand } from './command';
-import { settingsApi } from './data';
 import { SectionHeading } from './section-heading';
 
 const durations = [

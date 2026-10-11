@@ -18,14 +18,14 @@ import {
   Truck,
 } from 'lucide-react';
 
-import type { OrdersSearch } from './data';
 import {
   formatMoney,
   fulfillmentLabel,
   orderLabel,
   paymentLabels,
   statusLabels,
-} from './presentation';
+} from '../../shared/orders/presentation';
+import type { OrdersSearch } from './data';
 
 const paymentTones: Partial<Record<string, RecordFact['tone']>> = {
   failed: 'danger',

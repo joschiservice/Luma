@@ -8,13 +8,13 @@ import { Link, Navigate, useNavigate } from '@tanstack/react-router';
 import { ChevronRight, Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
 
-import { EntryFrame, Failure, Pending } from './common';
+import { EntryFrame, Failure, Pending } from '../../kit/identity/common';
 import {
   createOrganization,
   IdentityError,
   organizationsOptions,
   workspaceName,
-} from './data';
+} from '../../kit/identity/data';
 
 /**
  * Lists the person's workspaces, marking those where their access is suspended. Entry mode

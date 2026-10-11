@@ -9,10 +9,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ClipboardList } from 'lucide-react';
 import { useState } from 'react';
 
+import { contextOptions } from '../../kit/identity/data';
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
-import { contextOptions } from '../identity/data';
-import { OrderSection } from './order-section';
+import { OrderSection } from '../../shared/orders/order-section';
 
 const api = createWebApiClient();
 

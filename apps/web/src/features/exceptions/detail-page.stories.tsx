@@ -24,7 +24,7 @@ import { ArrowLeft, Maximize2 } from 'lucide-react';
 import { useState } from 'react';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
-import { StoryShell } from '../identity/storybook-shell';
+import { StoryShell } from '../../shell/storybook-shell';
 
 const evidence = Array.from({ length: 48 }, (_, index) => ({
   ...inventoryCase.diagnosis!.provenance.evidence[0]!,

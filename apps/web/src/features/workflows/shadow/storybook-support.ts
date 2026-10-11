@@ -1,6 +1,6 @@
 import type { WorkflowSummary } from '@luma/api-contract';
 
-import { contextFixture } from '../identity/context.fixture';
+import { contextFixture } from '../../../kit/identity/context.fixture';
 import type { ShadowComparison, ShadowReport } from './data';
 
 export const organizationId = '22222222-2222-4222-8222-222222222222';

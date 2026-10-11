@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
+import { fieldRows, readFields } from '../../exceptions/shadow/review-fields';
 import {
   candidateAction,
   type ShadowEvaluation,
   shadowLatestOptions,
   shadowWindow,
 } from './data';
-import { fieldRows, readFields } from './review-fields';
 
 describe('Shadow comparison inputs', () => {
   it('uses inclusive UTC calendar days and rejects invalid dates or reversed windows', () => {

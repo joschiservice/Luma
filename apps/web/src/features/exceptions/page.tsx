@@ -27,8 +27,8 @@ import {
 import { ChevronRight, Maximize2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
-import { connectionsOptions } from '../connections/data';
-import { IdentityError } from '../identity/data';
+import { connectionsOptions } from '../../kit/connections/data';
+import { IdentityError } from '../../kit/identity/data';
 import { overviewOptions } from '../overview/data';
 import { IssueActions } from './actions';
 import { casesKey, casesOptions, type InboxSearch, matchesView } from './data';

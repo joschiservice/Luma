@@ -25,15 +25,15 @@ import { Link, useParams, useSearch } from '@tanstack/react-router';
 import { ArrowRight, Check, Minus, Undo2, X } from 'lucide-react';
 import { type ReactNode, useSyncExternalStore } from 'react';
 
-import { appsOptions } from '../apps/data';
-import { AppExtension } from '../apps/extension';
-import { SignInRedirect } from '../identity/common';
-import { IdentityError } from '../identity/data';
+import { appsOptions } from '../../kit/apps/data';
+import { SignInRedirect } from '../../kit/identity/common';
+import { IdentityError } from '../../kit/identity/data';
 import {
   formatMoney,
   paymentLabels,
   statusLabels,
-} from '../orders/presentation';
+} from '../../shared/orders/presentation';
+import { AppExtension } from '../apps/extension';
 import { recordReturnPath } from '../records/data';
 import { StoreReturnCase } from './case-entry';
 import { returnFilters, returnOptions, type ReturnsSearch } from './data';

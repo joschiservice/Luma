@@ -7,8 +7,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useEffect, useId, useState } from 'react';
 
+import { auth, clearPrivate } from '../../kit/identity/data';
 import { AuthLayout } from './auth-form';
-import { auth, clearPrivate } from './data';
 
 /** Requests a recovery email or consumes a reset token from a URL fragment. */
 export function PasswordRecovery({ reset = false }: { reset?: boolean }) {

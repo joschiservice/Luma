@@ -16,17 +16,17 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, useParams, useSearch } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 
-import { appsOptions } from '../apps/data';
-import { AppExtension } from '../apps/extension';
-import { SignInRedirect } from '../identity/common';
-import { IdentityError } from '../identity/data';
+import { appsOptions } from '../../kit/apps/data';
+import { SignInRedirect } from '../../kit/identity/common';
+import { IdentityError } from '../../kit/identity/data';
 import {
   connectionStatusLabel,
   formatSourceNumber,
   issueStateLabel,
   purchaseOrderLabels,
   statusLabels as orderStatusLabels,
-} from '../orders/presentation';
+} from '../../shared/orders/presentation';
+import { AppExtension } from '../apps/extension';
 import { recordReturnPath } from '../records/data';
 import { IdentityLinks } from '../sync/identity-links';
 import { linkMethodLabel } from '../sync/presentation';

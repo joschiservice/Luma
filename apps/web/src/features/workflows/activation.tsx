@@ -8,7 +8,7 @@ import { Select } from '@luma/ui/components/primitives/select';
 import { personLabel } from '@luma/ui/lib/actor';
 import { useState } from 'react';
 
-import { IdentityError } from '../identity/data';
+import { IdentityError } from '../../kit/identity/data';
 import { activateWorkflow, workflowError } from './data';
 
 /** Reviews one immutable version and explicit order grants before submitting a retry-safe activation. */

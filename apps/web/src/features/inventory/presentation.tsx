@@ -3,7 +3,7 @@ import { formatList, formatRelativeTime } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { StatePill } from '@luma/ui/components/primitives/state';
 
-import { formatSourceNumber } from '../orders/presentation';
+import { formatSourceNumber } from '../../shared/orders/presentation';
 
 type StockField = 'onHand' | 'reserved' | 'available' | 'incoming';
 

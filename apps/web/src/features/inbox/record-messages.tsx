@@ -1,15 +1,15 @@
 import './inbox.css';
 
-import type { LinkedRecordKind, ThreadSummary } from '@luma/api-contract';
+import type { ThreadSummary } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import type { ReactNode } from 'react';
 
-import { usePermissions } from '../identity/permissions';
+import { usePermissions } from '../../kit/identity/permissions';
+import type { RecordMessagesProps } from '../../kit/record-messages';
 import { readFailure, recordThreadsOptions } from './data';
 import {
   correspondentLabel,
@@ -95,13 +95,7 @@ export function RecordMessages({
   kind,
   recordId,
   frame,
-}: {
-  organizationId: string;
-  kind: LinkedRecordKind;
-  recordId: string;
-  /** Wraps the list in the record page's section, such as a card with the "Messages" title. */
-  frame: (content: ReactNode) => ReactNode;
-}) {
+}: RecordMessagesProps) {
   const { can, ready } = usePermissions(organizationId);
   const allowed = ready && can('messages.read');
   const query = useQuery({

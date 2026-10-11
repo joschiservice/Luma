@@ -9,15 +9,15 @@ import { actorLabel } from '@luma/ui/lib/actor';
 import { Link } from '@tanstack/react-router';
 import { Activity, ChevronRight, History, Truck } from 'lucide-react';
 
-import { activityLabel, activityState } from '../activity/presentation';
-import { OrderSection } from './order-section';
+import { OrderSection } from '../../shared/orders/order-section';
 import {
   formatQuantity,
   paymentLabels,
   returnLabels,
   shipmentLabels,
   statusLabels,
-} from './presentation';
+} from '../../shared/orders/presentation';
+import { activityLabel, activityState } from '../activity/presentation';
 
 function sourceLabel(detail: OrderDetail, connectionId: string) {
   return (

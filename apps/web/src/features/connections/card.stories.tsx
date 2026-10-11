@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
 
-import { ConnectionCard } from './connection-card';
+import { ConnectionCard } from '../apps/connection-card';
 import {
   ConnectionsPreview,
   loadAppUi,

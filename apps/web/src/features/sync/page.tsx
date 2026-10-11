@@ -57,11 +57,11 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useRef, useState } from 'react';
 
-import { statuses } from '../connections/presentation';
-import { ProviderIcon } from '../connections/provider-icon';
-import { SignInRedirect } from '../identity/common';
-import { IdentityError } from '../identity/data';
-import { usePermissions } from '../identity/permissions';
+import { statuses } from '../../kit/connections/presentation';
+import { ProviderIcon } from '../../kit/connections/provider-icon';
+import { SignInRedirect } from '../../kit/identity/common';
+import { IdentityError } from '../../kit/identity/data';
+import { usePermissions } from '../../kit/identity/permissions';
 import { AutomaticLinks } from './automatic-links';
 import { sendSyncCommand, syncKey, syncOptions } from './data';
 import {

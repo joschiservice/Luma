@@ -27,7 +27,7 @@ import { Link } from '@tanstack/react-router';
 import { Link2, Unlink } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 
-import { IdentityError } from '../identity/data';
+import { IdentityError } from '../../kit/identity/data';
 import { identityKey, identityOptions, requestLink } from './data';
 import { linkMethodLabel, providerName, sourceId } from './presentation';
 

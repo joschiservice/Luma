@@ -11,7 +11,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 
-import { EntryFrame, Pending } from './common';
+import { EntryFrame, Pending } from '../../kit/identity/common';
 import {
   clearPrivate,
   endSupportView,
@@ -19,7 +19,7 @@ import {
   redeemSupportView,
   rememberEndedSupportView,
   takeEndedSupportView,
-} from './data';
+} from '../../kit/identity/data';
 
 const endReasons: Record<string, () => string> = {
   ended: m.identity_support_view_ended_by_you,

@@ -54,9 +54,9 @@ import {
   useSyncExternalStore,
 } from 'react';
 
+import { SignInRedirect } from '../../kit/identity/common';
+import { useNow } from '../../kit/live/now';
 import { isTypingTarget } from '../../lib/keyboard';
-import { useNow } from '../decisions/live';
-import { SignInRedirect } from '../identity/common';
 import {
   inboxFilters,
   type InboxSearch,

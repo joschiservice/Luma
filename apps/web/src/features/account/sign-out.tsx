@@ -3,8 +3,8 @@ import { Button } from '@luma/ui/components/primitives/button';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 
-import { EntryFrame } from './common';
-import { auth, clearPrivate } from './data';
+import { EntryFrame } from '../../kit/identity/common';
+import { auth, clearPrivate } from '../../kit/identity/data';
 
 /** Ends the session, clears private query data, and returns the user to sign-in. */
 export function SignOut() {

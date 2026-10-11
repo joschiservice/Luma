@@ -1,7 +1,7 @@
 import { createRouter } from '@tanstack/react-router';
 import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query';
 
-import { clearPrivate } from './features/identity/data';
+import { clearPrivate } from './kit/identity/data';
 import { createQueryClient } from './lib/query-client';
 import { routeTree } from './routeTree.gen';
 

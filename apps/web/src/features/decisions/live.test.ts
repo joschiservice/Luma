@@ -1,12 +1,12 @@
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-import { subscribeToWorkspaceMetrics } from '../overview/metric-subscription';
+import { subscribeToWorkspaceMetrics } from '../../kit/live/metric-subscription';
 import { decisionsKey } from './data';
 import { subscribeToDecisionChanges } from './live';
 
-vi.mock('../overview/metric-subscription', async (original) => ({
-  ...(await original<typeof import('../overview/metric-subscription')>()),
+vi.mock('../../kit/live/metric-subscription', async (original) => ({
+  ...(await original<typeof import('../../kit/live/metric-subscription')>()),
   subscribeToWorkspaceMetrics: vi.fn(() => vi.fn()),
 }));
 

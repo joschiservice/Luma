@@ -12,14 +12,14 @@ import {
   useMemo,
 } from 'react';
 
+import { appsOptions } from '../../kit/apps/data';
 import {
   changeConnection,
   connectionError,
   installConnection,
-} from '../connections/data';
-import { IdentityError, sessionOptions } from '../identity/data';
-import { NoAccess, usePermissions } from '../identity/permissions';
-import { appsOptions } from './data';
+} from '../../kit/connections/data';
+import { IdentityError, sessionOptions } from '../../kit/identity/data';
+import { NoAccess, usePermissions } from '../../kit/identity/permissions';
 
 const modules = import.meta.glob<{ default: ComponentType<AppUiProps> }>(
   '../../../../../packages/apps/*/src/web/index.tsx',

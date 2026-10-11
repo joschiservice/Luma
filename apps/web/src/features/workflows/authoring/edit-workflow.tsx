@@ -6,7 +6,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { FilePenLine } from 'lucide-react';
 import { useState } from 'react';
 
-import { IdentityError } from '../../identity/data';
+import { IdentityError } from '../../../kit/identity/data';
 import { workflowError } from '../data';
 import { createDraft, draftsKey } from './data';
 

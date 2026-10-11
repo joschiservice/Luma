@@ -2,8 +2,8 @@ import { m } from '@luma/i18n/messages';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
-import { contextOptions } from '../identity/data';
-import { membersOptions } from '../settings/data';
+import { contextOptions } from '../../kit/identity/data';
+import { membersOptions } from '../../kit/settings/data';
 
 /** A workspace member as the inbox names them. */
 export interface Member {

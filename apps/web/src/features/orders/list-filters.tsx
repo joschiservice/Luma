@@ -10,19 +10,19 @@ import { CalendarDays, CircleDot, CreditCard, Plug } from 'lucide-react';
 import { useContext } from 'react';
 
 import {
+  paymentLabels,
+  sortLabels,
+  statusLabels,
+  viewDescriptions,
+  viewLabels,
+} from '../../shared/orders/presentation';
+import {
   orderPaymentStatuses,
   orderSorts,
   type OrdersSearch,
   orderStatuses,
   orderViews,
 } from './data';
-import {
-  paymentLabels,
-  sortLabels,
-  statusLabels,
-  viewDescriptions,
-  viewLabels,
-} from './presentation';
 
 export type OrderSource = { id: string; label: string };
 

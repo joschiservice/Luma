@@ -18,8 +18,8 @@ import { Link2, Plus } from 'lucide-react';
 import { useContext, useEffect, useId, useState } from 'react';
 import { z } from 'zod';
 
+import { usePermissions } from '../../kit/identity/permissions';
 import { customersOptions } from '../customers/data';
-import { usePermissions } from '../identity/permissions';
 import { ordersOptions as commerceOrdersOptions } from '../orders/data';
 import {
   ordersOptions as purchaseOrdersOptions,

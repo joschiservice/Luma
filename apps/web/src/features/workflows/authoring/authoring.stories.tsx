@@ -10,7 +10,7 @@ import {
 import { type ReactNode, useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 
-import { StoryShell } from '../../identity/storybook-shell';
+import { StoryShell } from '../../../shell/storybook-shell';
 import { WorkflowBuilder } from './builder';
 import { GenerationAssistant } from './describe';
 import { DraftEditor } from './editor';

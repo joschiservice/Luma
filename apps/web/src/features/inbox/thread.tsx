@@ -36,8 +36,8 @@ import { Link } from '@tanstack/react-router';
 import { ArrowDownLeft, ArrowUpRight, Paperclip } from 'lucide-react';
 import { type ReactNode, useContext, useId, useState } from 'react';
 
-import { SignInRedirect } from '../identity/common';
-import { usePermissions } from '../identity/permissions';
+import { SignInRedirect } from '../../kit/identity/common';
+import { usePermissions } from '../../kit/identity/permissions';
 import { CommandFeedback } from './command-feedback';
 import { Replies } from './composer';
 import {

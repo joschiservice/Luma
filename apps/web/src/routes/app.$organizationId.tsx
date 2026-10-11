@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { WorkspaceShell } from '../features/identity/shell';
+import { WorkspaceShell } from '../shell/shell';
 
 export const Route = createFileRoute('/app/$organizationId')({
   component: WorkspaceShell,

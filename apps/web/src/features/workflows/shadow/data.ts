@@ -9,9 +9,9 @@ import { m } from '@luma/i18n/messages';
 import { nextCalendarDay, workspaceInstant } from '@luma/ui/lib/timezone';
 import { queryOptions } from '@tanstack/react-query';
 
-import { createWebApiClient } from '../../lib/api-client';
-import { privateQueryDefaults } from '../../lib/private-query';
-import { IdentityError } from '../identity/data';
+import { IdentityError } from '../../../kit/identity/data';
+import { createWebApiClient } from '../../../lib/api-client';
+import { privateQueryDefaults } from '../../../lib/private-query';
 
 export type ShadowEvaluation = ReturnType<typeof shadowEvaluationSchema.parse>;
 

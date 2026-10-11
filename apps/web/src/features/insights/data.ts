@@ -2,9 +2,9 @@ import { type InsightChart, type InsightRange } from '@luma/api-contract';
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import { z } from 'zod';
 
+import { IdentityError } from '../../kit/identity/data';
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
-import { IdentityError } from '../identity/data';
 
 const api = createWebApiClient();
 

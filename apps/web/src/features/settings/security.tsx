@@ -16,14 +16,14 @@ import { Check, Copy, KeyRound, Smartphone } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
 import { encode } from 'uqr';
 
-import { privateQueryDefaults } from '../../lib/private-query';
 import {
   auth,
   IdentityError,
   sessionKey,
   sessionOptions,
   usePasskeySupport,
-} from '../identity/data';
+} from '../../kit/identity/data';
+import { privateQueryDefaults } from '../../lib/private-query';
 import { PasswordSettings } from './password';
 import { SectionHeading } from './section-heading';
 import { SecurityActivity, securityActivityKey } from './security-activity';

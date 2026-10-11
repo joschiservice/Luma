@@ -12,9 +12,9 @@ import {
 } from '@tanstack/react-router';
 import { useEffect } from 'react';
 
+import { connectionsOptions } from '../../kit/connections/data';
+import { usePermissions } from '../../kit/identity/permissions';
 import { AppStore } from '../apps/store';
-import { usePermissions } from '../identity/permissions';
-import { connectionsOptions } from './data';
 
 /** Lists apps and forwards existing connection links to their app management page. */
 export function ConnectionsPage() {

@@ -10,10 +10,10 @@ import {
 import { useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 
+import { contextFixture } from '../../kit/identity/context.fixture';
+import { contextOptions } from '../../kit/identity/data';
+import { membersOptions } from '../../kit/settings/data';
 import appStyles from '../../styles.css?inline';
-import { contextFixture } from '../identity/context.fixture';
-import { contextOptions } from '../identity/data';
-import { membersOptions } from '../settings/data';
 import type { InboxSearch } from './data';
 import { DocumentReviewView } from './document';
 import {

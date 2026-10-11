@@ -3,9 +3,9 @@ import { nextCalendarDay, workspaceInstant } from '@luma/ui/lib/timezone';
 import { queryOptions } from '@tanstack/react-query';
 import { z } from 'zod';
 
+import { IdentityError } from '../../kit/identity/data';
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
-import { IdentityError } from '../identity/data';
 
 const api = createWebApiClient();
 

@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { PackageSearch } from 'lucide-react';
 import { useState } from 'react';
 
-import { IdentityError } from '../identity/data';
+import { IdentityError } from '../../kit/identity/data';
 import { OrdersTable } from '../orders/list-table';
 import {
   customerOrderPageSize,

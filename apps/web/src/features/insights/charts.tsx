@@ -13,7 +13,7 @@ import {
 } from '@tanstack/react-query';
 import { useContext, useEffect, useId } from 'react';
 
-import { connectionsOptions } from '../connections/data';
+import { connectionsOptions } from '../../kit/connections/data';
 import { ChartCard, type Selection } from './chart-card';
 import {
   insightChartOptions,

@@ -31,8 +31,8 @@ import { Link, useParams } from '@tanstack/react-router';
 import { Mail, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { useId, useState } from 'react';
 
-import { SignInRedirect } from '../identity/common';
-import { usePermissions } from '../identity/permissions';
+import { SignInRedirect } from '../../kit/identity/common';
+import { usePermissions } from '../../kit/identity/permissions';
 import { suppliersOptions } from '../procurement/data';
 import { CommandFeedback } from './command-feedback';
 import {

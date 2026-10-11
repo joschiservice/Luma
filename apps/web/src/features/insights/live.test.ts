@@ -4,12 +4,12 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   liveRefreshMs,
   subscribeToWorkspaceMetrics,
-} from '../overview/metric-subscription';
+} from '../../kit/live/metric-subscription';
 import { insightsKey } from './data';
 import { subscribeToInsightChanges } from './live';
 
-vi.mock('../overview/metric-subscription', async (original) => ({
-  ...(await original<typeof import('../overview/metric-subscription')>()),
+vi.mock('../../kit/live/metric-subscription', async (original) => ({
+  ...(await original<typeof import('../../kit/live/metric-subscription')>()),
   subscribeToWorkspaceMetrics: vi.fn(() => vi.fn()),
 }));
 

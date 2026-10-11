@@ -2,7 +2,7 @@ import { m } from '@luma/i18n/messages';
 import { LumaLockup } from '@luma/ui/components/primitives/brand';
 import { StateDot } from '@luma/ui/components/primitives/state';
 
-import { ResolutionStory } from './features/identity/story';
+import { ResolutionStory } from './features/account/story';
 
 const loop = [
   {

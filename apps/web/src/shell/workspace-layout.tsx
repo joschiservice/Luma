@@ -13,12 +13,12 @@ import { WorkspacePageActionsSlot } from '@luma/ui/components/workspace/workspac
 import { Menu, PanelLeft } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 
-import { isTypingTarget } from '../../lib/keyboard';
+import { isTypingTarget } from '../lib/keyboard';
 import {
   readSidebarCollapsed,
   setSidebarCollapsed,
   useSidebarCollapsed,
-} from '../../lib/sidebar';
+} from '../lib/sidebar';
 
 type WorkspaceLayoutProps = {
   workspaceSwitcher: ReactNode;

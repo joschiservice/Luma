@@ -20,7 +20,7 @@ import { workspaceInstant } from '@luma/ui/lib/timezone';
 import { ArrowRight, Clock3, Play, ShieldCheck, Zap } from 'lucide-react';
 import { useContext, useState } from 'react';
 
-import { IdentityError } from '../identity/data';
+import { IdentityError } from '../../kit/identity/data';
 import { cancelWorkflowStart, fireWorkflow, workflowError } from './data';
 import { workflowTriggerLabel } from './presentation';
 

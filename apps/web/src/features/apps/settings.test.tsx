@@ -4,10 +4,10 @@ import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
 
-import { connectionsOptions } from '../connections/data';
-import { contextFixture } from '../identity/context.fixture';
-import { contextOptions } from '../identity/data';
-import { appsOptions } from './data';
+import { appsOptions } from '../../kit/apps/data';
+import { connectionsOptions } from '../../kit/connections/data';
+import { contextFixture } from '../../kit/identity/context.fixture';
+import { contextOptions } from '../../kit/identity/data';
 import { AppSettings } from './settings';
 import { AppStore } from './store';
 

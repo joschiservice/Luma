@@ -8,7 +8,7 @@ import {
 import { WorkspaceSwitcher } from '@luma/ui/components/workspace/workspace-switcher';
 import { type ReactNode, useState } from 'react';
 
-import appStyles from '../../styles.css?inline';
+import appStyles from '../styles.css?inline';
 import { workspaceDestinations } from './workspace-destinations';
 import { WorkspaceLayout } from './workspace-layout';
 

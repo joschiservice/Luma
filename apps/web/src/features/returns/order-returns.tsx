@@ -7,7 +7,7 @@ import { Link } from '@tanstack/react-router';
 import { ChevronRight, Undo2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import { OrderSection } from '../orders/order-section';
+import { OrderSection } from '../../shared/orders/order-section';
 import {
   refundSummary,
   returnLabel,

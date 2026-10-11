@@ -33,8 +33,8 @@ import {
 import { Package, PackageCheck, PackageX } from 'lucide-react';
 import { type ReactNode, useState, useSyncExternalStore } from 'react';
 
-import { SignInRedirect } from '../identity/common';
-import { IdentityError } from '../identity/data';
+import { SignInRedirect } from '../../kit/identity/common';
+import { IdentityError } from '../../kit/identity/data';
 import { recordReturnPath } from '../records/data';
 import { SyncCoverage } from '../sync/coverage';
 import { productFilters, productsOptions, type ProductsSearch } from './data';

@@ -9,9 +9,9 @@ import {
 import { useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 
-import appStyles from '../../styles.css?inline';
-import { contextFixture } from './context.fixture';
-import { contextOptions } from './data';
+import { contextFixture } from '../kit/identity/context.fixture';
+import { contextOptions } from '../kit/identity/data';
+import appStyles from '../styles.css?inline';
 import { WorkspaceSearch } from './workspace-search';
 
 function SearchExample() {

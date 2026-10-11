@@ -28,7 +28,7 @@ import { useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { MINIMAL_VIEWPORTS } from 'storybook/viewport';
 
-import { StoryShell } from '../identity/storybook-shell';
+import { StoryShell } from '../../shell/storybook-shell';
 
 const issues = [
   inventoryCase,

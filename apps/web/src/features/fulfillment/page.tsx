@@ -35,8 +35,8 @@ import {
 import { CircleCheck, MapPin, Plug, Shapes, Truck } from 'lucide-react';
 import { type ReactNode, useState, useSyncExternalStore } from 'react';
 
-import { SignInRedirect } from '../identity/common';
-import { IdentityError } from '../identity/data';
+import { SignInRedirect } from '../../kit/identity/common';
+import { IdentityError } from '../../kit/identity/data';
 import { recordReturnPath } from '../records/data';
 import { SyncCoverage } from '../sync/coverage';
 import {

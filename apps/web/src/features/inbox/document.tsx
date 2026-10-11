@@ -27,8 +27,8 @@ import { Link, useParams } from '@tanstack/react-router';
 import { FileSearch, Mail, Plus } from 'lucide-react';
 import { useState } from 'react';
 
-import { SignInRedirect } from '../identity/common';
-import { usePermissions } from '../identity/permissions';
+import { SignInRedirect } from '../../kit/identity/common';
+import { usePermissions } from '../../kit/identity/permissions';
 import { CommandFeedback } from './command-feedback';
 import {
   addFact,

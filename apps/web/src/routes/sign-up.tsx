@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { AuthForm } from '../features/identity/auth-form';
-import { authSearch } from '../features/identity/data';
+import { AuthForm } from '../features/account/auth-form';
+import { authSearch } from '../kit/identity/data';
 
 export const Route = createFileRoute('/sign-up')({
   ssr: false,

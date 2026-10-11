@@ -15,11 +15,11 @@ import { SearchableSelect } from '@luma/ui/components/primitives/searchable-sele
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useId, useState } from 'react';
 
+import { Failure } from '../../kit/identity/common';
+import { IdentityError } from '../../kit/identity/data';
+import { settingsApi } from '../../kit/settings/data';
 import { privateQueryDefaults } from '../../lib/private-query';
-import { Failure } from '../identity/common';
-import { IdentityError } from '../identity/data';
 import { authorityGroupLabels, authorityLabel } from '../orders/authority';
-import { settingsApi } from './data';
 import { SectionHeading } from './section-heading';
 
 function AuthorityOverride({

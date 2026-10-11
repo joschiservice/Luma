@@ -9,7 +9,7 @@ import { formatList, formatRelativeTime } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import type { OperationalState } from '@luma/ui/components/primitives/state';
 
-import { formatMoney, localizedLabels } from '../orders/presentation';
+import { formatMoney, localizedLabels } from '../../shared/orders/presentation';
 
 export const statusLabels: Record<CatalogListing['status'], string> =
   localizedLabels({

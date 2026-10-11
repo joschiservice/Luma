@@ -16,9 +16,9 @@ import { Check, KeyRound, LockKeyhole } from 'lucide-react';
 import {
   permissionDescription,
   permissionLabel,
-} from '../identity/permission-text';
-import { usePermissions } from '../identity/permissions';
-import { rolesOptions } from '../settings/roles-data';
+} from '../../kit/identity/permission-text';
+import { usePermissions } from '../../kit/identity/permissions';
+import { rolesOptions } from '../../kit/settings/roles-data';
 
 /**
  * Describes core permissions in people-facing words in the interface language, using the workspace

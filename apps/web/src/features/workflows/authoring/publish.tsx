@@ -11,7 +11,7 @@ import {
 import { Textarea } from '@luma/ui/components/primitives/textarea';
 import { type ReactNode, useState } from 'react';
 
-import { IdentityError } from '../../identity/data';
+import { IdentityError } from '../../../kit/identity/data';
 import { workflowError } from '../data';
 import { publishDraft } from './data';
 

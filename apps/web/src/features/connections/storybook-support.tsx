@@ -9,9 +9,9 @@ import {
 } from '@tanstack/react-router';
 import { type ReactNode, useState } from 'react';
 
+import { contextFixture } from '../../kit/identity/context.fixture';
 import appStyles from '../../styles.css?inline';
 import { AppSettings } from '../apps/settings';
-import { contextFixture } from '../identity/context.fixture';
 
 /** Apps the mocked workspace offers and, except in the empty state, has installed. */
 const catalog = [

@@ -14,7 +14,7 @@ import { Link } from '@tanstack/react-router';
 import { ShieldCheck } from 'lucide-react';
 import { useId } from 'react';
 
-import { IdentityError } from '../identity/data';
+import { IdentityError } from '../../kit/identity/data';
 import { workflowCoverageOptions, workflowError } from './data';
 import { readinessHeadline, ReadinessPills, RepairLink } from './readiness';
 

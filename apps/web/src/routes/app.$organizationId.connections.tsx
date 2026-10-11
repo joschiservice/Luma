@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 
-import { appResultSearch } from '../features/apps/data';
+import { appResultSearch } from '../kit/apps/data';
 
 export const Route = createFileRoute('/app/$organizationId/connections')({
   validateSearch: appResultSearch,

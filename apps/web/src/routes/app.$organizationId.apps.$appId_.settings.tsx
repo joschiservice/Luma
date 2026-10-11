@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { appResultSearch } from '../features/apps/data';
 import { AppSettings } from '../features/apps/settings';
+import { appResultSearch } from '../kit/apps/data';
 
 export const Route = createFileRoute(
   '/app/$organizationId/apps/$appId_/settings',

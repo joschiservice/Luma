@@ -17,10 +17,13 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 
-import { usePermissions } from '../identity/permissions';
+import { usePermissions } from '../../kit/identity/permissions';
+import {
+  rolesOptions,
+  type WorkspaceRole,
+} from '../../kit/settings/roles-data';
 import { CreateRoleDialog, type RoleDraft } from './role-create';
 import { RoleEditor } from './role-editor';
-import { rolesOptions, type WorkspaceRole } from './roles-data';
 
 const roleIcons = {
   owner: Crown,

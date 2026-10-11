@@ -118,7 +118,7 @@
       "primitive-appearance: .operational-group[data-slot='card'] { padding: 0 }": 1
     }
   },
-  "apps/web/src/features/home/home.css": {
+  "apps/web/src/shell/home/home.css": {
     "reason": "Existing appearance values retained to avoid visual changes in the tooling rollout. Remove entries when migrating to tokens or shared variants.",
     "findings": {
       "raw-color: .home-module[data-editing] { box-shadow: 0 0 0 1px color-mix(in srgb, var(--signal) 35%, transparent),\n    0 6px 16px -10px #1025532e }": 1

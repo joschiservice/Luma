@@ -37,9 +37,9 @@ import {
   useSyncExternalStore,
 } from 'react';
 
-import { SignInRedirect } from '../identity/common';
-import { IdentityError } from '../identity/data';
-import { formatMoney } from '../orders/presentation';
+import { SignInRedirect } from '../../kit/identity/common';
+import { IdentityError } from '../../kit/identity/data';
+import { formatMoney } from '../../shared/orders/presentation';
 import { SyncCoverage } from '../sync/coverage';
 import {
   customerFilters,

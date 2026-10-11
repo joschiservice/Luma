@@ -1,6 +1,6 @@
 import type { Membership, RolesSnapshot } from '@luma/api-contract';
 
-import { memberPermissions } from '../identity/context.fixture';
+import { memberPermissions } from '../../kit/identity/context.fixture';
 
 const groups: RolesSnapshot['groups'] = [
   {

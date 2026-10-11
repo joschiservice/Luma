@@ -2,9 +2,9 @@ import { caseClasses, type CaseQuery, caseStates } from '@luma/api-contract';
 import { queryOptions } from '@tanstack/react-query';
 import { z } from 'zod';
 
+import { IdentityError } from '../../kit/identity/data';
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
-import { IdentityError } from '../identity/data';
 
 export const inboxSearch = z.object({
   shadow: z.string().min(1).max(200).optional().catch(undefined),

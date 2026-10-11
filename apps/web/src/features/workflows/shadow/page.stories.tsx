@@ -10,8 +10,8 @@ import {
 import { useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 
-import appStyles from '../../styles.css?inline';
-import { CaseShadow } from './case';
+import appStyles from '../../../styles.css?inline';
+import { CaseShadow } from '../../exceptions/shadow/case';
 import { ShadowReport } from './report';
 import {
   exceptionId,

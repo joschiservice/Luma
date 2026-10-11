@@ -7,7 +7,7 @@ import type {
 } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 
-import { localizedLabels } from '../orders/presentation';
+import { localizedLabels } from '../../shared/orders/presentation';
 import { sourceId } from '../sync/presentation';
 
 /** Shopify customer states describe the online store account, not whether someone buys. */

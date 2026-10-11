@@ -9,8 +9,8 @@ import {
 import { type ReactNode, useState } from 'react';
 import { expect, userEvent, within } from 'storybook/test';
 
+import { StoryShell } from '../../shell/storybook-shell';
 import appStyles from '../../styles.css?inline';
-import { StoryShell } from '../identity/storybook-shell';
 import { returnItem } from '../returns/returns-fixtures';
 import type { OrdersError, OrdersSearch } from './data';
 import { OrderDetailView, type OrderError } from './detail';

@@ -4,7 +4,7 @@ import { m } from '@luma/i18n/messages';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { quantityUnit } from '@luma/ui/lib/units';
 
-import { formatSourceNumber } from '../orders/presentation';
+import { formatSourceNumber } from '../../shared/orders/presentation';
 
 type Sales = ProductDetail['sales']['sources'][number];
 

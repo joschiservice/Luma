@@ -48,13 +48,23 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useContext, useState } from 'react';
 
-import { sessionOptions } from '../identity/data';
-import { useWorkspaceLayout } from '../layout/data';
-import { overviewOptions } from '../overview/data';
-import { useLiveMetricSummary } from '../overview/metrics-live';
-import { OperationalMetrics } from '../overview/operational-metrics';
-import { operationalMetricRequest } from '../overview/operational-metrics-data';
-import { orderMetricRequest, OrderMetrics } from '../overview/order-metrics';
+import { overviewOptions } from '../../features/overview/data';
+import { useLiveMetricSummary } from '../../features/overview/metrics-live';
+import { OperationalMetrics } from '../../features/overview/operational-metrics';
+import { operationalMetricRequest } from '../../features/overview/operational-metrics-data';
+import {
+  orderMetricRequest,
+  OrderMetrics,
+} from '../../features/overview/order-metrics';
+import {
+  defaultHome,
+  homeModules,
+  type HomeWindow,
+  moveModule,
+  placeModule,
+} from '../../kit/home/preferences';
+import { sessionOptions } from '../../kit/identity/data';
+import { useWorkspaceLayout } from '../../kit/layout/data';
 import {
   ActivityModule,
   AttentionModule,
@@ -66,13 +76,6 @@ import {
   OutcomesModule,
   ReturnsModule,
 } from './modules';
-import {
-  defaultHome,
-  homeModules,
-  type HomeWindow,
-  moveModule,
-  placeModule,
-} from './preferences';
 
 /** Explains setup or data-quality problems that affect everything on Home. */
 function setupNotice(data: OperationsOverview) {

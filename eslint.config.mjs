@@ -119,7 +119,7 @@ export default tseslint.config(
     ],
     ignores: [
       'packages/identity/**',
-      'apps/web/src/features/identity/permissions.tsx',
+      'apps/web/src/kit/identity/permissions.tsx',
       '**/*.test.*',
       '**/*.stories.*',
       '**/*.fixture.*',

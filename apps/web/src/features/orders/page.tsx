@@ -23,9 +23,9 @@ import {
   useSyncExternalStore,
 } from 'react';
 
-import { connectionsOptions } from '../connections/data';
-import { SignInRedirect } from '../identity/common';
-import { IdentityError } from '../identity/data';
+import { connectionsOptions } from '../../kit/connections/data';
+import { SignInRedirect } from '../../kit/identity/common';
+import { IdentityError } from '../../kit/identity/data';
 import { SyncCoverage } from '../sync/coverage';
 import {
   orderFilters,

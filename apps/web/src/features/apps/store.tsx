@@ -10,9 +10,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useRef, useState } from 'react';
 
-import { connectionError, connectionsOptions } from '../connections/data';
+import { appsOptions, changeApp } from '../../kit/apps/data';
+import {
+  connectionError,
+  connectionsOptions,
+} from '../../kit/connections/data';
 import { AppAccessDialog } from './access';
-import { appsOptions, changeApp } from './data';
 
 /** Shows installed apps with connection summaries and a separate catalog for discovery. */
 export function AppStore({

@@ -3,7 +3,7 @@ import { Button } from '@luma/ui/components/primitives/button';
 import { Input } from '@luma/ui/components/primitives/input';
 import { useRef, useState } from 'react';
 
-import { auth } from './data';
+import { auth } from '../../kit/identity/data';
 
 const expiredCodes = new Set([
   'INVALID_TWO_FACTOR_COOKIE',

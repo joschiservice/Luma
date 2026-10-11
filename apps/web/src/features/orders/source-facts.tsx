@@ -16,16 +16,16 @@ import { Link } from '@tanstack/react-router';
 import { GitCompareArrows, ListOrdered } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import { authorityLabel } from './authority';
-import { LineComparison } from './line-comparison';
-import { OrderSection } from './order-section';
+import { OrderSection } from '../../shared/orders/order-section';
 import {
   formatMoney,
   formatQuantity,
   fulfillmentLabel,
   paymentLabels,
   statusLabels,
-} from './presentation';
+} from '../../shared/orders/presentation';
+import { authorityLabel } from './authority';
+import { LineComparison } from './line-comparison';
 
 type OrderLine = OrderSourceFacts['lines'][number];
 

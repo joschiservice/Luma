@@ -20,16 +20,16 @@ import { Link, useParams, useSearch } from '@tanstack/react-router';
 import { ExternalLink, PackageX } from 'lucide-react';
 import { type ReactNode, useSyncExternalStore } from 'react';
 
-import { activityLabel, activityState } from '../activity/presentation';
-import { appsOptions } from '../apps/data';
-import { AppExtension } from '../apps/extension';
-import { SignInRedirect } from '../identity/common';
-import { IdentityError } from '../identity/data';
+import { appsOptions } from '../../kit/apps/data';
+import { SignInRedirect } from '../../kit/identity/common';
+import { IdentityError } from '../../kit/identity/data';
 import {
   fulfillmentLabels as orderFulfillmentLabels,
   paymentLabels,
   statusLabels as orderStatusLabels,
-} from '../orders/presentation';
+} from '../../shared/orders/presentation';
+import { activityLabel, activityState } from '../activity/presentation';
+import { AppExtension } from '../apps/extension';
 import { recordReturnPath } from '../records/data';
 import {
   fulfillmentFilters,

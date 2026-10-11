@@ -42,9 +42,9 @@ import {
 } from 'lucide-react';
 import { useContext, useEffect, useSyncExternalStore } from 'react';
 
-import { connectionsOptions } from '../connections/data';
-import { SignInRedirect } from '../identity/common';
-import { IdentityError } from '../identity/data';
+import { connectionsOptions } from '../../kit/connections/data';
+import { SignInRedirect } from '../../kit/identity/common';
+import { IdentityError } from '../../kit/identity/data';
 import { providerName } from '../sync/presentation';
 import { type ActivityFilters, activityOptions } from './data';
 import {

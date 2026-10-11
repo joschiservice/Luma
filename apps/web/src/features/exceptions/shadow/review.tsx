@@ -1,4 +1,4 @@
-import './shadow.css';
+import '../../workflows/shadow/shadow.css';
 
 import { shadowReviewSchema } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
@@ -20,8 +20,7 @@ import { workspaceDateValue, workspaceInstant } from '@luma/ui/lib/timezone';
 import { useQuery } from '@tanstack/react-query';
 import { useContext, useId, useRef, useState } from 'react';
 
-import { historyOptions } from '../exceptions/observation-data';
-import { IdentityError } from '../identity/data';
+import { IdentityError } from '../../../kit/identity/data';
 import {
   candidateAction,
   reviewShadow,
@@ -29,7 +28,8 @@ import {
   shadowError,
   type ShadowEvaluation,
   type ShadowReview,
-} from './data';
+} from '../../workflows/shadow/data';
+import { historyOptions } from '../observation-data';
 import { ActionFieldsEditor, fieldRows, readFields } from './review-fields';
 
 /** Captures an explicit operator assessment with incident evidence and immutable retry semantics. */

@@ -19,12 +19,12 @@ import {
 } from 'lucide-react';
 import type { ReactElement, ReactNode } from 'react';
 
-import { permissionLabel } from '../identity/permission-text';
+import { permissionLabel } from '../../kit/identity/permission-text';
 import {
   type PermissionDefinition,
   roleHistoryOptions,
   type WorkspaceRole,
-} from './roles-data';
+} from '../../kit/settings/roles-data';
 
 /** Lists the people who currently have a role. */
 export function RolePeople({

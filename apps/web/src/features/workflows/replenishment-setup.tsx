@@ -22,7 +22,7 @@ import { Link } from '@tanstack/react-router';
 import { ArrowRight, Search, ShieldCheck } from 'lucide-react';
 import { useDeferredValue, useState } from 'react';
 
-import { IdentityError } from '../identity/data';
+import { IdentityError } from '../../kit/identity/data';
 import {
   configureReplenishmentBatch,
   previewReplenishment,

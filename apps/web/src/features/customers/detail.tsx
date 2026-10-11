@@ -22,10 +22,10 @@ import { Link, useParams } from '@tanstack/react-router';
 import { UsersRound } from 'lucide-react';
 import { type ReactNode, useSyncExternalStore } from 'react';
 
-import { SignInRedirect } from '../identity/common';
-import { IdentityError } from '../identity/data';
-import { RecordMessages } from '../inbox/record-messages';
-import { formatMoney } from '../orders/presentation';
+import { SignInRedirect } from '../../kit/identity/common';
+import { IdentityError } from '../../kit/identity/data';
+import { RecordMessages } from '../../kit/record-messages';
+import { formatMoney } from '../../shared/orders/presentation';
 import { systemName } from '../products/presentation';
 import { customerOptions } from './data';
 import { CustomerOrders } from './orders';

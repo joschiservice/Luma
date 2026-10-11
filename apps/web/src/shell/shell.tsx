@@ -15,20 +15,35 @@ import {
 } from '@tanstack/react-router';
 import { useEffect } from 'react';
 
-import { useAssistantOpen } from '../../lib/assistant-panel';
-import { isTypingTarget } from '../../lib/keyboard';
-import { setThemePreference, useThemePreference } from '../../lib/theme';
-import { AppNavigation } from '../apps/navigation';
-import { AssistantPanel } from '../assistant/panel';
-import { AssistantToggle, useAssistantShortcut } from '../assistant/toggle';
-import { decisionsOptions } from '../decisions/data';
-import { ContextHelp } from '../help/context-help';
-import { PinCurrentPage, PinnedNavigation } from '../layout/pins';
-import { settingsOptions } from '../settings/data';
-import { Failure, Pending } from './common';
-import { contextOptions, organizationsOptions, sessionOptions } from './data';
-import { NoAccess, usePermissions } from './permissions';
-import { SupportViewBanner, useEndSupportView } from './support-view';
+import {
+  SupportViewBanner,
+  useEndSupportView,
+} from '../features/account/support-view';
+import { AppNavigation } from '../features/apps/navigation';
+import { AssistantPanel } from '../features/assistant/panel';
+import {
+  AssistantToggle,
+  useAssistantShortcut,
+} from '../features/assistant/toggle';
+import { decisionsOptions } from '../features/decisions/data';
+import { ContextHelp } from '../features/help/context-help';
+import { RecordMessages } from '../features/inbox/record-messages';
+import { Failure, Pending } from '../kit/identity/common';
+import {
+  contextOptions,
+  organizationsOptions,
+  sessionOptions,
+} from '../kit/identity/data';
+import { NoAccess, usePermissions } from '../kit/identity/permissions';
+import {
+  type RecordMessagesProps,
+  RecordMessagesProvider,
+} from '../kit/record-messages';
+import { settingsOptions } from '../kit/settings/data';
+import { useAssistantOpen } from '../lib/assistant-panel';
+import { isTypingTarget } from '../lib/keyboard';
+import { setThemePreference, useThemePreference } from '../lib/theme';
+import { PinCurrentPage, PinnedNavigation } from './pins';
 import {
   destinationFor,
   type WorkspaceDestination,
@@ -170,6 +185,11 @@ function useGoShortcuts(organizationId: string) {
     return () => window.removeEventListener('keydown', onKey);
   }, [navigate, organizationId]);
 }
+
+/** Record pages show linked inbox threads through the kit's record messages slot. */
+const recordMessages = (props: RecordMessagesProps) => (
+  <RecordMessages {...props} />
+);
 
 /** Provides workspace navigation and tenant context for nested application routes. */
 export function WorkspaceShell() {
@@ -317,7 +337,9 @@ function TenantShell({ organizationId }: { organizationId: string }) {
             permission={page.permission}
           />
         ) : (
-          <Outlet />
+          <RecordMessagesProvider value={recordMessages}>
+            <Outlet />
+          </RecordMessagesProvider>
         )}
       </WorkspaceTimezone>
     </WorkspaceLayout>
