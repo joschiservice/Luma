@@ -18,8 +18,11 @@ import {
   supplierProfiles,
 } from './types.js';
 
-// Seeded assignments carry German standard VAT; JTL stores the rate per assignment.
-const SEED_VAT_RATE = 19;
+/**
+ * German standard VAT in percent. The simulated merchant charges it on every sale, and seeded
+ * supplier assignments carry it; JTL stores the rate per assignment and per order line.
+ */
+export const SEED_VAT_RATE = 19;
 
 // JTL's default unit name; the Luma adapter maps it to `each`.
 const SEED_UNIT = 'Stück';

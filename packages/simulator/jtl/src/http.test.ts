@@ -70,6 +70,8 @@ describe('JTL ERP API', () => {
         quantity: 3,
         salesUnit: 'Stück',
         salesPriceGross: 24,
+        salesPriceNet: 20.1681,
+        taxRate: 19,
       },
     ]);
     expect((await call(context, 'sales-orders/1')).body).toMatchObject({

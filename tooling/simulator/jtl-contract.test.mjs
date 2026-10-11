@@ -275,12 +275,15 @@ function observations(page, resource) {
   });
 }
 
-const orderLine = (id, order, sku, quantity, code, title) => ({
+// JTL reports net unit prices and the line's tax rate; the simulator charges 19% VAT.
+const orderLine = (id, order, sku, quantity, code, title, net) => ({
   id: ref(id, order),
   sku: ref(sku),
   quantity: each(quantity),
   cancelledQuantity: null,
   skuCode: code,
+  unitPrice: { amount: net, currency: 'EUR' },
+  taxRate: '0.19',
   title,
 });
 
@@ -302,8 +305,8 @@ test('orders.read pages sales orders with lines, totals and statuses', async () 
         status: 'completed',
         paymentStatus: 'paid',
         lines: [
-          orderLine('1', '1', '1', '3', 'LUMA-001', 'Canvas tote'),
-          orderLine('2', '1', '2', '1', 'LUMA-002', 'Linen shirt'),
+          orderLine('1', '1', '1', '3', 'LUMA-001', 'Canvas tote', '20.1681'),
+          orderLine('2', '1', '2', '1', 'LUMA-002', 'Linen shirt', '50.3361'),
         ],
       },
     },
@@ -317,7 +320,9 @@ test('orders.read pages sales orders with lines, totals and statuses', async () 
         total: { amount: '48', currency: 'EUR' },
         status: 'open',
         paymentStatus: 'pending',
-        lines: [orderLine('3', '2', '1', '2', 'LUMA-001', 'Canvas tote')],
+        lines: [
+          orderLine('3', '2', '1', '2', 'LUMA-001', 'Canvas tote', '20.1681'),
+        ],
       },
     },
   ]);

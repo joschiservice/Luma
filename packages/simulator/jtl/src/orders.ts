@@ -1,3 +1,4 @@
+import { SEED_VAT_RATE } from './catalog.js';
 import { customerFor } from './customers.js';
 import {
   allocate,
@@ -375,7 +376,10 @@ export function salesOrderJson(order: OrderRecord) {
   };
 }
 
-/** Serializes the line items of a sales order. */
+/**
+ * Serializes the line items of a sales order. Prices are stored gross; JTL also reports the
+ * net price and the line's tax rate in percent.
+ */
 export function orderLinesJson(order: OrderRecord) {
   return order.lines.map((line) => ({
     id: Number(line.id),
@@ -386,6 +390,9 @@ export function orderLinesJson(order: OrderRecord) {
     quantity: line.quantity,
     salesUnit: line.unit,
     salesPriceGross: line.price,
+    salesPriceNet:
+      Math.round((line.price / (1 + SEED_VAT_RATE / 100)) * 10_000) / 10_000,
+    taxRate: SEED_VAT_RATE,
   }));
 }
 
