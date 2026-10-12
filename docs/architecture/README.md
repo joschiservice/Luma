@@ -22,6 +22,7 @@ decisions.
 | [011](011-support-view.md)                        | Read-only support view                                     | Accepted                           |
 
 | [012](012-native-order-records.md) | Native order records and source evidence | Accepted |
+| [013](013-stock-ledger.md) | Quantity ledger and stock ownership | Accepted |
 
 ## Baseline
 
