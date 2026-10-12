@@ -24,7 +24,7 @@ export const dependencies = {
   ],
   // Reads mailboxes through composed ports; other owners' records only through ports.
   messaging: ['platform', 'identity', 'audit'],
-  inventory: ['platform', 'identity', 'audit'],
+  inventory: ['platform', 'identity', 'audit', 'connectors'],
   customers: ['platform', 'identity'],
   connectors: ['platform', 'identity'],
   policies: ['platform', 'identity'],

@@ -1618,15 +1618,24 @@ importers:
 
   packages/inventory:
     dependencies:
+      '@luma/api-contract':
+        specifier: workspace:*
+        version: link:../api-contract
       '@luma/audit':
         specifier: workspace:*
         version: link:../audit
+      '@luma/connections':
+        specifier: workspace:*
+        version: link:../connections
       '@luma/identity':
         specifier: workspace:*
         version: link:../identity
       '@luma/platform':
         specifier: workspace:*
         version: link:../platform
+      '@orpc/server':
+        specifier: 'catalog:'
+        version: 1.15.5(@opentelemetry/api@1.9.1)(fastify@5.12.5)(ws@8.21.3)
       zod:
         specifier: 'catalog:'
         version: 4.6.5

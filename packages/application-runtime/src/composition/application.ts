@@ -130,6 +130,7 @@ import {
   createReplyAdmission,
   createReplyEffects,
 } from './messaging-replies.js';
+import { createNativeStockRuntime } from './native-stock.js';
 import { createPersistentPlaybookLibrary } from './playbook-library.js';
 import { createProcurementEffects } from './procurement-effects.js';
 import {
@@ -233,6 +234,7 @@ export interface ApplicationServices {
     orders: ReturnType<typeof createOrderWorkspace>;
     sales: ReturnType<typeof createSalesRuntime>;
     inventoryLedger: ReturnType<typeof createInventoryLedgerRuntime>;
+    nativeStock: ReturnType<typeof createNativeStockRuntime>;
     sourceAuthority: ReturnType<typeof createSourceAuthority>;
     decisions: ReturnType<typeof createDecisionQueue>;
     decisionAssignments: ReturnType<typeof createDecisionAssignments>;
@@ -262,6 +264,7 @@ export interface ApplicationOptions {
    * Rereads a stock position's stale sources through installed capabilities, so owners act on
    * current stock. See `createStockRefreshService`.
    */
+  nativeStockReader?: CapabilityReader;
   refreshStock?: (context: TenantContext, positionId: string) => Promise<void>;
   /** How long the follow-up workflows wait; the simulator demo shortens them. */
   followUps?: FollowUpTiming;
@@ -974,6 +977,13 @@ export function createApplicationServices(
       records: createRecordExplorer(database, hiddenOrderSources),
       orders,
       inventoryLedger: createInventoryLedgerRuntime(database, identity),
+      nativeStock: createNativeStockRuntime(
+        database,
+        identity,
+        (context) => erpEnabledForTenant(context.tenantId),
+        authority,
+        options.nativeStockReader,
+      ),
       sales: createSalesRuntime(
         database,
         identity,

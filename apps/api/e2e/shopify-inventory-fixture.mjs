@@ -16,7 +16,7 @@ export const stockItem = 'gid://shopify/InventoryItem/1';
 
 export const stockLocation = 'gid://shopify/Location/1';
 
-const config = {
+const defaultConfig = {
   shop: 'stock.myshopify.com',
   name: 'Stock',
   currency: 'EUR',
@@ -40,6 +40,14 @@ export async function correctionFixture(
   origin = 'http://localhost:3000',
   options = {},
 ) {
+  const config = {
+    ...defaultConfig,
+    ...(options.name ? { name: options.name } : {}),
+    ...(options.shop ? { shop: options.shop } : {}),
+    ...(options.locationName
+      ? { locations: [{ id: '1', name: options.locationName }] }
+      : {}),
+  };
   const originalFetch = globalThis.fetch;
   const store = createMemoryStore();
   const context = () => ({
@@ -124,18 +132,28 @@ export async function correctionFixture(
     return response;
   });
   globalThis.fetch = async (url, init) =>
-    String(url).startsWith('https://stock.myshopify.com/')
+    String(url).startsWith(`https://${config.shop}/`)
       ? transport(url, init)
       : originalFetch(url, init);
   t.onTestFinished(() => {
     globalThis.fetch = originalFetch;
   });
+  let simulationBinding;
   const connectionsConfig = {
+    simulation: (connection) =>
+      simulationBinding &&
+      connection.tenantId === simulationBinding.tenantId &&
+      connection.id === simulationBinding.id &&
+      connection.target.kind === 'shopify' &&
+      connection.target.shop === config.shop
+        ? transport
+        : undefined,
     activeKeyId: 'test',
     keys: new Map([['test', randomBytes(32)]]),
   };
   const f = await settingsFixture(t, origin, {
     connections: connectionsConfig,
+    observability: options.observability,
   });
   // These journeys exercise writes; new workspaces otherwise stay observe-only.
   await f.request(
@@ -168,8 +186,8 @@ export async function correctionFixture(
     `${f.base}/connections`,
     'POST',
     {
-      label: 'Shopify stock',
-      target: { kind: 'shopify', shop: 'stock.myshopify.com' },
+      label: options.name ?? 'Shopify stock',
+      target: { kind: 'shopify', shop: config.shop },
       permissions: [
         'inventory.read',
         'inventory.available.reconcile',
@@ -184,12 +202,17 @@ export async function correctionFixture(
     },
     201,
   );
-  await f.request(
+  simulationBinding = { tenantId: f.org.id, id: installed.id };
+  const health = await f.request(
     f.owner,
     `${f.base}/connections/${installed.id}/check`,
     'POST',
     { version: installed.version },
   );
+  if (health.status !== 'active')
+    throw new Error(
+      `Synthetic Shopify health: ${JSON.stringify({ status: health.status, lastCheck: health.lastCheck })}`,
+    );
   const stock = await inventoryFixture(t, f);
   await f.db.owner.query(
     `UPDATE connector_installations SET document=document || $3::jsonb WHERE tenant_id=$1 AND id=$2`,
@@ -208,12 +231,14 @@ export async function correctionFixture(
     connectionId: stock.erp,
     external: '77',
     location: stockLocation,
+    locationKey: options.locationName ?? stockLocation,
     amount: '9',
   });
   await stock.stock({
     connectionId: installed.id,
     external: stockItem,
     location: stockLocation,
+    locationKey: options.locationName ?? stockLocation,
     amount: '12',
     // Match Shopify's timestamp resolution; the fixture must not outrank a later real read in the same second.
     time: new Date((await store.get('InventoryLevel', '1.1')).updatedAt)
@@ -249,6 +274,7 @@ export async function correctionFixture(
       sku: { externalId: stockItem, scopeKey: '' },
       location: { externalId: stockLocation, scopeKey: '' },
     },
+    details = false,
   ) {
     const pool = new Pool({ connectionString: f.db.runtimeUrl });
     const db = createTenantDatabase(pool);
@@ -281,6 +307,8 @@ export async function correctionFixture(
     });
     try {
       const items = [];
+      let complete = true;
+      const observedAt = new Date().toISOString();
       let cursor = input.cursor;
       const seen = new Set();
       do {
@@ -292,6 +320,7 @@ export async function correctionFixture(
         });
         if (!result.ok)
           throw new Error(`Provider read failed: ${result.error.code}`);
+        complete &&= result.value.completeness === 'complete';
         items.push(...result.value.items);
         cursor = result.value.nextCursor;
         if (cursor && seen.has(cursor))
@@ -299,7 +328,7 @@ export async function correctionFixture(
         if (cursor) seen.add(cursor);
       } while (cursor);
 
-      return items;
+      return details ? { items, complete, observedAt } : items;
     } finally {
       await commerce.close();
       await pool.end();

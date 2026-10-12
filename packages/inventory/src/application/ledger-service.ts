@@ -159,6 +159,18 @@ export function createLedgerService(deps: LedgerDependencies) {
   }
 
   return {
+    /** Reads the immutable proposed movements and source evidence for a stock review. */
+    async getReview(context: TenantContext, id: string): Promise<LedgerReview> {
+      const fresh = await access(context, 'inventory.read');
+
+      return deps.store.transaction(fresh, async (tx) => {
+        const review = await tx.review(id);
+        if (!review)
+          throw new IdentityError(404, 'NOT_FOUND', 'Stock review not found');
+
+        return review;
+      });
+    },
     /** Reads dated balances at an explicit knowledge/version cutoff; unknown effective times stay separate. */
     async historical(
       context: TenantContext,

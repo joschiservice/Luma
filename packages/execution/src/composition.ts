@@ -68,3 +68,5 @@ export { createExecutionService, createActionAdmission };
 export { parseEvidence, parseVerification };
 
 export { parseAdmissionReference };
+
+export { createUnsettledStockEffectReader } from './infrastructure/stock-effects.js';

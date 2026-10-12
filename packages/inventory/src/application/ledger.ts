@@ -49,6 +49,17 @@ export interface StockEvidence {
   mappingVersion: string;
   sourceRevision: string | null;
   meaningHash: string;
+  channelState?:
+    | {
+        semantics: 'shopify/1';
+        committed: string | null;
+        reserved: string | null;
+        itemActive: boolean | null;
+        locationActive: boolean | null;
+        tracked: boolean | null;
+      }
+    | null
+    | undefined;
   complete: boolean;
   bundleParent: boolean | null;
 }

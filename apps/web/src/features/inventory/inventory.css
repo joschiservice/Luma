@@ -147,3 +147,16 @@
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+.native-stock-form fieldset {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.native-stock-form label {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}

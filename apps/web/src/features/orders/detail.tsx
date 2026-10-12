@@ -48,6 +48,7 @@ import { OrderReturnCases } from '../returns/case-entry';
 import { OrderReturns } from '../returns/order-returns';
 import { orderFilters, orderOptions, type OrdersSearch } from './data';
 import { OrderIdentityLinks } from './identity-links';
+import { NativeOrderStock } from './native-stock';
 import { OrderHeader } from './order-header';
 import { OrderInspector } from './order-inspector';
 import {
@@ -178,6 +179,10 @@ export function OrderPage() {
         query.data ? (
           <>
             <SalesRecord organizationId={organizationId} detail={query.data} />
+            <NativeOrderStock
+              organizationId={organizationId}
+              detail={query.data}
+            />
             <OrderIdentityLinks
               organizationId={organizationId}
               orderId={query.data.order.id}

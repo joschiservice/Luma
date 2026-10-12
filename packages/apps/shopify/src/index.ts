@@ -92,8 +92,10 @@ export function createShopifyProvider(
       );
       const target = installationTarget.parse(current.connection.target);
       const fetch =
-        simulationTransport(current.connection, runtime.simulation) ??
-        runtime.fetch;
+        simulationTransport(
+          current.connection,
+          runtime.simulation ?? options.simulation,
+        ) ?? runtime.fetch;
 
       const budgetKey = `${context.tenantId}:${id}`;
       let budget = budgets.get(budgetKey);
@@ -430,3 +432,5 @@ export function createApp(context: AppFactoryContext): AppDefinition {
 }
 
 export { createShopifyRecordReader } from './infrastructure/records.js';
+
+export { createShopifyUnsettledStockReader } from './infrastructure/stock-effects.js';

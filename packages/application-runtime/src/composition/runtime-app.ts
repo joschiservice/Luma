@@ -168,6 +168,12 @@ export async function buildRuntimeApp(
             decisionSources: installedConnections.decisionSources(),
             workflowSources: installedConnections.registry.workflowSources(),
             ...(stockRefresh ? { refreshStock } : {}),
+            nativeStockReader: createInstalledRuntime({
+              installations: installedConnections.connections,
+              providers: installedConnections.registry.providers(),
+              record: async () => undefined,
+              recordObservations: async () => undefined,
+            }),
           }
         : {}),
       ...(modelGateway ? { modelGateway } : {}),

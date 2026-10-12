@@ -26,12 +26,14 @@ export function createSalesPersistence(
     source(context: TenantContext): Promise<InstalledConnection>;
     authority: AuthorityReader;
     audit: AuditLog;
+    reconcileStock: SalesTransaction['reconcileStock'];
   },
 ): SalesTransaction {
   const commerce = ports;
 
   return {
     ...createSalesStore(tx, context.tenantId, context.actor.id),
+    reconcileStock: ports.reconcileStock,
     intake: async (orderId, connectionId) => {
       const projections = await commerce.orders.current(context, orderId);
       const snapshot = projections.find(
@@ -145,9 +147,10 @@ export function createSalesPersistence(
       return order;
     },
     requireAuthority: async (order) => {
-      await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
-        `source-authority:${context.tenantId}`,
-      ]);
+      await tx.query(
+        'SELECT pg_advisory_xact_lock_shared(hashtextextended($1,0))',
+        [`source-authority:${context.tenantId}`],
+      );
       const current = await ports.authority.read(context);
       if (
         !['order_lifecycle', 'order_lines'].every((group) =>

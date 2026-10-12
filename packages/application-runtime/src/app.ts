@@ -38,3 +38,5 @@ export {
 } from './composition/detection-worker.js';
 
 export { createMetricListener } from './infrastructure/metric-listener.js';
+
+export { createNativeStockRuntime } from './composition/native-stock.js';

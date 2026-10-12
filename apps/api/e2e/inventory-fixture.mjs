@@ -30,6 +30,7 @@ export async function inventoryFixture(t, f) {
     external = 'SKU-100',
     sku = 'SKU-100',
     location = 'Tokyo',
+    locationKey = location,
     amount = '12',
     onHand = null,
     reserved = null,
@@ -81,7 +82,7 @@ export async function inventoryFixture(t, f) {
     await commerce.ingestion.bind(
       context,
       { ...source, resource: 'location', externalId: location },
-      location,
+      locationKey,
       key,
       'operator-confirmed',
     );

@@ -15,6 +15,7 @@ import { inventoryContract } from './contracts/inventory.js';
 import { resolutionLearningContract } from './contracts/learning.js';
 import { messagingContract } from './contracts/messaging.js';
 import { metricsContract } from './contracts/metrics.js';
+import { nativeStockContract } from './contracts/native-stock.js';
 import { ordersContract } from './contracts/orders.js';
 import { operationsContract } from './contracts/overview.js';
 import { playbooksContract } from './contracts/playbooks.js';
@@ -65,6 +66,7 @@ export const apiContract: {
   records: typeof recordsContract;
   fulfillment: typeof fulfillmentContract;
   inventory: typeof inventoryContract;
+  nativeStock: typeof nativeStockContract;
   products: typeof productsContract;
   orders: typeof ordersContract;
   sales: typeof salesContract;
@@ -102,6 +104,7 @@ export const apiContract: {
   records: recordsContract,
   fulfillment: fulfillmentContract,
   inventory: inventoryContract,
+  nativeStock: nativeStockContract,
   products: productsContract,
   orders: ordersContract,
   sales: salesContract,
@@ -238,3 +241,5 @@ export type {
   ReturnDeadlinePolicyView,
   ReturnWaitingView,
 } from './return-deadlines.js';
+
+export * from './native-stock.js';

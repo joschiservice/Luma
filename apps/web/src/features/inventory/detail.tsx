@@ -33,6 +33,7 @@ import { IdentityLinks } from '../sync/identity-links';
 import { linkMethodLabel } from '../sync/presentation';
 import { WorkflowCoverageCard } from '../workflows/coverage';
 import { type InventorySearch, stockOptions } from './data';
+import { NativeStockPool } from './native-stock';
 import {
   differingQuantities,
   quantityLabels,
@@ -66,6 +67,14 @@ export function StockPage() {
       refreshing={query.isFetching}
       offline={query.isPaused}
       refresh={() => void query.refetch()}
+      nativeStock={
+        query.data ? (
+          <NativeStockPool
+            organizationId={organizationId}
+            detail={query.data}
+          />
+        ) : null
+      }
       correction={
         query.data &&
         apps.data?.installations.some(
@@ -116,6 +125,7 @@ export function StockDetailView({
   refresh,
   identity,
   correction,
+  nativeStock,
   replenishment,
 }: {
   organizationId: string;
@@ -130,6 +140,7 @@ export function StockDetailView({
   identity?: ReactNode;
   /** Installed provider correction controls for this stock position. */
   correction?: ReactNode;
+  nativeStock?: ReactNode;
   /** Workflow coverage and readiness for this stock position. */
   replenishment?: ReactNode;
 }) {
@@ -367,6 +378,7 @@ export function StockDetailView({
               ]}
             />
           </Disclosure>
+          {nativeStock}
           {correction}
           {replenishment}
           <div className="inventory-context-grid">
