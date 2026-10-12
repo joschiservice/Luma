@@ -13,7 +13,7 @@ import { database, secret } from './helpers.mjs';
  * Journeys let a stock gap wait one second for provider sync instead of 30 minutes, so they
  * exercise the wait with a few detection passes.
  */
-export const journeyConfiguration = {
+const journeyConfiguration = {
   ...defaultConfiguration,
   version: `${defaultConfiguration.version}-journey`,
   thresholds: { ...defaultConfiguration.thresholds, propagationSeconds: 1 },
