@@ -642,7 +642,13 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
         incident.exceptionClass,
       ),
     async evaluate(context, incident): Promise<VerificationResult> {
-      if (incident.configVersion !== configuration.version)
+      // Stock and fulfillment verdicts apply this configuration's thresholds, so they wait until
+      // the next pass re-evaluates the case under it. Sync recovery uses no thresholds, and a
+      // recovered stream is not evaluated again, so its cases verify under their own version.
+      if (
+        incident.exceptionClass !== 'sync_failure' &&
+        incident.configVersion !== configuration.version
+      )
         throw new Error('Verification configuration changed');
       if (incident.exceptionClass === 'inventory_mismatch') {
         const found = await stockMapping(context, incident);
