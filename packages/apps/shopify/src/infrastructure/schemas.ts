@@ -478,6 +478,7 @@ export const inputs = {
     confirmMissing: scoped('Order')
       .extend({ createdAt: timestamp.nullable() })
       .optional(),
+    order: scoped('Order').optional(),
   }),
   'products.read': changedInput.extend({
     confirmMissing: scoped('Product')

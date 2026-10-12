@@ -28,6 +28,28 @@ const context = {
 
 const ref = (externalId: string) => ({ externalId, scopeKey: '' });
 
+/** A sales-order list row as `GET sales-orders/{id}` reports it, with nested detail objects. */
+function detail({
+  externalSalesOrderNumber,
+  currencyIso,
+  deliveryStatus,
+  paymentStatus,
+  totalGrossAmount,
+  ...order
+}: (typeof commerce.orders)[number]) {
+  return {
+    ...order,
+    externalDetails: { externalSalesOrderNumber },
+    paymentDetails: { currencyIso },
+    keyFigures: {
+      salesOrderId: order.id,
+      deliveryStatus,
+      paymentStatus,
+      totalGrossAmount,
+    },
+  };
+}
+
 function fixture(overrides: Partial<JtlConnectorOptions> = {}) {
   const data = structuredClone(commerce);
   const cloud = overrides.connection?.kind === 'cloud';
@@ -61,6 +83,12 @@ function fixture(overrides: Partial<JtlConnectorOptions> = {}) {
       return found ? json(found) : new Response('', { status: 404 });
     }
     if (path === 'sales-orders') return page(data.orders);
+    const order = /^sales-orders\/(\d+)$/.exec(path);
+    if (order) {
+      const found = data.orders.find(({ id }) => String(id) === order[1]);
+
+      return found ? json(detail(found)) : new Response('', { status: 404 });
+    }
     if (path === 'customers') return page(data.customers);
     if (path === 'sales-orders/10/line-items') return json(data.orderLines);
     if (path === 'delivery-notes') return page(data.notes);
@@ -759,6 +787,68 @@ describe('JTL read adapter', () => {
     expect(
       f.fetch.mock.calls.map(([url]) => new URL(String(url)).pathname),
     ).toEqual(['/api/eazybusiness/items/21']);
+  });
+
+  it('reads one order directly, observed exactly as an order page observes it', async () => {
+    const f = fixture();
+    expect(
+      (await f.runtime.discover(context, 'connection-a')).find(
+        (item) => item.capability === 'orders.read',
+      )?.filters,
+    ).toEqual(['order']);
+    const scanned = await f.read('orders.read');
+    f.fetch.mockClear();
+    const single = await f.read('orders.read', {
+      limit: 1,
+      order: ref('10'),
+    });
+    expect(
+      f.fetch.mock.calls.map(([url]) => new URL(String(url)).pathname),
+    ).toEqual([
+      '/api/eazybusiness/sales-orders/10',
+      '/api/eazybusiness/sales-orders/10/line-items',
+    ]);
+    if (!scanned.ok || !single.ok) throw new Error('Expected order reads');
+    const expected = scanned.value.items.find(
+      (item) => item.source.externalId === '10',
+    );
+    if (!expected) throw new Error('Expected order 10 in the page');
+    // Only the observation's own ID differs.
+    expect(single.value).toEqual({
+      items: [{ ...expected, id: expect.any(String) }],
+      nextCursor: null,
+      completeness: 'complete',
+    });
+    expect(f.recordObservations).toHaveBeenLastCalledWith(
+      expect.objectContaining({ observations: single.value.items }),
+    );
+  });
+
+  it('reads an unknown order as an empty page and rejects foreign or paged point reads', async () => {
+    const f = fixture();
+    expect(await f.read('orders.read', { limit: 1, order: ref('99') })).toEqual(
+      {
+        ok: true,
+        value: { items: [], nextCursor: null, completeness: 'complete' },
+      },
+    );
+    f.fetch.mockImplementationOnce(async () =>
+      Response.json(detail({ ...f.data.orders[0]!, id: 12 })),
+    );
+    expect(
+      await f.read('orders.read', { limit: 1, order: ref('10') }),
+    ).toMatchObject({ ok: false, error: { code: 'invalid_response' } });
+    // Only the empty page was recorded.
+    expect(f.recordObservations).toHaveBeenCalledOnce();
+    f.fetch.mockClear();
+    expect(
+      await f.read('orders.read', {
+        limit: 1,
+        order: ref('10'),
+        cursor: 'next',
+      }),
+    ).toMatchObject({ ok: false, error: { code: 'invalid_input' } });
+    expect(f.fetch).not.toHaveBeenCalled();
   });
 
   it('rejects unsafe configuration and resolves credential failures', async () => {

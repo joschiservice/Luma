@@ -815,6 +815,31 @@ test('incremental reads see only records changed since the last sync', async () 
   );
 });
 
+test('orders.read rereads one order exactly as a scan observes it', async () => {
+  const shop = createShop();
+  const ids = await seed(shop);
+  const orders = await reads(shop)('orders.read');
+  const page = pages(shop);
+  const single = await page('orders.read', {
+    limit: 1,
+    order: { externalId: ids.shipped.gid, scopeKey: '' },
+  });
+  assert.equal(single.ok, true, JSON.stringify(single));
+  assert.equal(single.value.nextCursor, null);
+  assert.equal(single.value.completeness, 'complete');
+  // Observation IDs and read times differ between the two reads.
+  const facts = (item) => ({ ...item, id: null, observedAt: null });
+  assert.deepEqual(single.value.items.map(facts), [
+    facts(byId(orders.items, ids.shipped.gid)),
+  ]);
+  const missing = await page('orders.read', {
+    limit: 1,
+    order: { externalId: gid('Order', '999999'), scopeKey: '' },
+  });
+  assert.equal(missing.ok, true, JSON.stringify(missing));
+  assert.deepEqual(missing.value.items, []);
+});
+
 test('throttling and drift fail reads the way Luma recovers from them', async () => {
   const shop = createShop();
   await seed(shop);

@@ -200,6 +200,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
     installations,
     recovery,
     corrections,
+    edits,
   });
 
   return {

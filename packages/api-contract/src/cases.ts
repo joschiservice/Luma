@@ -6,6 +6,7 @@ export const caseClasses = [
   'sync_failure',
   'stuck_fulfillment',
   'inventory_mismatch',
+  'order_quantity_mismatch',
   'workflow_failure',
 ] as const;
 

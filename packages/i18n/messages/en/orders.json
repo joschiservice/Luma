@@ -477,5 +477,10 @@
   "orders_plan_propose_no_lines": "No line can be matched across sources, so Luma can’t plan a quantity change.",
   "orders_plan_case_title": "Change plan for {order}",
   "orders_plan_case_order_fallback": "the linked order",
-  "orders_plan_case_open": "Open order"
+  "orders_plan_case_open": "Open order",
+  "orders_plan_story_authority": "{system} sets this quantity to {quantity}",
+  "orders_plan_story_differs": "{system} still shows {quantity}",
+  "orders_plan_story_unconfirmed": "{system} showed {quantity} when last read",
+  "orders_plan_story_reflects": "{system} shows it too",
+  "orders_plan_story_not_reported": "{system} doesn’t report it"
 }

@@ -118,6 +118,20 @@ export function createCaseService(
 
       return owners.assign(context, id, input);
     },
+    /**
+     * Gives a case nobody owns to `userId`, keeping any existing owner; see
+     * `createCaseOwners().claim`.
+     */
+    async claimOwner(context: TenantContext, id: string, userId: string) {
+      if (!owners)
+        throw new IdentityError(
+          503,
+          'SERVICE_UNAVAILABLE',
+          'Case assignment is unavailable',
+        );
+
+      return owners.claim(context, id, userId);
+    },
     evidence(context: TenantContext, id: string, query: CaseEvidenceQuery) {
       requireTenant(context, context.tenantId);
 

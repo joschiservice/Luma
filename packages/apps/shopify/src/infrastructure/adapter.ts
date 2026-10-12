@@ -137,6 +137,20 @@ const customerStates: Record<string, CustomerSnapshot['state']> = {
 // Without read_all_orders, Shopify returns orders created in the last 60 days.
 const recentOrderWindowMs = 60 * 24 * 60 * 60 * 1000;
 
+/** The order history Shopify hides from an installation without `read_all_orders`, if any. */
+const orderHistory = (
+  scopes: { handle: string }[],
+  at: Date,
+): HistoryLimit | null =>
+  scopes.some((scope) => scope.handle === 'read_all_orders')
+    ? null
+    : {
+        availableFrom: new Date(
+          at.getTime() - recentOrderWindowMs,
+        ).toISOString(),
+        requirement: 'read_all_orders',
+      };
+
 const counted = {
   'orders.read': 'ordersCount',
   'products.read': 'productsCount',
@@ -296,6 +310,7 @@ export function createShopifyConnector(
                 capability === 'customers.read'
                   ? ['historyImport' as const]
                   : []),
+                ...(capability === 'orders.read' ? ['order' as const] : []),
               ],
             }),
       },
@@ -310,6 +325,18 @@ export function createShopifyConnector(
           context.provider !== 'shopify'
         )
           fail('unavailable');
+        // A point read of one order is not a scan; it cannot page or filter.
+        if (
+          capability === 'orders.read' &&
+          'order' in input &&
+          input.order &&
+          (input.cursor ||
+            input.updatedSince ||
+            input.createdSince ||
+            input.historyImport ||
+            input.confirmMissing)
+        )
+          fail('invalid_input');
         if ('confirmMissing' in input && input.confirmMissing) {
           if (
             input.cursor ||
@@ -693,16 +720,10 @@ export function createShopifyConnector(
           );
           total = start.count?.count ?? null;
           if (root === 'orders')
-            history = start.currentAppInstallation.accessScopes.some(
-              (scope) => scope.handle === 'read_all_orders',
-            )
-              ? null
-              : {
-                  availableFrom: new Date(
-                    now().getTime() - recentOrderWindowMs,
-                  ).toISOString(),
-                  requirement: 'read_all_orders',
-                };
+            history = orderHistory(
+              start.currentAppInstallation.accessScopes,
+              now(),
+            );
         }
         let roots: { id: string }[];
         let nextAfter: string | null = null;
@@ -780,6 +801,35 @@ export function createShopifyConnector(
           }));
           nextAfter = bulk.cursor;
           total = capability === 'inventory.read' ? undefined : bulk.total;
+        } else if (selected && capability === 'orders.read') {
+          // Same selection as an order page, so the observation matches a scan of this order.
+          const data = parse(
+            z.object({ node: record.nullable() }),
+            await request(
+              `query LumaOrder($id: ID!) { node(id: $id) { ... on Order { ${readSelection(capability, orderCustomers, orderAddresses)} } } }`,
+              { id: selected.externalId },
+            ),
+          );
+          roots = [];
+          if (data.node) {
+            if (parse(s.gid('Order'), data.node.id) !== selected.externalId)
+              fail('invalid_response');
+            remember(data.node);
+            roots.push({ id: selected.externalId });
+          } else {
+            // Without read_all_orders, older orders read as absent rather than missing.
+            const start = parse(
+              s.scanStart,
+              await request(
+                'query LumaScanStart { currentAppInstallation { accessScopes { handle } } }',
+                {},
+              ),
+            );
+            history = orderHistory(
+              start.currentAppInstallation.accessScopes,
+              now(),
+            );
+          }
         } else if (selected) {
           if (after) fail('invalid_input');
           roots = [{ id: selected.externalId }];

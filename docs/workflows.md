@@ -136,11 +136,11 @@ leave audit evidence. Cancellation or closure of a linked case removes open task
 is workflow input, never approval or proof of provider success.
 
 Order change plans (see [Orders workspace](orders-workspace.md#change-plans)) describe
-person steps with a role and Luma steps with a capability; they create no tasks. An order
-change workflow turns each person step into a human task for that role, keeps the plan's
-order so holds and confirmations come before updates, and binds Luma steps as capability
-actions. It must re-plan after each task answer from fresh reads: an answer confirms what a
-person did, never that the change became safe or the provider applied it.
+person steps with a role and Luma steps with a capability; they create no tasks. The order
+quantity change (below) asks the warehouse before Luma changes anything, so holds and
+confirmations come before updates, and binds the Shopify step as a capability action. It
+re-plans from fresh reads of every source after the answer: an answer confirms what a person
+did, never that the change became safe or the provider applied it.
 
 Event waits publish an event type, a string correlation key, exact typed payload fields and
 a timeout recovery outcome. Deliveries are immutable by tenant and source identity. A wait
@@ -205,6 +205,8 @@ covers and what should happen next.
   runs that ended without acting are neither verified nor unresolved.
 - `nextAction` picks the first blocking issue, then waiting decisions, partial coverage,
   setup and the latest unresolved run.
+- A case workflow whose human tasks name a role needs an active member with that role, and
+  one with the fallback role; otherwise its readiness blocks and turning it on is refused.
 - `owner_suspended` means the workflow needs a new owner: the person whose access its runs
   use is suspended or their account disabled, so they pause. A case workflow blocks; replenishment degrades until every
   active rule is affected. Turning the workflow on again, or setting the rule up again, runs it
@@ -220,9 +222,9 @@ Case workflows are built-in `workflow/2` versions. Those with an `exception` tri
 one run per open case of their issue type. Follow-up workflows use an `event` trigger over
 signals their owner reports. Apps contribute adapters through their app definition.
 
-The built-in set is Shopify stock correction and hold release, the connection sync check,
-and the supplier, refund and payment follow-ups. Only the Shopify workflows change provider
-state. The supplier follow-up's only write is `procurement.follow-up.record` on Luma's own
+The built-in set is Shopify stock correction, hold release and the order quantity change,
+the connection sync check, and the supplier, refund and payment follow-ups. Only the
+Shopify workflows change provider state. The supplier follow-up's only write is `procurement.follow-up.record` on Luma's own
 order, so its readiness reports that no approval is needed. The connection check and the
 refund and payment follow-ups only reread and hand over.
 
@@ -241,6 +243,21 @@ refund and payment follow-ups only reread and hand over.
   rejection, policy denial, withheld write or uncertain write ends the attempt. Turning the
   workflow off or the case closing stops unsent changes; sent changes still reconcile.
 - **Closure:** runs never close cases. Detection verifies them independently.
+- **Responsibility:** the order quantity change gives a case nobody owns to the person whose
+  access it runs with as soon as it hands work to people (a human task or an escalation), so
+  an overdue or escalated case stays with someone. An existing owner is kept; without
+  `decisions.assign` the case keeps its state and the run continues.
+- **Order quantity change:** starts for `order_quantity_mismatch` cases whose sources include
+  a Shopify store. Each read rereads every source of the order and plans the value the
+  order-line authority reports, pinned for the rest of the run. Luma can't write dispatch
+  records, so a human task always asks the Member role to make dispatch carry the new
+  quantity, adjusting or resetting a started pick; it is due after four hours and then falls
+  to admins, with the open task still answerable. After an `Adjusted` answer a fresh plan
+  must show the change safe, otherwise the run escalates; it ends without a change when
+  Shopify already shows the value. The Shopify edit then runs through the
+  [order quantity edit](shopify-actions.md#order-quantity-edits), and one check confirms
+  Luma's edit in Shopify and rereads every system: each one that reports the line must show
+  the value, and systems that report none are counted apart.
 - **Follow-ups:** signals come from owners and read models as the run's principal, so access
   checks apply. A signal ID names one occurrence, such as an order's submission, so a
   recorded follow-up does not start a second run. A handover appears in Needs you while the

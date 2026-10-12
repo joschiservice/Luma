@@ -773,7 +773,15 @@ interface CapabilityContract {
     };
     output: WriteReceipt;
   };
-  'orders.read': { input: PageQuery; output: Page<OrderSnapshot> };
+  /**
+   * `order` reads exactly that order by its source ID; send it only to handlers whose
+   * descriptor lists `order`. The page then holds that order when the source has it, or
+   * nothing, and never a cursor.
+   */
+  'orders.read': {
+    input: PageQuery & { order?: ExternalId };
+    output: Page<OrderSnapshot>;
+  };
   'suppliers.read': {
     input: PageQuery & { supplier?: ExternalId };
     output: Page<SupplierSnapshot>;

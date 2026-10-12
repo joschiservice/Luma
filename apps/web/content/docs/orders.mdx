@@ -58,6 +58,8 @@ Each plan shows:
 
 Today Luma can change quantities in Shopify itself; every other system is updated by a person. When a Luma step is ready, choose **Review in** and the store name to open [Change quantities in Shopify](#change-quantities-in-shopify) with the planned quantity filled in. You still preview and approve it there. If the step says you need a permission, ask a workspace admin. Plans update when the order is read again, for example after the warehouse starts packing.
 
+A detected quantity difference also reads as one sentence, led by the system that holds order-line authority: for example “Luma ERP sets this quantity to 1; Shopify still shows 2; JTL doesn’t report it.” When the difference persists, Luma opens an issue, and the workflow [Carry an order quantity change to every system](/docs/workflows#workflows-that-start-from-issues) can carry it for you.
+
 ## Manage an order in Luma
 
 When native orders are available in your workspace, open a Shopify order and choose **Accept into Luma**. You need **Manage Luma orders** and **Manage imports**. Luma creates a record linked to the existing order. The list continues to show one order with Shopify and Luma ERP as sources.

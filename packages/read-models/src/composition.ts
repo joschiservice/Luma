@@ -8,6 +8,8 @@ export { createOrderWorkspace } from './infrastructure/orders/workspace.js';
 
 export { createSourceOrderLines } from './infrastructure/orders/source-lines.js';
 
+export { createOrderQuantities } from './infrastructure/orders/quantities.js';
+
 export { createInventoryWorkspace } from './infrastructure/inventory/workspace.js';
 
 export { createProductWorkspace } from './infrastructure/products/workspace.js';

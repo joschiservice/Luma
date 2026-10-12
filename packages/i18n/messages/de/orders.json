@@ -477,5 +477,10 @@
   "orders_plan_propose_no_lines": "Keine Position lässt sich zwischen den Quellen zuordnen, deshalb kann Luma keine Mengenänderung planen.",
   "orders_plan_case_title": "Änderungsplan für {order}",
   "orders_plan_case_order_fallback": "die verknüpfte Bestellung",
-  "orders_plan_case_open": "Bestellung öffnen"
+  "orders_plan_case_open": "Bestellung öffnen",
+  "orders_plan_story_authority": "{system} legt diese Menge auf {quantity} fest",
+  "orders_plan_story_differs": "{system} zeigt noch {quantity}",
+  "orders_plan_story_unconfirmed": "{system} zeigte beim letzten Lesen {quantity}",
+  "orders_plan_story_reflects": "{system} zeigt sie ebenfalls",
+  "orders_plan_story_not_reported": "{system} meldet sie nicht"
 }

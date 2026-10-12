@@ -1,7 +1,46 @@
-import { externalId } from '@luma/connector-jtl/schemas';
+import { externalId, id, order } from '@luma/connector-jtl/schemas';
 import { z } from 'zod';
 
 export * from '@luma/connector-jtl/schemas';
+
+/**
+ * Fields of `GET sales-orders/{id}` that a sales-order list row reports at the top level. The
+ * single-order response nests status, amount and currency in its detail objects.
+ */
+export const orderDetailFields = z.object({
+  id,
+  salesOrderNumber: order.shape.salesOrderNumber,
+  isCancelled: order.shape.isCancelled,
+  salesOrderDate: order.shape.salesOrderDate,
+  customerId: order.shape.customerId,
+  externalDetails: z
+    .object({
+      externalSalesOrderNumber: order.shape.externalSalesOrderNumber,
+    })
+    .nullable()
+    .optional()
+    .catch(null),
+  paymentDetails: z
+    .object({ currencyIso: order.shape.currencyIso })
+    .nullable()
+    .optional()
+    .catch(null),
+  keyFigures: z.object({
+    deliveryStatus: order.shape.deliveryStatus,
+    paymentStatus: order.shape.paymentStatus,
+    totalGrossAmount: order.shape.totalGrossAmount,
+  }),
+});
+
+/** One sales order read by ID, in the shape of a sales-order list row. */
+export const orderDetail = orderDetailFields.transform(
+  ({ externalDetails, paymentDetails, keyFigures, ...fields }) => ({
+    ...fields,
+    ...keyFigures,
+    externalSalesOrderNumber: externalDetails?.externalSalesOrderNumber,
+    currencyIso: paymentDetails?.currencyIso,
+  }),
+);
 
 const ref = z
   .object({
@@ -18,7 +57,10 @@ const query = z
   .strict();
 
 export const inputs = {
-  'orders.read': query,
+  // A point read of one order cannot continue a paged scan.
+  'orders.read': query
+    .extend({ order: ref.optional() })
+    .refine((value) => !(value.order && value.cursor)),
   'products.read': query,
   'inventory.read': query.extend({
     sku: ref.optional(),

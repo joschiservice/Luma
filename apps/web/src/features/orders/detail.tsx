@@ -221,6 +221,7 @@ export function OrderPage() {
             failed={plans.isError}
             sources={query.data.sources}
             locationNames={orderLocationNames(query.data)}
+            authority={query.data.authority.lines?.connectionId ?? null}
             lines={planLines(query.data)}
             proposal={proposal}
             propose={(lineKey, quantity) =>

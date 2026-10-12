@@ -46,7 +46,8 @@ not resolved, and the rest of the queue still loads.
 Human tasks appear only for their current assignee or fallback person or role. Their
 review collects a published choice and required evidence, with an optional note. The task's
 deadline changes responsibility without removing the open handoff. Responses remain input
-and cannot authorize a later action.
+and cannot authorize a later action. A task about an order links to it, where the order's
+change plan shows what the task asks for.
 
 ## Assignment
 

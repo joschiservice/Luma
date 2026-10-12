@@ -136,7 +136,9 @@ export function createJtlConnector(
         retry: { maxAttempts: 3, initialDelayMs: 1000 },
         ...(capability === 'customers.read'
           ? { filters: ['updatedSince' as const] }
-          : {}),
+          : capability === 'orders.read'
+            ? { filters: ['order' as const] }
+            : {}),
       },
       parseInput: (value) =>
         s.inputs[capability].parse(value) as CapabilityInput<K>,
@@ -346,10 +348,109 @@ export function createJtlConnector(
           return lines;
         }
 
+        // Emits one sales order with its lines, the same for paged and point reads.
+        function emitOrder(
+          order: z.infer<typeof s.order>,
+          lines: z.infer<typeof s.orderLine>[],
+        ) {
+          // ERP 2.2 sales orders and delivery notes have no modification time, so these
+          // snapshots are ordered by observation time. Creation dates are not update times.
+          emit('order', ref(order.id), null, {
+            displayNumber: order.salesOrderNumber,
+            externalOrderNumber: order.externalSalesOrderNumber ?? null,
+            placedAt: order.salesOrderDate ?? null,
+            total:
+              order.totalGrossAmount != null &&
+              /^[A-Z]{3}$/.test(order.currencyIso ?? '')
+                ? {
+                    amount: order.totalGrossAmount,
+                    currency: order.currencyIso!,
+                  }
+                : null,
+            ...(options.customers && order.customerId !== undefined
+              ? {
+                  customer:
+                    order.customerId === 0 || order.customerId === null
+                      ? null
+                      : ref(order.customerId),
+                }
+              : {}),
+            status:
+              order.isCancelled || order.deliveryStatus === 0
+                ? 'cancelled'
+                : [5, 7].includes(order.deliveryStatus)
+                  ? 'completed'
+                  : [1, 2, 3, 4].includes(order.deliveryStatus)
+                    ? 'open'
+                    : 'unknown',
+            paymentStatus:
+              order.paymentStatus === 2
+                ? 'paid'
+                : order.paymentStatus === 0
+                  ? 'pending'
+                  : 'unknown',
+            lines: lines.map((line) => ({
+              id: ref(line.id, String(order.id)),
+              sku:
+                line.itemId === 0 ||
+                line.itemId === null ||
+                line.itemId === '00000000-0000-0000-0000-000000000000'
+                  ? null
+                  : ref(line.itemId),
+              quantity: { amount: line.quantity, unit: unit(line.salesUnit) },
+              // ERP 2.2 exposes delivered/returned units, but no cancelled line quantity.
+              cancelledQuantity: null,
+              ...(line.salesPriceNet != null &&
+              order.currencyIso &&
+              /^[A-Z]{3}$/.test(order.currencyIso)
+                ? {
+                    unitPrice: {
+                      amount: line.salesPriceNet,
+                      currency: order.currencyIso,
+                    },
+                    // JTL reports net line prices.
+                    taxIncluded: false,
+                  }
+                : { unitPrice: null, taxIncluded: null }),
+              taxRate:
+                line.taxRate != null &&
+                Number(line.taxRate) >= 0 &&
+                Number(line.taxRate) <= 100
+                  ? String(Number(line.taxRate) / 100)
+                  : null,
+              skuCode: text(line.sKU),
+              title: text(line.name),
+            })),
+          });
+        }
+
         let hasNext: boolean;
         // Sales orders and items map one-to-one to observations, so their count estimates progress.
         let total: number | undefined;
-        if (capability === 'orders.read') {
+        if (capability === 'orders.read' && 'order' in input && input.order) {
+          // A point read of one order; an unknown order reads as an empty page.
+          hasNext = false;
+          const requested = input.order.externalId;
+          let order: z.infer<typeof s.order> | null = null;
+          try {
+            order = capture(
+              s.orderDetail,
+              await client.request(
+                `sales-orders/${encodeURIComponent(requested)}`,
+              ),
+            );
+          } catch (error) {
+            if (
+              !(error instanceof ConnectorError) ||
+              error.failure.code !== 'not_found'
+            )
+              throw error;
+          }
+          if (order) {
+            if (order.id !== requested) fail('invalid_response');
+            emitOrder(order, await orderLines(order.id));
+          }
+        } else if (capability === 'orders.read') {
           const result = await page(
             'sales-orders',
             s.order,
@@ -363,78 +464,8 @@ export function createJtlConnector(
             childReadConcurrency,
             (order) => orderLines(order.id),
           );
-          for (const [index, order] of result.items.entries()) {
-            const lines = linesOf[index]!;
-            // ERP 2.2 sales orders and delivery notes have no modification time, so these
-            // snapshots are ordered by observation time. Creation dates are not update times.
-            emit('order', ref(order.id), null, {
-              displayNumber: order.salesOrderNumber,
-              externalOrderNumber: order.externalSalesOrderNumber ?? null,
-              placedAt: order.salesOrderDate ?? null,
-              total:
-                order.totalGrossAmount != null &&
-                /^[A-Z]{3}$/.test(order.currencyIso ?? '')
-                  ? {
-                      amount: order.totalGrossAmount,
-                      currency: order.currencyIso!,
-                    }
-                  : null,
-              ...(options.customers && order.customerId !== undefined
-                ? {
-                    customer:
-                      order.customerId === 0 || order.customerId === null
-                        ? null
-                        : ref(order.customerId),
-                  }
-                : {}),
-              status:
-                order.isCancelled || order.deliveryStatus === 0
-                  ? 'cancelled'
-                  : [5, 7].includes(order.deliveryStatus)
-                    ? 'completed'
-                    : [1, 2, 3, 4].includes(order.deliveryStatus)
-                      ? 'open'
-                      : 'unknown',
-              paymentStatus:
-                order.paymentStatus === 2
-                  ? 'paid'
-                  : order.paymentStatus === 0
-                    ? 'pending'
-                    : 'unknown',
-              lines: lines.map((line) => ({
-                id: ref(line.id, String(order.id)),
-                sku:
-                  line.itemId === 0 ||
-                  line.itemId === null ||
-                  line.itemId === '00000000-0000-0000-0000-000000000000'
-                    ? null
-                    : ref(line.itemId),
-                quantity: { amount: line.quantity, unit: unit(line.salesUnit) },
-                // ERP 2.2 exposes delivered/returned units, but no cancelled line quantity.
-                cancelledQuantity: null,
-                ...(line.salesPriceNet != null &&
-                order.currencyIso &&
-                /^[A-Z]{3}$/.test(order.currencyIso)
-                  ? {
-                      unitPrice: {
-                        amount: line.salesPriceNet,
-                        currency: order.currencyIso,
-                      },
-                      // JTL reports net line prices.
-                      taxIncluded: false,
-                    }
-                  : { unitPrice: null, taxIncluded: null }),
-                taxRate:
-                  line.taxRate != null &&
-                  Number(line.taxRate) >= 0 &&
-                  Number(line.taxRate) <= 100
-                    ? String(Number(line.taxRate) / 100)
-                    : null,
-                skuCode: text(line.sKU),
-                title: text(line.name),
-              })),
-            });
-          }
+          for (const [index, order] of result.items.entries())
+            emitOrder(order, linesOf[index]!);
         } else if (capability === 'customers.read') {
           // JTL filters strictly after the given time; sync overlaps its windows.
           const result = await page(

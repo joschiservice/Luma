@@ -14,6 +14,7 @@ import {
   noteJson,
   noteLinesJson,
   orderLinesJson,
+  salesOrderDetailJson,
   salesOrderJson,
 } from './orders.js';
 import {
@@ -306,7 +307,7 @@ async function salesOrders(
       (rows) => rows.map((row) => salesOrderJson(row.data)),
     );
   const order = await detail<OrderRecord>(context, kinds.order, id);
-  if (!child) return json(salesOrderJson(order));
+  if (!child) return json(salesOrderDetailJson(order));
 
   return child === 'line-items' ? json(orderLinesJson(order)) : undefined;
 }

@@ -38,6 +38,9 @@ import {
 } from './infrastructure/order-edit-provider.js';
 import { createOrderEditStore } from './infrastructure/order-edit-store.js';
 
+/** Stored authoritative reads older than this are reread before an edit judges them. */
+const refreshAfterMs = 60_000;
+
 /** Composes Shopify order quantity edits with the platform's Action Admission, policy and audit services. */
 export function createShopifyOrderEdits(
   context: AppFactoryContext,
@@ -180,11 +183,22 @@ export function createShopifyOrderEdits(
     target: OrderEditRun['target'],
     sourceConnectionId: string,
   ): Promise<AuthoritativeLines | null> => {
-    const lines = await context.sourceOrderLines?.(tenant, {
-      connectionId: target.connectionId,
-      orderId: target.orderId,
-      sourceConnectionId,
-    });
+    const stored = () =>
+      context.sourceOrderLines?.(tenant, {
+        connectionId: target.connectionId,
+        orderId: target.orderId,
+        sourceConnectionId,
+      });
+    let lines = await stored();
+    // A propagated edit needs a fresh authoritative read, so a late decision rereads the order.
+    if (
+      lines &&
+      context.refreshOrder &&
+      Date.now() - Date.parse(lines.observedAt) > refreshAfterMs
+    ) {
+      await context.refreshOrder(tenant, lines.orderId);
+      lines = await stored();
+    }
 
     return lines
       ? authoritativeLines.parse({

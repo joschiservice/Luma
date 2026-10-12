@@ -1,4 +1,8 @@
-import { orderComparisonState } from '@luma/orders';
+import {
+  lineComparisonKeys,
+  orderComparisonState,
+  sharedComparisonLines,
+} from '@luma/orders';
 import type { SqlTransaction } from '@luma/platform';
 
 import type {
@@ -127,25 +131,12 @@ export async function readSourceFacts(
       lines,
     };
   });
-  const lineConnections = new Map<string, Set<string>>();
-  for (const source of sources)
-    for (const line of source.lines) {
-      const seen = lineConnections.get(line.id) ?? new Set<string>();
-      seen.add(source.connectionId);
-      lineConnections.set(line.id, seen);
-    }
+  // Line keys follow the comparison owner's matching rules exactly.
+  const shared = sharedComparisonLines(sources);
   for (const source of sources) {
-    const skuCounts = new Map<string, number>();
+    const keys = lineComparisonKeys(source, shared);
     for (const line of source.lines)
-      if (line.skuId)
-        skuCounts.set(line.skuId, (skuCounts.get(line.skuId) ?? 0) + 1);
-    for (const line of source.lines)
-      line.comparisonKey =
-        (lineConnections.get(line.id)?.size ?? 0) > 1
-          ? line.id
-          : line.skuId && skuCounts.get(line.skuId) === 1
-            ? line.skuId
-            : null;
+      line.comparisonKey = keys.get(line.id) ?? null;
   }
   const differences = rows[0]!.differences;
   const timing = rows[0]!.timing;
@@ -163,6 +154,8 @@ export async function readSourceFacts(
     sources,
     differences,
     comparisonState,
+    /** The maintained comparison's timing and whether a contributing read failed or was partial. */
+    comparison: { timing, incomplete: rows[0]!.incomplete === true },
     overdue: rows.find((row) => row.selected)?.overdue ?? null,
   };
 }

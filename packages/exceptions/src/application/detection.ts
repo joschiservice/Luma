@@ -52,6 +52,8 @@ export const verificationPostconditions = {
   sync_failure: 'complete_scan_checkpoint_advanced',
   stuck_fulfillment: 'fulfillment_disposition_verified',
   inventory_mismatch: 'equivalent_inventory_agrees',
+  // The business outcome a quantity change needs: every reporting source agrees on fresh reads.
+  order_quantity_mismatch: 'workflow_business_postcondition_verified',
   workflow_failure: 'workflow_business_postcondition_verified',
 } as const;
 
@@ -213,7 +215,8 @@ export function createDetectionService(
       )
         throw new Error('Evidence references must match immutable evidence');
       const connections =
-        input.exceptionClass === 'inventory_mismatch'
+        input.exceptionClass === 'inventory_mismatch' ||
+        input.exceptionClass === 'order_quantity_mismatch'
           ? input.facts.connectionIds
           : input.exceptionClass === 'workflow_failure'
             ? []

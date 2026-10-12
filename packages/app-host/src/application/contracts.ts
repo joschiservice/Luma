@@ -1,3 +1,4 @@
+import type { OrderChangePlans } from '@luma/api-contract';
 import type {
   AuthorityReader,
   ConnectionProvider,
@@ -201,10 +202,35 @@ export interface AppFactoryContext {
       sourceConnectionId: string;
     },
   ): Promise<SourceOrderLines | null>;
+  /**
+   * Rereads every source of a canonical order whose stored read is older than `maxAgeMs` (a
+   * minute by default): the order and its fulfilment records, through the installed
+   * capabilities' point reads, stored as the sources' current reads. Unshipped work a complete
+   * reread no longer returns is retired. Sources that can't be reread keep their stored reads,
+   * so plans then report them as stale. Absent where the host has no capability runtime.
+   */
+  refreshOrder?(
+    context: TenantContext,
+    orderId: string,
+    maxAgeMs?: number,
+  ): Promise<void>;
+  /**
+   * A canonical order's change plans as Orders shows them, from Luma's stored reads: a proposed
+   * quantity for one line, or every change the source comparison detected when `request` is null.
+   * Requires `orders.read`; null when the order has no current source. Rejects a line that is not
+   * on the order with 422. Absent where the host has no order read model.
+   */
+  orderChangePlans?(
+    context: TenantContext,
+    orderId: string,
+    request: { kind: 'quantity'; lineKey: string; quantity: string } | null,
+  ): Promise<OrderChangePlans | null>;
 }
 
 /** A source's stored read of an order's line quantities; see `sourceOrderLines`. */
 interface SourceOrderLines {
+  /** The canonical order both sources report. */
+  orderId: string;
   connectionId: string;
   snapshotId: string;
   observationId: string;

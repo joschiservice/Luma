@@ -6,6 +6,7 @@ import { createInstalledRuntime } from '@luma/connections/composition';
 import type { Diagnosis } from '@luma/exceptions';
 import type { IdentityService, TenantContext } from '@luma/identity';
 import { createIdentity } from '@luma/identity/composition';
+import type { Observability } from '@luma/platform';
 import { createTenantDatabase } from '@luma/platform/composition';
 import type { ProposedAction } from '@luma/policies';
 import type {
@@ -25,12 +26,17 @@ import {
 import { Pool } from 'pg';
 
 import {
+  type ApplicationServices,
   createApplicationServices,
   createOrderLineReader,
 } from './application.js';
-import { createStockRefreshService } from './detection-worker.js';
+import {
+  createOrderRefreshService,
+  createStockRefreshService,
+} from './detection-worker.js';
 import { createReplenishmentWorker } from './replenishment-worker.js';
 import { createResourceScope } from './resources.js';
+import { createSalesReadSource, createSalesTenantRelease } from './sales.js';
 import { createDetectionServices, createSafetyServices } from './services.js';
 
 /** Wire durable activities to the same tenant-scoped services used by commands. */
@@ -192,12 +198,14 @@ export function createExceptionWorkflowRuntime(
 /**
  * Start a worker for persisted incidents, diagnoses and process workflows. With `connections`,
  * installed apps contribute their case workflows; without it, only Luma's own run.
+ * `observability` evaluates workspace releases, such as Luma-owned order records.
  */
 export async function createDefaultExceptionWorker(
   identitySettings: Parameters<typeof createIdentity>[0],
   settings: WorkflowConfig & { temporal: TemporalSettings },
   connections?: ConnectionsConfig,
   env?: Readonly<Record<string, string | undefined>>,
+  observability?: Observability,
 ) {
   const resources = createResourceScope();
   try {
@@ -214,8 +222,11 @@ export async function createDefaultExceptionWorker(
     );
     resources.add(processClient.close);
     const database = createTenantDatabase(pool);
-    // Owners reread stale stock right before they act; the reread needs the host's providers.
+    // Owners reread stale stock and order sources right before they act; the rereads need the
+    // host's providers. Plans come from the Orders workspace composed below.
     let stockRefresh: ReturnType<typeof createStockRefreshService> | undefined;
+    let orderRefresh: ReturnType<typeof createOrderRefreshService> | undefined;
+    const composed: { orders?: ApplicationServices['http']['orders'] } = {};
     const refreshStock = async (context: TenantContext, positionId: string) =>
       stockRefresh?.refresh(context, positionId);
     const host = connections
@@ -224,21 +235,32 @@ export async function createDefaultExceptionWorker(
           refreshContext: identity.service.refreshContext,
           refreshStock,
           sourceOrderLines: createOrderLineReader(database),
+          refreshOrder: async (context, orderId, maxAgeMs) => {
+            await orderRefresh?.refresh(context, orderId, maxAgeMs);
+          },
+          internalOrdersEnabled: createSalesTenantRelease(observability),
+          orderChangePlans: async (context, orderId, request) => {
+            if (!composed.orders)
+              throw new Error('Order plans are not composed yet');
+
+            return composed.orders.changePlan(context, orderId, request);
+          },
           ...(env ? { env } : {}),
         })
       : undefined;
     if (host) {
-      stockRefresh = createStockRefreshService({
-        database,
-        capabilities: createInstalledRuntime({
-          installations: host.connections,
-          providers: host.registry.providers(),
-          // Owners record the reads they use as evidence; telemetry has no sink here.
-          record: async () => undefined,
-          recordObservations: async () => undefined,
-        }),
+      const capabilities = createInstalledRuntime({
+        internalSource: createSalesReadSource(database, observability),
+        installations: host.connections,
+        providers: host.registry.providers(),
+        // Owners record the reads they use as evidence; telemetry has no sink here.
+        record: async () => undefined,
+        recordObservations: async () => undefined,
       });
+      stockRefresh = createStockRefreshService({ database, capabilities });
       resources.add(stockRefresh.close);
+      orderRefresh = createOrderRefreshService({ database, capabilities });
+      resources.add(orderRefresh.close);
     }
     const {
       detection,
@@ -254,14 +276,17 @@ export async function createDefaultExceptionWorker(
       identity: identity.service,
       execution: { kind: 'enabled', effects: { resolve: async () => null } },
       replenishmentTransport: processClient,
+      ...(observability ? { observability } : {}),
       ...(host
         ? {
             workflowSources: host.registry.workflowSources(),
             providerCatalog: host.providerCatalog,
+            actionPermission: host.registry.actionPermission,
             refreshStock,
           }
         : {}),
     });
+    composed.orders = http.orders;
     const runtime = createExceptionWorkflowRuntime(
       settings.temporal,
       identity.service,

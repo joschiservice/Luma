@@ -393,6 +393,38 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
     expect(validated.items).toHaveLength(1);
     expect(validated.items[0]?.sourceRevision).toBe('2');
     expect(JSON.stringify(validated)).not.toContain('Private');
+    const salesOrderId = validated.items[0]!.source.externalId;
+    const invocation = {
+      tenant: context(),
+      connectionId: record.connectionId,
+      provider: 'luma-erp',
+    };
+    const single = reader.parseOutput(
+      await reader.run(
+        invocation,
+        reader.parseInput({
+          limit: 1,
+          order: { externalId: salesOrderId, scopeKey: '' },
+        }),
+      ),
+    );
+    expect(single).toMatchObject({
+      nextCursor: null,
+      items: [{ source: { externalId: salesOrderId }, sourceRevision: '2' }],
+    });
+    expect(
+      await reader.run(invocation, {
+        limit: 1,
+        order: { externalId: randomUUID(), scopeKey: '' },
+      }),
+    ).toMatchObject({ items: [], nextCursor: null, completeness: 'complete' });
+    expect(() =>
+      reader.parseInput({
+        limit: 1,
+        cursor: salesOrderId,
+        order: { externalId: salesOrderId, scopeKey: '' },
+      }),
+    ).toThrow();
     expect(
       await createSalesSource(
         db,

@@ -44,12 +44,13 @@ const suites = {
       'playbooks',
       'code-steps',
       'replenishment',
+      'order-quantity-change',
     ],
     [
       '--filter',
       '@luma/api',
       'test:browser',
-      'workflow|playbooks|code-steps|replenishment',
+      'workflow|playbooks|code-steps|replenishment|order-quantity-change',
     ],
   ],
   orders: [
@@ -91,9 +92,16 @@ const suites = {
       'test:e2e',
       'simulator.e2e.mjs',
       'case-workflows.e2e.mjs',
+      'order-quantity-change.e2e.mjs',
       'inbox.e2e.mjs',
     ],
-    ['--filter', '@luma/api', 'test:browser', 'simulator.browser.mjs'],
+    [
+      '--filter',
+      '@luma/api',
+      'test:browser',
+      'simulator.browser.mjs',
+      'order-quantity-change.browser.mjs',
+    ],
   ],
   // The operations inbox against the simulated mailbox, used by verify:feature.
   inbox: [

@@ -4,35 +4,14 @@ import { until } from './helpers.mjs';
 import { setupSimulator } from './simulator-fixture.mjs';
 
 /**
- * Starts the simulator pilot, links the fixture order 1 in Shopify with its JTL import and
- * returns the linked order, its line's comparison key and an API helper for the operator.
- * `packing()` lets the JTL warehouse start packing the order and reads it again.
+ * Imports fixture order 1 from Shopify and its JTL import and links the two source orders as an
+ * operator would, through `api`, an operator request helper for the workspace. Returns the
+ * canonical order, its line's comparison key and the order detail.
  */
-export async function linkedOrderFixture(t, origin = 'http://127.0.0.1:3000') {
-  const f = await setupSimulator(t, { origin });
+export async function linkFixtureOrder(f, api) {
   const tenantId = f.manifest.organizationId;
   const shopify = f.manifest.connections.shopify;
   const jtl = f.manifest.connections.jtl;
-  const signIn = await f.pilot.app.inject({
-    method: 'POST',
-    url: '/auth/sign-in/email',
-    headers: { origin },
-    payload: { email: 'pilot-operator@example.test', password: f.password },
-  });
-  assert.equal(signIn.statusCode, 200, signIn.body);
-  const cookie = signIn.cookies
-    .map(({ name, value }) => `${name}=${value}`)
-    .join('; ');
-  const api = async (url, options = {}, status = 200) => {
-    const response = await f.pilot.app.inject({
-      url: `/v1/organizations/${tenantId}${url}`,
-      headers: { cookie, origin },
-      ...options,
-    });
-    assert.equal(response.statusCode, status, response.body);
-
-    return response.json();
-  };
   const mapped = async (connectionId, externalId) =>
     (
       await f.db.owner.query(
@@ -79,6 +58,65 @@ export async function linkedOrderFixture(t, origin = 'http://127.0.0.1:3000') {
   )?.lines[0]?.comparisonKey;
   assert.ok(lineKey, 'the line is matched across sources');
 
+  return { shop, lineKey, detail };
+}
+
+/**
+ * Lets the JTL warehouse start packing fixture order 1: a delivery note whose parcel has no
+ * shipping date yet. Reads until Luma reports the work in progress.
+ */
+export async function packFixtureOrder(f, api, shop) {
+  const jtl = f.manifest.connections.jtl;
+  await f.call('runs/operations/control', {
+    action: 'command',
+    instance: 'jtl',
+    command: { kind: 'ship', id: '1', warehouse: '1', packing: true },
+  });
+  await until(
+    async () => {
+      await f.pilot.observe({ check: false });
+
+      return (await api(`/orders/${shop}`)).fulfillments.some(
+        (work) => work.connectionId === jtl && work.status === 'processing',
+      );
+    },
+    'JTL reported the delivery note as fulfilment in progress',
+    30_000,
+  );
+}
+
+/**
+ * Starts the simulator pilot, links the fixture order 1 in Shopify with its JTL import and
+ * returns the linked order, its line's comparison key and an API helper for the operator.
+ * `packing()` lets the JTL warehouse start packing the order and reads it again.
+ */
+export async function linkedOrderFixture(t, origin = 'http://127.0.0.1:3000') {
+  const f = await setupSimulator(t, { origin });
+  const tenantId = f.manifest.organizationId;
+  const shopify = f.manifest.connections.shopify;
+  const jtl = f.manifest.connections.jtl;
+  const signIn = await f.pilot.app.inject({
+    method: 'POST',
+    url: '/auth/sign-in/email',
+    headers: { origin },
+    payload: { email: 'pilot-operator@example.test', password: f.password },
+  });
+  assert.equal(signIn.statusCode, 200, signIn.body);
+  const cookie = signIn.cookies
+    .map(({ name, value }) => `${name}=${value}`)
+    .join('; ');
+  const api = async (url, options = {}, status = 200) => {
+    const response = await f.pilot.app.inject({
+      url: `/v1/organizations/${tenantId}${url}`,
+      headers: { cookie, origin },
+      ...options,
+    });
+    assert.equal(response.statusCode, status, response.body);
+
+    return response.json();
+  };
+  const { shop, lineKey, detail } = await linkFixtureOrder(f, api);
+
   return {
     f,
     api,
@@ -90,23 +128,6 @@ export async function linkedOrderFixture(t, origin = 'http://127.0.0.1:3000') {
     lineKey,
     detail,
     /** The JTL warehouse creates a delivery note whose parcel is still being packed. */
-    async packing() {
-      await f.call('runs/operations/control', {
-        action: 'command',
-        instance: 'jtl',
-        command: { kind: 'ship', id: '1', warehouse: '1', packing: true },
-      });
-      await until(
-        async () => {
-          await f.pilot.observe({ check: false });
-
-          return (await api(`/orders/${shop}`)).fulfillments.some(
-            (work) => work.connectionId === jtl && work.status === 'processing',
-          );
-        },
-        'JTL reported the delivery note as fulfilment in progress',
-        30_000,
-      );
-    },
+    packing: () => packFixtureOrder(f, api, shop),
   };
 }

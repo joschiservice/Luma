@@ -11,6 +11,8 @@ const scale = 1_000_000n;
 
 /** A source's stored read of an order's line quantities, by the other source's line IDs. */
 interface SourceOrderLines {
+  /** The canonical order both sources report. */
+  orderId: string;
   connectionId: string;
   snapshotId: string;
   observationId: string;
@@ -20,7 +22,7 @@ interface SourceOrderLines {
 }
 
 /** Exact current units: reported, or ordered minus cancelled; null when neither is known. */
-function currentUnits(line: {
+export function currentUnits(line: {
   quantity: string;
   currentQuantity: string | null;
   cancelledQuantity: string | null;
@@ -124,6 +126,7 @@ export function createSourceOrderLines(
         );
 
         return {
+          orderId,
           connectionId: input.sourceConnectionId,
           snapshotId: snapshot.id,
           observationId: snapshot.observationId,

@@ -1619,3 +1619,122 @@ describe('Shopify independent deletion confirmation', () => {
     expect(f.recordObservations).not.toHaveBeenCalled();
   });
 });
+
+describe('Shopify single-order reads', () => {
+  const schema = buildSchema(
+    readFileSync(
+      new URL('./fixtures/admin-2026-07.graphql', import.meta.url),
+      'utf8',
+    ),
+  );
+
+  function orderFixture(node: (id: string) => unknown) {
+    const f = fixture();
+    const fallback = f.fetch.getMockImplementation()!;
+    f.fetch.mockImplementation(async (url, init) => {
+      const { query, variables } = JSON.parse(String(init?.body)) as {
+        query: string;
+        variables: { id: string };
+      };
+      expect(
+        validate(schema, parse(query)).map((error) => error.message),
+      ).toEqual([]);
+      if (query.includes('LumaOrder'))
+        return response({ node: node(variables.id) });
+
+      return fallback(url, init);
+    });
+    const read = (input: Record<string, unknown>) =>
+      f.runtime.read(context, {
+        capability: 'orders.read',
+        connectionId: f.connection.id,
+        version: '0',
+        input: { limit: 1, ...input },
+      });
+
+    return { ...f, readOrder: read };
+  }
+
+  const stored = (id: string) =>
+    id === commerce.order.id
+      ? {
+          ...commerce.order,
+          lineItems: page(commerce.orderLines),
+          shippingLines: page(commerce.shippingLines),
+          discountApplications: page(commerce.discounts),
+        }
+      : null;
+
+  it('reads one order in one request, observed exactly as an order page observes it', async () => {
+    const f = orderFixture(stored);
+    expect(
+      (await f.runtime.discover(context, 'connection-a')).find(
+        (item) => item.capability === 'orders.read',
+      )?.filters,
+    ).toContain('order');
+    const scanned = await f.read('orders.read');
+    const calls = f.fetch.mock.calls.length;
+    const single = await f.readOrder({ order: ref(commerce.order.id) });
+    expect(f.fetch.mock.calls.length - calls).toBe(1);
+    if (!scanned.ok || !single.ok) throw new Error('Expected order reads');
+    expect(single.value).toMatchObject({
+      nextCursor: null,
+      completeness: 'complete',
+    });
+    expect(single.value).not.toHaveProperty('total');
+    // Only the observation's own ID differs.
+    expect(single.value.items).toEqual([
+      { ...scanned.value.items[0], id: expect.any(String) },
+    ]);
+    expect(f.recordObservations).toHaveBeenLastCalledWith(
+      expect.objectContaining({ observations: single.value.items }),
+    );
+  });
+
+  it('returns an empty complete page with the history limit when Shopify has no such order', async () => {
+    const f = orderFixture(stored);
+    expect(
+      await f.readOrder({ order: ref('gid://shopify/Order/999') }),
+    ).toMatchObject({
+      ok: true,
+      value: {
+        items: [],
+        nextCursor: null,
+        completeness: 'complete',
+        history: { requirement: 'read_all_orders' },
+      },
+    });
+    f.data.scopes.push({ handle: 'read_all_orders' });
+    const full = await f.readOrder({ order: ref('gid://shopify/Order/999') });
+    expect(full.ok && full.value.history).toBeNull();
+  });
+
+  it('rejects an order Shopify returns under another ID', async () => {
+    const f = orderFixture(() => stored(commerce.order.id));
+    expect(
+      await f.readOrder({ order: ref('gid://shopify/Order/2') }),
+    ).toMatchObject({ ok: false, error: { code: 'invalid_response' } });
+    expect(f.recordObservations).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { cursor: 'next' },
+    { updatedSince: '2026-09-01T00:00:00.000Z' },
+    { createdSince: '2026-09-01T00:00:00.000Z' },
+    { historyImport: { key: '00000000-0000-4000-8000-000000000001' } },
+    {
+      confirmMissing: {
+        externalId: 'gid://shopify/Order/1',
+        scopeKey: '',
+        createdAt: null,
+      },
+    },
+    { order: ref('gid://shopify/Product/1') },
+  ])('rejects a point read combined with scan input: %j', async (input) => {
+    const f = orderFixture(stored);
+    expect(
+      await f.readOrder({ order: ref(commerce.order.id), ...input }),
+    ).toMatchObject({ ok: false, error: { code: 'invalid_input' } });
+    expect(f.fetch).not.toHaveBeenCalled();
+  });
+});

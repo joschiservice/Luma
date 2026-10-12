@@ -238,16 +238,68 @@ function PlanStep({
   );
 }
 
+/**
+ * Says what each system shows for a detected quantity change, led by the system that holds
+ * order-line authority: “Luma ERP sets this quantity to 1; Shopify still shows 2; JTL doesn’t
+ * report it.” Null for other changes or when the authority's value is unknown.
+ */
+function quantityStory(
+  plan: Plan,
+  authority: string | null,
+  sourceLabel: (connectionId: string) => string,
+) {
+  if (
+    plan.change.origin !== 'detected' ||
+    (plan.change.kind !== 'quantity' && plan.change.kind !== 'item')
+  )
+    return null;
+  const lead = plan.acknowledgements.find(
+    (item) => item.connectionId === authority && item.value !== null,
+  );
+  if (!lead?.value) return null;
+  const quantity = (value: string) =>
+    formatQuantity(value, plan.change.unit ?? 'each');
+  const parts = [
+    m.orders_plan_story_authority({
+      system: sourceLabel(lead.connectionId),
+      quantity: quantity(lead.value),
+    }),
+    ...plan.acknowledgements
+      .filter((item) => item !== lead)
+      .map((item) => {
+        const system = sourceLabel(item.connectionId);
+        if (item.value === null)
+          return m.orders_plan_story_not_reported({ system });
+        if (item.state === 'reflects')
+          return m.orders_plan_story_reflects({ system });
+
+        return item.state === 'differs'
+          ? m.orders_plan_story_differs({
+              system,
+              quantity: quantity(item.value),
+            })
+          : m.orders_plan_story_unconfirmed({
+              system,
+              quantity: quantity(item.value),
+            });
+      }),
+  ];
+
+  return `${parts.join('; ')}.`;
+}
+
 function PlanCard({
   plan,
   sourceLabel,
   locationNames,
   editAction,
+  authority,
 }: {
   plan: Plan;
   sourceLabel: (connectionId: string) => string;
   locationNames: ReadonlyMap<string, string>;
   editAction?: ((step: Step) => ReactNode) | undefined;
+  authority: string | null;
 }) {
   const [state, label] = safety[plan.safety.state];
   const ackColumns: DataTableColumn<Plan['acknowledgements'][number]>[] = [
@@ -289,6 +341,7 @@ function PlanCard({
         .filter(Boolean)
         .join(' · ')
     : null;
+  const story = quantityStory(plan, authority, sourceLabel);
 
   return (
     <article className="order-plan">
@@ -313,6 +366,7 @@ function PlanCard({
         </div>
         <StatePill state={state}>{label()}</StatePill>
       </header>
+      {story ? <p className="order-plan-story">{story}</p> : null}
       {plan.safety.reasons.length ? (
         <ul className="order-plan-reasons">
           {plan.safety.reasons.map((reason) => (
@@ -496,6 +550,7 @@ export function OrderChangePlanView({
   editAction,
   title,
   action,
+  authority = null,
 }: {
   plans?: OrderChangePlans | undefined;
   loading?: boolean;
@@ -510,6 +565,8 @@ export function OrderChangePlanView({
   editAction?: (step: Step) => ReactNode;
   title?: string;
   action?: ReactNode;
+  /** The connection that holds order-line authority, which leads a quantity plan's summary. */
+  authority?: string | null;
 }) {
   const sourceLabel = (connectionId: string) =>
     sources.find((source) => source.connectionId === connectionId)?.label ??
@@ -546,6 +603,7 @@ export function OrderChangePlanView({
               sourceLabel={sourceLabel}
               locationNames={locationNames}
               editAction={editAction}
+              authority={authority}
             />
           ))
         ) : (
@@ -680,6 +738,7 @@ export function CaseOrderChangePlan({
       failed={plans.isError}
       sources={detail.data.sources}
       locationNames={orderLocationNames(detail.data)}
+      authority={detail.data.authority.lines?.connectionId ?? null}
       action={
         <Link
           to="/app/$organizationId/orders/$orderId"

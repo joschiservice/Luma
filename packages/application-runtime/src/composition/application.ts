@@ -644,6 +644,7 @@ export function createApplicationServices(
     database,
     identity,
     exceptions: detection.exceptions,
+    cases: detection.cases,
     policies: safety.policies,
     sources: [
       ...(options.workflowSources ?? []),
@@ -767,7 +768,11 @@ export function createApplicationServices(
               revision: 0,
             },
             subject: { label: task.subject.kind, detail: task.subject.id },
-            record: null,
+            // An order task links to the order, where its change plan shows what to do.
+            record:
+              task.subject.kind === 'order'
+                ? { kind: 'order' as const, id: task.subject.id }
+                : null,
             owner: {
               kind: 'human_task' as const,
               definitionId: task.definitionId,

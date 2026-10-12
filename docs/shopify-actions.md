@@ -114,7 +114,10 @@ may restock removed units. Luma never adds products or changes prices, discounts
   current units the authoritative source reports for the same line, matched by shared
   canonical line ID or a mapped SKU that occurs once per source, as order comparisons match
   lines. That source's stored read must be complete and at most five minutes old, the same
-  freshness as comparisons; an older, future or incomplete read blocks as stale. A host
+  freshness as comparisons; an older, future or incomplete read blocks as stale. A stored
+  read older than a minute is first reread through the [order refresh](orders-workspace.md#refreshing-an-orders-sources),
+  so a late approval still dispatches on current values. Luma ERP holds authority here only
+  while the workspace's Luma order records are released. A host
   without an authority reader or stored order reads, unknown or conflicting authority, or a
   changed authority revision blocks the edit.
 - A preview binds the order revision (a digest of Shopify's `updatedAt` and every fact

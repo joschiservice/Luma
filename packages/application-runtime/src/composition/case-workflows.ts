@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import { createAuditLog } from '@luma/audit/composition';
-import type { DetectionService, Incident } from '@luma/exceptions';
+import type { CaseService, DetectionService, Incident } from '@luma/exceptions';
 import type { IdentityService, TenantContext } from '@luma/identity';
 import { toUnits } from '@luma/orders';
 import type { TenantDatabase } from '@luma/platform';
@@ -52,8 +52,15 @@ const signal = (incident: Incident): CaseSignal => ({
 /** Reads cases for workflows through the exceptions owner, in the caller's tenant. */
 function caseReader(
   exceptions: Pick<DetectionService, 'list' | 'get' | 'evidence'>,
+  cases?: Pick<CaseService, 'claimOwner'>,
 ): CaseReader {
   return {
+    ...(cases
+      ? {
+          claim: (context: TenantContext, id: string, userId: string) =>
+            cases.claimOwner(context, id, userId),
+        }
+      : {}),
     open: async (context) =>
       (await exceptions.list(context))
         .filter((incident) => incident.state !== 'resolved')
@@ -82,9 +89,14 @@ export function createCaseWorkflowServices(options: {
   database: TenantDatabase;
   identity: Pick<
     IdentityService,
-    'refreshContext' | 'resolveWorkflowContext' | 'suspendedMembers'
+    | 'refreshContext'
+    | 'resolveWorkflowContext'
+    | 'suspendedMembers'
+    | 'listMembers'
   >;
   exceptions: Pick<DetectionService, 'list' | 'get' | 'evidence'>;
+  /** Assigns case owners when a workflow hands a case to people. */
+  cases?: Pick<CaseService, 'claimOwner'>;
   policies: Pick<PolicyService, 'approvalRequirement' | 'currentVersion'>;
   sources?: CaseWorkflowAdapter[];
   transport?: CaseRunTransport;
@@ -99,7 +111,7 @@ export function createCaseWorkflowServices(options: {
       }),
       ...(options.sources ?? []),
     ],
-    cases: caseReader(options.exceptions),
+    cases: caseReader(options.exceptions, options.cases),
     identity: options.identity,
     policies: options.policies,
     audit: createAuditLog(options.database),

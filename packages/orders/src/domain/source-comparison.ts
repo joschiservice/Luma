@@ -197,20 +197,54 @@ function lineFacts(
   };
 }
 
-/** Normalizes exact quantities and mapped line identities without summing repeated SKU lines. */
-export function comparisonFacts(source: SourceFacts, sharedLines: Set<string>) {
+/**
+ * How lines of different source reports are matched: line IDs that several sources share, and
+ * SKUs that stand for one of those shared lines in sources that report it under their own ID.
+ */
+export type ComparisonLines = ReadonlySet<string> & {
+  skus?: ReadonlyMap<string, string>;
+  /** SKUs of several shared lines, which therefore identify none of them. */
+  ambiguousSkus?: ReadonlySet<string>;
+};
+
+/**
+ * Each line's comparison key in one source report: its shared canonical line ID, else its mapped
+ * SKU when that SKU occurs once in the report (the shared line it stands for, when one does).
+ * Null when neither identifies the line, so repeated SKU lines are never summed.
+ */
+export function lineComparisonKeys(
+  source: Pick<SourceFacts, 'lines'>,
+  sharedLines: ComparisonLines,
+) {
   const skuCounts = new Map<string, number>();
   for (const line of source.lines)
     if (line.skuId)
       skuCounts.set(line.skuId, (skuCounts.get(line.skuId) ?? 0) + 1);
+
+  return new Map(
+    source.lines.map((line) => [
+      line.id,
+      sharedLines.has(line.id)
+        ? line.id
+        : line.skuId &&
+            skuCounts.get(line.skuId) === 1 &&
+            !sharedLines.ambiguousSkus?.has(line.skuId)
+          ? (sharedLines.skus?.get(line.skuId) ?? line.skuId)
+          : null,
+    ]),
+  );
+}
+
+/** Normalizes exact quantities and mapped line identities without summing repeated SKU lines. */
+export function comparisonFacts(
+  source: SourceFacts,
+  sharedLines: ComparisonLines,
+) {
+  const keys = lineComparisonKeys(source, sharedLines);
   let incomplete = false;
   const lines = source.lines
     .map((line) => {
-      const key = sharedLines.has(line.id)
-        ? line.id
-        : line.skuId && skuCounts.get(line.skuId) === 1
-          ? line.skuId
-          : null;
+      const key = keys.get(line.id) ?? null;
       if (!key) incomplete = true;
       if (
         source.fulfillments.some(
@@ -237,10 +271,15 @@ export function comparisonFacts(source: SourceFacts, sharedLines: Set<string>) {
   };
 }
 
-/** Finds line IDs explicitly shared by different source reports of the same linked order. */
+/**
+ * Finds line IDs explicitly shared by different source reports of the same linked order, and
+ * the SKUs that identify one of them: a SKU every source holding the shared line reports on it,
+ * that occurs once in every source and on no other shared line. A source that reports that line
+ * under its own ID, such as an ERP import, then matches it by SKU.
+ */
 export function sharedComparisonLines(
   sources: Pick<ComparisonSource, 'connectionId' | 'lines'>[],
-) {
+): ComparisonLines {
   const connections = new Map<string, Set<string>>();
   for (const source of sources)
     for (const line of source.lines) {
@@ -248,10 +287,30 @@ export function sharedComparisonLines(
       seen.add(source.connectionId);
       connections.set(line.id, seen);
     }
+  const shared = [...connections]
+    .filter(([, seen]) => seen.size > 1)
+    .map(([id]) => id);
+  const skus = new Map<string, string>();
+  const ambiguous = new Set<string>();
+  for (const id of shared) {
+    const holders = sources.flatMap((source) =>
+      source.lines.filter((line) => line.id === id),
+    );
+    const sku = holders[0]?.skuId;
+    if (!sku || holders.some((line) => line.skuId !== sku)) continue;
+    if (
+      skus.has(sku) ||
+      sources.some(
+        (source) =>
+          source.lines.filter((line) => line.skuId === sku).length > 1,
+      )
+    )
+      ambiguous.add(sku);
+    else skus.set(sku, id);
+  }
+  for (const sku of ambiguous) skus.delete(sku);
 
-  return new Set(
-    [...connections].filter(([, seen]) => seen.size > 1).map(([id]) => id),
-  );
+  return Object.assign(new Set(shared), { skus, ambiguousSkus: ambiguous });
 }
 
 /** Compares known business facts, preserving each source's immutable evidence and unknowns. */

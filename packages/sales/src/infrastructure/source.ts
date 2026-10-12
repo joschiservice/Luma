@@ -19,8 +19,18 @@ const pageInput = z
     cursor: z.string().uuid().optional(),
     updatedSince: z.string().datetime({ offset: true }).optional(),
     createdSince: z.string().datetime({ offset: true }).optional(),
+    order: z
+      .object({ externalId: z.string().uuid(), scopeKey: z.literal('') })
+      .strict()
+      .optional(),
   })
-  .strict();
+  .strict()
+  // A point read of one record cannot page or filter.
+  .refine(
+    (value) =>
+      !value.order ||
+      (!value.cursor && !value.updatedSince && !value.createdSince),
+  );
 
 /** Supplies fresh nonpersonal reads of committed records through the ordinary order capability. */
 export function createSalesSource(
@@ -60,7 +70,7 @@ export function createSalesSource(
             minimumRisk: 'low',
             idempotency: 'none',
             retry: { maxAttempts: 1, initialDelayMs: 0 },
-            filters: ['updatedSince', 'createdSince'],
+            filters: ['updatedSince', 'createdSince', 'order'],
           },
           parseInput: (value) => {
             const parsed = pageInput.parse(value);
@@ -74,6 +84,7 @@ export function createSalesSource(
               ...(parsed.createdSince
                 ? { createdSince: parsed.createdSince }
                 : {}),
+              ...(parsed.order ? { order: parsed.order } : {}),
             };
           },
           parseOutput: (value) => {
@@ -112,6 +123,7 @@ export function createSalesSource(
               FROM sales_orders o WHERE o.tenant_id=$1 AND o.connection_id=$2 AND ($3::uuid IS NULL OR o.id>$3)
               AND ($4::timestamptz IS NULL OR (o.document->>'updatedAt')::timestamptz >= $4)
               AND ($5::timestamptz IS NULL OR (o.document->>'placedAt')::timestamptz >= $5)
+              AND ($7::uuid IS NULL OR o.id=$7)
               ORDER BY o.id LIMIT $6`,
                   [
                     context.tenantId,
@@ -120,6 +132,7 @@ export function createSalesSource(
                     input.updatedSince ?? null,
                     input.createdSince ?? null,
                     input.limit + 1,
+                    input.order?.externalId ?? null,
                   ],
                 );
                 const records = rows.rows

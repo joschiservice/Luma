@@ -77,8 +77,10 @@ from the Shopify app's live read.
 ### Comparison evidence and propagation
 
 Comparisons use explicitly shared canonical line IDs, or a mapped SKU that occurs once
-per source. Repeated SKU lines without line mappings are inconclusive; quantities are never
-summed to guess line identity. Ordered, current, cancelled, fulfilled and remaining units,
+per source. A source that reports a shared line under its own ID, such as an ERP import of
+an order a Luma record copied, matches that line by SKU when the SKU occurs once in every
+source and on no other shared line; otherwise its line stays unmatched. Repeated SKU lines
+without line mappings are inconclusive; quantities are never summed to guess line identity. Ordered, current, cancelled, fulfilled and remaining units,
 unit, fulfillment state and mapped location allocations are compared independently. A
 missing line in a complete order report has zero current units. Other missing facts stay
 unknown. Display numbers, timestamps and location names never establish equivalence.
@@ -102,6 +104,23 @@ conflicting authority; comparisons do not authorize correction or create cases.
 List reads apply time checks to maintained scalar metadata. During a projection rebuild,
 orders without refreshed comparison metadata are inconclusive. Rebuild with the existing
 resumable procedure below; ingestion refreshes affected orders under the same owner locks.
+
+### Refreshing an order's sources
+
+Stored reads go stale after five minutes, and incremental sync rereads only records that
+changed, so owners that judge one order reread its sources first. The refresh reads each
+current source whose stored read is older than the caller's limit (a minute by default):
+the order through the `orders.read` point read and its fulfilment records through a
+complete, order-scoped `fulfillment.read`. Reads are stored through the normal ingestion,
+which updates projections and comparisons; customer references and addresses are dropped,
+as sync does. A source without a point read, or whose read fails or is incomplete, keeps
+its stored reads, so freshness checks fail honestly.
+
+Unshipped fulfilment work that a complete order-scoped reread no longer returns is retired
+with a tombstone: the source removed it, as a warehouse that stops packing deletes a JTL
+delivery note. Shipped, delivered and completed records are never retired this way.
+Scheduled detection, the [order quantity workflow](workflows.md#case-workflows) and the
+Shopify quantity edit's authoritative read use the refresh.
 
 ## Change plans
 
@@ -141,6 +160,10 @@ unresolved or conflicting authority for the fact the change needs (lines, lifecy
 fulfilment); no intended value; no source with fulfilment access; or a reader without
 `fulfillment.read`. A system whose own value is unknown, such as JTL without current units,
 is listed as unknown but does not by itself make the change unsafe.
+
+A detected quantity plan reads as one sentence on the order and its case, led by the system
+that holds order-line authority: what it sets, what each other system still shows, and which
+systems don't report the value.
 
 Steps are ordered: stop, hold or confirm work that may be in progress (or ask a person to
 check progress when it is unknown), then return or refund work, then update each system
@@ -264,7 +287,9 @@ instead of scanning stored search values.
 
 ## Luma-owned records
 
-The `luma-erp-orders` release flag defaults to false. When enabled, people with
+The `luma-erp-orders` release flag defaults to false. Without it, source authority, order
+reads and the connection list leave Luma ERP out, including the authority apps and
+workflows read. When enabled, people with
 `sales.manage` and `sync.manage` can accept a known Shopify order into one Luma record.
 Intake links the sources using canonical identities, never their numbers. It is retry-safe
 and does not change workspace authority. Select Luma ERP for order lifecycle and lines

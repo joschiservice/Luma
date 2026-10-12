@@ -31,7 +31,12 @@ export type {
   ComparisonDifference,
 } from './domain/source-comparison.js';
 
-export { orderComparisonState } from './domain/source-comparison.js';
+export {
+  lineComparisonKeys,
+  orderComparisonPolicy,
+  orderComparisonState,
+  sharedComparisonLines,
+} from './domain/source-comparison.js';
 
 export {
   settlementRefundProgress,

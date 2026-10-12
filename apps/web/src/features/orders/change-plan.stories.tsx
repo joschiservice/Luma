@@ -9,11 +9,13 @@ import { OrderChangePlanView } from './change-plan';
 
 const shop = '44444444-4444-4444-8444-444444444444';
 const erp = '55555555-5555-4555-8555-555555555555';
+const record = '77777777-7777-4777-8777-777777777777';
 const sku = '99999999-9999-4999-8999-999999999999';
 const read = '2026-10-12T09:58:00.000Z';
 const sources = [
   { connectionId: shop, label: 'Tokyo store' },
   { connectionId: erp, label: 'JTL-Wawi' },
+  { connectionId: record, label: 'Luma ERP' },
 ];
 const lines = [
   { key: sku, label: 'Canvas tote · TOTE-NAT', quantity: '3', unit: 'each' },
@@ -198,6 +200,22 @@ const scenarios = {
   ],
   permission: [plan({ steps: [luma({ viewerCanRequest: false }), step({})] })],
   detected: [] as OrderChangePlan[],
+  // Luma's own record holds line authority; the shop lags and JTL reports no current units.
+  propagation: [
+    plan({
+      change: { ...plan().change, origin: 'detected', from: '3', to: '2' },
+      acknowledgements: [
+        {
+          connectionId: record,
+          state: 'reflects',
+          value: '2',
+          readAt: read,
+          fresh: true,
+        },
+        ...plan().acknowledgements,
+      ],
+    }),
+  ],
 } satisfies Record<string, OrderChangePlan[]>;
 
 type Scenario = keyof typeof scenarios;
@@ -222,6 +240,7 @@ function Preview({ scenario }: { scenario: Scenario }) {
       <OrderChangePlanView
         plans={plans}
         sources={sources}
+        authority={scenario === 'propagation' ? record : erp}
         lines={lines}
         proposal={proposal ? { kind: 'quantity', ...proposal } : null}
         propose={(lineKey, quantity) => setProposal({ lineKey, quantity })}
@@ -356,6 +375,18 @@ export const ProposeWithKeyboard: Story = {
     await userEvent.keyboard('{Enter}');
     await expect(
       await canvas.findByRole('button', { name: 'Show detected changes' }),
+    ).toBeVisible();
+  },
+};
+
+export const DetectedPropagation: Story = {
+  args: { scenario: 'propagation' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByText(
+        'Luma ERP sets this quantity to 2; Tokyo store still shows 3; JTL-Wawi doesn’t report it.',
+      ),
     ).toBeVisible();
   },
 };
