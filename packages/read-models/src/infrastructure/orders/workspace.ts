@@ -77,6 +77,10 @@ export function createOrderWorkspace(
   return {
     list: (context, query) =>
       read(context, async (tx, _scoped, fresh, asOf, hidden) => {
+        if (query.view === 'stuck') {
+          requirePermission(fresh, 'inventory.read');
+          requirePermission(fresh, 'fulfillment.read');
+        }
         if (query.customerId) requirePermission(fresh, 'customers.read');
         const list = await listOrders(
           tx,

@@ -15,6 +15,7 @@ export const orderViews = [
   'overdue',
   'needs_you',
   'differs',
+  'stuck',
 ] as const;
 
 export const orderStatuses = [

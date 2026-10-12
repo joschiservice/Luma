@@ -27,6 +27,7 @@ const views = members<OrderQuery['view']>({
   overdue: true,
   needs_you: true,
   differs: true,
+  stuck: true,
 });
 const sorts = members<OrderQuery['sort']>({
   updated: true,
@@ -98,7 +99,7 @@ export function searchOrdersTool(orders: Pick<OrderWorkspace, 'list'>) {
     reads: 'order',
     permission: 'orders.read',
     description:
-      'Search current orders from connected sources, as on the Orders page. `q` matches order numbers, source order IDs and SKU text. Views: `outstanding` (open orders not yet fulfilled), `overdue` (outstanding past their due time), `needs_you` (orders with issues needing a person), `differs` (sources disagree), `all`. Filter by status, payment status and placed or updated time ranges (from is inclusive, before is exclusive). Returns the total number of matches and up to `limit` orders; pass `nextCursor` back as `cursor` with the same filters for the next page.',
+      'Search current orders from connected sources, as on the Orders page. `q` matches order numbers, source order IDs and SKU text. Views: `outstanding` (open orders not yet fulfilled), `overdue` (outstanding past their due time), `needs_you` (orders with issues needing a person), `differs` (sources disagree), `stuck` (journey investigation candidates requiring inventory and fulfillment read access), `all`. Filter by status, payment status and placed or updated time ranges (from is inclusive, before is exclusive). Returns the total number of matches and up to `limit` orders; pass `nextCursor` back as `cursor` with the same filters for the next page.',
     jsonSchema: {
       type: 'object',
       additionalProperties: false,
@@ -228,6 +229,15 @@ export function getOrderTool(orders: Pick<OrderWorkspace, 'get'>) {
               value: value.value,
             })),
           })),
+          journey: detail.journey
+            ? {
+                events: detail.journey.events.slice(0, 20),
+                eventsOmitted: Math.max(0, detail.journey.events.length - 20),
+                truncated: detail.journey.truncated,
+                candidates: detail.journey.candidates.slice(0, 10),
+                comparisons: detail.journey.comparisons,
+              }
+            : null,
           fulfillments: detail.fulfillments.slice(0, 10).map((item) => ({
             source: label(item.connectionId),
             status: item.status,

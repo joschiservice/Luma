@@ -408,6 +408,14 @@ export const commerceSchema = z.discriminatedUnion('capability', [
                         units(line.quantity.amount)),
                 ),
             ),
+            milestones: z
+              .object({
+                pickedAt: timestamp.nullable().optional(),
+                shippedAt: timestamp.nullable().optional(),
+                deliveredAt: timestamp.nullable().optional(),
+              })
+              .strict()
+              .optional(),
             lastProgressAt: timestamp.nullable(),
             progressBasis: z
               .enum(['note_created_or_package_shipped', 'source_updated'])

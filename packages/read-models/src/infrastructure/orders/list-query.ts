@@ -13,6 +13,9 @@ export interface OrderReadQueries {
 }
 
 const viewFilters: Record<OrderView, string> = {
+  stuck: `EXISTS (SELECT 1 FROM orders_journey_events j WHERE j.tenant_id=$1 AND j.order_id=o.entity_id AND j.connection_id=o.connection_id AND j.observed_at<=$2
+ AND ((j.stage='paid' AND o.payment_status='paid' AND o.open IS TRUE AND j.observed_at<=$2::timestamptz-interval '4 hours') OR j.stage='shipped')
+ AND NOT EXISTS(SELECT 1 FROM inventory_native_reservations r WHERE r.tenant_id=$1 AND r.order_id=o.entity_id AND r.order_line_id=j.order_line_id))`,
   all: 'true',
   outstanding: 'o.open IS TRUE',
   overdue: 'o.open IS TRUE AND o.due_at < $2',

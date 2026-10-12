@@ -439,7 +439,7 @@ export function createNativeStockStore(
                 const parsed = reservationSchema.parse(value);
                 if (expected === null)
                   await sql.query(
-                    'INSERT INTO inventory_native_reservations(tenant_id,id,order_id,order_line_id,sku_id,location_id,unit,version,allocated,remaining,consumed,released,expires_at,state,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)',
+                    'INSERT INTO inventory_native_reservations(tenant_id,id,order_id,order_line_id,sku_id,location_id,unit,version,allocated,remaining,consumed,released,expires_at,state,created_at,updated_at,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)',
                     [
                       tenant,
                       parsed.id,
@@ -457,6 +457,7 @@ export function createNativeStockStore(
                       parsed.state,
                       parsed.createdAt,
                       parsed.updatedAt,
+                      context.actor.id,
                     ],
                   );
                 else {

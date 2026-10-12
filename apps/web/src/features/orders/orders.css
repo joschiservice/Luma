@@ -251,3 +251,18 @@
 .sales-record-form legend {
   margin-block: 12px;
 }
+
+.order-history details {
+  min-width: 0;
+}
+
+.order-history details code {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+@media (width < 600px) {
+  .order-history li {
+    flex-wrap: wrap;
+  }
+}

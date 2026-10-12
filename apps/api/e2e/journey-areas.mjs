@@ -863,6 +863,14 @@ export const journeyAreas = {
     ...webShell,
     ...webOrders,
   ],
+  'order-journey.e2e.mjs': [...ordersFixture, ...orders, ...inventory],
+  'order-journey.browser.mjs': [
+    ...ordersFixture,
+    ...orders,
+    ...inventory,
+    ...webShell,
+    ...webOrders,
+  ],
   'orders.browser.mjs': [
     ...ordersFixture,
     ...orders,

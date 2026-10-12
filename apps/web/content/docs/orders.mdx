@@ -9,6 +9,7 @@ Orders lists every current order your connected stores and ERPs report. Use it t
 
 Choose a view above the list:
 
+- **Journey checks** finds paid open orders without a recorded Luma reservation after four hours, and shipments without one. Investigate these hints with the inventory team and the reporting source. External reservations may be unread. This view requires inventory and fulfillment access.
 - **All orders** shows every current order from your connected systems.
 - **Outstanding** shows open orders with units still to fulfill.
 - **Overdue** shows outstanding orders past the deadline set in their source.
@@ -28,6 +29,7 @@ The view, filters, sort and page are part of the page address, so you can share 
 The order number appears in the bar at the top, after **Orders**. Below it are the order’s status, payment, fulfillment, total, when it was placed, its due date and when Luma last read it. Values that need attention, such as a failed payment, are highlighted. When the due date has passed, it’s labeled **Overdue since**. Below that:
 
 - **Current state** sums up the order: how many units are still to fulfill, whether it’s overdue, and which issues need you. It’s based on the source updated most recently. When more than one source reports the order, it also names that source’s status and payment.
+- **Order journey** shows placed, paid, reserved, picked, shipped, delivered and returned milestones when there is evidence for them. Split shipments and partial returns retain their own references. Each milestone says whether it is a provider observation, a Luma action or an inference. **Occurrence time unknown** means the source did not report when it happened; the separate observation time says when Luma read it. Known shipment-to-delivery durations can be compared with this workspace’s median and p90 over 90 days. Expand **Evidence references** to inspect the records behind a milestone.
 - **Order lines** shows current, originally ordered, reduced, fulfilled and remaining quantities for each item. Shopify’s reduced quantity includes removed and refunded units; it does not tell you why they were reduced. If the order comes from more than one source, choose the source under **Show lines from**. Fulfilled quantities count shipped, delivered or completed shipments that the same source reports. When a source reports neither current nor reduced quantities, Luma says it can’t tell how much remains instead of guessing. **Product and stock** opens the item’s product.
 - **Fulfillments** lists the fulfillment work each source reports. Work mirrored in two systems is never added together. Choose a fulfillment to open it.
 - **Returns and refunds** lists the returns and refunds imported for the order. See [Returns](/docs/returns).

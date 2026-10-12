@@ -48,6 +48,7 @@ import { OrderReturnCases } from '../returns/case-entry';
 import { OrderReturns } from '../returns/order-returns';
 import { orderFilters, orderOptions, type OrdersSearch } from './data';
 import { OrderIdentityLinks } from './identity-links';
+import { OrderJourney } from './journey';
 import { NativeOrderStock } from './native-stock';
 import { OrderHeader } from './order-header';
 import { OrderInspector } from './order-inspector';
@@ -322,6 +323,11 @@ export function OrderDetailView({
                 })}
               </ul>
             </OrderSection>
+            <OrderJourney
+              detail={detail}
+              organizationId={organizationId}
+              from={here}
+            />
             <OrderLines
               detail={detail}
               shown={shown}

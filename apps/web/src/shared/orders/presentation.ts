@@ -23,6 +23,7 @@ export function localizedLabels<K extends string>(
 }
 
 export const viewLabels: Record<OrderView, string> = localizedLabels({
+  stuck: m.orders_view_stuck,
   all: m.orders_view_all,
   outstanding: m.orders_view_outstanding,
   overdue: m.orders_view_overdue,
@@ -31,6 +32,7 @@ export const viewLabels: Record<OrderView, string> = localizedLabels({
 });
 
 export const viewDescriptions: Record<OrderView, string> = localizedLabels({
+  stuck: m.orders_view_stuck_description,
   all: m.orders_view_all_description,
   outstanding: m.orders_view_outstanding_description,
   overdue: m.orders_view_overdue_description,

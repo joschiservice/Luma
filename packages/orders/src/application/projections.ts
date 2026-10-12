@@ -50,6 +50,12 @@ export type CommerceData =
       type: 'fulfillment';
       orderId: string;
       status: string;
+      /** Exact milestone times reported by the source; absence means unknown. */
+      milestones?: {
+        pickedAt?: string | null;
+        shippedAt?: string | null;
+        deliveredAt?: string | null;
+      };
       lastProgressAt: string | null;
       failureCode: string | null;
       lines: {
@@ -84,6 +90,7 @@ export interface CanonicalSnapshot {
    * Order snapshots use version 6 for sold bundle groups, version 5 for whether unit prices
    * include tax, and version 4 for
    * optional unit prices and fractional tax rates.
+   * Fulfillment version 4 adds explicit milestone times.
    * Order and fulfillment snapshots use version 3 for current and remaining line quantities.
    * Stored versions 1 and 2 remain readable. Return and refund snapshots use version 1.
    */

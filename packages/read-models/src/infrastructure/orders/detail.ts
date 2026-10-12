@@ -17,6 +17,7 @@ import {
   orderEntityAliases,
   resolveOrderEntity,
 } from './identity-references.js';
+import { readJourney } from './journey.js';
 import {
   readDirectRunIds,
   readHistory,
@@ -226,6 +227,7 @@ export async function readDetail(
   });
 
   return {
+    journey: await readJourney(tx, context, orderIds, asOf),
     authority: resolved,
     redirectedFrom: requestedId === orderId ? null : requestedId,
     order: {

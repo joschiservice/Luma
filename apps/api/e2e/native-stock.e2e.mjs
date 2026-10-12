@@ -36,6 +36,18 @@ test('native allocations retain real shortages, original receipts and exact canc
   assert.equal(result.allocated, '3.125001');
   assert.equal(result.unallocated, '0.874999');
   assert.equal(result.reservation.remaining, '3.125001');
+  const journey = (
+    await f.f.request(f.f.owner, `${f.f.base}/orders/${f.orderId}`)
+  ).journey;
+  const reserved = journey.events.find((event) => event.stage === 'reserved');
+  assert.equal(reserved.provenance, 'luma_action');
+  assert.equal(reserved.actorId, f.owner.actor.id);
+  assert.equal(reserved.occurredAt, result.reservation.createdAt);
+  assert.ok(
+    reserved.references.some(
+      (ref) => ref.kind === 'reservation' && ref.id === result.reservation.id,
+    ),
+  );
   const restarted = createNativeStockRuntime(
     f.db,
     f.f.identity.service,

@@ -108988,7 +108988,14 @@
             "name": "view",
             "in": "query",
             "schema": {
-              "enum": ["all", "outstanding", "overdue", "needs_you", "differs"],
+              "enum": [
+                "all",
+                "outstanding",
+                "overdue",
+                "needs_you",
+                "differs",
+                "stuck"
+              ],
               "type": "string",
               "default": "all"
             },
@@ -109529,6 +109536,351 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "journey": {
+                      "type": "object",
+                      "properties": {
+                        "timings": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "partId": {
+                                "type": "string"
+                              },
+                              "orderLineId": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "connectionId": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "from": {
+                                "enum": [
+                                  "placed",
+                                  "paid",
+                                  "reserved",
+                                  "picked",
+                                  "shipped",
+                                  "delivered",
+                                  "returned"
+                                ],
+                                "type": "string"
+                              },
+                              "to": {
+                                "enum": [
+                                  "placed",
+                                  "paid",
+                                  "reserved",
+                                  "picked",
+                                  "shipped",
+                                  "delivered",
+                                  "returned"
+                                ],
+                                "type": "string"
+                              },
+                              "durationMs": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": 0
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "partId",
+                              "orderLineId",
+                              "connectionId",
+                              "from",
+                              "to",
+                              "durationMs"
+                            ]
+                          }
+                        },
+                        "events": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "orderId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "partId": {
+                                "type": "string"
+                              },
+                              "orderLineId": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "stage": {
+                                "enum": [
+                                  "placed",
+                                  "paid",
+                                  "reserved",
+                                  "picked",
+                                  "shipped",
+                                  "delivered",
+                                  "returned"
+                                ],
+                                "type": "string"
+                              },
+                              "provenance": {
+                                "enum": [
+                                  "provider_observation",
+                                  "luma_action",
+                                  "inference"
+                                ],
+                                "type": "string"
+                              },
+                              "connectionId": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "actorId": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "occurredAt": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "observedAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "quantity": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "unit": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "references": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "enum": [
+                                        "order",
+                                        "order_line",
+                                        "shipment",
+                                        "return",
+                                        "invoice",
+                                        "reservation",
+                                        "snapshot",
+                                        "observation",
+                                        "activity"
+                                      ],
+                                      "type": "string"
+                                    },
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "connectionId": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "format": "uuid"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": ["kind", "id", "connectionId"]
+                                }
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "orderId",
+                              "partId",
+                              "orderLineId",
+                              "stage",
+                              "provenance",
+                              "connectionId",
+                              "actorId",
+                              "occurredAt",
+                              "observedAt",
+                              "quantity",
+                              "unit",
+                              "references"
+                            ]
+                          }
+                        },
+                        "truncated": {
+                          "type": "boolean"
+                        },
+                        "candidates": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "enum": [
+                                  "paid_without_reservation",
+                                  "shipped_without_reservation"
+                                ],
+                                "type": "string"
+                              },
+                              "orderLineId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "connectionId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "observedSince": {
+                                "type": "string",
+                                "format": "date-time"
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "orderLineId",
+                              "connectionId",
+                              "observedSince"
+                            ]
+                          }
+                        },
+                        "comparisons": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "from": {
+                                "enum": [
+                                  "placed",
+                                  "paid",
+                                  "reserved",
+                                  "picked",
+                                  "shipped",
+                                  "delivered",
+                                  "returned"
+                                ],
+                                "type": "string"
+                              },
+                              "to": {
+                                "enum": [
+                                  "placed",
+                                  "paid",
+                                  "reserved",
+                                  "picked",
+                                  "shipped",
+                                  "delivered",
+                                  "returned"
+                                ],
+                                "type": "string"
+                              },
+                              "count": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "medianMs": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "p90Ms": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "from",
+                              "to",
+                              "count",
+                              "medianMs",
+                              "p90Ms"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "timings",
+                        "events",
+                        "truncated",
+                        "candidates",
+                        "comparisons"
+                      ]
+                    },
                     "redirectedFrom": {
                       "anyOf": [
                         {

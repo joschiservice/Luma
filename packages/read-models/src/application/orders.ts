@@ -1,6 +1,10 @@
 import type { FactAuthority } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
-import type { ComparisonDifference, ComparisonState } from '@luma/orders';
+import type {
+  ComparisonDifference,
+  ComparisonState,
+  OrderJourney,
+} from '@luma/orders';
 import type { ActivityActor } from '@luma/resolution';
 
 import type { ReturnListItem } from './returns.js';
@@ -15,7 +19,7 @@ export interface OrderDifference extends ComparisonDifference {
 }
 
 export type OrderView =
-  'all' | 'outstanding' | 'overdue' | 'needs_you' | 'differs';
+  'all' | 'outstanding' | 'overdue' | 'needs_you' | 'differs' | 'stuck';
 
 export type OrderSort = 'updated' | 'placed' | 'number' | 'due';
 
@@ -130,6 +134,7 @@ export type OrderDetailSection =
   'fulfillments' | 'returns' | 'issues' | 'workflows' | 'activity';
 
 export interface OrderDetail {
+  journey?: OrderJourney;
   /** Live source authority and resolved facts; null means no authoritative source report. */
   authority: {
     revision: number;
