@@ -55,25 +55,52 @@ The token travels only in the URL fragment, tab-local session storage during sig
 
 ## Email delivery
 
-Configure all three API variables with a verified Resend sender and the public web origin:
+Configure all three API variables with a verified Resend sender and the public web origin. The webhook secret is optional; see [delivery events](#delivery-events).
 
 ```dotenv
 MAIL_RESEND_API_KEY=re_...
 MAIL_FROM=Luma <notifications@example.com>
 MAIL_PUBLIC_ORIGIN=https://app.example.com
+MAIL_RESEND_WEBHOOK_SECRET=whsec_...
 ```
 
 Without them, Settings reports delivery unavailable and disables invitations and test sends; personal preferences still persist, and optional email starts off. Every API replica needs the same provider, public origin and identity signing secret.
 
-The API drains a PostgreSQL mail queue every five seconds. Source transactions enqueue opted-in members when an issue needs approval, manual intervention or uncertainty review, or a connection becomes degraded or revoked.
+Mail goes through three PostgreSQL queues: password mail, account notices and workspace mail. The API drains them every five seconds, in that order, through one dispatch step that renders the message and calls Resend. Source transactions enqueue opted-in members when an issue needs approval, manual intervention or uncertainty review, or a connection becomes degraded or revoked.
 
 - Issue messages are deduplicated per incident and recipient; connection messages per lifecycle version and recipient. Opting in does not backfill past events; opting out cancels queued optional messages.
 - Before dispatch, a short transaction rechecks membership, workspace state and preference. Invitations also recheck that the inviter still holds `members.manage`, that a custom role is still active and the link generation. A message already dispatched may still arrive after opt-out or removal.
 - Attempts are committed before the provider call, and provider calls run outside operational locks. The stable message ID is the Resend idempotency key.
 - Calls time out after eight seconds. Retries back off exponentially, with at most five attempts, all within 23 hours of the first. That keeps every retry inside [Resend's 24-hour deduplication window](https://resend.com/changelog/idempotency-keys), including after a process crash. An expired retry window fails without sending again.
+- A rate-limited request was never processed, so it gives the attempt back, waits for Resend's `retry-after` delay and ends the pass. The 23-hour window still counts from the first attempt.
 - `sent` means the provider accepted the message, not that it reached the inbox. Failed invitations can be resent; failed test messages can be retried.
 
-The mail port accepts only destination, subject, plain text and message ID. Messages contain authorized issue or connection links and no provider payloads. Tests inject a deterministic provider through composition; there is no public test-mailbox endpoint. Queue tenant discovery and source triggers run as the migration owner, which needs RLS bypass; runtime connections stay restricted.
+The mail port accepts a destination, subject, HTML and plain-text parts, a category tag and the message ID. Messages contain authorized issue or connection links and no provider payloads. Tests inject a deterministic provider through composition; there is no public test-mailbox endpoint. Queue tenant discovery and source triggers run as the migration owner, which needs RLS bypass; runtime connections stay restricted.
+
+### Language and content
+
+Every message is rendered when it is sent, from the `@luma/email` templates and the `email` message catalog, so queued mail follows a language change. Mail uses the recipient's stored language:
+
+- Picking a language in the web app reloads the page; the first signed-in page afterwards stores it on the account. Each browser remembers what it sent per account, so this happens once per change. Sign-in also stores the browser's picked language, or fills an empty one from the browser preference.
+- An invitation uses the invitee's language when the address already has an account, otherwise the inviter's.
+- Password mail uses the language of the browser that asked for it.
+- People with no stored language get English.
+
+Workspace mail names the workspace and shows times in the workspace time zone; account notices show dates in UTC. Text from people, such as the reason support gives, is rendered as text and never as markup.
+
+### Templates and previews
+
+Templates live in `packages/email`. They share one layout: wordmark, a card with the heading, one main action with its address written out for clients that block buttons, and a footer that says why the person received the message. Styles are inlined with the light theme's token values, because email clients don't read CSS variables; Apple Mail and Outlook for Mac switch to the dark theme through a media query. The plain-text part comes from the same document and drops the wordmark, preview text and button fallback.
+
+Run `pnpm --filter @luma/email preview` to open the React Email preview server with every message in English and German. It reads the package's sample data, so add a sample and a preview file per language with each new message. The render tests send every sample through both languages.
+
+### Delivery events
+
+With `MAIL_RESEND_WEBHOOK_SECRET`, Resend reports delivery, delays, bounces and spam complaints to `POST /api/v1/email/resend/events`. Point a Resend webhook at that URL with the `email.delivered`, `email.delivery_delayed`, `email.bounced` and `email.complained` events and copy its signing secret.
+
+- Requests without a valid signature for the secret return 401. Events count only for messages whose Resend ID this deployment recorded when sending, so environments can share a Resend account. Receipts hold no address or content and are removed after 30 days.
+- A permanent bounce or a spam complaint pauses issue and connection notifications to the account with that address. Settings tells the person why. Invitations, test messages and account and security mail are still sent.
+- A later delivered message to the address lifts the pause, so a delivered test message resumes notifications. Changing the account's address also lifts it. Pauses are erased with the account.
 
 ## Timezone
 

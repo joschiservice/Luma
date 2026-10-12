@@ -146,6 +146,8 @@ export interface IdentityRepository {
     after: SecurityEventCursor | null,
     limit: number,
   ): Promise<SecurityEvent[]>;
+  /** Stores the language for email to one account. */
+  setLanguage(userId: string, language: 'en' | 'de'): Promise<void>;
   withUser<T>(
     userId: string,
     operation: (tx: IdentityTransaction) => Promise<T>,
@@ -322,6 +324,11 @@ export function createIdentityService(repository: IdentityRepository) {
     /** Records the end of open support views that are no longer valid. */
     sweepSupportViews: (requestId: string) =>
       repository.supportViews.sweep(requestId),
+    /** Stores the signed-in person's language for email; the account comes from the session. */
+    async setLanguage(credentials: Credentials, language: 'en' | 'de') {
+      const session = await authenticate(credentials);
+      await repository.setLanguage(session.userId, language);
+    },
     /**
      * Lists the signed-in person's own security events, 20 per page, newest first. The account
      * comes from the session, never from the caller. Rejects malformed cursors with 422.

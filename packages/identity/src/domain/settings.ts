@@ -57,6 +57,8 @@ export interface SettingsSnapshot {
   workspace: WorkspaceSettings;
   preferences: NotificationPreferences;
   deliveryAvailable: boolean;
+  /** Why optional email to the person's address is paused, if it is. */
+  emailPaused: 'bounced' | 'complained' | null;
   lastTest: { id: string; state: DeliveryState } | null;
 }
 

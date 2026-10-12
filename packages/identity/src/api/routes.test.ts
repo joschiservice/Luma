@@ -148,6 +148,7 @@ function fixture() {
     getSession,
     supportViews,
     listSecurityEvents: async () => [],
+    setLanguage: async () => undefined,
     withUser: async (_userId, operation) => operation(tx),
   });
   const app = Fastify();

@@ -28,6 +28,8 @@
   "dependencies": {
     "@better-auth/passkey": "catalog:",
     "@luma/api-contract": "workspace:*",
+    "@luma/email": "workspace:*",
+    "@luma/i18n": "workspace:*",
     "@orpc/contract": "catalog:",
     "@orpc/openapi": "catalog:",
     "@orpc/server": "catalog:",
@@ -36,7 +38,7 @@
     "drizzle-orm": "0.45.2",
     "fastify": "catalog:",
     "pg": "catalog:pg-8-20-0",
-    "@luma/i18n": "workspace:*"
+    "resend": "6.32.1"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

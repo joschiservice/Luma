@@ -479,6 +479,15 @@ function NotificationsForm({
           <strong>{m.settings_notifications_unavailable_title()}</strong>
           <p>{m.settings_notifications_unavailable_body()}</p>
         </Alert>
+      ) : data.emailPaused ? (
+        <Alert tone="warning">
+          <strong>{m.settings_notifications_paused_title()}</strong>
+          <p>
+            {data.emailPaused === 'bounced'
+              ? m.settings_notifications_paused_bounced()
+              : m.settings_notifications_paused_complained()}
+          </p>
+        </Alert>
       ) : null}
       <form
         onSubmit={(event) => {

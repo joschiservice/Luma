@@ -274,9 +274,5 @@
   "identity_recovery_rate_limited": "Too many attempts. Wait a minute and try again.",
   "identity_recovery_unavailable": "Password recovery is unavailable because email delivery is not configured. Contact Luma support.",
   "identity_recovery_failed": "The request could not be confirmed. Try again.",
-  "identity_password_mail_reset_subject": "Reset your Luma password",
-  "identity_password_mail_reset_body": "Use this link to reset your Luma password. It expires 15 minutes after your request and works once. If you did not request this, ignore this email.",
-  "identity_password_mail_changed_subject": "Your Luma password changed",
-  "identity_password_mail_changed_body": "Your Luma password changed. If you did not make this change, reset your password from the sign-in page and contact Luma support.",
   "identity_recovery_reset_unconfirmed": "Luma couldn’t confirm the reset. Try signing in with your new password, or request a new link."
 }

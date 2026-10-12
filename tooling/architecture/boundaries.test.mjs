@@ -390,14 +390,18 @@ test('simulator packages cannot cross provider or connector boundaries', () => {
 test('extracted domains retain layer boundaries and narrow public interfaces', () => {
   assert.equal(
     violation(
-      'packages/identity/src/infrastructure/password-mail.ts',
-      'packages/i18n/messages',
+      'packages/identity/src/infrastructure/mail-dispatch.ts',
+      'packages/email/',
     ),
     null,
   );
   assert.match(
+    violation('packages/identity/src/domain/password.ts', 'packages/email/'),
+    /registered module interfaces/,
+  );
+  assert.match(
     violation(
-      'packages/identity/src/domain/password.ts',
+      'packages/identity/src/infrastructure/password-mail.ts',
       'packages/i18n/messages',
     ),
     /registered module interfaces/,

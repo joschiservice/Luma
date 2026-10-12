@@ -16,6 +16,7 @@
       "./messages/{locale}/customers.json",
       "./messages/{locale}/decisions.json",
       "./messages/{locale}/docs.json",
+      "./messages/{locale}/email.json",
       "./messages/{locale}/exceptions.json",
       "./messages/{locale}/fulfillment.json",
       "./messages/{locale}/gmail.json",

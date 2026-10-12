@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 
 import { registerAuthHandler } from './api/auth-handler.js';
+import { registerMailEvents } from './api/mail-events.js';
 import type { createIdentity } from './composition.js';
 
 export { registerContractRoutes } from './api/contract-routes.js';
@@ -15,7 +16,10 @@ export {
   runInRequestScope,
 } from './api/request-scope.js';
 
-/** Registers authentication endpoints on the owning HTTP server. */
+/**
+ * Registers authentication endpoints on the owning HTTP server, and the email delivery event
+ * endpoint when a Resend webhook secret is configured.
+ */
 export function registerIdentityHttp(
   app: FastifyInstance,
   identity: ReturnType<typeof createIdentity>,
@@ -24,6 +28,10 @@ export function registerIdentityHttp(
     app.log.error('Identity database connection failed'),
   );
   registerAuthHandler(app, identity.handler, identity.baseURL);
+  if (identity.mailEvents)
+    registerMailEvents(app, (payload, headers) =>
+      identity.mailEvents!.receive(payload, headers),
+    );
 }
 
 export { rolesRoutes } from './api/roles.js';

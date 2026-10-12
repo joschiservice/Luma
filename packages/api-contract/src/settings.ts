@@ -39,6 +39,11 @@ export const settingsSnapshotSchema = z.object({
   workspace: workspaceSettingsSchema,
   preferences: notificationPreferencesSchema,
   deliveryAvailable: z.boolean(),
+  /**
+   * Why Luma paused optional email to your address: it bounced permanently or you reported
+   * Luma's email as spam. Null when email to you is not paused. A delivered test email resumes it.
+   */
+  emailPaused: z.enum(['bounced', 'complained']).nullable(),
   lastTest: z
     .object({ id: z.string().uuid(), state: deliveryStateSchema })
     .nullable(),

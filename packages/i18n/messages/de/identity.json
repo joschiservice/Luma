@@ -274,9 +274,5 @@
   "identity_recovery_rate_limited": "Zu viele Versuche. Warte eine Minute und versuche es erneut.",
   "identity_recovery_unavailable": "Die Passwortwiederherstellung ist nicht verfügbar, da der E-Mail-Versand nicht eingerichtet ist. Wende dich an den Luma-Support.",
   "identity_recovery_failed": "Die Anfrage konnte nicht bestätigt werden. Versuche es erneut.",
-  "identity_password_mail_reset_subject": "Dein Luma-Passwort zurücksetzen",
-  "identity_password_mail_reset_body": "Mit diesem Link setzt du dein Luma-Passwort zurück. Er läuft 15 Minuten nach deiner Anfrage ab und funktioniert einmal. Hast du das nicht angefordert, ignoriere diese E-Mail.",
-  "identity_password_mail_changed_subject": "Dein Luma-Passwort wurde geändert",
-  "identity_password_mail_changed_body": "Dein Luma-Passwort wurde geändert. Hast du es nicht geändert, setze dein Passwort auf der Anmeldeseite zurück und wende dich an den Luma-Support.",
   "identity_recovery_reset_unconfirmed": "Luma konnte das Zurücksetzen nicht bestätigen. Versuche, dich mit deinem neuen Passwort anzumelden, oder fordere einen neuen Link an."
 }

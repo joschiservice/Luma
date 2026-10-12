@@ -86,3 +86,28 @@ it('requires explicit identity credentials and exact trusted origins', () => {
     readIdentityConfig({ ...authEnvironment, BETTER_AUTH_SECRET: 'short' }),
   ).toThrow('32');
 });
+
+it('reads the optional Resend webhook secret only with the mail settings', () => {
+  const mail = {
+    ...authEnvironment,
+    MAIL_RESEND_API_KEY: 're_test',
+    MAIL_FROM: 'Luma <notifications@example.test>',
+    MAIL_PUBLIC_ORIGIN: 'http://localhost:3000',
+  };
+  expect(readIdentityConfig(mail).mail).not.toHaveProperty('webhookSecret');
+  expect(
+    readIdentityConfig({
+      ...mail,
+      MAIL_RESEND_WEBHOOK_SECRET: 'whsec_c2VjcmV0LXNpZ25pbmcta2V5',
+    }).mail?.webhookSecret,
+  ).toBe('whsec_c2VjcmV0LXNpZ25pbmcta2V5');
+  expect(() =>
+    readIdentityConfig({ ...mail, MAIL_RESEND_WEBHOOK_SECRET: 'not-a-secret' }),
+  ).toThrow('MAIL_RESEND_WEBHOOK_SECRET');
+  expect(() =>
+    readIdentityConfig({
+      ...authEnvironment,
+      MAIL_RESEND_WEBHOOK_SECRET: 'whsec_c2VjcmV0LXNpZ25pbmcta2V5',
+    }),
+  ).toThrow('MAIL_RESEND_WEBHOOK_SECRET needs');
+});

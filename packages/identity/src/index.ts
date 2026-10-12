@@ -37,6 +37,8 @@ export type { SecurityEventType } from './domain/security-events.js';
 
 export type { IdentityService } from './application/identity.js';
 
+export { MailRateLimited } from './application/mail.js';
+
 export type { SettingsService } from './application/settings.js';
 
 export type { AppPermissionGroup, RolesService } from './application/roles.js';
