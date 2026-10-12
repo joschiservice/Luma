@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
+import type { AppFactoryContext } from '@luma/app-host';
 import { createWorkspaceAssistant } from '@luma/assistant/composition';
 import { createAuditLog } from '@luma/audit/composition';
 import type {
@@ -67,6 +68,7 @@ import {
   createProductWorkspace,
   createRecordExplorer,
   createReturnWorkspace,
+  createSourceOrderLines,
   messageReplyDecisionProvider,
   replenishmentDecisionProvider,
   replySendDecisionProvider,
@@ -254,6 +256,11 @@ export interface ApplicationOptions {
   authoring?: { available: boolean; reason: string | null };
   /** Installed-app decision sources, such as `registry.decisionSources()`, for Needs you. */
   decisionSources?: Parameters<typeof appDecisionProvider>[0][];
+  /**
+   * The permission a person needs to request a provider write through an app, such as
+   * `registry.actionPermission`. Without it, order change plans name no permission.
+   */
+  actionPermission?: (appId: string, capability: string) => string | null;
   /** Installed-app case workflows, such as `registry.workflowSources()`. */
   workflowSources?: CaseWorkflowAdapter[];
   /**
@@ -298,6 +305,16 @@ export interface ApplicationOptions {
     pollMs?: number;
     log?: (message: string, error?: unknown) => void;
   };
+}
+
+/**
+ * Reads another connection's stored line quantities for a source order, so app hosts can let
+ * apps propagate an authoritative source's values. See `AppFactoryContext.sourceOrderLines`.
+ */
+export function createOrderLineReader(
+  database: TenantDatabase,
+): NonNullable<AppFactoryContext['sourceOrderLines']> {
+  return createSourceOrderLines(database, { state: orderStateQueries });
 }
 
 /**
@@ -873,6 +890,7 @@ export function createApplicationServices(
     authority,
     undefined,
     hiddenOrderSources,
+    options.actionPermission,
   );
   const fulfillment = createFulfillmentWorkspace(
     database,

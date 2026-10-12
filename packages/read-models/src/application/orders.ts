@@ -3,6 +3,8 @@ import type { TenantContext } from '@luma/identity';
 import type {
   ComparisonDifference,
   ComparisonState,
+  OrderChangePlan,
+  OrderChangeRequest,
   OrderCommercialData,
   OrderLineCommercialData,
 } from '@luma/orders';
@@ -309,6 +311,19 @@ export interface OrderActivityReader {
 }
 
 /**
+ * Plans for one order: the proposed change, or every change the source comparison found.
+ * `hidden` lists `fulfillments` when the reader can't see fulfilment, which makes every plan's
+ * safety unknown.
+ */
+export interface OrderChangePlans {
+  orderId: string;
+  comparisonState: ComparisonState;
+  plans: OrderChangePlan[];
+  hidden: 'fulfillments'[];
+  asOf: string;
+}
+
+/**
  * Reads current orders for one tenant from canonical projections and linked Luma records.
  * Requires `orders.read`. Issue links need `issues.read`; detail sections of other areas need
  * their read permission and are listed in `hidden` otherwise.
@@ -317,4 +332,13 @@ export interface OrderWorkspace {
   /** Rejects a cursor produced by different filters or sorting with a 400 error. */
   list(context: TenantContext, query: OrderListQuery): Promise<OrderList>;
   get(context: TenantContext, orderId: string): Promise<OrderDetail | null>;
+  /**
+   * Plans a proposed change, or the detected ones, from the same snapshot rules as `get`.
+   * Rejects a line that is not on the order with a 422 error.
+   */
+  changePlan(
+    context: TenantContext,
+    orderId: string,
+    request: OrderChangeRequest | null,
+  ): Promise<OrderChangePlans | null>;
 }

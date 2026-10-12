@@ -34,7 +34,8 @@ function attentionSql(queries: OrderReadQueries) {
   return `SELECT issue_id::text AS id FROM (${queries.attention}) a WHERE order_id=$3::uuid ORDER BY issue_id`;
 }
 
-async function readFulfillments(
+/** Reads every current fulfilment record linked to the order, newest observation first. */
+export async function readFulfillments(
   tx: SqlTransaction,
   tenantId: string,
   orderId: string,

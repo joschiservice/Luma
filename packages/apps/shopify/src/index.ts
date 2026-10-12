@@ -281,6 +281,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
           respond: 'shopify:order_edits.apply',
         },
       },
+      actionAccess: { 'orders.quantity.edit': 'shopify:order_edits.apply' },
     },
     connector: createShopifyProvider({
       ...(oauth ? { oauth } : {}),

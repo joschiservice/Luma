@@ -117,6 +117,11 @@ export type JtlCommand =
       lines?: { lineId: string; quantity: number }[] | undefined;
       trackingNumber: string;
       trackingUrl: string;
+      /**
+       * Records the delivery note while the parcel is still being packed: its package has no
+       * shipping date yet, so the order is in fulfilment but not shipped.
+       */
+      packing?: boolean | undefined;
     }
   /** Sets physical stock of an item in one warehouse, as an inventory count does. */
   | { kind: 'stock'; itemId: string; warehouse: string; quantity: number }

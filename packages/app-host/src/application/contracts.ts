@@ -53,6 +53,12 @@ export interface AppManifest {
   decisionAccess?: Partial<
     Record<AppDecision['kind'], { view: string; respond: string }>
   >;
+  /**
+   * The permission a person needs to request each provider write capability through this app,
+   * keyed by installation capability such as `orders.quantity.edit`. Plans use it to say who may
+   * start a Luma step; the app's own routes still check the permission.
+   */
+  actionAccess?: Partial<Record<string, string>>;
 }
 
 export type { WorkspaceApp } from '../domain/installation.js';
@@ -179,6 +185,34 @@ export interface AppFactoryContext {
    * current, so an app can act on fresh stock. Absent where the host has no capability runtime.
    */
   refreshStock?(context: TenantContext, positionId: string): Promise<void>;
+  /**
+   * Another connection's current quantities for the lines of a source order, from Luma's stored
+   * reads: the order linked to `orderId` on `connectionId`, and each of its lines by source line
+   * ID, matched to `sourceConnectionId` by shared canonical line ID or unambiguous mapped SKU.
+   * `quantity` is null when that source doesn't report the line's current units. Returns null
+   * when the order isn't linked to both connections or the reader can't read orders. Absent
+   * where the host has no order read model; apps must then treat the values as unknown.
+   */
+  sourceOrderLines?(
+    context: TenantContext,
+    input: {
+      connectionId: string;
+      orderId: string;
+      sourceConnectionId: string;
+    },
+  ): Promise<SourceOrderLines | null>;
+}
+
+/** A source's stored read of an order's line quantities; see `sourceOrderLines`. */
+interface SourceOrderLines {
+  connectionId: string;
+  snapshotId: string;
+  observationId: string;
+  /** When Luma read the source order, on Luma's clock. */
+  observedAt: string;
+  /** False when the source's latest collection read failed, was partial or unfinished. */
+  complete: boolean;
+  lines: { externalId: string; quantity: string | null }[];
 }
 
 /** Builds deployment contributions using explicit host services and environment configuration. */

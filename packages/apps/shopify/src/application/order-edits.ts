@@ -11,6 +11,7 @@ import type { PolicyService, ProposedAction } from '@luma/policies';
 import { z } from 'zod';
 
 import {
+  type AuthoritativeLines,
   editedLines,
   editFacts,
   type EditFence,
@@ -38,6 +39,11 @@ export interface OrderEditRun {
   /** Shopify's calculation; null for previews made while writes were off. */
   calculation: OrderEditCalculation | null;
   authority: OrderLineAuthority;
+  /**
+   * The authoritative source read whose quantities this edit propagates; null when this store
+   * holds line authority. Absent on edits saved before propagation existed.
+   */
+  source?: AuthoritativeLines | null;
   action: ProposedAction;
   decisionId: string | null;
 }
@@ -90,6 +96,15 @@ export interface OrderEditDependencies {
   ): Promise<OrderEditSnapshot>;
   /** The workspace's order-line authority; null when the host has no authority reader. */
   authority(context: TenantContext): Promise<OrderLineAuthority | null>;
+  /**
+   * Another connection's current quantities for this order's lines, from Luma's stored reads;
+   * null when the host can't tell or the order isn't linked to that source.
+   */
+  sourceLines(
+    context: TenantContext,
+    target: OrderEditTarget,
+    sourceConnectionId: string,
+  ): Promise<AuthoritativeLines | null>;
   /** Asks Shopify to calculate the edit without committing it. */
   calculate(
     context: TenantContext,
@@ -131,21 +146,45 @@ export function createOrderEdits(deps: OrderEditDependencies) {
     return run;
   }
 
-  /** Whether a fresh read and current authority still match the reviewed edit. */
+  /**
+   * Current line authority with, when another connection holds it, that source's latest stored
+   * read of this order's lines.
+   */
+  async function authorityAccess(
+    context: TenantContext,
+    target: OrderEditTarget,
+  ) {
+    const authority = await deps.authority(context);
+    const source =
+      authority?.state === 'resolved' &&
+      authority.connectionId &&
+      authority.connectionId !== target.connectionId
+        ? await deps.sourceLines(context, target, authority.connectionId)
+        : null;
+
+    return { authority, source, now: deps.now() };
+  }
+
+  /**
+   * Whether a fresh read and current authority still match the reviewed edit. A propagated edit
+   * also needs the same authoritative source, read freshly, still reporting the approved values.
+   */
   async function current(
     context: TenantContext,
     run: OrderEditRun,
     snapshot: OrderEditSnapshot,
   ) {
-    const authority = await deps.authority(context);
+    const access = await authorityAccess(context, run.target);
 
     return (
       snapshot.revision === run.before.revision &&
-      authority?.revision === run.authority.revision &&
+      access.authority?.revision === run.authority.revision &&
+      (access.source?.connectionId ?? null) ===
+        (run.source?.connectionId ?? null) &&
       !orderEditBlocker(snapshot, run.change, {
         connectionId: run.target.connectionId,
         granted: await deps.authorize(context, run.target.connectionId),
-        authority,
+        ...access,
       })
     );
   }
@@ -255,6 +294,7 @@ export function createOrderEdits(deps: OrderEditDependencies) {
       before: run.before,
       calculation: run.calculation,
       authority: run.authority,
+      source: run.source ?? null,
       onHold: editTouchesHold(run.before, run.change),
       requesterId: run.action.proposedBy.id,
       expiresAt: run.action.expiresAt,
@@ -335,14 +375,17 @@ export function createOrderEdits(deps: OrderEditDependencies) {
         ),
       };
     },
-    /** Reads the order, the connection's grants, line authority and recent edits of the order. */
+    /**
+     * Reads the order, the connection's grants, line authority (with the authoritative source's
+     * line quantities when another connection holds it) and recent edits of the order.
+     */
     async inspect(context: TenantContext, input: unknown) {
       context = await authorize(context);
       const target = orderEditTarget.parse(input);
       const granted = await deps.authorize(context, target.connectionId);
-      const [snapshot, authority] = await Promise.all([
+      const [snapshot, { authority, source }] = await Promise.all([
         deps.read(context, target),
-        deps.authority(context),
+        authorityAccess(context, target),
       ]);
       const runs = await deps.store.list(context, target);
 
@@ -350,6 +393,7 @@ export function createOrderEdits(deps: OrderEditDependencies) {
         snapshot,
         granted,
         authority,
+        source,
         observeOnly:
           (await deps.admission.writeMode?.(context, target.connectionId)) ===
           'observe_only',
@@ -360,8 +404,9 @@ export function createOrderEdits(deps: OrderEditDependencies) {
     },
     /**
      * Saves an immutable preview bound to the order revision, exact lines, restock choice, line
-     * authority and, unless writes are off, Shopify's non-committing calculation. Rejects
-     * blocked edits with 409 and never sends anything in observe-only.
+     * authority (and the authoritative source read a propagated edit carries) and, unless writes
+     * are off, Shopify's non-committing calculation. Rejects blocked edits with 409 and never
+     * sends anything in observe-only.
      */
     async preview(context: TenantContext, input: unknown) {
       context = await authorize(context);
@@ -399,8 +444,14 @@ export function createOrderEdits(deps: OrderEditDependencies) {
             'A previous edit of this order is uncertain. Reconcile it before starting another.',
           );
       }
-      const authority = await deps.authority(context);
-      const access = { connectionId: target.connectionId, granted, authority };
+      const { authority, source, now } = await authorityAccess(context, target);
+      const access = {
+        connectionId: target.connectionId,
+        granted,
+        authority,
+        source,
+        now,
+      };
       const first = await deps.read(context, target);
       const blocker = orderEditBlocker(first, change, access);
       // The blocker already requires resolved authority; the check narrows its type.
@@ -459,6 +510,10 @@ export function createOrderEdits(deps: OrderEditDependencies) {
             .join(','),
           calculation: calculation ? deps.digest(calculation) : null,
           authorityRevision: authority.revision,
+          // A propagated edit binds the authoritative read whose values it carries.
+          authoritySource: source
+            ? `${source.connectionId}:${source.observationId}@${source.observedAt}`
+            : null,
         },
         preconditions: {
           evidenceRefs: calculation ? [before.id, calculation.id] : [before.id],
@@ -482,6 +537,7 @@ export function createOrderEdits(deps: OrderEditDependencies) {
         before,
         calculation,
         authority,
+        source,
         action,
         decisionId: null,
       });

@@ -9,6 +9,7 @@ import {
   createCommerceServices,
   createExceptionWorkflowRuntime,
   createMetricListener,
+  createOrderLineReader,
   createReadinessCheck,
   createReplenishmentWorker,
   createResourceScope,
@@ -122,6 +123,7 @@ export async function createPilot(
       stockRefresh?.refresh(actor, positionId);
     const installations = createInstalledConnections(db, {
       refreshStock,
+      sourceOrderLines: createOrderLineReader(db),
       ...(simulation
         ? {
             simulation,
@@ -461,6 +463,7 @@ export async function createPilot(
       decisionSources: installations.decisionSources(),
       providerCatalog: installations.providerCatalog,
       workflowSources: installations.registry.workflowSources(),
+      actionPermission: installations.registry.actionPermission,
       ...(detectionTiming.followUps
         ? { followUps: detectionTiming.followUps }
         : {}),

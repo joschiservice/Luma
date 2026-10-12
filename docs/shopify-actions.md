@@ -98,7 +98,8 @@ because its quantity differs. JTL remains a read-only reference.
 
 Permission: `shopify:order_edits.apply`; capability `orders.quantity.edit`, granted only with
 `write_order_edits` and a fulfillment read scope. Order detail and the app's record browser
-offer the edit for a single Shopify order. One edit changes up to 20 existing lines to whole, nonnegative quantities and
+offer the edit for a single Shopify order. An order change plan's Luma step opens it
+prefilled with the planned quantities; the preview, approval and checks below still apply. One edit changes up to 20 existing lines to whole, nonnegative quantities and
 may restock removed units. Luma never adds products or changes prices, discounts or shipping.
 
 - Every changed line must be unstarted: no fulfilled unit, and every fulfillment order with
@@ -107,19 +108,29 @@ may restock removed units. Luma never adds products or changes prices, discounts
   requested or unrecognized work, remaining units that differ from Shopify's unfulfilled
   count, and a read truncated at 100 lines or 5 fulfillment orders all block the edit.
   Cancelled and closed orders cannot be edited.
-- Workspace line authority must resolve to the same connection. A host without an
-  authority reader, unknown or conflicting authority, or a changed authority revision
-  blocks the edit.
+- Workspace line authority must resolve. When this store holds it, the edit amends the
+  authoritative record. When another connection holds it (JTL-Wawi, or Luma ERP), the edit
+  may only propagate that source's value: every changed line's new quantity must equal the
+  current units the authoritative source reports for the same line, matched by shared
+  canonical line ID or a mapped SKU that occurs once per source, as order comparisons match
+  lines. That source's stored read must be complete and at most five minutes old, the same
+  freshness as comparisons; an older, future or incomplete read blocks as stale. A host
+  without an authority reader or stored order reads, unknown or conflicting authority, or a
+  changed authority revision blocks the edit.
 - A preview binds the order revision (a digest of Shopify's `updatedAt` and every fact
   above, because `updatedAt` has second precision), each line's reviewed and approved
-  quantity, the restock choice, the authority revision and Shopify's calculation. Luma
+  quantity, the restock choice, the authority revision, for a propagated edit the
+  authoritative source's connection, snapshot, observation and read time, and Shopify's
+  calculation. Luma
   calculates with `orderEditBegin` and `orderEditSetQuantity` and never commits that
   session; an abandoned session changes nothing. The preview binds the read taken after
   calculating and is refused if the edit facts changed meanwhile.
 - Observe-only previews send nothing, not even the calculation. They show the money
   consequences as not calculated and cannot run after writes are enabled; a new preview
   and approval are needed.
-- Before the commit, Luma reads the order again, rechecks every rule, recalculates in a new
+- Before the commit, Luma reads the order again, rechecks every rule (for a propagated edit,
+  that the same source still holds authority and a fresh, complete read still reports the
+  approved quantities), recalculates in a new
   session and withholds the edit when quantities or money differ from the approved
   calculation.
 

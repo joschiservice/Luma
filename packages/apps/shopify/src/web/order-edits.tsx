@@ -13,6 +13,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { z } from 'zod';
 
 import {
+  authoritativeLines,
   editTouchesHold,
   lineBlockerReason,
   type MoneyBag,
@@ -31,6 +32,7 @@ const blockerText: Record<OrderEditBlockerReason, () => string> = {
   cancelled: m.shopify_order_edit_blocker_cancelled,
   closed: m.shopify_order_edit_blocker_closed,
   authority: m.shopify_order_edit_blocker_authority,
+  authority_stale: m.shopify_order_edit_blocker_authority_stale,
   unknown_line: m.shopify_order_edit_blocker_unknown_line,
   no_change: m.shopify_order_edit_blocker_no_change,
   partially_fulfilled: m.shopify_order_edit_blocker_partially_fulfilled,
@@ -43,11 +45,16 @@ const inspection = z.object({
   snapshot: orderEditSnapshot,
   granted: z.array(z.string()),
   authority: orderLineAuthority.nullable(),
+  source: authoritativeLines.nullable().default(null),
   observeOnly: z.boolean(),
   runs: z.array(orderEditView),
 });
 
 const recent = z.object({ runs: z.array(orderEditView) });
+
+const plannedLines = z.array(
+  z.object({ externalId: z.string(), quantity: z.string() }),
+);
 
 /** Whether an edit still waits on a person, so the editor opens by itself. */
 const waiting = (view: OrderEditView) =>
@@ -121,11 +128,17 @@ export function ShopifyOrderEdits({
   orderId,
   services,
   headingLevel = 4,
+  prefill,
 }: {
   connectionId: string;
   orderId: string;
   services: AppUiProps['services'];
   headingLevel?: 2 | 3 | 4;
+  /**
+   * Quantities the host planned, by line item ID. They open the editor with these values for
+   * review; an edit that still waits on a person is shown instead.
+   */
+  prefill?: { lines: { externalId: string; quantity: string }[] } | undefined;
 }) {
   const Heading = `h${headingLevel}` as const;
   const id = useId();
@@ -140,6 +153,17 @@ export function ShopifyOrderEdits({
   const requestId = useRef<string | null>(null);
   const generation = useRef(0);
   const compose = useRef(false);
+  const planned = useRef<NonNullable<typeof prefill> | null>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const prefillKey = prefill ? JSON.stringify(prefill.lines) : '';
+
+  // A planned change opens the editor with its quantities, read again from Shopify first.
+  useEffect(() => {
+    if (!prefillKey) return;
+    planned.current = { lines: plannedLines.parse(JSON.parse(prefillKey)) };
+    setOpen(true);
+    setRefresh((value) => value + 1);
+  }, [prefillKey]);
 
   // Persisted edits only: the order page reads Shopify again only when someone opens the editor.
   useEffect(() => {
@@ -171,10 +195,25 @@ export function ShopifyOrderEdits({
       .then((value) => {
         if (current !== generation.current) return;
         const result = inspection.parse(value);
+        const latest = result.runs[0] ?? null;
+        const plan =
+          planned.current && !(latest && waiting(latest))
+            ? planned.current
+            : null;
+        planned.current = null;
         setData(result);
-        setReview(compose.current ? null : (result.runs[0] ?? null));
+        setReview(compose.current || plan ? null : latest);
         compose.current = false;
-        setTargets({});
+        setTargets(
+          Object.fromEntries(
+            (plan?.lines ?? []).flatMap((line) =>
+              result.snapshot.lines.some((item) => item.id === line.externalId)
+                ? [[line.externalId, line.quantity]]
+                : [],
+            ),
+          ),
+        );
+        if (plan) requestAnimationFrame(() => heading.current?.focus());
       })
       .catch((reason) => {
         if (current === generation.current) setError(services.error(reason));
@@ -216,7 +255,13 @@ export function ShopifyOrderEdits({
       ? orderEditBlockerReason(
           snapshot,
           { lines: changed, restock },
-          { connectionId, granted: data.granted, authority: data.authority },
+          {
+            connectionId,
+            granted: data.granted,
+            authority: data.authority,
+            source: data.source,
+            now: new Date(),
+          },
         )
       : null;
 
@@ -277,7 +322,9 @@ export function ShopifyOrderEdits({
     >
       <div className="shopify-order-edit-heading">
         <div>
-          <Heading>{m.shopify_order_edit_title()}</Heading>
+          <Heading ref={heading} tabIndex={-1}>
+            {m.shopify_order_edit_title()}
+          </Heading>
           <p className="field-help">{m.shopify_order_edit_help()}</p>
         </div>
         <Button

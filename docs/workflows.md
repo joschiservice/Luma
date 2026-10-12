@@ -135,6 +135,13 @@ receipts without repeating actions. Overdue tasks remain answerable by the escal
 leave audit evidence. Cancellation or closure of a linked case removes open tasks. An answer
 is workflow input, never approval or proof of provider success.
 
+Order change plans (see [Orders workspace](orders-workspace.md#change-plans)) describe
+person steps with a role and Luma steps with a capability; they create no tasks. An order
+change workflow turns each person step into a human task for that role, keeps the plan's
+order so holds and confirmations come before updates, and binds Luma steps as capability
+actions. It must re-plan after each task answer from fresh reads: an answer confirms what a
+person did, never that the change became safe or the provider applied it.
+
 Event waits publish an event type, a string correlation key, exact typed payload fields and
 a timeout recovery outcome. Deliveries are immutable by tenant and source identity. A wait
 can consume input delivered after its run began, including input received before the wait

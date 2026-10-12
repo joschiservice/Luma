@@ -134,6 +134,31 @@ export const orderLineAuthority = z.object({
 
 export type OrderLineAuthority = z.infer<typeof orderLineAuthority>;
 
+/**
+ * How old the authoritative source's read may be when an edit propagates its value. Matches the
+ * freshness of Luma's order comparisons.
+ */
+const authorityFreshnessMs = 5 * 60_000;
+
+/**
+ * Another connection's current quantities for this Shopify order's lines, matched by shared
+ * canonical line ID or unambiguous mapped SKU. `quantity` is null when that source does not
+ * report the line's current units or the line can't be matched. `complete` is false when the
+ * source's latest read failed, was partial or left pagination unfinished.
+ */
+export const authoritativeLines = z.object({
+  connectionId: z.string().uuid(),
+  snapshotId: z.string().uuid(),
+  observationId: z.string().min(1),
+  observedAt: z.string().datetime(),
+  complete: z.boolean(),
+  lines: z.array(
+    z.object({ lineItemId: gid('LineItem'), quantity: z.string().nullable() }),
+  ),
+});
+
+export type AuthoritativeLines = z.infer<typeof authoritativeLines>;
+
 /** Why an edit is unsafe now. Interfaces translate these codes. */
 export type OrderEditBlockerReason =
   | 'write_access'
@@ -141,6 +166,7 @@ export type OrderEditBlockerReason =
   | 'cancelled'
   | 'closed'
   | 'authority'
+  | 'authority_stale'
   | 'unknown_line'
   | 'no_change'
   | 'partially_fulfilled'
@@ -155,7 +181,9 @@ const blockerText: Record<OrderEditBlockerReason, string> = {
   cancelled: 'This order is cancelled.',
   closed: 'This order is closed.',
   authority:
-    'Order lines in this workspace do not come from this Shopify store. Review source authority before editing.',
+    'Order lines in this workspace come from another source that does not show these quantities. Review source authority or the order there before editing.',
+  authority_stale:
+    'The source that order lines come from was not read completely in the last five minutes. Wait for its next read and refresh.',
   unknown_line: 'A selected line is no longer on this order.',
   no_change: 'Choose a quantity that differs from the current quantity.',
   partially_fulfilled: 'Some units of a selected line are already fulfilled.',
@@ -216,8 +244,53 @@ export function lineBlockerReason(
 }
 
 /**
+ * Whether order-line authority allows this edit. This store's own lines may be amended. When
+ * another connection holds line authority, the edit may only propagate that source's value:
+ * every changed line must target the quantity the authoritative source currently reports for
+ * the same line, read completely within `authorityFreshnessMs` of `now`. Unknown or
+ * conflicting authority, or no host authority reader, blocks.
+ */
+function authorityBlockerReason(
+  change: OrderEditChange,
+  access: {
+    connectionId: string;
+    authority: OrderLineAuthority | null;
+    source?: AuthoritativeLines | null | undefined;
+    now?: Date | undefined;
+  },
+): 'authority' | 'authority_stale' | null {
+  const { authority, source, now } = access;
+  if (authority?.state !== 'resolved' || !authority.connectionId)
+    return 'authority';
+  if (authority.connectionId === access.connectionId) return null;
+  if (!source || source.connectionId !== authority.connectionId)
+    return 'authority';
+  const matches = change.lines.every((target) => {
+    const quantity = source.lines.find(
+      (line) => line.lineItemId === target.lineItemId,
+    )?.quantity;
+
+    return (
+      quantity != null &&
+      /^\d+(\.0+)?$/.test(quantity) &&
+      Number.parseInt(quantity, 10) === target.quantity
+    );
+  });
+  if (!matches) return 'authority';
+  const read = Date.parse(source.observedAt);
+
+  return source.complete &&
+    now !== undefined &&
+    read <= now.getTime() &&
+    now.getTime() - read <= authorityFreshnessMs
+    ? null
+    : 'authority_stale';
+}
+
+/**
  * Finds why an edit is unsafe on this read, or returns null when Luma may calculate and send it.
- * Line authority must resolve to the same connection; a missing reader counts as unknown.
+ * Line authority must resolve to this connection, or the edit must propagate the authoritative
+ * source's fresh value (see `authorityBlockerReason`); a missing reader counts as unknown.
  */
 export function orderEditBlockerReason(
   snapshot: OrderEditSnapshot,
@@ -226,17 +299,18 @@ export function orderEditBlockerReason(
     connectionId: string;
     granted: readonly string[];
     authority: OrderLineAuthority | null;
+    /** The authoritative source's line quantities, when another connection holds authority. */
+    source?: AuthoritativeLines | null | undefined;
+    /** When the check runs; propagation without it counts as stale. */
+    now?: Date | undefined;
   },
 ): OrderEditBlockerReason | null {
   if (!access.granted.includes(orderEditCapability)) return 'write_access';
   if (!snapshot.complete) return 'incomplete';
   if (snapshot.cancelled) return 'cancelled';
   if (snapshot.closed) return 'closed';
-  if (
-    access.authority?.state !== 'resolved' ||
-    access.authority.connectionId !== access.connectionId
-  )
-    return 'authority';
+  const authority = authorityBlockerReason(change, access);
+  if (authority) return authority;
   for (const target of change.lines) {
     const line = snapshot.lines.find((item) => item.id === target.lineItemId);
     if (!line) return 'unknown_line';
@@ -411,6 +485,8 @@ export const orderEditView = z.object({
   /** Null when writes are off: observe-only previews never ask Shopify to calculate. */
   calculation: orderEditCalculation.nullable(),
   authority: orderLineAuthority,
+  /** The authoritative source read an edit propagates; null when this store holds authority. */
+  source: authoritativeLines.nullable().default(null),
   onHold: z.boolean(),
   requesterId: z.string(),
   expiresAt: z.string().datetime(),

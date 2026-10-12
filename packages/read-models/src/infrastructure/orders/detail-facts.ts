@@ -32,7 +32,7 @@ type SourceRow = {
 };
 
 // $1 tenant, $2 as-of time, $3 order ID.
-function sourcesSql({ state }: OrderReadQueries) {
+function sourcesSql({ state }: Pick<OrderReadQueries, 'state'>) {
   return `WITH ${state.currentOrderSources('order_sources', 'p.entity_id=$3')},
  ${state.orderProgress('order_sources')}, ${state.sourceComparison('order_sources', 'order_sources')}
 SELECT o.connection_id AS "connectionId",s.document,ci.document AS connection,
@@ -60,7 +60,7 @@ ORDER BY o.connection_id`;
  */
 export async function readSourceFacts(
   tx: SqlTransaction,
-  queries: OrderReadQueries,
+  queries: Pick<OrderReadQueries, 'state'>,
   tenantId: string,
   orderId: string,
   asOf: string,

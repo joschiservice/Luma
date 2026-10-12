@@ -103,6 +103,62 @@ List reads apply time checks to maintained scalar metadata. During a projection 
 orders without refreshed comparison metadata are inconclusive. Rebuild with the existing
 resumable procedure below; ingestion refreshes affected orders under the same owner locks.
 
+## Change plans
+
+A change plan says what a supported order change still needs: which systems show it, what
+has shipped, whether the change is still safe, and the ordered steps with who does each.
+Plans read the same snapshot, comparison rules, line identities and five-minute freshness
+as detail; they change nothing and do not create cases or tasks. `@luma/orders` owns the
+rules; the read model supplies facts, authority, grants and write modes.
+
+Without parameters a plan covers each change the comparison detected while it is pending
+or confirmed: current units (a zero means a line added or removed), cancellation and
+location. Inconclusive comparisons plan nothing. Addresses are not compared, so address
+plans exist only as proposals. A proposal names the kind; quantity and line removal name
+the line by comparison key.
+
+| Change            | Safe only while                                                                                                       |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Quantity decrease | No fulfilment source has started work on the line and the new quantity is at least the shipped units.                 |
+| Quantity increase | The lifecycle authority reports the order neither cancelled nor completed. Started work only adds a warehouse notice. |
+| Line added        | As an increase. A removal is a decrease to zero.                                                                      |
+| Address           | No work has started and nothing has shipped on any line.                                                              |
+| Location          | Work for the line is still pending.                                                                                   |
+| Cancellation      | No work has started on any line. Shipped units add a return or refund step for finance.                               |
+
+Work has started on a line when any current fulfilment record of a source with fulfilment
+access covers it with units and is `processing` or `failed`, or is a shipment that shipped,
+delivered or completed. Fulfilment work counts alone do not start work, and every source is
+checked, so mirrored work in another system still counts. Shipped units are summed within
+one source and line, as comparisons do; across sources the fulfilment authority's count
+wins, else the largest report, never a sum.
+
+Safety is unsafe when a rule above fails, otherwise unknown when Luma lacks evidence, and
+safe only when neither applies. Unknown comes from a contributing order or fulfilment read
+older than five minutes or in the future; a failed, partial or unfinished latest collection
+read; unknown fulfilment status on the line; lines that cannot be matched across sources;
+unresolved or conflicting authority for the fact the change needs (lines, lifecycle or
+fulfilment); no intended value; no source with fulfilment access; or a reader without
+`fulfillment.read`. A system whose own value is unknown, such as JTL without current units,
+is listed as unknown but does not by itself make the change unsafe.
+
+Steps are ordered: stop, hold or confirm work that may be in progress (or ask a person to
+check progress when it is unknown), then return or refund work, then update each system
+that does not show the change with the authoritative system first, then notices, and an
+escalation last when the plan is not safe. A step is a Luma step only when the target
+connection's app declares a governed capability for the change; today that is Shopify's
+`orders.quantity.edit` for quantity and line removal. Every other system update, hold,
+reassignment, redirect and refund is a person step with a role. A Luma step is executable
+only when the plan is safe, the capability is granted, the connection is available,
+authority allows it, the source lines are mapped, the quantity is whole and writes are
+enabled; otherwise it names the first reason. Authority allows a connection to amend a fact
+group it holds, or to receive the value of the connection that holds it: the target must
+equal what that source reports for the same line, read fresh and complete (otherwise
+`unknown`). Any other value, and unknown or conflicting authority, is `authority`. The
+provider action applies the same rule again at preview and dispatch. Whether the reader holds the app's `actionAccess`
+permission is reported separately. Executable steps still go through the app's preview,
+approval, admission and verification; the plan only prefills the app's `record` slot.
+
 ## Source facts and live context
 
 Adapters populate optional canonical facts: `placedAt`, `total` and line `skuCode` and

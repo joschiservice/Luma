@@ -252,11 +252,12 @@
   "shopify_order_edit_blocker_incomplete": "Shopify returned incomplete order details. Refresh before continuing.",
   "shopify_order_edit_blocker_cancelled": "This order is cancelled.",
   "shopify_order_edit_blocker_closed": "This order is closed.",
-  "shopify_order_edit_blocker_authority": "Order lines in this workspace don’t come from this store. Review source authority before editing.",
+  "shopify_order_edit_blocker_authority": "Order lines in this workspace come from another source that doesn’t show these quantities. Review source authority or the order there before editing.",
   "shopify_order_edit_blocker_unknown_line": "A selected line is no longer on this order.",
   "shopify_order_edit_blocker_no_change": "A new quantity equals the current quantity.",
   "shopify_order_edit_blocker_partially_fulfilled": "Some units are already fulfilled.",
   "shopify_order_edit_blocker_fulfillment_started": "Fulfillment has started.",
   "shopify_order_edit_blocker_fulfillment_requested": "Sent to a fulfillment service. Cancel that request first.",
-  "shopify_order_edit_blocker_fulfillment_unknown": "Shopify reports fulfillment work Luma can’t confirm as unstarted."
+  "shopify_order_edit_blocker_fulfillment_unknown": "Shopify reports fulfillment work Luma can’t confirm as unstarted.",
+  "shopify_order_edit_blocker_authority_stale": "The source that order lines come from wasn’t read completely in the last five minutes. Wait for its next read and refresh."
 }

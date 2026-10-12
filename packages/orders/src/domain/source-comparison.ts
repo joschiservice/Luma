@@ -29,7 +29,7 @@ interface ComparisonEvidence {
   observedAt: string;
 }
 
-interface ComparisonLine {
+export interface ComparisonLine {
   id: string;
   skuId: string | null;
   quantity: string;
@@ -48,6 +48,21 @@ export interface ComparisonFulfillment extends ComparisonEvidence {
     quantity: string;
     remainingQuantity?: string | null;
   }[];
+}
+
+/** One fulfillment record's business facts, without its evidence references. */
+export type FulfillmentFacts = Omit<
+  ComparisonFulfillment,
+  keyof ComparisonEvidence
+>;
+
+/** The business facts of one source report that comparisons read. */
+export interface SourceFacts {
+  status: string;
+  paymentStatus: string;
+  total?: { amount: string; currency: string } | null;
+  lines: ComparisonLine[];
+  fulfillments: FulfillmentFacts[];
 }
 
 export interface ComparisonSource extends ComparisonEvidence {
@@ -97,7 +112,7 @@ const known = (value: string) => (value === 'unknown' ? null : value);
 
 function lineFacts(
   line: ComparisonLine,
-  fulfillments: ComparisonFulfillment[],
+  fulfillments: FulfillmentFacts[],
 ): LineFacts {
   const current =
     line.currentQuantity != null
@@ -183,10 +198,7 @@ function lineFacts(
 }
 
 /** Normalizes exact quantities and mapped line identities without summing repeated SKU lines. */
-export function comparisonFacts(
-  source: ComparisonSource,
-  sharedLines: Set<string>,
-) {
+export function comparisonFacts(source: SourceFacts, sharedLines: Set<string>) {
   const skuCounts = new Map<string, number>();
   for (const line of source.lines)
     if (line.skuId)
@@ -226,7 +238,9 @@ export function comparisonFacts(
 }
 
 /** Finds line IDs explicitly shared by different source reports of the same linked order. */
-export function sharedComparisonLines(sources: ComparisonSource[]) {
+export function sharedComparisonLines(
+  sources: Pick<ComparisonSource, 'connectionId' | 'lines'>[],
+) {
   const connections = new Map<string, Set<string>>();
   for (const source of sources)
     for (const line of source.lines) {

@@ -24,7 +24,10 @@ import {
 } from '@luma/workflow-temporal';
 import { Pool } from 'pg';
 
-import { createApplicationServices } from './application.js';
+import {
+  createApplicationServices,
+  createOrderLineReader,
+} from './application.js';
 import { createStockRefreshService } from './detection-worker.js';
 import { createReplenishmentWorker } from './replenishment-worker.js';
 import { createResourceScope } from './resources.js';
@@ -220,6 +223,7 @@ export async function createDefaultExceptionWorker(
           ...connections,
           refreshContext: identity.service.refreshContext,
           refreshStock,
+          sourceOrderLines: createOrderLineReader(database),
           ...(env ? { env } : {}),
         })
       : undefined;

@@ -219,6 +219,60 @@ describe('order edit safety', () => {
     expect(orderEditBlockerReason(value, reduce, current)).toBe(reason);
   });
 
+  it('propagates another authoritative source’s fresh value, and nothing else', () => {
+    const erp = '33333333-3333-4333-8333-333333333333';
+    const now = new Date('2026-10-12T10:04:00.000Z');
+    const source = {
+      connectionId: erp,
+      snapshotId: '44444444-4444-4444-8444-444444444444',
+      observationId: 'observation-erp',
+      observedAt: '2026-10-12T10:00:00.000Z',
+      complete: true,
+      lines: [
+        { lineItemId: gid('LineItem', 1), quantity: '1' },
+        { lineItemId: gid('LineItem', 2), quantity: null },
+      ],
+    };
+    const propagated = {
+      ...access,
+      authority: { revision: 4, state: 'resolved' as const, connectionId: erp },
+      source,
+      now,
+    };
+    // JTL or Luma ERP holds order lines and shows 1: Shopify may be brought to 1.
+    expect(orderEditBlockerReason(snapshot(), reduce, propagated)).toBeNull();
+    // Any other quantity, an unreported line or a read of another source is not propagation.
+    const cases: [
+      typeof reduce,
+      Parameters<typeof orderEditBlockerReason>[2],
+    ][] = [
+      [
+        { ...reduce, lines: [{ lineItemId: gid('LineItem', 1), quantity: 2 }] },
+        propagated,
+      ],
+      [
+        { ...reduce, lines: [{ lineItemId: gid('LineItem', 2), quantity: 0 }] },
+        propagated,
+      ],
+      [reduce, { ...propagated, source: { ...source, connectionId } }],
+      [reduce, { ...propagated, source: null }],
+    ];
+    for (const [change, current] of cases)
+      expect(orderEditBlockerReason(snapshot(), change, current)).toBe(
+        'authority',
+      );
+    // A read older than five minutes, from the future or incomplete is stale.
+    for (const current of [
+      { ...propagated, now: new Date('2026-10-12T10:05:01.000Z') },
+      { ...propagated, now: new Date('2026-10-12T09:59:00.000Z') },
+      { ...propagated, source: { ...source, complete: false } },
+      { ...propagated, now: undefined },
+    ])
+      expect(orderEditBlockerReason(snapshot(), reduce, current)).toBe(
+        'authority_stale',
+      );
+  });
+
   it('ignores finished work without remaining units and other lines', () => {
     const moved = snapshot((value) => {
       value.fulfillmentOrders.push({

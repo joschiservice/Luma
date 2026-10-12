@@ -25,6 +25,8 @@ import {
   type OrderEditRun,
 } from './application/order-edits.js';
 import {
+  type AuthoritativeLines,
+  authoritativeLines,
   editOutcome,
   orderEditCapability,
   orderEditPermission,
@@ -173,6 +175,29 @@ export function createShopifyOrderEdits(
       : null;
   };
 
+  const sourceLines = async (
+    tenant: TenantContext,
+    target: OrderEditRun['target'],
+    sourceConnectionId: string,
+  ): Promise<AuthoritativeLines | null> => {
+    const lines = await context.sourceOrderLines?.(tenant, {
+      connectionId: target.connectionId,
+      orderId: target.orderId,
+      sourceConnectionId,
+    });
+
+    return lines
+      ? authoritativeLines.parse({
+          ...lines,
+          lines: lines.lines.flatMap((line) =>
+            /^gid:\/\/shopify\/LineItem\/\d+$/.test(line.externalId)
+              ? [{ lineItemId: line.externalId, quantity: line.quantity }]
+              : [],
+          ),
+        })
+      : null;
+  };
+
   /**
    * Proves an edit from independent reads only. A fence that never sent its commit is closed
    * first, so an interrupted dispatch can no longer send it.
@@ -290,6 +315,7 @@ export function createShopifyOrderEdits(
     effects,
     read,
     authority,
+    sourceLines,
     authorize,
     calculate: async (tenant, target, lines, restock) =>
       (

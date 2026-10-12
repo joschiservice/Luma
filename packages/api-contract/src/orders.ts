@@ -570,6 +570,226 @@ export const orderDetailSchema = z.object({
   }),
 });
 
+const orderChangeKindSchema = z.enum([
+  'quantity',
+  'item',
+  'address',
+  'location',
+  'cancellation',
+]);
+
+const decimalQuantity = z
+  .string()
+  .regex(/^\d{1,14}(\.\d{1,6})?$/, 'Use a nonnegative decimal quantity.');
+
+/**
+ * A proposed change to plan. Without `kind`, the plan covers the differences source comparison
+ * detected. `quantity` needs `lineKey` and `quantity`; `item` (removing a line) needs `lineKey`;
+ * `location` may name a line; `cancellation` and `address` concern the whole order.
+ */
+export const orderChangePlanQuerySchema = z
+  .object({
+    kind: orderChangeKindSchema
+      .optional()
+      .describe('The change to plan; omit to plan detected differences.'),
+    lineKey: z
+      .string()
+      .uuid()
+      .optional()
+      .describe(
+        'The line’s comparison key: its shared line ID or its mapped SKU, as `comparisonKey` in order detail.',
+      ),
+    quantity: decimalQuantity
+      .optional()
+      .describe('The intended current units of the line.'),
+  })
+  .strict()
+  .superRefine((value, issues) => {
+    const lineKey = ['quantity', 'item'].includes(value.kind ?? '');
+    const forbidden = (field: 'lineKey' | 'quantity') =>
+      issues.addIssue({
+        code: 'custom',
+        path: [field],
+        message: `Remove ${field} for this change.`,
+      });
+    if (lineKey && !value.lineKey)
+      issues.addIssue({
+        code: 'custom',
+        path: ['lineKey'],
+        message: 'Choose the line to change.',
+      });
+    if (value.kind === 'quantity' && value.quantity === undefined)
+      issues.addIssue({
+        code: 'custom',
+        path: ['quantity'],
+        message: 'Enter the intended quantity.',
+      });
+    if (value.kind !== 'quantity' && value.quantity !== undefined)
+      forbidden('quantity');
+    if (value.lineKey && !lineKey && value.kind !== 'location')
+      forbidden('lineKey');
+  });
+
+const planReasonSchema = z.object({
+  code: z
+    .enum([
+      'work_started',
+      'shipped',
+      'fulfilled_beyond_target',
+      'cancelled',
+      'closed',
+      'stale_evidence',
+      'incomplete_evidence',
+      'ambiguous_line',
+      'unknown_progress',
+      'unknown_value',
+      'authority_unknown',
+      'authority_conflict',
+      'no_fulfilment_source',
+      'fulfilment_hidden',
+    ])
+    .describe(
+      'Why the change is unsafe (work_started, shipped, fulfilled_beyond_target, cancelled, closed) or unknown (every other code).',
+    ),
+  connectionId: z.string().uuid().nullable(),
+  lineKey: z.string().uuid().nullable(),
+});
+
+const planStepSchema = z.object({
+  id: z.string(),
+  kind: z.enum([
+    'confirm',
+    'request_hold',
+    'reassign_work',
+    'update_record',
+    'notify',
+    'escalate',
+  ]),
+  action: z.enum([
+    'check_progress',
+    'confirm_picking',
+    'stop_work',
+    'hold_for_address',
+    'stop_and_reassign',
+    'return_or_refund',
+    'update_quantity',
+    'cancel_order',
+    'update_address',
+    'reassign_location',
+    'carrier_redirect',
+    'notify_added_units',
+    'notify_customer',
+    'escalate_unsafe',
+    'escalate_unknown',
+  ]),
+  performer: z
+    .enum(['luma', 'person'])
+    .describe(
+      'Luma steps run a governed capability through approval and execution; person steps are for the named role.',
+    ),
+  role: z.enum(['warehouse', 'carrier', 'finance', 'operator']).nullable(),
+  connectionId: z.string().uuid().nullable(),
+  capability: z.string().nullable(),
+  executable: z
+    .boolean()
+    .describe(
+      'Whether Luma could run this step now. It still needs a preview, approval and fresh verification.',
+    ),
+  blockedBy: z
+    .enum([
+      'not_granted',
+      'unavailable',
+      'authority',
+      'unmapped',
+      'whole_units',
+      'observe_only',
+      'unsafe',
+      'unknown',
+    ])
+    .nullable(),
+  permission: z
+    .string()
+    .nullable()
+    .describe('The permission a person needs to request this Luma step.'),
+  viewerCanRequest: z.boolean().describe('Whether you hold `permission`.'),
+  handoff: z
+    .object({
+      orderExternalId: z.string(),
+      lines: z.array(
+        z.object({ externalId: z.string(), quantity: decimalQuantity }),
+      ),
+    })
+    .nullable()
+    .describe('Source references for the provider action, when mapped.'),
+});
+
+const orderChangePlanSchema = z.object({
+  change: z.object({
+    kind: orderChangeKindSchema,
+    origin: z.enum(['detected', 'proposed']),
+    lineKey: z.string().uuid().nullable(),
+    line: z
+      .object({ skuCode: z.string().nullable(), title: z.string().nullable() })
+      .nullable(),
+    from: z.string().nullable(),
+    to: z
+      .string()
+      .nullable()
+      .describe(
+        'The intended value; null when no authoritative source reports it.',
+      ),
+    unit: z.string().nullable(),
+  }),
+  acknowledgements: z.array(
+    z.object({
+      connectionId: z.string().uuid(),
+      state: z.enum(['reflects', 'differs', 'unknown']),
+      value: z.string().nullable(),
+      readAt: timestamp,
+      fresh: z.boolean(),
+    }),
+  ),
+  shipped: z
+    .array(
+      z.object({
+        lineKey: z.string().uuid(),
+        units: z.string().nullable(),
+        unit: z.string().nullable(),
+        basis: z.enum(['authority', 'maximum', 'unknown']),
+        connectionId: z.string().uuid().nullable(),
+        sources: z.array(
+          z.object({ connectionId: z.string().uuid(), units: z.string() }),
+        ),
+      }),
+    )
+    .describe(
+      'Shipped units counted once: summed within one source, never across mirrored sources.',
+    ),
+  safety: z.object({
+    state: z.enum(['safe', 'unsafe', 'unknown']),
+    reasons: z.array(planReasonSchema),
+  }),
+  steps: z.array(planStepSchema),
+});
+
+export const orderChangePlansSchema = z.object({
+  orderId: z.string().uuid(),
+  comparisonState: z.enum(['matching', 'pending', 'confirmed', 'inconclusive']),
+  plans: z.array(orderChangePlanSchema).max(20),
+  hidden: z
+    .array(z.literal('fulfillments'))
+    .describe(
+      'Fulfilment facts you can’t read; plans then report safety as unknown.',
+    ),
+  asOf: timestamp,
+});
+
+export type OrderChangePlanQuery = z.infer<typeof orderChangePlanQuerySchema>;
+
+export type OrderChangePlan = z.infer<typeof orderChangePlanSchema>;
+
+export type OrderChangePlans = z.infer<typeof orderChangePlansSchema>;
+
 export type OrderView = z.infer<typeof orderViewSchema>;
 
 export type OrderSort = z.infer<typeof orderSortSchema>;

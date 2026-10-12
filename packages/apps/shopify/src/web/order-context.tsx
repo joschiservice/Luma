@@ -106,6 +106,7 @@ export function ShopifyOrderContext({
           connectionId={record.connectionId}
           orderId={record.externalId}
           services={services}
+          prefill={record.change}
         />
       ) : null}
       {read.pending ? <p role="status">{m.shopify_context_loading()}</p> : null}

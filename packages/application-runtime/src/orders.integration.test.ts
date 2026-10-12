@@ -15,7 +15,7 @@ import {
   orderAttentionForOrders,
   orderAttentionQuery,
 } from '@luma/exceptions/composition';
-import type { IdentityService } from '@luma/identity';
+import { type IdentityService, PermissionSet } from '@luma/identity';
 import {
   builtInMembership,
   makeTenantContext,
@@ -34,6 +34,7 @@ import {
 import {
   createOperationalMetrics,
   createOrderWorkspace,
+  createSourceOrderLines,
 } from '@luma/read-models/composition';
 import { createActivityStore } from '@luma/resolution/composition';
 import { Pool } from 'pg';
@@ -78,7 +79,9 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     );
   }
 
-  function workspace() {
+  function workspace(
+    actionPermission?: (appId: string, capability: string) => string | null,
+  ) {
     return createOrderWorkspace(
       createTenantDatabase(reader),
       {
@@ -100,6 +103,8 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
           async (value) => value,
         ),
       () => clock,
+      undefined,
+      actionPermission,
     );
   }
 
@@ -226,6 +231,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     status: 'shipped' | 'processing' | 'completed';
     kind?: 'fulfillment_order' | 'shipment';
     remaining?: string;
+    observedAt?: string;
   }) {
     const observation: CommerceObservation & {
       capability: 'fulfillment.read';
@@ -242,8 +248,8 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
           scopeKey: '',
         },
         kind: 'snapshot',
-        observedAt: '2026-09-19T10:00:00Z',
-        sourceUpdatedAt: '2026-09-19T10:00:00Z',
+        observedAt: options.observedAt ?? '2026-09-19T10:00:00Z',
+        sourceUpdatedAt: options.observedAt ?? '2026-09-19T10:00:00Z',
         sourceRevision: null,
         adapterVersion: 'fixture/1',
         schemaVersion: 1,
@@ -2011,5 +2017,225 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     expect(
       (await workspace().get(context(), id))?.sources[0]?.lines[0],
     ).toMatchObject({ fulfilledQuantity: '1', remainingQuantity: '0' });
+  });
+  it('plans an order change from fresh fulfilment evidence, within one tenant and with the reader’s access', async () => {
+    const read = '2026-09-20T11:58:00Z';
+    clock = new Date('2026-09-20T12:00:00Z');
+    const tote = {
+      external: 'gid://shopify/InventoryItem/41',
+      key: 'plan-tote',
+    };
+    const id = await seedOrder({
+      connectionId: shopify,
+      external: 'gid://shopify/Order/2001',
+      key: 'plan-order',
+      updatedAt: read,
+      data: { displayNumber: '#2001' },
+      lines: [
+        {
+          external: 'gid://shopify/LineItem/21',
+          key: 'plan-line-shop',
+          quantity: '3',
+          current: '3',
+          sku: tote,
+          skuCode: 'TOTE-NAT',
+        },
+      ],
+    });
+    await seedOrder({
+      connectionId: jtl,
+      external: 'jtl-order-20',
+      key: 'plan-order',
+      updatedAt: read,
+      data: { displayNumber: 'SO-20' },
+      lines: [
+        {
+          external: '201',
+          key: 'plan-line-jtl',
+          quantity: '3',
+          current: '3',
+          sku: { external: 'jtl-item-41', key: 'plan-tote' },
+          skuCode: 'TOTE-NAT',
+        },
+      ],
+    });
+    const skuId = (await workspace().get(context(), id))!.sources[0]!.lines[0]!
+      .comparisonKey!;
+    await owner.query(
+      "INSERT INTO organizations(id,name,slug,status,created_at,write_mode) VALUES($1,'Plan',$2,'active',now(),'writes_enabled') ON CONFLICT (id) DO UPDATE SET write_mode='writes_enabled'",
+      [tenant, `plan-${tenant}`],
+    );
+    const grants = ['orders.read', 'fulfillment.read', 'inventory.read'];
+    const grant = (capabilities: string[]) =>
+      owner.query(
+        "UPDATE connector_installations SET document=document || jsonb_build_object('permissions',$3::jsonb,'granted',$3::jsonb) WHERE tenant_id=$1 AND id=$2",
+        [tenant, shopify, JSON.stringify(capabilities)],
+      );
+    await grant([...grants, 'orders.quantity.edit']);
+    try {
+      const plans = workspace((app, capability) =>
+        app === 'shopify' && capability === 'orders.quantity.edit'
+          ? 'shopify:order_edits.apply'
+          : null,
+      );
+      const request = {
+        kind: 'quantity' as const,
+        lineKey: skuId,
+        quantity: '1',
+      };
+      // Before picking, Luma can reduce the Shopify line; JTL is updated by a person.
+      const before = (await plans.changePlan(context(), id, request))!;
+      expect(before.hidden).toEqual([]);
+      expect(before.plans[0]!.safety).toEqual({ state: 'safe', reasons: [] });
+      expect(before.plans[0]!.steps).toMatchObject([
+        {
+          performer: 'luma',
+          connectionId: shopify,
+          capability: 'orders.quantity.edit',
+          executable: true,
+          permission: 'shopify:order_edits.apply',
+          viewerCanRequest: true,
+          handoff: {
+            orderExternalId: 'gid://shopify/Order/2001',
+            lines: [{ externalId: 'gid://shopify/LineItem/21', quantity: '1' }],
+          },
+        },
+        { performer: 'person', role: 'operator', connectionId: jtl },
+      ]);
+
+      // A member may read the plan, but lacks the app permission to request the Luma step.
+      const member = makeTenantContext(
+        { userId: 'member', sessionId: 'session' },
+        {
+          id: tenant,
+          name: 'Fixture',
+          slug: 'fixture',
+          status: 'active',
+          dataRegion: 'EU',
+        },
+        builtInMembership(
+          { id: 'm-member', organizationId: tenant, userId: 'member' },
+          'member',
+        ),
+        randomUUID(),
+      );
+      expect(
+        (await plans.changePlan(member, id, request))!.plans[0]!.steps[0],
+      ).toMatchObject({ executable: true, viewerCanRequest: false });
+      // Without fulfilment access the plan says so and is never safe.
+      const ordersOnly = {
+        ...builtInMembership(
+          { id: 'm-orders', organizationId: tenant, userId: 'orders' },
+          'member',
+        ),
+        permissions: new PermissionSet(['orders.read']),
+      };
+      const restricted = (await plans.changePlan(
+        makeTenantContext(
+          { userId: 'orders', sessionId: 'session' },
+          {
+            id: tenant,
+            name: 'Fixture',
+            slug: 'fixture',
+            status: 'active',
+            dataRegion: 'EU',
+          },
+          ordersOnly,
+          randomUUID(),
+        ),
+        id,
+        request,
+      ))!;
+      expect(restricted.hidden).toEqual(['fulfillments']);
+      expect(restricted.plans[0]!.shipped).toEqual([]);
+      expect(restricted.plans[0]!.safety).toMatchObject({ state: 'unknown' });
+      expect(
+        restricted.plans[0]!.safety.reasons.map((reason) => reason.code),
+      ).toContain('fulfilment_hidden');
+      // Another tenant cannot plan this order, and a foreign line is refused.
+      expect(
+        await plans.changePlan(context(otherTenant), id, request),
+      ).toBeNull();
+      await expect(
+        plans.changePlan(context(), id, { ...request, lineKey: randomUUID() }),
+      ).rejects.toMatchObject({ statusCode: 422 });
+
+      // Apps read another source's stored quantities for the store's lines, matched by SKU.
+      const lines = await createSourceOrderLines(createTenantDatabase(reader), {
+        state: orderStateQueries,
+      })(context(), {
+        connectionId: shopify,
+        orderId: 'gid://shopify/Order/2001',
+        sourceConnectionId: jtl,
+      });
+      expect(lines).toMatchObject({
+        connectionId: jtl,
+        observedAt: new Date(read).toISOString(),
+        complete: true,
+        lines: [{ externalId: 'gid://shopify/LineItem/21', quantity: '3' }],
+      });
+      expect(
+        await createSourceOrderLines(createTenantDatabase(reader), {
+          state: orderStateQueries,
+        })(context(otherTenant), {
+          connectionId: shopify,
+          orderId: 'gid://shopify/Order/2001',
+          sourceConnectionId: jtl,
+        }),
+      ).toBeNull();
+
+      // JTL created a delivery note: picking started, so the warehouse step goes to a person.
+      await seedShipment({
+        connectionId: jtl,
+        order: 'jtl-order-20',
+        external: 'jtl-note-20',
+        line: '201',
+        quantity: '3',
+        status: 'processing',
+        kind: 'shipment',
+        observedAt: '2026-09-20T11:59:00Z',
+      });
+      const after = (await plans.changePlan(context(), id, request))!.plans[0]!;
+      expect(after.safety).toEqual({
+        state: 'unsafe',
+        reasons: [{ code: 'work_started', connectionId: jtl, lineKey: skuId }],
+      });
+      expect(after.steps.map((step) => [step.action, step.role])).toEqual([
+        ['confirm_picking', 'warehouse'],
+        ['update_quantity', null],
+        ['update_quantity', 'operator'],
+        ['escalate_unsafe', 'operator'],
+      ]);
+      expect(after.steps[1]).toMatchObject({
+        performer: 'luma',
+        executable: false,
+        blockedBy: 'unsafe',
+      });
+
+      // Ten minutes without a reread make the evidence stale; the plan is unknown, not safe.
+      clock = new Date('2026-09-20T12:10:00Z');
+      const stale = (await plans.changePlan(context(), id, {
+        ...request,
+        quantity: '5',
+      }))!.plans[0]!;
+      expect(stale.safety.state).toBe('unknown');
+      expect(stale.safety.reasons.map((reason) => reason.code)).toContain(
+        'stale_evidence',
+      );
+      expect(stale.steps.some((step) => step.executable)).toBe(false);
+
+      // Observe-only blocks the Luma step even when the change is safe.
+      clock = new Date('2026-09-20T12:00:00Z');
+      await owner.query(
+        "UPDATE organizations SET write_mode='observe_only' WHERE id=$1",
+        [tenant],
+      );
+      expect(
+        (await plans.changePlan(context(), id, { ...request, quantity: '4' }))!
+          .plans[0]!.steps[0],
+      ).toMatchObject({ executable: false, blockedBy: 'observe_only' });
+    } finally {
+      await grant(grants);
+    }
   });
 });

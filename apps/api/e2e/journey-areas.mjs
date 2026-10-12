@@ -473,6 +473,10 @@ const webCases = [
   'apps/web/src/features/workflows/data.ts',
   'apps/web/src/routes/app.$organizationId.exceptions{,_}.*',
   'packages/i18n/messages/*/{connections,exceptions,settings,shadow,workflows}.json',
+  // Case detail shows the change plan of the case's order.
+  'apps/web/src/features/orders/{change-plan.tsx,data.ts,orders.css}',
+  'apps/web/src/shared/orders/{order-section.tsx,presentation.ts}',
+  'packages/i18n/messages/*/orders.json',
 ];
 const webFulfillment = [
   'apps/web/src/features/activity/presentation.ts',
@@ -787,6 +791,23 @@ export const journeyAreas = {
     ...procurement,
     ...cases,
   ],
+  'order-change-plan.browser.mjs': [
+    ...simulator,
+    ...sync,
+    ...orders,
+    ...shopify,
+    ...jtl,
+    ...webShell,
+    ...webOrders,
+    ...webExtensions,
+  ],
+  'order-change-plan.e2e.mjs': [
+    ...simulator,
+    ...sync,
+    ...orders,
+    ...shopify,
+    ...jtl,
+  ],
   'order-links.browser.mjs': [
     ...ordersFixture,
     ...orders,
@@ -1058,6 +1079,8 @@ export const journeyAreas = {
   'shopify-order-edits.browser.mjs': [
     ...shopify,
     ...sourceAuthority,
+    // Propagated edits read the authoritative source's stored order lines.
+    ...rmOrders,
     'packages/simulator/{core,shopify}/**',
     ...webShell,
     ...webApps,
@@ -1067,6 +1090,8 @@ export const journeyAreas = {
     ...shopify,
     ...decisions,
     ...sourceAuthority,
+    // Propagated edits read the authoritative source's stored order lines.
+    ...rmOrders,
     'packages/simulator/{core,shopify}/**',
   ],
   'simulator.browser.mjs': [...simulator, 'apps/simulator-web/**'],

@@ -30,7 +30,10 @@ import type { FastifyServerOptions } from 'fastify';
 import { Pool } from 'pg';
 
 import { createMetricListener } from '../infrastructure/metric-listener.js';
-import { createApplicationServices } from './application.js';
+import {
+  createApplicationServices,
+  createOrderLineReader,
+} from './application.js';
 import {
   assistantAvailability,
   authoringAvailability,
@@ -98,6 +101,7 @@ export async function buildRuntimeApp(
               : {}),
             refreshContext: identity.service.refreshContext,
             refreshStock,
+            sourceOrderLines: createOrderLineReader(tenantDatabase()),
           });
     if (connections && typeof connections !== 'function') {
       stockRefresh = createStockRefreshService({
@@ -167,6 +171,7 @@ export async function buildRuntimeApp(
         ? {
             decisionSources: installedConnections.decisionSources(),
             workflowSources: installedConnections.registry.workflowSources(),
+            actionPermission: installedConnections.registry.actionPermission,
             ...(stockRefresh ? { refreshStock } : {}),
           }
         : {}),

@@ -46,7 +46,18 @@ import { AppExtension } from '../apps/extension';
 import { recordReturnPath } from '../records/data';
 import { OrderReturnCases } from '../returns/case-entry';
 import { OrderReturns } from '../returns/order-returns';
-import { orderFilters, orderOptions, type OrdersSearch } from './data';
+import {
+  OrderChangePlanView,
+  orderLocationNames,
+  planLines,
+} from './change-plan';
+import {
+  changePlanOptions,
+  orderFilters,
+  orderOptions,
+  type OrdersSearch,
+  proposedChange,
+} from './data';
 import { OrderIdentityLinks } from './identity-links';
 import { OrderCharges } from './order-charges';
 import { OrderHeader } from './order-header';
@@ -108,6 +119,33 @@ export function OrderPage() {
       });
   }, [query.data, orderId, organizationId, search, navigate]);
   const apps = useQuery(appsOptions(organizationId));
+  const proposal = proposedChange(search);
+  // Planned at the detail's read time, so every detail refresh reads the plan again.
+  const plans = useQuery({
+    ...changePlanOptions(
+      organizationId,
+      query.data?.order.id ?? orderId,
+      proposal,
+      query.data?.asOf ?? null,
+    ),
+    enabled: Boolean(query.data),
+  });
+  const handoff = plans.data?.plans
+    .flatMap((plan) => plan.steps)
+    .find(
+      (step) =>
+        step.performer === 'luma' &&
+        step.executable &&
+        step.connectionId === search.edit,
+    )?.handoff;
+  const changeSearch = (next: Partial<OrdersSearch>) =>
+    void navigate({
+      to: '/app/$organizationId/orders/$orderId',
+      params: { organizationId, orderId },
+      search: { ...search, ...next },
+      replace: true,
+      ...(next.edit ? { hash: `source-${next.edit}` } : {}),
+    });
   const online = useSyncExternalStore(
     subscribe,
     onlineSnapshot,
@@ -175,6 +213,49 @@ export function OrderPage() {
           />
         ) : null
       }
+      changePlan={
+        query.data ? (
+          <OrderChangePlanView
+            plans={plans.data}
+            loading={plans.isFetching}
+            failed={plans.isError}
+            sources={query.data.sources}
+            locationNames={orderLocationNames(query.data)}
+            lines={planLines(query.data)}
+            proposal={proposal}
+            propose={(lineKey, quantity) =>
+              changeSearch({
+                changeLine: lineKey,
+                changeQuantity: quantity,
+                edit: undefined,
+              })
+            }
+            clear={() =>
+              changeSearch({
+                changeLine: undefined,
+                changeQuantity: undefined,
+                edit: undefined,
+              })
+            }
+            editAction={({ connectionId, handoff: target }) =>
+              connectionId && target ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => changeSearch({ edit: connectionId })}
+                >
+                  {m.orders_plan_open_edit({
+                    system:
+                      query.data.sources.find(
+                        (source) => source.connectionId === connectionId,
+                      )?.label ?? m.orders_plan_any_system(),
+                  })}
+                </Button>
+              ) : null
+            }
+          />
+        ) : null
+      }
       linkedSources={
         query.data ? (
           <>
@@ -196,6 +277,11 @@ export function OrderPage() {
               kind: 'order',
               connectionId: source.connectionId,
               externalId: source.externalId,
+              ...(handoff &&
+              search.edit === source.connectionId &&
+              handoff.orderExternalId === source.externalId
+                ? { change: { lines: handoff.lines } }
+                : {}),
             }}
             done={async () => undefined}
           />
@@ -220,6 +306,7 @@ export function OrderDetailView({
   linkedSources,
   messages,
   returnCases,
+  changePlan,
 }: {
   organizationId: string;
   search: OrdersSearch;
@@ -233,6 +320,8 @@ export function OrderDetailView({
   messages?: ReactNode;
   /** The order's return cases and the control to open one. */
   returnCases?: ReactNode;
+  /** The plan for a proposed or detected change, with its proposal control. */
+  changePlan?: ReactNode;
   sourceContext?: (source: OrderSourceFacts) => ReactNode;
 }) {
   const timeZone = useContext(WorkspaceTimezone);
@@ -330,6 +419,7 @@ export function OrderDetailView({
             {detail.sources.length > 1 || detail.differences.length ? (
               <SourceComparison detail={detail} />
             ) : null}
+            {changePlan}
             <OrderFulfillments
               detail={detail}
               organizationId={organizationId}
@@ -343,16 +433,21 @@ export function OrderDetailView({
             />
             {messages}
             {contexts.map(({ source, content }) => (
-              <OrderSection
+              <div
                 key={source.connectionId}
-                title={m.orders_detail_live_title({ source: source.label })}
-                icon={Radio}
-                description={m.orders_detail_live_description({
-                  source: source.label,
-                })}
+                id={`source-${source.connectionId}`}
+                className="order-source-context"
               >
-                {content}
-              </OrderSection>
+                <OrderSection
+                  title={m.orders_detail_live_title({ source: source.label })}
+                  icon={Radio}
+                  description={m.orders_detail_live_description({
+                    source: source.label,
+                  })}
+                >
+                  {content}
+                </OrderSection>
+              </div>
             ))}
             <LumaActivity detail={detail} organizationId={organizationId} />
             <ObservedHistory detail={detail} />

@@ -243,7 +243,7 @@ export async function shipOrder(context: JtlContext, command: ShipCommand) {
     packages: [
       {
         id: await next(context, 'delivery-note-package'),
-        shippingDate: at,
+        shippingDate: command.packing ? null : at,
         trackingNumber: command.trackingNumber,
         trackingUrl: command.trackingUrl,
       },
@@ -262,7 +262,7 @@ export async function shipOrder(context: JtlContext, command: ShipCommand) {
     });
   }
   order.warehouse = warehouse;
-  order.shippedAt ??= at;
+  if (!command.packing) order.shippedAt ??= at;
   await context.store.put(kinds.note, note.id, note, {
     parent: order.id,
     createdAt: context.now,

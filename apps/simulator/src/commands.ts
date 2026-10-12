@@ -154,6 +154,7 @@ export const jtlCommandSchema = z.discriminatedUnion('kind', [
       .string()
       .url()
       .default('https://tracking.example.test/manual'),
+    packing: z.boolean().optional(),
   }),
   z.object({ kind: z.literal('stock'), itemId: id, warehouse: id, quantity }),
   z.object({

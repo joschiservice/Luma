@@ -38,3 +38,15 @@ export {
   toUnits,
   fromUnits,
 } from './domain/returns.js';
+
+export {
+  OrderChangeRequestError,
+  orderChangeCapabilities,
+  planOrderChanges,
+} from './domain/order-change-plan.js';
+
+export type {
+  OrderChangePlan,
+  OrderChangeRequest,
+  PlanSource,
+} from './domain/order-change-plan.js';

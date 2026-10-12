@@ -38,6 +38,7 @@ export function createAppHost(
     factories?: readonly AppFactory[];
     simulation?: AppFactoryContext['simulation'];
     refreshStock?: AppFactoryContext['refreshStock'];
+    sourceOrderLines?: AppFactoryContext['sourceOrderLines'];
   },
 ): {
   registry: AppRegistry;
@@ -66,6 +67,9 @@ export function createAppHost(
         cipher,
         ...(options.simulation ? { simulation: options.simulation } : {}),
         ...(options.refreshStock ? { refreshStock: options.refreshStock } : {}),
+        ...(options.sourceOrderLines
+          ? { sourceOrderLines: options.sourceOrderLines }
+          : {}),
         refreshContext: options.refreshContext,
         env: options.env ?? process.env,
         requireInstalled: (context, appId) =>

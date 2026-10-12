@@ -252,11 +252,12 @@
   "shopify_order_edit_blocker_incomplete": "Shopify hat unvollständige Bestelldaten geliefert. Aktualisiere, bevor du fortfährst.",
   "shopify_order_edit_blocker_cancelled": "Diese Bestellung ist storniert.",
   "shopify_order_edit_blocker_closed": "Diese Bestellung ist abgeschlossen.",
-  "shopify_order_edit_blocker_authority": "Bestellpositionen kommen in diesem Arbeitsbereich nicht aus diesem Shop. Prüfe die Quellenhoheit, bevor du änderst.",
+  "shopify_order_edit_blocker_authority": "Bestellpositionen kommen in diesem Arbeitsbereich aus einer anderen Quelle, die diese Mengen nicht zeigt. Prüfe die Quellenhoheit oder die Bestellung dort, bevor du änderst.",
   "shopify_order_edit_blocker_unknown_line": "Eine gewählte Position ist nicht mehr in dieser Bestellung.",
   "shopify_order_edit_blocker_no_change": "Eine neue Menge entspricht der aktuellen Menge.",
   "shopify_order_edit_blocker_partially_fulfilled": "Einige Einheiten sind bereits erfüllt.",
   "shopify_order_edit_blocker_fulfillment_started": "Das Fulfillment hat begonnen.",
   "shopify_order_edit_blocker_fulfillment_requested": "An einen Fulfillment-Dienst übergeben. Ziehe diese Anfrage zuerst zurück.",
-  "shopify_order_edit_blocker_fulfillment_unknown": "Shopify meldet Fulfillment-Arbeit, die Luma nicht als unbegonnen bestätigen kann."
+  "shopify_order_edit_blocker_fulfillment_unknown": "Shopify meldet Fulfillment-Arbeit, die Luma nicht als unbegonnen bestätigen kann.",
+  "shopify_order_edit_blocker_authority_stale": "Die Quelle der Bestellpositionen wurde in den letzten fünf Minuten nicht vollständig abgerufen. Warte auf den nächsten Abruf und aktualisiere."
 }
