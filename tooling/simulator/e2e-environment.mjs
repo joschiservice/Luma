@@ -12,7 +12,8 @@ import { createOperationsClient } from './platform-client.mjs';
 /**
  * Starts an isolated healthy Luma workspace and simulator using the same provisioning, HTTP
  * bridge and sync runner as the local stack. The run uses the deterministic `test` profile on
- * JTL with `calm` failures unless options choose otherwise; its clock only moves when tests advance it.
+ * the profile's ERP with `calm` failures unless options choose otherwise; its clock only moves
+ * when tests advance it.
  */
 export async function createSimulatorEnvironment({
   t,
@@ -21,7 +22,8 @@ export async function createSimulatorEnvironment({
   saved,
   temporal = null,
   profile = 'test',
-  erp = 'jtl',
+  erp,
+  historyDays,
   chaos = 'calm',
   detection,
   demo,
@@ -60,7 +62,8 @@ export async function createSimulatorEnvironment({
     await call('runs', {
       id: 'operations',
       profile,
-      erp,
+      ...(erp ? { erp } : {}),
+      ...(historyDays === undefined ? {} : { historyDays }),
       chaos,
       seed: 44,
       running: false,

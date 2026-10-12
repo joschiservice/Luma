@@ -114,6 +114,8 @@ export interface OrderRecord {
   paid: boolean;
   shippingMethodId: string;
   currency: string;
+  /** Sales tax in percent included in the line prices; absent on orders stored before it. */
+  taxRate?: number | undefined;
   total: number;
   date: string;
   /** Warehouse that fulfills the order; set by the order input or its latest shipment. */

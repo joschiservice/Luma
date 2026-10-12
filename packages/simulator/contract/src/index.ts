@@ -93,8 +93,16 @@ export const createRunSchema = z.object({
   seed: z.number().int().min(0).max(4_294_967_295).default(44),
   /** Merchant profile preset name. */
   profile: name.default('large'),
-  /** The merchant's ERP: JTL-Wawi or Cin7 Core. */
-  erp: z.enum(['jtl', 'cin7']).default('jtl'),
+  /**
+   * The merchant's ERP: JTL-Wawi or Cin7 Core. The profile's usual ERP when omitted; another
+   * ERP runs the same merchant to test compatibility.
+   */
+  erp: z.enum(['jtl', 'cin7']).optional(),
+  /**
+   * Days of order history simulated before the run starts; the profile's when omitted. Fewer
+   * days start faster, which matters most on Cin7 with its request limit.
+   */
+  historyDays: z.number().min(0).max(14).optional(),
   /** Chaos preset name or a complete profile. */
   chaos: z.union([name, chaosProfileSchema]).default('realistic'),
   /** Runs start in real time; paused runs only change through controls. */
@@ -151,6 +159,8 @@ export const controlSchema = z.discriminatedUnion('action', [
     command: z.record(z.string(), z.unknown()),
   }),
   orderActionSchema,
+  /** A retail account books a wholesale order directly in the ERP; needs a wholesale profile. */
+  z.object({ action: z.literal('wholesale-order') }),
   z.object({ action: z.literal('fault'), rule: faultRuleSchema }),
   z.object({ action: z.literal('disable'), id: z.string().min(1).max(80) }),
   z.object({
@@ -270,6 +280,10 @@ export interface RunDetail extends RunSummary {
   merchant: {
     description: string;
     ordersPerDay: number;
+    /** Wholesale orders per weekday booked directly in the ERP; 0 without wholesale. */
+    wholesaleOrdersPerDay: number;
+    /** Currency the ERP books in. */
+    baseCurrency: string;
     autonomous: boolean;
     variants: number;
     shops: {
@@ -405,7 +419,11 @@ export interface Profiles {
     name: string;
     label: string;
     description: string;
+    /** The ERP a run uses unless it chooses another. */
+    erp: 'jtl' | 'cin7';
     ordersPerDay: number;
+    /** Wholesale orders per weekday booked directly in the ERP. */
+    wholesaleOrdersPerDay: number;
     variants: number;
     shops: number;
     warehouses: number;

@@ -181,7 +181,36 @@ function idParam(url: URL, kind: GuidKind) {
 const locationName = (context: Cin7Context, id: string) =>
   context.config.warehouses.find((w) => w.id === id)?.name ?? null;
 
-function saleRow(record: StoredRecord<OrderRecord>) {
+/**
+ * Customer-currency units per base-currency unit, as Cin7 reports `CurrencyRate`; 1 for sales
+ * in the base currency.
+ */
+function currencyRate(context: Cin7Context, currency: string) {
+  if (currency === context.config.baseCurrency) return 1;
+  const base = context.config.currencyRates?.[currency];
+
+  return base ? Math.round((1 / base) * 1_000_000) / 1_000_000 : 1;
+}
+
+const taxRule = (rate: number) =>
+  rate ? `Tax on Sales ${rate}%` : 'Tax Exempt';
+
+const round = (value: number, places = 2) =>
+  Math.round(value * 10 ** places) / 10 ** places;
+
+/** Splits a gross line price into Cin7's net price, tax and net total. */
+function taxedLine(line: OrderRecord['lines'][number], taxRate: number) {
+  const net = line.price / (1 + taxRate / 100);
+  const total = round(net * line.quantity);
+
+  return {
+    price: round(net, 4),
+    tax: round(line.price * line.quantity - total),
+    total,
+  };
+}
+
+function saleRow(context: Cin7Context, record: StoredRecord<OrderRecord>) {
   const order = record.data;
   const status = shipped(order);
 
@@ -194,7 +223,8 @@ function saleRow(record: StoredRecord<OrderRecord>) {
     CustomerReference: order.externalNumber ?? '',
     SourceChannel: order.externalNumber ? 'Shopify' : '',
     CustomerCurrency: order.currency,
-    BaseCurrency: order.currency,
+    BaseCurrency: context.config.baseCurrency,
+    CurrencyRate: currencyRate(context, order.currency),
     Updated: new Date(record.updatedAt).toISOString(),
     OrderStatus: orderStatus(order),
     FulFilmentStatus:
@@ -247,7 +277,13 @@ async function sale(
     };
   };
 
-  const summary = saleRow(record);
+  const summary = saleRow(context, record);
+  const taxRate = order.taxRate ?? 0;
+  const lines = order.lines.map((line) => ({
+    line,
+    ...taxedLine(line, taxRate),
+  }));
+  const beforeTax = round(lines.reduce((sum, line) => sum + line.total, 0));
 
   return {
     ID: summary.SaleID,
@@ -257,6 +293,9 @@ async function sale(
     SourceChannel: summary.SourceChannel,
     CustomerCurrency: summary.CustomerCurrency,
     BaseCurrency: summary.BaseCurrency,
+    CurrencyRate: summary.CurrencyRate,
+    TaxRule: taxRule(taxRate),
+    TaxInclusive: false,
     FulFilmentStatus: summary.FulFilmentStatus,
     CombinedPaymentStatus: summary.CombinedPaymentStatus,
     Type: summary.Type,
@@ -268,17 +307,20 @@ async function sale(
       SaleOrderNumber: orderNumber(order),
       Memo: '',
       Status: orderStatus(order),
-      Lines: order.lines.map((line) => ({
+      Lines: lines.map(({ line, price, tax, total }) => ({
         ProductID: guid('product', line.itemId),
         SKU: line.sku,
         Name: line.name,
         Quantity: line.quantity,
-        Price: line.price,
+        Price: price,
         Discount: 0,
-        Tax: 0,
-        Total: Math.round(line.price * line.quantity * 100) / 100,
+        Tax: tax,
+        TaxRule: taxRule(taxRate),
+        Total: total,
       })),
       AdditionalCharges: [],
+      BeforeTax: beforeTax,
+      Tax: round(order.total - beforeTax),
       Total: order.total,
     },
     Fulfilments: notes.items.map(({ data: note }, index) => {
@@ -329,7 +371,7 @@ async function sales(
     'SaleList',
     page,
     { kind: kinds.order, ...since(url, 'UpdatedSince') },
-    (rows) => rows.map(saleRow),
+    (rows) => rows.map((row) => saleRow(context, row)),
   );
 }
 
@@ -431,7 +473,10 @@ async function availability(
   );
 }
 
-function customerJson(record: StoredRecord<CustomerRecord>) {
+function customerJson(
+  context: Cin7Context,
+  record: StoredRecord<CustomerRecord>,
+) {
   const customer = record.data;
   const person = `${customer.firstName} ${customer.lastName}`;
 
@@ -442,7 +487,7 @@ function customerJson(record: StoredRecord<CustomerRecord>) {
       : `${person} (${customer.number})`,
     DisplayName: person,
     Status: 'Active',
-    Currency: 'EUR',
+    Currency: context.config.baseCurrency,
     Tags: '',
     LastModifiedOn: customer.modified,
     Addresses: [
@@ -469,13 +514,16 @@ function customerJson(record: StoredRecord<CustomerRecord>) {
   };
 }
 
-function supplierJson(record: StoredRecord<SupplierRecord>) {
+function supplierJson(
+  context: Cin7Context,
+  record: StoredRecord<SupplierRecord>,
+) {
   const supplier = record.data;
 
   return {
     ID: guid('supplier', supplier.id),
     Name: supplier.companyName,
-    Currency: 'EUR',
+    Currency: context.config.baseCurrency,
     Status: supplier.active ? 'Active' : 'Deprecated',
     LastModifiedOn: new Date(record.updatedAt).toISOString(),
     Addresses: [
@@ -629,7 +677,10 @@ async function route(
   const deprecated = url.searchParams.get('IncludeDeprecated') === 'true';
   switch (endpoint(url)) {
     case 'me':
-      return json({ Company: context.config.company, Currency: 'EUR' });
+      return json({
+        Company: context.config.company,
+        Currency: context.config.baseCurrency,
+      });
     case 'salelist':
       return sales(context, kinds, url, page);
     case 'salecreditnotelist':
@@ -679,7 +730,7 @@ async function route(
         kind: kinds.customer,
         guid: 'customer',
         since: 'ModifiedSince',
-        row: customerJson,
+        row: (record) => customerJson(context, record),
       });
     case 'supplier':
       return listOrOne<SupplierRecord>(context, url, page, {
@@ -688,7 +739,7 @@ async function route(
         guid: 'supplier',
         since: 'ModifiedSince',
         ...(deprecated ? {} : { keep: (record) => record.data.active }),
-        row: supplierJson,
+        row: (record) => supplierJson(context, record),
       });
     case 'purchaselist':
       return storedPage<PurchaseOrderRecord>(

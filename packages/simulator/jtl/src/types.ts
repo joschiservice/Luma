@@ -97,6 +97,8 @@ export type JtlCommand =
         /** Gross unit price. */
         price: number;
       }[];
+      /** Sales tax in percent included in the line prices; German VAT when omitted. */
+      taxRate?: number | undefined;
       shippingMethodId: string;
       currency: string;
       paid: boolean;

@@ -4,6 +4,7 @@ import type { ShopifySeedProduct } from '@luma/simulator-shopify';
 import type { Pool } from 'pg';
 
 import { advanceWorld } from '../engine/advance.js';
+import { mailboxLabels } from '../engine/mail.js';
 import { importOrder, placeOrder } from '../engine/orders.js';
 import { erp, mail, shop, type World } from '../engine/world.js';
 import { createPgStore } from '../pg-store.js';
@@ -154,7 +155,7 @@ export async function buildWorld(
   await mail(world, {
     kind: 'seed-mailbox',
     ...world.model.mailbox.config,
-    labels: ['Lieferanten', 'Kunden'],
+    labels: Object.values(mailboxLabels(world.model.profile.company.language)),
   });
   await seedFixtures(world);
   for (let hourIndex = 0; hourIndex < historyHours; hourIndex++) {

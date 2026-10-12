@@ -58,6 +58,7 @@ const tenant = makeTenantContext(
 const config = {
   accountId,
   company: 'Luma Goods GmbH',
+  baseCurrency: 'EUR',
   warehouses: [
     { id: '1', name: 'Hamburg' },
     { id: '2', name: 'Leipzig' },

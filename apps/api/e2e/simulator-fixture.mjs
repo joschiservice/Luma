@@ -26,7 +26,8 @@ export async function setupSimulator(
     temporal,
     origin = 'http://127.0.0.1:3000',
     profile = 'test',
-    erp = 'jtl',
+    erp,
+    historyDays,
     chaos = 'calm',
     detection,
     demo,
@@ -47,6 +48,7 @@ export async function setupSimulator(
     temporal,
     profile,
     erp,
+    historyDays,
     chaos,
     // A journey's own configuration wins; demo workspaces keep their other demo timings.
     detection: {

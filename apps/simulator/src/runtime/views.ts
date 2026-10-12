@@ -84,6 +84,8 @@ export async function detail(pool: Pool, run: RunRecord): Promise<RunDetail> {
     merchant: {
       description: run.profile.description,
       ordersPerDay: run.profile.demand.ordersPerDay,
+      wholesaleOrdersPerDay: run.profile.wholesale?.ordersPerDay ?? 0,
+      baseCurrency: run.profile.currency.base,
       autonomous: run.profile.demand.autonomous,
       variants: model.catalog.variants.length,
       shops: run.profile.shops.map((shop) => ({

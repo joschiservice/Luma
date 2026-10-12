@@ -167,10 +167,14 @@ export async function createOrder(
       },
     });
   }
-  const total = lines.reduce(
-    (sum, line) => sum + line.data.price * line.data.quantity,
-    0,
-  );
+  // Stores whose prices exclude tax, as in the US, add it at checkout, rounded per line.
+  const { taxRate, taxesIncluded } = context.config;
+  const added = taxRate === undefined || taxesIncluded ? 0 : taxRate;
+  const total = lines.reduce((sum, line) => {
+    const amount = line.data.price * line.data.quantity;
+
+    return sum + amount + Math.round(amount * added);
+  }, 0);
   const scheduled = command.fulfillAt !== undefined && command.fulfillAt > now;
   const workId = await nextId(context);
   const work: FulfillmentOrderData = {

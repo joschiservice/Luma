@@ -120,6 +120,77 @@ export function createAssortment(
   };
 }
 
+const businessHours: [number, number] = [8, 17];
+
+/**
+ * Expected wholesale orders per millisecond. Accounts order on weekdays during business hours
+ * in the time zone of the warehouse that fulfills them; zero without a wholesale channel.
+ */
+export function wholesaleRate(profile: MerchantProfile, time: number) {
+  const wholesale = profile.wholesale;
+  if (!profile.demand.autonomous || !wholesale?.ordersPerDay) return 0;
+  const warehouse = profile.warehouses.find(
+    (item) => item.id === wholesale.warehouse,
+  );
+  const { hour, weekday } = localTime(
+    time,
+    warehouse?.timeZone ?? profile.shops[0]!.timeZone,
+  );
+  const [open, close] = businessHours;
+  if (weekday === 0 || weekday === 6 || hour < open || hour >= close) return 0;
+
+  return wholesale.ordersPerDay / ((close - open) * hourMs);
+}
+
+/**
+ * Picks wholesale lines from all published products, weighted by popularity. Accounts reorder
+ * the merchant's bestsellers in case quantities.
+ */
+export function createWholesaleBasket(
+  profile: MerchantProfile,
+  catalog: Catalog,
+) {
+  const wholesale = profile.wholesale;
+  if (!wholesale) throw new Error(`${profile.name} sells no wholesale`);
+  const published = new Set(
+    catalog.products
+      .filter((product) => product.published)
+      .map((product) => product.id),
+  );
+  const listed = catalog.variants.filter((variant) =>
+    published.has(variant.productId),
+  );
+  const pickVariant = createWeightedPicker(
+    listed,
+    listed.map((variant) => variant.popularity),
+  );
+
+  return (random: Random) => {
+    const lines = new Map<
+      string,
+      { variant: CatalogVariant; quantity: number }
+    >();
+    const count = Math.min(
+      random.int(...wholesale.linesPerOrder),
+      listed.length,
+    );
+    for (
+      let attempt = 0;
+      lines.size < count && attempt < count * 4;
+      attempt++
+    ) {
+      const variant = pickVariant(random);
+      if (!lines.has(variant.id))
+        lines.set(variant.id, {
+          variant,
+          quantity: random.int(...wholesale.unitsPerLine),
+        });
+    }
+
+    return [...lines.values()];
+  };
+}
+
 /** Draws a duration in milliseconds from a profile given in days. */
 export const days = (
   random: Random,

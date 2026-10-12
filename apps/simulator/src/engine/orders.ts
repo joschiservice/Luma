@@ -1,4 +1,4 @@
-import { customer } from '@luma/simulator-commerce';
+import { businessCustomer, customer, days } from '@luma/simulator-commerce';
 import {
   type IncidentKindName,
   keyedRandom,
@@ -8,6 +8,7 @@ import {
 import { readOrder as readErpOrder } from '@luma/simulator-jtl';
 import { readOrder } from '@luma/simulator-shopify';
 
+import type { Pick } from './fulfillment.js';
 import { shippingMethods } from './model.js';
 import { driftStock } from './stock.js';
 import {
@@ -46,6 +47,21 @@ export interface WorldOrder {
 }
 
 const orderKey = (shopName: string, order: string) => `${shopName}:${order}`;
+
+/**
+ * The gross unit price an ERP books for a line whose shop added tax at checkout. Shopify rounds
+ * tax per line, so the unit price keeps four decimals and the line totals match the shop's.
+ */
+const grossUnitPrice = (net: number, quantity: number, rate: number) => {
+  const cents = Math.round(net * 100 * quantity);
+
+  return (
+    Math.round(((cents + Math.round(cents * rate)) / quantity) * 100) / 10_000
+  );
+};
+
+/** A tax fraction as the percentage ERPs record, without floating-point noise. */
+const percent = (rate: number) => Math.round(rate * 100_000) / 1_000;
 
 /** Reads the world's record of a shop order. */
 export async function worldOrder(
@@ -398,6 +414,7 @@ export async function importOrder(
     return;
   }
   const mismatch = order.incidents.includes('shipping-method-mismatch');
+  const tax = shopInstance.shop.tax;
   const result = await erp(world, {
     kind: 'order',
     ...(erpId ? { id: erpId } : {}),
@@ -407,15 +424,19 @@ export async function importOrder(
       : {}),
     lines: order.lines.map((line) => {
       const variant = world.model.variant(line.variant);
+      const price = Number(
+        (variant.price * shopInstance.shop.priceFactor).toFixed(2),
+      );
 
       return {
         itemId: variant.id,
         quantity: line.quantity,
-        price: Number(
-          (variant.price * shopInstance.shop.priceFactor).toFixed(2),
-        ),
+        price: tax.included
+          ? price
+          : grossUnitPrice(price, line.quantity, tax.rate),
       };
     }),
+    taxRate: percent(tax.rate),
     shippingMethodId:
       order.express && !mismatch
         ? shippingMethods.express
@@ -537,4 +558,69 @@ export async function cancelOrder(
     await world.store(worldInstance).delete('pick', order.erpOrder);
   }
   world.metric('orders.cancelled', 1, shopName);
+}
+
+/**
+ * Books a retail account's wholesale order directly in the ERP and queues it for its
+ * warehouse. No shop order exists for it; the account pays its invoice after its payment terms.
+ */
+export async function placeWholesaleOrder(world: World, identity: string) {
+  const wholesale = world.model.profile.wholesale;
+  if (!wholesale) return;
+  const random = keyedRandom(world.run.seed, 'wholesale', identity);
+  const account = businessCustomer(
+    world.run.seed,
+    wholesale.country,
+    random.int(1, wholesale.accounts),
+  );
+  const lines = world.model.wholesaleBasket(random);
+  if (!lines.length) return;
+  const result = await erp(world, {
+    kind: 'order',
+    customer: {
+      email: account.email,
+      firstName: account.firstName,
+      lastName: account.lastName,
+      company: account.company,
+      phone: account.phone,
+      street: account.address.address1,
+      city: account.address.city,
+      postalCode: account.address.zip,
+      countryIso: account.address.countryCode,
+    },
+    // Wholesale prices are net; the ERP books them with tax added.
+    lines: lines.map(({ variant, quantity }) => ({
+      itemId: variant.id,
+      quantity,
+      price: Number(
+        (
+          Number((variant.price * wholesale.priceFactor).toFixed(2)) *
+          (1 + wholesale.taxRate)
+        ).toFixed(2),
+      ),
+    })),
+    taxRate: percent(wholesale.taxRate),
+    shippingMethodId: shippingMethods.standard,
+    currency: world.model.profile.currency.base,
+    paid: false,
+    warehouse: wholesale.warehouse,
+  });
+  const pick: Pick = { shop: null, order: null, stalled: false };
+  await world.store(worldInstance).put('pick', result.id, pick, {
+    key: wholesale.warehouse,
+    updatedAt: world.now,
+  });
+  await schedule(
+    world,
+    world.now + days(random, wholesale.paymentDays),
+    'wholesale-payment',
+    { erpOrder: result.id },
+  );
+  world.metric('orders.wholesale', 1, world.model.erp.name);
+  world.journal(
+    'wholesale-order',
+    { account: account.company, lines: lines.length },
+    world.model.erp.name,
+    result.id,
+  );
 }
