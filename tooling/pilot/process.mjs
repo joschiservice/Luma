@@ -22,8 +22,10 @@ function startSync(pilot, log) {
         .observe({ passes: 1, refresh: false, check })
         .catch((error) => log('Pilot sync pass failed', error));
       if (check)
-        for (const step of [pilot.link, pilot.demo, pilot.detect])
+        for (const step of [pilot.link, pilot.demo, pilot.detect]) {
+          if (stopped) break;
           await step().catch((error) => log('Pilot sync step failed', error));
+        }
       await delay(2_000);
     }
   })();
@@ -65,6 +67,12 @@ function stop() {
 
 process.once('SIGINT', stop);
 process.once('SIGTERM', stop);
+// This process has its own process group, so terminal signals reach it only through its
+// launcher. Stop when the launcher is gone instead of running on unattended.
+const launcher = process.ppid;
+setInterval(() => {
+  if (process.ppid !== launcher) void stop();
+}, 1_000).unref();
 
 try {
   const { createPilot } = await import('./runtime.mjs');

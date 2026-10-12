@@ -8,7 +8,7 @@ import {
   state,
   stateDirectory,
 } from '../dev/environment.mjs';
-import { fail, run } from '../dev/process.mjs';
+import { fail, run, runTogether } from '../dev/process.mjs';
 
 try {
   if (Number(process.versions.node.split('.')[0]) !== 24)
@@ -68,16 +68,10 @@ try {
     console.log(
       'Run pnpm pilot:worker in a second terminal. Stop both commands before resetting.',
     );
-    try {
-      await Promise.all([
-        run('node', ['tooling/pilot/process.mjs'], { env }),
-        run('pnpm', ['--filter', '@luma/web', 'dev'], { env }),
-      ]);
-    } catch (error) {
-      // The shared process runner forwards this to any surviving child group.
-      process.emit('SIGTERM');
-      throw error;
-    }
+    await runTogether([
+      ['node', ['tooling/pilot/process.mjs'], { env }],
+      ['pnpm', ['--filter', '@luma/web', 'dev'], { env }],
+    ]);
   }
   if (['seed', 'reset'].includes(command))
     console.log(
