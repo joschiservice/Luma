@@ -35,6 +35,8 @@ export interface LedgerReview {
 
 /** Independent provider facts stay separate from native balances and order reservations. */
 export interface StockEvidence {
+  /** Published channel storage does not establish physical warehouse stock. */
+  channelReplica?: boolean | undefined;
   snapshotId: string;
   observationId: string;
   connectionId: string;
@@ -52,6 +54,9 @@ export interface StockEvidence {
   channelState?:
     | {
         semantics: 'shopify/1';
+        damaged?: string | null | undefined;
+        qualityControl?: string | null | undefined;
+        safetyStock?: string | null | undefined;
         committed: string | null;
         reserved: string | null;
         itemActive: boolean | null;

@@ -173,3 +173,36 @@ Failed native point reads retain uncertainty separately from immutable provider 
 native balances. They pause older stock evidence until a fresh successful read. Source replacement
 is refused for a location with ownership history: shipment identities need an explicit migration
 review before another connection can assume the binding.
+
+## Publishing native channel allocations
+
+Only the reviewed own phase permits native publication to its selected Shopify connection
+and exact SKU/location mappings. The channel allocation is an explicit nonnegative whole
+number no larger than native available stock; quantities are never silently rounded.
+Publication changes stored available quantity only. Inventory item and location activation,
+provider commitments and non-promisable states require separate authority.
+
+The immutable preview captures native account versions, opening reviews, ownership and
+workspace authority revisions, mappings, the provider CAS value and inventory eligibility.
+It uses the existing persistent policy, approval, Action Admission and idempotency path.
+Inventory holds the pool and ownership stable during dispatch. Native stock changes require
+a new preview. This is a reviewed snapshot allocation; it does not enable automatic
+publication after later stock changes.
+
+A marker recorded immediately before a possible mutation makes that exact source pool
+channel evidence while its ownership version remains own. Provider on-hand derived from
+published available quantity cannot establish warehouse drift or authorize physical ledger
+changes. ERP-to-store mismatch detection excludes native-owned locations; existing cases
+remain subject to independent verification and are not closed by this exclusion.
+
+Verification independently checks stored quantity, unchanged eligibility and exact write
+attribution. Acceptance alone does not verify quantity. Lost receipts retain uncertainty;
+checks read without replaying the mutation. Observe-only creates no provider mutation or
+channel-role marker.
+
+Handback requires no native holds or unsettled effects, zero provider commitments and
+reservations, and a fresh channel baseline aligned to native available, physical total,
+incoming and non-promisable states. The peer review binds that channel reading separately
+from physical drift evidence. Returned inspection and in-transit units must be cleared.
+Handback records the authority transition; it does not activate a location, move states or
+close cases.

@@ -182,5 +182,22 @@
   "shopify_subscriptions_unavailable": "Unavailable with current access",
   "shopify_subscriptions_received": "Last verified delivery: {time}",
   "shopify_subscriptions_no_delivery": "No verified delivery yet",
-  "shopify_blocker_correction_bundle_parent": "Bundle stock is derived from its components. Review component stock instead."
+  "shopify_blocker_correction_bundle_parent": "Bundle stock is derived from its components. Review component stock instead.",
+  "shopify_native_publication_allocation": "Whole-unit allocation",
+  "shopify_native_publication_whole_units": "Enter a nonnegative whole-unit allocation up to 2,147,483,647. Luma does not round native stock.",
+  "shopify_native_publication_rules": "Publish only an approved allocation from this owned location. Native balances, mappings, authority and Shopify storage are checked again. Activation and other stock states stay under separate authority.",
+  "shopify_native_publication_binding": "Native available: {quantity}. Ownership version: {version}.",
+  "shopify_native_publication_active": "Active",
+  "shopify_native_publication_inactive": "Inactive",
+  "shopify_native_publication_title": "Publish native allocation",
+  "shopify_native_publication_approve": "Approve allocation",
+  "shopify_native_publication_send": "Publish allocation",
+  "shopify_native_publication_review": "Review allocation",
+  "shopify_native_publication_review_new": "Review a new allocation",
+  "shopify_native_publication_eligibility": "Inventory item: {item}. Location: {location}.",
+  "shopify_native_publication_source": "Native source",
+  "shopify_native_publication_reading": "Channel stock reading",
+  "shopify_native_publication_table": "Allocation and Shopify storage before dispatch",
+  "shopify_native_publication_requested": "Requested allocation",
+  "shopify_native_publication_storage": "Stored in Shopify"
 }

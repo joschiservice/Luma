@@ -16,6 +16,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@luma/api-contract": "workspace:*",
     "@luma/app-host": "workspace:*",
     "@luma/audit": "workspace:*",
     "@luma/connections": "workspace:*",
@@ -23,6 +24,8 @@
     "@luma/execution": "workspace:*",
     "@luma/i18n": "workspace:*",
     "@luma/identity": "workspace:*",
+    "@luma/inventory": "workspace:*",
+    "@luma/orders": "workspace:*",
     "@luma/platform": "workspace:*",
     "@luma/policies": "workspace:*",
     "@luma/ui": "workspace:*",
@@ -30,9 +33,7 @@
     "@tanstack/react-form": "catalog:",
     "fastify": "catalog:",
     "react": "catalog:",
-    "zod": "catalog:",
-    "@luma/api-contract": "workspace:*",
-    "@luma/orders": "workspace:*"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

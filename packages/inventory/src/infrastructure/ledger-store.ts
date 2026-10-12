@@ -81,9 +81,13 @@ export const stockEvidenceSchema = z.object({
   mappingVersion: z.string(),
   sourceRevision: z.string().nullable(),
   meaningHash: z.string().regex(/^[a-f0-9]{64}$/),
+  channelReplica: z.boolean().optional(),
   channelState: z
     .object({
       semantics: z.literal('shopify/1'),
+      damaged: z.string().nullable().optional(),
+      qualityControl: z.string().nullable().optional(),
+      safetyStock: z.string().nullable().optional(),
       committed: z.string().nullable(),
       reserved: z.string().nullable(),
       itemActive: z.boolean().nullable(),
@@ -745,8 +749,20 @@ async function stockEvidence(
         typeof data.itemActive === 'boolean' &&
         typeof data.locationActive === 'boolean'));
 
+  const channelReplica =
+    ((
+      await tx.query(
+        `SELECT 1 FROM shopify_native_stock_replicas r
+   JOIN inventory_stock_ownership_scopes o ON o.tenant_id=r.tenant_id AND o.location_id=r.location_id
+    AND o.connection_id=r.connection_id AND o.version=r.scope_version AND o.mode='own'
+   WHERE r.tenant_id=$1 AND r.connection_id=$2 AND r.sku_id=$3 AND r.location_id=$4 AND r.unit=$5 LIMIT 1`,
+        [tenant, value.connectionId, data.skuId, data.locationId, data.unit],
+      )
+    ).rowCount ?? 0) > 0;
+
   return {
     snapshotId: row.snapshot_id,
+    channelReplica,
     observationId: value.observationId,
     connectionId: value.connectionId,
     skuId: data.skuId,
@@ -764,6 +780,9 @@ async function stockEvidence(
       data.inventorySemantics === 'shopify/1'
         ? {
             semantics: 'shopify/1',
+            damaged: data.damaged ?? null,
+            qualityControl: data.qualityControl ?? null,
+            safetyStock: data.safetyStock ?? null,
             committed: data.committed ?? null,
             reserved: data.reserved,
             itemActive: data.itemActive ?? null,

@@ -46,6 +46,8 @@ export async function ledgerFixture(t, options = {}) {
 
   return {
     ...source,
+    approverUser: source.admin,
+    providerStore: source.store,
     pool,
     db,
     store,

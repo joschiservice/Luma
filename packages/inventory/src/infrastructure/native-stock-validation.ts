@@ -68,7 +68,10 @@ const ownershipBindingSchema = z
             skuId: uuid,
             unit,
             openingReviewId: uuid,
-            comparisonId: uuid,
+            comparisonId: uuid.nullable(),
+            channelHandover: z
+              .object({ snapshotId: uuid, meaningHash: z.string() })
+              .optional(),
             mappingVersion: z.string().min(1),
             accountVersions: z
               .array(z.object({ id: uuid, version }).strict())

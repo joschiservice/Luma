@@ -163,7 +163,10 @@ const bindingSchema = z.object({
         skuId: uuid,
         unit,
         openingReviewId: uuid,
-        comparisonId: uuid,
+        comparisonId: uuid.nullable(),
+        channelHandover: z
+          .object({ snapshotId: uuid, meaningHash: z.string() })
+          .optional(),
         mappingVersion: z.string(),
         accountVersions: z
           .array(z.object({ id: uuid, version: stockVersionSchema }))
@@ -334,9 +337,13 @@ export const nativeStockEvidenceSchema = z.object({
   meaningHash: z.string(),
   complete: z.boolean(),
   bundleParent: z.boolean().nullable(),
+  channelReplica: z.boolean().optional(),
   channelState: z
     .object({
       semantics: z.literal('shopify/1'),
+      damaged: z.string().nullable().optional(),
+      qualityControl: z.string().nullable().optional(),
+      safetyStock: z.string().nullable().optional(),
       committed: stockQuantitySchema.nullable(),
       reserved: stockQuantitySchema.nullable(),
       itemActive: z.boolean().nullable(),
@@ -409,4 +416,23 @@ export const nativeComparisonSchema = z.object({
     .array(z.object({ accountId: uuid, version: stockVersionSchema }))
     .max(5000),
   entryId: uuid.nullable(),
+});
+
+/** A channel quantity is an explicit whole-unit allocation; it never changes activation or other stock states. */
+export const nativePublicationChoiceSchema = z
+  .object({
+    available: z.number().int().min(0).max(2147483647),
+  })
+  .strict();
+
+/** Server-captured native authority and exact account versions bound to a publication preview. */
+export const nativePublicationBindingSchema = z.object({
+  scope: nativeScopeSchema,
+  authorityRevision: z.number().int().nonnegative(),
+  skuId: uuid,
+  locationId: uuid,
+  unit: z.literal('each'),
+  available: stockQuantitySchema,
+  accounts: z.array(nativeAccountSchema).min(1).max(128),
+  openingReviewIds: z.array(uuid).min(1).max(128),
 });

@@ -72,6 +72,12 @@ export function createInventoryCorrectionProvider(
     ): Promise<InventoryWriteReceipt[]>;
     /** Rechecks source authority immediately before sending the mutation. */
     eligible?: () => Promise<boolean>;
+    /** Native publication stores quantity without changing inactive inventory eligibility. */
+    allowInactiveStorage?: boolean;
+    /** Holds the owner pool stable only during an admitted effect. */
+    dispatchFence?: <T>(operation: () => Promise<T>) => Promise<T>;
+    /** Retains channel semantics before a possible mutation; never called by preview or observe-only. */
+    beforeDispatch?: () => Promise<void>;
     now?: () => Date;
   },
 ) {
@@ -133,6 +139,8 @@ export function createInventoryCorrectionProvider(
       locationId,
       locationName: level?.location.name ?? locationId,
       tracked: node.tracked,
+      itemActive: level?.isActive ?? null,
+      locationActive: level?.location.isActive ?? null,
       bundleParent: node.variant
         ? node.variant.requiresComponents ||
           node.variant.productVariantComponents.nodes.length > 0
@@ -145,8 +153,8 @@ export function createInventoryCorrectionProvider(
             node.variant.productVariantComponents.nodes.length > 0)
         ) &&
         !!level &&
-        level.location.isActive &&
-        level.isActive &&
+        (options.allowInactiveStorage ||
+          (level.location.isActive && level.isActive)) &&
         level.quantities.length === 1 &&
         level.quantities[0]?.name === 'available',
       available,
@@ -216,6 +224,7 @@ export function createInventoryCorrectionProvider(
           retry: 'never',
           dispatch: 'not_dispatched',
         });
+      await options.beforeDispatch?.();
       try {
         const referenceDocumentUri = `luma://inventory-corrections/${context.idempotencyKey}`;
         const raw = await request(
@@ -328,6 +337,12 @@ export function createInventoryCorrectionProvider(
       }
     },
   };
+
+  if (options.dispatchFence) {
+    const run = handler.run;
+    handler.run = (context, input) =>
+      options.dispatchFence!(() => run(context, input));
+  }
 
   return { read, capabilities: { 'inventory.available.reconcile': handler } };
 }
