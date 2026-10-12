@@ -1,3 +1,5 @@
+export { createInventoryLedgerRuntime } from './composition/inventory-ledger.js';
+
 export {
   createSalesRuntime,
   createSalesReadSource,

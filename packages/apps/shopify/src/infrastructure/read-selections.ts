@@ -47,6 +47,7 @@ const transaction =
 export function readSelection(
   capability: ReadCapability,
   orderCustomers = false,
+  includeComposition = false,
 ): string {
   switch (capability) {
     case 'orders.read':
@@ -54,7 +55,7 @@ export function readSelection(
     case 'products.read':
       return `${product} ${connection('variants', 8, variantSelection)}`;
     case 'inventory.read':
-      return `id tracked ${connection('inventoryLevels', 4, level)}`;
+      return `id tracked ${includeComposition ? inventoryCompositionSelection : ''} ${connection('inventoryLevels', 4, level)}`;
     case 'fulfillment.read':
       return `id ${connection('fulfillmentOrders', 3, `${work} ${connection('lineItems', 3, workLine)}`)} fulfillments { ${shipment} ${connection('fulfillmentLineItems', 3, shipmentLine)} }`;
     case 'returns.read':
@@ -114,3 +115,7 @@ export function bulkReadSelection(
       throw new Error('This stream does not support bulk history');
   }
 }
+
+/** Live first-edge evidence distinguishes a stock-bearing variant from a supported bundle parent. */
+export const inventoryCompositionSelection =
+  'variant { id requiresComponents productVariantComponents(first: 1) { nodes { id } pageInfo { hasNextPage endCursor } } }';

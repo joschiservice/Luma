@@ -110,3 +110,35 @@ selected SKU, with at most 5,000 source edges. Detail displays the first 100 edg
 
 Known Shopify bundle parents cannot receive independent available-stock corrections.
 The provider checks the current parent flag and first recipe edge again before dispatch.
+
+## Shadow quantity ledger
+
+Inventory owns immutable balanced stock postings. Each account retains one canonical SKU,
+location, unit and state; external drift additionally retains the exact connection. Quantities
+use six decimal places and versions are integers represented as strings. Commands lock accounts
+in one identity order, check every expected balance and version, and retain the original receipt.
+Changing content under an accepted command key fails rather than retrying different work.
+
+A stock pool starts with a reviewed opening from a complete provider read observed within five
+minutes. Another current member with stock approval permission must review it. Posting checks
+source quantities, mappings, SKU composition and reviewer permission again. Provider commitments
+never create native order reservations. Zero openings retain their review and receipt without
+inventing zero postings. Later corrections and production movements require their own review.
+A reversal opposes every original posting and still checks current stock limits.
+
+Shadow reconciliation compares provider on-hand with the native on-hand buckets. Incoming and
+in-transit quantities remain separate. Evidence must follow the latest native physical posting;
+stale or incomplete evidence produces no difference. Reconciliation changes only a connection's
+virtual drift account and its balancing counterparty. It sends no provider write and grants no
+stock ownership. Shopify openings require a live composition read or a fresh complete catalog
+classification so that bundle parents cannot acquire physical stock.
+
+Historical reads require effective time, recorded knowledge time and an account version limit.
+Unknown effective times are returned separately. A checkpoint is used only when its whole prefix
+fits those cutoffs; backdated postings recorded later do not change earlier knowledge. Server
+recording times use millisecond precision consistently with API timestamps.
+
+Transit, returned-inspection and drift aging returns bounded advisory candidates linked to the
+entry that started the current nonzero episode. The age describes a continuously nonzero aggregate
+balance, not the age of individual units. Unknown effective time uses recording time explicitly.
+A candidate alone does not establish physical loss, delay or resolution.

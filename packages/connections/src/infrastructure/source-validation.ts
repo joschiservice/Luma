@@ -4,6 +4,7 @@ import type { SourceIdentity } from '../domain/capabilities.js';
 import {
   orderBundleGroupSchema,
   productBundleSchema,
+  stockCompositionSchema,
 } from './bundle-validation.js';
 import {
   shipmentSnapshotSchema,
@@ -334,6 +335,7 @@ export const commerceSchema = z.discriminatedUnion('capability', [
         z.literal('sku'),
         z
           .object({
+            composition: stockCompositionSchema.nullable().optional(),
             sku: external,
             location: external,
             unit,

@@ -26,11 +26,30 @@ const base = z.object({
 
 const position = base
   .extend({
-    schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+    schemaVersion: z.union([
+      z.literal(1),
+      z.literal(2),
+      z.literal(3),
+      z.literal(4),
+    ]),
     kind: z.literal('position'),
     data: z
       .object({
         type: z.literal('position'),
+        composition: z
+          .object({
+            variant: z
+              .object({
+                externalId: z.string().min(1).max(1024),
+                scopeKey: z.string().max(1024),
+              })
+              .strict(),
+            requiresComponents: z.boolean(),
+            hasComponents: z.boolean(),
+          })
+          .strict()
+          .nullable()
+          .optional(),
         skuId: uuid,
         locationId: uuid,
         unit: z.string().min(1).max(64),

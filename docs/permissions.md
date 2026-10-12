@@ -33,6 +33,8 @@ Imported orders, stock, products, customers, and returns.
 | View orders | `orders.read` | See orders, their lines, payments, and links to the source systems. |  | Yes | Yes | Yes |
 | View fulfillment | `fulfillment.read` | See shipments, carriers, and fulfillment progress. |  | Yes | Yes | Yes |
 | View inventory | `inventory.read` | See stock positions, locations, and stock history. |  | Yes | Yes | Yes |
+| Manage native stock | `inventory.manage` | Prepare reviewed stock openings and corrections, manage native stock movements and reconcile the shadow ledger. | Yes | Yes | Yes |  |
+| Review native stock changes | `inventory.approve` | Approve or reject another member’s exact stock opening or correction. | Yes | Yes | Yes |  |
 | View products | `products.read` | See the product catalog and SKU comparisons. |  | Yes | Yes | Yes |
 | View customers | `customers.read` | See customer profiles, including names, email addresses, and postal addresses. | Yes | Yes | Yes | Yes |
 | View returns | `returns.read` | See returns, refunds, and money returned. |  | Yes | Yes | Yes |

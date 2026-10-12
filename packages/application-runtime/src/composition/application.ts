@@ -113,6 +113,7 @@ import {
   createFollowUpWorkflows,
   type FollowUpTiming,
 } from './case-workflows.js';
+import { createInventoryLedgerRuntime } from './inventory-ledger.js';
 import {
   createMailboxConnections,
   createMemberDirectory,
@@ -231,6 +232,7 @@ export interface ApplicationServices {
     customers: ReturnType<typeof createCustomerWorkspace>;
     orders: ReturnType<typeof createOrderWorkspace>;
     sales: ReturnType<typeof createSalesRuntime>;
+    inventoryLedger: ReturnType<typeof createInventoryLedgerRuntime>;
     sourceAuthority: ReturnType<typeof createSourceAuthority>;
     decisions: ReturnType<typeof createDecisionQueue>;
     decisionAssignments: ReturnType<typeof createDecisionAssignments>;
@@ -971,6 +973,7 @@ export function createApplicationServices(
       customers: createCustomerWorkspace(database),
       records: createRecordExplorer(database, hiddenOrderSources),
       orders,
+      inventoryLedger: createInventoryLedgerRuntime(database, identity),
       sales: createSalesRuntime(
         database,
         identity,

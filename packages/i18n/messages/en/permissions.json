@@ -118,5 +118,9 @@
   "permissions_shopify_returns_manage_label": "Manage Shopify returns",
   "permissions_shopify_returns_manage_description": "Request approval for Shopify returns, refunds and exchanges.",
   "permissions_jtl_returns_restock_label": "Restock inspected returns",
-  "permissions_jtl_returns_restock_description": "Request approval for and restock only inspected resale units in a Wawi warehouse."
+  "permissions_jtl_returns_restock_description": "Request approval for and restock only inspected resale units in a Wawi warehouse.",
+  "permissions_inventory_manage_label": "Manage native stock",
+  "permissions_inventory_manage_description": "Prepare reviewed stock openings and corrections, manage native stock movements and reconcile the shadow ledger.",
+  "permissions_inventory_approve_label": "Review native stock changes",
+  "permissions_inventory_approve_description": "Approve or reject another member’s exact stock opening or correction."
 }

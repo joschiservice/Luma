@@ -126,6 +126,17 @@ export const product = z.object({
 });
 
 export const inventoryItem = z.object({
+  variant: z
+    .object({
+      id: gid('ProductVariant'),
+      requiresComponents: z.boolean(),
+      productVariantComponents: z.object({
+        nodes: z.array(z.object({ id: gid('ProductVariantComponent') })).max(1),
+        pageInfo,
+      }),
+    })
+    .nullable()
+    .optional(),
   id: gid('InventoryItem'),
   tracked: z.boolean(),
 });

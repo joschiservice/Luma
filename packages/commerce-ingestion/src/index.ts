@@ -27,7 +27,7 @@ export type ProjectionOutcome =
 // would normalize to a different document; replay then adds a new snapshot instead of
 // conflicting with the stored one.
 const normalizers = {
-  inventory: 'commerce/3',
+  inventory: 'commerce/4',
   inventoryTransfers: 'commerce/1',
   inventoryShipments: 'commerce/1',
   product: 'commerce/3',
@@ -226,10 +226,13 @@ export function createCommerceIngestion(
           ...provenance,
           entityId,
           kind: 'position',
-          schemaVersion: 3,
+          schemaVersion: 4,
           mappingVersion: digest(JSON.stringify([skuId, locationId])),
           data: {
             type: 'position',
+            ...(data.composition === undefined
+              ? {}
+              : { composition: data.composition }),
             skuId,
             locationId,
             unit: data.unit,

@@ -21,6 +21,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@luma/audit": "workspace:*",
     "@luma/identity": "workspace:*",
     "@luma/platform": "workspace:*",
     "zod": "catalog:"

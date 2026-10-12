@@ -180,6 +180,12 @@ export interface OrderSnapshot {
 }
 
 export interface InventorySnapshot {
+  /** Live SKU composition facts; omitted means unread, null means the variant was unavailable. */
+  composition?: {
+    variant: ExternalId;
+    requiresComponents: boolean;
+    hasComponents: boolean;
+  } | null;
   sku: ExternalId;
   location: ExternalId;
   unit: string;
@@ -682,7 +688,11 @@ interface CapabilityContract {
     output: WriteReceipt;
   };
   'inventory.read': {
-    input: PageQuery & { sku?: ExternalId; location?: ExternalId };
+    input: PageQuery & {
+      sku?: ExternalId;
+      location?: ExternalId;
+      includeComposition?: boolean;
+    };
     output: Page<InventorySnapshot>;
   };
   'inventory.transfers.read': {

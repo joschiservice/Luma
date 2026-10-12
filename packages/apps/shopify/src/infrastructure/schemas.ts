@@ -1,6 +1,7 @@
 import {
   orderBundleGroupSchema,
   productBundleSchema,
+  stockCompositionSchema,
 } from '@luma/connections/composition';
 import { count, gid, money, timestamp } from '@luma/connector-shopify/schemas';
 import { z } from 'zod';
@@ -11,7 +12,7 @@ export * from '@luma/connector-shopify/schemas';
  * Version of this adapter's normalized output, recorded as observation provenance. Bump it
  * whenever the same provider response would normalize differently.
  */
-export const adapterVersion = 'shopify/11';
+export const adapterVersion = 'shopify/12';
 
 const externalId = z
   .object({ externalId: z.string().min(1), scopeKey: z.string() })
@@ -202,6 +203,7 @@ export const outputs = {
     observation(
       'sku',
       z.object({
+        composition: stockCompositionSchema.nullable().optional(),
         sku: externalId,
         location: externalId,
         unit: z.literal('each'),
@@ -396,25 +398,31 @@ export const inputs = {
       .optional(),
   }),
   'customers.read': changedInput,
-  'inventory.read': pageInput.extend({
-    confirmMissing: z
-      .object({
-        externalId: gid('InventoryItem'),
-        scopeKey: gid('Location'),
-        createdAt: timestamp.nullable(),
-      })
-      .strict()
-      .optional(),
-    historyImport: z
-      .object({
-        key: z.string().uuid(),
-        chunkSize: z.number().int().min(1).max(1000).optional(),
-      })
-      .strict()
-      .optional(),
-    sku: scoped('InventoryItem').optional(),
-    location: scoped('Location').optional(),
-  }),
+  'inventory.read': pageInput
+    .extend({
+      includeComposition: z.boolean().optional(),
+      confirmMissing: z
+        .object({
+          externalId: gid('InventoryItem'),
+          scopeKey: gid('Location'),
+          createdAt: timestamp.nullable(),
+        })
+        .strict()
+        .optional(),
+      historyImport: z
+        .object({
+          key: z.string().uuid(),
+          chunkSize: z.number().int().min(1).max(1000).optional(),
+        })
+        .strict()
+        .optional(),
+      sku: scoped('InventoryItem').optional(),
+      location: scoped('Location').optional(),
+    })
+    .refine(
+      (value) => !value.includeComposition || !value.historyImport,
+      'Composition evidence requires a live read.',
+    ),
   'fulfillment.read': changedInput.extend({
     order: scoped('Order').optional(),
   }),
