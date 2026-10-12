@@ -196,7 +196,11 @@ export interface OrderDetail {
     relationship: 'order' | 'fulfillment' | 'sku';
     needsYou: boolean;
     lastDetectedAt: string | null;
+    /** Resolved issues of this class about the same record that this latest one stands for. */
+    occurrences: number;
   }[];
+  /** Ordered SKUs with a stock gap Luma is letting provider sync close. */
+  stockSync: { skuId: string; since: string; until: string }[];
   workflows: {
     id: string;
     definitionId: string;

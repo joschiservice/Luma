@@ -243,6 +243,7 @@ const detail: ProductDetail = {
       location: 'Berlin warehouse',
       unit: 'each',
       differences: ['available'],
+      sync: null,
       sources: [
         {
           connectionId: erp,

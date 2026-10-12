@@ -1,6 +1,7 @@
 {
   "inventory_page_title": "Bestand",
   "inventory_state_differs": "Quellen weichen ab",
+  "inventory_state_syncing": "Wird synchronisiert",
   "inventory_state_removed": "An der Quelle entfernt",
   "inventory_state_incomplete": "Unvollständiger Bestand",
   "inventory_state_agree": "Gemeldete Mengen stimmen überein",
@@ -55,6 +56,8 @@
   "inventory_explanation_differs": "Gleiche Position, unterschiedliche Mengen je Quelle.",
   "inventory_explanation_agree": "Was jede Quelle für diese Position meldet",
   "inventory_explanation_differs_body": "Die Quellen melden unterschiedliche Werte für: {fields}. Vergleiche Abrufzeiten und Verfügbarkeitsbasis, bevor du entscheidest, welcher Menge du vertraust.",
+  "inventory_explanation_syncing": "Gleiche Position. Synchronisierung ausstehend.",
+  "inventory_explanation_syncing_body": "Die Quellen melden unterschiedliche Werte für: {fields}. Luma hat die Abweichung um {since} erkannt und erwartet, dass die Synchronisierung zwischen den Quellen sie schließt. Besteht sie um {until} noch, meldet Luma ein Problem.",
   "inventory_explanation_agree_body": "Nur gemeldete Mengen werden verglichen. Eine Übereinstimmung belegt keinen aktuellen Abruf und macht keine Quelle maßgeblich.",
   "inventory_explanation_separate": "Mengen werden je Quelle angezeigt und nie zusammengezählt. „Aktualisieren“ zeigt die neuesten Abrufe von Luma; die Quellen werden dabei nicht erneut gelesen.",
   "inventory_comparison_caption": "Mengen je Quelle im Vergleich",

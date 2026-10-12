@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "ruleVersion": "v0.1",
+  "ruleVersion": "v0.2",
   "synthetic": true,
   "now": "2026-09-17T12:00:00Z",
   "thresholds": {
@@ -8,7 +8,9 @@
     "pairSkewSeconds": 60,
     "syncFailureSeconds": 900,
     "stuckSeconds": 7200,
-    "uncertaintySeconds": 1800
+    "uncertaintySeconds": 1800,
+    "propagationSeconds": 1800,
+    "oversellGuardPercent": 25
   },
   "bases": {
     "sync_failure": {
@@ -699,6 +701,159 @@
         "decision": "reject",
         "severity": null,
         "reason": "tenant_mismatch"
+      }
+    },
+    {
+      "id": "inventory-propagation-pending",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftAvailable": "100",
+        "rightAvailable": "101",
+        "mismatchSince": "2026-09-17T11:55:00Z"
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "propagation_pending"
+      }
+    },
+    {
+      "id": "inventory-propagation-window-boundary",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftAvailable": "100",
+        "rightAvailable": "101",
+        "mismatchSince": "2026-09-17T11:30:00Z"
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "propagation_pending"
+      }
+    },
+    {
+      "id": "inventory-propagation-expired",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftAvailable": "100",
+        "rightAvailable": "101",
+        "mismatchSince": "2026-09-17T11:29:59Z"
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "oversell_risk"
+      }
+    },
+    {
+      "id": "inventory-propagation-no-agreement",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftAvailable": "100",
+        "rightAvailable": "101",
+        "mismatchSince": null
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "oversell_risk"
+      }
+    },
+    {
+      "id": "inventory-propagation-future-mismatch",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftAvailable": "100",
+        "rightAvailable": "101",
+        "mismatchSince": "2026-09-17T12:00:01Z"
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "oversell_risk"
+      }
+    },
+    {
+      "id": "inventory-propagation-understated",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftAvailable": "300",
+        "rightAvailable": "30",
+        "mismatchSince": "2026-09-17T11:55:00Z"
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "propagation_pending"
+      }
+    },
+    {
+      "id": "inventory-propagation-without-authority",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "authority": null,
+        "mismatchSince": "2026-09-17T11:55:00Z"
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "propagation_pending"
+      }
+    },
+    {
+      "id": "inventory-oversell-guard",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftAvailable": "30",
+        "rightAvailable": "300",
+        "mismatchSince": "2026-09-17T11:55:00Z"
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "oversell_risk"
+      }
+    },
+    {
+      "id": "inventory-oversell-guard-boundary",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftAvailable": "100",
+        "rightAvailable": "125",
+        "mismatchSince": "2026-09-17T11:55:00Z"
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "propagation_pending"
+      }
+    },
+    {
+      "id": "inventory-oversell-guard-above-boundary",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftAvailable": "100",
+        "rightAvailable": "125.000001",
+        "mismatchSince": "2026-09-17T11:55:00Z"
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "oversell_risk"
+      }
+    },
+    {
+      "id": "inventory-oversell-guard-sold-out",
+      "exceptionClass": "inventory_mismatch",
+      "input": {
+        "leftAvailable": "0",
+        "rightAvailable": "1",
+        "mismatchSince": "2026-09-17T11:55:00Z"
+      },
+      "expected": {
+        "decision": "detect",
+        "severity": "high",
+        "reason": "oversell_risk"
       }
     },
     {

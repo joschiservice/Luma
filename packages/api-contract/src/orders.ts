@@ -253,6 +253,11 @@ export const orderIssueSchema = z.object({
   relationship: z.enum(['order', 'fulfillment', 'sku']),
   needsYou: z.boolean(),
   lastDetectedAt: timestamp.nullable(),
+  /**
+   * How many resolved issues of this class about the same record this row stands for; the row
+   * is the latest of them. Open issues are always listed individually with 1.
+   */
+  occurrences: z.number().int().positive(),
 });
 
 export const orderWorkflowRunSchema = z.object({
@@ -298,6 +303,17 @@ export const orderDetailSchema = z.object({
   /** Returns, and refunds without a return, per source; money counts only from successful payments. */
   returns: z.array(returnListItemSchema),
   issues: z.array(orderIssueSchema),
+  /**
+   * Ordered SKUs whose stock differs between sources while Luma waits for provider sync to
+   * close the gap; an issue is raised for a gap still open at `until`.
+   */
+  stockSync: z.array(
+    z.object({
+      skuId: z.string().uuid(),
+      since: timestamp,
+      until: timestamp,
+    }),
+  ),
   workflows: z.array(orderWorkflowRunSchema),
   history: z.object({
     entries: z.array(orderHistoryEntrySchema),

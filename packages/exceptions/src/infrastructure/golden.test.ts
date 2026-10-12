@@ -37,7 +37,7 @@ const decision = z.discriminatedUnion('decision', [
 const corpusSchema = z
   .object({
     schemaVersion: z.literal(1),
-    ruleVersion: z.literal('v0.1'),
+    ruleVersion: z.literal('v0.2'),
     synthetic: z.literal(true),
     now: timestamp,
     thresholds: z
@@ -47,6 +47,8 @@ const corpusSchema = z
         syncFailureSeconds: z.number().int().positive(),
         stuckSeconds: z.number().int().positive(),
         uncertaintySeconds: z.number().int().positive(),
+        propagationSeconds: z.number().int().positive(),
+        oversellGuardPercent: z.number().int().min(0).max(100),
       })
       .strict(),
     bases: z.object(schemas).strict(),

@@ -38,6 +38,7 @@ import {
   stockFreshness,
   stockQuantity,
   StockState,
+  syncExplanation,
 } from './presentation';
 
 /** Loads a stock investigation while keeping the list's search and return context. */
@@ -183,16 +184,20 @@ export function StockDetailView({
             aria-labelledby="stock-explanation"
           >
             <h2 id="stock-explanation">
-              {position.differences.length
-                ? m.inventory_explanation_differs()
-                : m.inventory_explanation_agree()}
+              {!position.differences.length
+                ? m.inventory_explanation_agree()
+                : position.sync
+                  ? m.inventory_explanation_syncing()
+                  : m.inventory_explanation_differs()}
             </h2>
             <p>
-              {position.differences.length
-                ? m.inventory_explanation_differs_body({
-                    fields: differingQuantities(position.differences),
-                  })
-                : m.inventory_explanation_agree_body()}
+              {!position.differences.length
+                ? m.inventory_explanation_agree_body()
+                : position.sync
+                  ? syncExplanation(position.sync, position.differences)
+                  : m.inventory_explanation_differs_body({
+                      fields: differingQuantities(position.differences),
+                    })}
             </p>
             <p>{m.inventory_explanation_separate()}</p>
           </section>

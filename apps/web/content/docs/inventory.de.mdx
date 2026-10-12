@@ -43,6 +43,14 @@ Mengen bleiben bei ihrer Quelle und werden nie über Quellen hinweg addiert. Mel
 
 **Bestand aktualisieren** oben auf der Seite zeigt die neuesten Abrufe von Luma. Die Quellen werden dabei nicht erneut gelesen; Luma liest sie beim regelmäßigen Abgleich.
 
+## Wenn Bestand noch synchronisiert wird [#when-stock-is-still-syncing]
+
+Ein Verkauf ändert den Bestand zuerst in einem System, das andere System zieht bei seiner nächsten Synchronisierung nach. Solange das dauert, zeigt die Position **Wird synchronisiert** statt **Quellen weichen ab**. Öffne sie, um zu sehen, wann Luma die Abweichung erkannt hat und wann Luma ein Problem meldet, falls sie dann noch besteht. Luma wartet bis zu 30 Minuten, bis deine Systeme wieder übereinstimmen.
+
+Ohne zu warten meldet Luma ein Problem, wenn ein Shop Bestand zeigt, den deine maßgebliche Bestandsquelle nicht decken kann: Die Bestandsquelle hat nichts mehr, oder der Shop zeigt mehr als 25 % über der verfügbaren Menge der Bestandsquelle. Die Bestandsquelle wählst du unter [Maßgebliche Quellen](/docs/workspace-settings#source-authority).
+
+Besteht die Abweichung nach der Wartezeit noch, wird daraus ein Problem **Bestandsabweichung**, das angibt, wie lange Luma gewartet hat. Eine Bestellung zeigt ihre bestellten Artikel, die noch synchronisiert werden, im Bereich **Probleme**.
+
 ## Dieselbe SKU systemübergreifend verknüpfen [#link-the-same-sku-across-systems]
 
 Luma behandelt Datensätze aus verschiedenen Systemen erst dann als dieselbe SKU, wenn sie verknüpft sind – von einer Person oder durch eine Regel für [automatisches Verknüpfen](/docs/data-sync#automatic-linking). Bis dahin erscheint der Bestand eines Artikels aus Shopify und aus deinem ERP als getrennte SKUs, und du kannst ihn weder vergleichen noch den einen anhand des anderen korrigieren.

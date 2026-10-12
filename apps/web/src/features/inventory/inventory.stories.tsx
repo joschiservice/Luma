@@ -29,6 +29,7 @@ const position: StockPosition = {
   location: 'Tokyo warehouse',
   unit: 'each',
   differences: ['available'],
+  sync: null,
   sources: [
     {
       connectionId: '55555555-5555-4555-8555-555555555555',
@@ -63,6 +64,11 @@ const position: StockPosition = {
       deleted: false,
     },
   ],
+};
+// A gap Luma first saw a minute ago and lets the provider sync close.
+const syncing: StockPosition = {
+  ...position,
+  sync: { since: '2026-09-29T08:59:00Z', until: '2026-09-29T09:14:00Z' },
 };
 const list: InventoryList = {
   items: [position],
@@ -143,11 +149,13 @@ const identity = (
 
 function Content({ state }: { state: string }) {
   const [search, change] = useState<InventorySearch>({});
-  if (state === 'detail')
+  if (state === 'detail' || state === 'syncing-detail')
     return (
       <StockDetailView
         organizationId={org}
-        detail={detail}
+        detail={
+          state === 'syncing-detail' ? { ...detail, position: syncing } : detail
+        }
         refresh={() => {}}
         identity={identity}
       />
@@ -164,7 +172,9 @@ function Content({ state }: { state: string }) {
           ? undefined
           : state === 'empty'
             ? { ...list, items: [] }
-            : list
+            : state === 'syncing'
+              ? { ...list, items: [syncing] }
+              : list
       }
       loading={state === 'loading'}
       offline={state === 'offline'}
@@ -226,6 +236,36 @@ export const Detail: Story = {
 
 export const DetailDark: Story = {
   args: { state: 'detail' },
+  globals: { theme: 'dark' },
+};
+
+/** A gap that provider sync is expected to close is shown as syncing, not as a difference. */
+export const Syncing: Story = {
+  args: { state: 'syncing' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText('Syncing')).toBeVisible();
+    await expect(canvas.queryByText('Differs by source')).toBeNull();
+  },
+};
+
+export const SyncingDetail: Story = {
+  args: { state: 'syncing-detail' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByRole('heading', {
+        name: 'Same position. Waiting for sync.',
+      }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByText(/If it is still open at .+, Luma raises an issue\./),
+    ).toBeVisible();
+  },
+};
+
+export const SyncingDetailDark: Story = {
+  args: { state: 'syncing-detail' },
   globals: { theme: 'dark' },
 };
 

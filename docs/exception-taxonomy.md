@@ -1,6 +1,6 @@
 # V0 exception taxonomy and golden cases
 
-Version: `v0.1`. Owner: `@luma/exceptions`.
+Version: `v0.2`. Owner: `@luma/exceptions`.
 
 This spec defines four exception classes, using the names and lifecycle in
 [ADR-002](architecture/002-canonical-commerce-model.md): what evidence each needs, when it
@@ -37,7 +37,7 @@ regression comparison. The rules rest on these provider facts:
 
 ## Shared evaluation contract
 
-- Evaluate with an injected UTC `now`; fixtures never use the machine clock. `v0.1` uses
+- Evaluate with an injected UTC `now`; fixtures never use the machine clock. Rules use
   elapsed time, not business hours.
 - Read trusted tenant context and explicit source-to-canonical mappings. Equal SKU labels,
   order numbers or external IDs never establish identity. Reject cross-tenant evidence
@@ -58,7 +58,7 @@ regression comparison. The rules rest on these provider facts:
   clock. Reread out-of-order or ambiguous projections before evaluation.
 - Thresholds are fixture defaults, not service promises: freshness 300 s, pair skew 60 s,
   sync retry window 900 s, stuck progress 7,200 s, uncertainty escalation 1,800 s,
-  inventory tolerance `0`. Tenant configuration is versioned; changing a value requires
+  inventory tolerance `0`, sync propagation 1,800 s and oversell guard 25 %. Tenant configuration is versioned; changing a value requires
   reevaluation and invalidates stale proposals.
 - Use exact decimal arithmetic (up to 14 integer and 6 fractional digits). Null is
   unknown, zero is known, and negative or fractional stock is valid. Never derive available
@@ -81,8 +81,8 @@ applicable branch wins:
    eligibility from current exemption evidence; a bare pending status is insufficient.
 3. **Inventory:** missing SKU/pool mapping → incomplete/ambiguous projection → null
    quantities → unknown/different units → non-provider basis → future/stale observations
-   → pair skew → tolerance → severity. Oversell severity requires the selling source and
-   the authority to be different sources.
+   → pair skew → tolerance → pending sync → severity. Oversell severity requires the
+   selling source and the authority to be different sources.
 4. **Workflow:** missing durable evidence → unknown effect → intentional cancellation →
    healthy running/succeeded → exhausted failed/timed-out step → pending retry. An
    interrupted step with known no effect defers for a durable terminal or retry decision.
@@ -212,9 +212,29 @@ authority exists and the selling source reports more available than the authorit
 authority the mismatch is still detected, but no correction direction exists. Equal
 negative stock is not a mismatch.
 
+**Pending sync:** a sale changes one provider before the stock sync reaches the other, so
+most gaps close on their own within minutes. The detector records when Luma first saw the
+gap: the first stored report after the last report on which both sides agreed. A gap first
+seen at most 1,800 s ago defers with `propagation_pending`, except when the selling source
+shows stock while the authority has none left, or exceeds the authority by more than the
+oversell guard, a percentage of the authority's available stock. Those gaps detect at once.
+The default window covers a sale that needs two sync cycles of up to 15 minutes, one to
+import the order and one to push the new stock. The default guard lets small overstatements
+wait, because the storefront would have to sell through the authority's whole stock before
+the sync arrives, while low stock still detects at once. Luma reads agreeing positions mostly during sync, so the
+last agreement can be hours old; agreement older than 24 hours does not count and the gap
+is evaluated without waiting. Without agreement history the rule never waits. Because the
+age counts from the first report that disagreed, a gap that keeps changing still detects
+once it outlasts the window. Verification uses the same rule, so it is inconclusive while a
+gap is pending. Waiting is not uncertainty: it resets the uncertainty window instead of
+escalating, because the rule itself detects once the wait ends. The detector stores the
+current wait per fingerprint so views can show the gap as syncing until it closes or is
+raised.
+
 **Evidence:** both source identities and observations, canonical mappings and their
 version, available quantities, units and basis, observation and source-update times,
-authority version, tolerance and the exact signed difference. JTL `all-warehouses` cannot
+authority version, tolerance, the exact signed difference and the agreement history
+searched with the two agreeing reports. JTL `all-warehouses` cannot
 match one Shopify location without an explicit stock-pool aggregation mapping. Warehouse
 on-hand never substitutes for available stock.
 
@@ -313,3 +333,9 @@ never counted as autonomous verified success.
   decision `detect`/`high`/`access_lost`, evaluated before the inactive-connection branch.
   Inputs without the fact evaluate as before, so the version stays `v0.1` and stored
   evaluations remain reproducible. Golden case: `sync-access-lost`.
+- **`v0.2`, `inventory_mismatch` pending sync.** Added the optional fact `mismatchSince`,
+  the thresholds `propagationSeconds` and `oversellGuardPercent`, and
+  the decision `defer`/`propagation_pending`. Inputs without the facts evaluate as in
+  `v0.1`. A threshold change needs a new configuration version, so open cases are
+  reevaluated on their next pass. Golden cases: `inventory-propagation-*` and
+  `inventory-oversell-guard*`.

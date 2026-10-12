@@ -118,7 +118,7 @@ function exceptionService(
             lastDetectedAt: ago(1),
             occurrenceCount: 1,
             previousExceptionId: null,
-            ruleVersion: 'v0.1',
+            ruleVersion: 'v0.2',
             configVersion: request.configuration.version,
           };
           incidents.push(incident);
@@ -147,9 +147,12 @@ function fixture(
     work?: FulfillmentWork[];
     stock?: Record<string, string>;
     fulfillment?: Partial<FulfillmentSnapshot>;
+    /** When Luma first saw the stock sides disagree after they last agreed. */
+    mismatchSince?: string;
   } = {},
 ) {
   const state = {
+    mismatchSince: overrides.mismatchSince ?? null,
     authorityOverrides: overrides.authorityOverrides ?? {},
     authorityRevision: 0,
     streams: overrides.streams ?? [],
@@ -189,6 +192,18 @@ function fixture(
               ),
           )
           .slice(0, limit),
+    ),
+    stockAgreement: vi.fn<DetectionSources['stockAgreement']>(async () =>
+      state.mismatchSince
+        ? {
+            agreedAt: ago(90),
+            mismatchSince: state.mismatchSince,
+            snapshotIds: [
+              '00000000-0000-4000-8000-00000000000a',
+              '00000000-0000-4000-8000-00000000000b',
+            ],
+          }
+        : null,
     ),
   };
   const read = vi.fn(
@@ -549,6 +564,72 @@ describe('detection monitor', () => {
     expect(f.exceptions.incidents[0]!.state).toBe('resolved');
   });
 
+  it('waits for sync on a gap Luma saw open recently, unless the storefront oversells', async () => {
+    const f = fixture({
+      positions: [position()],
+      authorityOverrides: { inventory_selling: connections.at },
+      mismatchSince: ago(2),
+      stock: {
+        [connections.erp]: '100',
+        [connections.de]: '100',
+        [connections.at]: '101',
+      },
+    });
+    // The storefront that sells is compared with the ERP's stock authority.
+    const latest = () => {
+      const request = [...f.exceptions.ingested]
+        .reverse()
+        .find(
+          (item) =>
+            item.input.exceptionClass === 'inventory_mismatch' &&
+            item.input.facts.connectionIds[1] === connections.at,
+        )!;
+
+      return {
+        facts: request.input.facts,
+        decision: evaluateException(
+          request.input,
+          now.toISOString(),
+          defaultConfiguration.thresholds,
+        ),
+      };
+    };
+
+    await f.monitor.tick(context);
+
+    expect(f.exceptions.incidents).toHaveLength(0);
+    expect(latest()).toMatchObject({
+      facts: { authority: 'left', mismatchSince: ago(2) },
+      decision: { decision: 'defer', reason: 'propagation_pending' },
+    });
+
+    // A storefront selling ten times the ERP's stock is raised without waiting.
+    f.state.stock = {
+      [connections.erp]: '30',
+      [connections.de]: '30',
+      [connections.at]: '300',
+    };
+    await f.monitor.tick(context);
+
+    expect(latest().decision).toMatchObject({
+      decision: 'detect',
+      reason: 'oversell_risk',
+    });
+    expect(f.exceptions.incidents).toHaveLength(1);
+
+    // A gap open longer than the propagation window is raised as well.
+    f.state.stock[connections.erp] = '100';
+    f.state.stock[connections.at] = '101';
+    f.state.mismatchSince = ago(31);
+    await f.monitor.tick(context);
+
+    expect(latest()).toMatchObject({
+      facts: { mismatchSince: ago(31) },
+      decision: { decision: 'detect', reason: 'oversell_risk' },
+    });
+    expect(f.exceptions.incidents).toHaveLength(1);
+  });
+
   it('defers conflicting authority, applies overrides on the next pass and keeps prior evidence intact', async () => {
     const f = fixture({
       positions: [position()],
@@ -576,9 +657,11 @@ describe('detection monitor', () => {
     await f.monitor.tick(context);
     expect(f.exceptions.incidents).toHaveLength(1);
     expect(f.exceptions.ingested.slice(0, previous.length)).toEqual(previous);
-    expect(f.exceptions.ingested.at(-2)!.evidence.at(-1)!.facts).toMatchObject({
-      sourceAuthority: { revision: 1 },
-    });
+    expect(
+      f.exceptions.ingested
+        .at(-2)!
+        .evidence.find((item) => item.key.startsWith('mapping:'))!.facts,
+    ).toMatchObject({ sourceAuthority: { revision: 1 } });
     const incident = f.exceptions.incidents[0]!;
     f.state.authorityOverrides.inventory_stock = connections.other;
     f.state.authorityRevision = 2;

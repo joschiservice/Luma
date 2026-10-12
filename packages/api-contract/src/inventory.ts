@@ -27,6 +27,16 @@ export const stockPositionSchema = z.object({
   unit: z.string(),
   sources: z.array(stockSourceSchema),
   differences: z.array(z.enum(['onHand', 'reserved', 'available'])),
+  /**
+   * Set while Luma waits for provider sync to close an available-stock gap: first seen at
+   * `since`; raised as an issue if the gap is still open at `until`.
+   */
+  sync: z
+    .object({
+      since: z.string().datetime({ offset: true }),
+      until: z.string().datetime({ offset: true }),
+    })
+    .nullable(),
 });
 
 export const inventoryQuerySchema = z
