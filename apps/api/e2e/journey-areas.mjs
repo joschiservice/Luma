@@ -1041,5 +1041,13 @@ export const journeyAreas = {
     ...webHome,
     ...webWorkflows,
   ],
+  'workflow-coordination.browser.mjs': [
+    ...connections,
+    ...workflows,
+    ...decisions,
+    ...webWorkflows,
+    ...webNeedsYou,
+  ],
+  'workflow-coordination.e2e.mjs': [...connections, ...workflows, ...decisions],
   'workflows.e2e.mjs': [...connections, ...workflows],
 };

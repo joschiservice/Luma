@@ -244,6 +244,7 @@ export async function createDefaultExceptionWorker(
       replenishment,
       codeProcesses,
       caseWorkflows,
+      coordination,
     } = createApplicationServices({
       database,
       identity: identity.service,
@@ -291,6 +292,7 @@ export async function createDefaultExceptionWorker(
       identity.service,
       codeProcesses,
       caseWorkflows,
+      coordination,
     );
     resources.add(procurementWorker.close);
 

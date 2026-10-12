@@ -216,6 +216,32 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
   await issueTypeFilter.waitFor();
   expect(await row.isVisible()).toBe(true);
   await expandSection('Change and outcome check');
+  await detailPane
+    .getByRole('combobox', { name: 'Assignee', exact: true })
+    .click();
+  await page.getByRole('option').filter({ hasText: 'Ada' }).first().click();
+  await expect(
+    detailPane.getByText('Case owner: Ada', { exact: true }),
+  ).toBeVisible();
+  const ownerApi = `/api/v1/organizations/${organizationId}/exceptions/${ids[0]}/owner`;
+  const owned = await (
+    await context.request.get(
+      `/api/v1/organizations/${organizationId}/exceptions/${ids[0]}`,
+    )
+  ).json();
+  expect(owned.owner).toMatchObject({ revision: 1, name: 'Ada' });
+  const staleOwner = await context.request.post(ownerApi, {
+    headers: { origin },
+    data: { userId: null, revision: 0 },
+  });
+  expect(staleOwner.status()).toBe(409);
+  await detailPane
+    .getByRole('button', { name: 'Clear owner', exact: true })
+    .click();
+  await expect(
+    detailPane.getByText('Case owner: Unassigned', { exact: true }),
+  ).toBeVisible();
+
   await page.getByText('Live updates', { exact: true }).waitFor();
   await services.diagnoses.run(tenant, ids[0]);
   // The credentialed stream refreshes the completed investigation without a click.

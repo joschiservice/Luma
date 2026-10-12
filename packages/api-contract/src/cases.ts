@@ -25,6 +25,7 @@ export const caseStates = [
 export const caseQuerySchema = z
   .object({
     view: z.enum(['needs_you', 'active', 'history']).default('needs_you'),
+    ownerId: z.union([z.string().uuid(), z.literal('unassigned')]).optional(),
     class: z.enum(caseClasses).optional(),
     severity: z.enum(['high', 'medium']).optional(),
     state: z.enum(caseStates).optional(),
@@ -35,7 +36,16 @@ export const caseQuerySchema = z
 
 export type CaseQuery = z.infer<typeof caseQuerySchema>;
 
+export const caseOwnerSchema = z.object({
+  userId: z.string().uuid().nullable(),
+  name: z.string().nullable(),
+  revision: z.number().int().positive(),
+  assignedBy: z.string().uuid(),
+  assignedAt: z.string().datetime(),
+});
+
 export const caseSummarySchema = z.object({
+  owner: caseOwnerSchema.nullable().optional(),
   schemaVersion: z.literal(1),
   id: z.string().uuid(),
   revision: z.number().int().positive(),

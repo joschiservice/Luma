@@ -41,11 +41,31 @@ export type ProcessStep =
   | { id: string; kind: 'wait'; seconds: number }
   | {
       id: string;
+      kind: 'human_task';
+      assignee: TaskAssignee;
+      instructions: string;
+      choices: string[];
+      evidence: 'text' | 'link' | 'record';
+      dueAfterSeconds: number;
+      escalationTarget: TaskAssignee;
+    }
+  | {
+      id: string;
+      kind: 'event_wait';
+      eventType: string;
+      correlation: ProcessValue;
+      fields: PlaybookFields;
+      timeoutSeconds: number;
+      onTimeout: 'escalate' | 'end';
+    }
+  | {
+      id: string;
       kind: 'verification';
       forStep: string;
       evaluatorVersion: string;
       maxDurationSeconds: number;
       fields: PlaybookFields;
+      recheck?: { attempts: number; intervalSeconds: number } | undefined;
     }
   | { id: string; kind: 'escalation'; reason: string }
   | { id: string; kind: 'end'; outcome: string };
@@ -128,3 +148,14 @@ export type ProcessRunState =
   | 'failed_verification'
   | 'inconclusive_verification'
   | 'escalated';
+
+/** A current workspace member or a role; assignment never grants action authority. */
+export type TaskAssignee =
+  { kind: 'person'; id: string } | { kind: 'role'; key: string };
+
+/** Human evidence is input to later steps, never verification of a provider effect. */
+export interface HumanTaskAnswer {
+  choice: string;
+  note?: string | undefined;
+  evidence: { kind: 'text' | 'link' | 'record'; value: string };
+}

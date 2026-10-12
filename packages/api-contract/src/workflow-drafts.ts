@@ -26,6 +26,8 @@ export const workflowStepKinds = [
   'capability',
   'approval',
   'wait',
+  'human_task',
+  'event_wait',
   'verification',
   'escalation',
   'end',
@@ -41,7 +43,33 @@ const workflowTriggerKinds = [
 ] as const;
 
 /** One step of a draft. Values may be empty until validation passes. */
+const assignee = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('person'), id: text }).strict(),
+  z.object({ kind: z.literal('role'), key: text }).strict(),
+]);
+
 export const draftStepSchema = z.discriminatedUnion('kind', [
+  step
+    .extend({
+      kind: z.literal('human_task'),
+      assignee,
+      instructions: text,
+      choices: z.array(text).max(20),
+      evidence: z.enum(['text', 'link', 'record']),
+      dueAfterSeconds: number,
+      escalationTarget: assignee,
+    })
+    .strict(),
+  step
+    .extend({
+      kind: z.literal('event_wait'),
+      eventType: text,
+      correlation: value,
+      fields,
+      timeoutSeconds: number,
+      onTimeout: z.enum(['escalate', 'end']),
+    })
+    .strict(),
   step
     .extend({
       kind: z.literal('code'),
@@ -92,6 +120,10 @@ export const draftStepSchema = z.discriminatedUnion('kind', [
       forStep: key,
       evaluatorVersion: text,
       maxDurationSeconds: number,
+      recheck: z
+        .object({ attempts: number, intervalSeconds: number })
+        .strict()
+        .optional(),
       fields,
     })
     .strict(),

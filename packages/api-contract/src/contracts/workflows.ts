@@ -29,7 +29,178 @@ const params = organizationParamsSchema.extend({
 });
 const path = '/v1/organizations/{organizationId}/workflows';
 
+const taskAssignee = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('person'), id: z.string().uuid() }),
+  z.object({ kind: z.literal('role'), key: z.string() }),
+]);
+const taskAnswer = z
+  .object({
+    choice: z.string().min(1).max(200),
+    note: z.string().max(2000).optional(),
+    evidence: z
+      .object({
+        kind: z.enum(['text', 'link', 'record']),
+        value: z.string().min(1).max(2000),
+      })
+      .strict(),
+  })
+  .strict();
+const humanTask = z.object({
+  runId: z.string().uuid(),
+  stepId: z.string(),
+  definitionId: z.string(),
+  subject: z.object({ kind: z.string(), id: z.string() }),
+  assignee: taskAssignee,
+  escalationTarget: taskAssignee,
+  instructions: z.string(),
+  choices: z.array(z.string()),
+  evidence: z.enum(['text', 'link', 'record']),
+  dueAt: z.string().datetime(),
+  createdAt: z.string().datetime(),
+  escalatedAt: z.string().datetime().nullable(),
+  state: z.enum(['open', 'answered', 'cancelled']),
+  answer: taskAnswer
+    .extend({ actorId: z.string().uuid(), answeredAt: z.string().datetime() })
+    .nullable(),
+});
+const taskParams = params.extend({
+  runId: z.string().uuid(),
+  stepId: z.string().min(1).max(80),
+});
+const subscriptionTrigger = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('manual') }).strict(),
+  z
+    .object({
+      kind: z.literal('exception'),
+      issueType: z.string().min(1).max(200),
+    })
+    .strict(),
+  z
+    .object({ kind: z.literal('event'), eventType: z.string().min(1).max(200) })
+    .strict(),
+  z.object({ kind: z.literal('schedule'), at: z.string().datetime() }).strict(),
+  z
+    .object({
+      kind: z.literal('condition'),
+      field: z.string().min(1).max(80),
+      equals: z.union([
+        z.string().max(2000),
+        z.number().finite(),
+        z.boolean(),
+        z.null(),
+      ]),
+    })
+    .strict(),
+]);
+const subscription = z.object({
+  id: z.string().uuid(),
+  definitionId: z.string(),
+  version: z.string(),
+  versionDigest: z.string(),
+  revision: z.number().int().positive(),
+  trigger: subscriptionTrigger,
+  active: z.boolean(),
+  updatedBy: z.string().uuid(),
+  updatedAt: z.string().datetime(),
+});
+
 export const workflowsContract = {
+  subscriptions: endpoint
+    .route({
+      method: 'GET',
+      path: `${path}/{definitionId}/subscriptions`,
+      summary: 'Read workflow subscriptions',
+    })
+    .meta({ access: requires('workflows.read'), errors: [401, 403, 404, 503] })
+    .input(z.object({ params }))
+    .output(z.array(subscription)),
+  configureSubscription: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/{definitionId}/subscriptions`,
+      summary: 'Configure future workflow starts',
+      description:
+        'Adds a subscription revision. Historical runs retain their exact subscription and immutable workflow version. Starts must review the current subscription revision.',
+    })
+    .meta({
+      access: requires('workflows.triggers.manage'),
+      errors: [401, 403, 404, 409, 422, 503],
+    })
+    .input(
+      z.object({
+        params,
+        body: z
+          .object({
+            id: z.string().uuid(),
+            revision: z.number().int().nonnegative(),
+            version: z.string().min(1).max(80),
+            reviewedDigest: z.string().regex(/^[a-f0-9]{64}$/),
+            trigger: subscriptionTrigger,
+            active: z.boolean(),
+          })
+          .strict(),
+      }),
+    )
+    .output(subscription),
+  humanTask: endpoint
+    .route({
+      method: 'GET',
+      path: `${path}/{definitionId}/runs/{runId}/tasks/{stepId}`,
+      summary: 'Read assigned human work',
+    })
+    .meta({ access: requires('workflows.read'), errors: [401, 403, 404, 503] })
+    .input(z.object({ params: taskParams }))
+    .output(humanTask),
+  answerHumanTask: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/{definitionId}/runs/{runId}/tasks/{stepId}/answer`,
+      summary: 'Answer assigned human work',
+      description:
+        'Records the assignee’s answer and evidence once. Answers are workflow input; provider changes still require policy admission.',
+    })
+    .meta({
+      access: requires('workflows.read'),
+      errors: [401, 403, 404, 409, 422, 503],
+    })
+    .input(z.object({ params: taskParams, body: taskAnswer }))
+    .output(humanTask),
+  deliverEvent: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/{definitionId}/events`,
+      summary: 'Deliver a correlated business event',
+      description:
+        'Persists immutable event evidence within this workspace. Retry the exact source and body. Waiting workflows read this evidence durably.',
+    })
+    .meta({
+      access: requires('workflows.triggers.manage'),
+      errors: [401, 403, 404, 409, 422, 503],
+    })
+    .input(
+      z.object({
+        params,
+        body: z
+          .object({
+            sourceId: z.string().min(1).max(200),
+            eventType: z.string().min(1).max(200),
+            correlationKey: z.string().min(1).max(2000),
+            occurredAt: z.string().datetime(),
+            values: z.record(
+              z.string().max(80),
+              z.union([
+                z.string().max(2000),
+                z.number().finite(),
+                z.boolean(),
+                z.null(),
+              ]),
+            ),
+            evidenceRefs: z.array(z.string().min(1).max(200)).min(1).max(100),
+          })
+          .strict(),
+      }),
+    )
+    .output(z.object({ recorded: z.literal(true) })),
   evaluateCode: endpoint
     .route({
       method: 'POST',
@@ -304,7 +475,7 @@ export const workflowsContract = {
     .route({
       method: 'POST',
       path: `${path}/{definitionId}/starts/{runId}/cancel`,
-      summary: 'Cancel a pending scheduled start',
+      summary: 'Cancel a scheduled start or open workflow handoff',
     })
     .meta({
       access: requires('workflows.triggers.manage'),

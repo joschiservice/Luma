@@ -25,7 +25,73 @@ export function workflowRoutes(service?: WorkflowCatalog) {
 
   const os = implement(apiContract.workflows).$context<HttpContext>();
 
+  function coordinator(request: FastifyRequest) {
+    const s = use(request);
+    if (!s.service.coordination)
+      throw new IdentityError(
+        503,
+        'SERVICE_UNAVAILABLE',
+        'Workflow coordination is unavailable.',
+      );
+
+    return { context: s.context, service: s.service.coordination };
+  }
+
   return os.router({
+    subscriptions: os.subscriptions.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = use(request);
+
+        return s.service.subscriptions(s.context, params.definitionId);
+      },
+    ),
+    configureSubscription: os.configureSubscription.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = use(request);
+
+        return s.service.configureSubscription(
+          s.context,
+          params.definitionId,
+          body,
+        );
+      },
+    ),
+    humanTask: os.humanTask.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = coordinator(request);
+        const task = await s.service.task(
+          s.context,
+          params.runId,
+          params.stepId,
+        );
+        if (task.definitionId !== params.definitionId)
+          throw new IdentityError(404, 'NOT_FOUND', 'Human task not found.');
+
+        return task;
+      },
+    ),
+    answerHumanTask: os.answerHumanTask.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = coordinator(request);
+        const task = await s.service.task(
+          s.context,
+          params.runId,
+          params.stepId,
+        );
+        if (task.definitionId !== params.definitionId)
+          throw new IdentityError(404, 'NOT_FOUND', 'Human task not found.');
+
+        return s.service.answer(s.context, params.runId, params.stepId, body);
+      },
+    ),
+    deliverEvent: os.deliverEvent.handler(
+      async ({ context: { request }, input: { body } }) => {
+        const s = coordinator(request);
+        await s.service.deliver(s.context, body);
+
+        return { recorded: true as const };
+      },
+    ),
     evaluateCode: os.evaluateCode.handler(
       async ({ context: { request }, input: { params, body } }) => {
         const s = use(request);

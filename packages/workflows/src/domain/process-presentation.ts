@@ -7,6 +7,8 @@ const names: Record<ProcessStep['kind'], string> = {
   capability: 'Use capability',
   approval: 'Get a decision',
   wait: 'Wait',
+  human_task: 'Ask a person',
+  event_wait: 'Wait for an event',
   verification: 'Verify result',
   escalation: 'Escalate',
   end: 'Finish',
@@ -25,6 +27,10 @@ function reference(step: ProcessStep): string {
       return `${step.capability}@${step.capabilityVersion} on ${step.targetKind} · minimum risk ${step.minimumRisk}`;
     case 'approval':
       return `approval for ${step.forStep}`;
+    case 'human_task':
+      return `human task due within ${step.dueAfterSeconds}s`;
+    case 'event_wait':
+      return `event ${step.eventType} within ${step.timeoutSeconds}s`;
     case 'wait':
       return `wait ${step.seconds}s`;
     case 'verification':
@@ -68,23 +74,27 @@ export function presentProcessVersion(version: ProcessWorkflowVersion) {
       reference: `${step.id} · ${reference(step)}`,
       title: names[step.kind],
       description:
-        step.kind === 'code'
-          ? `Compute ${Object.keys(step.fields).join(', ') || 'a result'} with ${step.grants.length} granted capabilities.`
-          : step.kind === 'capability'
-            ? `${step.capability}@${step.capabilityVersion} on a ${step.targetKind}.`
-            : step.kind === 'approval'
-              ? `Decide whether ${step.forStep} may proceed.`
-              : step.kind === 'verification'
-                ? `Confirm the result of ${step.forStep}.`
-                : step.kind === 'wait'
-                  ? `Wait ${step.seconds} seconds before continuing.`
-                  : step.kind === 'read'
-                    ? `Read current ${step.source} context.`
-                    : step.kind === 'condition'
-                      ? `Continue when ${step.field} equals ${JSON.stringify(step.equals)}.`
-                      : step.kind === 'escalation'
-                        ? step.reason
-                        : `Finish with ${step.outcome}.`,
+        step.kind === 'human_task'
+          ? step.instructions
+          : step.kind === 'event_wait'
+            ? `Wait for ${step.eventType}.`
+            : step.kind === 'code'
+              ? `Compute ${Object.keys(step.fields).join(', ') || 'a result'} with ${step.grants.length} granted capabilities.`
+              : step.kind === 'capability'
+                ? `${step.capability}@${step.capabilityVersion} on a ${step.targetKind}.`
+                : step.kind === 'approval'
+                  ? `Decide whether ${step.forStep} may proceed.`
+                  : step.kind === 'verification'
+                    ? `Confirm the result of ${step.forStep}.`
+                    : step.kind === 'wait'
+                      ? `Wait ${step.seconds} seconds before continuing.`
+                      : step.kind === 'read'
+                        ? `Read current ${step.source} context.`
+                        : step.kind === 'condition'
+                          ? `Continue when ${step.field} equals ${JSON.stringify(step.equals)}.`
+                          : step.kind === 'escalation'
+                            ? step.reason
+                            : `Finish with ${step.outcome}.`,
       details:
         step.kind === 'capability'
           ? [

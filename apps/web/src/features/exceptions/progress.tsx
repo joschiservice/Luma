@@ -8,6 +8,7 @@ import { CaseTimeline } from '@luma/ui/components/issues/case-timeline';
 import { Button } from '@luma/ui/components/primitives/button';
 
 import type { CaseObservation } from './observation';
+import { CaseOwnerControl } from './owner';
 
 /**
  * Keeps a selected case investigation and history current through progress events and query
@@ -48,43 +49,52 @@ export function LiveCaseDetail({
     );
 
   return (
-    <CaseInvestigation
-      item={data.detail}
-      review={data.review}
-      embedded
-      expanded={expanded}
-      unconfirmed={!confirmed}
-      onRefresh={refresh}
-      refreshing={snapshot.isFetching}
-      progress={
-        <CaseTimeline
-          expanded={expanded}
-          {...data}
-          timeline={history.data?.timeline ?? []}
-          evidence={history.data?.evidence ?? []}
-          historyUnavailable={history.isError || history.isPending}
-          hasMoreTimeline={history.data?.hasMoreTimeline ?? false}
-          hasMoreEvidence={history.data?.hasMoreEvidence ?? false}
-          loadingHistory={history.isFetching}
-          onLoadMore={observation.loadMore}
-          connection={connection}
-          confirmed={confirmed}
-          onRefresh={refresh}
-        >
-          {history.isError ? (
-            <CaseNotice error title={m.exceptions_history_failed_title()}>
-              {history.data
-                ? m.exceptions_history_failed_stale()
-                : m.exceptions_history_failed_text()}
-              <Button variant="outline" onClick={observation.retryHistory}>
-                {m.exceptions_history_retry()}
-              </Button>
-            </CaseNotice>
-          ) : history.isPending ? (
-            <CaseLoading />
-          ) : null}
-        </CaseTimeline>
-      }
-    />
+    <>
+      <CaseOwnerControl
+        organizationId={observation.organizationId}
+        item={data.detail}
+        onChange={observation.refresh}
+      />
+      <CaseInvestigation
+        item={data.detail}
+        review={data.review}
+        embedded
+        expanded={expanded}
+        unconfirmed={!confirmed}
+        onRefresh={refresh}
+        refreshing={snapshot.isFetching}
+        progress={
+          <>
+            <CaseTimeline
+              expanded={expanded}
+              {...data}
+              timeline={history.data?.timeline ?? []}
+              evidence={history.data?.evidence ?? []}
+              historyUnavailable={history.isError || history.isPending}
+              hasMoreTimeline={history.data?.hasMoreTimeline ?? false}
+              hasMoreEvidence={history.data?.hasMoreEvidence ?? false}
+              loadingHistory={history.isFetching}
+              onLoadMore={observation.loadMore}
+              connection={connection}
+              confirmed={confirmed}
+              onRefresh={refresh}
+            >
+              {history.isError ? (
+                <CaseNotice error title={m.exceptions_history_failed_title()}>
+                  {history.data
+                    ? m.exceptions_history_failed_stale()
+                    : m.exceptions_history_failed_text()}
+                  <Button variant="outline" onClick={observation.retryHistory}>
+                    {m.exceptions_history_retry()}
+                  </Button>
+                </CaseNotice>
+              ) : history.isPending ? (
+                <CaseLoading />
+              ) : null}
+            </CaseTimeline>
+          </>
+        }
+      />
+    </>
   );
 }

@@ -21,6 +21,7 @@ import {
   type WorkflowPeople,
 } from './application/catalog.js';
 import { createCodeEvaluations } from './application/code-evaluations.js';
+import { createWorkflowCoordination } from './application/coordination.js';
 import {
   createDraftGeneration,
   generateDraft,
@@ -57,6 +58,7 @@ import {
 import { createCodeEvaluationStore } from './infrastructure/code/evaluations.js';
 import { createWasmtimeRunner } from './infrastructure/code/runner.js';
 import type { createCodeProcesses } from './infrastructure/code-processes.js';
+import { createCoordinationStore } from './infrastructure/coordination.js';
 import { createDraftTestStore } from './infrastructure/draft-tests.js';
 import {
   createReservedDefinitions,
@@ -151,8 +153,10 @@ export function createWorkflows(
   ) => Promise<string[]>,
   caseWorkflows?: CaseWorkflows,
   people?: WorkflowPeople,
+  coordination?: ReturnType<typeof createWorkflowCoordination>,
 ) {
   return createWorkflowCatalog({
+    ...(coordination ? { coordination } : {}),
     ...(people ? { people } : {}),
     ...(explain ? { explain } : {}),
     ...(caseWorkflows ? { caseWorkflows } : {}),
@@ -495,3 +499,23 @@ export function createAuthoringHarness(deps: {
 }
 
 export { authoringPromptVersion } from './domain/draft-generation.js';
+
+/** Composes tenant-scoped coordination for API responses and durable process activities. */
+export function createCoordination(
+  db: TenantDatabase,
+  identity: Pick<
+    IdentityService,
+    'refreshContext' | 'resolveWorkflowContext' | 'listMembers'
+  >,
+  audit: Parameters<typeof createCoordinationStore>[1],
+) {
+  return createWorkflowCoordination({
+    store: createCoordinationStore(db, audit),
+    members: identity.listMembers,
+    refreshContext: identity.refreshContext,
+    resolveContext: (run) =>
+      identity.resolveWorkflowContext(run.actor.id, run.tenantId, run.id),
+  });
+}
+
+export { createWorkflowEventSink } from './infrastructure/coordination.js';

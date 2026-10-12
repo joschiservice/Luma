@@ -1,6 +1,7 @@
 import type {
   FireWorkflow,
   WorkflowDetail,
+  WorkflowTrigger,
   WorkflowVersionView,
 } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
@@ -17,12 +18,17 @@ import {
   WorkspaceTimezone,
 } from '@luma/ui/components/primitives/workspace-date';
 import { workspaceInstant } from '@luma/ui/lib/timezone';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { ArrowRight, Clock3, Play, ShieldCheck, Zap } from 'lucide-react';
 import { useContext, useState } from 'react';
 
 import { IdentityError } from '../../kit/identity/data';
+import { createWebApiClient } from '../../lib/api-client';
+import { privateQueryDefaults } from '../../lib/private-query';
 import { cancelWorkflowStart, fireWorkflow, workflowError } from './data';
 import { workflowTriggerLabel } from './presentation';
+
+const api = createWebApiClient();
 
 const actions = {
   manual: m.workflows_triggers_action_manual,
@@ -50,7 +56,83 @@ export function WorkflowTriggers({
   accessLost: () => Promise<void>;
 }) {
   const timeZone = useContext(WorkspaceTimezone);
-  const trigger = version.applicability.trigger;
+  const params = { organizationId, definitionId: detail.summary.id };
+  const subscriptions = useQuery({
+    ...privateQueryDefaults,
+    queryKey: [
+      'private',
+      organizationId,
+      'workflow-subscriptions',
+      detail.summary.id,
+    ],
+    queryFn: ({ signal }) =>
+      api.workflows.subscriptions({ params }, { signal }),
+    enabled:
+      version.format === 'workflow/2' &&
+      version.applicability.trigger.kind !== 'exception',
+  });
+  const [subscriptionId, setSubscriptionId] = useState('');
+  const selectedSubscription = subscriptions.data?.find(
+    (item) =>
+      item.id === subscriptionId &&
+      item.active &&
+      item.versionDigest === version.digest,
+  );
+  const trigger =
+    selectedSubscription?.trigger ?? version.applicability.trigger;
+  const [schedule, setSchedule] = useState('');
+  const [subscriptionKind, setSubscriptionKind] = useState<
+    'manual' | 'schedule' | 'event' | 'condition'
+  >('schedule');
+  const [eventType, setEventType] = useState(version.context.kind);
+  const [conditionField, setConditionField] = useState(
+    Object.keys(version.context.fields)[0] ?? '',
+  );
+  const [conditionValue, setConditionValue] = useState('');
+
+  function subscriptionTrigger(): WorkflowTrigger {
+    if (subscriptionKind === 'manual') return { kind: 'manual' };
+    if (subscriptionKind === 'schedule')
+      return { kind: 'schedule', at: workspaceInstant(schedule, timeZone) };
+    if (subscriptionKind === 'event') return { kind: 'event', eventType };
+    const type = version.context.fields[conditionField];
+    const equals =
+      type === 'null'
+        ? null
+        : type === 'boolean'
+          ? conditionValue === 'true'
+          : type === 'number'
+            ? Number(conditionValue)
+            : conditionValue;
+    if (
+      (type === 'boolean' && !['true', 'false'].includes(conditionValue)) ||
+      (type === 'number' &&
+        (!conditionValue.trim() || !Number.isFinite(equals)))
+    )
+      throw new Error(m.authoring_coordination_invalid_condition());
+
+    return { kind: 'condition', field: conditionField, equals };
+  }
+
+  const [scheduleId] = useState(() => crypto.randomUUID());
+  const configure = useMutation({
+    mutationFn: () =>
+      api.workflows.configureSubscription({
+        params,
+        body: {
+          id: selectedSubscription?.id ?? scheduleId,
+          revision: selectedSubscription?.revision ?? 0,
+          version: version.version,
+          reviewedDigest: version.digest,
+          trigger: subscriptionTrigger(),
+          active: true,
+        },
+      }),
+    onSuccess: async (value) => {
+      await subscriptions.refetch();
+      setSubscriptionId(value.id);
+    },
+  });
   const [subject, setSubject] = useState('');
   const [source, setSource] = useState('');
   const [observedAt, setObservedAt] = useState('');
@@ -103,6 +185,14 @@ export function WorkflowTriggers({
     }
     const sourceId = external ? source.trim() : crypto.randomUUID();
     const body: FireWorkflow = request ?? {
+      ...(selectedSubscription
+        ? {
+            subscription: {
+              id: selectedSubscription.id,
+              revision: selectedSubscription.revision,
+            },
+          }
+        : {}),
       version: version.version,
       reviewedDigest: version.digest,
       subject: { kind: version.applicability.subjectKind, id: subject.trim() },
@@ -155,6 +245,140 @@ export function WorkflowTriggers({
       className="workflow-section"
       aria-labelledby="trigger-title"
     >
+      {version.format === 'workflow/2' &&
+      version.applicability.trigger.kind !== 'exception' ? (
+        <Disclosure>
+          <summary>{m.authoring_coordination_subscriptions()}</summary>
+          <Select
+            aria-label={m.authoring_coordination_subscriptions()}
+            value={subscriptionId}
+            options={[
+              {
+                value: '',
+                label: m.authoring_coordination_subscription_default(),
+              },
+              ...(subscriptions.data ?? [])
+                .filter(
+                  (item) =>
+                    item.active && item.versionDigest === version.digest,
+                )
+                .map((item) => ({
+                  value: item.id,
+                  label: `${workflowTriggerLabel(item.trigger)} · ${item.revision}`,
+                })),
+            ]}
+            onValueChange={(id) => {
+              setSubscriptionId(id ?? '');
+              setRequest(null);
+            }}
+          />
+          {subscriptions.isError ? (
+            <p role="alert">{m.authoring_coordination_unavailable()}</p>
+          ) : null}
+          {detail.canManage ? (
+            <div>
+              <label htmlFor="workflow-subscription-kind">
+                {m.authoring_coordination_subscription_kind()}
+              </label>
+              <Select
+                id="workflow-subscription-kind"
+                value={subscriptionKind}
+                options={['manual', 'schedule', 'event', 'condition'].map(
+                  (kind) => ({
+                    value: kind,
+                    label: actions[kind as keyof typeof actions](),
+                  }),
+                )}
+                onValueChange={(value) => {
+                  if (
+                    value === 'manual' ||
+                    value === 'schedule' ||
+                    value === 'event' ||
+                    value === 'condition'
+                  )
+                    setSubscriptionKind(value);
+                }}
+                disabled={configure.isPending}
+              />
+              {subscriptionKind === 'event' ? (
+                <>
+                  <label htmlFor="workflow-subscription-event">
+                    {m.authoring_coordination_event_type()}
+                  </label>
+                  <Input
+                    id="workflow-subscription-event"
+                    value={eventType}
+                    onChange={(event) => setEventType(event.target.value)}
+                    disabled={configure.isPending}
+                  />
+                </>
+              ) : null}
+              {subscriptionKind === 'condition' ? (
+                <>
+                  <label htmlFor="workflow-subscription-field">
+                    {m.authoring_coordination_condition_field()}
+                  </label>
+                  <Select
+                    id="workflow-subscription-field"
+                    value={conditionField}
+                    options={Object.entries(version.context.fields).map(
+                      ([value, type]) => ({
+                        value,
+                        label: `${value} (${type})`,
+                      }),
+                    )}
+                    onValueChange={(value) => setConditionField(value ?? '')}
+                    disabled={configure.isPending}
+                  />
+                  <label htmlFor="workflow-subscription-value">
+                    {m.authoring_coordination_condition_value()}
+                  </label>
+                  <Input
+                    id="workflow-subscription-value"
+                    value={conditionValue}
+                    onChange={(event) => setConditionValue(event.target.value)}
+                    disabled={configure.isPending}
+                  />
+                </>
+              ) : null}
+              {subscriptionKind === 'schedule' ? (
+                <>
+                  <label htmlFor="workflow-subscription-schedule">
+                    {m.authoring_coordination_subscription_schedule()}
+                  </label>
+                  <Input
+                    id="workflow-subscription-schedule"
+                    type="datetime-local"
+                    value={schedule}
+                    disabled={configure.isPending}
+                    onChange={(event) => setSchedule(event.target.value)}
+                  />
+                </>
+              ) : null}
+              <Button
+                type="button"
+                onClick={() => configure.mutate()}
+                disabled={
+                  configure.isPending ||
+                  (subscriptionKind === 'schedule' && !schedule) ||
+                  (subscriptionKind === 'event' && !eventType.trim()) ||
+                  (subscriptionKind === 'condition' && !conditionField)
+                }
+              >
+                {m.authoring_coordination_subscription_save()}
+              </Button>
+              {configure.isError ? (
+                <p role="alert">{configure.error.message}</p>
+              ) : null}
+              {configure.isSuccess ? (
+                <p role="status">
+                  {m.authoring_coordination_subscription_saved()}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+        </Disclosure>
+      ) : null}
       <CardHeader className="workflows-heading">
         <h2 id="trigger-title">
           <Zap size={16} aria-hidden="true" /> {m.workflows_triggers_title()}
@@ -371,11 +595,13 @@ export function CancelScheduledStart({
   definitionId,
   runId,
   refresh,
+  coordination = false,
 }: {
   organizationId: string;
   definitionId: string;
   runId: string;
   refresh: () => Promise<void>;
+  coordination?: boolean;
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
@@ -400,7 +626,9 @@ export function CancelScheduledStart({
       >
         {pending
           ? m.workflows_triggers_canceling()
-          : m.workflows_triggers_cancel_scheduled()}
+          : coordination
+            ? m.common_cancel()
+            : m.workflows_triggers_cancel_scheduled()}
       </Button>
       {error ? <p role="alert">{error}</p> : null}
     </div>

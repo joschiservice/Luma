@@ -399,7 +399,7 @@ export function createDeskStore(
           `
         WITH proposals AS (SELECT id FROM case_proposals WHERE tenant_id=$1 AND exception_id=$2),
         events AS (
-          SELECT 0 AS priority,id,created_at,document AS doc FROM audit_entries WHERE tenant_id=$1 AND proposal_id IN (SELECT id FROM proposals)
+          SELECT 0 AS priority,id,created_at,document AS doc FROM audit_entries WHERE tenant_id=$1 AND (proposal_id IN (SELECT id FROM proposals) OR proposal_id=$2)
           UNION ALL SELECT 1,id,created_at,document FROM execution_outbox WHERE tenant_id=$1 AND proposal_id IN (SELECT id FROM proposals)
           UNION ALL SELECT 2,id,created_at,jsonb_build_object('eventType',document->'type','occurredAt',COALESCE(document->'document'->'evaluatedAt',document->'document'->'createdAt'),'actor',jsonb_build_object('id',COALESCE(document->'document'->'actorId',document->'document'->'approverId')),'proposalId',document->'document'->'proposalId','details',jsonb_build_object('outcome',document->'document'->'outcome')) FROM policy_outbox WHERE tenant_id=$1 AND (document->'document'->>'proposalId')::uuid IN (SELECT id FROM proposals)
           UNION ALL SELECT 3,id,created_at,jsonb_build_object('eventType',document->'type','occurredAt',COALESCE(document->'at',document->'resolution'->'at'),'actor',jsonb_build_object('id',COALESCE(document->'actorId',document->'resolution'->'actorId')),'evidenceRefs',document->'resolution'->'evidenceRefs','reason',document->'resolution'->'reason','details',jsonb_build_object('outcome',document->'resolution'->'kind')) FROM exception_outbox WHERE tenant_id=$1 AND exception_id=$2
@@ -434,7 +434,23 @@ export function createDeskStore(
             proposalId: typeof d.proposalId === 'string' ? d.proposalId : null,
             outcome: details?.outcome ?? details?.state ?? null,
             reason:
-              typeof d.reason === 'string' ? d.reason.slice(0, 1000) : null,
+              typeof d.reason === 'string'
+                ? d.reason.slice(0, 1000)
+                : d.eventType === 'workflow.human_task_answered'
+                  ? Object.entries((d.details ?? {}) as Record<string, string>)
+                      .filter(([key]) =>
+                        ['choice', 'note', 'evidence'].includes(key),
+                      )
+                      .map(([, value]) => value)
+                      .filter(Boolean)
+                      .join(' · ')
+                      .slice(0, 1000)
+                  : d.eventType === 'case.owner_changed'
+                    ? String(
+                        (d.details as Record<string, string> | undefined)
+                          ?.ownerName ?? '',
+                      )
+                    : null,
             evidenceRefs: Array.isArray(d.evidenceRefs)
               ? d.evidenceRefs
                   .filter((e): e is string => typeof e === 'string')

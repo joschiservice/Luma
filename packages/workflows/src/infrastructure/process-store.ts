@@ -22,6 +22,8 @@ function validateOutput(
     capability: ['waiting', 'completed', 'escalated', 'not_executed'],
     approval: ['waiting', 'completed', 'denied'],
     wait: ['waiting', 'completed'],
+    human_task: ['waiting', 'completed', 'ended'],
+    event_wait: ['waiting', 'completed', 'ended', 'escalated'],
     verification: ['completed', 'failed', 'inconclusive'],
     escalation: ['escalated'],
     end: ['completed'],
@@ -36,7 +38,8 @@ function validateOutput(
   if (
     step.kind === 'read' ||
     step.kind === 'verification' ||
-    (step.kind === 'code' && output.state === 'completed')
+    ((step.kind === 'code' || step.kind === 'event_wait') &&
+      output.state === 'completed')
   ) {
     if (
       Object.keys(output.values).length !== Object.keys(step.fields).length ||
@@ -48,6 +51,25 @@ function validateOutput(
     )
       throw new Error('Step output does not match its declared fields');
   }
+  if (
+    step.kind === 'human_task' &&
+    output.state === 'completed' &&
+    (Object.keys(output.values).length !== 4 ||
+      !['choice', 'note', 'actorId', 'evidence'].every(
+        (key) => typeof output.values[key] === 'string',
+      ) ||
+      !step.choices.includes(String(output.values.choice)) ||
+      !output.values.evidence)
+  )
+    throw new Error('Human task output must match its answer contract');
+  if (
+    step.kind === 'event_wait' &&
+    output.reason !== 'coordination_cancelled' &&
+    ['ended', 'escalated'].includes(output.state) &&
+    (output.reason !== 'event_wait_timeout' ||
+      output.state !== (step.onTimeout === 'end' ? 'ended' : 'escalated'))
+  )
+    throw new Error('Event wait timeout must match its recovery contract');
   if (
     step.kind === 'read' &&
     (!output.observedAt ||

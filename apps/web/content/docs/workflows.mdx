@@ -98,3 +98,16 @@ A workflow never closes an issue on its own. Luma closes it only after its own c
 - **Test and turn on issue workflows**: activate workflows that change specific orders, and test workflows on issues.
 
 To build a new workflow, select **New workflow**. See [Create a workflow](/docs/workflows/create).
+
+## Handoffs and event waits
+
+A **Human task** asks a person or role to choose an answer and add the required evidence.
+Its due time hands responsibility to the fallback person or role; the task stays open.
+Answer it in [Needs you](/docs/needs-you). An answer never approves a later change.
+
+An **Event wait** waits for an event with the workflow's correlation key and required fields.
+Choose its time limit and whether a timeout ends or escalates the run. A timeout is not a
+verified result. Supplier acknowledgment events come from confirmed purchasing-system reads.
+
+Under **Trigger**, you can save a schedule subscription without publishing new workflow
+logic. Starts retain the subscription revision they used; edits affect future starts.

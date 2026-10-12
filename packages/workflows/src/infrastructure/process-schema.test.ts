@@ -225,3 +225,35 @@ describe('draft diagnostics', () => {
     );
   });
 });
+
+it('autosaves incomplete coordination drafts but blocks publication until the contract is complete', () => {
+  const human = {
+    id: 'handoff',
+    kind: 'human_task' as const,
+    assignee: { kind: 'person' as const, id: '' },
+    instructions: '',
+    choices: [],
+    evidence: 'text' as const,
+    dueAfterSeconds: 0,
+    escalationTarget: { kind: 'role' as const, key: '' },
+  };
+  const draft = {
+    ...draftFromVersion(compileProcessWorkflow(processSource)),
+    steps: [human, processSource.steps[6]],
+  };
+  expect(parseDraftShape(draft).content).not.toBeNull();
+  expect(() => compileProcessWorkflow(draft)).toThrow();
+  const event = {
+    id: 'ack',
+    kind: 'event_wait' as const,
+    eventType: '',
+    correlation: { source: 'step' as const, stepId: '', field: '' },
+    fields: {},
+    timeoutSeconds: 0,
+    onTimeout: 'escalate' as const,
+  };
+  expect(
+    parseDraftShape({ ...draft, steps: [event, processSource.steps[6]] })
+      .content,
+  ).not.toBeNull();
+});

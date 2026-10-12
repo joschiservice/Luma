@@ -11,7 +11,10 @@ import type {
   ProcessActivities,
   ProcessRun,
 } from '@luma/workflows';
-import type { createCodeProcesses } from '@luma/workflows/composition';
+import type {
+  createCodeProcesses,
+  createCoordination,
+} from '@luma/workflows/composition';
 import type { Pool } from 'pg';
 
 import type { createReplenishmentRuntime } from './replenishment.js';
@@ -27,6 +30,7 @@ export async function createReplenishmentWorker(
   identity: Pick<IdentityService, 'resolveWorkflowContext'>,
   codeProcesses?: ReturnType<typeof createCodeProcesses>,
   caseWorkflows?: CaseWorkflows,
+  coordination?: ReturnType<typeof createCoordination>,
 ) {
   const select = (run: ProcessRun) =>
     run.definitionId === 'inventory-replenishment'
@@ -35,6 +39,7 @@ export async function createReplenishmentWorker(
         ? caseWorkflows.activities
         : codeProcesses?.activities;
   const activities: ProcessActivities = {
+    ...(coordination ? { coordinate: coordination.coordinate } : {}),
     read: (run, step) => select(run)!.read(run, step),
     decision: (run, step) => select(run)!.decision(run, step),
     action: (run, version, step, outputs) =>

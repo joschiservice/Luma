@@ -443,6 +443,7 @@ describe('draft test runs', () => {
     expect(Object.keys(activities).sort()).toEqual([
       'action',
       'code',
+      'coordinate',
       'decision',
       'read',
       'record',

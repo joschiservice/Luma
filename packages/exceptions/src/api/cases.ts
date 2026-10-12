@@ -31,6 +31,13 @@ export function caseRoutes(service?: CaseService) {
   const os = implement(apiContract.exceptions).$context<HttpContext>();
 
   return os.router({
+    assignOwner: os.assignOwner.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = use(request);
+
+        return s.service.assignOwner(s.context, params.exceptionId, body);
+      },
+    ),
     list: os.list.handler(
       async ({ context: { request }, input: { query } }) => {
         const { context, service } = use(request);

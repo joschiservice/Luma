@@ -34,6 +34,14 @@ const triggers: Record<string, Text> = {
 };
 
 const steps: Record<string, Text> = {
+  human_task: [
+    m.authoring_coordination_human_label,
+    m.authoring_coordination_human_description,
+  ],
+  event_wait: [
+    m.authoring_coordination_event_label,
+    m.authoring_coordination_event_description,
+  ],
   read: [m.vocabulary_step_read_label, m.vocabulary_step_read_description],
   condition: [
     m.vocabulary_step_condition_label,

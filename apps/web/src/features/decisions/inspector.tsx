@@ -292,7 +292,11 @@ export function DecisionInspector({
         <section className="decision-section" aria-labelledby={`${id}-why`}>
           <h3 id={`${id}-why`}>{m.decisions_why_title()}</h3>
           <p>
-            {item.observeOnly ? m.issues_observe_only_proposal() : item.why}
+            {item.observeOnly
+              ? m.issues_observe_only_proposal()
+              : item.kind === 'human_task'
+                ? m.authoring_coordination_waiting_for_answer()
+                : item.why}
           </p>
           {item.response === 'awaiting_other' ? (
             <p className="decision-note">{m.decisions_note_awaiting_other()}</p>
@@ -313,8 +317,20 @@ export function DecisionInspector({
           <dl className="decision-facts">
             {item.change.map((fact) => (
               <div key={fact.label}>
-                <dt>{fact.label}</dt>
-                <dd>{fact.value}</dd>
+                <dt>
+                  {item.kind === 'human_task'
+                    ? m.authoring_coordination_evidence()
+                    : fact.label}
+                </dt>
+                <dd>
+                  {item.kind === 'human_task'
+                    ? ({
+                        text: m.authoring_coordination_text(),
+                        link: m.authoring_coordination_link(),
+                        record: m.authoring_coordination_record(),
+                      }[fact.value as 'text' | 'link' | 'record'] ?? fact.value)
+                    : fact.value}
+                </dd>
               </div>
             ))}
           </dl>
@@ -324,8 +340,16 @@ export function DecisionInspector({
           <dl className="decision-consequences">
             {item.consequences.map((consequence) => (
               <div key={consequence.response}>
-                <dt>{consequence.response}</dt>
-                <dd>{consequence.text}</dd>
+                <dt>
+                  {item.kind === 'human_task'
+                    ? m.authoring_coordination_answer()
+                    : consequence.response}
+                </dt>
+                <dd>
+                  {item.kind === 'human_task'
+                    ? m.authoring_coordination_answer_effect()
+                    : consequence.text}
+                </dd>
               </div>
             ))}
           </dl>
@@ -366,7 +390,9 @@ export function DecisionInspector({
                 <dt>{m.decisions_deadline_label()}</dt>
                 <dd>
                   <WorkspaceDate value={item.deadline} />
-                  <span>{m.decisions_deadline_note()}</span>
+                  {item.kind !== 'human_task' ? (
+                    <span>{m.decisions_deadline_note()}</span>
+                  ) : null}
                 </dd>
               </div>
             ) : null}
@@ -418,11 +444,13 @@ export function DecisionInspector({
       <section className="decision-review" aria-labelledby={`${id}-review`}>
         <h3 id={`${id}-review`}>{m.decisions_review_title()}</h3>
         <p className="decision-note">
-          {item.owner.kind === 'case'
-            ? m.decisions_review_note_case()
-            : item.owner.kind === 'workflow_run'
-              ? m.decisions_review_note_run()
-              : m.decisions_review_note_record()}
+          {item.owner.kind === 'human_task'
+            ? m.authoring_coordination_answer_effect()
+            : item.owner.kind === 'case'
+              ? m.decisions_review_note_case()
+              : item.owner.kind === 'workflow_run'
+                ? m.decisions_review_note_run()
+                : m.decisions_review_note_record()}
         </p>
         {review}
       </section>

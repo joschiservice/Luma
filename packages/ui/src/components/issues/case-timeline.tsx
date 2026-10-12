@@ -53,6 +53,10 @@ type Event = CaseTimelinePage['items'][number];
 type Execution = NonNullable<CaseProgress['execution']>;
 
 const eventNames: Record<string, () => string> = {
+  'case.owner_changed': m.authoring_coordination_owner_changed,
+  'workflow.human_task_created': m.authoring_coordination_task_created,
+  'workflow.human_task_escalated': m.authoring_coordination_overdue,
+  'workflow.human_task_answered': m.authoring_coordination_answered,
   'exception.detected': m.issues_event_detected,
   'execution.prepared': m.issues_event_change_queued,
   'execution.completed': m.issues_event_change_finished,

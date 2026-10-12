@@ -142,6 +142,10 @@ function stepInputs(
         ? resolveAll(action.expectedPostcondition, run, seen)
         : {};
     }
+    case 'human_task':
+      return {};
+    case 'event_wait':
+      return {};
     case 'wait':
       return { seconds: step.seconds };
     default:
@@ -221,6 +225,10 @@ function note(
 
       return `${label} couldn’t confirm the result in this example. A person would review the run.`;
     }
+    case 'human_task':
+      return 'Collects a human answer and evidence.';
+    case 'event_wait':
+      return 'Waits for a correlated event.';
     case 'wait':
       return `Would wait ${duration(step.seconds)}. The test skips the wait.`;
     case 'escalation':

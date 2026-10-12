@@ -98,3 +98,18 @@ Ein Workflow schließt nie selbst ein Problem. Luma schließt es erst, wenn die 
 - **Problem-Workflows testen und einschalten**: Workflows aktivieren, die bestimmte Bestellungen ändern, und Workflows an Problemen testen.
 
 Um einen neuen Workflow zu erstellen, wähle **Neuer Workflow**. Siehe [Workflow erstellen](/docs/workflows/create).
+
+## Übergaben und Ereignisse
+
+Eine **Menschliche Aufgabe** fordert eine Person oder Rolle auf, eine Antwort auszuwählen
+und den erforderlichen Nachweis einzutragen. Bei Fälligkeit übernimmt die Ersatzperson
+oder Ersatzrolle; die Aufgabe bleibt offen. Antworte unter [Deine Aufgaben](/docs/needs-you).
+Eine Antwort genehmigt keine spätere Änderung.
+
+**Auf Ereignis warten** wartet auf ein Ereignis mit dem passenden Korrelationsschlüssel
+und den erforderlichen Feldern. Lege das Zeitlimit fest und ob ein Timeout den Lauf beendet
+oder eskaliert. Ein Timeout ist kein verifiziertes Ergebnis. Lieferantenbestätigungen
+stammen aus bestätigten Abfragen des Einkaufssystems.
+
+Unter **Auslöser** kannst du einen Zeitplan speichern, ohne die Workflow-Logik neu zu
+veröffentlichen. Jeder Start behält seine Auslöserrevision; Änderungen gelten für neue Starts.

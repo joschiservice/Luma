@@ -43,12 +43,19 @@ request; clients refresh from the first page and deduplicate by ID.
 A provider that throws is reported in `sources` as `unavailable`. Its decisions are missing,
 not resolved, and the rest of the queue still loads.
 
+Human tasks appear only for their current assignee or fallback person or role. Their
+review collects a published choice and required evidence, with an optional note. The task's
+deadline changes responsibility without removing the open handoff. Responses remain input
+and cannot authorize a later action.
+
 ## Assignment
 
 `decision_assignments` stores the current owner per decision ID with an optimistic revision;
 Resolution owns the writes. `decisions.self_assign` takes an unassigned decision or releases
 one's own; `decisions.assign` assigns any decision to a current member. The decision must
-currently be in the reader's queue. Assignment never grants approval authority.
+currently be in the reader's queue. Assignment never grants approval authority. Case responsibility comes from the case owner;
+its optimistic assignment and audit are owned by Exceptions. Human task responsibility is
+published with the workflow and refreshed against the current membership.
 
 ## Live refresh
 

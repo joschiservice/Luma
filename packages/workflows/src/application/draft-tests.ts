@@ -262,6 +262,11 @@ function exampleActivities(
   };
 
   return {
+    async coordinate(_run, step) {
+      live();
+
+      return { state: 'pending', evidenceRefs: [`example:${step.id}`] };
+    },
     async read(_run, step) {
       live();
 

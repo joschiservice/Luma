@@ -69,7 +69,7 @@ it('saves, validates and publishes tenant drafts without activating them', async
   expect(
     vocabulary.capabilities.every((item) => item.reason && !item.executable),
   ).toBe(true);
-  expect(vocabulary.stepKinds).toHaveLength(9);
+  expect(vocabulary.stepKinds).toHaveLength(11);
 
   // Templates list their requirements; customizing copies one into a new draft.
   const templates = (await call('/workflow-templates')).body.items;

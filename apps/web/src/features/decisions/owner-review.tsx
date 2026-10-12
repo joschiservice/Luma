@@ -12,6 +12,7 @@ import { CaseResolution } from '../exceptions/resolution';
 import { ThreadReview } from '../inbox/thread';
 import { PurchaseOrderReview } from '../procurement/detail';
 import { workflowRunsOptions } from '../workflows/data';
+import { HumanTaskReview } from '../workflows/human-task';
 import { ReplenishmentRunReview } from '../workflows/replenishment';
 
 /**
@@ -32,6 +33,15 @@ export function OwnerReview({
   onChange: () => Promise<void>;
 }) {
   switch (owner.kind) {
+    case 'human_task':
+      return (
+        <HumanTaskReview
+          key={`${owner.runId}:${owner.stepId}`}
+          organizationId={organizationId}
+          owner={owner}
+          onChange={onChange}
+        />
+      );
     case 'case':
       return (
         <CaseReview

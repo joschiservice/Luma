@@ -1,3 +1,4 @@
+import type { IdentityService } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 
 import { createCaseService } from './application/cases.js';
@@ -6,6 +7,7 @@ import { createDetectionService } from './application/detection.js';
 import type { DiagnosisOptions } from './application/diagnosis.js';
 import { createDiagnosisService } from './application/diagnosis.js';
 import { createEscalationService } from './application/escalation.js';
+import { createCaseOwners } from './application/owners.js';
 import { createCaseReader } from './infrastructure/cases.js';
 import {
   boundedInvestigation,
@@ -15,6 +17,7 @@ import {
 import { createDiagnosisRepository } from './infrastructure/diagnosis-repository.js';
 import { parseDiagnosis } from './infrastructure/diagnosis-validation.js';
 import { createEscalationRepository } from './infrastructure/escalation.js';
+import { createCaseOwnerStore } from './infrastructure/owners.js';
 import { createDetectionRepository } from './infrastructure/repository.js';
 import { detectionBoundary } from './infrastructure/validation.js';
 
@@ -65,8 +68,20 @@ export function createCases(
   db: TenantDatabase,
   now: () => Date = () => new Date(),
   productIdentities?: Parameters<typeof createCaseService>[1],
+  identity?: Pick<IdentityService, 'refreshContext' | 'listMembers'>,
+  audit?: Parameters<typeof createCaseOwnerStore>[1],
 ) {
-  return createCaseService(createCaseReader(db, now), productIdentities);
+  return createCaseService(
+    createCaseReader(db, now),
+    productIdentities,
+    identity && audit
+      ? createCaseOwners({
+          store: createCaseOwnerStore(db, audit),
+          refreshContext: identity.refreshContext,
+          members: identity.listMembers,
+        })
+      : undefined,
+  );
 }
 
 /** Creates a persistent command for escalating a tenant's incident to manual attention. */

@@ -5,11 +5,38 @@ import {
   caseEvidencePageSchema,
   caseEvidenceQuerySchema,
   caseListSchema,
+  caseOwnerSchema,
   caseQuerySchema,
 } from '../cases.js';
 import { endpoint, organizationParamsSchema, requires } from '../common.js';
 
 export const exceptionsContract = {
+  assignOwner: endpoint
+    .route({
+      method: 'POST',
+      path: '/v1/organizations/{organizationId}/exceptions/{exceptionId}/owner',
+      summary: 'Assign or clear a case owner',
+      description:
+        'Changes responsibility with an optimistic revision. Assignment is audited and grants no approval or execution authority.',
+    })
+    .meta({
+      access: requires('decisions.assign'),
+      errors: [401, 403, 404, 409, 422, 503],
+    })
+    .input(
+      z.object({
+        params: organizationParamsSchema.extend({
+          exceptionId: z.string().uuid(),
+        }),
+        body: z
+          .object({
+            userId: z.string().uuid().nullable(),
+            revision: z.number().int().nonnegative(),
+          })
+          .strict(),
+      }),
+    )
+    .output(caseOwnerSchema),
   list: endpoint
     .route({
       method: 'GET',

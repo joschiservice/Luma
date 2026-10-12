@@ -144,6 +144,7 @@ export function useCaseObservation(
       : connection;
 
   return {
+    organizationId,
     snapshot,
     history,
     denied,

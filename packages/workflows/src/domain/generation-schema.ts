@@ -111,6 +111,31 @@ function contentSchema(vocabulary: AuthoringVocabulary): JsonSchema {
     ),
     step('approval', { forStep: key, expiresAfterSeconds: seconds(86_400) }),
     step('wait', { seconds: seconds(86_400) }),
+    step('human_task', {
+      assignee: {
+        anyOf: [
+          object({ kind: choice(['person']), id: text(36) }),
+          object({ kind: choice(['role']), key: text(200) }),
+        ],
+      },
+      instructions: text(2000),
+      choices: { type: 'array', items: text(200), minItems: 1, maxItems: 20 },
+      evidence: choice(['text', 'link', 'record']),
+      dueAfterSeconds: seconds(2592000),
+      escalationTarget: {
+        anyOf: [
+          object({ kind: choice(['person']), id: text(36) }),
+          object({ kind: choice(['role']), key: text(200) }),
+        ],
+      },
+    }),
+    step('event_wait', {
+      eventType: text(200),
+      correlation: value,
+      fields: { type: 'object', additionalProperties: fieldType },
+      timeoutSeconds: seconds(2592000),
+      onTimeout: choice(['escalate', 'end']),
+    }),
     ...vocabulary.evaluators.map((evaluator) =>
       step('verification', {
         forStep: key,

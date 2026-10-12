@@ -19,6 +19,7 @@ import {
 
 type Row = {
   document: Incident;
+  owner: import('../application/owners.js').CaseOwner | null;
   version: number;
   diagnosis: Diagnosis | null;
   attention_reason: 'approval' | 'manual_intervention' | 'uncertainty' | null;
@@ -33,7 +34,7 @@ type Row = {
 // select-list entries, such as the current policy decision `pa.document` and `pa.proposal`.
 function caseQuery(filter = 'true', columns = '') {
   return `cases AS (
- SELECT e.document,e.version,d.document AS diagnosis${columns},
+ SELECT e.document,e.version,owner.document || jsonb_build_object('name',person.name) AS owner,d.document AS diagnosis${columns},
  CASE WHEN e.state='resolved' THEN NULL
  WHEN e.state='escalated' OR u.review_required THEN 'uncertainty'
  WHEN pa.observe_only THEN 'manual_intervention'
@@ -46,6 +47,8 @@ function caseQuery(filter = 'true', columns = '') {
  GREATEST(e.document->>'lastDetectedAt',d.document->'provenance'->>'generatedAt',e.document->'resolution'->>'at',command.at,pa.document->>'evaluatedAt') AS activity,
  CASE WHEN e.document->>'severity'='high' THEN 0 ELSE 1 END AS rank
  FROM exceptions e
+ LEFT JOIN case_owners owner ON owner.tenant_id=e.tenant_id AND owner.exception_id=e.id
+ LEFT JOIN workspace_people person ON person.tenant_id=owner.tenant_id AND person.user_id=owner.user_id
  LEFT JOIN exception_diagnosis_heads h ON h.tenant_id=e.tenant_id AND h.exception_id=e.id
  LEFT JOIN exception_diagnoses d ON d.tenant_id=h.tenant_id AND d.exception_id=h.exception_id AND d.revision=h.revision
  LEFT JOIN exception_uncertainty u ON u.tenant_id=e.tenant_id AND u.fingerprint=e.fingerprint
@@ -110,7 +113,7 @@ export const orderAttentionQuery = attentionQuery();
  * `valid_until`. Bind `$1` to the tenant ID and `$2` to the evaluation time.
  */
 export const caseDecisionQuery = `WITH ${caseQuery("e.state<>'resolved'", ',pa.document AS policy,pa.proposal,pa.observe_only')}
- SELECT (o.document->>'id')::uuid AS exception_id,o.attention_reason AS reason,
+ SELECT o.owner,(o.document->>'id')::uuid AS exception_id,o.attention_reason AS reason,
   o.attention_at::timestamptz AS requested_at,o.document->>'severity' AS severity,
   o.document->>'exceptionClass' AS class,o.document->>'state' AS state,o.document->'subject' AS subject,
   o.diagnosis->>'status' AS diagnosis_status,o.diagnosis->>'summary' AS summary,
@@ -182,6 +185,7 @@ function contextKey(tenantId: string, query: CaseQuery) {
         query.class ?? null,
         query.severity ?? null,
         query.state ?? null,
+        query.ownerId ?? null,
         query.limit,
       ]),
     )
@@ -244,6 +248,7 @@ function project(row: Row, now: Date): CaseDetail {
 
   return {
     schemaVersion: 1,
+    owner: row.owner,
     id: incident.id,
     revision: row.version,
     class: incident.exceptionClass,
@@ -448,7 +453,8 @@ export function createCaseReader(
         ($3='needs_you' AND attention_reason IS NOT NULL OR $3='active' AND document->>'state'<>'resolved' OR $3='history' AND document->>'state'='resolved')
         AND ($4::text IS NULL OR document->>'exceptionClass'=$4)
         AND ($5::text IS NULL OR document->>'severity'=$5)
-        AND ($6::text IS NULL OR document->>'state'=$6)),
+        AND ($6::text IS NULL OR document->>'state'=$6)
+        AND ($11::text IS NULL OR ($11='unassigned' AND owner->>'userId' IS NULL) OR owner->>'userId'=$11)),
         page AS (SELECT * FROM filtered WHERE ($7::integer IS NULL OR (rank,sort_at::timestamptz,document->>'id') > ($7,$8::timestamptz,$9))
         ORDER BY rank,sort_at::timestamptz,document->>'id' LIMIT $10)
         SELECT (SELECT count(*)::integer FROM filtered) AS total_count,
@@ -466,6 +472,7 @@ export function createCaseReader(
             cursor?.at ?? null,
             cursor?.id ?? null,
             query.limit + 1,
+            query.ownerId ?? null,
           ],
         );
         const page = result.rows[0]!;

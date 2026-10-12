@@ -1,11 +1,13 @@
 import type { TenantContext } from '@luma/identity';
-import { requireTenant } from '@luma/identity';
+import { IdentityError, requireTenant } from '@luma/identity';
 
 import type { Diagnosis } from '../domain/diagnosis.js';
 import type { Incident } from './detection.js';
+import type { CaseOwner, createCaseOwners } from './owners.js';
 
 export interface CaseQuery {
   view: 'needs_you' | 'active' | 'history';
+  ownerId?: string | undefined;
   class?: Incident['exceptionClass'] | undefined;
   severity?: Incident['severity'] | undefined;
   state?: Incident['state'] | undefined;
@@ -15,6 +17,7 @@ export interface CaseQuery {
 
 /** @public Declaration emit names it in the inferred type of `createCases`. */
 export interface CaseSummary {
+  owner?: CaseOwner | null | undefined;
   schemaVersion: 1;
   id: string;
   revision: number;
@@ -98,8 +101,23 @@ export function createCaseService(
     tenantId: string,
     skuId: string,
   ) => Promise<NonNullable<CaseDetail['productIdentities']>>,
+  owners?: ReturnType<typeof createCaseOwners>,
 ) {
   return {
+    async assignOwner(
+      context: TenantContext,
+      id: string,
+      input: { userId: string | null; revision: number },
+    ) {
+      if (!owners)
+        throw new IdentityError(
+          503,
+          'SERVICE_UNAVAILABLE',
+          'Case assignment is unavailable',
+        );
+
+      return owners.assign(context, id, input);
+    },
     evidence(context: TenantContext, id: string, query: CaseEvidenceQuery) {
       requireTenant(context, context.tenantId);
 

@@ -7,6 +7,10 @@ import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
 
 export const inboxSearch = z.object({
+  ownerId: z
+    .union([z.string().uuid(), z.literal('unassigned')])
+    .optional()
+    .catch(undefined),
   shadow: z.string().min(1).max(200).optional().catch(undefined),
   view: z
     .enum(['needs_you', 'active', 'history'])

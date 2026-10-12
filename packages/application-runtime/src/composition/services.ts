@@ -84,6 +84,7 @@ export function createDetectionServices(
   verifier?: VerificationEvaluator,
   diagnosisOptions: DiagnosisOptions = {},
   sourceAuthority?: AuthorityReader,
+  caseIdentity?: Parameters<typeof createCases>[3],
 ): {
   exceptions: ReturnType<typeof createExceptions>;
   cases: ReturnType<typeof createCases>;
@@ -100,7 +101,13 @@ export function createDetectionServices(
 
   return {
     exceptions,
-    cases: createCases(db, now, createProductIdentityReader(db)),
+    cases: createCases(
+      db,
+      now,
+      createProductIdentityReader(db),
+      caseIdentity,
+      createAuditLog,
+    ),
     diagnoses: createDiagnoses(db, now, {
       ...diagnosisOptions,
       ...(sourceAuthority

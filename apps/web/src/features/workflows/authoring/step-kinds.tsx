@@ -19,6 +19,8 @@ export const stepKinds: Record<
   StepKind,
   { icon: LucideIcon; name: () => string }
 > = {
+  human_task: { icon: UserCheck, name: m.authoring_coordination_human_label },
+  event_wait: { icon: Hourglass, name: m.authoring_coordination_event_label },
   read: { icon: Database, name: m.authoring_step_kind_read },
   condition: { icon: Split, name: m.authoring_step_kind_condition },
   capability: { icon: Zap, name: m.authoring_step_kind_action },

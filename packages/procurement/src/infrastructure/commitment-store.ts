@@ -19,6 +19,10 @@ const live = ['approved', 'submitting', 'uncertain', 'submitted'];
 export function createCommitmentStore(
   db: TenantDatabase,
   audit: (db: TenantDatabase) => AuditLog,
+  observed?: (
+    db: TenantDatabase,
+    observation: PurchasingObservation,
+  ) => Promise<void>,
 ): CommitmentStore {
   return {
     transaction: (tenantId, write, operation) =>
@@ -240,6 +244,7 @@ export function createCommitmentStore(
                 o.observedAt,
               ],
             );
+            await observed?.({ transaction: async (_tenant, fn) => fn(tx) }, o);
           },
           followUps: (ids) =>
             documents<FollowUp>(

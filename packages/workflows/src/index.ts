@@ -32,6 +32,7 @@ export type {
 export type {
   ProcessActionResult,
   ProcessActivities,
+  ProcessCheckpoint,
   ProcessProgress,
 } from './application/process-runtime.js';
 
