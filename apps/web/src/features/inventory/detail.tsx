@@ -297,7 +297,7 @@ export function StockDetailView({
           />
           <Disclosure>
             <summary>{m.inventory_provider_states_title()}</summary>
-            <p>{m.inventory_provider_states_note()}</p>
+            <p className="inventory-note">{m.inventory_provider_states_note()}</p>
             <DataTable
               caption={m.inventory_provider_states_title()}
               rows={position.sources}
