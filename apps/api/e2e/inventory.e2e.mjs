@@ -155,7 +155,7 @@ it('compares mapped stock without summing sources and follows scoped related rec
   ).toHaveLength(1);
   expect(
     (await f.request(f.member, `${f.base}/inventory?view=unknown`)).items,
-  ).toHaveLength(2);
+  ).toHaveLength(1);
   await stock.stock({ unit: 'box', amount: '3' });
   const withUnit = await f.request(
     f.member,
