@@ -85,6 +85,7 @@ import {
   createActivityStore,
   createDecisionAssignments,
   createOperationsOverview,
+  createRefundFollowUpCursor,
   createResolutionLearning,
   createResolutionMeasurements,
   createResolutionMetricReader,
@@ -639,6 +640,7 @@ export function createApplicationServices(
       }),
       // Orders and returns are composed below; follow-ups read them only once runs start.
       ...createFollowUpWorkflows({
+        refundCursor: createRefundFollowUpCursor(database),
         commitments,
         suppliers: async (context) =>
           (await procurement.suppliers(context)).items,

@@ -99,6 +99,25 @@ it('independently completes stock, one reserved replacement and a settled net re
   ).toBe(true);
   expect(report.checks.find((c) => c.id === 'payment').verified).toBe(false);
   expect((await request(path)).case.state).toBe('open');
+  await f.call('runs/operations/control', {
+    action: 'fault',
+    rule: {
+      instance: 'shopify',
+      operation: 'returns.exchange.price.read',
+      kind: 'malformed',
+      remaining: 1,
+    },
+  });
+  const missingPrice = await request(`${path}/exchange/complete`, {});
+  expect(missingPrice).toMatchObject({
+    state: 'unresolved',
+    replacementTotal: null,
+    ownerId: f.detail.case.openedBy.id,
+  });
+  expect(missingPrice.checks.find((c) => c.id === 'payment')).toMatchObject({
+    verified: false,
+    reason: 'price_mismatch',
+  });
   await f.command({ kind: 'refund-settle', order: f.providerOrderId });
   // Read from each native source again; neither API acceptance nor a prior paid check can close the case.
   report = await request(`${path}/exchange/complete`, {});

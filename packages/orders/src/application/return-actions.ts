@@ -298,6 +298,20 @@ export function createReturnActions(deps: Dependencies) {
       await tx.lock(value.caseId);
       const current =
         (await tx.get(value.id)) ?? fail(404, 'Return action not found');
+      if (
+        (patch.sent === false &&
+          (!current.sent || current.proof?.outcome === 'passed')) ||
+        (patch.proof &&
+          current.proof &&
+          Date.parse(patch.proof.observedAt) <
+            Date.parse(current.proof.observedAt)) ||
+        (patch.sent !== false &&
+          !patch.proof &&
+          value.sent &&
+          current.proof &&
+          deps.digest(current.proof) !== deps.digest(value.proof))
+      )
+        return current;
       const next = {
         ...current,
         ...patch,
@@ -425,6 +439,8 @@ export function createReturnActions(deps: Dependencies) {
     // Durable sent fencing survives a lost response or worker restart. Execution owns dispatch deduplication.
     try {
       const result = await deps.admission.execute(context, current);
+      if (result.state === 'not_started')
+        return load(context, current.caseId, current.id);
       if (result.state === 'not_executed' || result.state === 'withheld')
         return save(context, current, {
           state: 'not_executed',

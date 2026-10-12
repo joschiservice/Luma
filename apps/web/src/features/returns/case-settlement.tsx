@@ -26,6 +26,7 @@ import {
   returnCaseKey,
   settlementCommands,
 } from './case-data';
+import { retryableReturnRequestId } from './case-requests';
 
 const labels: Record<ReturnActionView['state'], () => string> = {
   approval_required: () => m.returns_case_creation_state_approval_required(),
@@ -70,7 +71,12 @@ export function ReturnSettlement({
 
   function request(kind: 'refund' | 'restock', targetId?: string) {
     const key = targetId ?? kind,
-      id = requests[key] ?? crypto.randomUUID();
+      id =
+        retryableReturnRequestId(
+          requests[key],
+          data?.items.find((a) => a.id === requests[key]),
+          now,
+        ) ?? crypto.randomUUID();
     setRequests((current) => ({ ...current, [key]: id }));
     run(() => command.request({ id, kind, ...(targetId ? { targetId } : {}) }));
   }

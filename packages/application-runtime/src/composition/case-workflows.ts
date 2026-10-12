@@ -141,6 +141,17 @@ export function createFollowUpWorkflows(deps: {
   suppliers(context: TenantContext): Promise<{ link?: unknown }[]>;
   returns: () => Pick<ReturnWorkspace, 'list' | 'get'>;
   orders: () => Pick<OrderWorkspace, 'list' | 'get'>;
+  refundCursor: {
+    get(
+      context: TenantContext,
+      view: 'action' | 'waiting',
+    ): Promise<string | null>;
+    save(
+      context: TenantContext,
+      view: 'action' | 'waiting',
+      cursor: string | null,
+    ): Promise<void>;
+  };
   timing?: FollowUpTiming;
 }): CaseWorkflowAdapter[] {
   const timing = deps.timing ?? {};
@@ -160,7 +171,6 @@ export function createFollowUpWorkflows(deps: {
         ...[
           detail.item.observedAt,
           ...detail.refunds.map((r) => r.observedAt),
-          ...(detail.source?.fullReadAt ? [detail.source.fullReadAt] : []),
         ].map((v) => Date.parse(v)),
       ),
     ).toISOString(),
@@ -219,16 +229,35 @@ export function createFollowUpWorkflows(deps: {
       version: compileProcessWorkflow(refundFollowUpSource),
       waitMs: timing.refundWaitMs ?? 48 * 3_600_000,
       candidates: async (context) => {
+        const views = ['action', 'waiting'] as const;
         const pages = await Promise.all(
-          ['action', 'waiting'].map((view) =>
-            deps.returns().list(context, {
+          views.map(async (view) => {
+            const cursor = await deps.refundCursor.get(context, view);
+            const query = {
               q: '',
-              view: view as 'action' | 'waiting',
-              sort: 'activity',
-              direction: 'asc',
+              view,
+              sort: 'activity' as const,
+              direction: 'asc' as const,
               limit: 50,
-            }),
-          ),
+            };
+            try {
+              return await deps
+                .returns()
+                .list(context, { ...query, ...(cursor ? { cursor } : {}) });
+            } catch (error) {
+              if (
+                !cursor ||
+                !(error instanceof Error) ||
+                !('statusCode' in error) ||
+                error.statusCode !== 400
+              )
+                throw error;
+              // A changed cursor format starts a new scan instead of blocking monitoring.
+              await deps.refundCursor.save(context, view, null);
+
+              return deps.returns().list(context, query);
+            }
+          }),
         );
         const ids = [
           ...new Set(
@@ -237,6 +266,12 @@ export function createFollowUpWorkflows(deps: {
         ];
         const details = await Promise.all(
           ids.map((id) => deps.returns().get(context, id)),
+        );
+
+        await Promise.all(
+          pages.map((page, index) =>
+            deps.refundCursor.save(context, views[index]!, page.nextCursor),
+          ),
         );
 
         return details.flatMap((detail) => (detail ? [refund(detail)] : []));

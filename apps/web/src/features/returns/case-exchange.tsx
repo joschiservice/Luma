@@ -20,6 +20,7 @@ import { useState } from 'react';
 import { useNow } from '../../kit/live/now';
 import { formatMoney } from '../../shared/orders/presentation';
 import { exchangeCommands, returnCaseError, returnCaseKey } from './case-data';
+import { retryableReturnRequestId } from './case-requests';
 
 const consistencyLabels = {
   receipt: () => m.returns_exchange_check_receipt(),
@@ -136,7 +137,12 @@ export function ReturnExchange({
 
   function request(kind: 'request' | 'process' | 'cancel' | 'release') {
     const key = `${kind}:${root?.currentAttemptId ?? 'initial'}:${kind === 'request' ? `${replacement}:${quantity}` : ''}`,
-      id = requests[key] ?? crypto.randomUUID();
+      id =
+        retryableReturnRequestId(
+          requests[key],
+          data?.steps.find((s) => s.id === requests[key]),
+          now,
+        ) ?? crypto.randomUUID();
     setRequests((values) => ({ ...values, [key]: id }));
     run(() =>
       command.request({

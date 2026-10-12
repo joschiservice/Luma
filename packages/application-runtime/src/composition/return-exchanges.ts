@@ -244,8 +244,18 @@ export function createReturnExchangeAdmission(
 
         return { state: 'uncertain' };
       } catch (error) {
-        if (error instanceof AdmissionRejected)
-          return { state: 'withheld', failure: 'changed' };
+        if (error instanceof AdmissionRejected) {
+          // Another sender may have reserved this identity after admission's first read.
+          const result = await safety.execution.get(context, value.actionId);
+          if (result?.state === 'not_executed')
+            return { state: 'not_executed' };
+          if (result && 'record' in result)
+            return result.record.attempt.dispatch === 'not_dispatched'
+              ? { state: 'withheld', failure: 'not_sent' }
+              : { state: 'uncertain' };
+
+          return { state: 'not_started' };
+        }
         throw error;
       }
     },

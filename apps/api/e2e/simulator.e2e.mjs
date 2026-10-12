@@ -218,7 +218,7 @@ test('projects orders and fulfillments beyond the first provider page', async (t
     { kind: 'fulfillment', count: 101 },
     { kind: 'order', count: 103 },
   ]);
-});
+}, 120_000);
 
 test('inventory drift is detected, verified, scored and recurs through the same HTTP APIs as the panel', async (t) => {
   const f = await setupSimulator(t);

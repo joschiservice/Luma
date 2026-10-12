@@ -52,6 +52,26 @@ test('independently approves a refund, distinguishes pending payment, and checks
   await expect(
     requestSection.getByRole('button', { name: 'Approve and send' }),
   ).toHaveCount(0);
+  const rejected = (await f.request(`${f.path}/settlements`)).items[0];
+  await f.request(
+    `${f.path}/settlements/${rejected.id}/decision`,
+    { decisionId: rejected.decisionId, outcome: 'rejected' },
+    f.approver,
+  );
+  await requester
+    .getByRole('button', { name: 'Refresh return case', exact: true })
+    .click();
+  await requestSection
+    .getByRole('button', { name: 'Request refund approval' })
+    .click();
+  await expect
+    .poll(
+      async () =>
+        (await f.request(`${f.path}/settlements`)).items.filter(
+          (a) => a.state === 'approval_required' && a.id !== rejected.id,
+        ).length,
+    )
+    .toBe(1);
   await f.call('runs/operations/control', {
     action: 'fault',
     rule: {

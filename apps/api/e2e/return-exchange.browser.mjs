@@ -86,6 +86,32 @@ test('requests a replacement by keyboard and verifies charge payment before appr
     section.getByText('Waiting for approval', { exact: true }),
   ).toBeVisible();
   await approver.reload();
+  const rejected = (await f.request(`${f.path}/exchange`)).steps.find(
+    (s) => s.plan.kind === 'process' && s.state === 'approval_required',
+  );
+  await f.request(
+    `${f.path}/exchange/steps/${rejected.id}/decision`,
+    { decisionId: rejected.decisionId, outcome: 'rejected' },
+    f.approver,
+  );
+  await requester
+    .getByRole('button', { name: 'Refresh return case', exact: true })
+    .click();
+  await section
+    .getByRole('button', { name: 'Request processing approval' })
+    .click();
+  await expect
+    .poll(
+      async () =>
+        (await f.request(`${f.path}/exchange`)).steps.filter(
+          (s) =>
+            s.plan.kind === 'process' &&
+            s.state === 'approval_required' &&
+            s.id !== rejected.id,
+        ).length,
+    )
+    .toBe(1);
+  await approver.reload();
   await review.getByRole('button', { name: 'Approve and send' }).click();
   await expect(
     review.getByText('Price difference payment pending', { exact: true }),

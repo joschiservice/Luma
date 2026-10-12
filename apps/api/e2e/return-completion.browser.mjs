@@ -166,6 +166,17 @@ test('records receipt and inspection, approves stock and exchange separately, th
   ).toBeVisible();
   expect((await f.request(f.path)).case.state).toBe('completed');
   await expect(
+    approver.getByText(
+      'This exchange was completed after independent checks in both systems.',
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(
+    approver.getByText('No further work on this cancelled case.', {
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await expect(
     review.getByText('Price difference payment verified', { exact: true }),
   ).toBeVisible();
   await expect(

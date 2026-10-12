@@ -261,12 +261,36 @@ export function createReturnExchanges(deps: Dependencies) {
       await tx.lock(value.caseId);
       const current =
         (await tx.get(value.id)) ?? fail(404, 'Exchange step not found');
+      if (
+        (patch.sent === false &&
+          (!current.sent || current.proof?.outcome === 'passed')) ||
+        (patch.proof &&
+          current.proof &&
+          Date.parse(patch.proof.observedAt) <
+            Date.parse(current.proof.observedAt)) ||
+        (patch.sent !== false &&
+          !patch.proof &&
+          value.sent &&
+          current.proof &&
+          deps.digest(current.proof) !== deps.digest(value.proof))
+      )
+        return current;
       const next = {
         ...current,
         ...patch,
         updatedAt: deps.now().toISOString(),
       };
       await tx.save(next);
+      if (patch.sent === false && current.plan.kind === 'process') {
+        const root = await tx.root(current.caseId);
+        if (root)
+          await tx.saveRoot({
+            ...root,
+            processingStarted: false,
+            revision: root.revision + 1,
+            updatedAt: next.updatedAt,
+          });
+      }
       if (event) await tx.audit(audit(context, next, event));
 
       return next;
@@ -424,24 +448,14 @@ export function createReturnExchanges(deps: Dependencies) {
     );
     try {
       const result = await deps.admission.execute(context, current);
+      if (result.state === 'not_started')
+        return load(context, current.caseId, current.id);
       if (result.state === 'not_executed' || result.state === 'withheld') {
         const saved = await save(context, current, {
           state: 'not_executed',
           sent: false,
           failure: 'withheld',
         });
-        if (current.plan.kind === 'process')
-          await deps.store.transaction(context.tenantId, async (tx) => {
-            await tx.lock(current.caseId);
-            const root = await tx.root(current.caseId);
-            if (root)
-              await tx.saveRoot({
-                ...root,
-                processingStarted: false,
-                revision: root.revision + 1,
-                updatedAt: deps.now().toISOString(),
-              });
-          });
 
         return saved;
       }
@@ -457,6 +471,11 @@ export function createReturnExchanges(deps: Dependencies) {
 
   async function admit(context: TenantContext, value: ExchangeStep) {
     if (!deps.admission) fail(503, 'Exchange approval unavailable');
+    if (value.state === 'failed' && !value.sent && !value.decisionId)
+      value = await save(context, value, {
+        state: 'approval_required',
+        failure: null,
+      });
     let decision: PolicyDecision;
     try {
       decision = await deps.admission.prepare(

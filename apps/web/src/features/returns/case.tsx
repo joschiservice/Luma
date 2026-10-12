@@ -737,7 +737,9 @@ export function ReturnCaseView({
                 <dt>{m.returns_service_waiting_on()}</dt>
                 <dd>
                   {!open
-                    ? m.returns_service_cancelled_wait()
+                    ? item.state === 'completed'
+                      ? m.returns_service_completed_wait()
+                      : m.returns_service_cancelled_wait()
                     : detail.creation?.state === 'approval_required'
                       ? m.returns_service_waiting_approver()
                       : currentWait

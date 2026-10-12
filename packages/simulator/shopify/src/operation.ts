@@ -110,6 +110,7 @@ const namedCapabilities: Record<string, string> = {
   LumaExchangeFulfillment: 'returns.exchange.proof.read',
   LumaExchangeEvenProof: 'returns.exchange.proof.read',
   LumaExchangeRefundProof: 'returns.exchange.proof.read',
+  LumaExchangePrice: 'returns.exchange.price.read',
   LumaExchangeReturnable: 'returns.exchange.quote.read',
   LumaExchangeRequest: 'returns.exchange.request',
   LumaExchangeProcess: 'returns.exchange.process',

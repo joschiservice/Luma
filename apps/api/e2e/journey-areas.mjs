@@ -275,6 +275,7 @@ const codeSteps = [
   'packages/api-contract/src/code-steps.ts',
 ];
 const caseWorkflows = [
+  'packages/application-runtime/migrations/0092_refund_follow_up_cursors.sql',
   ...workflows,
   'packages/application-runtime/src/composition/case-workflows.ts',
 ];

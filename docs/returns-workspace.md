@@ -175,6 +175,12 @@ stock step uncertain. Financial proof requires successful transactions for the w
 and currency. Pending, failed and partial payments never establish settlement. Case completion still
 requires the other steps; neither accepted mutation nor one verified step closes a case.
 
+An admission rejection alone does not release a send fence: another caller may already have reserved
+the same execution. Only the durable execution ledger can establish non-dispatch. Concurrent late
+results retain newer proof, and an exchange's processing fence resets in the same owner transaction
+as confirmed non-dispatch. If admission has not reserved execution, the same sending identity remains
+resumable; it is never replaced with another provider operation.
+
 Settlement proof older than five minutes is shown as stale. Unavailable reads retain the last proof
 and ask for another check. Wawi settlement writes are currently granted only in the installed
 simulator. A live installation needs its stock write capability verified before it can be granted.
@@ -227,6 +233,10 @@ the workflow hands overdue steps to that owner rather than duplicating the Needs
 The existing imported-return refund follow-up requires a reported receipt timestamp. Latest
 activity is not a substitute. A pending or failed stage never ends that follow-up; complete,
 fresh evidence of the refunded units and settled money is required.
+Record read times establish freshness independently of the daily full-scan timestamp. The full scan
+establishes coverage, rather than making a current incremental payment read stale. Bounded passes
+retain a tenant-scoped cursor per view, advance past settled or unreceived returns, and resume after
+restart. A failed detail read retains the page for another pass.
 
 ### Independent exchange completion
 

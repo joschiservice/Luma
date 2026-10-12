@@ -500,6 +500,7 @@
   "returns_service_blocker_proposal": "Es gibt noch keinen Lösungsvorschlag.",
   "returns_service_blocker_settlement": "Die Abwicklung ist noch nicht unabhängig bestätigt.",
   "returns_service_cancelled_wait": "Keine weiteren Schritte für diesen stornierten Fall.",
+  "returns_service_completed_wait": "Dieser Umtausch wurde nach unabhängigen Prüfungen in beiden Systemen abgeschlossen.",
   "returns_settlement_title": "Bestand und Erstattung",
   "returns_settlement_description": "Fordern Sie jeden Schritt separat zur Freigabe an. Erst eine aktuelle, unabhängige Systemprüfung bestätigt Verkaufsbestand oder zurückgezahltes Geld.",
   "returns_settlement_loading": "Abwicklung wird geladen…",

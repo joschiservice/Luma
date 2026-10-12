@@ -556,6 +556,16 @@ function Preview({
                 exchangeState
                   ? {
                       ...proposed,
+                      case: {
+                        ...proposed.case,
+                        ...(completionState === 'verified' ||
+                        completionState === 'stale'
+                          ? {
+                              state: 'completed' as const,
+                              stage: 'completed' as const,
+                            }
+                          : {}),
+                      },
                       order: {
                         ...proposed.order,
                         connection: {
@@ -937,6 +947,16 @@ export const ExchangeCompleted: Story = {
     ).toBeVisible();
     await expect(
       within(canvasElement).queryByText(/Wawi allocation needs the case owner/),
+    ).not.toBeInTheDocument();
+    await expect(
+      within(canvasElement).getByText(
+        'This exchange was completed after independent checks in both systems.',
+      ),
+    ).toBeVisible();
+    await expect(
+      within(canvasElement).queryByText(
+        'No further work on this cancelled case.',
+      ),
     ).not.toBeInTheDocument();
   },
 };

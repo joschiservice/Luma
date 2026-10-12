@@ -500,6 +500,7 @@
   "returns_service_blocker_proposal": "A resolution has not been proposed.",
   "returns_service_blocker_settlement": "Settlement has not been independently verified.",
   "returns_service_cancelled_wait": "No further work on this cancelled case.",
+  "returns_service_completed_wait": "This exchange was completed after independent checks in both systems.",
   "returns_settlement_title": "Stock and refund",
   "returns_settlement_description": "Request approval for each step separately. Only a fresh, independent source check confirms resale stock or money returned.",
   "returns_settlement_loading": "Loading settlement…",
