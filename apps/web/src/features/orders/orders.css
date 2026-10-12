@@ -139,6 +139,62 @@
   color: var(--signal-text);
 }
 
+.order-charges {
+  display: grid;
+  gap: 18px;
+}
+
+.order-charges-group {
+  display: grid;
+  gap: 8px;
+}
+
+.order-charges-group h3 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.order-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.order-facts > div {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.order-facts dt {
+  color: var(--muted-foreground);
+}
+
+.order-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.order-muted {
+  color: var(--muted-foreground);
+}
+
+.order-tags,
+.order-charge-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.order-address-line {
+  display: block;
+}
+
 .order-comparison-field {
   min-width: 10rem;
   display: flex;

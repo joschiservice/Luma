@@ -6,6 +6,7 @@ import type {
   OrderDifference,
   OrderSourceFacts,
 } from '../../application/orders.js';
+import { commercialFacts, lineCommercialFacts } from './commercial-facts.js';
 import type { OrderReadQueries } from './list-query.js';
 import { connectionLabel, iso, money, object, text } from './values.js';
 
@@ -97,6 +98,7 @@ export async function readSourceFacts(
           unit: String(line.unit),
           fulfilledQuantity: progress?.fulfilled ?? '0',
           remainingQuantity: progress?.remaining ?? null,
+          ...lineCommercialFacts(line),
         };
       },
     );
@@ -121,6 +123,7 @@ export async function readSourceFacts(
       dueAt: iso(data.dueAt),
       fulfillment: row.fulfillment,
       open: row.open,
+      ...commercialFacts(data),
       lines,
     };
   });

@@ -17,24 +17,47 @@ export const pageInfo = z.object({
 export const connection = <T extends z.ZodTypeAny>(node: T) =>
   z.object({ nodes: z.array(node), pageInfo });
 
+const currencyCode = z.string().regex(/^[A-Z]{3}$/);
+
 /** Shopify money in the shop currency. */
 export const money = z.object({
   amount: z.string().regex(/^-?\d{1,14}(\.\d{1,6})?$/),
-  currencyCode: z.string().regex(/^[A-Z]{3}$/),
+  currencyCode,
 });
+
+/**
+ * Shopify money in the shop and presentment (customer-facing) currencies. Descriptive amounts
+ * become unknown when malformed instead of failing the record.
+ */
+export const moneyBag = z
+  .object({ shopMoney: money, presentmentMoney: money })
+  .nullable()
+  .optional()
+  .catch(null);
+
+const optionalFlag = z.boolean().nullable().optional().catch(null);
+
+const descriptiveText = z.string().nullable().optional().catch(null);
 
 export const orderLine = z
   .object({
     id: gid('LineItem'),
     quantity: count,
     currentQuantity: count,
-    name: z.string().nullable().optional().catch(null),
-    sku: z.string().nullable().optional().catch(null),
+    name: descriptiveText,
+    sku: descriptiveText,
+    variantTitle: descriptiveText,
+    requiresShipping: optionalFlag,
     originalUnitPriceSet: z
-      .object({ shopMoney: money })
+      .object({
+        shopMoney: money,
+        presentmentMoney: money.nullable().optional().catch(null),
+      })
       .nullable()
       .optional()
       .catch(null),
+    discountedUnitPriceAfterAllDiscountsSet: moneyBag,
+    totalDiscountSet: moneyBag,
     taxLines: z
       .array(z.object({ rate: z.number().min(0).max(1).nullable() }))
       .optional()
@@ -42,8 +65,75 @@ export const orderLine = z
     variant: z
       .object({ inventoryItem: z.object({ id: gid('InventoryItem') }) })
       .nullable(),
+    // Requested with the line's prices; distinguishes a removed variant from a custom item.
+    product: z
+      .object({ id: gid('Product') })
+      .nullable()
+      .optional()
+      .catch(undefined),
   })
   .refine((line) => line.currentQuantity <= line.quantity);
+
+/** A shipping charge on an order, including charges removed by an order edit. */
+export const shippingLine = z.object({
+  id: z.string().min(1).nullable().optional().catch(null),
+  title: descriptiveText,
+  code: descriptiveText,
+  source: descriptiveText,
+  carrierIdentifier: descriptiveText,
+  isRemoved: optionalFlag,
+  originalPriceSet: moneyBag,
+  discountedPriceSet: moneyBag,
+  currentDiscountedPriceSet: moneyBag,
+});
+
+/**
+ * A discount applied to an order. Codes and automatic, manual and script discount titles are
+ * labels; manual discount descriptions are free text and are never requested.
+ */
+export const discountApplication = z.object({
+  __typename: z.string().nullable().optional().catch(null),
+  index: z.number().int().min(0).nullable().optional().catch(null),
+  code: descriptiveText,
+  title: descriptiveText,
+  allocationMethod: descriptiveText,
+  targetType: descriptiveText,
+  value: z
+    .union([
+      money,
+      z.object({ percentage: z.number().finite().min(0).max(100) }),
+    ])
+    .nullable()
+    .optional()
+    .catch(null),
+});
+
+const taxLine = z.object({
+  title: descriptiveText,
+  rate: z.number().min(0).max(1).nullable().optional().catch(null),
+  priceSet: moneyBag,
+});
+
+/**
+ * A delivery or billing address. Protected customer data: request it only with approval, and
+ * never record it with order evidence.
+ */
+export const mailingAddress = z
+  .object({
+    address1: descriptiveText,
+    address2: descriptiveText,
+    city: descriptiveText,
+    provinceCode: descriptiveText,
+    zip: descriptiveText,
+    countryCodeV2: descriptiveText,
+  })
+  .nullable();
+
+/** An order's addresses, read only with approval for protected address data. */
+export const orderAddresses = z.object({
+  shippingAddress: mailingAddress,
+  billingAddress: mailingAddress,
+});
 
 export const order = z.object({
   id: gid('Order'),
@@ -54,12 +144,40 @@ export const order = z.object({
   displayFinancialStatus: z.string().nullable(),
   // Descriptive facts become unknown when malformed; they never block the order's status read.
   createdAt: timestamp.nullable().optional().catch(null),
+  // A malformed presentment amount must not hide the shop-currency total.
   currentTotalPriceSet: z
-    .object({ shopMoney: money })
+    .object({
+      shopMoney: money,
+      presentmentMoney: money.nullable().optional().catch(null),
+    })
     .nullable()
     .optional()
     .catch(null),
-  taxesIncluded: z.boolean().nullable().optional().catch(null),
+  taxesIncluded: optionalFlag,
+  dutiesIncluded: optionalFlag,
+  currencyCode: currencyCode.nullable().optional().catch(null),
+  presentmentCurrencyCode: currencyCode.nullable().optional().catch(null),
+  subtotalPriceSet: moneyBag,
+  currentSubtotalPriceSet: moneyBag,
+  totalShippingPriceSet: moneyBag,
+  currentShippingPriceSet: moneyBag,
+  totalDiscountsSet: moneyBag,
+  currentTotalDiscountsSet: moneyBag,
+  totalTaxSet: moneyBag,
+  currentTotalTaxSet: moneyBag,
+  originalTotalDutiesSet: moneyBag,
+  currentTotalDutiesSet: moneyBag,
+  originalTotalPriceSet: moneyBag,
+  currentTaxLines: z.array(taxLine).nullable().optional().catch(null),
+  tags: z.array(z.string()).nullable().optional().catch(null),
+  edited: optionalFlag,
+  requiresShipping: optionalFlag,
+  test: optionalFlag,
+  cancelReason: descriptiveText,
+  closedAt: timestamp.nullable().optional().catch(null),
+  processedAt: timestamp.nullable().optional().catch(null),
+  sourceName: descriptiveText,
+  displayFulfillmentStatus: descriptiveText,
   // Requested only with customer access; null for orders without a customer.
   customer: z
     .object({ id: gid('Customer') })

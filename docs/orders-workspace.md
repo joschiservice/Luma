@@ -111,10 +111,23 @@ them keep working and gain them with the next source update. Current units and o
 ordered units stay separate; source comparisons use mapped line business state. Unknown
 reductions remain unknown. Outstanding units are never negative after refunds.
 Returns and refunds are order children (see [Returns workspace](returns-workspace.md)).
-Customer and payment transaction details are not stored. For those, the web app mounts the
-owning app's `record` UI slot per source connection (see [workspace apps](apps.md)). The
-Shopify app reads the order live through its authorized `records` operation, so installed
-capabilities, granted scopes and protected customer data approval apply unchanged.
+
+Delivery and charges show each source's commercial facts as that source reported them
+(order schema version 6, see [projection rules](commerce-projections.md)): currencies,
+amounts as placed and current, shipping lines, discounts, tax lines, tags and operational
+attributes, with the source read and update times. A group a source does not report is
+labeled as not reported by that source, never shown as zero or empty. Amounts are not
+compared across sources and have no authority rule.
+
+Order addresses are customer data kept in the erasable customer store, not in order
+evidence. Detail returns them per source only to readers who can also read customers;
+otherwise `hidden` lists `addresses` and the page says access is restricted. A source
+reports them as shared, not shared (the deployment is not approved to read them) or not
+imported (no read recorded them). Customer names, contact details and payment transactions
+are not stored. For those, the web app mounts the owning app's `record` UI slot per source
+connection (see [workspace apps](apps.md)). The Shopify app reads the order live through its
+authorized `records` operation, so installed capabilities, granted scopes and protected
+customer data approval apply unchanged.
 
 ## Maintained list projection
 
@@ -208,7 +221,8 @@ the imported total because discounts, shipping and tax adjustments are not recal
 Cancellation preserves original units and publishes zero current units; reopening is refused.
 
 Line unit price and fractional tax rates use canonical order schema version 4; version 5
-adds whether the unit price includes tax. They are source-reported facts, not invoices.
-Missing prices, ambiguous tax rates and unstated tax inclusion remain unknown.
+adds whether the unit price includes tax, and version 6 the commercial facts above. They
+are source-reported facts, not invoices. Missing prices, ambiguous tax rates and unstated
+tax inclusion remain unknown.
 Stored earlier schema versions remain readable. See
 [ADR-012](architecture/012-native-order-records.md) for ownership and retention.

@@ -1,6 +1,7 @@
 import type {
   CommerceObservation,
   ExternalId,
+  OrderCommercialFacts,
   SourceIdentity,
   SourceRecords,
 } from '@luma/connections';
@@ -25,11 +26,30 @@ export type ProjectionOutcome =
 const normalizers = {
   inventory: 'commerce/1',
   product: 'commerce/2',
-  order: 'commerce/5',
+  order: 'commerce/6',
   fulfillment: 'commerce/3',
   return: 'commerce/1',
   refund: 'commerce/1',
 } as const;
+
+/** Copies the commercial facts an order observation reports; unread groups stay absent. */
+function commercialFacts(data: OrderCommercialFacts): OrderCommercialFacts {
+  const facts: OrderCommercialFacts = {};
+  for (const key of [
+    'currencies',
+    'amounts',
+    'taxesIncluded',
+    'dutiesIncluded',
+    'taxLines',
+    'shippingLines',
+    'discounts',
+    'tags',
+    'attributes',
+  ] as const)
+    if (data[key] !== undefined) Object.assign(facts, { [key]: data[key] });
+
+  return facts;
+}
 
 /** Mapping method recorded for identities created by a history import or sync. */
 const sourceLocalMethod =
@@ -181,6 +201,14 @@ export function createCommerceIngestion(
             ...(line.taxRate === undefined ? {} : { taxRate: line.taxRate }),
             ...(line.skuCode === undefined ? {} : { skuCode: line.skuCode }),
             ...(line.title === undefined ? {} : { title: line.title }),
+            ...(line.variantTitle === undefined
+              ? {}
+              : { variantTitle: line.variantTitle }),
+            ...(line.prices === undefined ? {} : { prices: line.prices }),
+            ...(line.requiresShipping === undefined
+              ? {}
+              : { requiresShipping: line.requiresShipping }),
+            ...(line.catalog === undefined ? {} : { catalog: line.catalog }),
           });
       }
       if (!entityId || missing.length) return { status: 'pending', missing };
@@ -189,7 +217,7 @@ export function createCommerceIngestion(
         owner: 'orders',
         snapshot: {
           ...provenance,
-          schemaVersion: 5,
+          schemaVersion: 6,
           normalizerVersion: normalizers.order,
           entityId,
           kind: 'order',
@@ -204,6 +232,7 @@ export function createCommerceIngestion(
             ...(data.total === undefined ? {} : { total: data.total }),
             status: data.status,
             paymentStatus: data.paymentStatus,
+            ...commercialFacts(data),
             lines,
           },
         },

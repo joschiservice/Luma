@@ -230,7 +230,13 @@ async function seed(shop) {
       financialStatus: 'PAID',
       ...extra,
     });
-  const shipped = await order({ shipping: 'express' });
+  // Prices are after a code discount; the customer paid in Swiss francs.
+  const shipped = await order({
+    shipping: 'express',
+    discounts: [{ kind: 'code', label: 'WELCOME10', percentage: 10 }],
+    tags: ['vip', 'gift'],
+    presentment: { currency: 'CHF', rate: 0.95 },
+  });
   await shop.run({
     kind: 'fulfill',
     order: shipped.id,
@@ -424,12 +430,89 @@ test('every read capability returns complete, parsed snapshots', async () => {
     6,
   );
   const shipped = byId(orders.items, ids.shipped.gid);
+  const eur = (amount) => ({ amount, currency: 'EUR' });
+  // Shop amounts in euros and the customer's amounts in francs at the order's rate.
+  const paid = (shop, presentment) => ({
+    shop: eur(shop),
+    presentment: { amount: presentment, currency: 'CHF' },
+  });
+  const unchanged = (shop, presentment) => ({
+    original: paid(shop, presentment),
+    current: paid(shop, presentment),
+  });
   assert.deepEqual(shipped.data, {
     displayNumber: '#C1001',
     placedAt: shipped.data.placedAt,
-    total: { amount: '74.5', currency: 'EUR' },
+    total: eur('74.5'),
+    addresses: {
+      shared: true,
+      shipping: {
+        line1: 'Hauptstraße 1',
+        line2: null,
+        city: 'Berlin',
+        region: null,
+        postalCode: '10115',
+        country: 'DE',
+      },
+      billing: {
+        line1: 'Hauptstraße 1',
+        line2: null,
+        city: 'Berlin',
+        region: null,
+        postalCode: '10115',
+        country: 'DE',
+      },
+    },
     status: 'completed',
     paymentStatus: 'paid',
+    currencies: { shop: 'EUR', presentment: 'CHF' },
+    // Line prices are after the discount, so the subtotal and total include it.
+    amounts: {
+      subtotal: unchanged('74.5', '70.78'),
+      shipping: unchanged('0.0', '0.0'),
+      discounts: unchanged('8.28', '7.87'),
+      tax: unchanged('11.89', '11.3'),
+      duties: { original: null, current: null },
+      total: unchanged('74.5', '70.78'),
+    },
+    taxesIncluded: true,
+    dutiesIncluded: false,
+    taxLines: [{ title: 'VAT', rate: '0.19', amount: paid('11.89', '11.3') }],
+    shippingLines: [
+      {
+        id: gid('ShippingLine', ids.shipped.id),
+        title: 'Express',
+        code: 'EXPRESS',
+        source: 'shopify',
+        carrier: null,
+        removed: false,
+        original: paid('0.0', '0.0'),
+        discounted: paid('0.0', '0.0'),
+        current: paid('0.0', '0.0'),
+      },
+    ],
+    discounts: [
+      {
+        index: 0,
+        kind: 'code',
+        label: 'WELCOME10',
+        target: 'line_item',
+        allocation: 'across',
+        value: { type: 'percentage', percentage: '10' },
+      },
+    ],
+    tags: ['vip', 'gift'],
+    attributes: {
+      edited: false,
+      requiresShipping: true,
+      test: false,
+      cancelReason: null,
+      cancelledAt: null,
+      closedAt: shipped.data.attributes.closedAt,
+      processedAt: shipped.data.placedAt,
+      channel: 'web',
+      fulfillmentStatus: 'fulfilled',
+    },
     lines: [
       {
         id: {
@@ -441,10 +524,18 @@ test('every read capability returns complete, parsed snapshots', async () => {
         currentQuantity: { amount: '2', unit: 'each' },
         cancelledQuantity: { amount: '0', unit: 'each' },
         skuCode: 'TOTE-NAT',
-        unitPrice: { amount: '24.0', currency: 'EUR' },
+        unitPrice: eur('26.67'),
         taxIncluded: true,
         taxRate: '0.19',
         title: 'Canvas tote - Natural',
+        variantTitle: 'Natural',
+        prices: {
+          originalUnit: paid('26.67', '25.34'),
+          discountedUnit: paid('24.0', '22.8'),
+          totalDiscount: paid('5.34', '5.07'),
+        },
+        requiresShipping: true,
+        catalog: 'variant',
       },
       {
         id: {
@@ -456,10 +547,18 @@ test('every read capability returns complete, parsed snapshots', async () => {
         currentQuantity: { amount: '1', unit: 'each' },
         cancelledQuantity: { amount: '0', unit: 'each' },
         skuCode: 'TOTE-BLK',
-        unitPrice: { amount: '26.5', currency: 'EUR' },
+        unitPrice: eur('29.44'),
         taxIncluded: true,
         taxRate: '0.19',
         title: 'Canvas tote - Black',
+        variantTitle: 'Black',
+        prices: {
+          originalUnit: paid('29.44', '27.97'),
+          discountedUnit: paid('26.5', '25.18'),
+          totalDiscount: paid('2.94', '2.79'),
+        },
+        requiresShipping: true,
+        catalog: 'variant',
       },
     ],
   });
@@ -1036,7 +1135,19 @@ test('bulk history resumes export and JSONL chunks after restart with identical 
       imported.push(...result.value.items);
       cursor = result.value.nextCursor;
     } while (cursor);
-    assert.deepEqual(normalized(imported), normalized(paged.items));
+    // Exports cannot include discounts, so exported orders leave them unread.
+    assert.ok(imported.every((item) => !Object.hasOwn(item.data, 'discounts')));
+    assert.deepEqual(
+      normalized(imported),
+      normalized(
+        paged.items.map((item) => {
+          const data = { ...item.data };
+          delete data.discounts;
+
+          return { ...item, data };
+        }),
+      ),
+    );
     // Records carry the export's start time, however late Luma reads the file.
     assert.ok(
       imported.every(

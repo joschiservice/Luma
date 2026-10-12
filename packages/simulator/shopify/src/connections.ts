@@ -210,3 +210,44 @@ export async function list<T>(
 
   return first === null ? records : records.slice(0, first);
 }
+
+/**
+ * Pages values that belong to one record, such as an order's shipping lines, as a Shopify
+ * connection with `first` and `after`. Bulk exports list every value.
+ */
+export function valueConnection<T>(
+  context: RequestContext,
+  args: Args,
+  values: T[],
+) {
+  const page = (items: T[], start: number, more: boolean) => ({
+    nodes: items,
+    edges: items.map((node, index) => ({
+      node,
+      cursor: wrap(`value:${start + index}`),
+    })),
+    pageInfo: {
+      hasNextPage: more,
+      endCursor: items.length
+        ? wrap(`value:${start + items.length - 1}`)
+        : null,
+    },
+  });
+  if (context.bulk) return page(values, 0, false);
+  const first = int(args, 'first');
+  if (first === null || first < 0 || first > 250)
+    throw argumentError('You must provide first, between 0 and 250.');
+  const after = text(args, 'after');
+  const position = after
+    ? /^value:(\d+)$/.exec(Buffer.from(after, 'base64url').toString('utf8'))
+    : null;
+  if (after && !position)
+    throw argumentError(`Invalid cursor for this connection: ${after}`);
+  const start = position ? Number(position[1]) + 1 : 0;
+
+  return page(
+    values.slice(start, start + first),
+    start,
+    start + first < values.length,
+  );
+}

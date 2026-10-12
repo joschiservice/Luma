@@ -101,6 +101,26 @@ export async function createOrder(
   const holds = command.holds ?? [];
   if (holds.some((reason) => !shopifyHoldReasons.includes(reason)))
     throw new Error('Invalid hold reason');
+  const discounts = command.discounts ?? [];
+  if (
+    discounts.some(
+      (discount) =>
+        !discount.label ||
+        !(discount.percentage > 0 && discount.percentage < 100),
+    )
+  )
+    throw new Error('Discounts need a label and a percentage below 100');
+  // Line prices are after discounts; the original price is what discounts reduced.
+  const retained = discounts.reduce(
+    (share, discount) => share * (1 - discount.percentage / 100),
+    1,
+  );
+  if (
+    command.presentment &&
+    (!/^[A-Z]{3}$/.test(command.presentment.currency) ||
+      !(command.presentment.rate > 0))
+  )
+    throw new Error('Invalid presentment currency');
   const customer = command.customer
     ? await load<CustomerData>(context, 'Customer', command.customer)
     : undefined;
@@ -164,17 +184,30 @@ export async function createOrder(
         quantity: line.quantity,
         currentQuantity: line.quantity,
         price: minorUnits(line.price),
+        ...(discounts.length
+          ? { originalPrice: Math.round(minorUnits(line.price) / retained) }
+          : {}),
+        variantTitle: variant.title === 'Default Title' ? null : variant.title,
       },
     });
   }
   // Stores whose prices exclude tax, as in the US, add it at checkout, rounded per line.
   const { taxRate, taxesIncluded } = context.config;
   const added = taxRate === undefined || taxesIncluded ? 0 : taxRate;
+  const shippingPrice = minorUnits(command.shippingPrice ?? '0');
   const total = lines.reduce((sum, line) => {
     const amount = line.data.price * line.data.quantity;
 
     return sum + amount + Math.round(amount * added);
-  }, 0);
+  }, shippingPrice);
+  const address = customer
+    ? {
+        address1: customer.data.address.address1,
+        city: customer.data.address.city,
+        zip: customer.data.address.zip,
+        countryCode: customer.data.address.countryCode,
+      }
+    : null;
   const scheduled = command.fulfillAt !== undefined && command.fulfillAt > now;
   const workId = await nextId(context);
   const work: FulfillmentOrderData = {
@@ -213,6 +246,22 @@ export async function createOrder(
     closed: false,
     total,
     refunded: 0,
+    // One charge per order; it shares the order's number, so record IDs stay unchanged.
+    shippingLines: [
+      {
+        id,
+        title: command.shipping === 'express' ? 'Express' : 'Standard',
+        code: command.shipping === 'express' ? 'EXPRESS' : 'STANDARD',
+        price: shippingPrice,
+        removed: false,
+      },
+    ],
+    discounts,
+    tags: [...new Set(command.tags ?? [])],
+    presentment: command.presentment ?? null,
+    shippingAddress: address,
+    billingAddress: address,
+    edited: false,
   };
   const workLineRecords = [];
   for (const line of lines)

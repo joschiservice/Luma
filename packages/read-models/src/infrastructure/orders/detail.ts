@@ -12,6 +12,7 @@ import type {
 import type { ReturnListItem } from '../../application/returns.js';
 import { readSyncWaits } from '../inventory/positions.js';
 import { itemColumns } from '../returns/list.js';
+import { readOrderAddresses } from './commercial-facts.js';
 import { readSourceFacts } from './detail-facts.js';
 import {
   orderEntityAliases,
@@ -104,7 +105,8 @@ async function readFulfillments(
 /**
  * Reads one order with every source's facts, differences, fulfillments, history, linked issues,
  * workflow runs and recent activity. Sections of areas the reader can't read are empty and
- * listed in `hidden`. Returns null when the order has no current source.
+ * listed in `hidden`; source addresses are left out unless the reader can read customers.
+ * Returns null when the order has no current source.
  */
 export async function readDetail(
   tx: SqlTransaction,
@@ -181,8 +183,22 @@ export async function readDetail(
     ['issues', 'issues.read'],
     ['workflows', 'workflows.read'],
     ['activity', 'activity.read'],
+    ['addresses', 'customers.read'],
   ]);
   const shown = (section: OrderDetailSection) => !hidden.includes(section);
+  // Addresses are customer data: they are read only for readers of customers.
+  if (shown('addresses')) {
+    const addresses = await readOrderAddresses(
+      tx,
+      tenantId,
+      orderIds,
+      sources.map((source) => source.connectionId),
+    );
+    for (const source of sources)
+      source.addresses = addresses.get(source.connectionId) ?? {
+        state: 'not_imported',
+      };
+  }
   const events = shown('activity')
     ? await activity.list(context, {
         from: new Date(Date.parse(asOf) - activityWindow).toISOString(),

@@ -52,12 +52,12 @@ Approval flags request access; they cannot grant it, and the record reader check
 grants on every request. All default to false. Restart the server and reconnect after
 changing one.
 
-| Flag                                       | Set only after Shopify approves                          |
-| ------------------------------------------ | -------------------------------------------------------- |
-| `SHOPIFY_PROTECTED_CUSTOMER_DATA_APPROVED` | Protected customer data (requests `read_customers`)      |
-| `SHOPIFY_CUSTOMER_CONTACT_APPROVED`        | Name, email and phone access                             |
-| `SHOPIFY_CUSTOMER_ADDRESS_APPROVED`        | Address access; data sync then imports default addresses |
-| `SHOPIFY_ALL_ORDERS_APPROVED`              | Older-order access (requests `read_all_orders`)          |
+| Flag                                       | Set only after Shopify approves                                    |
+| ------------------------------------------ | ------------------------------------------------------------------ |
+| `SHOPIFY_PROTECTED_CUSTOMER_DATA_APPROVED` | Protected customer data (requests `read_customers`)                |
+| `SHOPIFY_CUSTOMER_CONTACT_APPROVED`        | Name, email and phone access                                       |
+| `SHOPIFY_CUSTOMER_ADDRESS_APPROVED`        | Address access; data sync then imports default and order addresses |
+| `SHOPIFY_ALL_ORDERS_APPROVED`              | Older-order access (requests `read_all_orders`)                    |
 
 Without contact approval, Customers shows source identities and their imported orders, and
 imported profiles and live reads withhold names, email addresses and phone numbers.

@@ -13,6 +13,7 @@ Simulates one Shopify store's Admin GraphQL API 2026-07 for Luma's real Shopify 
 - Without `read_all_orders` in the configured scopes, orders older than 60 days are hidden.
 - `inventorySetQuantities` requires `@idempotent(key:)`, compares `changeFromQuantity` exactly and stores successful receipts in the record store. A replay returns the stored receipt; another input with the same key is refused.
 - `fulfillmentOrderMove` moves whole fulfillment orders only. Partly fulfilled work splits into a new fulfillment order at the target location.
+- Order line prices are the prices after the order's discounts; a discount derives each line's original price from its percentage, so discounts never change the total. A shipping price adds to the total. Orders have one shipping line (free unless priced), tax lines from the shop's rate, the customer's address as delivery and billing address, and optionally a presentment currency whose amounts are the shop amounts at a fixed rate. Refunds and transactions stay in the shop currency.
 - Catalog seeding writes in one bulk insert and sends no webhooks.
 - `rateLimit` is Shopify's 2,000-point bucket restored at 100 points per second. Requests are admitted by requested cost; `rateLimit.actualCost(response)` returns the cost Shopify deducts, so hosts can refund the difference.
 

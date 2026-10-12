@@ -43,6 +43,44 @@ export interface OrderData {
   total: number;
   /** Successfully refunded amount in minor units. */
   refunded: number;
+  /**
+   * Shipping charges in minor units. Orders stored before charges were recorded have one free
+   * charge for their shipping speed.
+   */
+  shippingLines?: OrderShippingLineData[];
+  /** Discounts across line items; line prices are already after them. */
+  discounts?: OrderDiscountData[];
+  tags?: string[];
+  /** The customer's currency and its rate per shop currency unit; the shop currency when absent. */
+  presentment?: { currency: string; rate: number } | null;
+  /** Delivery address; orders stored before addresses were recorded use the customer's address. */
+  shippingAddress?: OrderAddressData | null;
+  billingAddress?: OrderAddressData | null;
+  /** Whether a merchant edited the order after it was placed. */
+  edited?: boolean;
+}
+
+interface OrderShippingLineData {
+  id: string;
+  title: string;
+  code: string;
+  /** Charge in minor units. */
+  price: number;
+  removed: boolean;
+}
+
+interface OrderDiscountData {
+  kind: 'code' | 'automatic';
+  /** Discount code or automatic discount title. */
+  label: string;
+  percentage: number;
+}
+
+interface OrderAddressData {
+  address1: string;
+  city: string;
+  zip: string;
+  countryCode: string;
 }
 
 export interface LineItemData {
@@ -54,8 +92,12 @@ export interface LineItemData {
   quantity: number;
   /** Missing on records stored before order edits were supported. */
   currentQuantity?: number;
-  /** Unit price in minor units. */
+  /** Unit price in minor units, after the order's discounts. */
   price: number;
+  /** Unit price before discounts in minor units; `price` when absent. */
+  originalPrice?: number;
+  /** Variant title when the order was placed; absent for records stored before titles. */
+  variantTitle?: string | null;
 }
 
 interface FulfillmentHoldData {
@@ -299,6 +341,20 @@ export const money = (value: number) => (value / 100).toFixed(2);
 export const moneyBag = (value: number, currency: string) => ({
   shopMoney: { amount: decimal(value), currencyCode: currency },
   presentmentMoney: { amount: decimal(value), currencyCode: currency },
+});
+
+/**
+ * Builds a `MoneyBag` of an order amount: the shop currency, and the customer's currency at
+ * the order's rate, rounded to minor units, when the order was presented in another currency.
+ */
+export const orderMoneyBag = (value: number, order: OrderData) => ({
+  shopMoney: { amount: decimal(value), currencyCode: order.currency },
+  presentmentMoney: order.presentment
+    ? {
+        amount: decimal(Math.round(value * order.presentment.rate)),
+        currencyCode: order.presentment.currency,
+      }
+    : { amount: decimal(value), currencyCode: order.currency },
 });
 
 /** Store ID of an inventory level. */

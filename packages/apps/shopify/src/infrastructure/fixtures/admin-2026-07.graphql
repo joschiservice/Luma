@@ -378,6 +378,7 @@ type MailingAddress implements Node {
   countryCodeV2: CountryCode
   id: ID!
   province: String
+  provinceCode: String
   zip: String
 }
 
@@ -665,13 +666,32 @@ type OrderEdge {
 }
 
 type Order implements Node {
+  billingAddress: MailingAddress
+  cancelReason: OrderCancelReason
   cancelledAt: DateTime
   closed: Boolean!
+  closedAt: DateTime
   createdAt: DateTime!
+  currencyCode: CurrencyCode!
+  currentShippingPriceSet: MoneyBag!
+  currentSubtotalPriceSet: MoneyBag!
+  currentTaxLines: [TaxLine!]!
+  currentTotalDiscountsSet: MoneyBag!
+  currentTotalDutiesSet: MoneyBag
   currentTotalPriceSet: MoneyBag!
+  currentTotalTaxSet: MoneyBag!
   customer: Customer
+  discountApplications(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): DiscountApplicationConnection!
   displayFinancialStatus: OrderDisplayFinancialStatus
   displayFulfillmentStatus: OrderDisplayFulfillmentStatus!
+  dutiesIncluded: Boolean!
+  edited: Boolean!
   events(
     first: Int
     after: String
@@ -700,8 +720,12 @@ type Order implements Node {
     reverse: Boolean = false
   ): LineItemConnection!
   name: String!
+  originalTotalDutiesSet: MoneyBag
+  originalTotalPriceSet: MoneyBag!
   presentmentCurrencyCode: CurrencyCode!
+  processedAt: DateTime!
   refunds(first: Int): [Refund!]!
+  requiresShipping: Boolean!
   returns(
     first: Int
     after: String
@@ -710,6 +734,17 @@ type Order implements Node {
     reverse: Boolean = false
     query: String
   ): ReturnConnection!
+  shippingAddress: MailingAddress
+  shippingLines(
+    includeRemovals: Boolean = false
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): ShippingLineConnection!
+  sourceName: String
+  subtotalPriceSet: MoneyBag
   suggestedRefund(
     shippingAmount: Money
     refundShipping: Boolean
@@ -718,8 +753,13 @@ type Order implements Node {
     suggestFullRefund: Boolean = false
     refundMethodAllocation: RefundMethodAllocation = ORIGINAL_PAYMENT_METHODS
   ): SuggestedRefund
+  tags: [String!]!
   taxesIncluded: Boolean!
+  test: Boolean!
+  totalDiscountsSet: MoneyBag
   totalOutstandingSet: MoneyBag!
+  totalShippingPriceSet: MoneyBag!
+  totalTaxSet: MoneyBag
   transactions(
     first: Int
     capturable: Boolean
@@ -728,9 +768,63 @@ type Order implements Node {
   updatedAt: DateTime!
 }
 
+enum OrderCancelReason {
+  CUSTOMER
+  DECLINED
+  FRAUD
+  INVENTORY
+  STAFF
+  OTHER
+}
+
 type MoneyBag {
   presentmentMoney: MoneyV2!
   shopMoney: MoneyV2!
+}
+
+type TaxLine {
+  priceSet: MoneyBag!
+  rate: Float
+  title: String!
+}
+
+"""
+The `Float` scalar type represents signed double-precision fractional values as specified by [IEEE 754](https://en.wikipedia.org/wiki/IEEE_floating_point).
+"""
+scalar Float
+
+type DiscountApplicationConnection {
+  edges: [DiscountApplicationEdge!]!
+  nodes: [DiscountApplication!]!
+  pageInfo: PageInfo!
+}
+
+type DiscountApplicationEdge {
+  node: DiscountApplication!
+}
+
+interface DiscountApplication {
+  allocationMethod: DiscountApplicationAllocationMethod!
+  index: Int!
+  targetType: DiscountApplicationTargetType!
+  value: PricingValue!
+}
+
+enum DiscountApplicationAllocationMethod {
+  ACROSS
+  EACH
+  ONE
+}
+
+enum DiscountApplicationTargetType {
+  LINE_ITEM
+  SHIPPING_LINE
+}
+
+union PricingValue = MoneyV2 | PricingPercentageValue
+
+type PricingPercentageValue {
+  percentage: Float!
 }
 
 enum OrderDisplayFinancialStatus {
@@ -877,24 +971,73 @@ type FulfillmentOrderLineItem implements Node {
 type LineItem implements Node {
   currentQuantity: Int!
   discountedTotalSet(withCodeDiscounts: Boolean = false): MoneyBag!
+  discountedUnitPriceAfterAllDiscountsSet: MoneyBag!
   id: ID!
   name: String!
   originalUnitPriceSet: MoneyBag!
+  product: Product
   quantity: Int!
+  requiresShipping: Boolean!
   sku: String
   taxLines(first: Int): [TaxLine!]!
+  totalDiscountSet: MoneyBag!
   variant: ProductVariant
+  variantTitle: String
 }
 
-type TaxLine {
-  priceSet: MoneyBag!
-  rate: Float
+type Product implements Node {
+  id: ID!
+  priceRangeV2: ProductPriceRangeV2!
+  publishedAt: DateTime
+  status: ProductStatus!
+  title: String!
+  updatedAt: DateTime!
+  variants(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    sortKey: ProductVariantSortKeys = POSITION
+  ): ProductVariantConnection!
+  vendor: String!
 }
 
-"""
-The `Float` scalar type represents signed double-precision fractional values as specified by [IEEE 754](https://en.wikipedia.org/wiki/IEEE_floating_point).
-"""
-scalar Float
+type ProductPriceRangeV2 {
+  minVariantPrice: MoneyV2!
+}
+
+enum ProductStatus {
+  ACTIVE
+  ARCHIVED
+  DRAFT
+  UNLISTED
+}
+
+enum ProductVariantSortKeys {
+  FULL_TITLE
+  ID
+  INVENTORY_LEVELS_AVAILABLE
+  INVENTORY_MANAGEMENT
+  INVENTORY_POLICY
+  INVENTORY_QUANTITY
+  NAME
+  POPULAR
+  POSITION
+  RELEVANCE
+  SKU
+  TITLE
+}
+
+type ProductVariantConnection {
+  edges: [ProductVariantEdge!]!
+  nodes: [ProductVariant!]!
+  pageInfo: PageInfo!
+}
+
+type ProductVariantEdge {
+  node: ProductVariant!
+}
 
 type ProductVariant implements Node {
   barcode: String
@@ -954,60 +1097,6 @@ type InventoryLevelEdge {
 }
 
 scalar Money
-
-type Product implements Node {
-  id: ID!
-  priceRangeV2: ProductPriceRangeV2!
-  publishedAt: DateTime
-  status: ProductStatus!
-  title: String!
-  updatedAt: DateTime!
-  variants(
-    first: Int
-    after: String
-    last: Int
-    before: String
-    reverse: Boolean = false
-    sortKey: ProductVariantSortKeys = POSITION
-  ): ProductVariantConnection!
-  vendor: String!
-}
-
-type ProductPriceRangeV2 {
-  minVariantPrice: MoneyV2!
-}
-
-enum ProductStatus {
-  ACTIVE
-  ARCHIVED
-  DRAFT
-  UNLISTED
-}
-
-enum ProductVariantSortKeys {
-  FULL_TITLE
-  ID
-  INVENTORY_LEVELS_AVAILABLE
-  INVENTORY_MANAGEMENT
-  INVENTORY_POLICY
-  INVENTORY_QUANTITY
-  NAME
-  POPULAR
-  POSITION
-  RELEVANCE
-  SKU
-  TITLE
-}
-
-type ProductVariantConnection {
-  edges: [ProductVariantEdge!]!
-  nodes: [ProductVariant!]!
-  pageInfo: PageInfo!
-}
-
-type ProductVariantEdge {
-  node: ProductVariant!
-}
 
 type FulfillmentOrderLocationForMoveConnection {
   nodes: [FulfillmentOrderLocationForMove!]!
@@ -1455,6 +1544,28 @@ type OrderTransactionConnection {
 type ReturnConnection {
   nodes: [Return!]!
   pageInfo: PageInfo!
+}
+
+type ShippingLineConnection {
+  edges: [ShippingLineEdge!]!
+  nodes: [ShippingLine!]!
+  pageInfo: PageInfo!
+}
+
+type ShippingLineEdge {
+  node: ShippingLine!
+}
+
+type ShippingLine {
+  carrierIdentifier: String
+  code: String
+  currentDiscountedPriceSet: MoneyBag!
+  discountedPriceSet: MoneyBag!
+  id: ID
+  isRemoved: Boolean!
+  originalPriceSet: MoneyBag!
+  source: String
+  title: String!
 }
 
 input RefundLineItemInput {
@@ -2141,6 +2252,38 @@ input HasMetafieldsMetafieldIdentifierInput {
 type WebhookSubscriptionCreatePayload {
   userErrors: [UserError!]!
   webhookSubscription: WebhookSubscription
+}
+
+type DiscountCodeApplication implements DiscountApplication {
+  allocationMethod: DiscountApplicationAllocationMethod!
+  code: String!
+  index: Int!
+  targetType: DiscountApplicationTargetType!
+  value: PricingValue!
+}
+
+type AutomaticDiscountApplication implements DiscountApplication {
+  allocationMethod: DiscountApplicationAllocationMethod!
+  index: Int!
+  targetType: DiscountApplicationTargetType!
+  title: String!
+  value: PricingValue!
+}
+
+type ManualDiscountApplication implements DiscountApplication {
+  allocationMethod: DiscountApplicationAllocationMethod!
+  index: Int!
+  targetType: DiscountApplicationTargetType!
+  title: String!
+  value: PricingValue!
+}
+
+type ScriptDiscountApplication implements DiscountApplication {
+  allocationMethod: DiscountApplicationAllocationMethod!
+  index: Int!
+  targetType: DiscountApplicationTargetType!
+  title: String!
+  value: PricingValue!
 }
 
 type ReturnLineItem implements Node & ReturnLineItemType {

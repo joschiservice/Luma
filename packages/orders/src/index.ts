@@ -1,6 +1,9 @@
 export type {
   CanonicalSnapshot,
   CommerceProjections,
+  MoneyPair,
+  OrderCommercialData,
+  OrderLineCommercialData,
   RefundData,
   ReturnData,
 } from './application/projections.js';

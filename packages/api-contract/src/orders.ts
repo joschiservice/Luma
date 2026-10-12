@@ -117,6 +117,35 @@ export const orderListQuerySchema = z
   })
   .strict();
 
+const moneyPairSchema = z
+  .object({
+    shop: moneySchema.describe('Amount in the shop currency.'),
+    presentment: moneySchema.describe(
+      'Amount in the currency the customer was charged in.',
+    ),
+  })
+  .describe('An exact amount in the shop and presentment currencies.');
+
+const orderAmountSchema = z.object({
+  original: moneyPairSchema
+    .nullable()
+    .describe('Amount when the order was placed; null when not reported.'),
+  current: moneyPairSchema
+    .nullable()
+    .describe(
+      'Amount after edits, refunds and returns; null when not reported.',
+    ),
+});
+
+const orderAddressSchema = z.object({
+  line1: z.string().nullable(),
+  line2: z.string().nullable(),
+  city: z.string().nullable(),
+  region: z.string().nullable(),
+  postalCode: z.string().nullable(),
+  country: z.string().nullable(),
+});
+
 const orderLineSchema = z.object({
   id: z.string().uuid(),
   skuId: z.string().uuid().nullable(),
@@ -151,6 +180,32 @@ const orderLineSchema = z.object({
   unit: z.string(),
   fulfilledQuantity: z.string(),
   remainingQuantity: z.string().nullable(),
+  variantTitle: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Variant title at the source; absent when not reported.'),
+  prices: z
+    .object({
+      originalUnit: moneyPairSchema.nullable(),
+      discountedUnit: moneyPairSchema
+        .nullable()
+        .describe('Unit price after line and order discounts.'),
+      totalDiscount: moneyPairSchema
+        .nullable()
+        .describe('Discount on the whole line.'),
+    })
+    .optional()
+    .describe(
+      'Source line prices in both currencies; absent when the source does not report them.',
+    ),
+  requiresShipping: z.boolean().nullable().optional(),
+  catalog: z
+    .enum(['variant', 'variant_removed', 'no_product'])
+    .optional()
+    .describe(
+      'Whether the line still refers to a catalog variant. `variant_removed`: the variant was deleted but its product remains. `no_product`: a custom item or a deleted product; the source does not say which. Absent when not reported.',
+    ),
 });
 
 const orderSourceFactsSchema = orderSourceSchema.extend({
@@ -164,6 +219,142 @@ const orderSourceFactsSchema = orderSourceSchema.extend({
   dueAt: timestamp.nullable(),
   fulfillment: orderFulfillmentStateSchema,
   open: z.boolean().nullable(),
+  currencies: z
+    .object({
+      shop: z.string().nullable(),
+      presentment: z.string().nullable(),
+    })
+    .optional()
+    .describe(
+      'The shop currency and the currency the customer was charged in; absent when the source does not report them.',
+    ),
+  amounts: z
+    .object({
+      subtotal: orderAmountSchema.describe(
+        'Line items after discounts, before shipping and tax.',
+      ),
+      shipping: orderAmountSchema,
+      discounts: orderAmountSchema,
+      tax: orderAmountSchema,
+      duties: orderAmountSchema,
+      total: orderAmountSchema,
+    })
+    .optional()
+    .describe(
+      'Order amounts exactly as the source reports them, never recalculated or converted. Absent when the source does not report them.',
+    ),
+  taxesIncluded: z
+    .boolean()
+    .nullable()
+    .optional()
+    .describe('Whether the order prices include tax.'),
+  dutiesIncluded: z
+    .boolean()
+    .nullable()
+    .optional()
+    .describe('Whether the order prices include duties.'),
+  taxLines: z
+    .array(
+      z.object({
+        title: z.string().nullable(),
+        rate: z
+          .string()
+          .nullable()
+          .describe('Fractional rate: 0.19 means 19%.'),
+        amount: moneyPairSchema.nullable(),
+      }),
+    )
+    .optional()
+    .describe('Current tax lines; absent when not reported.'),
+  shippingLines: z
+    .array(
+      z.object({
+        id: z.string().nullable(),
+        title: z.string().nullable(),
+        code: z.string().nullable(),
+        source: z.string().nullable(),
+        carrier: z.string().nullable(),
+        removed: z
+          .boolean()
+          .nullable()
+          .describe('Whether an order edit removed the charge.'),
+        original: moneyPairSchema.nullable(),
+        discounted: moneyPairSchema.nullable(),
+        current: moneyPairSchema.nullable(),
+      }),
+    )
+    .optional()
+    .describe(
+      'Shipping charges, including removed ones; absent when not reported.',
+    ),
+  discounts: z
+    .array(
+      z.object({
+        index: z.number().int().nullable(),
+        kind: z.enum(['code', 'automatic', 'manual', 'script', 'unknown']),
+        label: z
+          .string()
+          .nullable()
+          .describe('Discount code or title. Descriptions are not imported.'),
+        target: z.enum(['line_item', 'shipping_line', 'unknown']),
+        allocation: z.enum(['across', 'each', 'unknown']),
+        value: z
+          .discriminatedUnion('type', [
+            z.object({
+              type: z.literal('percentage'),
+              percentage: z.string(),
+            }),
+            z.object({ type: z.literal('fixed'), amount: moneySchema }),
+          ])
+          .nullable(),
+      }),
+    )
+    .optional()
+    .describe(
+      'Discounts applied to the order; absent when not read, for example after a history import.',
+    ),
+  tags: z
+    .array(z.string())
+    .optional()
+    .describe('Merchant tags; absent when not reported.'),
+  attributes: z
+    .object({
+      edited: z.boolean().nullable(),
+      requiresShipping: z.boolean().nullable(),
+      test: z.boolean().nullable(),
+      cancelReason: z.string().nullable(),
+      cancelledAt: timestamp.nullable(),
+      closedAt: timestamp.nullable(),
+      processedAt: timestamp.nullable(),
+      channel: z.string().nullable().describe('Sales channel at the source.'),
+      fulfillmentStatus: z
+        .string()
+        .nullable()
+        .describe(
+          "The source's own fulfillment status, such as `partially_fulfilled`. Luma's fulfillment state is `fulfillment`.",
+        ),
+    })
+    .optional()
+    .describe('Operational facts the source reports about the order.'),
+  addresses: z
+    .discriminatedUnion('state', [
+      z.object({
+        state: z.literal('shared'),
+        shipping: orderAddressSchema
+          .nullable()
+          .describe('Null when the order has no delivery address.'),
+        billing: orderAddressSchema
+          .nullable()
+          .describe('Null when the order has no billing address.'),
+        observedAt: timestamp,
+      }),
+      z.object({ state: z.literal('not_shared'), observedAt: timestamp }),
+      z.object({ state: z.literal('not_imported') }),
+    ])
+    .optional()
+    .describe(
+      'Delivery and billing addresses. `not_shared`: this deployment is not approved to read addresses. `not_imported`: no read has recorded them. Absent without permission to read customers; `hidden` then lists `addresses`.',
+    ),
   lines: z.array(orderLineSchema),
 });
 
@@ -323,6 +514,20 @@ export const orderDetailSchema = z.object({
     entries: z.array(orderActivitySchema),
     truncated: z.boolean(),
   }),
+  hidden: z
+    .array(
+      z.enum([
+        'fulfillments',
+        'returns',
+        'issues',
+        'workflows',
+        'activity',
+        'addresses',
+      ]),
+    )
+    .describe(
+      "Sections left out because the reader can't read their area. Treat them as unavailable, not as empty.",
+    ),
   asOf: timestamp,
   authority: z.object({
     revision: z.number().int().nonnegative(),

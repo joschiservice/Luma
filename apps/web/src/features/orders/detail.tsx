@@ -48,6 +48,7 @@ import { OrderReturnCases } from '../returns/case-entry';
 import { OrderReturns } from '../returns/order-returns';
 import { orderFilters, orderOptions, type OrdersSearch } from './data';
 import { OrderIdentityLinks } from './identity-links';
+import { OrderCharges } from './order-charges';
 import { OrderHeader } from './order-header';
 import { OrderInspector } from './order-inspector';
 import {
@@ -324,6 +325,7 @@ export function OrderDetailView({
               organizationId={organizationId}
               from={here}
             />
+            <OrderCharges detail={detail} shown={shown} choose={setChosen} />
             {linkedSources}
             {detail.sources.length > 1 || detail.differences.length ? (
               <SourceComparison detail={detail} />

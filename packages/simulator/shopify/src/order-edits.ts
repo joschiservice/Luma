@@ -125,6 +125,7 @@ export async function editOrder(
   await touchOrder(context, order, {
     ...order.data,
     total: order.data.total - totalReduction,
+    edited: true,
   });
   notify(context, 'orders/edited', 'Order', order.id, {
     order_edit: { order_id: Number(order.id) },

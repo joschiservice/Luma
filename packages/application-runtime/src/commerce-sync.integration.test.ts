@@ -501,7 +501,7 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
   beforeEach(async () => {
     await owner.query(
       `TRUNCATE commerce_sync_runs,commerce_sync_items,commerce_sync_streams,commerce_identity_links,
-        customer_profiles,customer_erasures,customer_orders,connector_refresh_hints,connector_read_checks,
+        customer_profiles,customer_erasures,customer_orders,customer_order_addresses,connector_refresh_hints,connector_read_checks,
         connector_mapping_revisions,connector_observations,connector_source_mappings,
         connector_lifecycle_events,connector_installations,orders_entities,inventory_entities CASCADE`,
     );
@@ -699,6 +699,24 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
       { kind: 'position', deleted: false },
       { kind: 'product', deleted: false },
     ]);
+    // The adapter's commercial facts reach the order record; this deployment reads no addresses.
+    const imported = await workspace().get(
+      context(),
+      await canonical(shop, 'order', `gid://shopify/Order/${created.id}`),
+    );
+    expect(imported?.sources[0]).toMatchObject({
+      currencies: { shop: 'EUR', presentment: 'EUR' },
+      amounts: {
+        total: { current: { shop: { amount: '10.0', currency: 'EUR' } } },
+        duties: { original: null, current: null },
+      },
+      shippingLines: [{ title: 'Standard', removed: false }],
+      discounts: [],
+      tags: [],
+      attributes: { channel: 'web', fulfillmentStatus: 'unfulfilled' },
+      addresses: { state: 'not_shared', observedAt: expect.any(String) },
+      lines: [{ catalog: 'variant', requiresShipping: true }],
+    });
     const before = await owner.query(
       'SELECT count(*)::int AS count FROM connector_source_mappings WHERE tenant_id=$1',
       [tenant],
@@ -1506,6 +1524,146 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
         )
       ).rowCount,
     ).toBe(0);
+  });
+
+  it('keeps order addresses out of order evidence, shows them only to customer readers and erases them', async () => {
+    const ada = 'gid://shopify/Customer/1';
+    const home = {
+      line1: 'Hafenstraße 1',
+      line2: null,
+      city: 'Hamburg',
+      region: null,
+      postalCode: '20457',
+      country: 'DE',
+    };
+    const orders = (updated: string) =>
+      (
+        [
+          ['1', ada, { shared: true, shipping: home, billing: null }],
+          ['2', null, { shared: true, shipping: home, billing: home }],
+          ['3', undefined, { shared: false }],
+        ] as const
+      ).map(([id, customer, addresses]) => {
+        const item = order(shop, `gid://shopify/Order/${id}`, {
+          updated,
+          ...(customer === undefined ? {} : { customer }),
+        });
+
+        return { ...item, data: { ...(item.data as object), addresses } };
+      });
+    source.set(shop, 'orders.read', orders('2026-09-01T10:00:00.000Z'));
+    source.set(erp, 'orders.read', [order(erp, '9')]);
+    await drain();
+
+    // Addresses never enter retained order evidence or snapshots.
+    for (const sql of [
+      `SELECT 1 FROM connector_observations WHERE tenant_id=$1
+      AND document->'observation'->'data' ? 'addresses'`,
+      `SELECT 1 FROM orders_snapshots WHERE tenant_id=$1 AND document->'data' ? 'addresses'`,
+    ])
+      expect((await owner.query(sql, [tenant])).rowCount).toBe(0);
+    const id = (number: string) =>
+      canonical(shop, 'order', `gid://shopify/Order/${number}`);
+    const addresses = async (orderId: string, reader = context()) =>
+      (await workspace().get(reader, orderId))?.sources[0]?.addresses;
+    expect(await addresses(await id('1'), context('viewer'))).toEqual({
+      state: 'shared',
+      shipping: home,
+      billing: null,
+      observedAt: expect.any(String),
+    });
+    expect(await addresses(await id('3'))).toEqual({
+      state: 'not_shared',
+      observedAt: expect.any(String),
+    });
+    expect(await addresses(await canonical(erp, 'order', '9'))).toEqual({
+      state: 'not_imported',
+    });
+
+    // Without permission to read customers, addresses are hidden, never empty.
+    const ordersOnly = makeTenantContext(
+      { userId: 'viewer', sessionId: 'session' },
+      {
+        id: tenant,
+        name: 'Fixture',
+        slug: 'fixture',
+        status: 'active',
+        dataRegion: 'EU',
+      },
+      {
+        ...builtInMembership(
+          { id: 'm-viewer', organizationId: tenant, userId: 'viewer' },
+          'member',
+        ),
+        permissions: new PermissionSet(['orders.read']),
+      },
+      randomUUID(),
+    );
+    const restricted = await workspace().get(ordersOnly, await id('1'));
+    expect(restricted?.hidden).toContain('addresses');
+    expect(restricted?.sources[0]).not.toHaveProperty('addresses');
+
+    // An older read does not replace newer addresses.
+    const profiles = createCustomerProfiles(db);
+    await profiles.recordOrderAddresses(context(), shop, [
+      {
+        order: { externalId: 'gid://shopify/Order/2', scopeKey: '' },
+        shared: true,
+        shipping: null,
+        billing: null,
+        observedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ]);
+    expect(await addresses(await id('2'))).toMatchObject({ shipping: home });
+
+    const stored = async () =>
+      (
+        await owner.query<{ order_external_id: string }>(
+          'SELECT order_external_id FROM customer_order_addresses WHERE tenant_id=$1 ORDER BY 1',
+          [tenant],
+        )
+      ).rows.map((row) => row.order_external_id);
+    await owner.query(
+      'INSERT INTO shopify_installation_bindings(tenant_id,app,shop,connection_id) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING',
+      [tenant, 'test:app', 'fixture.myshopify.com', shop],
+    );
+    // A redaction that lists only orders erases their addresses and no customer.
+    await runtime.query('SELECT erase_shopify_customer_data($1,$2,$3,$4)', [
+      'test:app',
+      'fixture.myshopify.com',
+      [],
+      ['gid://shopify/Order/2'],
+    ]);
+    expect(await stored()).toEqual([
+      'gid://shopify/Order/1',
+      'gid://shopify/Order/3',
+    ]);
+    expect(
+      (
+        await owner.query(
+          'SELECT 1 FROM customer_profiles WHERE tenant_id=$1',
+          [tenant],
+        )
+      ).rowCount,
+    ).toBe(0);
+    // Erasing a customer erases the addresses of the orders they placed.
+    await profiles.erase(context(), shop, [ada]);
+    expect(await stored()).toEqual(['gid://shopify/Order/3']);
+
+    // Newer reads of erased orders do not store their addresses again.
+    source.set(shop, 'orders.read', orders(new Date().toISOString()));
+    await service.command(context(), (await stream('orders'))!.id, 'reimport');
+    await drain();
+    expect(await stored()).toEqual(['gid://shopify/Order/3']);
+    expect(await addresses(await id('1'))).toEqual({ state: 'not_imported' });
+
+    // Shop redaction erases every address of the shop.
+    await runtime.query('SELECT erase_shopify_customer_data($1,$2,$3)', [
+      'test:app',
+      'fixture.myshopify.com',
+      null,
+    ]);
+    expect(await stored()).toEqual([]);
   });
 
   it('flags customers the source no longer has and removes them only after they stay missing', async () => {

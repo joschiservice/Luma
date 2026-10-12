@@ -89,6 +89,19 @@ export type ShopifyCommand =
        * time leaves the fulfillment order SCHEDULED until it is opened.
        */
       fulfillAt?: number | undefined;
+      /**
+       * Discounts across all lines. Line prices are the prices after discounts; the original
+       * price is derived from each percentage, so the order total does not change.
+       */
+      discounts?:
+        | { kind: 'code' | 'automatic'; label: string; percentage: number }[]
+        | undefined;
+      /** Shipping charge as a decimal string in the shop currency; free when omitted. */
+      shippingPrice?: string | undefined;
+      /** Merchant tags. */
+      tags?: string[] | undefined;
+      /** The customer's currency and its rate per shop currency unit. */
+      presentment?: { currency: string; rate: number } | undefined;
     }
   | {
       kind: 'order-edit';

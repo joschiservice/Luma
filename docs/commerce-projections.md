@@ -168,7 +168,8 @@ These reads do not authorize corrections. Workspace authority is separate config
 with audited overrides described in [workspace settings](workspace-settings.md#source-authority).
 ADR-002's full versioned field-group publication remains designed rather than implemented. Raw provider payloads are not retained, and observations
 never carry customer or address data. Imported customer profiles and the customer references
-that order reads report are stored separately (see [Commerce sync](commerce-sync.md#customers)).
+and addresses that order reads report are stored separately (see
+[Commerce sync](commerce-sync.md#customers)).
 
 Order schema version 4 adds optional source-reported line unit prices and fractional tax
 rates. JTL's net price and percentage tax rate and Shopify's original shop-currency unit
@@ -176,5 +177,16 @@ price and unambiguous tax line are retained without converting currencies or est
 missing facts. Version 5 records whether each unit price includes tax as the source states
 it: Shopify's order setting, and false for JTL's net prices. Prices are never converted
 between net and gross, because a rate can be missing or split across jurisdictions; an
-unstated or earlier-version flag is unknown. These facts do not establish an invoice total. Internal record publication uses the same owner transaction as
-Sales, unlike replay recovery across independent external observations.
+unstated or earlier-version flag is unknown. These facts do not establish an invoice total.
+
+Version 6 adds optional commercial facts: shop and presentment currencies; original and
+current subtotal, shipping, discount, tax, duty and total amounts in both currencies; tax
+lines, shipping lines and discounts; tags; operational attributes; and per line, unit prices
+before and after discounts, the line discount, whether it requires shipping and whether its
+variant or product still exists. Each group is absent when the adapter does not read it and
+null inside when the source read reported nothing, so JTL, Cin7 and earlier versions read as
+not reported rather than zero. Amounts are copied as exact decimals; they are never
+recalculated from lines, compared across sources or converted between currencies. The
+source's own fulfillment status label is a reported fact, separate from Luma's fulfillment
+state. Internal record publication uses the same owner transaction as Sales, unlike replay
+recovery across independent external observations.
