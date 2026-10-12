@@ -320,6 +320,19 @@ export const commerceSchema = z.discriminatedUnion('capability', [
             itemActive: z.boolean().nullable().optional(),
             tracked: z.boolean().nullable().optional(),
             inventorySemantics: z.literal('shopify/1').nullable().optional(),
+            writeAttribution: z
+              .object({
+                evidenceId: uuid,
+                adjustmentId: z
+                  .string()
+                  .regex(/^gid:\/\/shopify\/InventoryAdjustmentGroup\/[0-9]+$/),
+                referenceDocumentUri: z.string().min(1).max(1024),
+                available: decimal,
+                quantityMatches: z.boolean().nullable(),
+              })
+              .strict()
+              .nullable()
+              .optional(),
             availabilityBasis: z.enum([
               'provider_reported',
               'derived',

@@ -90,6 +90,7 @@ function inventoryEvidence(observation: Observation<InventorySnapshot>) {
     availabilityBasis: d.availabilityBasis,
     onHand: d.onHand,
     reserved: d.reserved,
+    writeAttribution: d.writeAttribution ?? null,
   });
 }
 

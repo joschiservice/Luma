@@ -184,3 +184,6 @@ Older Shopify observations reported committed stock in the reserved field; repla
 as committed and leaves the separate reserved state unknown. Earlier snapshots remain
 readable and immutable. Shopify availability remains a reported fact, regardless of whether
 its other state quantities are present.
+
+Position version 3 retains corroborated stock-write references. A verified adjustment and
+the current quantity are separate facts; matching quantity alone does not establish authorship.

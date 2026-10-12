@@ -30,6 +30,10 @@ import { z } from 'zod';
 
 import { readBulkHistory } from './bulk-history.js';
 import {
+  attributeInventoryWrites,
+  type InventoryWriteReceipt,
+} from './inventory-write-attribution.js';
+import {
   orderSelection,
   readPageSize,
   readSelection,
@@ -227,6 +231,10 @@ export interface ShopifyConnectorOptions extends ShopifyTransportOptions {
   orderCustomers?: boolean;
   /** Persist the batch before it is returned. Throw if durable recording fails. */
   recordObservations(evidence: ShopifyEvidence): Promise<void>;
+  /** Reads accepted actions for these exact source targets. Absent means authorship is unknown. */
+  inventoryWrites?(
+    targets: { inventoryItemId: string; locationId: string }[],
+  ): Promise<InventoryWriteReceipt[]>;
   rawRetentionMs?: number;
   now?: () => Date;
   id?: () => string;
@@ -1224,6 +1232,21 @@ export function createShopifyConnector(
           ...(total === undefined ? {} : { total }),
           ...(history === undefined ? {} : { history }),
         };
+        if (capability === 'inventory.read' && options.inventoryWrites) {
+          const inventory = parse(s.outputs['inventory.read'], result);
+          const receipts = await options.inventoryWrites(
+            inventory.items.map((item) => ({
+              inventoryItemId: item.data.sku.externalId,
+              locationId: item.data.location.externalId,
+            })),
+          );
+          await attributeInventoryWrites(request, inventory.items, receipts);
+          for (const [index, item] of inventory.items.entries()) {
+            const original = result.items[index];
+            if (original) original.data = item.data;
+          }
+          result.retryAfterMs = request.nextReadDelay();
+        }
         const validated = parse<unknown>(
           s.outputs[capability],
           result,

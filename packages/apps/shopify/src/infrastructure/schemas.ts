@@ -7,7 +7,7 @@ export * from '@luma/connector-shopify/schemas';
  * Version of this adapter's normalized output, recorded as observation provenance. Bump it
  * whenever the same provider response would normalize differently.
  */
-export const adapterVersion = 'shopify/8';
+export const adapterVersion = 'shopify/9';
 
 const externalId = z
   .object({ externalId: z.string().min(1), scopeKey: z.string() })
@@ -211,6 +211,18 @@ export const outputs = {
         itemActive: z.boolean().nullable().optional(),
         tracked: z.boolean().nullable().optional(),
         inventorySemantics: z.literal('shopify/1').nullable().optional(),
+        writeAttribution: z
+          .object({
+            evidenceId: z.string().uuid(),
+            adjustmentId: z
+              .string()
+              .regex(/^gid:\/\/shopify\/InventoryAdjustmentGroup\/[0-9]+$/),
+            referenceDocumentUri: z.string().min(1).max(1024),
+            available: decimal,
+            quantityMatches: z.boolean().nullable(),
+          })
+          .nullable()
+          .optional(),
         availabilityBasis: z.enum(['provider_reported', 'unknown']),
       }),
     ),

@@ -183,6 +183,14 @@ export interface InventorySnapshot {
   tracked?: boolean | null;
   /** Versioned quantity meaning; absent for earlier or other provider reports. */
   inventorySemantics?: 'shopify/1' | null;
+  /** Independently corroborated accepted action; matching current stock does not prove exclusive authorship. */
+  writeAttribution?: {
+    evidenceId: string;
+    adjustmentId: string;
+    referenceDocumentUri: string;
+    available: string;
+    quantityMatches: boolean | null;
+  } | null;
   availabilityBasis: 'provider_reported' | 'derived' | 'unknown';
 }
 

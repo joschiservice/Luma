@@ -19,6 +19,16 @@ const stockSourceSchema = z.object({
   itemActive: z.boolean().nullable().optional(),
   tracked: z.boolean().nullable().optional(),
   inventorySemantics: z.literal('shopify/1').nullable().optional(),
+  writeAttribution: z
+    .object({
+      evidenceId: z.string().uuid(),
+      adjustmentId: z.string(),
+      referenceDocumentUri: z.string(),
+      available: z.string(),
+      quantityMatches: z.boolean().nullable(),
+    })
+    .nullable()
+    .optional(),
   availabilityBasis: z.enum(['provider_reported', 'derived', 'unknown']),
   observedAt: z.string().datetime({ offset: true }),
   sourceUpdatedAt: z.string().datetime({ offset: true }).nullable(),

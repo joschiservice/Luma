@@ -252,6 +252,19 @@ export interface WebhookSubscriptionData {
   format: string;
 }
 
+/** Persisted adjustment facts retain exact target identities for independent filtered reads. */
+export interface InventoryAdjustmentGroupData {
+  reason: string;
+  referenceDocumentUri: string | null;
+  changes: {
+    inventoryItemId: string;
+    locationId: string;
+    name: string;
+    delta: number;
+    quantityAfterChange: number;
+  }[];
+}
+
 /** Stored response of an idempotent mutation. */
 export interface IdempotencyKeyData {
   input: string;

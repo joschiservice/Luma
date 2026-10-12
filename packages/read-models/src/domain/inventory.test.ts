@@ -21,6 +21,30 @@ const source = (overrides: Partial<StockSource>): StockSource => ({
   ...overrides,
 });
 describe('stock comparison', () => {
+  it('clears a matching correction echo but preserves residual drift after a confirmed write', () => {
+    const attribution = {
+      evidenceId: 'receipt',
+      adjustmentId: 'adjustment',
+      referenceDocumentUri: 'luma://action',
+      available: '9',
+      quantityMatches: true,
+    };
+    expect(
+      stockDifferences([
+        source({ available: '9' }),
+        source({ available: '9', writeAttribution: attribution }),
+      ]),
+    ).toEqual([]);
+    expect(
+      stockDifferences([
+        source({ available: '9' }),
+        source({
+          available: '8',
+          writeAttribution: { ...attribution, quantityMatches: false },
+        }),
+      ]),
+    ).toEqual(['available']);
+  });
   it('preserves six-decimal precision for large and negative values', () => {
     expect(
       stockDecimal('99999999999999.999999') -

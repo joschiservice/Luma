@@ -9,7 +9,10 @@ import {
   correctionBlocker,
   inventoryReconciled,
 } from '../domain/inventory-correction.js';
-import { createInventoryCorrectionProvider } from './inventory-correction-provider.js';
+import {
+  type CorrectionEvidence,
+  createInventoryCorrectionProvider,
+} from './inventory-correction-provider.js';
 
 const schema = buildSchema(
   readFileSync(
@@ -48,8 +51,10 @@ function fixture() {
             inventoryAdjustmentGroup: refuse
               ? null
               : {
+                  id: 'gid://shopify/InventoryAdjustmentGroup/1',
                   reason: 'correction',
-                  referenceDocumentUri: null,
+                  referenceDocumentUri:
+                    body.variables.input.referenceDocumentUri,
                   changes: [
                     { name: 'available', delta: -3, quantityAfterChange: 9 },
                   ],
@@ -70,7 +75,9 @@ function fixture() {
 
     return Response.json({ data: { node } });
   });
-  const record = vi.fn(async () => {}),
+  const record = vi.fn<(evidence: CorrectionEvidence) => Promise<void>>(
+      async () => {},
+    ),
     eligible = vi.fn(async () => true);
   const tenantId = randomUUID(),
     connectionId = randomUUID();
@@ -127,12 +134,20 @@ it('validates pinned GraphQL queries and sends exact CAS with provider idempoten
     key: f.context.idempotencyKey,
     input: {
       name: 'available',
+      referenceDocumentUri: `luma://inventory-corrections/${f.context.idempotencyKey}`,
       quantities: [
         { inventoryItemId, locationId, changeFromQuantity: 12, quantity: 9 },
       ],
     },
   });
   expect(f.record.mock.calls).toHaveLength(3);
+  expect(f.record.mock.calls[2]?.[0]).toMatchObject({
+    kind: 'acceptance',
+    document: {
+      adjustmentId: 'gid://shopify/InventoryAdjustmentGroup/1',
+      referenceDocumentUri: `luma://inventory-corrections/${f.context.idempotencyKey}`,
+    },
+  });
 });
 it('withholds incomplete, untracked, concurrent or revoked-authority stock before dispatch', async () => {
   for (const change of [

@@ -109,5 +109,8 @@
   "inventory_item_active": "Artikel am Standort aktiv",
   "inventory_item_tracked": "Bestand erfasst",
   "inventory_activation_yes": "Ja",
-  "inventory_activation_no": "Nein"
+  "inventory_activation_no": "Nein",
+  "inventory_write_matches": "Luma hat den verfügbaren Bestand auf {quantity} gesetzt. Diese Ablesung stimmt überein; weitere Änderungen sind möglich.",
+  "inventory_write_changed": "Luma hat den verfügbaren Bestand auf {quantity} gesetzt. Diese Ablesung weicht ab; andere Änderungen sind nicht zugeordnet.",
+  "inventory_write_unknown": "Luma hat den verfügbaren Bestand auf {quantity} gesetzt. Die aktuelle Menge ist unbekannt."
 }

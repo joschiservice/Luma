@@ -32,6 +32,7 @@ import {
   type FulfillmentOrderData,
   type FulfillmentOrderLineItemData,
   gid,
+  type InventoryAdjustmentGroupData,
   type InventoryItemData,
   type InventoryLevelData,
   iso,
@@ -81,6 +82,7 @@ const nodeKinds = new Set([
   'FulfillmentOrder',
   'FulfillmentOrderLineItem',
   'InventoryItem',
+  'InventoryAdjustmentGroup',
   'LineItem',
   'Order',
   'OrderTransaction',
@@ -478,6 +480,20 @@ const resolvers: Record<string, TypeResolvers> = {
     }),
     variants: (product, args, context) =>
       connection(context, args, { kind: 'ProductVariant', parent: product.id }),
+  }),
+  InventoryAdjustmentGroup: on<InventoryAdjustmentGroupData>({
+    changes: (group, args) => {
+      const items = texts(args, 'inventoryItemIds');
+      const locations = texts(args, 'locationIds');
+      const names = texts(args, 'quantityNames');
+
+      return group.data.changes.filter(
+        (change) =>
+          (!items || items.includes(change.inventoryItemId)) &&
+          (!locations || locations.includes(change.locationId)) &&
+          (!names || names.includes(change.name)),
+      );
+    },
   }),
   InventoryItem: on<InventoryItemData>({
     variant: (item, _args, context) =>

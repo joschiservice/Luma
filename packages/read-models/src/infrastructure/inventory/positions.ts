@@ -49,6 +49,7 @@ const sourceRows = `SELECT p.entity_id AS id,
  'locationActive',s.document->'data'->'locationActive',
  'itemActive',s.document->'data'->'itemActive',
  'tracked',s.document->'data'->'tracked',
+ 'writeAttribution',s.document->'data'->'writeAttribution',
  'inventorySemantics',CASE WHEN c.document->>'provider'='shopify' THEN to_jsonb('shopify/1'::text) ELSE s.document->'data'->'inventorySemantics' END,
  'availabilityBasis',s.document->'data'->>'availabilityBasis','observedAt',s.document->>'observedAt',
  'sourceUpdatedAt',s.document->>'sourceUpdatedAt','deleted',s.document->'deleted') AS source

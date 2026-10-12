@@ -372,6 +372,7 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
         connectionId: target.connectionId,
         target: { kind: 'shopify_inventory_correction', id: requestId },
         parameters: {
+          referenceDocumentUri: `luma://inventory-corrections/v0:${requestId}`,
           policy: 'erp_to_shopify',
           sourceConnectionId: target.sourceConnectionId,
           sourceObservationId: before.source.observationId,
@@ -544,11 +545,16 @@ export function verifyCorrection(
   current: CorrectionSnapshot,
 ) {
   return {
-    outcome: inventoryReconciled(run.before, current)
-      ? ('passed' as const)
-      : ('inconclusive' as const),
+    outcome:
+      inventoryReconciled(run.before, current) &&
+      (run.action.parameters.referenceDocumentUri === undefined ||
+        (current.writeAttribution?.referenceDocumentUri ===
+          run.action.parameters.referenceDocumentUri &&
+          current.writeAttribution.quantityMatches === true))
+        ? ('passed' as const)
+        : ('inconclusive' as const),
     observationRefs: [current.id],
     observedAt: current.observedAt,
-    evaluatorVersion: 'shopify-inventory-reconciliation/1',
+    evaluatorVersion: 'shopify-inventory-reconciliation/2',
   };
 }

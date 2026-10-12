@@ -164,6 +164,70 @@ test('ERP authority, separate approval, one dispatch, reconciliation and tenant 
   }
 });
 
+test('correlates an exact correction echo after restart while preserving unrelated changes', async (t) => {
+  const { f, admin, call, target, mutations, syncStock, changeAvailable } =
+    await correctionFixture(t);
+  const preview = await call(f.owner, 'preview', {
+    ...target,
+    requestId: randomUUID(),
+  });
+  await call(admin, 'approve', { id: preview.id, outcome: 'approved' });
+  await call(f.owner, 'execute', { id: preview.id });
+  const reference = `luma://inventory-corrections/v0:${preview.id}`;
+  assert.equal(mutations[0].variables.input.referenceDocumentUri, reference);
+  assert.equal(
+    (await call(f.owner, 'check', { id: preview.id })).state,
+    'verified',
+  );
+  const echo = await syncStock();
+  assert.equal(echo[0].data.available, '9');
+  assert.equal(echo[0].data.writeAttribution.referenceDocumentUri, reference);
+  assert.equal(echo[0].data.writeAttribution.quantityMatches, true);
+  let detail = await f.request(
+    f.owner,
+    `${f.base}/inventory/${target.positionId}`,
+  );
+  const source = detail.position.sources.find(
+    (s) => s.connectionId === target.connectionId,
+  );
+  assert.equal(source.writeAttribution.quantityMatches, true);
+  assert.equal(source.available, '9');
+  assert.equal(
+    (await call(f.owner, 'inspect', target)).snapshot.writeAttribution
+      .referenceDocumentUri,
+    reference,
+  );
+  await changeAvailable(8);
+  const changed = await syncStock();
+  assert.equal(changed[0].data.available, '8');
+  assert.equal(changed[0].data.writeAttribution.quantityMatches, false);
+  detail = await f.request(f.owner, `${f.base}/inventory/${target.positionId}`);
+  assert.ok(detail.position.differences.includes('available'));
+  assert.equal(
+    detail.position.sources.find((s) => s.connectionId === target.connectionId)
+      .available,
+    '8',
+  );
+  assert.ok(
+    detail.history.entries.some(
+      (entry) => entry.writeAttribution?.quantityMatches === true,
+    ),
+  );
+  assert.ok(
+    detail.history.entries.some(
+      (entry) => entry.writeAttribution?.quantityMatches === false,
+    ),
+  );
+  assert.equal(mutations.length, 1);
+  await f.request(
+    f.outsider,
+    `${f.base}/inventory/${target.positionId}`,
+    'GET',
+    undefined,
+    404,
+  );
+});
+
 test('a newer ERP read of the same quantity keeps an approved correction valid', async (t) => {
   const { f, admin, call, target, mutations, stock } =
     await correctionFixture(t);
@@ -317,7 +381,11 @@ test('lost write response survives reload and only reconciles, without replay', 
   assert.equal(reload.runs[0].state, 'uncertain');
   delayVerification(false);
   const verified = await call(f.owner, 'check', { id: preview.id });
-  assert.equal(verified.state, 'verified');
+  assert.equal(verified.state, 'uncertain');
+  assert.equal(
+    (await call(f.owner, 'inspect', target)).snapshot.writeAttribution,
+    null,
+  );
   assert.equal(mutations.length, 1);
 });
 

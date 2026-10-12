@@ -18,6 +18,14 @@ export interface StockSource {
   tracked?: boolean | null;
   /** Versioned quantity meaning; absent for earlier or other provider reports. */
   inventorySemantics?: 'shopify/1' | null;
+  /** Independently corroborated adjustment; other changes remain unattributed. */
+  writeAttribution?: {
+    evidenceId: string;
+    adjustmentId: string;
+    referenceDocumentUri: string;
+    available: string;
+    quantityMatches: boolean | null;
+  } | null;
   availabilityBasis: 'provider_reported' | 'derived' | 'unknown';
   observedAt: string;
   sourceUpdatedAt: string | null;

@@ -109,5 +109,8 @@
   "inventory_item_active": "Item active at location",
   "inventory_item_tracked": "Inventory tracked",
   "inventory_activation_yes": "Yes",
-  "inventory_activation_no": "No"
+  "inventory_activation_no": "No",
+  "inventory_write_matches": "Luma set available stock to {quantity}. This read matches; other changes may also have occurred.",
+  "inventory_write_changed": "Luma set available stock to {quantity}. This read differs; other changes remain unattributed.",
+  "inventory_write_unknown": "Luma set available stock to {quantity}. The current quantity is unknown."
 }

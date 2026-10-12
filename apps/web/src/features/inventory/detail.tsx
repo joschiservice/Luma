@@ -39,6 +39,7 @@ import {
   stockFreshness,
   stockQuantity,
   StockState,
+  StockWriteAttribution,
   syncExplanation,
 } from './presentation';
 
@@ -214,6 +215,7 @@ export function StockDetailView({
                 cell: (source: StockSource) => (
                   <div className="inventory-cell">
                     <strong>{source.label}</strong>
+                    <StockWriteAttribution source={source} />
                     <small>
                       {connectionStatusLabel(source.status)} ·{' '}
                       {source.mappingMethod
@@ -297,7 +299,9 @@ export function StockDetailView({
           />
           <Disclosure>
             <summary>{m.inventory_provider_states_title()}</summary>
-            <p className="inventory-note">{m.inventory_provider_states_note()}</p>
+            <p className="inventory-note">
+              {m.inventory_provider_states_note()}
+            </p>
             <DataTable
               caption={m.inventory_provider_states_title()}
               rows={position.sources}
@@ -479,6 +483,7 @@ export function StockDetailView({
                   cell: (entry) => (
                     <div className="inventory-cell">
                       <span>{entry.label}</span>
+                      <StockWriteAttribution source={entry} />
                       <small>
                         {entry.deleted
                           ? m.inventory_history_removed()

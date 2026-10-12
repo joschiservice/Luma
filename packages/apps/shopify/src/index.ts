@@ -11,6 +11,7 @@ import {
 } from '@luma/connections/composition';
 import { createReadBudget, type ReadBudget } from '@luma/connector-shopify';
 import { IdentityError } from '@luma/identity';
+import type { TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
 
 import { registerRecoveryRoutes } from './api/fulfillment-recovery.js';
@@ -32,6 +33,7 @@ import {
   installationInput,
   installationTarget,
 } from './infrastructure/installation-validation.js';
+import { readInventoryWriteReceipts } from './infrastructure/inventory-write-store.js';
 import { createShopifyOAuth } from './infrastructure/oauth.js';
 import { createPrivacyIntake } from './infrastructure/privacy.js';
 import { createShopifyRecordReader } from './infrastructure/records.js';
@@ -58,6 +60,8 @@ export function createShopifyProvider(
     oauth?: ShopifyOAuth;
     /** Offers customer reads; set only when Shopify approved protected customer data. */
     customerAccess?: { contact: boolean; address: boolean };
+    /** Connects tenant-scoped correction receipts to independent commerce reads. */
+    database?: TenantDatabase;
   } = {},
 ): ConnectionProvider {
   const budgets = new Map<string, ReadBudget>();
@@ -97,6 +101,7 @@ export function createShopifyProvider(
         budget = createReadBudget();
         budgets.set(budgetKey, budget);
       }
+      const database = options.database;
 
       return createShopifyConnector({
         budget,
@@ -128,6 +133,12 @@ export function createShopifyProvider(
           ).credentials.token;
         },
         recordObservations: runtime.recordObservations,
+        ...(database
+          ? {
+              inventoryWrites: (targets) =>
+                readInventoryWriteReceipts(database, context, id, targets),
+            }
+          : {}),
         ...(options.customerAccess
           ? {
               customerAccess: options.customerAccess,
@@ -268,6 +279,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
       },
     },
     connector: createShopifyProvider({
+      database: context.database,
       ...(oauth ? { oauth } : {}),
       ...(context.simulation ? { simulation: context.simulation } : {}),
       ...(context.env.SHOPIFY_PROTECTED_CUSTOMER_DATA_APPROVED === 'true'
