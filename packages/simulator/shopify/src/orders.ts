@@ -20,6 +20,7 @@ import {
   iso,
   levelId,
   type LineItemData,
+  type LineItemGroupData,
   load,
   location,
   minorUnits,
@@ -141,6 +142,26 @@ export async function createOrder(
     number = await store.sequence('order-number', 1001);
   }
   const name = `#${config.orderPrefix}${number}`;
+  const groups = new Map<string, LineItemGroupData>();
+  for (const line of command.lines)
+    if (line.bundleGroup) {
+      const { id: groupId, ...group } = line.bundleGroup;
+      if (
+        !/^[1-9][0-9]*$/.test(groupId) ||
+        !group.title ||
+        !Number.isSafeInteger(group.quantity) ||
+        group.quantity < 1
+      )
+        throw new Error('Invalid bundle group');
+      if (await store.get('LineItemGroup', groupId))
+        throw new Error('Bundle group already exists');
+      if (
+        groups.has(groupId) &&
+        JSON.stringify(groups.get(groupId)) !== JSON.stringify(group)
+      )
+        throw new Error('Inconsistent bundle group');
+      groups.set(groupId, group);
+    }
   const lines: { id: string; data: LineItemData }[] = [];
   for (const line of command.lines) {
     const variant = variants.get(line.variant);
@@ -154,6 +175,7 @@ export async function createOrder(
       id: await nextId(context),
       data: {
         order: id,
+        ...(line.bundleGroup ? { bundleGroup: line.bundleGroup.id } : {}),
         variant: line.variant,
         product: variant.product,
         sku: variant.sku,
@@ -231,6 +253,9 @@ export async function createOrder(
       ),
     );
   await store.putMany([
+    ...[...groups].map(([groupId, group]) =>
+      insert(context, 'LineItemGroup', groupId, group, { parent: id }),
+    ),
     insert(context, 'Order', id, order, {
       parent: customer?.id ?? null,
       key: name,

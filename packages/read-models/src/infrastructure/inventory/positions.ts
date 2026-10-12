@@ -49,6 +49,9 @@ const sourceRows = `SELECT p.entity_id AS id,
  'locationActive',s.document->'data'->'locationActive',
  'itemActive',s.document->'data'->'itemActive',
  'tracked',s.document->'data'->'tracked',
+ 'bundleContext',(SELECT jsonb_build_object('observedAt',to_char(k.observed_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),'componentCount',k.component_count)
+ FROM inventory_product_skus k WHERE k.tenant_id=p.tenant_id AND k.connection_id=p.connection_id AND k.sku_id=e.id
+ AND (k.requires_components OR k.component_count>0) ORDER BY k.observed_at DESC,k.product_id LIMIT 1),
  'writeAttribution',s.document->'data'->'writeAttribution',
  'inventorySemantics',CASE WHEN c.document->>'provider'='shopify' THEN to_jsonb('shopify/1'::text) ELSE s.document->'data'->'inventorySemantics' END,
  'availabilityBasis',s.document->'data'->>'availabilityBasis','observedAt',s.document->>'observedAt',

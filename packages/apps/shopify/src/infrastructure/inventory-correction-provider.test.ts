@@ -27,6 +27,10 @@ function fixture() {
   const node = {
     id: inventoryItemId,
     tracked: true,
+    variant: {
+      requiresComponents: false,
+      productVariantComponents: { nodes: [] as { id: string }[] },
+    },
     inventoryLevel: {
       id: 'gid://shopify/InventoryLevel/1',
       isActive: true,
@@ -235,4 +239,33 @@ it('requires fresh source evidence and a separate complete exact-location read f
       source: { ...after.source, revision: 'erp-2' },
     }),
   ).toBe(false);
+});
+
+it.each(['required', 'optional'])(
+  'withholds a %s bundle parent, including a recipe changed after preview',
+  async (kind) => {
+    const f = fixture(),
+      input = await f.input();
+    if (kind === 'required') f.node.variant.requiresComponents = true;
+    else
+      f.node.variant.productVariantComponents.nodes.push({
+        id: 'gid://shopify/ProductVariantComponent/1',
+      });
+    const fresh = await f.provider.read(inventoryItemId, locationId);
+    expect(fresh).toMatchObject({ bundleParent: true, complete: false });
+    await expect(f.handler.run(f.context, input)).rejects.toMatchObject({
+      failure: { effect: 'none', dispatch: 'not_dispatched' },
+    });
+    expect(f.mutations).toHaveLength(0);
+  },
+);
+
+it('does not dispatch when requested bundle metadata is missing', async () => {
+  const f = fixture(),
+    input = await f.input();
+  Reflect.deleteProperty(f.node, 'variant');
+  await expect(f.handler.run(f.context, input)).rejects.toMatchObject({
+    failure: { code: 'invalid_response', effect: 'none' },
+  });
+  expect(f.mutations).toHaveLength(0);
 });

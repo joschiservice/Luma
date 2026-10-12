@@ -120,6 +120,24 @@ export const orderListQuerySchema = z
 const orderLineSchema = z.object({
   id: z.string().uuid(),
   skuId: z.string().uuid().nullable(),
+  bundleGroup: z
+    .object({
+      id: z.object({ externalId: z.string(), scopeKey: z.string() }),
+      title: z.string(),
+      quantity: z.string(),
+      product: z
+        .object({ externalId: z.string(), scopeKey: z.string() })
+        .nullable(),
+      variant: z
+        .object({ externalId: z.string(), scopeKey: z.string() })
+        .nullable(),
+      skuCode: z.string().nullable(),
+    })
+    .nullable()
+    .optional()
+    .describe(
+      'Merchandising group of this component. It is not an additional stock or fulfillment line. Omitted means unread; null means standalone.',
+    ),
   comparisonKey: z.string().uuid().nullable(),
   unitPrice: z
     .object({ amount: z.string(), currency: z.string() })

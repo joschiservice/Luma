@@ -396,11 +396,61 @@ const identity = (
 
 function Content({ state }: { state: string }) {
   const [search, change] = useState<ProductsSearch>({});
-  if (state === 'detail' || state === 'missing')
+  if (
+    state === 'detail' ||
+    state === 'missing' ||
+    state === 'bundle' ||
+    state === 'bundle-unknown'
+  )
     return (
       <ProductDetailView
         organizationId={org}
-        detail={state === 'missing' ? missingDetail : detail}
+        detail={
+          state === 'missing'
+            ? missingDetail
+            : state.startsWith('bundle')
+              ? {
+                  ...detail,
+                  bundles: [
+                    {
+                      connectionId: store,
+                      productId: shirt.listings[0]!.productId,
+                      variant: {
+                        externalId: 'gid://shopify/ProductVariant/4400',
+                        scopeKey: '',
+                      },
+                      requiresComponents: true,
+                      observedAt: asOf,
+                      sourceUpdatedAt: null,
+                      components:
+                        state === 'bundle-unknown'
+                          ? null
+                          : [
+                              {
+                                sourceId: {
+                                  externalId:
+                                    'gid://shopify/ProductVariantComponent/101',
+                                  scopeKey: '',
+                                },
+                                sourceVariant: {
+                                  externalId:
+                                    'gid://shopify/ProductVariant/4410',
+                                  scopeKey: '',
+                                },
+                                sourceSku: {
+                                  externalId:
+                                    'gid://shopify/InventoryItem/4499',
+                                  scopeKey: '',
+                                },
+                                skuId: shirt.skuId,
+                                quantity: '2',
+                              },
+                            ],
+                    },
+                  ],
+                }
+              : detail
+        }
         refresh={() => {}}
         identity={state === 'detail' ? identity : null}
       />
@@ -573,3 +623,12 @@ export const Loading: Story = { args: { state: 'loading' } };
 export const Error: Story = { args: { state: 'error' } };
 
 export const Offline: Story = { args: { state: 'offline' } };
+
+export const Bundle: Story = { args: { state: 'bundle' } };
+
+export const BundleDark: Story = {
+  args: { state: 'bundle' },
+  globals: { theme: 'dark' },
+};
+
+export const BundleUnknown: Story = { args: { state: 'bundle-unknown' } };

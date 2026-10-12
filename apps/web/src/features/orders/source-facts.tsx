@@ -20,6 +20,7 @@ import { OrderSection } from '../../shared/orders/order-section';
 import {
   formatMoney,
   formatQuantity,
+  formatSourceNumber,
   fulfillmentLabel,
   paymentLabels,
   statusLabels,
@@ -40,6 +41,14 @@ function lineColumns(
       cell: (line) => (
         <span className="orders-cell-stack">
           <span>{line.title ?? line.skuCode ?? m.orders_lines_untitled()}</span>
+          {line.bundleGroup ? (
+            <small>
+              {m.products_bundles_group({
+                title: line.bundleGroup.title,
+                quantity: formatSourceNumber(line.bundleGroup.quantity),
+              })}
+            </small>
+          ) : null}
           <small>
             {line.skuCode
               ? m.orders_lines_sku({ sku: line.skuCode })
@@ -139,6 +148,12 @@ export function OrderLines({
             </Button>
           ))}
         </div>
+      ) : null}
+      {shown?.lines.some((line) => line.bundleGroup === undefined) ? (
+        <p className="order-note">{m.products_bundles_unknown()}</p>
+      ) : null}
+      {shown?.lines.some((line) => line.bundleGroup) ? (
+        <p className="order-note">{m.products_bundles_note()}</p>
       ) : null}
       {shown ? (
         <DataTable

@@ -35,6 +35,15 @@ export type CommerceData =
         /** Source SKU text. Descriptive only; `skuId` carries the mapped identity. */
         skuCode?: string | null;
         title?: string | null;
+        /** Exact source merchandising group; it never creates a second stock or fulfillment quantity. */
+        bundleGroup?: {
+          id: { externalId: string; scopeKey: string };
+          title: string;
+          quantity: string;
+          product: { externalId: string; scopeKey: string } | null;
+          variant: { externalId: string; scopeKey: string } | null;
+          skuCode: string | null;
+        } | null;
       }[];
     }
   | {
@@ -72,12 +81,13 @@ export type CommerceData =
 
 export interface CanonicalSnapshot {
   /**
-   * Order snapshots use version 5 for whether unit prices include tax, and version 4 for
+   * Order snapshots use version 6 for sold bundle groups, version 5 for whether unit prices
+   * include tax, and version 4 for
    * optional unit prices and fractional tax rates.
    * Order and fulfillment snapshots use version 3 for current and remaining line quantities.
    * Stored versions 1 and 2 remain readable. Return and refund snapshots use version 1.
    */
-  schemaVersion: 1 | 2 | 3 | 4 | 5;
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6;
   entityId: string;
   kind: EntityKind;
   connectionId: string;

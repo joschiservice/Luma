@@ -974,6 +974,7 @@ type FulfillmentOrderLineItem implements Node {
 }
 
 type LineItem implements Node {
+  lineItemGroup: LineItemGroup
   currentQuantity: Int!
   discountedTotalSet(withCodeDiscounts: Boolean = false): MoneyBag!
   id: ID!
@@ -996,6 +997,14 @@ The `Float` scalar type represents signed double-precision fractional values as 
 scalar Float
 
 type ProductVariant implements Node {
+  requiresComponents: Boolean!
+  productVariantComponents(
+    first: Int
+    after: String
+    before: String
+    last: Int
+    reverse: Boolean = false
+  ): ProductVariantComponentConnection!
   barcode: String
   displayName: String!
   id: ID!
@@ -2259,4 +2268,27 @@ type BasicEvent implements Event & Node {
   action: String!
   createdAt: DateTime!
   id: ID!
+}
+
+# Native bundle relationships; parent merchandising is not a physical stock posting.
+type LineItemGroup implements Node {
+  id: ID!
+  title: String!
+  quantity: Int!
+  productId: ID
+  variantId: ID
+  variantSku: String
+}
+type ProductVariantComponent implements Node {
+  id: ID!
+  productVariant: ProductVariant!
+  quantity: Int!
+}
+type ProductVariantComponentConnection {
+  nodes: [ProductVariantComponent!]!
+  edges: [ProductVariantComponentEdge!]!
+  pageInfo: PageInfo!
+}
+type ProductVariantComponentEdge {
+  node: ProductVariantComponent!
 }

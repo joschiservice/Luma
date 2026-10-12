@@ -1,4 +1,6 @@
 export interface StockSource {
+  /** Positive catalog evidence of a merchandising parent, separate from this stock read. */
+  bundleContext?: { observedAt: string; componentCount: number | null } | null;
   connectionId: string;
   label: string;
   status: string;

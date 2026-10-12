@@ -50,6 +50,16 @@ scan rather than truncating it. Collection absence never emits tombstones. Indep
 - **Products:** per variant, the inventory-item SKU identity, variant title (none for
   `Default Title`), price in shop currency and barcode. SKU text preserves case and is
   never identity.
+- **Bundles:** catalog recipes use exact component, variant and InventoryItem identities.
+  `requiresComponents` is retained separately: false alone does not prove an empty recipe.
+  The first recipe edge is included in the catalog page; overflow pages are drained in batches of ten parents, with at most 5,000 components per
+  parent and 5,000 edges across the product to bound import memory. Missing parent nodes leave recipes unknown; incomplete pages fail the read.
+  Bulk exports retain the exported parent flag but leave the recipe unknown rather than
+  attaching a recipe read later to historical evidence. Sold component lines retain their
+  historical LineItemGroup, independently of the current catalog recipe. Parent group
+  quantity is merchandising context, not another stock or fulfillment line. Current-unit
+  reductions and component returns do not redefine the sold group. Deleted components
+  keep group and SKU text without inventing an InventoryItem identity.
 - **Inventory:** all eight states are retained separately in `each`: on hand, committed,
   reserved, incoming, damaged, quality control, safety stock and available. Shopify committed
   stock and its separate reserved state are distinct; neither establishes a native Luma

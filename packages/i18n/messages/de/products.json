@@ -159,5 +159,14 @@
   "products_sales_daily": "Einheiten pro Tag",
   "products_sales_daily_caption": "{source}: bestellte Einheiten pro Tag",
   "products_sales_day_column": "Tag (UTC)",
-  "products_sales_units_column": "Einheiten"
+  "products_sales_units_column": "Einheiten",
+  "products_bundles_title": "Bundle-Komponenten",
+  "products_bundles_note": "Der übergeordnete Artikel beschreibt die Vermarktung. Bestand und Erfüllung verwenden die tatsächlichen Komponentenpositionen. Aktuelle Katalogrezepte ändern keine verkauften Bundles.",
+  "products_bundles_unknown": "Komponenten sind nicht bekannt. SKU-Text belegt keine Beziehung.",
+  "products_bundles_empty": "Diese Quelle meldet kein Komponentenrezept.",
+  "products_bundles_parent": "Bundle-Artikel · Komponentenbestand",
+  "products_bundles_group": "Bundle: {title} · {quantity} verkaufte Gruppen",
+  "products_bundles_limit": "Die ersten 100 Komponenten werden angezeigt.",
+  "products_bundles_component": "Komponente",
+  "products_bundles_quantity": "Einheiten pro Bundle"
 }

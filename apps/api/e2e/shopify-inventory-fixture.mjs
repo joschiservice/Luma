@@ -102,6 +102,7 @@ export async function correctionFixture(
         race = false;
       }
     }
+    await options.beforeShopifyRequest?.(body, store);
     const response = await shopify.handle(context(), request);
     await refresh();
     if (body.query.startsWith('mutation') && lost) {
@@ -172,6 +173,9 @@ export async function correctionFixture(
       permissions: [
         'inventory.read',
         'inventory.available.reconcile',
+        ...(options.bundleReads
+          ? ['orders.read', 'products.read', 'fulfillment.read', 'returns.read']
+          : []),
         ...(options.transferReads
           ? ['inventory.transfers.read', 'inventory.shipments.read']
           : []),
@@ -315,6 +319,7 @@ export async function correctionFixture(
     call,
     syncStock: () => syncRecords(),
     syncRecords,
+    runShopify: (command) => shopify.command(context(), command),
     recordTransfer: (transfer) =>
       shopify.command(context(), { kind: 'inventory-transfer', transfer }),
     changeAvailable: (quantity) =>

@@ -154,6 +154,9 @@ export function InventoryView({
           {item.sources.map((source) => (
             <div key={source.connectionId}>
               <strong>{source.label}</strong>
+              {source.bundleContext ? (
+                <small>{m.products_bundles_parent()}</small>
+              ) : null}
               <small>
                 {stockFreshness(source, list!.asOf)} ·{' '}
                 {connectionStatusLabel(source.status)}

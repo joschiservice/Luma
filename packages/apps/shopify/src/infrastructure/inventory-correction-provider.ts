@@ -27,6 +27,14 @@ const inputSchema = z
 const nodeSchema = z.object({
   id: gid('InventoryItem'),
   tracked: z.boolean(),
+  variant: z
+    .object({
+      requiresComponents: z.boolean(),
+      productVariantComponents: z.object({
+        nodes: z.array(z.object({ id: gid('ProductVariantComponent') })),
+      }),
+    })
+    .nullable(),
   inventoryLevel: z
     .object({
       id: z.string(),
@@ -75,7 +83,7 @@ export function createInventoryCorrectionProvider(
     gid('Location').parse(locationId);
     const raw = await request(
       `query LumaInventoryCorrection($id: ID!, $locationId: ID!) {
-      node(id: $id) { ... on InventoryItem { id tracked inventoryLevel(locationId: $locationId) {
+      node(id: $id) { ... on InventoryItem { id tracked variant { requiresComponents productVariantComponents(first: 1) { nodes { id } } } inventoryLevel(locationId: $locationId) {
         id updatedAt isActive location { id name isActive } quantities(names: ["available"]) { name quantity }
       } } }
     }`,
@@ -125,7 +133,17 @@ export function createInventoryCorrectionProvider(
       locationId,
       locationName: level?.location.name ?? locationId,
       tracked: node.tracked,
+      bundleParent: node.variant
+        ? node.variant.requiresComponents ||
+          node.variant.productVariantComponents.nodes.length > 0
+        : null,
       complete:
+        node.variant !== null &&
+        !(
+          node.variant &&
+          (node.variant.requiresComponents ||
+            node.variant.productVariantComponents.nodes.length > 0)
+        ) &&
         !!level &&
         level.location.isActive &&
         level.isActive &&

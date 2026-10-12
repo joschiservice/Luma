@@ -181,5 +181,6 @@
   "shopify_subscriptions_failed": "Registration failed — reconnect to retry",
   "shopify_subscriptions_unavailable": "Unavailable with current access",
   "shopify_subscriptions_received": "Last verified delivery: {time}",
-  "shopify_subscriptions_no_delivery": "No verified delivery yet"
+  "shopify_subscriptions_no_delivery": "No verified delivery yet",
+  "shopify_blocker_correction_bundle_parent": "Bundle stock is derived from its components. Review component stock instead."
 }

@@ -28,6 +28,7 @@ export const correctionSnapshot = z.object({
   locationName: z.string(),
   available: z.number().int().nullable(),
   tracked: z.boolean(),
+  bundleParent: z.boolean().nullable().optional(),
   complete: z.boolean(),
   writeAttribution: z
     .object({
@@ -53,9 +54,11 @@ export type CorrectionSnapshot = z.infer<typeof correctionSnapshot>;
 
 /** Why a stock correction can't be reviewed now. Interfaces translate these codes. */
 export type CorrectionBlockerReason =
-  'write_access' | 'untracked' | 'stale' | 'already_matches';
+  'bundle_parent' | 'write_access' | 'untracked' | 'stale' | 'already_matches';
 
 const correctionBlockerText: Record<CorrectionBlockerReason, string> = {
+  bundle_parent:
+    'Bundle stock is derived from its components. Review component stock instead.',
   write_access: 'Reconnect Shopify with inventory write access.',
   untracked:
     'Shopify did not confirm tracked inventory at this exact location.',
@@ -76,6 +79,7 @@ export function correctionBlockerReason(
   now = new Date(),
 ): CorrectionBlockerReason | null {
   if (!granted.includes('inventory.available.reconcile')) return 'write_access';
+  if (snapshot.bundleParent) return 'bundle_parent';
   if (!snapshot.complete || !snapshot.tracked || snapshot.available === null)
     return 'untracked';
   for (const observedAt of [snapshot.observedAt, snapshot.source.observedAt]) {

@@ -43,6 +43,7 @@ import {
   levelGid,
   levelId,
   type LineItemData,
+  type LineItemGroupData,
   location,
   locationNode,
   money,
@@ -51,6 +52,7 @@ import {
   type OrderTransactionData,
   parseGid,
   type ProductData,
+  type ProductVariantComponentData,
   type ProductVariantData,
   type RefundData,
   type RefundLineItemData,
@@ -96,6 +98,8 @@ const nodeKinds = new Set([
   'OrderTransaction',
   'Product',
   'ProductVariant',
+  'ProductVariantComponent',
+  'LineItemGroup',
   'Refund',
   'Return',
   'ReturnLineItem',
@@ -238,10 +242,13 @@ async function node(context: RequestContext, id: string | null) {
       : null;
   }
   if (!nodeKinds.has(parsed.type)) return null;
+  if (['ProductVariantComponent', 'ProductVariant'].includes(parsed.type))
+    requireNativeRead(context, 'products');
+  if (parsed.type === 'LineItemGroup') requireNativeRead(context, 'orders');
   if (parsed.type.startsWith('InventoryTransfer'))
-    transferAccess(context, 'inventory_transfers');
+    requireNativeRead(context, 'inventory_transfers');
   if (parsed.type.startsWith('InventoryShipment'))
-    transferAccess(context, 'inventory_shipments');
+    requireNativeRead(context, 'inventory_shipments');
   const record = await load(context, parsed.type, parsed.id);
   if (record && parsed.type === 'Order' && !visible(context, record))
     return null;
@@ -249,8 +256,8 @@ async function node(context: RequestContext, id: string | null) {
   return record ?? null;
 }
 
-/** Denies transfer access independently from shipment access. */
-function transferAccess(context: RequestContext, scope: string) {
+/** Requires the native scope for a source collection or exact node read. */
+function requireNativeRead(context: RequestContext, scope: string) {
   if (
     !context.shop.config.scopes.some(
       (s) => s === `read_${scope}` || s === `write_${scope}`,
@@ -263,22 +270,22 @@ function transferAccess(context: RequestContext, scope: string) {
 
 const root: TypeResolvers = {
   inventoryTransfer: (_source, args, context) => {
-    transferAccess(context, 'inventory_transfers');
+    requireNativeRead(context, 'inventory_transfers');
 
     return node(context, text(args, 'id'));
   },
   inventoryTransfers: (_source, args, context) => {
-    transferAccess(context, 'inventory_transfers');
+    requireNativeRead(context, 'inventory_transfers');
 
     return connection(context, args, { kind: 'InventoryTransfer' });
   },
   inventoryShipment: (_source, args, context) => {
-    transferAccess(context, 'inventory_shipments');
+    requireNativeRead(context, 'inventory_shipments');
 
     return node(context, text(args, 'id'));
   },
   inventoryShipments: (_source, args, context) => {
-    transferAccess(context, 'inventory_shipments');
+    requireNativeRead(context, 'inventory_shipments');
 
     return connection(context, args, { kind: 'InventoryShipment' });
   },
@@ -461,7 +468,20 @@ const resolvers: Record<string, TypeResolvers> = {
   QueryRoot: root,
   Mutation: mutationResolvers,
   Order: orderResolvers,
+  LineItemGroup: on<LineItemGroupData>({
+    productId: (group) =>
+      group.data.product ? gid('Product', group.data.product) : null,
+    variantId: (group) =>
+      group.data.variant ? gid('ProductVariant', group.data.variant) : null,
+    variantSku: (group) => group.data.sku,
+  }),
+  ProductVariantComponent: on<ProductVariantComponentData>({
+    productVariant: (component, _args, context) =>
+      load(context, 'ProductVariant', component.data.variant),
+  }),
   LineItem: on<LineItemData>({
+    lineItemGroup: (line, _args, context) =>
+      load(context, 'LineItemGroup', line.data.bundleGroup ?? null),
     currentQuantity: (line) => line.data.currentQuantity ?? line.data.quantity,
     discountedTotalSet: (line, _args, context) =>
       moneyBag(
@@ -493,6 +513,15 @@ const resolvers: Record<string, TypeResolvers> = {
       load(context, 'ProductVariant', line.data.variant),
   }),
   ProductVariant: on<ProductVariantData>({
+    requiresComponents: (variant) => variant.data.requiresComponents ?? false,
+    productVariantComponents: (variant, args, context) => {
+      requireNativeRead(context, 'products');
+
+      return connection(context, args, {
+        kind: 'ProductVariantComponent',
+        parent: variant.id,
+      });
+    },
     displayName: async (variant, _args, context) => {
       const product = await load<ProductData>(
         context,
@@ -554,7 +583,7 @@ const resolvers: Record<string, TypeResolvers> = {
         parent: transfer.id,
       }),
     shipments: async (transfer, args, context) => {
-      transferAccess(context, 'inventory_shipments');
+      requireNativeRead(context, 'inventory_shipments');
 
       return connection(
         context,

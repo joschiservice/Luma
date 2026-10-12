@@ -66,6 +66,10 @@ second action.
 
 ## Inventory corrections
 
+Known bundle parents are ineligible for an independent stock correction. A fresh read of
+the variant flag and recipe membership requires native product read access. Unreadable
+metadata prevents dispatch; catalog context alone never authorizes a write.
+
 Permission: `shopify:inventory_corrections.apply`. Luma supports one source-of-truth
 policy: a JTL ERP source the requester selects supplies the available quantity, and
 Shopify is the destination. Luma never writes ERP stock, accepts a manually entered

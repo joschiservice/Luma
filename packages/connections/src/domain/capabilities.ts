@@ -1,5 +1,6 @@
 import type { ConnectorFailure } from '@luma/connector-core';
 
+import type { OrderBundleGroup, ProductBundle } from './bundles.js';
 import type {
   InventoryShipmentSnapshot,
   InventoryTransferSnapshot,
@@ -171,6 +172,8 @@ export interface OrderSnapshot {
     taxIncluded?: boolean | null;
     /** Fractional tax rate (0.19 means 19%); absent or null when not reported. */
     taxRate?: string | null;
+    /** Exact merchandising group; omitted means unread, null means a standalone line. */
+    bundleGroup?: OrderBundleGroup | null;
     /** Line title at the source when the order was read. */
     title?: string | null;
   }[];
@@ -317,6 +320,8 @@ export interface ProductSnapshot {
     /** Variant title, for example a size or colour; null for a product's only variant. */
     title?: string | null;
     price?: ListPrice | null;
+    /** Variant composition; omitted when the source does not report it. */
+    bundle?: ProductBundle;
     /** GTIN, EAN or UPC text; descriptive only. */
     barcode?: string | null;
   }[];

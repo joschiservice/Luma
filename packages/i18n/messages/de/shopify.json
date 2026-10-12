@@ -181,5 +181,6 @@
   "shopify_subscriptions_failed": "Registrierung fehlgeschlagen — zum Wiederholen erneut verbinden",
   "shopify_subscriptions_unavailable": "Mit aktuellem Zugriff nicht verfügbar",
   "shopify_subscriptions_received": "Letzte verifizierte Zustellung: {time}",
-  "shopify_subscriptions_no_delivery": "Noch keine verifizierte Zustellung"
+  "shopify_subscriptions_no_delivery": "Noch keine verifizierte Zustellung",
+  "shopify_blocker_correction_bundle_parent": "Der Bundle-Bestand ergibt sich aus den Komponenten. Prüfen Sie deren Bestand."
 }

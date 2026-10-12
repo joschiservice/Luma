@@ -65,11 +65,10 @@ const position = base
   })
   .strict();
 
-// Product snapshots use version 2 since they may carry vendor, listing, variant title, price
-// and barcode. Version 1 product documents stay valid without those facts.
+// Earlier catalog snapshots stay readable; version 3 adds independently sourced bundle recipes.
 const product = base
   .extend({
-    schemaVersion: z.union([z.literal(1), z.literal(2)]),
+    schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3)]),
     kind: z.literal('product'),
     data: z
       .object({
@@ -98,10 +97,60 @@ const product = base
                   .nullable()
                   .optional(),
                 barcode: z.string().max(512).nullable().optional(),
+                bundle: z
+                  .object({
+                    variant: z
+                      .object({
+                        externalId: z.string().min(1).max(1024),
+                        scopeKey: z.string().max(1024),
+                      })
+                      .strict(),
+                    requiresComponents: z.boolean(),
+                    components: z
+                      .array(
+                        z
+                          .object({
+                            sourceId: z
+                              .object({
+                                externalId: z.string().min(1).max(1024),
+                                scopeKey: z.string().max(1024),
+                              })
+                              .strict(),
+                            sourceVariant: z
+                              .object({
+                                externalId: z.string().min(1).max(1024),
+                                scopeKey: z.string().max(1024),
+                              })
+                              .strict(),
+                            sourceSku: z
+                              .object({
+                                externalId: z.string().min(1).max(1024),
+                                scopeKey: z.string().max(1024),
+                              })
+                              .strict()
+                              .nullable(),
+                            skuId: uuid.nullable(),
+                            quantity: decimal.refine((v) => !v.startsWith('-')),
+                          })
+                          .strict(),
+                      )
+                      .max(5000)
+                      .nullable(),
+                  })
+                  .strict()
+                  .optional(),
               })
               .strict(),
           )
-          .max(5000),
+          .max(5000)
+          .refine(
+            (skus) =>
+              skus.reduce(
+                (sum, sku) => sum + (sku.bundle?.components?.length ?? 0),
+                0,
+              ) <= 5000,
+            'Product component budget exceeded',
+          ),
       })
       .strict(),
   })

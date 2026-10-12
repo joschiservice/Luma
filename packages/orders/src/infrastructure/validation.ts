@@ -51,6 +51,26 @@ const line = z
       .optional(),
     skuCode: text.nullable().optional(),
     title: text.nullable().optional(),
+    bundleGroup: z
+      .object({
+        id: z
+          .object({ externalId: text, scopeKey: z.string().max(1024) })
+          .strict(),
+        title: text,
+        quantity: count,
+        product: z
+          .object({ externalId: text, scopeKey: z.string().max(1024) })
+          .strict()
+          .nullable(),
+        variant: z
+          .object({ externalId: text, scopeKey: z.string().max(1024) })
+          .strict()
+          .nullable(),
+        skuCode: text.nullable(),
+      })
+      .strict()
+      .nullable()
+      .optional(),
   })
   .strict()
   .refine(
@@ -285,6 +305,7 @@ export const snapshotSchema = z.union([
         z.literal(3),
         z.literal(4),
         z.literal(5),
+        z.literal(6),
       ]),
       kind: z.literal('order'),
       data: order,

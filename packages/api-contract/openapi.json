@@ -51397,6 +51397,39 @@
                                   "items": {
                                     "type": "object",
                                     "properties": {
+                                      "bundleContext": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "observedAt": {
+                                                "type": "string",
+                                                "format": "date-time"
+                                              },
+                                              "componentCount": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "integer",
+                                                    "minimum": 0,
+                                                    "maximum": 9007199254740991
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
+                                              }
+                                            },
+                                            "required": [
+                                              "observedAt",
+                                              "componentCount"
+                                            ]
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ],
+                                        "description": "Catalog context of a known bundle parent. Its timestamp is independent of the stock read and does not establish physical component stock."
+                                      },
                                       "connectionId": {
                                         "type": "string",
                                         "format": "uuid"
@@ -52104,6 +52137,39 @@
                                   "items": {
                                     "type": "object",
                                     "properties": {
+                                      "bundleContext": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "observedAt": {
+                                                "type": "string",
+                                                "format": "date-time"
+                                              },
+                                              "componentCount": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "integer",
+                                                    "minimum": 0,
+                                                    "maximum": 9007199254740991
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
+                                              }
+                                            },
+                                            "required": [
+                                              "observedAt",
+                                              "componentCount"
+                                            ]
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ],
+                                        "description": "Catalog context of a known bundle parent. Its timestamp is independent of the stock read and does not establish physical component stock."
+                                      },
                                       "connectionId": {
                                         "type": "string",
                                         "format": "uuid"
@@ -98977,6 +99043,39 @@
                             "items": {
                               "type": "object",
                               "properties": {
+                                "bundleContext": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "observedAt": {
+                                          "type": "string",
+                                          "format": "date-time"
+                                        },
+                                        "componentCount": {
+                                          "anyOf": [
+                                            {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 9007199254740991
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "observedAt",
+                                        "componentCount"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Catalog context of a known bundle parent. Its timestamp is independent of the stock read and does not establish physical component stock."
+                                },
                                 "connectionId": {
                                   "type": "string",
                                   "format": "uuid"
@@ -99426,6 +99525,36 @@
                           "items": {
                             "type": "object",
                             "properties": {
+                              "bundleContext": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "observedAt": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                      },
+                                      "componentCount": {
+                                        "anyOf": [
+                                          {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": ["observedAt", "componentCount"]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Catalog context of a known bundle parent. Its timestamp is independent of the stock read and does not establish physical component stock."
+                              },
                               "connectionId": {
                                 "type": "string",
                                 "format": "uuid"
@@ -99723,6 +99852,36 @@
                           "items": {
                             "type": "object",
                             "properties": {
+                              "bundleContext": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "observedAt": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                      },
+                                      "componentCount": {
+                                        "anyOf": [
+                                          {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": ["observedAt", "componentCount"]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Catalog context of a known bundle parent. Its timestamp is independent of the stock read and does not establish physical component stock."
+                              },
                               "connectionId": {
                                 "type": "string",
                                 "format": "uuid"
@@ -100415,6 +100574,16 @@
                                   "type": "string",
                                   "format": "date-time"
                                 },
+                                "requiresComponents": {
+                                  "anyOf": [
+                                    {
+                                      "type": "boolean"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
                                 "sourceUpdatedAt": {
                                   "anyOf": [
                                     {
@@ -100717,6 +100886,151 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "bundles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "variant": {
+                            "type": "object",
+                            "properties": {
+                              "externalId": {
+                                "type": "string"
+                              },
+                              "scopeKey": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["externalId", "scopeKey"]
+                          },
+                          "requiresComponents": {
+                            "type": "boolean"
+                          },
+                          "components": {
+                            "anyOf": [
+                              {
+                                "type": "array",
+                                "maxItems": 5000,
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "sourceId": {
+                                      "type": "object",
+                                      "properties": {
+                                        "externalId": {
+                                          "type": "string"
+                                        },
+                                        "scopeKey": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": ["externalId", "scopeKey"]
+                                    },
+                                    "sourceVariant": {
+                                      "type": "object",
+                                      "properties": {
+                                        "externalId": {
+                                          "type": "string"
+                                        },
+                                        "scopeKey": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": ["externalId", "scopeKey"]
+                                    },
+                                    "sourceSku": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "externalId": {
+                                              "type": "string"
+                                            },
+                                            "scopeKey": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": ["externalId", "scopeKey"]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "skuId": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "format": "uuid"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "skuLabel": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "quantity": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "sourceId",
+                                    "sourceVariant",
+                                    "sourceSku",
+                                    "skuId",
+                                    "quantity"
+                                  ]
+                                }
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "connectionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "productId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "observedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "sourceUpdatedAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "variant",
+                          "requiresComponents",
+                          "components",
+                          "connectionId",
+                          "productId",
+                          "observedAt",
+                          "sourceUpdatedAt"
+                        ]
+                      }
+                    },
                     "item": {
                       "type": "object",
                       "properties": {
@@ -100874,6 +101188,16 @@
                               "observedAt": {
                                 "type": "string",
                                 "format": "date-time"
+                              },
+                              "requiresComponents": {
+                                "anyOf": [
+                                  {
+                                    "type": "boolean"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               },
                               "sourceUpdatedAt": {
                                 "anyOf": [
@@ -101169,6 +101493,137 @@
                                     "type": "null"
                                   }
                                 ]
+                              },
+                              "bundle": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "variant": {
+                                        "type": "object",
+                                        "properties": {
+                                          "externalId": {
+                                            "type": "string"
+                                          },
+                                          "scopeKey": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": ["externalId", "scopeKey"]
+                                      },
+                                      "requiresComponents": {
+                                        "type": "boolean"
+                                      },
+                                      "components": {
+                                        "anyOf": [
+                                          {
+                                            "type": "array",
+                                            "maxItems": 5000,
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "sourceId": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "externalId": {
+                                                      "type": "string"
+                                                    },
+                                                    "scopeKey": {
+                                                      "type": "string"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "externalId",
+                                                    "scopeKey"
+                                                  ]
+                                                },
+                                                "sourceVariant": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "externalId": {
+                                                      "type": "string"
+                                                    },
+                                                    "scopeKey": {
+                                                      "type": "string"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "externalId",
+                                                    "scopeKey"
+                                                  ]
+                                                },
+                                                "sourceSku": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "externalId": {
+                                                          "type": "string"
+                                                        },
+                                                        "scopeKey": {
+                                                          "type": "string"
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "externalId",
+                                                        "scopeKey"
+                                                      ]
+                                                    },
+                                                    {
+                                                      "type": "null"
+                                                    }
+                                                  ]
+                                                },
+                                                "skuId": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "string",
+                                                      "format": "uuid"
+                                                    },
+                                                    {
+                                                      "type": "null"
+                                                    }
+                                                  ]
+                                                },
+                                                "skuLabel": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "string"
+                                                    },
+                                                    {
+                                                      "type": "null"
+                                                    }
+                                                  ]
+                                                },
+                                                "quantity": {
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "sourceId",
+                                                "sourceVariant",
+                                                "sourceSku",
+                                                "skuId",
+                                                "quantity"
+                                              ]
+                                            }
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "variant",
+                                      "requiresComponents",
+                                      "components"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -101225,6 +101680,39 @@
                             "items": {
                               "type": "object",
                               "properties": {
+                                "bundleContext": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "observedAt": {
+                                          "type": "string",
+                                          "format": "date-time"
+                                        },
+                                        "componentCount": {
+                                          "anyOf": [
+                                            {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 9007199254740991
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "observedAt",
+                                        "componentCount"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Catalog context of a known bundle parent. Its timestamp is independent of the stock read and does not establish physical component stock."
+                                },
                                 "connectionId": {
                                   "type": "string",
                                   "format": "uuid"
@@ -102793,6 +103281,99 @@
                                     }
                                   ]
                                 },
+                                "bundleGroup": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "object",
+                                          "properties": {
+                                            "externalId": {
+                                              "type": "string"
+                                            },
+                                            "scopeKey": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": ["externalId", "scopeKey"]
+                                        },
+                                        "title": {
+                                          "type": "string"
+                                        },
+                                        "quantity": {
+                                          "type": "string"
+                                        },
+                                        "product": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "externalId": {
+                                                  "type": "string"
+                                                },
+                                                "scopeKey": {
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "externalId",
+                                                "scopeKey"
+                                              ]
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "variant": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "externalId": {
+                                                  "type": "string"
+                                                },
+                                                "scopeKey": {
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "externalId",
+                                                "scopeKey"
+                                              ]
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "skuCode": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "id",
+                                        "title",
+                                        "quantity",
+                                        "product",
+                                        "variant",
+                                        "skuCode"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Merchandising group of this component. It is not an additional stock or fulfillment line. Omitted means unread; null means standalone."
+                                },
                                 "comparisonKey": {
                                   "anyOf": [
                                     {
@@ -104070,6 +104651,102 @@
                                             "type": "null"
                                           }
                                         ]
+                                      },
+                                      "bundleGroup": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "id": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "externalId": {
+                                                    "type": "string"
+                                                  },
+                                                  "scopeKey": {
+                                                    "type": "string"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "externalId",
+                                                  "scopeKey"
+                                                ]
+                                              },
+                                              "title": {
+                                                "type": "string"
+                                              },
+                                              "quantity": {
+                                                "type": "string"
+                                              },
+                                              "product": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "externalId": {
+                                                        "type": "string"
+                                                      },
+                                                      "scopeKey": {
+                                                        "type": "string"
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "externalId",
+                                                      "scopeKey"
+                                                    ]
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
+                                              },
+                                              "variant": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "externalId": {
+                                                        "type": "string"
+                                                      },
+                                                      "scopeKey": {
+                                                        "type": "string"
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "externalId",
+                                                      "scopeKey"
+                                                    ]
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
+                                              },
+                                              "skuCode": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string"
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
+                                              }
+                                            },
+                                            "required": [
+                                              "id",
+                                              "title",
+                                              "quantity",
+                                              "product",
+                                              "variant",
+                                              "skuCode"
+                                            ]
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ],
+                                        "description": "Merchandising group of this component. It is not an additional stock or fulfillment line. Omitted means unread; null means standalone."
                                       },
                                       "comparisonKey": {
                                         "anyOf": [

@@ -335,6 +335,10 @@ export function createCommerceProjections(
           JOIN inventory_projections p ON p.tenant_id=k.tenant_id AND p.entity_id=k.product_id AND p.connection_id=k.connection_id
           JOIN inventory_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
           WHERE $4 AND k.tenant_id=$1 AND k.sku_id=$2 AND ($3::uuid IS NULL OR k.connection_id=$3)
+          UNION
+          SELECT k.product_id,'product',k.connection_id,s.observation_id
+          FROM inventory_bundle_components k JOIN inventory_snapshots s ON s.tenant_id=k.tenant_id AND s.id=k.snapshot_id
+          WHERE $4 AND k.tenant_id=$1 AND k.component_sku_id=$2 AND ($3::uuid IS NULL OR k.connection_id=$3)
           UNION ALL
           SELECT k.entity_id,s.kind,k.connection_id,s.observation_id
           FROM inventory_transfer_references k JOIN inventory_snapshots s ON s.tenant_id=k.tenant_id AND s.id=k.snapshot_id
@@ -459,7 +463,12 @@ export function supersedes(
 
 function references(value: CanonicalSnapshot): { kind: string; id: string }[] {
   if (value.data.type === 'product')
-    return value.data.skus.map((sku) => ({ kind: 'sku', id: sku.skuId }));
+    return value.data.skus.flatMap((sku) => [
+      { kind: 'sku', id: sku.skuId },
+      ...(sku.bundle?.components ?? []).flatMap((component) =>
+        component.skuId ? [{ kind: 'sku', id: component.skuId }] : [],
+      ),
+    ]);
   if (
     value.data.type === 'inventory_transfer' ||
     value.data.type === 'inventory_shipment'
@@ -523,20 +532,45 @@ async function refreshProductSkus(
       amount: sku.price?.amount ?? null,
       currency: sku.price?.currency ?? null,
       unit: sku.unit,
+      requires_components: sku.bundle?.requiresComponents ?? null,
+      component_count: sku.bundle?.components?.length ?? null,
+      variant_source_id: sku.bundle?.variant.externalId ?? null,
     }));
   });
   if (!rows.length) return;
   await tx.query(
     `INSERT INTO inventory_product_skus(tenant_id,product_id,connection_id,sku_id,code,snapshot_id,
       product_title,product_status,vendor,published,variant_title,barcode,price_amount,price_currency,unit,
-      observed_at,source_updated_at)
+      observed_at,source_updated_at,requires_components,variant_source_id,component_count)
     SELECT DISTINCT ON (s.product_id,s.connection_id,s.sku_id) $1::uuid,s.product_id,s.connection_id,s.sku_id,s.code,
       s.snapshot_id,s.product_title,s.product_status,s.vendor,s.published,s.title,s.barcode,s.amount::numeric,s.currency,
-      s.unit,s.observed_at,s.source_updated_at
+      s.unit,s.observed_at,s.source_updated_at,s.requires_components,s.variant_source_id,s.component_count
     FROM jsonb_to_recordset($2::jsonb) AS s(product_id uuid,connection_id uuid,snapshot_id uuid,product_title text,
       product_status text,vendor text,published boolean,observed_at timestamptz,source_updated_at timestamptz,
-      sku_id uuid,code text,title text,barcode text,amount text,currency text,unit text)
+      sku_id uuid,code text,title text,barcode text,amount text,currency text,unit text,requires_components boolean,variant_source_id text,component_count integer)
     ORDER BY s.product_id,s.connection_id,s.sku_id,s.code NULLS LAST`,
     [tenant, JSON.stringify(rows)],
   );
+  const components = products.flatMap(({ snapshotId, value }) =>
+    value.deleted || value.data.type !== 'product'
+      ? []
+      : value.data.skus.flatMap((sku) =>
+          (sku.bundle?.components ?? []).map((component) => ({
+            product_id: value.entityId,
+            connection_id: value.connectionId,
+            parent_sku_id: sku.skuId,
+            snapshot_id: snapshotId,
+            source_component_id: component.sourceId.externalId,
+            source_scope_key: component.sourceId.scopeKey,
+            component_sku_id: component.skuId,
+          })),
+        ),
+  );
+  if (components.length)
+    await tx.query(
+      `INSERT INTO inventory_bundle_components(tenant_id,product_id,connection_id,parent_sku_id,snapshot_id,source_component_id,source_scope_key,component_sku_id)
+    SELECT $1,r.product_id,r.connection_id,r.parent_sku_id,r.snapshot_id,r.source_component_id,r.source_scope_key,r.component_sku_id
+    FROM jsonb_to_recordset($2::jsonb) AS r(product_id uuid,connection_id uuid,parent_sku_id uuid,snapshot_id uuid,source_component_id text,source_scope_key text,component_sku_id uuid)`,
+      [tenant, JSON.stringify(components)],
+    );
 }

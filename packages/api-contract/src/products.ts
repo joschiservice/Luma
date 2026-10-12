@@ -36,6 +36,7 @@ const catalogListingSchema = z.object({
   price: listPriceSchema.nullable(),
   unit: z.string(),
   observedAt: timestamp,
+  requiresComponents: z.boolean().nullable().optional(),
   sourceUpdatedAt: timestamp.nullable(),
 });
 
@@ -84,7 +85,36 @@ export const productListSchema = z.object({
   asOf: timestamp,
 });
 
+const sourceRef = z.object({ externalId: z.string(), scopeKey: z.string() });
+const bundleRecipeSchema = z.object({
+  variant: sourceRef,
+  requiresComponents: z.boolean(),
+  components: z
+    .array(
+      z.object({
+        sourceId: sourceRef,
+        sourceVariant: sourceRef,
+        sourceSku: sourceRef.nullable(),
+        skuId: z.string().uuid().nullable(),
+        skuLabel: z.string().nullable().optional(),
+        quantity: z.string(),
+      }),
+    )
+    .max(5000)
+    .nullable(),
+});
+
 export const productDetailSchema = z.object({
+  bundles: z
+    .array(
+      bundleRecipeSchema.extend({
+        connectionId: z.string().uuid(),
+        productId: z.string().uuid(),
+        observedAt: timestamp,
+        sourceUpdatedAt: timestamp.nullable(),
+      }),
+    )
+    .optional(),
   item: catalogItemSchema,
   sources: z.array(catalogSourceSchema),
   variants: z.array(
@@ -109,6 +139,7 @@ export const productDetailSchema = z.object({
         status: productStatusSchema.nullable(),
         published: z.boolean().nullable(),
         price: listPriceSchema.nullable(),
+        bundle: bundleRecipeSchema.nullable().optional(),
       }),
     ),
     truncated: z.boolean(),

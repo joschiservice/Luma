@@ -231,6 +231,14 @@ export function StockDetailView({
                 cell: (source: StockSource) => (
                   <div className="inventory-cell">
                     <strong>{source.label}</strong>
+                    {source.bundleContext ? (
+                      <small>
+                        {m.products_bundles_parent()} ·{' '}
+                        <WorkspaceDate
+                          value={source.bundleContext.observedAt}
+                        />
+                      </small>
+                    ) : null}
                     <StockWriteAttribution source={source} />
                     <small>
                       {connectionStatusLabel(source.status)} ·{' '}
