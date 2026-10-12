@@ -4,11 +4,18 @@ interface Thresholds {
   syncFailureSeconds: number;
   stuckSeconds: number;
   uncertaintySeconds: number;
+  /** How long a stock gap may wait for provider sync after Luma first saw it. */
+  propagationSeconds: number;
+  /**
+   * Storefront overstatement, in percent of the authority's available stock, that is raised at
+   * once instead of waiting for sync.
+   */
+  oversellGuardPercent: number;
 }
 
 export interface Configuration {
   version: string;
-  ruleVersion: 'v0.1';
+  ruleVersion: 'v0.2';
   inventoryTolerance: string;
   thresholds: Thresholds;
 }
@@ -91,6 +98,11 @@ interface FactMap {
     authorityState?: 'resolved' | 'unknown' | 'conflicting';
     sellingSource: 'left' | 'right';
     tolerance: string;
+    /**
+     * Luma observation time of the first report that disagreed after both sides last agreed
+     * within tolerance; null when no agreement is recorded. Absent on legacy input.
+     */
+    mismatchSince?: string | null;
   };
   workflow_failure: Common & {
     runId: string;
@@ -124,8 +136,8 @@ export type Decision =
   | { decision: 'clear' | 'defer' | 'reject'; severity: null; reason: string };
 
 export const defaultConfiguration: Configuration = {
-  version: 'v0.1',
-  ruleVersion: 'v0.1',
+  version: 'v0.2',
+  ruleVersion: 'v0.2',
   inventoryTolerance: '0',
   thresholds: {
     freshnessSeconds: 300,
@@ -133,6 +145,8 @@ export const defaultConfiguration: Configuration = {
     syncFailureSeconds: 900,
     stuckSeconds: 7200,
     uncertaintySeconds: 1800,
+    propagationSeconds: 1800,
+    oversellGuardPercent: 25,
   },
 };
 

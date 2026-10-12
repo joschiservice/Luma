@@ -1,4 +1,9 @@
-import type { Configuration, Decision, EvaluationInput } from './facts.js';
+import type {
+  Configuration,
+  Decision,
+  EvaluationInput,
+  Facts,
+} from './facts.js';
 import { decimalUnits } from './facts.js';
 
 const result = (
@@ -11,6 +16,23 @@ const detect = (severity: 'medium' | 'high', reason: string): Decision => ({
   severity,
   reason,
 });
+
+/**
+ * Whether a storefront overstatement is too large to wait for sync: the authority has nothing
+ * left to sell, or the excess exceeds the configured share of its available stock.
+ */
+function guarded(
+  f: Facts<'inventory_mismatch'>,
+  difference: bigint,
+  percent: number,
+) {
+  const excess = difference < 0n ? -difference : difference;
+  const available = decimalUnits(
+    (f.authority === 'left' ? f.leftAvailable : f.rightAvailable)!,
+  );
+
+  return available <= 0n || excess * 100n > available * BigInt(percent);
+}
 
 /**
  * Evaluates one exception class against its configured thresholds, returning detect, clear,
@@ -131,12 +153,20 @@ export function evaluate(
         decimalUnits(f.tolerance)
       )
         return result('clear', 'within_tolerance');
-      if (
+      const oversell =
         f.authority !== null &&
         f.authority !== f.sellingSource &&
-        (f.sellingSource === 'left' ? difference > 0n : difference < 0n)
+        (f.sellingSource === 'left' ? difference > 0n : difference < 0n);
+      // A gap Luma saw open only recently is usually a sale still syncing. It waits unless the
+      // storefront oversells a material share of the authority's stock.
+      if (
+        f.mismatchSince &&
+        age(f.mismatchSince) >= 0 &&
+        age(f.mismatchSince) <= t.propagationSeconds &&
+        !(oversell && guarded(f, difference, t.oversellGuardPercent))
       )
-        return detect('high', 'oversell_risk');
+        return result('defer', 'propagation_pending');
+      if (oversell) return detect('high', 'oversell_risk');
 
       return detect('medium', 'quantity_mismatch');
     }

@@ -108,6 +108,7 @@ export const factSchemas = {
       authorityState: z.enum(['resolved', 'unknown', 'conflicting']).optional(),
       sellingSource: z.enum(['left', 'right']),
       tolerance: decimal.refine((value) => !value.startsWith('-')),
+      mismatchSince: timestamp.nullable().optional(),
     })
     .strict(),
   workflow_failure: z
@@ -140,13 +141,15 @@ const thresholdsSchema = z
     syncFailureSeconds: z.number().int().positive(),
     stuckSeconds: z.number().int().positive(),
     uncertaintySeconds: z.number().int().positive(),
+    propagationSeconds: z.number().int().positive(),
+    oversellGuardPercent: z.number().int().min(0).max(100),
   })
   .strict();
 
 const configurationSchema = z
   .object({
     version: z.string().min(1),
-    ruleVersion: z.literal('v0.1'),
+    ruleVersion: z.literal('v0.2'),
     thresholds: thresholdsSchema,
     inventoryTolerance: decimal.refine((value) => !value.startsWith('-')),
   })

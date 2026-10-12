@@ -223,6 +223,7 @@ const detail: FulfillmentDetail = {
       relationship: 'fulfillment',
       needsYou: true,
       lastDetectedAt: '2026-09-30T08:00:00.000Z',
+      occurrences: 1,
     },
   ],
   workflows: [

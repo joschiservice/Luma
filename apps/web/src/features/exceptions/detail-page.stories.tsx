@@ -489,6 +489,33 @@ export const FindingsComparison: Story = {
   },
 };
 
+/** A gap that outlasted the sync window explains how long Luma waited before raising it. */
+export const FindingsAfterSyncWait: Story = {
+  args: {
+    item: {
+      ...FindingsComparison.args!.item!,
+      diagnosis: {
+        ...FindingsComparison.args!.item!.diagnosis!,
+        facts: [
+          ...FindingsComparison.args!.item!.diagnosis!.facts,
+          {
+            code: 'sync_did_not_close_gap',
+            text: 'Luma first saw this gap at 2026-09-28T07:40:00.000Z and waited 20 minutes for sync; the gap is still open.',
+            evidenceRefs: ['shopify-stock', 'jtl-stock'],
+          },
+        ],
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const findings = within(canvas.getByRole('region', { name: 'Findings' }));
+    await expect(
+      findings.getByText(/waited 20 minutes for the sync between the sources/),
+    ).toBeVisible();
+  },
+};
+
 export const FindingsEvidence: Story = {
   args: FindingsComparison.args!,
   play: async ({ canvasElement }) => {

@@ -27,6 +27,11 @@ export interface StockPosition {
   unit: string;
   sources: StockSource[];
   differences: ('onHand' | 'reserved' | 'available')[];
+  /**
+   * A stock gap Luma is letting provider sync close: first seen at `since`, raised as an issue
+   * if still open at `until`. Null when Luma is not waiting.
+   */
+  sync: { since: string; until: string } | null;
 }
 
 /** Normalizes decimal quantities without losing precision at the canonical six-decimal scale. */

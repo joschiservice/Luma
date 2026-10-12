@@ -6,6 +6,7 @@ import {
   type Cin7Context,
   createCin7Simulator,
   type ErpItem,
+  type ErpOrder,
   guid,
   recordOf,
 } from './index.js';
@@ -33,6 +34,7 @@ function createContext(): Cin7Context {
     config: {
       accountId,
       company: 'Luma Goods GmbH',
+      baseCurrency: 'EUR',
       warehouses: [
         { id: '1', name: 'Hamburg' },
         { id: '2', name: 'Leipzig' },
@@ -93,6 +95,50 @@ describe('Cin7 Core API', () => {
     expect((await get(context, 'Me')).body).toEqual({
       Company: 'Luma Goods GmbH',
       Currency: 'EUR',
+    });
+  });
+
+  it('reports foreign-currency sales against the base currency with tax', async () => {
+    const context = await seeded(1);
+    context.config.baseCurrency = 'AUD';
+    context.config.currencyRates = { NZD: 0.91 };
+    await context.store.put<ErpOrder>(kinds.order, '1', {
+      id: '1',
+      externalNumber: 'NZ1001',
+      cancelled: false,
+      paid: true,
+      shippingMethodId: '7',
+      currency: 'NZD',
+      taxRate: 15,
+      total: 23,
+      date: '2026-10-01T08:00:00.000Z',
+      lines: [
+        {
+          id: '1',
+          itemId: '1',
+          sku: 'SKU-1',
+          name: 'Item 1',
+          quantity: 2,
+          shipped: 0,
+          price: 11.5,
+        },
+      ],
+    });
+    const sale = (await get(context, `sale?ID=${guid('sale', '1')}`))
+      .body as Record<string, unknown> & {
+      Order: { Lines: Record<string, unknown>[] } & Record<string, unknown>;
+    };
+    expect(sale).toMatchObject({
+      CustomerCurrency: 'NZD',
+      BaseCurrency: 'AUD',
+      CurrencyRate: 1.098901,
+      SourceChannel: 'Shopify',
+    });
+    expect(sale.Order).toMatchObject({ BeforeTax: 20, Tax: 3, Total: 23 });
+    expect(sale.Order.Lines[0]).toMatchObject({ Price: 10, Tax: 3, Total: 20 });
+    expect((await get(context, 'me')).body).toEqual({
+      Company: 'Luma Goods GmbH',
+      Currency: 'AUD',
     });
   });
 

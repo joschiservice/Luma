@@ -345,8 +345,12 @@ test('scheduled detection compares linked stock and closes the case only after f
     target: 'LUMA-001',
   });
   await f.pilot.observe({ check: false });
-  await f.pilot.detect();
-  const [opened] = await stockCases();
+  // A small gap waits for provider sync first; the journey's window is one second.
+  const opened = await until(async () => {
+    await f.pilot.detect();
+
+    return (await stockCases())[0];
+  }, 'the stock gap outlasts the sync window');
   expect(opened).toMatchObject({
     state: expect.not.stringMatching('resolved'),
   });
@@ -357,9 +361,11 @@ test('scheduled detection compares linked stock and closes the case only after f
     actor,
     opened.id,
   );
+  // Both reads, the mapping and the agreement history the wait was based on.
   expect(evidence.map((item) => item.source?.provider).sort()).toEqual([
     'jtl',
     'shopify',
+    undefined,
     undefined,
   ]);
 

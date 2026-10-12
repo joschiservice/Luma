@@ -22,9 +22,10 @@ import {
 const hour = 3_600_000;
 const day = 24 * hour;
 
-interface Pick {
-  shop: string;
-  order: string;
+/** An ERP order waiting for its warehouse; wholesale orders have no shop order. */
+export interface Pick {
+  shop: string | null;
+  order: string | null;
   stalled: boolean;
 }
 
@@ -36,7 +37,7 @@ export async function pickOrders(world: World, minutes: number) {
   const store = world.store(worldInstance);
   let backlog = 0;
   for (const warehouse of world.model.profile.warehouses) {
-    const { hour: local } = localTime(world.now, 'Europe/Berlin');
+    const { hour: local } = localTime(world.now, warehouse.timeZone);
     const staffed = local >= warehouse.shift[0] && local < warehouse.shift[1];
     const carry = world.run.state.pickCarry[warehouse.id] ?? 0;
     let capacity = staffed
@@ -92,7 +93,9 @@ async function pickOne(
     erpOrder,
     order.lines.length,
   );
-  const carriers = world.model.profile.carriers;
+  const carriers = world.model.profile.carriers.filter(
+    (item) => !item.warehouses || item.warehouses.includes(warehouse),
+  );
   const carrier = createWeightedPicker(
     carriers,
     carriers.map((item) => item.share),
@@ -114,6 +117,7 @@ async function pickOne(
   } else
     await store.put('pick', erpOrder, pick, { updatedAt: world.now + hour });
   world.metric('shipments', 1, `warehouse-${warehouse}`);
+  if (!pick.shop || !pick.order) return;
   const worldRecord = await worldOrder(world, pick.shop, pick.order);
   if (!worldRecord) return;
   const lines = shippable.map((item) => {
@@ -472,7 +476,9 @@ export async function reorderIfLow(
   const result = await erp(world, {
     kind: 'purchase-order',
     supplierId: variant.supplierId,
-    deliveryDate: new Date(world.now + 7 * day).toISOString().slice(0, 10),
+    deliveryDate: new Date(world.now + suppliers.leadTimeDays * day)
+      .toISOString()
+      .slice(0, 10),
     lines: [{ itemId, quantity }],
   });
   await store.put(

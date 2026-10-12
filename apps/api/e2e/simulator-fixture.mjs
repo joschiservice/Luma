@@ -3,8 +3,21 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { defaultConfiguration } from '@luma/exceptions';
+
+import { demoDetection } from '../../../tooling/simulator/demo.mjs';
 import { createSimulatorEnvironment } from '../../../tooling/simulator/e2e-environment.mjs';
 import { database, secret } from './helpers.mjs';
+
+/**
+ * Journeys let a stock gap wait one second for provider sync instead of 30 minutes, so they
+ * exercise the wait with a few detection passes.
+ */
+const journeyConfiguration = {
+  ...defaultConfiguration,
+  version: `${defaultConfiguration.version}-journey`,
+  thresholds: { ...defaultConfiguration.thresholds, propagationSeconds: 1 },
+};
 
 /** Provisions and cleans an isolated database-backed simulator workspace for platform tests. */
 export async function setupSimulator(
@@ -13,7 +26,8 @@ export async function setupSimulator(
     temporal,
     origin = 'http://127.0.0.1:3000',
     profile = 'test',
-    erp = 'jtl',
+    erp,
+    historyDays,
     chaos = 'calm',
     detection,
     demo,
@@ -34,8 +48,15 @@ export async function setupSimulator(
     temporal,
     profile,
     erp,
+    historyDays,
     chaos,
-    detection,
+    // A journey's own configuration wins; demo workspaces keep their other demo timings.
+    detection: {
+      ...(demo?.detection === 'demo'
+        ? demoDetection(journeyConfiguration)
+        : { configuration: journeyConfiguration }),
+      ...detection,
+    },
     demo,
     env: {
       IDENTITY_DATABASE_URL: db.runtimeUrl,

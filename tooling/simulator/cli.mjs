@@ -50,9 +50,10 @@ try {
   const { values: flags } = parseArgs({
     options: {
       profile: { type: 'string', default: 'large' },
-      erp: { type: 'string', default: 'jtl' },
+      erp: { type: 'string' },
       chaos: { type: 'string', default: 'realistic' },
       seed: { type: 'string', default: '44' },
+      'history-days': { type: 'string' },
       'approval-required': { type: 'boolean', default: false },
       'demo-workflows': { type: 'boolean', default: true },
       detection: { type: 'string', default: 'demo' },
@@ -61,8 +62,17 @@ try {
   });
   if (!['demo', 'production'].includes(flags.detection))
     throw new Error('--detection must be demo or production');
-  if (!['jtl', 'cin7'].includes(flags.erp))
+  if (flags.erp !== undefined && !['jtl', 'cin7'].includes(flags.erp))
     throw new Error('--erp must be jtl or cin7');
+  const historyDays =
+    flags['history-days'] === undefined
+      ? undefined
+      : Number(flags['history-days']);
+  if (
+    historyDays !== undefined &&
+    !(Number.isFinite(historyDays) && historyDays >= 0 && historyDays <= 14)
+  )
+    throw new Error('--history-days must be a number from 0 to 14');
   const saved = await state(true);
   await compose(saved, [
     '--profile',
@@ -147,13 +157,14 @@ try {
   const created = !(await call('runs')).some((item) => item.id === runId);
   if (created) {
     console.log(
-      `Creating simulator run ${runId}: ${flags.profile} merchant on ${flags.erp === 'cin7' ? 'Cin7 Core' : 'JTL-Wawi'}, ${flags.chaos} failures.`,
+      `Creating simulator run ${runId}: ${flags.profile} merchant on ${flags.erp === 'cin7' ? 'Cin7 Core' : flags.erp === 'jtl' ? 'JTL-Wawi' : 'its usual ERP'}, ${flags.chaos} failures.`,
     );
     await call('runs', {
       id: runId,
       seed: Number(flags.seed),
       profile: flags.profile,
-      erp: flags.erp,
+      ...(flags.erp ? { erp: flags.erp } : {}),
+      ...(historyDays === undefined ? {} : { historyDays }),
       chaos: flags.chaos,
       running: true,
     });

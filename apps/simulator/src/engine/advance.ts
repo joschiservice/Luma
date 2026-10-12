@@ -1,4 +1,4 @@
-import { orderRate } from '@luma/simulator-commerce';
+import { orderRate, wholesaleRate } from '@luma/simulator-commerce';
 import {
   incidentKinds,
   keyedRandom,
@@ -18,12 +18,14 @@ import {
   cancelOrder,
   importOrder,
   placeOrder,
+  placeWholesaleOrder,
   settlePayment,
 } from './orders.js';
 import { checkFreezes, syncStock } from './stock.js';
 import {
   closeIncident,
   type EngineEvent,
+  erp,
   openIncident,
   shop,
   type World,
@@ -83,10 +85,17 @@ async function apply(world: World, event: EngineEvent) {
       return supplierAnswer(world, event.payload.command);
     case 'purchase-order-mail':
       return purchaseOrderMail(world, event.payload.purchaseOrder);
+    case 'wholesale-payment':
+      await erp(world, { kind: 'paid', id: event.payload.erpOrder });
+
+      return;
   }
 }
 
-/** Customer orders arriving in [from, to), drawn per shop and second so timing never changes them. */
+/**
+ * Customer and wholesale orders arriving in [from, to), drawn per shop and second so timing
+ * never changes them.
+ */
 function arrivals(world: World, from: number, to: number): Step[] {
   const steps: Step[] = [];
   const profile = world.model.profile;
@@ -113,6 +122,29 @@ function arrivals(world: World, from: number, to: number): Step[] {
           label: 'order',
           run: async () => {
             await placeOrder(world, name, { identity: `${start}:${index}` });
+          },
+        });
+    }
+  if (profile.wholesale)
+    for (
+      let start = Math.ceil(from / second) * second;
+      start < to;
+      start += second
+    ) {
+      const count = poisson(
+        keyedRandom(world.run.seed, 'wholesale-arrivals', start),
+        wholesaleRate(profile, start) * second,
+      );
+      for (let index = 0; index < count; index++)
+        steps.push({
+          at:
+            start +
+            Math.floor(
+              unit(world.run.seed, 'wholesale-at', start, index) * second,
+            ),
+          label: 'wholesale-order',
+          run: async () => {
+            await placeWholesaleOrder(world, `${start}:${index}`);
           },
         });
     }

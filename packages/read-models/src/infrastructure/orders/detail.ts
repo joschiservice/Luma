@@ -10,6 +10,7 @@ import type {
   OrderDetailSection,
 } from '../../application/orders.js';
 import type { ReturnListItem } from '../../application/returns.js';
+import { readSyncWaits } from '../inventory/positions.js';
 import { itemColumns } from '../returns/list.js';
 import { readSourceFacts } from './detail-facts.js';
 import {
@@ -158,6 +159,15 @@ export async function readDetail(
     needsYou,
   );
   const issueIds = issues.map((issue) => issue.id);
+  const stockSync = new Map<string, { since: string; until: string }>();
+  for (const [key, wait] of await readSyncWaits(tx, tenantId, refs.skuIds)) {
+    const skuId = key.split('/')[0]!;
+    const known = stockSync.get(skuId);
+    stockSync.set(skuId, {
+      since: known && known.since < wait.since ? known.since : wait.since,
+      until: known && known.until > wait.until ? known.until : wait.until,
+    });
+  }
   const workflows = await readWorkflowRuns(tx, tenantId, refs, issueIds);
   const history = await readHistory(tx, tenantId, orderIds);
   const returns = await tx.query<ReturnListItem>(
@@ -253,6 +263,9 @@ export async function readDetail(
     fulfillments: shown('fulfillments') ? fulfillments : [],
     returns: shown('returns') ? returns.rows : [],
     issues: shown('issues') ? issues : [],
+    stockSync: shown('issues')
+      ? [...stockSync].map(([skuId, wait]) => ({ skuId, ...wait }))
+      : [],
     workflows: shown('workflows') ? workflows : [],
     history: {
       ...history,

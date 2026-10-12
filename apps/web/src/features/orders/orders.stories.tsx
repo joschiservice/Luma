@@ -297,8 +297,10 @@ const detail: OrderDetail = {
       relationship: 'fulfillment',
       needsYou: true,
       lastDetectedAt: '2026-09-28T06:00:00.000Z',
+      occurrences: 1,
     },
   ],
+  stockSync: [],
   workflows: [
     {
       id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
@@ -423,6 +425,7 @@ function DetailPreview({
     | 'offline'
     | 'pending'
     | 'inconclusive'
+    | 'syncing'
     | undefined;
 }) {
   return (
@@ -447,9 +450,33 @@ function DetailPreview({
                 comparisonState: state,
               },
             }
-          : state === 'ready' || state === 'offline'
-            ? detail
-            : undefined
+          : state === 'syncing'
+            ? {
+                ...detail,
+                issues: [
+                  ...detail.issues,
+                  {
+                    id: '78787878-7878-4878-8878-787878787878',
+                    class: 'inventory_mismatch',
+                    state: 'resolved',
+                    severity: 'high',
+                    relationship: 'sku',
+                    needsYou: false,
+                    lastDetectedAt: '2026-09-28T08:40:00.000Z',
+                    occurrences: 54,
+                  },
+                ],
+                stockSync: [
+                  {
+                    skuId: '99999999-9999-4999-8999-999999999999',
+                    since: '2026-09-28T08:58:00.000Z',
+                    until: '2026-09-28T09:13:00.000Z',
+                  },
+                ],
+              }
+            : state === 'ready' || state === 'offline'
+              ? detail
+              : undefined
       }
       sourceContext={(source) =>
         source.appId === 'shopify' ? (
@@ -667,4 +694,19 @@ export const RecordPending: Story = {
 
 export const RecordInconclusive: Story = {
   args: { page: 'detail', state: 'inconclusive' },
+};
+
+/** An ordered SKU whose stock gap is expected to close through provider sync. */
+export const RecordStockSyncing: Story = {
+  args: { page: 'detail', state: 'syncing' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const row = await canvas.findByRole('link', { name: /TOTE-RED/ });
+    await expect(row).toHaveTextContent('Syncing');
+    await expect(row).toHaveTextContent(
+      /Raised as an issue if still open at .+\./,
+    );
+    // Resolved repeats of one stock issue are one row with their count.
+    await expect(canvas.getByRole('link', { name: /54 times/ })).toBeVisible();
+  },
 };

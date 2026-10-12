@@ -40,7 +40,7 @@ import {
 import { advanceWorld } from './engine/advance.js';
 import { injectIncident, recoverIncident } from './engine/incidents.js';
 import { forgetModel, worldModel } from './engine/model.js';
-import { placeOrder } from './engine/orders.js';
+import { placeOrder, placeWholesaleOrder } from './engine/orders.js';
 import { erp, type Incident, mail, shop, type World } from './engine/world.js';
 import { createDispatcher } from './runtime/dispatch.js';
 import { clearRun, provisionRun } from './runtime/provision.js';
@@ -275,7 +275,10 @@ export async function createApp(options: SimulatorOptions) {
       name: profile.name,
       label: profile.label,
       description: profile.description,
+      erp: profile.erp,
       ordersPerDay: profile.demand.ordersPerDay,
+      wholesaleOrdersPerDay:
+        'wholesale' in profile ? profile.wholesale.ordersPerDay : 0,
       variants:
         'fixed' in profile.catalog
           ? profile.catalog.fixed.reduce(
@@ -307,15 +310,17 @@ export async function createApp(options: SimulatorOptions) {
     const input = createRunSchema.parse(request.body);
     if (!Object.hasOwn(merchantProfiles, input.profile))
       throw new Error(`Unknown merchant profile ${input.profile}`);
+    const profile = merchantProfile(
+      input.profile as keyof typeof merchantProfiles,
+    );
+    profile.erp = input.erp ?? profile.erp;
+    profile.historyDays = input.historyDays ?? profile.historyDays;
     const now = Date.now();
     const run: RunRecord = {
       id: input.id,
       seed: input.seed,
       profileName: input.profile,
-      profile: {
-        ...merchantProfile(input.profile as keyof typeof merchantProfiles),
-        erp: input.erp,
-      },
+      profile,
       chaos: chaosFrom(input.chaos as string | ChaosProfile),
       status: 'provisioning',
       progress: { step: 'queued', done: 0, total: 1 },
@@ -382,7 +387,11 @@ export async function createApp(options: SimulatorOptions) {
     }
     await withRun(pool, id, async ({ client, run, world }) => {
       if (run.status !== 'ready') throw new Error('The run is not ready');
-      if (input.action === 'command' || input.action === 'order')
+      if (
+        input.action === 'command' ||
+        input.action === 'order' ||
+        input.action === 'wholesale-order'
+      )
         await advanceWorld(world, actionTime(run));
       world.journal('control', input);
       switch (input.action) {
@@ -443,6 +452,14 @@ export async function createApp(options: SimulatorOptions) {
           });
           break;
         }
+        case 'wholesale-order':
+          if (!run.profile.wholesale)
+            throw new Error(`${run.profileName} sells no wholesale`);
+          await placeWholesaleOrder(
+            world,
+            `manual:${await world.store('world').sequence('manual-wholesale')}`,
+          );
+          break;
         case 'fault':
           await armFault(client, run, world, input.rule);
           break;

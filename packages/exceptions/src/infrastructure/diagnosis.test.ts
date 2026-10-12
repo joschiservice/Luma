@@ -118,6 +118,43 @@ describe('deterministic evidence-grounded diagnoses', () => {
       result.hypotheses.every((h) => h.uncertainty === 'unsubstantiated'),
     ).toBe(true);
   });
+  it.each([
+    {
+      changes: { mismatchSince: '2026-09-17T11:20:00Z' },
+      code: 'sync_did_not_close_gap',
+      text: 'Luma first saw this gap at 2026-09-17T11:20:00Z and waited 40 minutes for sync; the gap is still open.',
+    },
+    {
+      changes: {
+        mismatchSince: '2026-09-17T11:58:00Z',
+        leftAvailable: '30',
+        rightAvailable: '300',
+      },
+      code: 'raised_oversell_guard',
+    },
+    { changes: { mismatchSince: null }, code: 'no_recent_agreement' },
+  ])(
+    'tells how a raised stock gap relates to provider sync: $code',
+    ({ changes, code, text }) => {
+      const result = diagnose(
+        snapshot('inventory_mismatch', changes),
+        corpus.now,
+      );
+
+      expect(result.detectorDecision.decision).toBe('detect');
+      expect(result.facts).toContainEqual(
+        expect.objectContaining({ code, ...(text ? { text } : {}) }),
+      );
+    },
+  );
+  it('adds no sync backstory to legacy stock evidence', () => {
+    const result = diagnose(snapshot('inventory_mismatch'), corpus.now);
+
+    expect(result.facts.map((fact) => fact.code)).toEqual([
+      'reported_availability',
+      'signed_difference',
+    ]);
+  });
   it('rejects cross-tenant sources and duplicate evidence IDs', () => {
     const value = snapshot('inventory_mismatch');
     value.evidence[0]!.tenantId = 'other';

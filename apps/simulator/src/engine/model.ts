@@ -4,9 +4,11 @@ import {
   type CatalogProduct,
   type CatalogVariant,
   createAssortment,
+  createWholesaleBasket,
   generateCatalog,
   type MerchantProfile,
   type ShopProfile,
+  wholesaleUnitsPerDay,
 } from '@luma/simulator-commerce';
 import type { Random } from '@luma/simulator-core';
 import type { GmailConfig } from '@luma/simulator-gmail';
@@ -37,15 +39,6 @@ export type MailboxInstance = Extract<Instance, { kind: 'gmail' }>;
 /** Instance name of the merchant's operations mailbox in every run. */
 export const mailboxName = 'gmail';
 
-/**
- * The simulated operations mailbox. Its `.example` domain is reserved, so mail can never reach a
- * real recipient.
- */
-const merchantMailbox: GmailConfig = {
-  address: 'einkauf@luma-goods.example',
-  name: 'Luma Goods Einkauf',
-};
-
 const shopifyScopes = [
   'read_orders',
   'read_all_orders',
@@ -61,16 +54,10 @@ const shopifyScopes = [
   'read_customers',
 ];
 
-// Standard VAT rates of the profiles' shop countries; Shopify reports them per order line.
-const standardTaxRates: Record<string, number> = {
-  AT: 0.2,
-  CH: 0.081,
-  DE: 0.19,
-};
-
 /**
  * Derives the provider instances a profile runs: one ERP, one store per shop and the merchant's
- * operations mailbox.
+ * operations mailbox. Profile mailboxes use reserved `.example` domains, so mail can never
+ * reach a real recipient.
  */
 export function instancesFor(profile: MerchantProfile): Instance[] {
   const erp = {
@@ -91,7 +78,9 @@ export function instancesFor(profile: MerchantProfile): Instance[] {
           config: {
             ...erp,
             accountId: simulatedAccountId,
-            company: profile.label,
+            company: profile.company.name,
+            baseCurrency: profile.currency.base,
+            currencyRates: profile.currency.rates,
           },
         }
       : { name: 'jtl', kind: 'jtl', label: 'JTL-Wawi', config: erp },
@@ -104,10 +93,8 @@ export function instancesFor(profile: MerchantProfile): Instance[] {
         shop: shop.domain,
         name: shop.name,
         currency: shop.currency,
-        // The profiles' European shops list prices including tax.
-        ...(Object.hasOwn(standardTaxRates, shop.country)
-          ? { taxRate: standardTaxRates[shop.country], taxesIncluded: true }
-          : {}),
+        taxRate: shop.tax.rate,
+        taxesIncluded: shop.tax.included,
         orderPrefix: profile.name === 'test' ? 'SIM-' : shop.country,
         locations: [
           {
@@ -124,7 +111,7 @@ export function instancesFor(profile: MerchantProfile): Instance[] {
       name: mailboxName,
       kind: 'gmail',
       label: 'Gmail',
-      config: merchantMailbox,
+      config: profile.company.mailbox,
     },
   ];
 }
@@ -146,7 +133,11 @@ export interface WorldModel {
     shop: string,
     random: Random,
   ): { variant: CatalogVariant; quantity: number }[];
-  /** Expected units sold per day for a variant across all shops. */
+  /** Draws a wholesale order's lines; only for profiles with a wholesale channel. */
+  wholesaleBasket(
+    random: Random,
+  ): { variant: CatalogVariant; quantity: number }[];
+  /** Expected units sold per day for a variant across all shops and wholesale. */
   dailyUnits(variant: CatalogVariant): number;
 }
 
@@ -177,10 +168,12 @@ export function worldModel(
     catalog.variants.map((variant) => [variant.sku, variant]),
   );
   const assortments = new Map<string, ReturnType<typeof createAssortment>>();
+  let wholesale: ReturnType<typeof createWholesaleBasket> | undefined;
   const unitsPerDay =
     profile.demand.ordersPerDay *
-    (profile.basket.lineWeights.reduce((sum, w, i) => sum + w * (i + 1), 0) /
-      profile.basket.lineWeights.reduce((sum, w) => sum + w, 0));
+      (profile.basket.lineWeights.reduce((sum, w, i) => sum + w * (i + 1), 0) /
+        profile.basket.lineWeights.reduce((sum, w) => sum + w, 0)) +
+    wholesaleUnitsPerDay(profile);
   const erp = instances.find(
     (instance): instance is ErpInstance =>
       instance.kind === 'jtl' || instance.kind === 'cin7',
@@ -220,6 +213,11 @@ export function worldModel(
       }
 
       return assortment(random);
+    },
+    wholesaleBasket(random) {
+      wholesale ??= createWholesaleBasket(profile, catalog);
+
+      return wholesale(random);
     },
     dailyUnits: (variant) => variant.popularity * unitsPerDay,
   };

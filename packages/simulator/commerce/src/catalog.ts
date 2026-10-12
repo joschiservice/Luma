@@ -5,7 +5,11 @@ import {
   zipfWeights,
 } from '@luma/simulator-core';
 
-import type { CategoryProfile, MerchantProfile } from './profiles.js';
+import type {
+  CategoryProfile,
+  MerchantProfile,
+  SupplierDirectoryEntry,
+} from './profiles.js';
 
 export interface CatalogVariant {
   /** Shared variant number; providers derive their own record IDs from it. */
@@ -101,6 +105,12 @@ const nouns: Record<string, string[]> = {
   SHO: ['Sneaker', 'Boot', 'Loafer', 'Sandal', 'Runner'],
   ACC: ['Tote', 'Belt', 'Cap', 'Scarf', 'Wallet', 'Backpack'],
   HOM: ['Throw', 'Mug', 'Vase', 'Cushion', 'Planter', 'Lamp', 'Bowl'],
+  OUT: ['Shell Jacket', 'Fleece', 'Insulated Vest', 'Rain Pant', 'Base Layer'],
+  CMP: ['Tent', 'Sleeping Bag', 'Camp Chair', 'Headlamp', 'Bottle', 'Stove'],
+  SKN: ['Face Cream', 'Serum', 'Cleanser', 'Toner', 'Eye Balm', 'Face Oil'],
+  HAI: ['Shampoo', 'Conditioner', 'Hair Mask', 'Scalp Tonic'],
+  BOD: ['Soap Bar', 'Body Lotion', 'Shower Gel', 'Hand Cream', 'Deodorant'],
+  FRA: ['Eau de Parfum', 'Eau de Toilette', 'Room Spray'],
 };
 const vendors = [
   'Luma Goods',
@@ -111,7 +121,7 @@ const vendors = [
   'Seeufer',
   'Hafenwerk',
 ];
-const supplierNames = [
+const defaultSupplierNames = [
   'Nordwind Textil GmbH',
   'Baltic Packaging AB',
   'Porto Knitwear Lda',
@@ -123,7 +133,7 @@ const supplierNames = [
   'Brabant Trading BV',
   'Tatra Wool s.r.o.',
 ];
-const supplierCities: [string, string][] = [
+const defaultSupplierCities: [string, string][] = [
   ['Hamburg', 'DE'],
   ['Malmö', 'SE'],
   ['Porto', 'PT'],
@@ -135,6 +145,14 @@ const supplierCities: [string, string][] = [
   ['Eindhoven', 'NL'],
   ['Brno', 'CZ'],
 ];
+
+const defaultDirectory: SupplierDirectoryEntry[] = defaultSupplierNames.map(
+  (name, index) => {
+    const [city, country] = defaultSupplierCities[index]!;
+
+    return { name, city, country };
+  },
+);
 
 /** Builds an EAN-13 with a valid check digit. */
 function ean(random: Random) {
@@ -174,7 +192,23 @@ function unitsPerOrder(profile: MerchantProfile) {
   );
 }
 
+/** Average wholesale units per calendar day; accounts order on weekdays only. */
+export function wholesaleUnitsPerDay(profile: MerchantProfile) {
+  const wholesale = profile.wholesale;
+  if (!wholesale) return 0;
+  const average = ([low, high]: [number, number]) => (low + high) / 2;
+
+  return (
+    ((wholesale.ordersPerDay * 5) / 7) *
+    average(wholesale.linesPerOrder) *
+    average(wholesale.unitsPerLine)
+  );
+}
+
 function suppliersFor(profile: MerchantProfile, random: Random) {
+  const directory = profile.suppliers.directory?.length
+    ? profile.suppliers.directory
+    : defaultDirectory;
   const pickProfile = createWeightedPicker(
     Object.keys(profile.suppliers.profileMix) as CatalogSupplier['profile'][],
     Object.values(profile.suppliers.profileMix),
@@ -183,16 +217,15 @@ function suppliersFor(profile: MerchantProfile, random: Random) {
   return Array.from(
     { length: Math.max(1, profile.suppliers.count) },
     (_, index): CatalogSupplier => {
-      const base = supplierNames[index % supplierNames.length]!;
-      const [city, country] = supplierCities[index % supplierCities.length]!;
-      const round = Math.floor(index / supplierNames.length);
+      const entry = directory[index % directory.length]!;
+      const round = Math.floor(index / directory.length);
 
       return {
         id: String(index + 1),
-        name: round ? `${base} ${round + 1}` : base,
+        name: round ? `${entry.name} ${round + 1}` : entry.name,
         number: `L-${1001 + index}`,
-        city,
-        country,
+        city: entry.city,
+        country: entry.country,
         email: `orders${index + 1}@supplier.example`,
         // The first suppliers keep the seeded fixtures' dependable behavior.
         profile: index < 2 ? 'full' : pickProfile(random),
@@ -256,7 +289,7 @@ export function generateCatalog(
     const category: CategoryProfile = pickCategory(random);
     const productId = String(index + 1);
     const noun = random.pick(nouns[category.code] ?? ['Item']);
-    const title = `${random.pick(adjectives)} ${random.pick(materials)} ${noun}`;
+    const title = `${random.pick(adjectives)} ${random.pick(category.materials ?? materials)} ${noun}`;
     const [minPrice, maxPrice] = category.priceRange;
     const price =
       Math.round(minPrice + random.next() * (maxPrice - minPrice)) - 0.01;
@@ -318,7 +351,9 @@ export function generateCatalog(
   ranking.forEach((variantIndex, rank) => {
     variants[variantIndex]!.popularity = weights[rank]! / total;
   });
-  const dailyUnits = profile.demand.ordersPerDay * unitsPerOrder(profile);
+  const dailyUnits =
+    profile.demand.ordersPerDay * unitsPerOrder(profile) +
+    wholesaleUnitsPerDay(profile);
   for (const product of products) {
     // Smaller shops list a stable subset of products, chosen per product.
     const listed = profile.shops

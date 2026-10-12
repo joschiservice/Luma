@@ -834,8 +834,10 @@ export function orderDetail(): OrderDetail {
         relationship: 'order',
         needsYou: true,
         lastDetectedAt: minutesAgo(12),
+        occurrences: 1,
       },
     ],
+    stockSync: [],
     workflows: [
       {
         id: 'a58af323-9374-4f06-8e60-6b289def7a30',

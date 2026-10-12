@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
 
 import {
+  type Cin7Context,
+  guid,
+  simulatedAccountId,
+} from '@luma/simulator-cin7';
+import {
+  localTime,
   merchantProfile,
   type MerchantProfileName,
 } from '@luma/simulator-commerce';
@@ -8,6 +14,8 @@ import { chaosPreset, type ChaosPresetName } from '@luma/simulator-core';
 import { gmail, type MessageRecord } from '@luma/simulator-gmail';
 import {
   kinds as erpKinds,
+  type NoteRecord,
+  type OrderRecord,
   type PurchaseOrderRecord,
   readItemStock,
   readOrder as readErpOrder,
@@ -18,9 +26,10 @@ import { describe, expect, it } from 'vitest';
 import { buildWorld } from '../runtime/provision.js';
 import type { RunRecord } from '../runtime/runs.js';
 import { advanceWorld } from './advance.js';
+import { cin7 } from './cin7.js';
 import { injectIncident, recoverIncident } from './incidents.js';
 import { forgetModel } from './model.js';
-import { placeOrder } from './orders.js';
+import { importOrder, placeOrder } from './orders.js';
 import {
   erp,
   erpContext,
@@ -404,5 +413,98 @@ describe('operations mailbox', () => {
     const message = await firstMail(world, 'from:@customer.example');
     expect(headerOf(message, 'Subject')).toContain(order.label);
     expect(message.labelIds).toEqual(['INBOX', 'UNREAD', 'Label_2']);
+  }, 60_000);
+});
+
+describe('regional merchants', () => {
+  it('runs an ANZ merchant on Cin7 with wholesale, local shifts and carriers', async () => {
+    const run = testRun('anz-lifestyle');
+    const { world, stores } = await buildWorld(run);
+    expect(world.model.erp).toMatchObject({ name: 'cin7', kind: 'cin7' });
+    const records = async <T>(kind: string) =>
+      (await stores.get('cin7')!.page<T>({ kind, limit: 100_000 })).items.map(
+        (record) => record.data,
+      );
+    const orders = await records<OrderRecord>(erpKinds.order);
+    const wholesale = orders.filter((order) => !order.externalNumber);
+    expect(wholesale.length).toBeGreaterThan(5);
+    for (const order of wholesale)
+      expect(order).toMatchObject({ currency: 'AUD', taxRate: 10 });
+    expect(
+      orders.find((order) => order.externalNumber?.startsWith('NZ')),
+    ).toMatchObject({ currency: 'NZD', taxRate: 15 });
+
+    const notes = await records<NoteRecord>(erpKinds.note);
+    const byWarehouse = (id: string) =>
+      notes.filter((note) => note.warehouse === id);
+    expect(byWarehouse('2').length).toBeGreaterThan(0);
+    for (const note of byWarehouse('2')) {
+      expect(note.packages[0]?.trackingUrl).toMatch(/nzpost|nzcouriers/);
+      const { hour } = localTime(Date.parse(note.date), 'Pacific/Auckland');
+      expect(hour).toBeGreaterThanOrEqual(8);
+      expect(hour).toBeLessThan(16);
+    }
+    for (const note of byWarehouse('1'))
+      expect(note.packages[0]?.trackingUrl).toMatch(
+        /auspost|startrack|aramex-au/,
+      );
+
+    const read = async (path: string) =>
+      (
+        await cin7.handle(erpContext(world) as Cin7Context, {
+          url: `https://inventory.dearsystems.com/ExternalApi/v2/${path}`,
+          method: 'GET',
+          headers: {
+            'api-auth-accountid': simulatedAccountId,
+            'api-auth-applicationkey': 'key',
+          },
+          body: null,
+        })
+      ).body as Record<string, unknown>;
+    const nz = orders.find((order) => order.externalNumber?.startsWith('NZ'))!;
+    expect(await read(`sale?ID=${guid('sale', nz.id)}`)).toMatchObject({
+      CustomerCurrency: 'NZD',
+      BaseCurrency: 'AUD',
+      SourceChannel: 'Shopify',
+    });
+    expect(
+      await read(`sale?ID=${guid('sale', wholesale[0]!.id)}`),
+    ).toMatchObject({ SourceChannel: '', CustomerReference: '' });
+    expect(await read('me')).toEqual({
+      Company: 'Harbour & Pine Pty Ltd',
+      Currency: 'AUD',
+    });
+  }, 180_000);
+
+  it('adds US sales tax at checkout and books it gross in the ERP', async () => {
+    const run = testRun('uk-us-dtc');
+    run.profile.historyDays = 0;
+    const { world } = await buildWorld(run);
+    const variant = world.model.catalog.variants.find((item) =>
+      item.shops.includes('shopify-us'),
+    )!;
+    const order = await placeOrder(world, 'shopify-us', {
+      identity: 'tax',
+      lines: [{ variant: variant.id, quantity: 2 }],
+    });
+    const net = Number((variant.price * 1.25).toFixed(2));
+    const shopOrder = await world
+      .store('shopify-us')
+      .get<{ total: number }>('Order', order.order);
+    // Shopify stores order totals in minor units and rounds tax per line.
+    const cents = Math.round(net * 200);
+    const total = cents + Math.round(cents * 0.0725);
+    expect(shopOrder?.data.total).toBe(total);
+    await importOrder(world, 'shopify-us', order.order, '9001');
+    const erpOrder = await erpContext(world).store.get<OrderRecord>(
+      erpKinds.order,
+      '9001',
+    );
+    // Linked orders compare totals exactly, so the ERP books the shop's gross total.
+    expect(erpOrder?.data).toMatchObject({
+      currency: 'USD',
+      taxRate: 7.25,
+      total: total / 100,
+    });
   }, 60_000);
 });

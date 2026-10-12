@@ -2,14 +2,20 @@ import { createRandom } from '@luma/simulator-core';
 import { describe, expect, it } from 'vitest';
 
 import { generateCatalog } from './catalog.js';
-import { customer } from './customers.js';
+import { businessCustomer, customer } from './customers.js';
 import {
   createAssortment,
+  createWholesaleBasket,
   localTime,
   orderRate,
   promotionMultiplier,
+  wholesaleRate,
 } from './demand.js';
-import { merchantProfile } from './profiles.js';
+import {
+  merchantProfile,
+  type MerchantProfileName,
+  merchantProfiles,
+} from './profiles.js';
 
 const day = 86_400_000;
 
@@ -111,5 +117,76 @@ describe('demand', () => {
     expect(customer(1, 'shopify-de', 'DE', 5).email).toMatch(
       /@customer\.example$/,
     );
+  });
+});
+
+describe('regional profiles', () => {
+  it('only reference warehouses, carriers and currencies the profile defines', () => {
+    for (const name of Object.keys(merchantProfiles) as MerchantProfileName[]) {
+      const profile = merchantProfile(name);
+      const warehouses = new Set(profile.warehouses.map((item) => item.id));
+      for (const shop of profile.shops) {
+        expect(warehouses, `${name} ${shop.instance}`).toContain(
+          shop.warehouse,
+        );
+        expect(
+          shop.currency === profile.currency.base ||
+            Object.hasOwn(profile.currency.rates, shop.currency),
+          `${name} converts ${shop.currency}`,
+        ).toBe(true);
+        expect(() => localTime(0, shop.timeZone)).not.toThrow();
+      }
+      for (const warehouse of profile.warehouses) {
+        expect(() => localTime(0, warehouse.timeZone)).not.toThrow();
+        expect(
+          profile.carriers.some(
+            (carrier) =>
+              !carrier.warehouses || carrier.warehouses.includes(warehouse.id),
+          ),
+          `${name} ships from ${warehouse.id}`,
+        ).toBe(true);
+      }
+      if (profile.wholesale)
+        expect(warehouses).toContain(profile.wholesale.warehouse);
+      expect(profile.company.mailbox.address).toMatch(/\.example$/);
+    }
+  });
+
+  it('names suppliers from the profile’s directory', () => {
+    const profile = merchantProfile('anz-lifestyle');
+    const catalog = generateCatalog(profile, 44);
+    expect(catalog.suppliers.map((supplier) => supplier.country)).toEqual(
+      profile.suppliers.directory?.map((entry) => entry.country),
+    );
+    expect(catalog.variants.length).toBeGreaterThan(2_000);
+  });
+
+  it('derives customers and wholesale accounts that fit the country', () => {
+    const person = customer(1, 'shopify-au', 'AU', 5);
+    expect(person.phone).toMatch(/^\+61 /);
+    expect(person.address.city).toMatch(/ (NSW|VIC|QLD|WA|SA|TAS)$/);
+    expect(person.address.address1).toMatch(/^\d+ /);
+    expect(customer(1, 'shopify-de', 'DE', 5).phone).toMatch(/^\+49 151 /);
+    const account = businessCustomer(1, 'AU', 3);
+    expect(account).toEqual(businessCustomer(1, 'AU', 3));
+    expect(account.company).toMatch(/ Pty Ltd$/);
+    expect(account.email).toBe('orders.3@retailer.example');
+  });
+
+  it('takes wholesale orders on weekdays during business hours', () => {
+    const profile = merchantProfile('anz-lifestyle');
+    // Monday 10:00 and 20:00 and Saturday 10:00 in Sydney.
+    const monday = Date.parse('2026-10-04T23:00:00Z');
+    expect(wholesaleRate(profile, monday)).toBeGreaterThan(0);
+    expect(wholesaleRate(profile, monday + 10 * 3_600_000)).toBe(0);
+    expect(wholesaleRate(profile, monday + 5 * day)).toBe(0);
+    expect(wholesaleRate(merchantProfile('large'), monday)).toBe(0);
+    const basket = createWholesaleBasket(profile, generateCatalog(profile, 1));
+    const lines = basket(createRandom(2));
+    expect(lines.length).toBeGreaterThanOrEqual(3);
+    for (const line of lines) {
+      expect(line.quantity).toBeGreaterThanOrEqual(4);
+      expect(line.quantity).toBeLessThanOrEqual(24);
+    }
   });
 });

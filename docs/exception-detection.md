@@ -47,7 +47,9 @@ reads decide:
   linked their SKU and location, are compared when stored availability differs. Each ERP
   report is paired with each storefront report; the app category decides the roles and
   the ERP is the authority. Both sides are reread and projected before the rule runs, at
-  most 25 positions per pass.
+  most 25 positions per pass. Before the reread, the monitor reads the stored reports of
+  the last 24 hours to find when the pair last agreed, so the rule can let a fresh gap wait
+  for provider sync.
 - **Stuck fulfillment:** open work without progress for the stuck threshold is reread
   through its order, at most 25 per pass, oldest progress first. A future start time
   exempts the work. A reported hold exempts it until the work has gone 24 hours
@@ -93,7 +95,9 @@ predecessor, and replaying old evidence cannot reopen it.
 A clear or deferred decision never resolves an incident. Deferred subjects are reevaluated
 after authoritative refreshes; after 30 minutes of uncertainty (default configuration)
 the next evaluation escalates the existing incident or records an operator review task.
-No mismatch is invented, and a certain result resets the window.
+No mismatch is invented, and a certain result resets the window. A stock gap that waits for
+provider sync (`propagation_pending`) also resets it: the wait is bounded by the rule, and
+an escalation would turn normal sync into review work.
 
 State changes and append-only audit events commit together in the exception outbox.
 Detection never deletes or overwrites earlier connector snapshots.

@@ -47,6 +47,8 @@ function suggestId(existing: readonly string[]) {
   return `merchant-${index}`;
 }
 
+const erpLabels = { jtl: 'JTL-Wawi', cin7: 'Cin7 Core' } as const;
+
 /**
  * Creates a run from a merchant profile and chaos preset. The new run provisions in the
  * background; `onCreated` receives its ID so the caller can select it.
@@ -104,6 +106,7 @@ function CreateRunForm({
   const [id, setId] = useState(defaultId);
   const [seed, setSeed] = useState<number | undefined>(44);
   const [profile, setProfile] = useState('large');
+  const [erp, setErp] = useState<'profile' | 'jtl' | 'cin7'>('profile');
   const [chaos, setChaos] = useState('realistic');
   const [running, setRunning] = useState(true);
   const [problems, setProblems] = useState<string[]>([]);
@@ -114,10 +117,20 @@ function CreateRunForm({
   const chosenProfile = merchants.some((merchant) => merchant.name === profile)
     ? profile
     : (merchants[0]?.name ?? profile);
+  const profileErp = merchants.find(
+    (merchant) => merchant.name === chosenProfile,
+  )?.erp;
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    const body = { id, seed, profile: chosenProfile, chaos, running };
+    const body = {
+      id,
+      seed,
+      profile: chosenProfile,
+      ...(erp === 'profile' ? {} : { erp }),
+      chaos,
+      running,
+    };
     const parsed = createRunSchema.safeParse(body);
     const issues = parsed.success
       ? []
@@ -185,7 +198,11 @@ function CreateRunForm({
                   <strong>{merchant.label}</strong>
                   <span>{merchant.description}</span>
                   <span className="sim-choice-facts lu-numeric">
+                    {erpLabels[merchant.erp]} ·{' '}
                     {formatCount(merchant.ordersPerDay)} orders a day ·{' '}
+                    {merchant.wholesaleOrdersPerDay
+                      ? `${formatCount(merchant.wholesaleOrdersPerDay)} wholesale orders a weekday · `
+                      : ''}
                     {formatCount(merchant.variants)} variants · {merchant.shops}{' '}
                     {merchant.shops === 1 ? 'shop' : 'shops'} ·{' '}
                     {merchant.warehouses}{' '}
@@ -197,6 +214,22 @@ function CreateRunForm({
           </div>
         )}
       </fieldset>
+      <SelectField
+        label="ERP"
+        value={erp}
+        options={[
+          {
+            value: 'profile',
+            label: profileErp
+              ? `Profile’s ERP (${erpLabels[profileErp]})`
+              : 'Profile’s ERP',
+          },
+          { value: 'jtl', label: erpLabels.jtl },
+          { value: 'cin7', label: erpLabels.cin7 },
+        ]}
+        description="Another ERP runs the same merchant to test compatibility."
+        onChange={setErp}
+      />
       <SelectField
         label="Chaos preset"
         value={chaos}

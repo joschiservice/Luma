@@ -43,6 +43,14 @@ Open a row to see one SKU at one location:
 
 **Refresh stock** at the top of the page shows Luma’s latest readings. It doesn’t read the sources again; Luma reads them on its regular sync.
 
+## When stock is still syncing
+
+A sale changes stock in one system first, and the other system catches up on its next sync. While that happens, the position shows **Syncing** instead of **Differs by source**. Open it to see when Luma first saw the gap and when it opens an issue if the gap is still there. Luma waits up to 30 minutes for your systems to agree again.
+
+Luma opens an issue without waiting when a store shows stock that your stock source can't cover: the stock source has none left, or the store shows more than 25% above the stock source's available quantity. Choose the stock source in [Source authority](/docs/workspace-settings#source-authority).
+
+A gap that is still open after the wait becomes a **Stock mismatch** issue that says how long Luma waited. An order shows its ordered items that are syncing in its **Issues** panel.
+
 ## Link the same SKU across systems
 
 Luma treats records from different systems as the same SKU only after they’re linked, by a person or by an [automatic linking](/docs/data-sync#automatic-linking) rule. Until then, Shopify’s and your ERP’s stock for one item appear as separate SKUs, and you can’t compare them or correct one from the other.

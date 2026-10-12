@@ -102,11 +102,51 @@ export async function readPositions(
     rows.push(row);
     grouped.set(row.id, rows);
   }
+  const waits = await readSyncWaits(
+    tx,
+    tenantId,
+    [...grouped.values()].map((rows) => rows[0]!.skuId),
+  );
 
-  return [...grouped.values()].map(position);
+  return [...grouped.values()].map((rows) =>
+    position(rows, waits.get(`${rows[0]!.skuId}/${rows[0]!.locationId}`)),
+  );
 }
 
-function position(rows: PositionRow[]): StockPosition {
+/**
+ * Stock gaps the detector is currently letting provider sync close, by `skuId/locationId`.
+ * A wait that was not reconfirmed within five minutes or whose deadline passed is omitted:
+ * the gap has closed or is about to be raised.
+ */
+export async function readSyncWaits(
+  tx: SqlTransaction,
+  tenantId: string,
+  skuIds: string[],
+) {
+  const result = await tx.query<{
+    key: string;
+    since: Date;
+    until: Date;
+  }>(
+    `SELECT subject_id||'/'||(scope->>0) AS key,min(mismatch_since) AS since,max(wait_until) AS until
+     FROM exception_pending_sync WHERE tenant_id=$1 AND subject_kind='sku' AND subject_id=ANY($2::text[])
+      AND wait_until>now() AND evaluated_at>now()-interval '5 minutes'
+     GROUP BY 1`,
+    [tenantId, [...new Set(skuIds)]],
+  );
+
+  return new Map(
+    result.rows.map((row) => [
+      row.key,
+      { since: row.since.toISOString(), until: row.until.toISOString() },
+    ]),
+  );
+}
+
+function position(
+  rows: PositionRow[],
+  sync: StockPosition['sync'] = null,
+): StockPosition {
   const first = rows[0]!;
   const sources = rows.map((row) => row.source);
 
@@ -120,5 +160,7 @@ function position(rows: PositionRow[]): StockPosition {
     unit: first.unit,
     sources,
     differences: stockDifferences(sources),
+    // A wait describes an open gap; once the stored reports agree it no longer applies.
+    sync: stockDifferences(sources).includes('available') ? sync : null,
   };
 }

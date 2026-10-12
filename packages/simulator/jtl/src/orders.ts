@@ -81,6 +81,12 @@ export async function placeOrder(context: JtlContext, command: OrderCommand) {
         line.price < 0,
     ) ||
     !/^[A-Z]{3}$/.test(command.currency) ||
+    (command.taxRate !== undefined &&
+      !(
+        Number.isFinite(command.taxRate) &&
+        command.taxRate >= 0 &&
+        command.taxRate < 100
+      )) ||
     (command.externalNumber !== undefined &&
       (!command.externalNumber.trim() || command.externalNumber.length > 255))
   )
@@ -130,6 +136,7 @@ export async function placeOrder(context: JtlContext, command: OrderCommand) {
     paid: command.paid,
     shippingMethodId: command.shippingMethodId,
     currency: command.currency,
+    taxRate: command.taxRate ?? SEED_VAT_RATE,
     total: cents(
       lines.reduce((sum, line) => sum + line.price * line.quantity, 0),
     ),
@@ -383,6 +390,8 @@ export function salesOrderJson(order: OrderRecord) {
  * net price and the line's tax rate in percent.
  */
 export function orderLinesJson(order: OrderRecord) {
+  const taxRate = order.taxRate ?? SEED_VAT_RATE;
+
   return order.lines.map((line) => ({
     id: Number(line.id),
     salesOrderId: Number(order.id),
@@ -393,8 +402,8 @@ export function orderLinesJson(order: OrderRecord) {
     salesUnit: line.unit,
     salesPriceGross: line.price,
     salesPriceNet:
-      Math.round((line.price / (1 + SEED_VAT_RATE / 100)) * 10_000) / 10_000,
-    taxRate: SEED_VAT_RATE,
+      Math.round((line.price / (1 + taxRate / 100)) * 10_000) / 10_000,
+    taxRate,
   }));
 }
 
