@@ -58,3 +58,41 @@ suppresses residual differences. History retains the attribution of each individ
 
 See [quantity ledger and ownership](architecture/013-stock-ledger.md) for the separate native
 quantity model. These provider facts neither post ledger entries nor select ownership.
+
+## Transfers and receiving
+
+Transfers and shipments are separate source records with separate read grants. A transfer
+retains requested, allocated-to-draft-shipment, ready and shipped line quantities. A shipment
+retains accepted, rejected and unreceived line quantities and the provider's receipt total.
+Shopify's receipt total includes cancellations; it is not an accepted-stock balance. Transfer
+and shipment quantities never augment position available or incoming quantities.
+
+Location names, addresses and snapshot times describe the historical request. A missing live
+location identity stays unknown; matching names never establish a pool. Relationships use
+exact provider IDs within one connection. SKU or location remapping replays dependent facts.
+Creation and first-receipt times are lifecycle evidence, not update times. Shopify exposes no
+transfer modification watermark, so these streams perform complete paginated scans.
+
+Receiving checks require an active source, current requested and granted capability, a known
+non-draft lifecycle, complete line collections and an observation at most five minutes old.
+Inconsistent totals request another read. Rejected units and terminal unreceived units require
+investigation. An estimated arrival in the past with unreceived units establishes only an
+unconfirmed receipt, never proven physical loss. These bounded advisory signals do not
+submit claims, change stock or close cases. Missing collections suppress conclusions instead
+of becoming empty. Removed records retain their last known name and history; current
+quantities remain unknown. Stale or inaccessible evidence remains inspectable with its limitations.
+
+A purchase order relates only through an external reference whose system is
+`shopify_inventory_transfer` or `shopify_inventory_shipment`, with the exact provider GID and
+connection ID. Viewing that link requires procurement access. The linked order owns its
+receipt context; matching names, SKUs and quantities are insufficient.
+
+Receiving evidence exports retain source identities, current snapshots, observed history and
+explicit links. Supplier confirmations, shipping notices, delivery documents, photos and claim
+deadlines need their own evidence and policy. A Shopify arrival estimate cannot establish a
+3PL claim window. Provider-specific claim preparation remains gated by selection and policy;
+downloads do not send a claim.
+
+Operational lists read scalar stage facts from a tenant-scoped index and return at most 50
+summaries. Detail reads retain at most 5,000 exact lines, 20 scalar history summaries with historical location facts and 50 related records
+per kind. Truncation is explicit. Cursors belong to the tenant, source and filters that produced them.

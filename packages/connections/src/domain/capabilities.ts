@@ -1,6 +1,10 @@
 import type { ConnectorFailure } from '@luma/connector-core';
 
 import type {
+  InventoryShipmentSnapshot,
+  InventoryTransferSnapshot,
+} from './inventory-transfers.js';
+import type {
   ReturnExchangeProof,
   ReturnExchangeQuoted,
   ReturnExchangeRead,
@@ -15,6 +19,11 @@ import type {
 export { ConnectorError } from '@luma/connector-core';
 
 export type { ConnectorFailure } from '@luma/connector-core';
+
+export type {
+  InventoryShipmentSnapshot,
+  InventoryTransferSnapshot,
+} from './inventory-transfers.js';
 
 /** Provider IDs are opaque and case-preserved; scopeKey identifies a parent-local namespace. */
 export interface ExternalId {
@@ -39,7 +48,9 @@ export interface SourceIdentity extends ExternalId {
     | 'supplier'
     | 'purchase_order'
     | 'message'
-    | 'return_reason';
+    | 'return_reason'
+    | 'inventory_transfer'
+    | 'inventory_shipment';
 }
 
 export interface Observation<T> {
@@ -668,6 +679,14 @@ interface CapabilityContract {
   'inventory.read': {
     input: PageQuery & { sku?: ExternalId; location?: ExternalId };
     output: Page<InventorySnapshot>;
+  };
+  'inventory.transfers.read': {
+    input: PageQuery;
+    output: Page<InventoryTransferSnapshot>;
+  };
+  'inventory.shipments.read': {
+    input: PageQuery;
+    output: Page<InventoryShipmentSnapshot>;
   };
   'inventory.write': {
     input: {

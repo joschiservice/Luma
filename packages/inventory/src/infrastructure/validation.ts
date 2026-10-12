@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+import {
+  shipmentDataSchema,
+  transferDataSchema,
+} from './transfer-validation.js';
+
 const uuid = z.string().uuid();
 
 const decimal = z.string().regex(/^-?\d{1,14}(\.\d{1,6})?$/);
@@ -102,4 +107,13 @@ const product = base
   })
   .strict();
 
-export const snapshotSchema = z.discriminatedUnion('kind', [position, product]);
+export const snapshotSchema = z.discriminatedUnion('kind', [
+  position,
+  product,
+  base
+    .extend({ kind: z.literal('inventory_transfer'), data: transferDataSchema })
+    .strict(),
+  base
+    .extend({ kind: z.literal('inventory_shipment'), data: shipmentDataSchema })
+    .strict(),
+]);

@@ -94,7 +94,7 @@ const rmInsights = [
 const rmInventory = [
   ...rmBase,
   'packages/read-models/src/api/inventory.ts',
-  'packages/read-models/src/application/inventory.ts',
+  'packages/read-models/src/application/{inventory,transfers}.ts',
   'packages/read-models/src/domain/inventory.ts',
   'packages/read-models/src/infrastructure/inventory/**',
 ];
@@ -743,6 +743,22 @@ export const journeyAreas = {
     ...webCases,
     ...webInventory,
     ...webOrders,
+  ],
+  'shopify-transfers.e2e.mjs': [
+    ...ordersFixture,
+    ...detectionFixture,
+    ...inventory,
+    ...procurement,
+    ...appHost,
+  ],
+  'shopify-transfers.browser.mjs': [
+    ...ordersFixture,
+    ...detectionFixture,
+    ...inventory,
+    ...procurement,
+    ...appHost,
+    ...webShell,
+    ...webInventory,
   ],
   'inventory.e2e.mjs': [
     ...ordersFixture,

@@ -29,6 +29,7 @@ import {
 import { z } from 'zod';
 
 import { readBulkHistory } from './bulk-history.js';
+import { createInventoryTransferCapabilities } from './inventory-transfers.js';
 import {
   attributeInventoryWrites,
   type InventoryWriteReceipt,
@@ -236,6 +237,8 @@ export interface ShopifyConnectorOptions extends ShopifyTransportOptions {
     targets: { inventoryItemId: string; locationId: string }[],
   ): Promise<InventoryWriteReceipt[]>;
   rawRetentionMs?: number;
+  /** Shares transfer shipment identities only when the installation grants their separate read capability. */
+  inventoryShipmentAccess?: boolean;
   now?: () => Date;
   id?: () => string;
 }
@@ -272,6 +275,8 @@ export function createShopifyConnector(
       | 'returns.exchange.reservation.read'
       | 'returns.settlement.quote.read'
       | 'returns.settlement.proof.read'
+      | 'inventory.transfers.read'
+      | 'inventory.shipments.read'
     >,
   >(capability: K): CapabilityHandler<K> {
     return {
@@ -1289,6 +1294,12 @@ export function createShopifyConnector(
       'orders.read': handler('orders.read'),
       'products.read': handler('products.read'),
       'inventory.read': handler('inventory.read'),
+      ...createInventoryTransferCapabilities({
+        ...options,
+        now,
+        id,
+        shipmentAccess: options.inventoryShipmentAccess ?? false,
+      }),
       'fulfillment.read': handler('fulfillment.read'),
       'returns.read': handler('returns.read'),
       ...(options.customerAccess

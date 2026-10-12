@@ -5,6 +5,8 @@ export const recordTypes = [
   'inventory',
   'customers',
   'returns',
+  'inventory_transfers',
+  'inventory_shipments',
 ] as const;
 
 export type RecordType = (typeof recordTypes)[number];
@@ -17,6 +19,8 @@ export const recordCapabilities = {
   inventory: 'inventory.read',
   customers: 'customers.read',
   returns: 'returns.read',
+  inventory_transfers: 'inventory.transfers.read',
+  inventory_shipments: 'inventory.shipments.read',
 } as const satisfies Record<RecordType, `${string}.read`>;
 
 /** Record types that refer to orders; their history import waits for the order history. */

@@ -90394,6 +90394,8 @@
                                 "orders.read",
                                 "products.read",
                                 "inventory.read",
+                                "inventory.transfers.read",
+                                "inventory.shipments.read",
                                 "inventory.available.reconcile",
                                 "fulfillment.read",
                                 "fulfillment.hold.release",
@@ -90437,6 +90439,8 @@
                                 "orders.read",
                                 "products.read",
                                 "inventory.read",
+                                "inventory.transfers.read",
+                                "inventory.shipments.read",
                                 "inventory.available.reconcile",
                                 "fulfillment.read",
                                 "fulfillment.hold.release",
@@ -90673,12 +90677,14 @@
                   "permissions": {
                     "type": "array",
                     "minItems": 1,
-                    "maxItems": 35,
+                    "maxItems": 37,
                     "items": {
                       "enum": [
                         "orders.read",
                         "products.read",
                         "inventory.read",
+                        "inventory.transfers.read",
+                        "inventory.shipments.read",
                         "inventory.available.reconcile",
                         "fulfillment.read",
                         "fulfillment.hold.release",
@@ -90805,6 +90811,8 @@
                           "orders.read",
                           "products.read",
                           "inventory.read",
+                          "inventory.transfers.read",
+                          "inventory.shipments.read",
                           "inventory.available.reconcile",
                           "fulfillment.read",
                           "fulfillment.hold.release",
@@ -90848,6 +90856,8 @@
                           "orders.read",
                           "products.read",
                           "inventory.read",
+                          "inventory.transfers.read",
+                          "inventory.shipments.read",
                           "inventory.available.reconcile",
                           "fulfillment.read",
                           "fulfillment.hold.release",
@@ -91161,6 +91171,8 @@
                           "orders.read",
                           "products.read",
                           "inventory.read",
+                          "inventory.transfers.read",
+                          "inventory.shipments.read",
                           "inventory.available.reconcile",
                           "fulfillment.read",
                           "fulfillment.hold.release",
@@ -91204,6 +91216,8 @@
                           "orders.read",
                           "products.read",
                           "inventory.read",
+                          "inventory.transfers.read",
+                          "inventory.shipments.read",
                           "inventory.available.reconcile",
                           "fulfillment.read",
                           "fulfillment.hold.release",
@@ -91506,6 +91520,8 @@
                           "orders.read",
                           "products.read",
                           "inventory.read",
+                          "inventory.transfers.read",
+                          "inventory.shipments.read",
                           "inventory.available.reconcile",
                           "fulfillment.read",
                           "fulfillment.hold.release",
@@ -91549,6 +91565,8 @@
                           "orders.read",
                           "products.read",
                           "inventory.read",
+                          "inventory.transfers.read",
+                          "inventory.shipments.read",
                           "inventory.available.reconcile",
                           "fulfillment.read",
                           "fulfillment.hold.release",
@@ -91865,6 +91883,8 @@
                           "orders.read",
                           "products.read",
                           "inventory.read",
+                          "inventory.transfers.read",
+                          "inventory.shipments.read",
                           "inventory.available.reconcile",
                           "fulfillment.read",
                           "fulfillment.hold.release",
@@ -91908,6 +91928,8 @@
                           "orders.read",
                           "products.read",
                           "inventory.read",
+                          "inventory.transfers.read",
+                          "inventory.shipments.read",
                           "inventory.available.reconcile",
                           "fulfillment.read",
                           "fulfillment.hold.release",
@@ -92211,6 +92233,8 @@
                           "orders.read",
                           "products.read",
                           "inventory.read",
+                          "inventory.transfers.read",
+                          "inventory.shipments.read",
                           "inventory.available.reconcile",
                           "fulfillment.read",
                           "fulfillment.hold.release",
@@ -92254,6 +92278,8 @@
                           "orders.read",
                           "products.read",
                           "inventory.read",
+                          "inventory.transfers.read",
+                          "inventory.shipments.read",
                           "inventory.available.reconcile",
                           "fulfillment.read",
                           "fulfillment.hold.release",
@@ -96538,6 +96564,2236 @@
           },
           "403": {
             "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/inventory/transfers": {
+      "get": {
+        "operationId": "inventory.transfers",
+        "summary": "Browse inventory transfers and shipments",
+        "description": "Read up to 50 source summaries with separately reported stages. Transfer and shipment quantities do not augment stock balances. Signals require active grants and complete evidence observed within five minutes; a past arrival estimate establishes only that receipt is unconfirmed.",
+        "tags": ["inventory"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "enum": ["inventory_transfer", "inventory_shipment"],
+              "type": "string",
+              "default": "inventory_transfer"
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 120,
+              "default": ""
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true
+          },
+          {
+            "name": "connectionId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true
+          },
+          {
+            "name": "skuId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true
+          },
+          {
+            "name": "locationId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "connectionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "enum": [
+                              "inventory_transfer",
+                              "inventory_shipment"
+                            ],
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "snapshotId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "observedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "facts": {
+                            "type": "object",
+                            "properties": {
+                              "requested": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "received": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "shipped": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "unreceived": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "rejected": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "expectedArrivalAt": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "origin": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "destination": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "complete": {
+                                "type": "boolean"
+                              },
+                              "consistent": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "requested",
+                              "received",
+                              "shipped",
+                              "unreceived",
+                              "rejected",
+                              "expectedArrivalAt",
+                              "origin",
+                              "destination",
+                              "complete",
+                              "consistent"
+                            ]
+                          },
+                          "evidence": {
+                            "enum": [
+                              "fresh",
+                              "stale",
+                              "incomplete",
+                              "unavailable",
+                              "removed"
+                            ],
+                            "type": "string"
+                          },
+                          "signals": {
+                            "type": "array",
+                            "items": {
+                              "enum": [
+                                "inconsistent_quantities",
+                                "rejected",
+                                "terminal_unreceived",
+                                "receipt_late"
+                              ],
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "connectionId",
+                          "label",
+                          "kind",
+                          "name",
+                          "status",
+                          "snapshotId",
+                          "observedAt",
+                          "facts",
+                          "evidence",
+                          "signals"
+                        ]
+                      }
+                    },
+                    "nextCursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "asOf": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": ["items", "nextCursor", "asOf"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/inventory/transfers/{transferId}/sources/{connectionId}": {
+      "get": {
+        "operationId": "inventory.transfer",
+        "summary": "Inspect transfer or receiving evidence",
+        "description": "Read one source projection, exact line identities, historical location snapshots, up to 20 observations and 50 explicit relationships per type. Null collections are unavailable. Procurement links require procurement.read and an exact connection-scoped external reference. No stock, receiving or claim action is executed.",
+        "tags": ["inventory"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "transferId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "connectionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "record": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "connectionId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "enum": ["inventory_transfer", "inventory_shipment"],
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "snapshotId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "observedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "facts": {
+                          "type": "object",
+                          "properties": {
+                            "requested": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "received": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "shipped": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "unreceived": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "rejected": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "expectedArrivalAt": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "origin": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "destination": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "complete": {
+                              "type": "boolean"
+                            },
+                            "consistent": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "requested",
+                            "received",
+                            "shipped",
+                            "unreceived",
+                            "rejected",
+                            "expectedArrivalAt",
+                            "origin",
+                            "destination",
+                            "complete",
+                            "consistent"
+                          ]
+                        },
+                        "evidence": {
+                          "enum": [
+                            "fresh",
+                            "stale",
+                            "incomplete",
+                            "unavailable",
+                            "removed"
+                          ],
+                          "type": "string"
+                        },
+                        "signals": {
+                          "type": "array",
+                          "items": {
+                            "enum": [
+                              "inconsistent_quantities",
+                              "rejected",
+                              "terminal_unreceived",
+                              "receipt_late"
+                            ],
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "connectionId",
+                        "label",
+                        "kind",
+                        "name",
+                        "status",
+                        "snapshotId",
+                        "observedAt",
+                        "facts",
+                        "evidence",
+                        "signals"
+                      ]
+                    },
+                    "provenance": {
+                      "type": "object",
+                      "properties": {
+                        "observationId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "sourceRevision": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "sourceUpdatedAt": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "observationId",
+                        "sourceRevision",
+                        "sourceUpdatedAt"
+                      ]
+                    },
+                    "deleted": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "const": "inventory_transfer"
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 512
+                                },
+                                "status": {
+                                  "enum": [
+                                    "draft",
+                                    "ready",
+                                    "in_progress",
+                                    "received",
+                                    "cancelled",
+                                    "unknown"
+                                  ],
+                                  "type": "string"
+                                },
+                                "createdAt": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "origin": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "sourceId": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "externalId": {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 1024
+                                                },
+                                                "scopeKey": {
+                                                  "type": "string",
+                                                  "maxLength": 1024
+                                                }
+                                              },
+                                              "required": [
+                                                "externalId",
+                                                "scopeKey"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "locationId": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string",
+                                              "format": "uuid"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 512
+                                        },
+                                        "snapshottedAt": {
+                                          "type": "string",
+                                          "format": "date-time"
+                                        },
+                                        "address": {
+                                          "type": "object",
+                                          "properties": {
+                                            "address1": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 512
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            },
+                                            "address2": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 512
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            },
+                                            "city": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 512
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            },
+                                            "provinceCode": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 512
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            },
+                                            "countryCode": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 512
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            },
+                                            "zip": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 512
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            }
+                                          },
+                                          "required": [
+                                            "address1",
+                                            "address2",
+                                            "city",
+                                            "provinceCode",
+                                            "countryCode",
+                                            "zip"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "required": [
+                                        "sourceId",
+                                        "locationId",
+                                        "name",
+                                        "snapshottedAt",
+                                        "address"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "destination": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "sourceId": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "externalId": {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 1024
+                                                },
+                                                "scopeKey": {
+                                                  "type": "string",
+                                                  "maxLength": 1024
+                                                }
+                                              },
+                                              "required": [
+                                                "externalId",
+                                                "scopeKey"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "locationId": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string",
+                                              "format": "uuid"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 512
+                                        },
+                                        "snapshottedAt": {
+                                          "type": "string",
+                                          "format": "date-time"
+                                        },
+                                        "address": {
+                                          "type": "object",
+                                          "properties": {
+                                            "address1": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 512
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            },
+                                            "address2": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 512
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            },
+                                            "city": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 512
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            },
+                                            "provinceCode": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 512
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            },
+                                            "countryCode": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 512
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            },
+                                            "zip": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 512
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            }
+                                          },
+                                          "required": [
+                                            "address1",
+                                            "address2",
+                                            "city",
+                                            "provinceCode",
+                                            "countryCode",
+                                            "zip"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "required": [
+                                        "sourceId",
+                                        "locationId",
+                                        "name",
+                                        "snapshottedAt",
+                                        "address"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "requestedQuantity": {
+                                  "type": "string",
+                                  "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                                },
+                                "receivedQuantity": {
+                                  "type": "string",
+                                  "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                                },
+                                "lines": {
+                                  "anyOf": [
+                                    {
+                                      "type": "array",
+                                      "maxItems": 5000,
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "sourceId": {
+                                            "type": "object",
+                                            "properties": {
+                                              "externalId": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 1024
+                                              },
+                                              "scopeKey": {
+                                                "type": "string",
+                                                "maxLength": 1024
+                                              }
+                                            },
+                                            "required": [
+                                              "externalId",
+                                              "scopeKey"
+                                            ],
+                                            "additionalProperties": false
+                                          },
+                                          "sourceSku": {
+                                            "anyOf": [
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "externalId": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "maxLength": 1024
+                                                  },
+                                                  "scopeKey": {
+                                                    "type": "string",
+                                                    "maxLength": 1024
+                                                  }
+                                                },
+                                                "required": [
+                                                  "externalId",
+                                                  "scopeKey"
+                                                ],
+                                                "additionalProperties": false
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "skuId": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string",
+                                                "format": "uuid"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "unit": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 64
+                                          },
+                                          "title": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 512
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "requested": {
+                                            "type": "string",
+                                            "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                                          },
+                                          "picked": {
+                                            "type": "string",
+                                            "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                                          },
+                                          "ready": {
+                                            "type": "string",
+                                            "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                                          },
+                                          "shipped": {
+                                            "type": "string",
+                                            "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                                          }
+                                        },
+                                        "required": [
+                                          "sourceId",
+                                          "sourceSku",
+                                          "skuId",
+                                          "unit",
+                                          "title",
+                                          "requested",
+                                          "picked",
+                                          "ready",
+                                          "shipped"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "shipmentSources": {
+                                  "anyOf": [
+                                    {
+                                      "type": "array",
+                                      "maxItems": 5000,
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "externalId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 1024
+                                          },
+                                          "scopeKey": {
+                                            "type": "string",
+                                            "maxLength": 1024
+                                          }
+                                        },
+                                        "required": ["externalId", "scopeKey"],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "name",
+                                "status",
+                                "createdAt",
+                                "origin",
+                                "destination",
+                                "requestedQuantity",
+                                "receivedQuantity",
+                                "lines",
+                                "shipmentSources"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "const": "inventory_shipment"
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 512
+                                },
+                                "status": {
+                                  "enum": [
+                                    "draft",
+                                    "in_transit",
+                                    "partially_received",
+                                    "received",
+                                    "unknown"
+                                  ],
+                                  "type": "string"
+                                },
+                                "createdAt": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "shippedAt": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "receivedAt": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "expectedArrivalAt": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "quantity": {
+                                  "type": "string",
+                                  "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                                },
+                                "receivedQuantity": {
+                                  "type": "string",
+                                  "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                                },
+                                "acceptedQuantity": {
+                                  "type": "string",
+                                  "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                                },
+                                "rejectedQuantity": {
+                                  "type": "string",
+                                  "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                                },
+                                "lines": {
+                                  "anyOf": [
+                                    {
+                                      "type": "array",
+                                      "maxItems": 5000,
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "sourceId": {
+                                            "type": "object",
+                                            "properties": {
+                                              "externalId": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 1024
+                                              },
+                                              "scopeKey": {
+                                                "type": "string",
+                                                "maxLength": 1024
+                                              }
+                                            },
+                                            "required": [
+                                              "externalId",
+                                              "scopeKey"
+                                            ],
+                                            "additionalProperties": false
+                                          },
+                                          "sourceSku": {
+                                            "anyOf": [
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "externalId": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "maxLength": 1024
+                                                  },
+                                                  "scopeKey": {
+                                                    "type": "string",
+                                                    "maxLength": 1024
+                                                  }
+                                                },
+                                                "required": [
+                                                  "externalId",
+                                                  "scopeKey"
+                                                ],
+                                                "additionalProperties": false
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "skuId": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string",
+                                                "format": "uuid"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "unit": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 64
+                                          },
+                                          "quantity": {
+                                            "type": "string",
+                                            "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                                          },
+                                          "accepted": {
+                                            "type": "string",
+                                            "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                                          },
+                                          "rejected": {
+                                            "type": "string",
+                                            "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                                          },
+                                          "unreceived": {
+                                            "type": "string",
+                                            "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                                          }
+                                        },
+                                        "required": [
+                                          "sourceId",
+                                          "sourceSku",
+                                          "skuId",
+                                          "unit",
+                                          "quantity",
+                                          "accepted",
+                                          "rejected",
+                                          "unreceived"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "tracking": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "carrier": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 512
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "number": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 512
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "url": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string",
+                                              "maxLength": 2048,
+                                              "pattern": "^https?:\\/\\/"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": ["carrier", "number", "url"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "name",
+                                "status",
+                                "createdAt",
+                                "shippedAt",
+                                "receivedAt",
+                                "expectedArrivalAt",
+                                "quantity",
+                                "receivedQuantity",
+                                "acceptedQuantity",
+                                "rejectedQuantity",
+                                "lines",
+                                "tracking"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "source": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "externalId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 1024
+                            },
+                            "scopeKey": {
+                              "type": "string",
+                              "maxLength": 1024
+                            }
+                          },
+                          "required": ["externalId", "scopeKey"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "shipments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "connectionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "enum": [
+                              "inventory_transfer",
+                              "inventory_shipment"
+                            ],
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "snapshotId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "observedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "facts": {
+                            "type": "object",
+                            "properties": {
+                              "requested": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "received": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "shipped": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "unreceived": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "rejected": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "expectedArrivalAt": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "origin": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "destination": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "complete": {
+                                "type": "boolean"
+                              },
+                              "consistent": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "requested",
+                              "received",
+                              "shipped",
+                              "unreceived",
+                              "rejected",
+                              "expectedArrivalAt",
+                              "origin",
+                              "destination",
+                              "complete",
+                              "consistent"
+                            ]
+                          },
+                          "evidence": {
+                            "enum": [
+                              "fresh",
+                              "stale",
+                              "incomplete",
+                              "unavailable",
+                              "removed"
+                            ],
+                            "type": "string"
+                          },
+                          "signals": {
+                            "type": "array",
+                            "items": {
+                              "enum": [
+                                "inconsistent_quantities",
+                                "rejected",
+                                "terminal_unreceived",
+                                "receipt_late"
+                              ],
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "connectionId",
+                          "label",
+                          "kind",
+                          "name",
+                          "status",
+                          "snapshotId",
+                          "observedAt",
+                          "facts",
+                          "evidence",
+                          "signals"
+                        ]
+                      }
+                    },
+                    "transfers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "connectionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "enum": [
+                              "inventory_transfer",
+                              "inventory_shipment"
+                            ],
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "snapshotId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "observedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "facts": {
+                            "type": "object",
+                            "properties": {
+                              "requested": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "received": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "shipped": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "unreceived": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "rejected": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "expectedArrivalAt": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "origin": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "destination": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "complete": {
+                                "type": "boolean"
+                              },
+                              "consistent": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "requested",
+                              "received",
+                              "shipped",
+                              "unreceived",
+                              "rejected",
+                              "expectedArrivalAt",
+                              "origin",
+                              "destination",
+                              "complete",
+                              "consistent"
+                            ]
+                          },
+                          "evidence": {
+                            "enum": [
+                              "fresh",
+                              "stale",
+                              "incomplete",
+                              "unavailable",
+                              "removed"
+                            ],
+                            "type": "string"
+                          },
+                          "signals": {
+                            "type": "array",
+                            "items": {
+                              "enum": [
+                                "inconsistent_quantities",
+                                "rejected",
+                                "terminal_unreceived",
+                                "receipt_late"
+                              ],
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "connectionId",
+                          "label",
+                          "kind",
+                          "name",
+                          "status",
+                          "snapshotId",
+                          "observedAt",
+                          "facts",
+                          "evidence",
+                          "signals"
+                        ]
+                      }
+                    },
+                    "history": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "snapshotId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "observedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "deleted": {
+                            "type": "boolean"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "receivedQuantity": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "origin": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "sourceId": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "externalId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 1024
+                                          },
+                                          "scopeKey": {
+                                            "type": "string",
+                                            "maxLength": 1024
+                                          }
+                                        },
+                                        "required": ["externalId", "scopeKey"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "locationId": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 512
+                                  },
+                                  "snapshottedAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "address": {
+                                    "type": "object",
+                                    "properties": {
+                                      "address1": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 512
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "address2": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 512
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "city": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 512
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "provinceCode": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 512
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "countryCode": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 512
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "zip": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 512
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "address1",
+                                      "address2",
+                                      "city",
+                                      "provinceCode",
+                                      "countryCode",
+                                      "zip"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "sourceId",
+                                  "locationId",
+                                  "name",
+                                  "snapshottedAt",
+                                  "address"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "destination": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "sourceId": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "externalId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 1024
+                                          },
+                                          "scopeKey": {
+                                            "type": "string",
+                                            "maxLength": 1024
+                                          }
+                                        },
+                                        "required": ["externalId", "scopeKey"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "locationId": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 512
+                                  },
+                                  "snapshottedAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "address": {
+                                    "type": "object",
+                                    "properties": {
+                                      "address1": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 512
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "address2": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 512
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "city": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 512
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "provinceCode": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 512
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "countryCode": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 512
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "zip": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 512
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "address1",
+                                      "address2",
+                                      "city",
+                                      "provinceCode",
+                                      "countryCode",
+                                      "zip"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "sourceId",
+                                  "locationId",
+                                  "name",
+                                  "snapshottedAt",
+                                  "address"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "snapshotId",
+                          "observedAt",
+                          "deleted",
+                          "status",
+                          "receivedQuantity",
+                          "origin",
+                          "destination"
+                        ]
+                      }
+                    },
+                    "purchaseOrders": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["id", "label", "status"]
+                      }
+                    },
+                    "hidden": {
+                      "type": "array",
+                      "items": {
+                        "const": "purchaseOrders"
+                      }
+                    },
+                    "relatedTruncated": {
+                      "type": "boolean"
+                    },
+                    "asOf": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "record",
+                    "provenance",
+                    "deleted",
+                    "data",
+                    "source",
+                    "shipments",
+                    "transfers",
+                    "history",
+                    "purchaseOrders",
+                    "hidden",
+                    "relatedTruncated",
+                    "asOf"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
             "content": {
               "application/json": {
                 "schema": {
@@ -135228,7 +137484,9 @@
                                     "products",
                                     "inventory",
                                     "customers",
-                                    "returns"
+                                    "returns",
+                                    "inventory_transfers",
+                                    "inventory_shipments"
                                   ],
                                   "type": "string"
                                 },
@@ -135656,7 +137914,9 @@
                               "products",
                               "inventory",
                               "customers",
-                              "returns"
+                              "returns",
+                              "inventory_transfers",
+                              "inventory_shipments"
                             ],
                             "type": "string"
                           },

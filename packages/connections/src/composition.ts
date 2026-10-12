@@ -96,3 +96,8 @@ export { createProductIdentityReader } from './infrastructure/product-identities
 export { createProviderCatalog } from './application/providers.js';
 
 export { commerceSchema } from './infrastructure/source-validation.js';
+
+export {
+  transferSnapshotSchema,
+  shipmentSnapshotSchema,
+} from './infrastructure/transfer-validation.js';

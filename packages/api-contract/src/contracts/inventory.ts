@@ -6,8 +6,47 @@ import {
   inventoryListSchema,
   inventoryQuerySchema,
 } from '../inventory.js';
+import {
+  transferDetailSchema,
+  transferListSchema,
+  transferQuerySchema,
+} from '../inventory-transfers.js';
 
 export const inventoryContract = {
+  transfers: endpoint
+    .route({
+      method: 'GET',
+      path: '/v1/organizations/{organizationId}/inventory/transfers',
+      summary: 'Browse inventory transfers and shipments',
+      description:
+        'Read up to 50 source summaries with separately reported stages. Transfer and shipment quantities do not augment stock balances. Signals require active grants and complete evidence observed within five minutes; a past arrival estimate establishes only that receipt is unconfirmed.',
+    })
+    .meta({ access: requires('inventory.read'), errors: [400, 401, 404, 503] })
+    .input(
+      z.object({
+        params: organizationParamsSchema,
+        query: transferQuerySchema,
+      }),
+    )
+    .output(transferListSchema),
+  transfer: endpoint
+    .route({
+      method: 'GET',
+      path: '/v1/organizations/{organizationId}/inventory/transfers/{transferId}/sources/{connectionId}',
+      summary: 'Inspect transfer or receiving evidence',
+      description:
+        'Read one source projection, exact line identities, historical location snapshots, up to 20 observations and 50 explicit relationships per type. Null collections are unavailable. Procurement links require procurement.read and an exact connection-scoped external reference. No stock, receiving or claim action is executed.',
+    })
+    .meta({ access: requires('inventory.read'), errors: [401, 404, 503] })
+    .input(
+      z.object({
+        params: organizationParamsSchema.extend({
+          transferId: z.string().uuid(),
+          connectionId: z.string().uuid(),
+        }),
+      }),
+    )
+    .output(transferDetailSchema),
   list: endpoint
     .route({
       method: 'GET',

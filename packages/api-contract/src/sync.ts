@@ -9,6 +9,8 @@ const syncRecordTypeSchema = z.enum([
   'inventory',
   'customers',
   'returns',
+  'inventory_transfers',
+  'inventory_shipments',
 ]);
 
 const syncStatusSchema = z.enum([

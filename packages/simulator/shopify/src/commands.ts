@@ -32,6 +32,7 @@ import {
   settleRefund,
 } from './returns.js';
 import { fulfillOrder, shipmentStatus } from './shipments.js';
+import { recordInventoryTransfer } from './transfers.js';
 import type {
   ShopifyCommand,
   ShopifyCommandResult,
@@ -54,6 +55,8 @@ export function command(
   value: ShopifyCommand,
 ): Promise<ShopifyCommandResult> {
   switch (value.kind) {
+    case 'inventory-transfer':
+      return recordInventoryTransfer(context, value.transfer);
     case 'seed-catalog':
       return seedCatalog(context, value.products);
     case 'customer':

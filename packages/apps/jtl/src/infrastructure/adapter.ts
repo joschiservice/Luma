@@ -126,6 +126,8 @@ export function createJtlConnector(
       | 'returns.exchange.reservation.read'
       | 'returns.settlement.quote.read'
       | 'returns.settlement.proof.read'
+      | 'inventory.transfers.read'
+      | 'inventory.shipments.read'
     >,
   >(capability: K): CapabilityHandler<K> {
     return {

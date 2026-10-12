@@ -18,6 +18,8 @@ it('reports import progress and coverage, and lets only managers control syncs',
     'inventory',
     'customers',
     'returns',
+    'inventory_transfers',
+    'inventory_shipments',
   ]);
   expect(store.recordTypes[0]).toMatchObject({
     availability: 'granted',
@@ -40,6 +42,19 @@ it('reports import progress and coverage, and lets only managers control syncs',
     availability: 'not_requested',
     stream: null,
   });
+
+  expect(store.recordTypes.slice(6)).toEqual([
+    {
+      recordType: 'inventory_transfers',
+      availability: 'not_requested',
+      stream: null,
+    },
+    {
+      recordType: 'inventory_shipments',
+      availability: 'not_requested',
+      stream: null,
+    },
+  ]);
 
   await f.db.owner.query(
     `UPDATE commerce_sync_streams SET recent_history_from=now()-interval '30 days',

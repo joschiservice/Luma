@@ -30,6 +30,7 @@
     "@luma/connections": "workspace:*",
     "@luma/exceptions": "workspace:*",
     "@luma/identity": "workspace:*",
+    "@luma/inventory": "workspace:*",
     "@luma/orders": "workspace:*",
     "@luma/platform": "workspace:*",
     "@luma/procurement": "workspace:*",

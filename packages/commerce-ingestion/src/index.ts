@@ -6,7 +6,11 @@ import type {
 } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
 import { requirePermission, requireTenant } from '@luma/identity';
-import type { CommerceProjections as Inventory } from '@luma/inventory';
+import type {
+  CommerceProjections as Inventory,
+  ShipmentData,
+  TransferData,
+} from '@luma/inventory';
 import type { CommerceProjections as Orders } from '@luma/orders';
 
 import {
@@ -24,6 +28,8 @@ export type ProjectionOutcome =
 // conflicting with the stored one.
 const normalizers = {
   inventory: 'commerce/3',
+  inventoryTransfers: 'commerce/1',
+  inventoryShipments: 'commerce/1',
   product: 'commerce/2',
   order: 'commerce/5',
   fulfillment: 'commerce/3',
@@ -82,6 +88,128 @@ export function createCommerceIngestion(
       observedAt: o.observedAt,
       deleted: o.kind === 'tombstone',
     };
+    if (input.capability === 'inventory.transfers.read') {
+      const data = input.observation.data;
+      const entityId = await resolve('inventory_transfer', o.source);
+      if (!entityId) return { status: 'pending', missing };
+      const mappedLocation = async (location: typeof data.origin) =>
+        location
+          ? {
+              sourceId: location.id,
+              locationId: location.id
+                ? ((await lookup({
+                    ...o.source,
+                    ...location.id,
+                    resource: 'location',
+                  })) ?? null)
+                : null,
+              name: location.name,
+              snapshottedAt: location.snapshottedAt,
+              address: location.address,
+            }
+          : null;
+      const lines =
+        data.lines === null
+          ? null
+          : await Promise.all(
+              data.lines.map(async (line) => ({
+                sourceId: line.id,
+                sourceSku: line.sku,
+                skuId: line.sku
+                  ? ((await lookup({
+                      ...o.source,
+                      ...line.sku,
+                      resource: 'sku',
+                    })) ?? null)
+                  : null,
+                title: line.title,
+                unit: line.unit,
+                requested: line.requested,
+                picked: line.picked,
+                ready: line.ready,
+                shipped: line.shipped,
+              })),
+            );
+      const normalized: TransferData = {
+        type: 'inventory_transfer',
+        name: data.name,
+        status: data.status,
+        createdAt: data.createdAt,
+        origin: await mappedLocation(data.origin),
+        destination: await mappedLocation(data.destination),
+        requestedQuantity: data.requestedQuantity,
+        receivedQuantity: data.receivedQuantity,
+        lines,
+        shipmentSources: data.shipments,
+      };
+
+      return {
+        owner: 'inventory',
+        snapshot: {
+          ...provenance,
+          entityId,
+          kind: 'inventory_transfer',
+          normalizerVersion: normalizers.inventoryTransfers,
+          mappingVersion: digest(
+            JSON.stringify([
+              entityId,
+              normalized.origin?.locationId ?? null,
+              normalized.destination?.locationId ?? null,
+              lines?.map((line) => line.skuId) ?? null,
+            ]),
+          ),
+          data: normalized,
+        },
+      };
+    }
+    if (input.capability === 'inventory.shipments.read') {
+      const data = input.observation.data;
+      const entityId = await resolve('inventory_shipment', o.source);
+      if (!entityId) return { status: 'pending', missing };
+      const lines =
+        data.lines === null
+          ? null
+          : await Promise.all(
+              data.lines.map(async (line) => ({
+                sourceId: line.id,
+                sourceSku: line.sku,
+                skuId: line.sku
+                  ? ((await lookup({
+                      ...o.source,
+                      ...line.sku,
+                      resource: 'sku',
+                    })) ?? null)
+                  : null,
+                unit: line.unit,
+                quantity: line.quantity,
+                accepted: line.accepted,
+                rejected: line.rejected,
+                unreceived: line.unreceived,
+              })),
+            );
+      const normalized: ShipmentData = {
+        ...data,
+        type: 'inventory_shipment',
+        lines,
+      };
+
+      return {
+        owner: 'inventory',
+        snapshot: {
+          ...provenance,
+          entityId,
+          kind: 'inventory_shipment',
+          normalizerVersion: normalizers.inventoryShipments,
+          mappingVersion: digest(
+            JSON.stringify([
+              entityId,
+              lines?.map((line) => line.skuId) ?? null,
+            ]),
+          ),
+          data: normalized,
+        },
+      };
+    }
     if (input.capability === 'inventory.read') {
       const data = input.observation.data;
       const skuId = await resolve('sku', data.sku),
@@ -830,7 +958,13 @@ function sourceLocalEntity(
   | {
       owner: 'inventory';
       entity: {
-        kind: 'sku' | 'location' | 'product' | 'position';
+        kind:
+          | 'sku'
+          | 'location'
+          | 'product'
+          | 'position'
+          | 'inventory_transfer'
+          | 'inventory_shipment';
         reconciliationKey: string;
       };
     } {
@@ -873,6 +1007,22 @@ function identities(input: CommerceObservation): SourceIdentity[] {
   const refs: SourceIdentity[] = [source];
   const add = (resource: SourceIdentity['resource'], external: ExternalId) =>
     refs.push({ ...source, ...external, resource });
+  if (
+    input.capability === 'inventory.transfers.read' ||
+    input.capability === 'inventory.shipments.read'
+  ) {
+    for (const line of input.observation.data.lines ?? [])
+      if (line.sku) add('sku', line.sku);
+    if (input.capability === 'inventory.transfers.read') {
+      for (const location of [
+        input.observation.data.origin,
+        input.observation.data.destination,
+      ])
+        if (location?.id) add('location', location.id);
+      for (const shipment of input.observation.data.shipments ?? [])
+        add('inventory_shipment', shipment);
+    }
+  }
   if (input.capability === 'orders.read')
     for (const line of input.observation.data.lines) {
       add('order_line', line.id);

@@ -11,6 +11,7 @@ import type {
 } from '../../application/inventory.js';
 import { readPositions } from './positions.js';
 import { readStockContext } from './related.js';
+import { createTransferWorkspace } from './transfers.js';
 
 const cursorSchema = z
   .object({ context: z.string(), id: z.string().uuid() })
@@ -21,6 +22,7 @@ export function createInventoryWorkspace(
   db: TenantDatabase,
 ): InventoryWorkspace {
   return {
+    ...createTransferWorkspace(db),
     async list(context, query) {
       requirePermission(context, 'inventory.read');
       const scope = createHash('sha256')

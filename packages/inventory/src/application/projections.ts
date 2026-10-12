@@ -1,8 +1,24 @@
 import type { TenantContext } from '@luma/identity';
 
-type EntityKind = 'sku' | 'location' | 'product' | 'position';
+import type { ShipmentData, TransferData } from '../domain/transfers.js';
+
+export type {
+  TransferData,
+  ShipmentData,
+  TransferLocation,
+} from '../domain/transfers.js';
+
+type EntityKind =
+  | 'sku'
+  | 'location'
+  | 'product'
+  | 'position'
+  | 'inventory_transfer'
+  | 'inventory_shipment';
 
 type CommerceData =
+  | TransferData
+  | ShipmentData
   | {
       type: 'position';
       skuId: string;
@@ -54,7 +70,7 @@ type CommerceData =
 /** A current source projection that refers to a SKU or location. */
 export type Dependent = {
   entityId: string;
-  kind: 'position' | 'product';
+  kind: 'position' | 'product' | 'inventory_transfer' | 'inventory_shipment';
   connectionId: string;
   observationId: string;
 };

@@ -105,6 +105,20 @@ export const recordTypes: Record<
     m.sync_type_inventory_count,
     Boxes,
   ),
+  inventory_transfers: recordType(
+    m.sync_type_inventory_transfers_title,
+    m.sync_type_inventory_transfers_noun,
+    m.sync_type_inventory_transfers_one,
+    m.sync_type_inventory_transfers_count,
+    Truck,
+  ),
+  inventory_shipments: recordType(
+    m.sync_type_inventory_shipments_title,
+    m.sync_type_inventory_shipments_noun,
+    m.sync_type_inventory_shipments_one,
+    m.sync_type_inventory_shipments_count,
+    Truck,
+  ),
   customers: recordType(
     m.sync_type_customers_title,
     m.sync_type_customers_noun,

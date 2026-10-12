@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
 import type { SourceIdentity } from '../domain/capabilities.js';
+import {
+  shipmentSnapshotSchema,
+  transferSnapshotSchema,
+} from './transfer-validation.js';
 
 const uuid = z.string().uuid();
 
@@ -43,6 +47,8 @@ export const sourceSchema = external
       'supplier',
       'purchase_order',
       'return_reason',
+      'inventory_transfer',
+      'inventory_shipment',
     ]),
   })
   .strict();
@@ -237,6 +243,24 @@ const observation = <T extends z.ZodTypeAny>(
     .strict();
 
 export const commerceSchema = z.discriminatedUnion('capability', [
+  z
+    .object({
+      capability: z.literal('inventory.transfers.read'),
+      observation: observation(
+        z.literal('inventory_transfer'),
+        transferSnapshotSchema,
+      ),
+    })
+    .strict(),
+  z
+    .object({
+      capability: z.literal('inventory.shipments.read'),
+      observation: observation(
+        z.literal('inventory_shipment'),
+        shipmentSnapshotSchema,
+      ),
+    })
+    .strict(),
   z
     .object({
       capability: z.literal('orders.read'),

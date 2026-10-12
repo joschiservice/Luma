@@ -34,6 +34,8 @@ export type {
   FulfillmentSnapshot,
   HistoryLimit,
   InventorySnapshot,
+  InventoryTransferSnapshot,
+  InventoryShipmentSnapshot,
   MailboxFilter,
   MessageReadCapability,
   MessageSnapshot,

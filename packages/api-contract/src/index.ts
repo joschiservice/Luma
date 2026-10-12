@@ -39,7 +39,44 @@ import { workflowsContract } from './contracts/workflows.js';
  * Every customer API route, keyed by area. Route keys form OpenAPI operation IDs, such as
  * `orders.list`.
  */
-export const apiContract = {
+export const apiContract: {
+  shadow: typeof shadowContract;
+  activity: typeof activityContract;
+  playbooks: typeof playbooksContract;
+  workflows: typeof workflowsContract;
+  workflowDrafts: typeof workflowDraftsContract;
+  workflowGeneration: typeof workflowGenerationContract;
+  draftTests: typeof draftTestsContract;
+  procurement: typeof procurementContract;
+  procurementContext: typeof procurementContextContract;
+  messaging: typeof messagingContract;
+  resolutionLearning: typeof resolutionLearningContract;
+  caseDesk: typeof caseDeskContract;
+  operations: typeof operationsContract;
+  metrics: typeof metricsContract;
+  exceptions: typeof exceptionsContract;
+  identity: typeof identityContract;
+  settings: typeof settingsContract;
+  roles: typeof rolesContract;
+  connections: typeof connectionsContract;
+  apps: typeof appsContract;
+  system: typeof systemContract;
+  connectorProviders: typeof connectorProvidersContract;
+  records: typeof recordsContract;
+  fulfillment: typeof fulfillmentContract;
+  inventory: typeof inventoryContract;
+  products: typeof productsContract;
+  orders: typeof ordersContract;
+  sales: typeof salesContract;
+  returns: typeof returnsContract;
+  returnCases: typeof returnCasesContract;
+  customers: typeof customersContract;
+  sync: typeof syncContract;
+  decisions: typeof decisionsContract;
+  insights: typeof insightsContract;
+  assistant: typeof assistantContract;
+  sourceAuthority: typeof sourceAuthorityContract;
+} = {
   shadow: shadowContract,
   activity: activityContract,
   playbooks: playbooksContract,
@@ -168,6 +205,8 @@ export * from './records.js';
 export * from './orders.js';
 
 export * from './inventory.js';
+
+export * from './inventory-transfers.js';
 
 export * from './fulfillment.js';
 
