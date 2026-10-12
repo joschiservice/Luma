@@ -68,6 +68,9 @@ const fields = {
     'fulfillmentOrderOpen',
     'fulfillmentOrderMove',
     'inventorySetQuantities',
+    'orderEditBegin',
+    'orderEditSetQuantity',
+    'orderEditCommit',
   ],
   BulkOperation: [
     'id',
@@ -83,7 +86,8 @@ const fields = {
   BulkOperationRunQueryPayload: ['bulkOperation', 'userErrors'],
   Shop: ['id', 'myshopifyDomain'],
   ProductPriceRangeV2: ['minVariantPrice'],
-  AppInstallation: ['id', 'accessScopes'],
+  AppInstallation: ['id', 'accessScopes', 'app'],
+  App: ['id'],
   AccessScope: ['handle'],
   WebhookSubscriptionConnection: ['nodes', 'pageInfo'],
   WebhookSubscription: ['topic', 'id', 'uri'],
@@ -138,7 +142,31 @@ const fields = {
     'returns',
     'refunds',
     'events',
+    'agreements',
   ],
+  SalesAgreementConnection: ['nodes', 'pageInfo'],
+  SalesAgreement: ['id', 'happenedAt', 'reason', 'app', 'sales'],
+  OrderEditAgreement: ['id', 'happenedAt', 'reason', 'app', 'sales'],
+  SaleConnection: ['nodes', 'pageInfo'],
+  Sale: ['id', 'actionType', 'lineType', 'quantity'],
+  ProductSale: ['id', 'actionType', 'lineType', 'quantity', 'lineItem'],
+  OrderEditSession: ['id'],
+  OrderEditBeginPayload: ['calculatedOrder', 'orderEditSession', 'userErrors'],
+  OrderEditSetQuantityPayload: [
+    'calculatedOrder',
+    'calculatedLineItem',
+    'userErrors',
+  ],
+  OrderEditCommitPayload: ['order', 'userErrors'],
+  CalculatedOrder: [
+    'id',
+    'subtotalPriceSet',
+    'totalPriceSet',
+    'totalOutstandingSet',
+    'lineItems',
+  ],
+  CalculatedLineItemConnection: ['nodes', 'pageInfo'],
+  CalculatedLineItem: ['id', 'quantity', 'editableQuantity', 'restocking'],
   TaxLine: ['title', 'rate', 'priceSet'],
   ShippingLine: [
     'id',
@@ -194,6 +222,7 @@ const fields = {
     'name',
     'quantity',
     'currentQuantity',
+    'unfulfilledQuantity',
     'sku',
     'variant',
   ],
@@ -472,9 +501,14 @@ function include(name) {
     definition = {
       ...definition,
       interfaces: definition.interfaces.filter((item) =>
-        ['Node', 'Event', 'ReturnLineItemType', 'DiscountApplication'].includes(
-          item.name.value,
-        ),
+        [
+          'Node',
+          'Event',
+          'ReturnLineItemType',
+          'DiscountApplication',
+          'SalesAgreement',
+          'Sale',
+        ].includes(item.name.value),
       ),
     };
   }

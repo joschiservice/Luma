@@ -7,6 +7,7 @@ import { useState } from 'react';
 import type { ShopifyRecordKind } from '../domain/records.js';
 import { customerHref, useCustomerRecord } from './customer-data.js';
 import { ShopifyFulfillmentRecovery } from './fulfillment-recovery.js';
+import { ShopifyOrderEdits } from './order-edits.js';
 import { ShopifyRecordSections } from './sections.js';
 
 const orderId = /^gid:\/\/shopify\/Order\/(\d+)$/;
@@ -16,10 +17,13 @@ export function ShopifyOrderContext({
   record,
   services,
   organizationId,
+  canEdit = false,
 }: {
   record: NonNullable<AppUiProps['record']>;
   services: AppUiProps['services'];
   organizationId?: string;
+  /** Whether the reader may change order quantities; the server checks again. */
+  canEdit?: boolean;
 }) {
   const [trail, setTrail] = useState<{ kind: ShopifyRecordKind; id: string }[]>(
     [{ kind: 'Order', id: record.externalId }],
@@ -96,6 +100,14 @@ export function ShopifyOrderContext({
         ) : null}
       </div>
       {read.error ? <p role="alert">{read.error}</p> : null}
+      {canEdit && current.kind === 'Order' ? (
+        <ShopifyOrderEdits
+          key={`${record.connectionId}:${record.externalId}`}
+          connectionId={record.connectionId}
+          orderId={record.externalId}
+          services={services}
+        />
+      ) : null}
       {read.pending ? <p role="status">{m.shopify_context_loading()}</p> : null}
       {detail ? (
         <div aria-live="polite">

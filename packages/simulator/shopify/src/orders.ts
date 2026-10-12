@@ -62,6 +62,33 @@ export async function orderEvent(
   );
 }
 
+/**
+ * The unpaid amount of an order total in minor units: the total less captured payments plus
+ * successful refunds, never below zero. An edit preview passes the total the edit would leave.
+ */
+export async function outstanding(
+  context: ShopifyContext,
+  order: string,
+  total: number,
+) {
+  const transactions = await all<OrderTransactionData>(context, {
+    kind: 'OrderTransaction',
+    parent: order,
+  });
+  const captured = transactions
+    .filter(
+      (t) =>
+        ['SALE', 'CAPTURE'].includes(t.data.kind) &&
+        t.data.status === 'SUCCESS',
+    )
+    .reduce((n, t) => n + t.data.amount, 0);
+  const refunded = transactions
+    .filter((t) => t.data.kind === 'REFUND' && t.data.status === 'SUCCESS')
+    .reduce((n, t) => n + t.data.amount, 0);
+
+  return Math.max(0, total - captured + refunded);
+}
+
 /** Changes a customer's lifetime spend, which Shopify reports net of cancellations and refunds. */
 export async function spend(
   context: ShopifyContext,

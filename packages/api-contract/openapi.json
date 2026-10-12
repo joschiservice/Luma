@@ -90155,6 +90155,7 @@
                                 "fulfillment.hold.release",
                                 "fulfillment.open",
                                 "fulfillment.move",
+                                "orders.quantity.edit",
                                 "customers.read",
                                 "returns.read",
                                 "orders.shipping-method.read",
@@ -90198,6 +90199,7 @@
                                 "fulfillment.hold.release",
                                 "fulfillment.open",
                                 "fulfillment.move",
+                                "orders.quantity.edit",
                                 "customers.read",
                                 "returns.read",
                                 "orders.shipping-method.read",
@@ -90429,7 +90431,7 @@
                   "permissions": {
                     "type": "array",
                     "minItems": 1,
-                    "maxItems": 35,
+                    "maxItems": 36,
                     "items": {
                       "enum": [
                         "orders.read",
@@ -90440,6 +90442,7 @@
                         "fulfillment.hold.release",
                         "fulfillment.open",
                         "fulfillment.move",
+                        "orders.quantity.edit",
                         "customers.read",
                         "returns.read",
                         "orders.shipping-method.read",
@@ -90566,6 +90569,7 @@
                           "fulfillment.hold.release",
                           "fulfillment.open",
                           "fulfillment.move",
+                          "orders.quantity.edit",
                           "customers.read",
                           "returns.read",
                           "orders.shipping-method.read",
@@ -90609,6 +90613,7 @@
                           "fulfillment.hold.release",
                           "fulfillment.open",
                           "fulfillment.move",
+                          "orders.quantity.edit",
                           "customers.read",
                           "returns.read",
                           "orders.shipping-method.read",
@@ -90922,6 +90927,7 @@
                           "fulfillment.hold.release",
                           "fulfillment.open",
                           "fulfillment.move",
+                          "orders.quantity.edit",
                           "customers.read",
                           "returns.read",
                           "orders.shipping-method.read",
@@ -90965,6 +90971,7 @@
                           "fulfillment.hold.release",
                           "fulfillment.open",
                           "fulfillment.move",
+                          "orders.quantity.edit",
                           "customers.read",
                           "returns.read",
                           "orders.shipping-method.read",
@@ -91267,6 +91274,7 @@
                           "fulfillment.hold.release",
                           "fulfillment.open",
                           "fulfillment.move",
+                          "orders.quantity.edit",
                           "customers.read",
                           "returns.read",
                           "orders.shipping-method.read",
@@ -91310,6 +91318,7 @@
                           "fulfillment.hold.release",
                           "fulfillment.open",
                           "fulfillment.move",
+                          "orders.quantity.edit",
                           "customers.read",
                           "returns.read",
                           "orders.shipping-method.read",
@@ -91626,6 +91635,7 @@
                           "fulfillment.hold.release",
                           "fulfillment.open",
                           "fulfillment.move",
+                          "orders.quantity.edit",
                           "customers.read",
                           "returns.read",
                           "orders.shipping-method.read",
@@ -91669,6 +91679,7 @@
                           "fulfillment.hold.release",
                           "fulfillment.open",
                           "fulfillment.move",
+                          "orders.quantity.edit",
                           "customers.read",
                           "returns.read",
                           "orders.shipping-method.read",
@@ -91972,6 +91983,7 @@
                           "fulfillment.hold.release",
                           "fulfillment.open",
                           "fulfillment.move",
+                          "orders.quantity.edit",
                           "customers.read",
                           "returns.read",
                           "orders.shipping-method.read",
@@ -92015,6 +92027,7 @@
                           "fulfillment.hold.release",
                           "fulfillment.open",
                           "fulfillment.move",
+                          "orders.quantity.edit",
                           "customers.read",
                           "returns.read",
                           "orders.shipping-method.read",
@@ -138479,6 +138492,7 @@
                               "replenishment",
                               "fulfillment_recovery",
                               "inventory_correction",
+                              "order_edit",
                               "supplier_commitment",
                               "workflow_handover",
                               "human_task",
@@ -138842,6 +138856,32 @@
                                   }
                                 },
                                 "required": ["kind", "appId", "positionId"]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "const": "app_order"
+                                  },
+                                  "appId": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "connectionId": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "orderId": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "appId",
+                                  "connectionId",
+                                  "orderId"
+                                ]
                               },
                               {
                                 "type": "object",

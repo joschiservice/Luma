@@ -287,6 +287,42 @@ export interface WebhookSubscriptionData {
   format: string;
 }
 
+/** A quantity change staged in an order edit session. */
+interface StagedQuantityData {
+  lineItem: string;
+  /** Target current quantity of the line. */
+  quantity: number;
+  restock: boolean;
+  /** Current quantity when the change was staged; a commit refuses lines changed since. */
+  from: number;
+}
+
+/** An API order edit between `orderEditBegin` and `orderEditCommit`; the order is unchanged until commit. */
+export interface OrderEditSessionData {
+  order: string;
+  state: 'open' | 'committed';
+  changes: StagedQuantityData[];
+}
+
+/** One changed line of an order edit; removed units have negative quantities. */
+export interface OrderEditSaleData {
+  id: string;
+  lineItem: string;
+  quantity: number;
+  actionType: 'ORDER' | 'RETURN';
+}
+
+/** The sales agreement Shopify records for a committed order edit. */
+export interface OrderEditAgreementData {
+  order: string;
+  happenedAt: string;
+  /** App GID of the editing app; null for a staff edit in Shopify admin. */
+  app: string | null;
+  staffNote: string | null;
+  notifyCustomer: boolean;
+  sales: OrderEditSaleData[];
+}
+
 /** Stored response of an idempotent mutation. */
 export interface IdempotencyKeyData {
   input: string;
@@ -295,8 +331,38 @@ export interface IdempotencyKeyData {
 
 export const dayMs = 86_400_000;
 
-/** A merchant or API action that Shopify refuses in the current state. */
-export class RuleError extends Error {}
+/** The app GID of this simulator's installation; agreements of API order edits name it. */
+export const simulatorAppId = 'gid://shopify/App/1';
+
+/**
+ * Orders created before the returned time are hidden without `read_all_orders`; Shopify then
+ * exposes the last 60 days. Undefined when the whole history is visible.
+ */
+export function historyStart(context: ShopifyContext) {
+  return context.config.scopes.includes('read_all_orders')
+    ? undefined
+    : context.now - 60 * dayMs;
+}
+
+/** Whether an order is visible to the installation's granted order history. */
+export function visibleOrder(context: ShopifyContext, order: StoredRecord) {
+  const start = historyStart(context);
+
+  return start === undefined || order.createdAt >= start;
+}
+
+/**
+ * A merchant or API action that Shopify refuses in the current state. `field` names the
+ * mutation argument a user error points to, when the refusal concerns one.
+ */
+export class RuleError extends Error {
+  constructor(
+    message: string,
+    readonly field?: string,
+  ) {
+    super(message);
+  }
+}
 
 /** Formats a Shopify global ID. */
 export const gid = (type: string, id: string) => `gid://shopify/${type}/${id}`;

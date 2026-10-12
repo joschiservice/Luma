@@ -629,6 +629,19 @@ interface ShippingMethodSnapshot {
 }
 
 /** A recovery command is bound to an exact provider record and reviewed revision. */
+interface OrderQuantityEditInput {
+  /** Luma's operation UUID; the adapter fences and marks the provider write with it. */
+  operationId: string;
+  orderId: string;
+  /** The order revision the approval reviewed. */
+  expectedRevision: string;
+  /** Returns removed units to stock; only applies to reductions. */
+  restock: boolean;
+  lines: { lineItemId: string; currentQuantity: number; quantity: number }[];
+  /** Digest of the approved provider calculation; null when none was approved, which withholds. */
+  calculationDigest: string | null;
+}
+
 interface FulfillmentRecoveryInput {
   orderId: string;
   fulfillmentOrderId: string;
@@ -739,6 +752,15 @@ interface CapabilityContract {
   };
   'fulfillment.open': { input: FulfillmentRecoveryInput; output: WriteReceipt };
   'fulfillment.move': { input: FulfillmentRecoveryInput; output: WriteReceipt };
+  /**
+   * Sets approved quantities on existing, unfulfilled order lines through one provider order
+   * edit. Adapters recalculate before sending, withhold any change from the approved
+   * calculation, and send the commit at most once per operation.
+   */
+  'orders.quantity.edit': {
+    input: OrderQuantityEditInput;
+    output: WriteReceipt;
+  };
   'orders.shipping-method.read': {
     input: PageQuery & { order: ExternalId };
     output: Page<ShippingMethodSnapshot>;

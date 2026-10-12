@@ -261,6 +261,7 @@ export async function seedPilot(
                             'fulfillment.hold.release',
                             'fulfillment.open',
                             'fulfillment.move',
+                            'orders.quantity.edit',
                           ]
                         : instance.kind === 'cin7'
                           ? [

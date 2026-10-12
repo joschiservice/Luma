@@ -69,7 +69,7 @@ export interface AppDecision {
    * same problem waits on a person, so a refreshed proposal updates the item in place.
    */
   id: string;
-  kind: 'fulfillment_recovery' | 'inventory_correction';
+  kind: 'fulfillment_recovery' | 'inventory_correction' | 'order_edit';
   reason: 'approval' | 'run' | 'recovery';
   domain: 'orders' | 'fulfillment' | 'inventory';
   title: string;
@@ -104,7 +104,8 @@ export interface AppDecision {
         orderId: string;
         fulfillmentId: string;
       }
-    | { kind: 'app_inventory'; positionId: string };
+    | { kind: 'app_inventory'; positionId: string }
+    | { kind: 'app_order'; connectionId: string; orderId: string };
   group: { key: string; label: string };
 }
 

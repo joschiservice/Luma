@@ -2,8 +2,8 @@
 
 The Shopify app reads orders, products, inventory, fulfillment work, shipments, returns,
 refunds and (when approved) customers through the Admin GraphQL API `2026-07`, and offers
-[governed actions](shopify-actions.md) for fulfillment recovery and inventory
-corrections. Merchants connect through standalone OAuth. Reads are observations, not a
+[governed actions](shopify-actions.md) for fulfillment recovery, inventory
+corrections, order quantity edits and returns. Merchants connect through standalone OAuth. Reads are observations, not a
 transactional snapshot of the shop, and scope-limited visibility never establishes
 shop-wide absence. Code: `@luma/app-shopify`, with the protocol client in
 `@luma/connector-shopify`.
@@ -22,6 +22,9 @@ described in its [package README](../packages/apps/shopify/README.md#operational
   because it is not a fulfillment service.
 - `returns.read` is granted with `read_orders` and `read_returns`; connections authorized
   before it existed must reconnect.
+- `orders.quantity.edit` is granted with `write_order_edits` and a fulfillment read scope,
+  because edits are judged against fulfillment work. Connections authorized before Luma
+  requested `write_order_edits` must reconnect to edit orders.
 - `read_customers` is requested only when the deployment has protected customer data
   approval (see [commerce sync](commerce-sync.md#customers)).
 - Order addresses are read with `read_orders` only when the deployment is approved for

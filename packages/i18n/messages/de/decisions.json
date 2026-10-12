@@ -18,6 +18,7 @@
   "decisions_kind_replenishment": "Nachbestellung",
   "decisions_kind_fulfillment_recovery": "Fulfillment-Wiederaufnahme",
   "decisions_kind_inventory_correction": "Bestandskorrektur",
+  "decisions_kind_order_edit": "Mengenänderung",
   "decisions_kind_supplier_commitment": "Lieferantenbestellung",
   "decisions_kind_message_reply": "Antwort fällig",
   "decisions_kind_workflow_handover": "Workflow-Nacharbeit",

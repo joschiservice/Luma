@@ -15,10 +15,12 @@ import { z } from 'zod';
 
 import { registerRecoveryRoutes } from './api/fulfillment-recovery.js';
 import { registerInventoryCorrectionRoutes } from './api/inventory-correction.js';
+import { registerOrderEditRoutes } from './api/order-edits.js';
 import { registerRecordRoutes } from './api/records.js';
 import { registerShopifyRoutes } from './api/shopify.js';
 import {
   correctionDecision,
+  orderEditDecision,
   recoveryDecision,
 } from './application/decisions.js';
 import type { ShopifyOAuth } from './application/oauth.js';
@@ -37,6 +39,7 @@ import { createPrivacyIntake } from './infrastructure/privacy.js';
 import { createShopifyRecordReader } from './infrastructure/records.js';
 import { createInstallationVerifier } from './infrastructure/verifier.js';
 import { createShopifyInventoryCorrection } from './inventory-correction.js';
+import { createShopifyOrderEdits } from './order-edits.js';
 import { createShopifyWorkflows } from './workflows.js';
 
 export {
@@ -192,6 +195,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
 
   const recovery = createShopifyRecovery(context, installations);
   const corrections = createShopifyInventoryCorrection(context, installations);
+  const edits = createShopifyOrderEdits(context, installations);
   const workflows = createShopifyWorkflows(context, {
     installations,
     recovery,
@@ -237,6 +241,13 @@ export function createApp(context: AppFactoryContext): AppDefinition {
             'Preview, request approval for, and apply stock corrections at Shopify locations.',
           consequential: true,
         },
+        {
+          key: 'shopify:order_edits.apply',
+          label: 'Change Shopify order quantities',
+          description:
+            'Preview, request approval for, and send quantity changes to unfulfilled Shopify order lines.',
+          consequential: true,
+        },
       ],
       scopes: [
         'orders.read',
@@ -265,6 +276,10 @@ export function createApp(context: AppFactoryContext): AppDefinition {
           view: 'shopify:inventory_corrections.apply',
           respond: 'shopify:inventory_corrections.apply',
         },
+        order_edit: {
+          view: 'shopify:order_edits.apply',
+          respond: 'shopify:order_edits.apply',
+        },
       },
     },
     connector: createShopifyProvider({
@@ -280,14 +295,16 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         : {}),
     }),
     async decisions(tenant) {
-      const [recoveries, stock] = await Promise.all([
+      const [recoveries, stock, quantities] = await Promise.all([
         recovery.pending(tenant),
         corrections.pending(tenant),
+        edits.pending(tenant),
       ]);
 
       const items = [
         ...recoveries.map((view) => recoveryDecision(view, tenant.actor.id)),
         ...stock.map((view) => correctionDecision(view, tenant.actor.id)),
+        ...quantities.map((view) => orderEditDecision(view, tenant.actor.id)),
       ];
 
       // Owners list newest first, so the current proposal for a target wins its item.
@@ -335,6 +352,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
       registerRecordRoutes(server, records);
       registerInventoryCorrectionRoutes(server, corrections);
       registerRecoveryRoutes(server, recovery);
+      registerOrderEditRoutes(server, edits);
       server.post(
         '/v1/organizations/:organizationId/apps/shopify/record-connections',
         { config: { access: { access: 'member' }, readOnly: true } },
@@ -415,3 +433,6 @@ export function createApp(context: AppFactoryContext): AppDefinition {
 }
 
 export { createShopifyRecordReader } from './infrastructure/records.js';
+
+/** Order edit persistence, exported so runtime tests can prove its claims, fence and isolation on PostgreSQL. */
+export { createOrderEditStore } from './infrastructure/order-edit-store.js';

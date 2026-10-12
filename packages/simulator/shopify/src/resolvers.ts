@@ -19,13 +19,18 @@ import {
 } from './connections.js';
 import type { RequestContext } from './context.js';
 import { suggestedExchangeFinancial } from './exchanges.js';
-import { moveOptions, supportedActions } from './fulfillment.js';
+import {
+  moveOptions,
+  supportedActions,
+  unfulfilledUnits,
+} from './fulfillment.js';
 import { available, quantity } from './inventory.js';
 import { mutationResolvers } from './mutations.js';
+import { orderAgreements, orderEditResolvers } from './order-edit-api.js';
+import { outstanding } from './orders.js';
 import {
   all,
   type CustomerData,
-  dayMs,
   decimal,
   type ExchangeLineItemData,
   type FulfillmentData,
@@ -33,6 +38,7 @@ import {
   type FulfillmentOrderData,
   type FulfillmentOrderLineItemData,
   gid,
+  historyStart,
   type InventoryItemData,
   type InventoryLevelData,
   iso,
@@ -54,6 +60,8 @@ import {
   type ReturnData,
   type ReturnLineItemData,
   type ReverseFulfillmentOrderLineItemData,
+  simulatorAppId,
+  visibleOrder,
   type WebhookSubscriptionData,
 } from './records.js';
 import { suggestedRefund } from './refund-actions.js';
@@ -107,23 +115,6 @@ function isRecord(value: unknown): value is StoredRecord {
   );
 }
 
-/**
- * Orders created before this time are hidden without `read_all_orders`; Shopify then
- * exposes the last 60 days.
- */
-function historyStart(context: RequestContext) {
-  return context.shop.config.scopes.includes('read_all_orders')
-    ? undefined
-    : context.shop.now - 60 * dayMs;
-}
-
-/** Whether an order is visible to the installation's granted order history. */
-function visible(context: RequestContext, order: StoredRecord) {
-  const start = historyStart(context);
-
-  return start === undefined || order.createdAt >= start;
-}
-
 /** Shopify sorts by update time only when asked; other sort keys follow creation order. */
 const sortOrder = (args: Args) =>
   args.sortKey === 'UPDATED_AT' ? ('updated' as const) : ('created' as const);
@@ -138,7 +129,7 @@ function orderQuery(context: RequestContext, args: Args, customer?: string) {
   const filter = searchFilter(query, 'name', (value) =>
     value.startsWith('#') ? value : `#${value}`,
   );
-  const start = historyStart(context);
+  const start = historyStart(context.shop);
 
   return {
     query: {
@@ -231,7 +222,7 @@ async function node(context: RequestContext, id: string | null) {
   }
   if (!nodeKinds.has(parsed.type)) return null;
   const record = await load(context, parsed.type, parsed.id);
-  if (record && parsed.type === 'Order' && !visible(context, record))
+  if (record && parsed.type === 'Order' && !visibleOrder(context.shop, record))
     return null;
 
   return record ?? null;
@@ -243,6 +234,7 @@ const root: TypeResolvers = {
   currentAppInstallation: (_source, _args, context) => ({
     __typename: 'AppInstallation',
     id: gid('AppInstallation', '1'),
+    app: { __typename: 'App', id: simulatorAppId },
     accessScopes: context.shop.config.scopes.map((handle) => ({ handle })),
   }),
   shop: (_source, _args, context) => ({
@@ -314,30 +306,48 @@ const root: TypeResolvers = {
   },
 };
 
-// Line items per order, read once per request for the amounts derived from them.
+/** Values per request and order, read once per request for the amounts derived from them. */
+function perOrder<T>(
+  cache: WeakMap<RequestContext, Map<string, Promise<T>>>,
+  context: RequestContext,
+  order: string,
+  read: () => Promise<T>,
+) {
+  let orders = cache.get(context);
+  if (!orders) {
+    orders = new Map();
+    cache.set(context, orders);
+  }
+  let value = orders.get(order);
+  if (!value) {
+    value = read();
+    orders.set(order, value);
+  }
+
+  return value;
+}
+
 const requestLines = new WeakMap<
   RequestContext,
   Map<string, Promise<StoredRecord<LineItemData>[]>>
 >();
 
 /** An order's line items, read once per request. */
-function orderLines(context: RequestContext, order: StoredRecord<OrderData>) {
-  let orders = requestLines.get(context);
-  if (!orders) {
-    orders = new Map();
-    requestLines.set(context, orders);
-  }
-  let lines = orders.get(order.id);
-  if (!lines) {
-    lines = all<LineItemData>(context.shop, {
-      kind: 'LineItem',
-      parent: order.id,
-    });
-    orders.set(order.id, lines);
-  }
+const orderLines = (context: RequestContext, order: StoredRecord<OrderData>) =>
+  perOrder(requestLines, context, order.id, () =>
+    all<LineItemData>(context.shop, { kind: 'LineItem', parent: order.id }),
+  );
 
-  return lines;
-}
+const requestUnfulfilled = new WeakMap<
+  RequestContext,
+  Map<string, Promise<Map<string, number>>>
+>();
+
+/** Units per line of an order still remaining in open fulfillment work, read once per request. */
+const orderUnfulfilled = (context: RequestContext, order: string) =>
+  perOrder(requestUnfulfilled, context, order, () =>
+    unfulfilledUnits(context.shop, order),
+  );
 
 /** A line's tax in minor units, rounded per line as Shopify does. */
 function lineTax(context: RequestContext, line: LineItemData, units: number) {
@@ -566,29 +576,14 @@ const orderResolvers = on<OrderData>({
     load(context, 'Customer', order.data.customer),
   currentTotalPriceSet: (order) =>
     orderMoneyBag(order.data.total - order.data.refunded, order.data),
-  totalOutstandingSet: async (order, _args, context) => {
-    const transactions = await all<OrderTransactionData>(context.shop, {
-      kind: 'OrderTransaction',
-      parent: order.id,
-    });
-    const captured = transactions
-      .filter(
-        (t) =>
-          ['SALE', 'CAPTURE'].includes(t.data.kind) &&
-          t.data.status === 'SUCCESS',
-      )
-      .reduce((n, t) => n + t.data.amount, 0);
-    const refunded = transactions
-      .filter((t) => t.data.kind === 'REFUND' && t.data.status === 'SUCCESS')
-      .reduce((n, t) => n + t.data.amount, 0);
-
-    return moneyBag(
-      Math.max(0, order.data.total - captured + refunded),
+  totalOutstandingSet: async (order, _args, context) =>
+    moneyBag(
+      await outstanding(context.shop, order.id, order.data.total),
       order.data.currency,
-    );
-  },
+    ),
   lineItems: (order, args, context) =>
     connection(context, args, { kind: 'LineItem', parent: order.id }),
+  agreements: (order, args, context) => orderAgreements(context, order, args),
   fulfillmentOrders: (order, args, context) =>
     connection(context, args, { kind: 'FulfillmentOrder', parent: order.id }),
   fulfillments: (order, args, context) =>
@@ -671,11 +666,14 @@ async function lineMoneyBag(
 
 /** Field resolvers by GraphQL type; unlisted fields read the record data property of that name. */
 const resolvers: Record<string, TypeResolvers> = {
+  ...orderEditResolvers,
   QueryRoot: root,
   Mutation: mutationResolvers,
   Order: orderResolvers,
   LineItem: on<LineItemData>({
     currentQuantity: (line) => line.data.currentQuantity ?? line.data.quantity,
+    unfulfilledQuantity: async (line, _args, context) =>
+      (await orderUnfulfilled(context, line.data.order)).get(line.id) ?? 0,
     discountedTotalSet: (line, _args, context) =>
       moneyBag(
         line.data.price * line.data.quantity,

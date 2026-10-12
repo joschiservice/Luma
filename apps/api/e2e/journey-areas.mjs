@@ -1055,6 +1055,20 @@ export const journeyAreas = {
     ...sourceAuthority,
     'packages/simulator/{core,shopify}/**',
   ],
+  'shopify-order-edits.browser.mjs': [
+    ...shopify,
+    ...sourceAuthority,
+    'packages/simulator/{core,shopify}/**',
+    ...webShell,
+    ...webApps,
+    ...webExtensions,
+  ],
+  'shopify-order-edits.e2e.mjs': [
+    ...shopify,
+    ...decisions,
+    ...sourceAuthority,
+    'packages/simulator/{core,shopify}/**',
+  ],
   'simulator.browser.mjs': [...simulator, 'apps/simulator-web/**'],
   'simulator.e2e.mjs': [
     ...simulator,

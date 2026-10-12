@@ -51,13 +51,26 @@ Wenn native Bestellungen in deinem Workspace verfügbar sind, öffne eine Shopif
 
 Wähle vor dem Bearbeiten unter [Maßgebliche Quellen](/docs/workspace-settings#source-authority) **Luma ERP** für Bestellstatus und Bestellpositionen. Ändere unter **Luma-Auftrag** den Status oder die aktuelle Positionsmenge. Klappe **Rechnungsadresse** oder **Lieferadresse** auf, bearbeite die Adresse und wähle **Auftrag speichern**. Wenn jemand den Datensatz inzwischen geändert hat, aktualisiere ihn vor einem weiteren Versuch.
 
-Eine Stornierung ist endgültig. Wenn du eine Positionsmenge reduzierst, wird die Summe unbekannt: Versand, Rabatte und Steueranpassungen lassen sich nicht allein aus dem Positionspreis berechnen. Adressänderungen erzeugen keine neue Quellversion im Bestellverlauf. Änderungen bleiben in Luma und werden nicht an Shopify gesendet. Vergleiche die Quellen, um Unterschiede zu sehen. Die Quellenzuordnung einer übernommenen Bestellung bleibt fest und kann über die Quellensteuerung nicht verknüpft oder getrennt werden.
+Eine Stornierung ist endgültig. Wenn du eine Positionsmenge reduzierst, wird die Summe unbekannt: Versand, Rabatte und Steueranpassungen lassen sich nicht allein aus dem Positionspreis berechnen. Adressänderungen erzeugen keine neue Quellversion im Bestellverlauf. Änderungen bleiben in Luma und werden nicht an Shopify gesendet. Wie du eine Shopify-Bestellung selbst änderst, steht unter [Mengen in Shopify ändern](#change-quantities-in-shopify). Vergleiche die Quellen, um Unterschiede zu sehen. Die Quellenzuordnung einer übernommenen Bestellung bleibt fest und kann über die Quellensteuerung nicht verknüpft oder getrennt werden.
 
 ## Live-Details aus Shopify ansehen [#see-live-shopify-details]
 
 Bei einer Bestellung aus Shopify liest ein Abschnitt mit Live-Details Zahlungen, Kunde, Fulfillment-Sperren, Retouren, Erstattungen und Ereignisse direkt aus deinem Shop, mit den Berechtigungen der Verbindung. Luma speichert diese Details nicht. Wähle **Aktualisieren**, um sie erneut zu lesen, oder **In Shopify Admin öffnen**, um die Bestellung in Shopify zu öffnen.
 
 **Kunden in Luma öffnen →** öffnet den Kunden der Bestellung unter [Kunden](/docs/customers). Kundendaten erscheinen erst, wenn Shopify den Zugriff von Luma auf Kundendaten genehmigt und dein Shop ihn erteilt hat. Hat eine Bestellung keine Shopify-Bestell-ID, kann Luma keine Live-Details dazu lesen.
+
+## Mengen in Shopify ändern [#change-quantities-in-shopify]
+
+Um zu ändern, wie viele Einheiten nicht erfüllter Positionen einer Shopify-Bestellung die Kundin oder der Kunde erhält, öffne die Bestellung und wähle in den Live-Details aus Shopify **Mengen ändern…**. Du brauchst **Shopify-Bestellmengen ändern**, und die Shop-Verbindung muss Bestelländerungen erlauben. Ein Shop, der verbunden wurde, bevor Luma diesen Zugriff angefragt hat, zeigt ihn als fehlend an, bis jemand mit **Verbindungen verwalten** ihn neu verbindet.
+
+1. Gib für jede Position, die du ändern willst, die neue Menge ein. Lass andere Positionen leer. Wähle **Entfernte Einheiten wieder einlagern**, um entfernte Einheiten in den Bestand zurückzugeben.
+2. Wähle **Änderung ansehen**. Shopify berechnet die neue Zwischensumme, Gesamtsumme und den offenen Betrag, ohne die Bestellung zu ändern. Zahlt die Kundin oder der Kunde in einer anderen Währung, siehst du beide Beträge.
+3. Jemand mit Genehmigungsrecht genehmigt genau diese Änderung in der Bestellung oder unter [Braucht dich](/docs/needs-you). Die Genehmigungsregeln deines Arbeitsbereichs legen fest, ob das eine andere Person sein muss.
+4. Die anfragende Person wählt **An Shopify senden**. Luma liest die Bestellung erneut und sendet die Änderung nur, wenn sich nichts Wesentliches geändert hat und Shopify dieselben Beträge berechnet. Andernfalls lege eine neue Änderung an.
+
+Eine Position lässt sich nicht mehr ändern, sobald eine Einheit erfüllt ist, ihr Fulfillment begonnen hat oder sie an einen Fulfillment-Dienst übergeben wurde. Stornierte und abgeschlossene Bestellungen lassen sich nicht ändern, und Bestellpositionen müssen laut [Quellenhoheit](/docs/workspace-settings#source-authority) aus diesem Shop kommen. Luma benachrichtigt die Kundin oder den Kunden nicht. Solange [Nur beobachten](/docs/apps-and-connections#observe-only) gilt, hält Luma die Änderung fest, sendet aber nichts an Shopify, auch keine Berechnung.
+
+**Von Shopify angenommen** heißt noch nicht erledigt: Die Änderung ist erst **Bestätigt**, wenn ein erneuter Abruf die neuen Mengen zeigt. Geht Shopifys Antwort verloren, steht dort **Gesendet, Ergebnis unbekannt**. Wähle **Shopify prüfen**; Luma liest die Bestellung, um es herauszufinden, und sendet die Änderung nie zweimal. **Nicht übernommen** heißt, dass Shopify zeigt, dass die Änderung nie ausgeführt wurde.
 
 ## Shopify-Bestellung mit ihrer JTL-Wawi-Bestellung verknüpfen [#link-a-shopify-order-with-its-jtl-wawi-order]
 

@@ -1,0 +1,98 @@
+.shopify-order-edit {
+  display: grid;
+  gap: var(--content-gap);
+  padding-block: var(--content-gap);
+  border-block-start: 1px solid var(--line);
+}
+.shopify-order-edit > button {
+  justify-self: start;
+}
+.shopify-order-edit-heading,
+.shopify-order-edit-controls,
+.shopify-order-edit-stages {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--content-gap);
+}
+.shopify-order-edit-heading {
+  justify-content: space-between;
+}
+.shopify-order-edit-stages {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.shopify-order-edit-form,
+.shopify-order-edit-review {
+  display: grid;
+  gap: var(--content-gap);
+}
+.shopify-order-edit-form > button {
+  justify-self: start;
+}
+.shopify-order-edit-lines,
+.shopify-order-edit-totals {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.shopify-order-edit-lines th,
+.shopify-order-edit-lines td,
+.shopify-order-edit-totals th,
+.shopify-order-edit-totals td {
+  padding: var(--content-related-gap);
+  text-align: start;
+  vertical-align: top;
+  border-block-end: 1px solid var(--line);
+}
+.shopify-order-edit-totals caption {
+  text-align: start;
+  font-weight: 600;
+  padding-block-end: var(--content-related-gap);
+}
+.shopify-order-edit-lines th[scope='row'] {
+  display: grid;
+  font-weight: normal;
+  overflow-wrap: anywhere;
+}
+.shopify-order-edit-lines td:last-child {
+  display: grid;
+  gap: var(--content-related-gap);
+}
+.shopify-order-edit-quantity {
+  max-inline-size: 8rem;
+}
+.shopify-order-edit-restock {
+  display: flex;
+  align-items: start;
+  gap: var(--content-related-gap);
+}
+.shopify-order-edit-changes {
+  margin: 0;
+  padding-inline-start: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 40rem) {
+  .shopify-order-edit-lines thead {
+    display: none;
+  }
+  .shopify-order-edit-lines tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-block-end: 1px solid var(--line);
+  }
+  .shopify-order-edit-lines th[scope='row'],
+  .shopify-order-edit-lines td:last-child {
+    grid-column: 1 / -1;
+  }
+  .shopify-order-edit-lines th,
+  .shopify-order-edit-lines td {
+    border-block-end: 0;
+  }
+  .shopify-order-edit-lines td[data-label]::before {
+    content: attr(data-label) ': ';
+    color: var(--muted-foreground);
+  }
+}

@@ -26,8 +26,13 @@ import {
   shopify,
 } from '@luma/simulator-shopify';
 
+import { editOutcome } from '../../packages/apps/shopify/dist/domain/order-edits.js';
 import { createFulfillmentProvider } from '../../packages/apps/shopify/dist/infrastructure/fulfillment-recovery-provider.js';
 import { createInventoryCorrectionProvider } from '../../packages/apps/shopify/dist/infrastructure/inventory-correction-provider.js';
+import {
+  calculationDigest,
+  createOrderEditProvider,
+} from '../../packages/apps/shopify/dist/infrastructure/order-edit-provider.js';
 import {
   createClient,
   createReadBudget,
@@ -75,6 +80,7 @@ const config = {
     'read_assigned_fulfillment_orders',
     'read_third_party_fulfillment_orders',
     'write_merchant_managed_fulfillment_orders',
+    'write_order_edits',
   ],
 };
 const catalog = [
@@ -378,6 +384,7 @@ test('installation verification, scope reads and lifecycle subscriptions', async
     'fulfillment.read',
     'inventory.available.reconcile',
     'inventory.read',
+    'orders.quantity.edit',
     'orders.read',
     'products.read',
     'returns.read',
@@ -968,6 +975,114 @@ test('fulfillment recovery releases holds, opens scheduled work and moves work',
   await assert.rejects(
     recover('fulfillment.open', ids.movable, () => ({})),
     (error) => error.failure.code === 'conflict',
+  );
+});
+
+test('order quantity edits calculate, commit once and reconcile from Shopify’s agreements', async () => {
+  const shop = createShop();
+  await shop.run({ kind: 'seed-catalog', products: catalog });
+  const order = await shop.run({
+    kind: 'order',
+    lines: [
+      { variant: '11', quantity: 3, price: '24.00' },
+      { variant: '12', quantity: 1, price: '26.50' },
+    ],
+    location: '1',
+    shipping: 'standard',
+    financialStatus: 'PAID',
+  });
+  const line = gid('LineItem', order.lines[0].id);
+  let fence = null;
+  const provider = createOrderEditProvider({
+    tenantId,
+    connectionId,
+    shop: domain,
+    accessToken: async () => 'synthetic',
+    fetch: shop.fetch,
+    record: async () => {},
+    eligible: async () => true,
+    fence: {
+      reserve: async () => {
+        if (fence) return false;
+        fence = { state: 'reserved', sentAt: null };
+
+        return true;
+      },
+      send: async () => {
+        fence = { state: 'sent', sentAt: new Date(shop.now).toISOString() };
+
+        return true;
+      },
+      finish: async (_id, state) => {
+        fence = { ...fence, state };
+      },
+    },
+  });
+  const before = await provider.read(order.gid);
+  assert.equal(before.complete, true);
+  assert.deepEqual(
+    before.lines.map((item) => [
+      item.currentQuantity,
+      item.unfulfilledQuantity,
+    ]),
+    [
+      [3, 3],
+      [1, 1],
+    ],
+  );
+  assert.deepEqual(
+    before.fulfillmentOrders.map((work) => [work.status, work.requestStatus]),
+    [['OPEN', 'UNSUBMITTED']],
+  );
+  const lines = [{ lineItemId: line, currentQuantity: 3, quantity: 1 }];
+  const { calculation } = await provider.calculate(order.gid, lines, true);
+  assert.equal(Number(calculation.subtotal.shop.amount), 50.5);
+  assert.deepEqual(
+    (await readOrder(shop.context(), order.id)).lines.map(
+      (item) => item.unfulfilled,
+    ),
+    [3, 1],
+  );
+  const input = {
+    operationId: '00000000-0000-4000-8000-0000000000e1',
+    orderId: order.gid,
+    expectedRevision: (await provider.read(order.gid)).revision,
+    restock: true,
+    lines,
+    calculationDigest: calculationDigest(calculation),
+  };
+  const invocation = {
+    tenant,
+    connectionId,
+    provider: 'shopify',
+    idempotencyKey: `v0:${input.operationId}`,
+  };
+  const receipt = await provider.handler.run(invocation, input);
+  assert.equal(receipt.status, 'accepted');
+  assert.deepEqual(
+    (await readOrder(shop.context(), order.id)).lines.map(
+      (item) => item.unfulfilled,
+    ),
+    [1, 1],
+  );
+  assert.equal(
+    shop.events.filter((event) => event.topic === 'orders/edited').length,
+    1,
+  );
+  const proof = await provider.proof(order.gid, fence.sentAt);
+  assert.equal(proof.complete, true);
+  assert.deepEqual(proof.agreements[0].deltas, { [line]: -2 });
+  assert.equal(
+    editOutcome(lines, fence, proof, new Date(shop.now)),
+    'committed',
+  );
+  await assert.rejects(
+    provider.handler.run(invocation, input),
+    (error) => error.failure.dispatch === 'uncertain',
+  );
+  assert.equal(
+    shop.events.filter((event) => event.topic === 'orders/edited').length,
+    1,
   );
 });
 

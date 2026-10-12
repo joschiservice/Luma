@@ -15,6 +15,7 @@ import {
 } from './exchanges.js';
 import { moveWork, openWork, releaseHolds, touchOrder } from './fulfillment.js';
 import { available, writeLevel } from './inventory.js';
+import { orderEditMutations } from './order-edit-api.js';
 import {
   all,
   type FulfillmentLineItemData,
@@ -419,6 +420,7 @@ async function returnMutation(
 
 /** Shopify Admin API mutations Luma sends. */
 export const mutationResolvers: TypeResolvers = {
+  ...orderEditMutations,
   refundCreate: (_source, args, context, info) =>
     refundCreate(context, args, info),
   returnCreate: (_source, args, context) =>

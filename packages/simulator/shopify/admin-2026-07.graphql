@@ -149,11 +149,16 @@ type PageInfo {
 
 type AppInstallation implements Node {
   accessScopes: [AccessScope!]!
+  app: App!
   id: ID!
 }
 
 type AccessScope {
   handle: String!
+}
+
+type App implements Node {
+  id: ID!
 }
 
 enum CustomerSortKeys {
@@ -666,6 +671,14 @@ type OrderEdge {
 }
 
 type Order implements Node {
+  agreements(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    query: String
+  ): SalesAgreementConnection!
   billingAddress: MailingAddress
   cancelReason: OrderCancelReason
   cancelledAt: DateTime
@@ -766,6 +779,64 @@ type Order implements Node {
     manuallyResolvable: Boolean
   ): [OrderTransaction!]!
   updatedAt: DateTime!
+}
+
+type SalesAgreementConnection {
+  nodes: [SalesAgreement!]!
+  pageInfo: PageInfo!
+}
+
+interface SalesAgreement {
+  app: App
+  happenedAt: DateTime!
+  id: ID!
+  reason: OrderActionType!
+  sales(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): SaleConnection!
+}
+
+enum OrderActionType {
+  ORDER
+  ORDER_EDIT
+  REFUND
+  RETURN
+  UNKNOWN
+}
+
+type SaleConnection {
+  nodes: [Sale!]!
+  pageInfo: PageInfo!
+}
+
+interface Sale {
+  actionType: SaleActionType!
+  id: ID!
+  lineType: SaleLineType!
+  quantity: Int
+}
+
+enum SaleActionType {
+  ORDER
+  RETURN
+  UPDATE
+  UNKNOWN
+}
+
+enum SaleLineType {
+  PRODUCT
+  TIP
+  GIFT_CARD
+  SHIPPING
+  DUTY
+  ADDITIONAL_FEE
+  FEE
+  UNKNOWN
+  ADJUSTMENT
 }
 
 enum OrderCancelReason {
@@ -981,6 +1052,7 @@ type LineItem implements Node {
   sku: String
   taxLines(first: Int): [TaxLine!]!
   totalDiscountSet: MoneyBag!
+  unfulfilledQuantity: Int!
   variant: ProductVariant
   variantTitle: String
 }
@@ -1894,6 +1966,19 @@ type Mutation {
   inventorySetQuantities(
     input: InventorySetQuantitiesInput!
   ): InventorySetQuantitiesPayload
+  orderEditBegin(id: ID!): OrderEditBeginPayload
+  orderEditCommit(
+    id: ID!
+    notifyCustomer: Boolean
+    staffNote: String
+  ): OrderEditCommitPayload
+  orderEditSetQuantity(
+    id: ID!
+    lineItemId: ID!
+    quantity: Int!
+    restock: Boolean
+    locationId: ID
+  ): OrderEditSetQuantityPayload
   refundCreate(input: RefundInput!): RefundCreatePayload
   returnApproveRequest(
     input: ReturnApproveRequestInput!
@@ -2019,6 +2104,54 @@ enum InventorySetQuantitiesUserErrorCode {
   IDEMPOTENCY_CONCURRENT_REQUEST
   IDEMPOTENCY_KEY_PARAMETER_MISMATCH
   IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED
+}
+
+type OrderEditBeginPayload {
+  calculatedOrder: CalculatedOrder
+  orderEditSession: OrderEditSession
+  userErrors: [UserError!]!
+}
+
+type CalculatedOrder implements Node {
+  id: ID!
+  lineItems(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+    query: String
+  ): CalculatedLineItemConnection!
+  subtotalPriceSet: MoneyBag
+  totalOutstandingSet: MoneyBag!
+  totalPriceSet: MoneyBag!
+}
+
+type CalculatedLineItemConnection {
+  nodes: [CalculatedLineItem!]!
+  pageInfo: PageInfo!
+}
+
+type CalculatedLineItem {
+  editableQuantity: Int!
+  id: ID!
+  quantity: Int!
+  restocking: Boolean!
+}
+
+type OrderEditSession implements Node {
+  id: ID!
+}
+
+type OrderEditCommitPayload {
+  order: Order
+  userErrors: [UserError!]!
+}
+
+type OrderEditSetQuantityPayload {
+  calculatedLineItem: CalculatedLineItem
+  calculatedOrder: CalculatedOrder
+  userErrors: [UserError!]!
 }
 
 input RefundInput {
@@ -2252,6 +2385,28 @@ input HasMetafieldsMetafieldIdentifierInput {
 type WebhookSubscriptionCreatePayload {
   userErrors: [UserError!]!
   webhookSubscription: WebhookSubscription
+}
+
+type OrderEditAgreement implements SalesAgreement {
+  app: App
+  happenedAt: DateTime!
+  id: ID!
+  reason: OrderActionType!
+  sales(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): SaleConnection!
+}
+
+type ProductSale implements Sale {
+  actionType: SaleActionType!
+  id: ID!
+  lineItem: LineItem!
+  lineType: SaleLineType!
+  quantity: Int
 }
 
 type DiscountCodeApplication implements DiscountApplication {

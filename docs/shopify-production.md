@@ -20,7 +20,7 @@ application_url = "https://<luma-host>"
 embedded = false
 
 [access_scopes]
-scopes = "read_orders,read_products,read_inventory,write_inventory,read_merchant_managed_fulfillment_orders,read_third_party_fulfillment_orders,read_returns,read_locations,write_merchant_managed_fulfillment_orders,write_third_party_fulfillment_orders"
+scopes = "read_orders,read_products,read_inventory,read_merchant_managed_fulfillment_orders,read_third_party_fulfillment_orders,write_inventory,write_merchant_managed_fulfillment_orders,write_third_party_fulfillment_orders,read_returns,write_returns,write_orders,write_order_edits,read_locations"
 use_legacy_install_flow = true
 
 [auth]
