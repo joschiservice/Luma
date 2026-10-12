@@ -18,8 +18,10 @@ import type { JtlTransportOptions } from '@luma/connector-jtl';
 import { API_VERSION, createClient, fail, parse } from '@luma/connector-jtl';
 import { z } from 'zod';
 
+import { createExchangeReservation } from './exchange-reservation.js';
 import { adapterVersion, outputs } from './outputs.js';
 import { createJtlPurchaseOrderCapabilities } from './purchase-orders.js';
+import { createJtlSettlementCapabilities } from './return-settlement.js';
 import { createJtlReturnCapabilities } from './returns.js';
 import * as s from './schemas.js';
 import { createJtlShippingMethodCapabilities } from './shipping-method.js';
@@ -69,6 +71,8 @@ export interface JtlConnectorOptions extends JtlTransportOptions {
   purchaseOrderActions?: boolean;
   /** Enable only after confirming return write, return read and sales-order read grants. */
   returnActions?: boolean;
+  /** Writes are currently verified only in the installed simulator. */
+  settlementActions?: boolean;
   /**
    * Reads customers and reports which customer placed each order. Set only when the connection
    * grants `customers.read`.
@@ -115,6 +119,13 @@ export function createJtlConnector(
       | MessageReadCapability
       | 'returns.options.read'
       | 'returns.created.read'
+      | 'returns.exchange.options.read'
+      | 'returns.exchange.quote.read'
+      | 'returns.exchange.proof.read'
+      | 'returns.exchange.price.read'
+      | 'returns.exchange.reservation.read'
+      | 'returns.settlement.quote.read'
+      | 'returns.settlement.proof.read'
     >,
   >(capability: K): CapabilityHandler<K> {
     return {
@@ -643,6 +654,8 @@ export function createJtlConnector(
         : {}),
       ...createJtlPurchaseOrderCapabilities(options),
       ...createJtlReturnCapabilities(options),
+      ...createJtlSettlementCapabilities(options),
+      'returns.exchange.reservation.read': createExchangeReservation(options),
       'orders.read': handler('orders.read'),
       'products.read': handler('products.read'),
       'inventory.read': handler('inventory.read'),

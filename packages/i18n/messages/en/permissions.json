@@ -114,5 +114,9 @@
   "permissions_messages_send_label": "Send replies",
   "permissions_messages_send_description": "Draft replies and send them, or request approval when they make commitments.",
   "permissions_gmail_messages_send_label": "Send from Gmail",
-  "permissions_gmail_messages_send_description": "Send replies from connected Gmail mailboxes, and approve replies others want to send."
+  "permissions_gmail_messages_send_description": "Send replies from connected Gmail mailboxes, and approve replies others want to send.",
+  "permissions_shopify_returns_manage_label": "Manage Shopify returns",
+  "permissions_shopify_returns_manage_description": "Request approval for Shopify returns, refunds and exchanges.",
+  "permissions_jtl_returns_restock_label": "Restock inspected returns",
+  "permissions_jtl_returns_restock_description": "Request approval for and restock only inspected resale units in a Wawi warehouse."
 }

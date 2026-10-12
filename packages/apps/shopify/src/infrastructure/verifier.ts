@@ -48,13 +48,42 @@ export function createInstallationVerifier(options: {
     const has = (scope: string) =>
       scopes.has(`read_${scope}`) || scopes.has(`write_${scope}`);
     const granted: InstallationCapability[] = [];
-    if (has('orders')) granted.push('orders.read');
+    if (has('orders'))
+      granted.push(
+        'orders.read',
+        'returns.settlement.quote.read',
+        'returns.settlement.proof.read',
+      );
+    if (scopes.has('write_orders')) granted.push('returns.refund');
     if (has('products')) granted.push('products.read');
     if (has('inventory')) granted.push('inventory.read');
     if (scopes.has('write_inventory'))
       granted.push('inventory.available.reconcile');
     if (has('customers')) granted.push('customers.read');
     if (has('orders') && has('returns')) granted.push('returns.read');
+    if (has('orders') && has('returns'))
+      granted.push('returns.options.read', 'returns.created.read');
+    if (has('orders') && scopes.has('write_returns'))
+      granted.push('returns.create');
+    if (has('products') && has('inventory'))
+      granted.push('returns.exchange.options.read');
+    if (has('orders') && has('returns') && has('products') && has('inventory'))
+      granted.push(
+        'returns.exchange.quote.read',
+        'returns.exchange.proof.read',
+        'returns.exchange.price.read',
+      );
+    if (
+      has('orders') &&
+      has('products') &&
+      has('inventory') &&
+      scopes.has('write_returns')
+    )
+      granted.push(
+        'returns.exchange.request',
+        'returns.exchange.process',
+        'returns.exchange.cancel',
+      );
     if (
       has('orders') &&
       [
@@ -73,6 +102,7 @@ export function createInstallationVerifier(options: {
       ].some((scope) => scopes.has(scope))
     ) {
       granted.push(
+        'returns.exchange.release',
         'fulfillment.hold.release',
         'fulfillment.open',
         'fulfillment.move',

@@ -173,6 +173,26 @@ export function createInstallationVerifier(options: {
     )
       granted.push('returns.create');
 
+    if (
+      simulated &&
+      connection.permissions.includes('returns.restock') &&
+      (await readable('items', jtl.item)) &&
+      (await readable('warehouses', jtl.warehouse))
+    )
+      granted.push(
+        'returns.settlement.quote.read',
+        'returns.settlement.proof.read',
+        'returns.restock',
+      );
+
+    if (
+      connection.permissions.includes('returns.exchange.reservation.read') &&
+      granted.includes('orders.read') &&
+      granted.includes('inventory.read') &&
+      (await readable('stocks/reservations', jtl.stockReservation))
+    )
+      granted.push('returns.exchange.reservation.read');
+
     return granted;
   };
 }

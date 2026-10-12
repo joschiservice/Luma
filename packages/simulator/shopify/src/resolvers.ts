@@ -17,13 +17,16 @@ import {
   texts,
 } from './connections.js';
 import type { RequestContext } from './context.js';
+import { suggestedExchangeFinancial } from './exchanges.js';
 import { moveOptions, supportedActions } from './fulfillment.js';
-import { quantity } from './inventory.js';
+import { available, quantity } from './inventory.js';
 import { mutationResolvers } from './mutations.js';
 import {
+  all,
   type CustomerData,
   dayMs,
   decimal,
+  type ExchangeLineItemData,
   type FulfillmentData,
   type FulfillmentLineItemData,
   type FulfillmentOrderData,
@@ -51,6 +54,7 @@ import {
   type ReverseFulfillmentOrderLineItemData,
   type WebhookSubscriptionData,
 } from './records.js';
+import { suggestedRefund } from './refund-actions.js';
 import { matchesText, searchFilter } from './search.js';
 
 /** Resolves one field of a source value. */
@@ -69,6 +73,7 @@ const on = <D>(map: Record<string, Resolver<StoredRecord<D>>>) =>
 
 /** Record types the `node` field can return; their store kind is the Shopify type name. */
 const nodeKinds = new Set([
+  'ExchangeLineItem',
   'BasicEvent',
   'Customer',
   'Fulfillment',
@@ -231,6 +236,8 @@ async function node(context: RequestContext, id: string | null) {
 }
 
 const root: TypeResolvers = {
+  nodes: (_source, args, context) =>
+    Promise.all((texts(args, 'ids') ?? []).map((id) => node(context, id))),
   currentAppInstallation: (_source, _args, context) => ({
     __typename: 'AppInstallation',
     id: gid('AppInstallation', '1'),
@@ -306,19 +313,34 @@ const root: TypeResolvers = {
 };
 
 const orderResolvers = on<OrderData>({
+  presentmentCurrencyCode: (order) => order.data.currency,
   taxesIncluded: (_order, _args, context) =>
     context.shop.config.taxesIncluded ?? false,
   customer: (order, _args, context) =>
     load(context, 'Customer', order.data.customer),
   currentTotalPriceSet: (order) =>
     moneyBag(order.data.total - order.data.refunded, order.data.currency),
-  totalOutstandingSet: (order) =>
-    moneyBag(
-      ['PENDING', 'AUTHORIZED'].includes(order.data.displayFinancialStatus)
-        ? order.data.total
-        : 0,
+  totalOutstandingSet: async (order, _args, context) => {
+    const transactions = await all<OrderTransactionData>(context.shop, {
+      kind: 'OrderTransaction',
+      parent: order.id,
+    });
+    const captured = transactions
+      .filter(
+        (t) =>
+          ['SALE', 'CAPTURE'].includes(t.data.kind) &&
+          t.data.status === 'SUCCESS',
+      )
+      .reduce((n, t) => n + t.data.amount, 0);
+    const refunded = transactions
+      .filter((t) => t.data.kind === 'REFUND' && t.data.status === 'SUCCESS')
+      .reduce((n, t) => n + t.data.amount, 0);
+
+    return moneyBag(
+      Math.max(0, order.data.total - captured + refunded),
       order.data.currency,
-    ),
+    );
+  },
   lineItems: (order, args, context) =>
     connection(context, args, { kind: 'LineItem', parent: order.id }),
   fulfillmentOrders: (order, args, context) =>
@@ -327,6 +349,8 @@ const orderResolvers = on<OrderData>({
     list(context, args, { kind: 'Fulfillment', parent: order.id }),
   returns: (order, args, context) =>
     connection(context, args, { kind: 'Return', parent: order.id }),
+  suggestedRefund: (order, args, context) =>
+    suggestedRefund(context, order, args),
   refunds: (order, args, context) =>
     list(context, args, { kind: 'Refund', parent: order.id }),
   transactions: (order, args, context) =>
@@ -393,16 +417,52 @@ const resolvers: Record<string, TypeResolvers> = {
   Order: orderResolvers,
   LineItem: on<LineItemData>({
     currentQuantity: (line) => line.data.currentQuantity ?? line.data.quantity,
+    discountedTotalSet: (line, _args, context) =>
+      moneyBag(
+        line.data.price * line.data.quantity,
+        context.shop.config.currency,
+      ),
     originalUnitPriceSet: (line, _args, context) =>
       moneyBag(line.data.price, context.shop.config.currency),
     taxLines: (_line, _args, context) =>
       context.shop.config.taxRate === undefined
         ? []
-        : [{ rate: context.shop.config.taxRate }],
+        : [
+            {
+              rate: context.shop.config.taxRate,
+              priceSet: moneyBag(
+                Math.round(
+                  (_line.data.price *
+                    _line.data.quantity *
+                    context.shop.config.taxRate) /
+                    (context.shop.config.taxesIncluded
+                      ? 1 + context.shop.config.taxRate
+                      : 1),
+                ),
+                context.shop.config.currency,
+              ),
+            },
+          ],
     variant: (line, _args, context) =>
       load(context, 'ProductVariant', line.data.variant),
   }),
   ProductVariant: on<ProductVariantData>({
+    displayName: async (variant, _args, context) => {
+      const product = await load<ProductData>(
+        context,
+        'Product',
+        variant.data.product,
+      );
+
+      return `${product?.data.title ?? ''} — ${variant.data.title}`;
+    },
+    inventoryQuantity: async (variant, _args, context) =>
+      (
+        await all<InventoryLevelData>(context.shop, {
+          kind: 'InventoryLevel',
+          parent: variant.id,
+        })
+      ).reduce((n, level) => n + available(level.data), 0),
     inventoryItem: (variant, _args, context) =>
       load(context, 'InventoryItem', variant.id),
     product: (variant, _args, context) =>
@@ -475,6 +535,17 @@ const resolvers: Record<string, TypeResolvers> = {
       load(context, 'LineItem', line.data.lineItem),
   }),
   Return: on<ReturnData>({
+    exchangeLineItems: (item, args, context) =>
+      connection(context, args, { kind: 'ExchangeLineItem', parent: item.id }),
+    refunds: (item, args, context) =>
+      connection(
+        context,
+        args,
+        { kind: 'Refund' },
+        { match: (refund) => (refund.data as RefundData).return === item.id },
+      ),
+    suggestedFinancialOutcome: (item, args, context) =>
+      suggestedExchangeFinancial(context, item, args),
     order: (item, _args, context) => load(context, 'Order', item.data.order),
     decline: (item) =>
       item.data.declineReason ? { reason: item.data.declineReason } : null,
@@ -487,6 +558,10 @@ const resolvers: Record<string, TypeResolvers> = {
       }),
   }),
   ReturnLineItem: on<ReturnLineItemData>({
+    processedQuantity: (line) => line.data.processedQuantity ?? 0,
+    processableQuantity: (line) =>
+      line.data.quantity - (line.data.processedQuantity ?? 0),
+    returnReasonNote: (line) => line.data.returnReasonNote ?? '',
     fulfillmentLineItem: (line, _args, context) =>
       load(context, 'FulfillmentLineItem', line.data.fulfillmentLineItem),
     withCodeDiscountedTotalPriceSet: (line, _args, context) =>
@@ -496,6 +571,18 @@ const resolvers: Record<string, TypeResolvers> = {
       id: gid('ReturnReasonDefinition', reasonId(line.data.reason)),
       name: line.data.reason,
     }),
+  }),
+  ExchangeLineItem: on<ExchangeLineItemData>({
+    variantId: (line) => gid('ProductVariant', line.data.variant),
+    processableQuantity: (line) =>
+      line.data.quantity - line.data.processedQuantity,
+    lineItems: async (line, _args, context) =>
+      (
+        await all<LineItemData>(context.shop, {
+          kind: 'LineItem',
+          parent: line.data.order,
+        })
+      ).filter((item) => line.data.lineItems.includes(item.id)),
   }),
   ReverseFulfillmentOrder: on({
     lineItems: (reverse, args, context) =>
@@ -515,6 +602,7 @@ const resolvers: Record<string, TypeResolvers> = {
       })),
   }),
   Refund: on<RefundData>({
+    note: (refund) => refund.data.note ?? null,
     order: (refund, _args, context) =>
       load(context, 'Order', refund.data.order),
     return: (refund, _args, context) =>

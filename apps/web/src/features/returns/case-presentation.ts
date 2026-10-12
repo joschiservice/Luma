@@ -17,6 +17,7 @@ export const caseStageLabels = localized({
   awaiting_inspection: m.returns_case_stage_awaiting_inspection,
   awaiting_proposal: m.returns_case_stage_awaiting_proposal,
   proposed: m.returns_case_stage_proposed,
+  completed: m.returns_case_stage_completed,
   cancelled: m.returns_case_stage_cancelled,
 } satisfies Record<ReturnCaseStage, () => string>);
 
@@ -25,6 +26,7 @@ export const caseStageDescriptions = localized({
   awaiting_inspection: m.returns_case_stage_awaiting_inspection_description,
   awaiting_proposal: m.returns_case_stage_awaiting_proposal_description,
   proposed: m.returns_case_stage_proposed_description,
+  completed: m.returns_case_stage_completed_description,
   cancelled: m.returns_case_stage_cancelled_description,
 } satisfies Record<ReturnCaseStage, () => string>);
 
@@ -33,6 +35,7 @@ export const caseStageStates: Record<ReturnCaseStage, OperationalState> = {
   awaiting_inspection: 'attention',
   awaiting_proposal: 'attention',
   proposed: 'waiting',
+  completed: 'verified',
   cancelled: 'idle',
 };
 
@@ -98,6 +101,8 @@ export function creationBlocker(
   system: string,
 ): string {
   switch (blocker) {
+    case 'completed':
+      return m.returns_case_stage_completed_description();
     case 'cancelled':
       return m.returns_case_blocker_cancelled();
     case 'execution_disabled':
@@ -168,6 +173,10 @@ export function historyTitle(entry: HistoryEntry, system: string): string {
       return m.returns_case_history_creation_approved();
     case 'creation_rejected':
       return m.returns_case_history_creation_rejected();
+    case 'exchange_completed':
+      return m.returns_case_history_exchange_completed();
+    case 'exchange_reopened':
+      return m.returns_case_history_exchange_reopened();
     case 'creation_created':
       return m.returns_case_history_creation_created({
         system,

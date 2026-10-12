@@ -409,6 +409,16 @@ describe('identification', () => {
 
   it('derives Luma capabilities from the parsed operation', () => {
     const id = 'gid://shopify/Order/1';
+    expect(
+      target(
+        'query LumaExchangePrice($id:ID!) { node(id:$id) { ... on Return { id } } }',
+        { id: 'gid://shopify/Return/1' },
+      ),
+    ).toEqual({
+      operation: 'returns.exchange.price.read',
+      resource: 'gid://shopify/Return/1',
+      write: false,
+    });
     expect(target(page('orders'), { first: 10 })).toEqual({
       operation: 'orders.read',
       write: false,

@@ -47,6 +47,7 @@ import {
   type ReturnSort,
   type ReturnsSearch,
 } from './data';
+import { ReturnDeadlines } from './deadlines';
 import {
   accessMessage,
   nextStep,
@@ -116,7 +117,12 @@ export function ReturnsPage() {
   return (
     <ReturnsView
       organizationId={organizationId}
-      coverage={<SyncCoverage organizationId={organizationId} type="returns" />}
+      coverage={
+        <>
+          <ReturnDeadlines organizationId={organizationId} />
+          <SyncCoverage organizationId={organizationId} type="returns" />
+        </>
+      }
       search={search}
       list={query.isError ? undefined : query.data}
       stale={query.isError ? query.data : undefined}

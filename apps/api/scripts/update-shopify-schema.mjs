@@ -23,7 +23,10 @@ const response = await fetch(source, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    query: getIntrospectionQuery({ descriptions: false }),
+    query: getIntrospectionQuery({
+      descriptions: false,
+      inputValueDeprecation: true,
+    }),
   }),
 });
 
@@ -39,6 +42,7 @@ const schema = buildClientSchema(body.data);
 const fields = {
   QueryRoot: [
     'node',
+    'nodes',
     'bulkOperations',
     'bulkOperation',
     'orders',
@@ -53,6 +57,11 @@ const fields = {
     'webhookSubscriptions',
   ],
   Mutation: [
+    'returnCreate',
+    'returnApproveRequest',
+    'refundCreate',
+    'returnProcess',
+    'returnCancel',
     'bulkOperationRunQuery',
     'webhookSubscriptionCreate',
     'fulfillmentOrderReleaseHold',
@@ -76,12 +85,13 @@ const fields = {
   ProductPriceRangeV2: ['minVariantPrice'],
   AppInstallation: ['id', 'accessScopes'],
   AccessScope: ['handle'],
-  WebhookSubscriptionConnection: ['nodes'],
-  WebhookSubscription: ['id', 'uri'],
+  WebhookSubscriptionConnection: ['nodes', 'pageInfo'],
+  WebhookSubscription: ['topic', 'id', 'uri'],
   WebhookSubscriptionCreatePayload: ['webhookSubscription', 'userErrors'],
   UserError: ['field', 'message'],
   Node: ['id'],
   Order: [
+    'taxesIncluded',
     'id',
     'updatedAt',
     'name',
@@ -96,12 +106,25 @@ const fields = {
     'currentTotalPriceSet',
     'totalOutstandingSet',
     'transactions',
+    'presentmentCurrencyCode',
+    'suggestedRefund',
     'customer',
     'returns',
     'refunds',
     'events',
   ],
-  LineItem: ['id', 'name', 'quantity', 'currentQuantity', 'sku', 'variant'],
+  TaxLine: ['rate', 'priceSet'],
+  LineItem: [
+    'originalUnitPriceSet',
+    'discountedTotalSet',
+    'taxLines',
+    'id',
+    'name',
+    'quantity',
+    'currentQuantity',
+    'sku',
+    'variant',
+  ],
   Product: [
     'id',
     'updatedAt',
@@ -113,6 +136,8 @@ const fields = {
     'priceRangeV2',
   ],
   ProductVariant: [
+    'displayName',
+    'inventoryQuantity',
     'id',
     'sku',
     'inventoryItem',
@@ -214,7 +239,7 @@ const fields = {
   CustomerEdge: ['node'],
   CustomerEmailAddress: ['emailAddress'],
   CustomerPhoneNumber: ['phoneNumber'],
-  MoneyBag: ['shopMoney'],
+  MoneyBag: ['shopMoney', 'presentmentMoney'],
   MoneyV2: ['amount', 'currencyCode'],
   OrderTransaction: [
     'id',
@@ -227,6 +252,7 @@ const fields = {
     'parentTransaction',
   ],
   Refund: [
+    'note',
     'id',
     'createdAt',
     'updatedAt',
@@ -237,9 +263,13 @@ const fields = {
     'transactions',
   ],
   RefundLineItemConnection: ['nodes', 'pageInfo'],
+  RefundConnection: ['nodes', 'pageInfo'],
   RefundLineItem: ['quantity', 'restockType', 'restocked', 'lineItem'],
   OrderTransactionConnection: ['nodes', 'pageInfo'],
   Return: [
+    'exchangeLineItems',
+    'suggestedFinancialOutcome',
+    'refunds',
     'id',
     'name',
     'status',
@@ -255,12 +285,16 @@ const fields = {
   ReturnConnection: ['nodes', 'pageInfo'],
   ReturnLineItemTypeConnection: ['nodes', 'pageInfo'],
   ReturnLineItemType: [
+    'returnReasonNote',
     'id',
     'quantity',
     'refundedQuantity',
     'returnReasonDefinition',
   ],
   ReturnLineItem: [
+    'returnReasonNote',
+    'processedQuantity',
+    'processableQuantity',
     'id',
     'quantity',
     'refundedQuantity',
@@ -284,6 +318,36 @@ const fields = {
   Event: ['id', 'createdAt'],
   BasicEvent: ['id', 'createdAt', 'action'],
   PageInfo: ['hasNextPage', 'endCursor'],
+  ReturnCreatePayload: ['return', 'userErrors'],
+  ReturnApproveRequestPayload: ['return', 'userErrors'],
+  ReturnCancelPayload: ['return', 'userErrors'],
+  ReturnProcessPayload: ['return', 'userErrors'],
+  ReturnUserError: ['field', 'message', 'code'],
+  RefundCreatePayload: ['refund', 'userErrors'],
+  SuggestedRefund: [
+    'amountSet',
+    'maximumRefundableSet',
+    'refundLineItems',
+    'suggestedTransactions',
+  ],
+  SuggestedOrderTransaction: [
+    'amountSet',
+    'gateway',
+    'kind',
+    'parentTransaction',
+  ],
+  ExchangeLineItemConnection: ['nodes', 'pageInfo'],
+  ExchangeLineItem: [
+    'id',
+    'variantId',
+    'quantity',
+    'processedQuantity',
+    'processableQuantity',
+    'lineItems',
+  ],
+  SuggestedReturnFinancialOutcome: ['maximumRefundable', 'financialTransfer'],
+  InvoiceReturnOutcome: ['amount'],
+  RefundReturnOutcome: ['amount', 'suggestedTransactions'],
 };
 
 for (const type of [

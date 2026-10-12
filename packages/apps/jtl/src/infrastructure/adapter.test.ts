@@ -266,7 +266,10 @@ describe('JTL read adapter', () => {
         'products.read',
         'purchase-orders.read',
         'returns.created.read',
+        'returns.exchange.reservation.read',
         'returns.options.read',
+        'returns.settlement.proof.read',
+        'returns.settlement.quote.read',
         'suppliers.read',
       ]);
     },
@@ -784,4 +787,116 @@ describe('JTL read adapter', () => {
     expect(f.apiKey).toHaveBeenCalledTimes(4);
     expect(f.fetch).not.toHaveBeenCalled();
   });
+});
+
+it('reads a marked replacement and only its native item reservation, with native array line items', async () => {
+  const operationId = '11111111-1111-4111-8111-111111111111';
+  const f = fixture({ units: { piece: 'each' } });
+  f.fetch.mockImplementation(async (input) => {
+    const url = new URL(String(input)),
+      path = url.pathname.replace('/api/eazybusiness/', '');
+    const rows =
+      path === 'sales-orders'
+        ? [
+            {
+              id: 10,
+              salesOrderNumber: 'AU-10',
+              externalSalesOrderNumber: `luma-ex:${operationId}`,
+              isCancelled: false,
+              deliveryStatus: 1,
+              paymentStatus: 2,
+              totalGrossAmount: '46',
+              currencyIso: 'EUR',
+            },
+          ]
+        : path === 'stocks/reservations'
+          ? [
+              {
+                itemId: 20,
+                salesOrderId: 10,
+                amount: 2,
+                createdAt: '2026-09-17T00:00:00Z',
+              },
+              {
+                itemId: 20,
+                salesOrderId: 11,
+                amount: 100,
+                createdAt: '2026-09-17T00:00:00Z',
+              },
+            ]
+          : [
+              {
+                id: 1,
+                salesOrderId: 10,
+                itemId: 20,
+                quantity: 2,
+                salesUnit: 'piece',
+              },
+            ];
+
+    return Response.json(
+      path.endsWith('line-items')
+        ? rows
+        : {
+            items: rows,
+            totalItems: rows.length,
+            pageNumber: 1,
+            pageSize: 100,
+            hasNextPage: false,
+          },
+    );
+  });
+  const result = await f.read('returns.exchange.reservation.read', {
+    operationId,
+    item: ref('20'),
+  });
+  expect(result).toMatchObject({
+    ok: true,
+    value: {
+      complete: true,
+      orders: [
+        {
+          id: ref('10'),
+          total: { amount: '46', currency: 'EUR' },
+          paid: true,
+          exactLines: true,
+          quantity: '2',
+          reserved: '2',
+        },
+      ],
+    },
+  });
+  expect(f.recordObservations).toHaveBeenCalledTimes(1);
+});
+
+it('does not certify uniqueness when the native order scan exceeds its complete-read bound', async () => {
+  const f = fixture();
+  f.fetch.mockImplementation(async (input) => {
+    const url = new URL(String(input)),
+      number = Number(url.searchParams.get('pageNumber'));
+    const items = url.pathname.endsWith('sales-orders')
+      ? Array.from({ length: 100 }, (_, i) => ({
+          id: (number - 1) * 100 + i + 1,
+          salesOrderNumber: 'AU',
+          isCancelled: false,
+          deliveryStatus: 1,
+          paymentStatus: 2,
+        }))
+      : [];
+
+    return Response.json({
+      items,
+      totalItems: items.length ? 501 : 0,
+      pageNumber: number,
+      pageSize: 100,
+      hasNextPage: items.length > 0,
+    });
+  });
+  expect(
+    await f.read('returns.exchange.reservation.read', {
+      operationId: '11111111-1111-4111-8111-111111111111',
+      item: ref('20'),
+    }),
+  ).toMatchObject({ ok: true, value: { complete: false, orders: [] } });
+  expect(f.fetch).toHaveBeenCalledTimes(6);
 });

@@ -215,6 +215,7 @@ const returns = [
   'packages/api-contract/src/**/returns.ts',
 ];
 const customers = [
+  'packages/application-runtime/migrations/0087_return_service_reads.sql',
   ...rmCustomers,
   'packages/customers/**',
   'packages/api-contract/src/**/customers.ts',
@@ -236,6 +237,8 @@ const operationalMetrics = [
   'packages/api-contract/src/operational-metrics.ts',
 ];
 const decisions = [
+  'packages/application-runtime/migrations/0087_return_service_reads.sql',
+  'packages/read-models/src/domain/return-case-decisions.ts',
   ...rmDecisions,
   'packages/resolution/**',
   'packages/api-contract/src/**/decisions.ts',
@@ -276,6 +279,7 @@ const codeSteps = [
   'packages/api-contract/src/code-steps.ts',
 ];
 const caseWorkflows = [
+  'packages/application-runtime/migrations/0092_refund_follow_up_cursors.sql',
   ...workflows,
   'packages/application-runtime/src/composition/case-workflows.ts',
 ];
@@ -310,6 +314,16 @@ const messaging = [
   'packages/i18n/messages/*/{gmail,messaging}.json',
 ];
 const returnCases = [
+  'packages/application-runtime/src/composition/return-consistency.ts',
+  'apps/api/e2e/return-completion-fixture.mjs',
+  'packages/application-runtime/src/composition/return-exchanges.ts',
+  'packages/api-contract/src/return-exchanges.ts',
+  'apps/api/e2e/return-settlement-fixture.mjs',
+  'packages/application-runtime/migrations/0088_return_settlement.sql',
+  'packages/application-runtime/src/composition/return-settlement.ts',
+  'packages/api-contract/src/return-actions.ts',
+  'packages/application-runtime/migrations/0087_return_service_reads.sql',
+  'packages/application-runtime/migrations/0086_return_creation_binding.sql',
   'packages/orders/**',
   'packages/api-contract/src/**/return-cases.ts',
   'packages/application-runtime/src/composition/return-cases.ts',
@@ -892,6 +906,70 @@ export const journeyAreas = {
     ...webHome,
     ...webCases,
   ],
+  'return-settlement.browser.mjs': [
+    ...simulator,
+    ...returns,
+    ...returnCases,
+    ...decisions,
+    ...commerce,
+    ...webShell,
+    ...webReturns,
+  ],
+  'return-exchange.browser.mjs': [
+    ...simulator,
+    ...returns,
+    ...returnCases,
+    ...decisions,
+    ...commerce,
+    ...webShell,
+    ...webReturns,
+  ],
+  'return-completion.e2e.mjs': [
+    ...simulator,
+    ...returns,
+    ...returnCases,
+    ...decisions,
+    ...commerce,
+  ],
+  'return-completion.browser.mjs': [
+    ...simulator,
+    ...returns,
+    ...returnCases,
+    ...decisions,
+    ...commerce,
+    ...webShell,
+    ...webReturns,
+  ],
+  'return-deadlines.e2e.mjs': [
+    ...simulator,
+    ...returns,
+    ...returnCases,
+    ...decisions,
+    ...commerce,
+  ],
+  'return-deadlines.browser.mjs': [
+    ...simulator,
+    ...returns,
+    ...returnCases,
+    ...decisions,
+    ...commerce,
+    ...webShell,
+    ...webReturns,
+  ],
+  'return-exchange.e2e.mjs': [
+    ...simulator,
+    ...returns,
+    ...returnCases,
+    ...decisions,
+    ...commerce,
+  ],
+  'return-settlement.e2e.mjs': [
+    ...simulator,
+    ...returns,
+    ...returnCases,
+    ...decisions,
+    ...commerce,
+  ],
   'return-cases.e2e.mjs': [
     ...simulator,
     ...returns,
@@ -899,6 +977,11 @@ export const journeyAreas = {
     ...decisions,
   ],
   'returns.browser.mjs': [
+    ...returnCases,
+    ...customers,
+    ...decisions,
+    ...webCustomers,
+    ...webNeedsYou,
     ...commerce,
     ...returns,
     ...orders,

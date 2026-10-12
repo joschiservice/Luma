@@ -82,8 +82,6 @@ export async function requestReturn(
     kind: 'Return',
     parent: order.id,
   });
-  if (returns.some((item) => ['REQUESTED', 'OPEN'].includes(item.data.status)))
-    throw new Error('This order already has an open return');
   if (!command.lines.length)
     throw new Error('A return needs at least one line');
   const shipped: StoredRecord<FulfillmentLineItemData>[] = [];
@@ -101,7 +99,7 @@ export async function requestReturn(
   if (!shipped.length) throw new Error('Ship the order first');
   const returned = new Map<string, number>();
   for (const item of returns)
-    if (item.data.status !== 'DECLINED')
+    if (!['DECLINED', 'CANCELED'].includes(item.data.status))
       for (const line of await all<ReturnLineItemData>(context, {
         kind: 'ReturnLineItem',
         parent: item.id,
@@ -175,9 +173,13 @@ export async function requestReturn(
 /** Approves a requested return and opens a reverse fulfillment order for its lines. */
 export async function approveReturn(
   context: ShopifyContext,
-  command: { order: string },
+  command: { order: string; returnId?: string },
 ) {
-  const item = await requireReturn(context, command.order);
+  const item = command.returnId
+    ? await load<ReturnData>(context, 'Return', command.returnId)
+    : await requireReturn(context, command.order);
+  if (item.data.order !== command.order)
+    throw new Error('Return belongs to another order');
   if (item.data.status !== 'REQUESTED')
     throw new Error('Only a requested return can be approved');
   const reverse = await nextId(context);

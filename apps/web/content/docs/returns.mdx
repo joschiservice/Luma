@@ -3,7 +3,7 @@ title: Follow returns and refunds
 description: See which returns need you, follow each one from request to refund, work it in a return case and tell a requested refund from money returned.
 ---
 
-Returns shows every return a connected store shares with Luma, and every refund that no return settles. Each return keeps its order, items, reasons, refunds and the evidence Luma read. Luma reads your store’s returns; it doesn’t approve, receive or refund them there. You do that in your store, and Luma reads the result on its next sync. To record what arrived, how it was judged and how to settle it, work the return in a [return case](#work-a-return-in-a-case). Open **Returns** in the sidebar or press **G**, then **T**.
+Returns shows every return a connected store shares with Luma, and every refund that no return settles. Each return keeps its order, items, reasons, refunds and the evidence Luma read. Luma reads your store’s returns and refunds. A return case can also request creation or approval of a Shopify return. Receipt and refunds stay separate steps, and Luma reads the store’s results on its next sync. To record what arrived, how it was judged and how to settle it, work the return in a [return case](#work-a-return-in-a-case). Open **Returns** in the sidebar or press **G**, then **T**.
 
 ## Find returns that need you
 
@@ -79,7 +79,7 @@ For an order from JTL-Wawi, a case can create the return in JTL-Wawi, so your wa
 
 Luma creates the return without a credit; a refund stays a separate decision in JTL-Wawi. A request expires after 24 hours. If JTL-Wawi doesn’t confirm the request, the case shows **Not confirmed**: select **Check**, followed by your connection’s name, to read it again. Luma never sends the request a second time. In an observe-only workspace, Luma records the request and sends nothing.
 
-The JTL-Wawi connection needs access to returns. A connection set up before returns were available must be reconnected; see [Apps and connections](/docs/apps-and-connections#change-or-reconnect-a-connection). Shopify and Cin7 Core can’t create returns from Luma.
+The JTL-Wawi connection needs access to returns. A connection set up before returns were available must be reconnected; see [Apps and connections](/docs/apps-and-connections#change-or-reconnect-a-connection). Shopify can also create returns when the connection has return write access. A case linked to a customer’s requested return asks for approval of that exact request; an unlinked case creates a new return. Luma checks the lines and quantities before sending and reads Shopify independently to verify the result. Missing or uncertain results stay **Not confirmed**, and Luma never sends them again. This action does not refund or restock items. Cin7 Core cannot create returns from Luma.
 
 ## When returns are missing
 
@@ -93,3 +93,98 @@ Returns appear only from connections that share them:
 Luma checks for new and changed returns regularly and reads every return again once a day. [Data sync](/docs/data-sync) shows the progress for each store.
 
 Viewing returns and return cases needs **View returns**. Without it, Returns is hidden from the sidebar and search. Opening and working return cases needs **Manage returns**.
+
+## Review a return with a customer
+
+Open the return case from its order, customer, workspace search or **Needs you**. The service
+timeline shows store events alongside receipt, inspection and other case decisions. Each event
+names its source; store evidence includes when Luma read it.
+
+Use **What you can tell the customer** to explain what is known. Pending payments are still processing. Failed
+attempts did not confirm a payment. Old or unavailable evidence needs another read before you
+confirm money returned. A recorded resolution proposal has not changed the connected systems.
+
+Check the next step, owner and waiting reason before handing the case over. If no deadline has
+been configured, the view says so. Assign the case to a person who can manage returns.
+
+## Settle the case
+
+After recording receipt, inspection and a refund proposal, use **Stock and refund** on the case.
+Request the refund separately from restocking resale units. Choose the mapped Wawi item and actual
+warehouse for each restock. Damaged and missing units cannot be restocked; missing units cannot be
+refunded through this case action.
+
+Someone else approves each request with the relevant app permission. Luma sends the approved action
+once and reads the system again. **Refund processing** means the money is still processing. **Failed**
+means the payment did not succeed. Use **Check source** when a response or payment is uncertain.
+Checking never issues a second refund or stock addition.
+
+A successful refund does not prove stock changed, and a successful restock does not prove the refund
+was paid. Review both results and their read times. An old check needs a new read before you confirm
+the result to the customer. Once an action was sent, receipt, inspection and the proposal stay fixed;
+you can still hand the case to another owner. Wawi stock settlement is available in the simulator;
+your live connection must support the action before it can be used.
+
+## Coordinate an exchange
+
+Record receipt and inspection, then propose **Exchange**. In **Exchange**, choose a replacement
+that is explicitly mapped to Shopify and Wawi and enter its quantity. Request replacement approval.
+Someone else approves the exact request. Reported available stock is not a reservation.
+
+After the request is independently verified, request processing approval. Luma checks availability
+again and uses Shopify's current financial quote. The replacement fulfillment and the price difference
+have separate progress. A requested charge is pending until successful payment is independently read.
+Use **Check source** after payment, then request payment hold release approval. Other holds remain.
+An exchange refund difference is also pending until its payment succeeds.
+
+If stock becomes unavailable, the case owner chooses **Wait for this item**, **Choose a different item**
+or **Choose a refund**. Luma never chooses automatically. A different item or refund needs cancellation
+approval and fresh cancellation proof first. After cancellation, choose the different replacement or
+continue to the separately approved refund settlement. This preserves the approved resale stock units.
+A processed exchange needs an owned handoff instead of another replacement request.
+
+Arrange and verify the Wawi replacement allocation before shipping. The Shopify replacement request
+does not prove an ERP reservation. Settle returned stock separately and review both systems before
+confirming that the case is complete.
+
+## Set return deadlines
+
+Open **Return deadlines** on Returns. Choose the hours allowed for receipt, inspection and a
+resolution proposal, and financial follow-through. Select **Configured**, then **Save deadlines**.
+Enable **Follow up on overdue return steps** in Workflows to monitor automatically.
+
+Receipt is due from case opening. Inspection is due from the recorded receipt, and the proposal
+from inspection. Financial work is due from the proposal or its actual action request. Luma does
+not invent a date for an event your store has not reported.
+
+On the case, **Waiting and deadlines** shows the owner, due dates and earlier occurrences.
+Select **Check progress** to reread evidence without changing either system. Missing units,
+inspection, pending money, failed money and unavailable or stale evidence stay separate.
+Only fresh financial evidence ends a payment wait. Repeated checks retain the same waiting
+occurrence; a later recurrence keeps its earlier history. Reassign the case when another person
+should own the next step.
+
+### Complete an exchange
+
+When adding the Wawi connection, select **Read exchange replacement orders and reservations** and
+validate its access. An older connection without this access must be reconnected; see
+[Apps and connections](/docs/apps-and-connections#change-or-reconnect-a-connection).
+
+In the exchange case, open **Completion across both systems**. Record the actual warehouse receipt
+in Shopify. Create one paid replacement order in Wawi using the **Replacement order reference**
+shown in the case, the mapped replacement item and its exact quantity. Reserve those units for that
+order. After Shopify processing, **Check both systems** shows the actual replacement total to use in
+Wawi. It also identifies any stock, price, payment or reservation step that still needs attention.
+
+Approve resale restocking separately. Wait for the actual price-difference payment or refund to
+settle, and approve any payment hold release separately. Then check both systems again. Luma completes
+the case only when its recorded units, source receipt, physical resale stock, one replacement order,
+reservation and settled money agree. Pending money and an accepted action do not complete it.
+
+An unresolved check stays with the case owner in Needs you. Review duplicate Wawi references and
+connection access before retrying. Damaged units need a confirmed physical disposal; this system pair
+cannot prove that disposal yet, so those cases remain owned and open. New stock movements may need
+review before the final check can confirm the warehouse total.
+
+You can check a completed exchange again. If fresh source evidence no longer agrees, Luma reopens the
+case and keeps the earlier completion in its history.

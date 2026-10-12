@@ -7,9 +7,17 @@ import {
 
 import { type Args, text, texts } from './connections.js';
 import type { RequestContext } from './context.js';
+import {
+  attachExchangeInput,
+  cancelExchange,
+  processExchange,
+  validateExchangeInput,
+} from './exchanges.js';
 import { moveWork, openWork, releaseHolds, touchOrder } from './fulfillment.js';
 import { available, writeLevel } from './inventory.js';
 import {
+  all,
+  type FulfillmentLineItemData,
   type FulfillmentOrderData,
   type IdempotencyKeyData,
   type InventoryItemData,
@@ -18,11 +26,15 @@ import {
   location,
   nextId,
   parseGid,
+  type ReturnData,
+  type ReturnLineItemData,
   RuleError,
   save,
   type WebhookSubscriptionData,
 } from './records.js';
+import { refundCreate } from './refund-actions.js';
 import type { TypeResolvers } from './resolvers.js';
+import { approveReturn, requestReturn } from './returns.js';
 import { idempotent } from './schema.js';
 
 /** Reads an input object argument as a record of its fields. */
@@ -297,8 +309,124 @@ async function recover(
   }
 }
 
+/** Creates or approves an exact return through the same provider rules as simulator commands. */
+async function returnMutation(
+  context: RequestContext,
+  value: unknown,
+  approve: boolean,
+) {
+  const input = fields(value);
+  if (!context.shop.config.scopes.includes('write_returns'))
+    throw new GraphQLError('Returns write scope is required.', {
+      extensions: { code: 'ACCESS_DENIED' },
+    });
+  try {
+    let id: string;
+    if (approve) {
+      const target = parseGid(text(input, 'id'), 'Return');
+      const current =
+        target &&
+        (await context.shop.store.get<ReturnData>('Return', target.id));
+      if (!current) throw new RuleError('Return not found');
+      id = (
+        await approveReturn(context.shop, {
+          order: current.data.order,
+          returnId: current.id,
+        })
+      ).id;
+    } else {
+      const exchanges = await validateExchangeInput(context, input);
+      const order = parseGid(text(input, 'orderId'), 'Order');
+      if (
+        !order ||
+        !Array.isArray(input.returnLineItems) ||
+        !input.returnLineItems.length
+      )
+        throw new RuleError('Return lines are required');
+      const lines = [];
+      const notes = new Map<string, string | null>();
+      for (const value of input.returnLineItems) {
+        const line = fields(value),
+          target = parseGid(
+            text(line, 'fulfillmentLineItemId'),
+            'FulfillmentLineItem',
+          );
+        const shipped =
+          target &&
+          (await context.shop.store.get<FulfillmentLineItemData>(
+            'FulfillmentLineItem',
+            target.id,
+          ));
+        const quantity = line.quantity;
+        if (
+          !shipped ||
+          !Number.isSafeInteger(quantity) ||
+          typeof quantity !== 'number' ||
+          quantity < 1
+        )
+          throw new RuleError('Invalid fulfillment line');
+        if (notes.has(shipped.data.lineItem))
+          throw new RuleError('Duplicate order line');
+        notes.set(shipped.data.lineItem, text(line, 'returnReasonNote'));
+        lines.push({ lineItem: shipped.data.lineItem, quantity });
+      }
+      id = (
+        await requestReturn(context.shop, {
+          kind: 'return',
+          order: order.id,
+          lines,
+          reason:
+            text(fields(input.returnLineItems[0]), 'returnReason') ?? 'OTHER',
+        })
+      ).id;
+      context.committed = true;
+      for (const line of await all<ReturnLineItemData>(context.shop, {
+        kind: 'ReturnLineItem',
+        parent: id,
+      }))
+        await save(context.shop, 'ReturnLineItem', line.id, {
+          ...line.data,
+          returnReasonNote: notes.get(line.data.lineItem) ?? null,
+        });
+      await approveReturn(context.shop, { order: order.id, returnId: id });
+      await attachExchangeInput(context, id, exchanges);
+    }
+    context.committed = true;
+    context.loader.clear();
+
+    return {
+      return: await context.shop.store.get('Return', id),
+      userErrors: [],
+    };
+  } catch (error) {
+    if (error instanceof GraphQLError) throw error;
+    if (context.committed) throw error;
+
+    return {
+      return: null,
+      userErrors: [
+        {
+          field: ['input'],
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Return could not be changed',
+        },
+      ],
+    };
+  }
+}
+
 /** Shopify Admin API mutations Luma sends. */
 export const mutationResolvers: TypeResolvers = {
+  refundCreate: (_source, args, context, info) =>
+    refundCreate(context, args, info),
+  returnCreate: (_source, args, context) =>
+    returnMutation(context, args.returnInput, false),
+  returnApproveRequest: (_source, args, context) =>
+    returnMutation(context, args.input, true),
+  returnProcess: (_source, args, context) => processExchange(context, args),
+  returnCancel: (_source, args, context) => cancelExchange(context, args),
   inventorySetQuantities: (_source, args, context, info) =>
     setQuantities(context, args, info),
   fulfillmentOrderReleaseHold: (_source, args, context) =>

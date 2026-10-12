@@ -3,7 +3,7 @@ title: Retouren und Erstattungen verfolgen
 description: Sieh, welche Retouren auf dich warten, verfolge jede Retoure von der Anfrage bis zur Erstattung, bearbeite sie in einem Retourenfall und unterscheide eine angeforderte Erstattung von tatsächlich erstattetem Geld.
 ---
 
-Retouren zeigt jede Retoure, die ein verbundener Shop mit Luma teilt, und jede Erstattung, die zu keiner Retoure gehört. Zu jeder Retoure gehören Bestellung, Artikel, Gründe, Erstattungen und die Nachweise, die Luma gelesen hat. Luma liest die Retouren deines Shops; es genehmigt, empfängt oder erstattet sie dort nicht. Das tust du in deinem Shop, und Luma liest das Ergebnis beim nächsten Abgleich. Um festzuhalten, was angekommen ist, wie es beurteilt wurde und wie die Retoure abgeschlossen werden soll, bearbeite sie in einem [Retourenfall](#work-a-return-in-a-case). Öffne **Retouren** in der Seitenleiste oder drücke **G**, dann **T**.
+Retouren zeigt jede Retoure, die ein verbundener Shop mit Luma teilt, und jede Erstattung, die zu keiner Retoure gehört. Zu jeder Retoure gehören Bestellung, Artikel, Gründe, Erstattungen und die Nachweise, die Luma gelesen hat. Luma liest die Retouren deines Shops. In Shopify kannst du über einen Retourenfall auch eine Retoure anlegen oder eine Kundenanfrage genehmigen lassen. Empfang, Prüfung und Erstattung bleiben getrennte Schritte. Luma liest die Ergebnisse beim nächsten Abgleich. Um festzuhalten, was angekommen ist, wie es beurteilt wurde und wie die Retoure abgeschlossen werden soll, bearbeite sie in einem [Retourenfall](#work-a-return-in-a-case). Öffne **Retouren** in der Seitenleiste oder drücke **G**, dann **T**.
 
 ## Retouren finden, die auf dich warten [#find-returns-that-need-you]
 
@@ -79,7 +79,7 @@ Für eine Bestellung aus JTL-Wawi kann ein Fall die Retoure in JTL-Wawi anlegen,
 
 Luma legt die Retoure ohne Gutschrift an; eine Erstattung bleibt eine eigene Entscheidung in JTL-Wawi. Eine Anfrage läuft nach 24 Stunden ab. Bestätigt JTL-Wawi die Anfrage nicht, zeigt der Fall **Nicht bestätigt**: Wähle **… prüfen** mit dem Namen deiner Verbindung, um erneut zu lesen. Luma sendet die Anfrage nie ein zweites Mal. In einem Workspace, der nur beobachtet, erfasst Luma die Anfrage und sendet nichts.
 
-Die Verbindung zu JTL-Wawi braucht Zugriff auf Retouren. Eine Verbindung, die eingerichtet wurde, bevor Retouren verfügbar waren, muss neu verbunden werden; siehe [Apps und Verbindungen](/docs/apps-and-connections#change-or-reconnect-a-connection). Shopify und Cin7 Core können keine Retouren aus Luma anlegen.
+Die Verbindung zu JTL-Wawi braucht Zugriff auf Retouren. Eine Verbindung, die eingerichtet wurde, bevor Retouren verfügbar waren, muss neu verbunden werden; siehe [Apps und Verbindungen](/docs/apps-and-connections#change-or-reconnect-a-connection). Shopify kann ebenfalls Retouren anlegen, wenn die Verbindung Schreibzugriff auf Retouren hat. Ein Fall mit einer bestehenden Kundenanfrage fordert die Freigabe genau dieser Anfrage an; ein Fall ohne verknüpfte Retoure legt eine neue Retoure an. Luma prüft Positionen und Mengen vor dem Senden und bestätigt das Ergebnis durch einen unabhängigen Shopify-Abruf. Fehlende oder unklare Ergebnisse bleiben **Nicht bestätigt** und werden nie erneut gesendet. Diese Aktion erstattet kein Geld und bucht keine Ware ein. Cin7 Core kann keine Retouren aus Luma anlegen.
 
 ## Wenn Retouren fehlen [#when-returns-are-missing]
 
@@ -93,3 +93,91 @@ Retouren erscheinen nur aus Verbindungen, die sie teilen:
 Luma prüft regelmäßig auf neue und geänderte Retouren und liest jede Retoure einmal täglich neu. Den Fortschritt je Shop siehst du unter [Datenabgleich](/docs/data-sync).
 
 Zum Ansehen von Retouren und Retourenfällen brauchst du **Retouren ansehen**. Ohne diese Berechtigung ist Retouren in der Seitenleiste und in der Suche ausgeblendet. Zum Eröffnen und Bearbeiten von Retourenfällen brauchst du **Retouren bearbeiten**.
+
+## Eine Retoure mit Kunden besprechen
+
+Öffne den Retourenfall über den Auftrag, den Kunden, die Arbeitsbereichssuche oder **Du bist
+gefragt**. Der Verlauf zeigt Shop-Ereignisse neben Wareneingang, Prüfung und weiteren
+Fallentscheidungen. Jedes Ereignis nennt seine Quelle; bei Shop-Daten steht der Lesezeitpunkt.
+
+Die **Auskunft für den Kunden** zeigt gesicherte Informationen. Ausstehende Zahlungen werden noch
+verarbeitet. Fehlgeschlagene Versuche bestätigen keine Zahlung. Alte oder nicht verfügbare
+Daten müssen erneut gelesen werden, bevor du eine Rückzahlung bestätigst. Ein dokumentierter
+Lösungsvorschlag hat die verbundenen Systeme noch nicht verändert.
+
+Prüfe den nächsten Schritt, die zuständige Person und den Wartegrund vor einer Übergabe. Ohne
+konfigurierte Frist weist die Ansicht darauf hin. Weise den Fall einer Person zu, die Retouren
+bearbeiten darf.
+
+## Den Fall abwickeln
+
+Nach Wareneingang, Prüfung und Erstattungsvorschlag verwenden Sie **Bestand und Erstattung** im Fall.
+Fordern Sie die Erstattung getrennt von der Wiedereinlagerung verkaufsfähiger Artikel an. Wählen Sie
+für jede Wiedereinlagerung den zugeordneten Wawi-Artikel und das tatsächliche Lager. Beschädigte und
+fehlende Einheiten dürfen nicht eingelagert werden. Fehlende Einheiten werden über diese Aktion nicht
+erstattet.
+
+Eine andere Person genehmigt jede Anfrage mit der passenden App-Berechtigung. Luma sendet die Aktion
+einmal und liest das System danach erneut. Eine ausstehende Zahlung ist noch in Bearbeitung. Eine
+fehlgeschlagene Zahlung bestätigt keine Erstattung. Prüfen Sie bei einer unklaren Antwort das Ergebnis
+erneut. Diese Prüfung sendet keine zweite Erstattung oder Bestandsbuchung.
+
+Prüfen Sie Bestand und Zahlung einzeln sowie deren Lesezeitpunkte. Veraltete Nachweise benötigen eine
+neue Abfrage, bevor Sie das Ergebnis dem Kunden bestätigen. Nach dem Versand einer Aktion bleiben
+Wareneingang, Prüfung und Vorschlag fest. Die Zuständigkeit kann weiterhin wechseln. Die
+Wawi-Bestandsabwicklung ist im Simulator verfügbar. Ihre Live-Verbindung muss die Aktion unterstützen,
+bevor sie verwendet werden kann.
+
+## Einen Umtausch koordinieren
+
+Erfasse Wareneingang und Prüfung und schlage **Umtausch** vor. Wähle im Bereich **Umtausch** einen
+explizit Shopify und Wawi zugeordneten Ersatzartikel und dessen Menge. Fordere die Genehmigung der
+Ersatzanfrage an. Eine andere Person genehmigt die genaue Anfrage. Gemeldeter verfügbarer Bestand
+ist keine Reservierung.
+
+Nach unabhängiger Bestätigung der Anfrage fordere die Genehmigung zur Verarbeitung an. Luma prüft
+die Verfügbarkeit erneut und verwendet den aktuellen finanziellen Vorschlag von Shopify. Ersatzversand
+und Preisunterschied haben getrennte Fortschritte. Eine angeforderte zusätzliche Zahlung bleibt
+unbestätigt, bis eine erfolgreiche Zahlung unabhängig gelesen wurde. Prüfe danach die Quelle und
+fordere die Genehmigung zur Freigabe der Zahlungssperre an. Andere Sperren bleiben bestehen. Auch
+eine Erstattung des Preisunterschieds bleibt bis zur erfolgreichen Zahlung ausstehend.
+
+Bei fehlendem Ersatzbestand entscheidet die fallverantwortliche Person zwischen **Auf diesen Artikel
+warten**, **Anderen Artikel wählen** und **Erstattung wählen**. Luma wählt nicht automatisch. Ein
+anderer Artikel oder eine Erstattung benötigt zuerst eine genehmigte Stornierung und deren aktuelle
+Bestätigung. Wähle anschließend den anderen Ersatz oder gehe zur separat genehmigten Erstattung
+über. Bereits genehmigte verkaufsfähige Bestandsmengen bleiben erhalten. Ein verarbeiteter Umtausch
+benötigt eine zuständige Person zur Klärung statt einer weiteren Ersatzanfrage.
+
+Veranlasse und prüfe die Ersatzzuordnung in Wawi vor dem Versand. Die Shopify-Anfrage bestätigt
+keine ERP-Reservierung. Wickle Retourenbestand separat ab und prüfe beide Systeme, bevor du den
+Fall als abgeschlossen bestätigst.
+
+### Einen Umtausch abschließen [#complete-an-exchange]
+
+Wähle beim Anlegen der Wawi-Verbindung **Ersatzaufträge und Reservierungen für Umtausch lesen**
+und prüfe den Zugriff. Eine ältere Verbindung ohne diesen Zugriff muss neu verbunden werden; siehe
+[Apps und Verbindungen](/docs/apps-and-connections#change-or-reconnect-a-connection).
+
+Öffne im Umtauschfall **Abschluss in beiden Systemen**. Erfasse den tatsächlichen Wareneingang
+in Shopify. Erstelle in Wawi genau einen bezahlten Ersatzauftrag mit der im Fall angezeigten
+**Referenz für den Ersatzauftrag**, dem zugeordneten Ersatzartikel und der genauen Menge. Reserviere diese
+Einheiten für den Auftrag. Nach der Shopify-Verarbeitung zeigt **Beide Systeme prüfen** den
+tatsächlichen Ersatzgesamtbetrag für Wawi. Die Prüfung zeigt auch, welche Bestands-, Preis-,
+Zahlungs- oder Reservierungsschritte noch Aufmerksamkeit brauchen.
+
+Genehmige die Wiedereinlagerung verkaufsfähiger Artikel separat. Warte auf den tatsächlichen
+Abschluss der Zahlung oder Erstattung des Preisunterschieds und genehmige die Freigabe einer
+Zahlungssperre separat. Prüfe anschließend beide Systeme erneut. Luma schließt den Fall erst ab,
+wenn erfasste Mengen, Wareneingang, verkaufsfähiger Lagerbestand, genau ein Ersatzauftrag,
+Reservierung und abgeschlossene Zahlung übereinstimmen. Eine ausstehende Zahlung oder eine
+angenommene Aktion schließt den Fall nicht ab.
+
+Eine ungeklärte Prüfung bleibt bei der fallverantwortlichen Person in **Wartet auf dich**. Prüfe
+doppelte Wawi-Referenzen und den Verbindungszugriff vor einer erneuten Prüfung. Beschädigte
+Einheiten benötigen eine bestätigte physische Entsorgung. Dieses Systempaar kann diese Entsorgung
+noch nicht nachweisen; solche Fälle bleiben offen und haben eine zuständige Person. Neue
+Bestandsbewegungen können eine Prüfung erfordern, bevor der Lagerbestand bestätigt werden kann.
+
+Du kannst einen abgeschlossenen Umtausch erneut prüfen. Stimmen aktuelle Quelldaten nicht mehr
+überein, öffnet Luma den Fall wieder und behält den früheren Abschluss im Verlauf.

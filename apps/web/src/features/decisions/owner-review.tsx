@@ -33,6 +33,15 @@ export function OwnerReview({
   onChange: () => Promise<void>;
 }) {
   switch (owner.kind) {
+    case 'return_case':
+      return (
+        <Link
+          to="/app/$organizationId/returns/cases/$caseId"
+          params={{ organizationId, caseId: owner.caseId }}
+        >
+          {m.returns_service_open_case()}
+        </Link>
+      );
     case 'human_task':
       return (
         <HumanTaskReview

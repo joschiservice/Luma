@@ -98,6 +98,7 @@ it('publishes native workflows without cases, retains immutable versions and exp
       'shopify-hold-release',
       'supplier-follow-up',
       'refund-follow-up',
+      'return-case-follow-up',
       'payment-follow-up',
       native.definition.id,
       legacy.version.definition.id,

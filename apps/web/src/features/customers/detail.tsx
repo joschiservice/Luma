@@ -27,6 +27,7 @@ import { IdentityError } from '../../kit/identity/data';
 import { RecordMessages } from '../../kit/record-messages';
 import { formatMoney } from '../../shared/orders/presentation';
 import { systemName } from '../products/presentation';
+import { CustomerReturnCases } from '../returns/case-list';
 import { customerOptions } from './data';
 import { CustomerOrders } from './orders';
 import {
@@ -91,11 +92,18 @@ export function CustomerPage() {
       }
       history={
         detail ? (
-          <CustomerOrders
-            key={detail.item.id}
-            organizationId={organizationId}
-            customerId={detail.item.id}
-          />
+          <>
+            <CustomerOrders
+              key={detail.item.id}
+              organizationId={organizationId}
+              customerId={detail.item.id}
+            />
+            <CustomerReturnCases
+              key={`returns:${detail.item.id}`}
+              organizationId={organizationId}
+              customerId={detail.item.id}
+            />
+          </>
         ) : null
       }
     />

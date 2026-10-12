@@ -287,3 +287,29 @@ export function refundProgress(value: RefundData): ReturnProgress {
     value: null,
   };
 }
+
+/** Verifies an exact approved refund amount using the same payment totals as the returns workspace. */
+export function settlementRefundProgress(
+  value: RefundData,
+  approved: { amount: string; currency: string },
+) {
+  const progress = refundProgress(value);
+  if (
+    progress.currency === approved.currency &&
+    progress.refunded !== null &&
+    toUnits(progress.refunded) > 0n &&
+    toUnits(progress.refunded) < toUnits(approved.amount)
+  )
+    return 'partial' as const;
+  if (progress.refund === 'pending') return 'pending' as const;
+  if (progress.refund === 'failed') return 'failed' as const;
+  if (
+    progress.currency === approved.currency &&
+    progress.refunded !== null &&
+    toUnits(progress.refunded) === toUnits(approved.amount) &&
+    value.transactions.every((t) => t.status === 'success')
+  )
+    return 'paid' as const;
+
+  return 'unknown' as const;
+}

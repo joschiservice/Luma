@@ -2,6 +2,7 @@
 
 type DecisionKind =
   | 'case'
+  | 'return_case'
   | 'replenishment'
   | 'fulfillment_recovery'
   | 'inventory_correction'
@@ -25,6 +26,7 @@ type DecisionRecordKind =
   'order' | 'fulfillment' | 'position' | 'sku' | 'product';
 
 export type DecisionOwner =
+  | { kind: 'return_case'; caseId: string }
   | { kind: 'human_task'; definitionId: string; runId: string; stepId: string }
   | { kind: 'case'; exceptionId: string }
   | { kind: 'workflow_run'; definitionId: string; runId: string }

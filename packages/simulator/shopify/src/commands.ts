@@ -1,3 +1,4 @@
+import { payExchangeBalance } from './exchanges.js';
 import { readLevel, writeLevel } from './inventory.js';
 import { editOrder } from './order-edits.js';
 import { cancelOrder, createOrder, holdOrder, markPaid } from './orders.js';
@@ -63,6 +64,8 @@ export function command(
       return editOrder(context, value);
     case 'paid':
       return markPaid(context, value);
+    case 'exchange-pay':
+      return payExchangeBalance(context, value.order);
     case 'cancel':
       return cancelOrder(context, value);
     case 'hold':

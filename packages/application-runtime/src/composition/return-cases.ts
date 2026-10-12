@@ -87,7 +87,14 @@ export function createReturnSystem(
         connectionId,
         capability: 'returns.created.read',
         version: '0',
-        input: { limit: 25, order: query.order, lumaCaseId: query.lumaCaseId },
+        input: {
+          limit: 25,
+          order: query.order,
+          lumaCaseId: query.lumaCaseId,
+          ...(query.requestedReturn
+            ? { requestedReturn: query.requestedReturn }
+            : {}),
+        },
       });
       if (!result.ok) return { ok: false, reason: failureReason(result.error) };
       const items: FoundReturn[] = result.value.items
@@ -149,6 +156,9 @@ export function createReturnCreationEffects(
           map: async () => ({
             lumaCaseId: creation.caseId,
             order: creation.order,
+            ...(creation.requestedReturn
+              ? { requestedReturn: creation.requestedReturn }
+              : {}),
             warehouse: {
               externalId: creation.warehouse.externalId,
               scopeKey: creation.warehouse.scopeKey,

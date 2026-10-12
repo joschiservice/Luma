@@ -21,9 +21,17 @@ export type {
 
 export type { OrderStateQueries } from './application/order-state.js';
 
+export type { ReturnCaseAttention } from './application/return-cases.js';
+
 export type {
   ComparisonState,
   ComparisonDifference,
 } from './domain/source-comparison.js';
 
 export { orderComparisonState } from './domain/source-comparison.js';
+
+export {
+  settlementRefundProgress,
+  toUnits,
+  fromUnits,
+} from './domain/returns.js';

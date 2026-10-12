@@ -2,6 +2,11 @@ import { z } from 'zod';
 
 import { endpoint, organizationParamsSchema, requires } from '../common.js';
 import {
+  requestReturnActionSchema,
+  returnActionListSchema,
+  returnActionSchema,
+} from '../return-actions.js';
+import {
   assignReturnCaseSchema,
   cancelReturnCaseSchema,
   decideReturnCreationSchema,
@@ -12,8 +17,22 @@ import {
   recordReceiptSchema,
   requestReturnCreationSchema,
   returnCaseDetailSchema,
+  returnCaseListSchema,
   returnCreationOptionsSchema,
 } from '../return-cases.js';
+import {
+  configureReturnDeadlinesSchema,
+  returnDeadlinePolicySchema,
+  returnWaitingViewSchema,
+} from '../return-deadlines.js';
+import {
+  exchangeChoiceInputSchema,
+  exchangeConsistencySchema,
+  exchangeRequestSchema,
+  exchangeStepSchema,
+  returnExchangeSchema,
+  returnExchangesSchema,
+} from '../return-exchanges.js';
 
 const path = '/v1/organizations/{organizationId}';
 
@@ -53,7 +72,233 @@ function caseCommand<T extends z.ZodTypeAny>(
     .output(returnCaseDetailSchema);
 }
 
+const actionParams = caseParams.extend({ actionId: z.string().uuid() });
+
 export const returnCasesContract = {
+  deadlines: endpoint
+    .route({
+      method: 'GET',
+      path: `${path}/return-deadlines`,
+      summary: 'Read merchant return deadlines',
+      description:
+        'Reads configured hours anchored to recorded case events. Configuration alone does not turn on automatic monitoring.',
+    })
+    .meta({ access: requires('returns.read'), errors: [401, 403, 503] })
+    .input(z.object({ params: organizationParamsSchema }))
+    .output(returnDeadlinePolicySchema),
+  configureDeadlines: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-deadlines`,
+      summary: 'Configure merchant return deadlines',
+      description:
+        'Saves a revision-checked policy. Exact command retries retain the original version. Activate Return step follow-up in Workflows to monitor automatically.',
+    })
+    .meta(writes)
+    .input(
+      z.object({
+        params: organizationParamsSchema,
+        body: configureReturnDeadlinesSchema,
+      }),
+    )
+    .output(returnDeadlinePolicySchema),
+  waiting: endpoint
+    .route({
+      method: 'GET',
+      path: `${path}/return-cases/{caseId}/waiting`,
+      summary: 'Read durable return waiting',
+      description:
+        'Reads owned waits, escalation and earlier occurrences without refreshing provider evidence.',
+    })
+    .meta({ access: requires('returns.read'), errors: [401, 403, 404, 503] })
+    .input(z.object({ params: caseParams }))
+    .output(returnWaitingViewSchema),
+  checkWaiting: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-cases/{caseId}/waiting/check`,
+      summary: 'Check return progress',
+      description:
+        'Independently rereads financial evidence and records actual receipt and inspection progress. It executes no provider write.',
+    })
+    .meta(writes)
+    .input(z.object({ params: caseParams, body: empty }))
+    .output(returnWaitingViewSchema),
+  exchanges: endpoint
+    .route({
+      method: 'GET',
+      path: `${path}/return-cases/{caseId}/exchange`,
+      summary: 'Read tracked return exchange',
+      description:
+        'Reads the operation, independent fulfillment and payment proof, and explicitly mapped replacement choices.',
+    })
+    .meta({ access: requires('returns.read'), errors: [401, 403, 404, 503] })
+    .input(z.object({ params: caseParams }))
+    .output(returnExchangesSchema),
+  completeExchange: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-cases/{caseId}/exchange/complete`,
+      summary: 'Verify exchange consistency in both systems',
+      description:
+        'Independently reads Shopify and Wawi. Completes the case only when returned stock, exactly one replacement order, its reservation, price and actual payment agree. A failed later check reopens owned work. Executes no provider write.',
+    })
+    .meta(writes)
+    .input(z.object({ params: caseParams, body: empty }))
+    .output(exchangeConsistencySchema),
+  requestExchange: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-cases/{caseId}/exchange/steps`,
+      summary: 'Request exchange step approval',
+      description:
+        'Freezes one native request, process, cancellation or payment hold release for independent approval. All attempts retain the same case operation. Uncertain sent writes are checked without redispatch.',
+    })
+    .meta(writes)
+    .input(z.object({ params: caseParams, body: exchangeRequestSchema }))
+    .output(exchangeStepSchema),
+  chooseExchange: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-cases/{caseId}/exchange/choice`,
+      summary: 'Choose how to handle replacement availability',
+      description:
+        'Records wait, different item or refund with an owner. The choice does not send a provider write. A different item or refund requires independently approved and freshly verified cancellation first.',
+    })
+    .meta(writes)
+    .input(z.object({ params: caseParams, body: exchangeChoiceInputSchema }))
+    .output(returnExchangeSchema),
+  refundExchange: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-cases/{caseId}/exchange/refund`,
+      summary: 'Hand off a cancelled exchange to refund',
+      description:
+        'After fresh cancellation proof, changes the proposal to refund while preserving physical inspection and restock quantities. Refunding remains a separately approved settlement.',
+    })
+    .meta(writes)
+    .input(
+      z.object({
+        params: caseParams,
+        body: z.object({ revision: z.number().int().positive() }).strict(),
+      }),
+    )
+    .output(z.object({ caseId: z.string().uuid() })),
+  decideExchange: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-cases/{caseId}/exchange/steps/{actionId}/decision`,
+      summary: 'Approve an exact exchange step',
+      description:
+        'A current independent approver responds to the frozen step. Execution uses the requester’s rechecked authority.',
+    })
+    .meta(writes)
+    .input(z.object({ params: actionParams, body: decideReturnCreationSchema }))
+    .output(exchangeStepSchema),
+  sendExchange: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-cases/{caseId}/exchange/steps/{actionId}/send`,
+      summary: 'Send an approved exchange step',
+      description:
+        'Resumes the same durable execution identity. A sent uncertain effect is reconciled without creating a second replacement.',
+    })
+    .meta(writes)
+    .input(z.object({ params: actionParams, body: empty }))
+    .output(exchangeStepSchema),
+  checkExchange: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-cases/{caseId}/exchange/steps/{actionId}/check`,
+      summary: 'Verify exchange fulfillment and payment',
+      description:
+        'Independently reads the exact native replacement, fulfillment and financial outcome. Provider acceptance does not prove payment or case closure.',
+    })
+    .meta(writes)
+    .input(z.object({ params: actionParams, body: empty }))
+    .output(exchangeStepSchema),
+  actions: endpoint
+    .route({
+      method: 'GET',
+      path: `${path}/return-cases/{caseId}/settlements`,
+      summary: 'Read return settlement',
+      description:
+        'Reads recorded physical and financial actions. Managers with a restock proposal also receive current Wawi warehouse choices for explicitly mapped items.',
+    })
+    .meta({ access: requires('returns.read'), errors: [401, 403, 404, 503] })
+    .input(z.object({ params: caseParams }))
+    .output(returnActionListSchema),
+  requestAction: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-cases/{caseId}/settlements`,
+      summary: 'Request return settlement approval',
+      description:
+        'Freezes the provider-calculated refund or the inspected resale units at an explicitly mapped warehouse. Refunds never restock goods. An independent approver must authorize the exact action.',
+    })
+    .meta(writes)
+    .input(z.object({ params: caseParams, body: requestReturnActionSchema }))
+    .output(returnActionSchema),
+  decideAction: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-cases/{caseId}/settlements/{actionId}/decision`,
+      summary: 'Approve return settlement',
+      description:
+        'A current independent approver responds to the frozen action. Approval dispatches once as the requester after their authority and case facts are checked again.',
+    })
+    .meta(writes)
+    .input(z.object({ params: actionParams, body: decideReturnCreationSchema }))
+    .output(returnActionSchema),
+  sendAction: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-cases/{caseId}/settlements/{actionId}/send`,
+      summary: 'Send approved return settlement',
+      description:
+        'The requester sends an approved action through Action Admission. Repeated calls do not duplicate the provider effect.',
+    })
+    .meta(writes)
+    .input(z.object({ params: actionParams, body: empty }))
+    .output(returnActionSchema),
+  checkAction: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/return-cases/{caseId}/settlements/{actionId}/check`,
+      summary: 'Verify return settlement',
+      description:
+        'Independently reads the exact stock change or refund payment. Pending, failed and uncertain outcomes stay distinct. This command never sends a provider write.',
+    })
+    .meta(writes)
+    .input(z.object({ params: actionParams, body: empty }))
+    .output(returnActionSchema),
+  list: endpoint
+    .route({
+      method: 'GET',
+      path: `${path}/return-cases`,
+      summary: 'Find return cases',
+      description:
+        'Searches persisted return cases by case, order, source identity or item. Customer filtering also requires customers.read and follows source order mappings. No provider is called. The cursor is bound to the tenant and filters.',
+    })
+    .meta({ access: requires('returns.read'), errors: [401, 403, 422, 503] })
+    .input(
+      z.object({
+        params: organizationParamsSchema,
+        query: z.object({
+          q: z.string().max(120).default(''),
+          customerId: z.string().uuid().optional(),
+          openOnly: z
+            .union([
+              z.boolean(),
+              z.enum(['true', 'false']).transform((value) => value === 'true'),
+            ])
+            .optional(),
+          cursor: z.string().max(4096).optional(),
+          limit: z.coerce.number().int().min(1).max(50).default(20),
+        }),
+      }),
+    )
+    .output(returnCaseListSchema),
   forOrder: endpoint
     .route({
       method: 'GET',

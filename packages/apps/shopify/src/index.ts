@@ -103,9 +103,30 @@ export function createShopifyProvider(
         tenantId: context.tenantId,
         connectionId: id,
         shop: target.shop,
-        accessToken: async () =>
-          (await runtime.installations.credential(context, id, capability))
-            .credentials.token,
+        accessToken: async () => {
+          if (
+            capability.startsWith('returns.exchange.') &&
+            !capability.endsWith('.read')
+          )
+            for (const read of [
+              'orders.read',
+              'returns.exchange.quote.read',
+              'returns.exchange.proof.read',
+              'returns.exchange.options.read',
+            ] as const)
+              await runtime.installations.credential(context, id, read);
+          if (capability === 'returns.refund')
+            for (const read of [
+              'orders.read',
+              'returns.settlement.quote.read',
+              'returns.settlement.proof.read',
+            ] as const)
+              await runtime.installations.credential(context, id, read);
+
+          return (
+            await runtime.installations.credential(context, id, capability)
+          ).credentials.token;
+        },
         recordObservations: runtime.recordObservations,
         ...(options.customerAccess
           ? {
@@ -195,6 +216,13 @@ export function createApp(context: AppFactoryContext): AppDefinition {
       ],
       connectionTypes: [{ kind: 'shopify', name: 'Shopify' }],
       permissions: [
+        {
+          key: 'shopify:returns.manage',
+          label: 'Manage Shopify returns',
+          description:
+            'Request approval for Shopify returns, refunds and exchanges.',
+          consequential: true,
+        },
         {
           key: 'shopify:fulfillment_recovery.run',
           label: 'Recover Shopify fulfillments',

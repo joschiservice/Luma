@@ -1,6 +1,11 @@
 import './returns.css';
 
-import type { DecisionEvidence, ReturnCaseDetail } from '@luma/api-contract';
+import type {
+  DecisionEvidence,
+  ReturnCaseDetail,
+  ReturnDetail,
+  ReturnWaitingView,
+} from '@luma/api-contract';
 import { formatNumber } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { rich } from '@luma/i18n/rich';
@@ -31,12 +36,16 @@ import { type ReactNode, useState } from 'react';
 
 import { SignInRedirect } from '../../kit/identity/common';
 import { IdentityError } from '../../kit/identity/data';
+import { useNow } from '../../kit/live/now';
 import { membersOptions } from '../../kit/settings/data';
 import {
   caseCommands,
   returnCaseError,
   returnCaseKey,
   returnCaseOptions,
+  returnExchangeOptions,
+  returnSettlementOptions,
+  returnWaitingOptions,
 } from './case-data';
 import {
   CancelDialog,
@@ -45,6 +54,7 @@ import {
   ProposalDialog,
   ReceiptDialog,
 } from './case-dialogs';
+import { ReturnExchange } from './case-exchange';
 import {
   caseStageDescriptions,
   caseStageLabels,
@@ -53,11 +63,14 @@ import {
   creationFailure,
   creationStateLabels,
   creationStateStates,
-  historyTitle,
   personName,
   reasonLabels,
   resolutionLabels,
 } from './case-presentation';
+import { ReturnServiceSummary, ReturnServiceTimeline } from './case-service';
+import { ReturnSettlement } from './case-settlement';
+import { ReturnWaiting, returnWaitReasons } from './case-waiting';
+import { returnOptions } from './data';
 
 export type ReturnCaseLoadError = 'missing' | 'access' | 'unavailable';
 
@@ -70,9 +83,28 @@ export function ReturnCasePage() {
     from: '/app/$organizationId/returns/cases/$caseId',
   });
   const query = useQuery(returnCaseOptions(organizationId, caseId));
+  const settlements = useQuery({
+    ...returnSettlementOptions(organizationId, caseId),
+    enabled: !!query.data,
+  });
+  const exchanges = useQuery({
+    ...returnExchangeOptions(organizationId, caseId),
+    enabled: !!query.data,
+  });
+  const waiting = useQuery({
+    ...returnWaitingOptions(organizationId, caseId),
+    enabled: !!query.data,
+  });
   const members = useQuery({
     ...membersOptions(organizationId),
     enabled: !!query.data?.canManage,
+  });
+  const sourceId = query.data?.sourceReturn?.id;
+  const source = useQuery({
+    ...returnOptions(organizationId, sourceId ?? ''),
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: 'always',
+    enabled: !!sourceId,
   });
   if (query.error instanceof IdentityError && query.error.status === 401)
     return <SignInRedirect />;
@@ -82,9 +114,51 @@ export function ReturnCasePage() {
     <ReturnCaseView
       organizationId={organizationId}
       detail={status === 403 ? undefined : query.data}
+      sourceDetail={sourceId ? source.data : undefined}
+      sourceLoading={!!sourceId && source.isPending}
+      sourceUnavailable={!!sourceId && source.isError}
+      waiting={waiting.isError ? undefined : waiting.data}
+      settlement={
+        query.data ? (
+          <>
+            <ReturnWaiting
+              data={waiting.data}
+              loading={waiting.isPending}
+              error={waiting.error}
+              organizationId={organizationId}
+              detail={query.data}
+            />
+            <ReturnExchange
+              organizationId={organizationId}
+              detail={query.data}
+              data={exchanges.data}
+              loading={exchanges.isPending}
+              unavailable={exchanges.isError}
+              retry={() => void exchanges.refetch()}
+            />
+            <ReturnSettlement
+              organizationId={organizationId}
+              detail={query.data}
+              data={settlements.data}
+              loading={settlements.isPending}
+              unavailable={settlements.isError}
+              retry={() => void settlements.refetch()}
+            />
+          </>
+        ) : null
+      }
+      settlementStarted={
+        (settlements.data?.items.some((a) => a.sent) ?? false) ||
+        (exchanges.data?.steps.some((a) => a.sent) ?? false)
+      }
       loading={query.isPending}
       refreshing={query.isFetching}
-      refresh={() => void query.refetch()}
+      refresh={() => {
+        void query.refetch();
+        void settlements.refetch();
+        void exchanges.refetch();
+        if (sourceId) void source.refetch();
+      }}
       people={(members.data ?? []).map((member) => ({
         id: member.userId,
         name: member.name ?? member.email ?? member.userId,
@@ -287,6 +361,11 @@ function Creation({
   open: (dialog: CaseDialogKind) => void;
 }) {
   const { creation, creationAvailability: availability } = detail;
+  const approving =
+    creation?.operation === 'approve' ||
+    (!creation &&
+      detail.order.connection.provider === 'shopify' &&
+      detail.sourceReturn?.status === 'requested');
   const system =
     availability.connection?.label ??
     detail.order.connection.label ??
@@ -317,14 +396,24 @@ function Creation({
 
   return (
     <Section
-      title={m.returns_case_creation_title({ system })}
-      description={m.returns_case_creation_description({ system })}
+      title={
+        approving
+          ? m.returns_case_approval_title({ system })
+          : m.returns_case_creation_title({ system })
+      }
+      description={
+        approving
+          ? m.returns_case_approval_description({ system })
+          : m.returns_case_creation_description({ system })
+      }
     >
       {creation ? (
         <div className="returns-case-creation">
           <p>
             <StatePill state={creationStateStates[creation.state]}>
-              {creationStateLabels[creation.state]}
+              {approving && creation.state === 'created'
+                ? m.returns_case_approval_verified()
+                : creationStateLabels[creation.state]}
             </StatePill>
           </p>
           {creation.observeOnly ? (
@@ -345,14 +434,18 @@ function Creation({
                 })}
               </dd>
             </div>
-            <div>
-              <dt>{m.returns_case_creation_warehouse()}</dt>
-              <dd>{creation.warehouse.name ?? m.common_not_reported()}</dd>
-            </div>
-            <div>
-              <dt>{m.returns_case_creation_reason()}</dt>
-              <dd>{creation.reason.name ?? m.common_not_reported()}</dd>
-            </div>
+            {!approving ? (
+              <div>
+                <dt>{m.returns_case_creation_warehouse()}</dt>
+                <dd>{creation.warehouse.name ?? m.common_not_reported()}</dd>
+              </div>
+            ) : null}
+            {!approving ? (
+              <div>
+                <dt>{m.returns_case_creation_reason()}</dt>
+                <dd>{creation.reason.name ?? m.common_not_reported()}</dd>
+              </div>
+            ) : null}
             {creation.state === 'approval_required' ? (
               <div>
                 <dt>{m.returns_case_creation_expires()}</dt>
@@ -413,7 +506,9 @@ function Creation({
                   <Send size={14} aria-hidden="true" />
                   {decide.isPending
                     ? m.returns_case_creation_sending()
-                    : m.returns_case_creation_approve({ system })}
+                    : approving
+                      ? m.returns_case_approval_send({ system })
+                      : m.returns_case_creation_approve({ system })}
                 </Button>
                 <Button
                   variant="outline"
@@ -464,7 +559,9 @@ function Creation({
             <Send size={14} aria-hidden="true" />
             {creation
               ? m.returns_case_creation_request_again({ system })
-              : m.returns_case_creation_start({ system })}
+              : approving
+                ? m.returns_case_approval_start({ system })
+                : m.returns_case_creation_start({ system })}
           </Button>
         </div>
       ) : null}
@@ -481,6 +578,12 @@ export function ReturnCaseView({
   refreshing = false,
   refresh,
   people = [],
+  sourceDetail,
+  sourceLoading = false,
+  sourceUnavailable = false,
+  settlement,
+  settlementStarted = false,
+  waiting,
 }: {
   organizationId: string;
   detail?: ReturnCaseDetail | undefined;
@@ -489,7 +592,14 @@ export function ReturnCaseView({
   refreshing?: boolean;
   refresh: () => void;
   people?: readonly PersonOption[];
+  sourceDetail?: ReturnDetail | undefined;
+  sourceLoading?: boolean;
+  sourceUnavailable?: boolean;
+  settlement?: ReactNode;
+  settlementStarted?: boolean;
+  waiting?: ReturnWaitingView | undefined;
 }) {
+  const now = new Date(useNow()).toISOString();
   const [dialog, setDialog] = useState<CaseDialogKind | null>(null);
   const client = useQueryClient();
   const assign = useMutation({
@@ -503,8 +613,12 @@ export function ReturnCaseView({
       client.invalidateQueries({ queryKey: returnCaseKey(organizationId) }),
   });
   const item = detail?.case;
+  const currentWait = waiting?.episodes
+    .filter((e) => ['waiting', 'escalated'].includes(e.state))
+    .sort((a, b) => a.dueAt.localeCompare(b.dueAt))[0];
   const open = item?.state === 'open';
-  const manage = !!detail?.canManage && open;
+  const canAssign = !!detail?.canManage && open;
+  const manage = canAssign && !settlementStarted;
   const order = detail?.order.number ?? detail?.order.id.slice(0, 8) ?? '';
   const source = detail?.order.connection.label ?? m.returns_source_fallback();
   const close = () => setDialog(null);
@@ -608,6 +722,68 @@ export function ReturnCaseView({
           >
             <h2 id="return-case-next-step">{caseStageLabels[item.stage]}</h2>
             <p>{caseStageDescriptions[item.stage]}</p>
+            <dl className="returns-facts">
+              <div>
+                <dt>{m.returns_service_owner()}</dt>
+                <dd>
+                  {item.assignee
+                    ? personName(item.assignee)
+                    : currentWait
+                      ? personName(detail.case.openedBy)
+                      : m.returns_service_unassigned()}
+                </dd>
+              </div>
+              <div>
+                <dt>{m.returns_service_waiting_on()}</dt>
+                <dd>
+                  {!open
+                    ? item.state === 'completed'
+                      ? m.returns_service_completed_wait()
+                      : m.returns_service_cancelled_wait()
+                    : detail.creation?.state === 'approval_required'
+                      ? m.returns_service_waiting_approver()
+                      : currentWait
+                        ? returnWaitReasons[currentWait.reason]()
+                        : detail.creation?.state === 'uncertain' ||
+                            detail.creation?.state === 'sending'
+                          ? m.returns_service_waiting_check()
+                          : item.stage === 'awaiting_receipt'
+                            ? m.returns_service_waiting_customer()
+                            : item.stage === 'proposed' &&
+                                sourceDetail?.item.refund.state === 'pending'
+                              ? m.returns_service_waiting_payment()
+                              : m.returns_service_waiting_operator()}
+                </dd>
+              </div>
+              {open ? (
+                <div>
+                  <dt>{m.returns_service_blocker()}</dt>
+                  <dd>
+                    {sourceUnavailable
+                      ? m.returns_service_source_unavailable()
+                      : item.stage === 'awaiting_receipt'
+                        ? m.returns_service_blocker_receipt()
+                        : item.stage === 'awaiting_inspection'
+                          ? m.returns_service_blocker_inspection()
+                          : item.stage === 'awaiting_proposal'
+                            ? m.returns_service_blocker_proposal()
+                            : m.returns_service_blocker_settlement()}
+                  </dd>
+                </div>
+              ) : null}
+              <div>
+                <dt>{m.returns_service_due()}</dt>
+                <dd>
+                  {detail.creation?.state === 'approval_required' ? (
+                    <WorkspaceDate value={detail.creation.expiresAt} />
+                  ) : currentWait ? (
+                    <WorkspaceDate value={currentWait.dueAt} />
+                  ) : (
+                    m.returns_service_due_unset()
+                  )}
+                </dd>
+              </div>
+            </dl>
             {detail.case.cancellation ? (
               <p className="returns-note">
                 {rich(m.returns_case_cancelled_by, {
@@ -663,6 +839,17 @@ export function ReturnCaseView({
           </section>
           <div className="returns-layout">
             <div className="returns-main">
+              <ReturnServiceSummary
+                detail={detail}
+                now={now}
+                source={sourceDetail}
+                loading={sourceLoading}
+                unavailable={sourceUnavailable}
+              />
+              {settlement}
+              {settlementStarted ? (
+                <Alert>{m.returns_settlement_locked()}</Alert>
+              ) : null}
               <Lines detail={detail} />
               <Decisions detail={detail} />
               <Creation
@@ -670,27 +857,11 @@ export function ReturnCaseView({
                 detail={detail}
                 open={setDialog}
               />
-              <Section
-                title={m.returns_case_history_title()}
-                description={m.returns_case_history_description()}
-              >
-                <ol className="returns-history">
-                  {detail.history.map((entry) => (
-                    <li key={entry.id}>
-                      <span className="returns-cell">
-                        <strong>{historyTitle(entry, system)}</strong>
-                        <small>
-                          {rich(m.returns_case_decided_by, {
-                            name: personName(entry.actor),
-                            date: <WorkspaceDate value={entry.at} />,
-                          })}
-                        </small>
-                        <Evidence value={entry.evidence} />
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-              </Section>
+              <ReturnServiceTimeline
+                detail={detail}
+                now={now}
+                source={sourceDetail}
+              />
             </div>
             <aside
               className="returns-inspector"
@@ -753,7 +924,7 @@ export function ReturnCaseView({
                           ? personName(item.assignee)
                           : m.returns_case_unassigned()}
                       </span>
-                      {manage && people.length ? (
+                      {canAssign && people.length ? (
                         <PersonPicker
                           label={m.returns_case_assign()}
                           title={m.returns_case_assign_title()}
@@ -762,7 +933,7 @@ export function ReturnCaseView({
                           onSelect={(id) => assign.mutate(id)}
                         />
                       ) : null}
-                      {manage && item.assignee ? (
+                      {canAssign && item.assignee ? (
                         <Button
                           variant="ghost"
                           size="sm"

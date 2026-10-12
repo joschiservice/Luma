@@ -2,8 +2,8 @@
 
 Returns lists the returns a connected store shares, and refunds that no return settles, with
 their stage, refund state, order and evidence. Returns and refunds are imported through
-commerce sync into the Orders owner's projections. Store records are only read: approving,
-receiving and refunding happen in the store, and Luma reads the result on its next sync.
+commerce sync into the Orders owner's projections. Store records are imported without changing their facts. Shopify creation and approval run
+through governed case actions; receipt and refunds remain separate steps.
 People record their own receipt, inspection and resolution decisions in
 [return cases](#return-cases), which link to store records without changing them.
 
@@ -119,8 +119,18 @@ Success needs an independent read through `returns.created.read` that finds exac
 return for the case with the approved lines and units; more than one, or different lines,
 fails the request and nothing is sent again. An uncertain dispatch only reconciles by
 reading. One request per case can be live or created. Approval requests expire after 24
-hours. Requests are not in Needs you yet; approvers open the case. JTL-Wawi is the only
-provider that creates returns; see [JTL](jtl.md#returns).
+hours. Requests are not in Needs you yet; approvers open the case. JTL-Wawi and Shopify
+create returns; see [JTL](jtl.md#returns) and [Shopify actions](shopify-actions.md#returns).
+
+For Shopify, a case linked to a requested return approves that exact request instead of
+creating a second return. It must cover all the request's lines and quantities. An open,
+closed, declined or cancelled source return cannot be approved again. A new case's return
+uses a machine case marker on every source return line. A fresh complete read must find
+exactly one open return with that marker and the approved units; matching quantities alone
+never establish identity. If Shopify loses or changes that marker, the write stays uncertain.
+After verified creation, commerce sync binds the imported return to the case and advances
+its revision, preventing double counting. This technical binding changes no receipt,
+inspection or financial decision.
 
 ## Limits
 
@@ -130,3 +140,120 @@ scans the tenant's returns (about 150 ms at 20,000); much larger volumes need a 
 search index like the order list's. Re-measure with `LUMA_RETURN_BENCHMARK=<return count>` on
 `returns.e2e.mjs`. The benchmark copies one return, so its detail reads are larger than for a
 real order.
+
+### Service review
+
+The case service view combines audited operator decisions with source return events and refund
+payments. It retains their origins and read times. Missing source transitions stay absent.
+The customer summary confirms payment facts only while the return and every associated refund
+read are at most 24 hours old and the connection has healthy, granted access. Pending and failed
+payments remain separate from successful money returned. A proposal is not execution evidence.
+
+Case search and Needs you use persisted tenant data, never provider reads. Customer links follow
+explicit source order mappings and require both customer and returns access. Linked orders retain
+case reachability. Needs you uses the case's audited assignment; assignment changes go through
+the case's revision-checked command and never grant action or approval authority.
+
+### Settling goods and money
+
+Receipt, inspection and the proposal are separate from provider effects. A case refunds received
+units, including damaged units; it never refunds missing units. Restock is limited to the proposed
+resale quantity. Each line needs an explicit canonical SKU mapping to the Wawi item and a current
+warehouse chosen from an independent source read. Aggregate inventory locations are not warehouses.
+
+Each settlement freezes its provider quote, case facts, source identities and evidence. Refunds use
+Shopify's suggested refund for the selected units, including its tax, discount and captured-payment
+allocation. A high-risk Action Admission request requires independent approval and current app
+permission. Approval lasts 24 hours. A stale case or remapped source blocks dispatch. Changing case
+ownership preserves the approval; changing physical facts after dispatch is refused.
+
+One sent request permanently holds its case/kind/line slot. Restart or retry uses the same execution
+identity. An uncertain outcome is read again, never resent. Shopify uses native refund idempotency;
+Wawi stock changes have no provider idempotency guarantee. An independent read must find the exact
+operation marker, approved units and physical stock total. Concurrent unrelated movements leave the
+stock step uncertain. Financial proof requires successful transactions for the whole approved amount
+and currency. Pending, failed and partial payments never establish settlement. Case completion still
+requires the other steps; neither accepted mutation nor one verified step closes a case.
+
+An admission rejection alone does not release a send fence: another caller may already have reserved
+the same execution. Only the durable execution ledger can establish non-dispatch. Concurrent late
+results retain newer proof, and an exchange's processing fence resets in the same owner transaction
+as confirmed non-dispatch. If admission has not reserved execution, the same sending identity remains
+resumable; it is never replaced with another provider operation.
+
+Settlement proof older than five minutes is shown as stale. Unavailable reads retain the last proof
+and ask for another check. Wawi settlement writes are currently granted only in the installed
+simulator. A live installation needs its stock write capability verified before it can be granted.
+
+### Exchanges
+
+A reviewed exchange credits only received units. The replacement needs explicit canonical SKU
+mappings to Shopify's inventory item and Wawi's item. Shopify availability and Wawi's reported
+all-warehouse availability are read independently; neither is a reservation. Luma first requests
+an unprocessed native exchange, then asks separately for approval to process its exact lines and
+native financial outcome. A source return without a compatible replacement intent needs an owned
+handoff; Luma does not invent an API to add exchange lines to an existing return.
+
+One case operation retains the replacement requests, approval steps and availability choices.
+After processing could have been sent, its permanent slot prevents a second replacement fulfillment.
+A lost response is reconciled through the exact machine marker and native processed lines, not by
+sending another request. An independently read fulfillment can be prepared while its price difference
+is still pending or failed. Charges require new successful captured transactions for the approved
+amount and currency and a zero outstanding balance. Refund differences require successful native
+return-refund transactions for the approved amount. Only the exact payment hold can be released,
+through a separate approval after fresh payment proof; unrelated holds remain in place.
+
+When stock changes, the case owner explicitly chooses wait, a different item or a refund. A different
+item or refund first requires governed cancellation of the pristine source intent and independent
+cancellation proof. A processed or uncertain processing attempt cannot be replaced this way. Refund
+handoff preserves inspected resale stock quantities and still requires separate refund approval.
+Wawi allocation remains owned work: native Shopify intent is not proof of an ERP reservation or
+replacement order. Neither prepared fulfillment nor a paid difference alone closes the case.
+
+## Owned return deadlines
+
+Merchant deadline configuration is versioned and disabled until reviewed. Receipt waits start
+at case opening; inspection waits start at the recorded receipt; proposal waits start at
+inspection. Financial waits start at the proposal, then the actual action request once one
+exists. Missing physical units can wait alongside inspection of the units that arrived.
+Unobserved store transitions never supply an inferred timestamp.
+
+The return step follow-up must be activated in Workflows for automatic monitoring. Its bounded
+passes use a persisted cursor and reread each case no more than once per minute. Explicit progress checks use the same service and make no
+provider writes. Each phase has one live occurrence; repeated observations update it rather
+than opening duplicate cases. Policy or anchor changes supersede earlier occurrences. Disabled
+policies and cancelled cases pause their waits without claiming verification.
+
+Pending, failed and partial money remain unresolved. Only complete independent evidence no more
+than five minutes old can verify financial progress. Unavailable access, missing evidence and
+stale observations remain separate waiting reasons. Later recurrence creates a new occurrence
+and preserves the earlier verified or escalated history. Case assignment controls ownership;
+the workflow hands overdue steps to that owner rather than duplicating the Needs you item.
+
+The existing imported-return refund follow-up requires a reported receipt timestamp. Latest
+activity is not a substitute. A pending or failed stage never ends that follow-up; complete,
+fresh evidence of the refunded units and settled money is required.
+Record read times establish freshness independently of the daily full-scan timestamp. The full scan
+establishes coverage, rather than making a current incremental payment read stale. Bounded passes
+retain a tenant-scoped cursor per view, advance past settled or unreceived returns, and resume after
+restart. A failed detail read retains the page for another pass.
+
+### Independent exchange completion
+
+The final check reads the configured Shopify and Wawi installations again. It compares source receipt
+and stock disposition with the case, the exact approved Wawi restock movement and warehouse total,
+the native processed replacement price, and actual payment or refund transactions. In Wawi, an
+operator creates one paid replacement sales order with the operation reference shown in the case.
+The read checks the exact mapped item, quantity and gross total, plus native reservations tied to
+that sales order. Reported item availability is never used as proof of reservation.
+
+Order and reservation scans stop at 500 records, with complete pagination required to prove uniqueness.
+Missing access, incomplete scans, duplicate references, unsettled money, price disagreement and
+concurrent stock movements leave the case open with its current owner and a specific handover in
+Needs you. Each verdict retains source observation references in the audit log. Damaged units remain
+unresolved because this pair cannot independently prove disposal in the physical stock owner.
+
+Only a complete fresh verdict closes the case and retires its active return waits. A later explicit
+check reads both sources again; if they no longer agree, it reopens the case, preserves its owner and
+adds a history event. Past verification is a point-in-time result. The final check dispatches no
+provider write and never replays uncertain exchange or stock actions.

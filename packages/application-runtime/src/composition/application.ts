@@ -30,9 +30,15 @@ import type { IdentityService, TenantContext } from '@luma/identity';
 import { createMessaging } from '@luma/messaging/composition';
 import {
   createOrderMetricReader,
+  createReturnActionService,
   createReturnCaseService,
+  createReturnDeadlineService,
+  createReturnExchangeService,
   orderStateQueries,
+  type ReturnActions,
   type ReturnCases,
+  type ReturnDeadlines,
+  type ReturnExchanges,
 } from '@luma/orders/composition';
 import type {
   ModelGateway,
@@ -64,11 +70,14 @@ import {
   messageReplyDecisionProvider,
   replenishmentDecisionProvider,
   replySendDecisionProvider,
+  returnCaseDecisionProvider,
   supplierCommitmentDecisionProvider,
   workflowHandoverDecisionProvider,
 } from '@luma/read-models/composition';
 import {
+  createReturnStepFollowUp,
   createShippingMethodTemplate,
+  returnStepFollowUpSource,
   shippingMethodPlaybook,
   shippingMethodVocabulary,
 } from '@luma/resolution';
@@ -76,6 +85,7 @@ import {
   createActivityStore,
   createDecisionAssignments,
   createOperationsOverview,
+  createRefundFollowUpCursor,
   createResolutionLearning,
   createResolutionMeasurements,
   createResolutionMetricReader,
@@ -86,6 +96,7 @@ import {
 import type { CaseWorkflowAdapter } from '@luma/workflows';
 import {
   compilePlaybook,
+  compileProcessWorkflow,
   createCodeProcesses,
   createCoordination,
   createDraftGenerations,
@@ -134,6 +145,16 @@ import {
   createReturnCreationEffects,
   createReturnSystem,
 } from './return-cases.js';
+import { createReturnConsistencySystem } from './return-consistency.js';
+import {
+  createReturnExchangeAdmission,
+  createReturnExchangeEffects,
+} from './return-exchanges.js';
+import {
+  createReturnSettlementAdmission,
+  createReturnSettlementEffects,
+  createReturnSettlementSystem,
+} from './return-settlement.js';
 import { createSalesRuntime } from './sales.js';
 import {
   createDeskServices,
@@ -171,6 +192,9 @@ export interface ApplicationServices {
   procurement: ReturnType<typeof createProcurement>;
   commitments: SupplierCommitments;
   returnCases: ReturnCases;
+  returnActions: ReturnActions;
+  returnExchanges: ReturnExchanges;
+  returnDeadlines: ReturnDeadlines;
   library: ReturnType<typeof createPersistentPlaybookLibrary>;
   messaging: ReturnType<typeof createMessaging>;
   http: {
@@ -201,6 +225,9 @@ export interface ApplicationServices {
     fulfillment: ReturnType<typeof createFulfillmentWorkspace>;
     returns: ReturnType<typeof createReturnWorkspace>;
     returnCases: ReturnCases;
+    returnActions: ReturnActions;
+    returnExchanges: ReturnExchanges;
+    returnDeadlines: ReturnDeadlines;
     customers: ReturnType<typeof createCustomerWorkspace>;
     orders: ReturnType<typeof createOrderWorkspace>;
     sales: ReturnType<typeof createSalesRuntime>;
@@ -349,12 +376,28 @@ export function createApplicationServices(
     options.execution.kind === 'enabled' && options.returns
       ? createReturnCreationEffects(options.returns.runtime, () => returnCases)
       : { resolve: async () => null };
+  const settlementEffects =
+    options.execution.kind === 'enabled' && options.returns
+      ? createReturnSettlementEffects(
+          options.returns.runtime,
+          () => returnActions,
+        )
+      : { resolve: async () => null };
+  const exchangeEffects =
+    options.execution.kind === 'enabled' && options.returns
+      ? createReturnExchangeEffects(
+          options.returns.runtime,
+          () => returnExchanges,
+        )
+      : { resolve: async () => null };
   const combinedEffects: EffectRegistry = {
     resolve: async (context, intent) =>
       (await procurementEffects.resolve(context, intent)) ??
       (await submissionEffects.resolve(context, intent)) ??
       (await replyEffects.resolve(context, intent)) ??
       (await returnCreationEffects.resolve(context, intent)) ??
+      (await settlementEffects.resolve(context, intent)) ??
+      (await exchangeEffects.resolve(context, intent)) ??
       effects.resolve(context, intent),
   };
   const resolutionEligible = createAdmissionEligibility(detection.diagnoses);
@@ -366,9 +409,13 @@ export function createApplicationServices(
           ? messaging.replies.eligible(context, step)
           : step.subject?.kind === 'return_case_creation'
             ? returnCases.eligible(context, step)
-            : step.subject
-              ? replenishment.eligible(context, step)
-              : resolutionEligible(context, step),
+            : step.subject?.kind === 'return_case_settlement'
+              ? returnActions.eligible(context, step)
+              : step.subject?.kind === 'return_case_exchange'
+                ? returnExchanges.eligible(context, step)
+                : step.subject
+                  ? replenishment.eligible(context, step)
+                  : resolutionEligible(context, step),
   });
   const commitments: SupplierCommitments = createSupplierCommitmentService(
     database,
@@ -479,6 +526,74 @@ export function createApplicationServices(
       principal: identity.resolveWorkflowContext,
     },
   );
+  const returnActions = createReturnActionService(database, createAuditLog, {
+    system: options.returns
+      ? createReturnSettlementSystem(options.returns.runtime)
+      : null,
+    admission:
+      options.execution.kind === 'enabled' && options.returns
+        ? createReturnSettlementAdmission(safety, combinedEffects)
+        : null,
+    refreshContext: identity.refreshContext,
+    principal: identity.resolveWorkflowContext,
+  });
+  const returnExchanges = createReturnExchangeService(
+    database,
+    createAuditLog,
+    {
+      system: options.returns
+        ? createReturnConsistencySystem(options.returns.runtime)
+        : null,
+      admission:
+        options.execution.kind === 'enabled' && options.returns
+          ? createReturnExchangeAdmission(safety, combinedEffects)
+          : null,
+      refreshContext: identity.refreshContext,
+      principal: identity.resolveWorkflowContext,
+    },
+  );
+  const returnDeadlines = createReturnDeadlineService(
+    database,
+    createAuditLog,
+    {
+      refreshContext: identity.refreshContext,
+      source: {
+        async money(context, value, refund, exchange) {
+          const step = value.proposal?.kind === 'exchange' ? exchange : refund;
+          if (!step?.sent)
+            return {
+              state: 'not_requested',
+              readable: true,
+              complete: true,
+              observedAt: value.proposal?.at ?? null,
+              evidenceRefs: [`case:${value.id}:${value.revision}`],
+              requestedAt: step?.requestedAt ?? null,
+            };
+          if (!options.returns)
+            throw new Error('Return financial reads unavailable');
+          const proof =
+            value.proposal?.kind === 'exchange' && exchange
+              ? await returnExchanges.observe(context, value.id, exchange.id)
+              : refund
+                ? await returnActions.observe(context, value.id, refund.id)
+                : null;
+
+          return {
+            state: proof?.payment ?? 'unknown',
+            readable: true,
+            complete:
+              !!proof &&
+              proof.payment !== null &&
+              proof.payment !== 'unknown' &&
+              proof.evidenceRefs.length > 0,
+            observedAt: proof?.observedAt ?? null,
+            evidenceRefs: proof?.evidenceRefs ?? [],
+            requestedAt: step.requestedAt,
+          };
+        },
+      },
+    },
+  );
   const desk = createDeskServices(
     database,
     identity,
@@ -515,8 +630,17 @@ export function createApplicationServices(
     policies: safety.policies,
     sources: [
       ...(options.workflowSources ?? []),
+      createReturnStepFollowUp({
+        version: compileProcessWorkflow(returnStepFollowUpSource),
+        configured: async (context) =>
+          (await returnDeadlines.policy(context)).policy?.enabled === true,
+        tick: (context) => returnDeadlines.tick(context),
+        pending: (context) => returnDeadlines.pending(context),
+        get: (context, id) => returnDeadlines.occurrence(context, id),
+      }),
       // Orders and returns are composed below; follow-ups read them only once runs start.
       ...createFollowUpWorkflows({
+        refundCursor: createRefundFollowUpCursor(database),
         commitments,
         suppliers: async (context) =>
           (await procurement.suppliers(context)).items,
@@ -640,6 +764,18 @@ export function createApplicationServices(
           })),
       },
       replenishmentDecisionProvider(replenishment.pending),
+      returnCaseDecisionProvider(async (context) => {
+        const [cases, waits] = await Promise.all([
+          returnCases.pending(context),
+          returnDeadlines.pending(context),
+        ]);
+
+        return cases.map((value) => {
+          const waiting = waits.find((w) => w.caseId === value.case.id);
+
+          return waiting ? { ...value, waiting } : value;
+        });
+      }),
       supplierCommitmentDecisionProvider(async (context) =>
         (await commitments.pending(context)).map((item) => ({
           key: item.attention.key,
@@ -717,7 +853,12 @@ export function createApplicationServices(
     refreshContext: identity.refreshContext,
     members: async (context) =>
       (await identity.listMembers(context)).map((member) => member.userId),
-    pending: async (context, id) => !!(await decisions.find(context, id)),
+    pending: async (context, id) => {
+      const item = await decisions.find(context, id);
+
+      // Return case assignments belong to the case's revision-checked command.
+      return !!item && item.owner.kind !== 'return_case';
+    },
   });
   const orderQueries = {
     state: orderStateQueries,
@@ -771,6 +912,9 @@ export function createApplicationServices(
     procurement,
     commitments,
     returnCases,
+    returnActions,
+    returnExchanges,
+    returnDeadlines,
     detection,
     safety,
     desk,
@@ -821,6 +965,9 @@ export function createApplicationServices(
       procurementContext: createProcurementContext(database),
       returns,
       returnCases,
+      returnActions,
+      returnExchanges,
+      returnDeadlines,
       customers: createCustomerWorkspace(database),
       records: createRecordExplorer(database, hiddenOrderSources),
       orders,

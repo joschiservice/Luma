@@ -47,7 +47,7 @@ import {
   returnLinesJson,
   returnReasonsJson,
 } from './returns.js';
-import { itemJson } from './stock.js';
+import { itemJson, loadItems, saveStock } from './stock.js';
 
 const roots = new Set([
   'sales-orders',
@@ -60,6 +60,7 @@ const roots = new Set([
   'purchase-orders',
   'returns',
   'return-reasons',
+  'stocks',
 ]);
 
 const MAX_PAGE_SIZE = 1000;
@@ -94,33 +95,39 @@ export function identify(request: ProviderRequest): ProviderTarget {
   const [root, id, child, nested] = path;
   const resource = root === 'warehouses' ? nested : id;
   const operation =
-    root === 'sales-orders'
-      ? request.method === 'PATCH'
-        ? 'orders.shipping-method.write'
-        : id && !child
-          ? 'orders.shipping-method.read'
-          : 'orders.read'
-      : root === 'delivery-notes'
-        ? 'fulfillment.read'
-        : root === 'items' || root === 'warehouses'
-          ? 'items.read'
-          : root === 'shipping-methods'
-            ? 'orders.read'
-            : root === 'suppliers'
-              ? 'suppliers.read'
-              : root === 'customers'
-                ? 'customers.read'
-                : root === 'purchase-orders'
-                  ? write
-                    ? 'purchase-orders.submit'
-                    : 'purchase-orders.read'
-                  : root === 'returns'
+    root === 'stocks'
+      ? write
+        ? 'returns.restock'
+        : id === 'reservations'
+          ? 'returns.exchange.reservation.read'
+          : 'returns.settlement.proof.read'
+      : root === 'sales-orders'
+        ? request.method === 'PATCH'
+          ? 'orders.shipping-method.write'
+          : id && !child
+            ? 'orders.shipping-method.read'
+            : 'orders.read'
+        : root === 'delivery-notes'
+          ? 'fulfillment.read'
+          : root === 'items' || root === 'warehouses'
+            ? 'items.read'
+            : root === 'shipping-methods'
+              ? 'orders.read'
+              : root === 'suppliers'
+                ? 'suppliers.read'
+                : root === 'customers'
+                  ? 'customers.read'
+                  : root === 'purchase-orders'
                     ? write
-                      ? 'returns.create'
-                      : 'returns.created.read'
-                    : root === 'return-reasons'
-                      ? 'returns.options.read'
-                      : 'unknown';
+                      ? 'purchase-orders.submit'
+                      : 'purchase-orders.read'
+                    : root === 'returns'
+                      ? write
+                        ? 'returns.create'
+                        : 'returns.created.read'
+                      : root === 'return-reasons'
+                        ? 'returns.options.read'
+                        : 'unknown';
 
   return { operation, resource, write };
 }
@@ -349,6 +356,12 @@ async function warehouses(
       })),
       page,
     );
+  if (!child) {
+    const w = context.config.warehouses.find((w) => w.id === id);
+    if (!w) throw new JtlError(404, 'Not Found');
+
+    return json({ id: configId(w.id), name: w.name, active: true });
+  }
   if (child !== 'items' || !itemId || leaf !== 'stocks' || rest.length)
     return undefined;
   if (!context.config.warehouses.some((w) => w.id === id))
@@ -534,11 +547,144 @@ async function returns(
   );
 }
 
+interface StockChange {
+  itemId: string;
+  warehouseId: string;
+  quantity: number;
+  changedDate: string;
+  comment: string | null;
+}
+
+/** ERP stock POST has no native idempotency; each request records one physical addition. */
+async function stocks(
+  context: JtlContext,
+  request: ProviderRequest,
+  url: URL,
+  page: PageRequest,
+  path: string[],
+) {
+  if (request.method === 'POST' && !path.length) {
+    const input = body(request);
+    if (
+      !input ||
+      typeof input !== 'object' ||
+      !('itemId' in input) ||
+      !('warehouseId' in input) ||
+      !('quantity' in input)
+    )
+      throw new JtlError(400, 'Invalid stock input');
+    const itemId = String(input.itemId),
+      warehouseId = String(input.warehouseId),
+      quantity = input.quantity;
+    if (
+      typeof quantity !== 'number' ||
+      !Number.isSafeInteger(quantity) ||
+      quantity <= 0 ||
+      !context.config.warehouses.some((w) => w.id === warehouseId)
+    )
+      throw new JtlError(400, 'Invalid stock quantity or warehouse');
+    const item = (await loadItems(context, [itemId])).get(itemId)!;
+    const comment =
+      'comment' in input && typeof input.comment === 'string'
+        ? input.comment
+        : null;
+    item.stock[warehouseId] = (item.stock[warehouseId] ?? 0) + quantity;
+    const id = String(await context.store.sequence('stock-change', 1));
+    await saveStock(context, [item]);
+    await context.store.put<StockChange>(
+      'stock-change',
+      id,
+      {
+        itemId,
+        warehouseId,
+        quantity,
+        changedDate: new Date(context.now).toISOString(),
+        comment,
+      },
+      { parent: itemId, updatedAt: context.now },
+    );
+
+    return {
+      ...json(
+        {
+          itemId: configId(itemId),
+          warehouseId: configId(warehouseId),
+          storageLocationId: null,
+          storageLocationName: null,
+          shelfLifeExpirationDate: null,
+          batchNumber: null,
+          quantityTotal: item.stock[warehouseId],
+          quantityLockedForShipment: 0,
+          quantityLockedForAvailability: 0,
+          quantityInPickingLists: 0,
+        },
+        201,
+      ),
+      committed: true,
+    };
+  }
+  if (
+    request.method === 'GET' &&
+    path.length === 1 &&
+    path[0] === 'reservations'
+  ) {
+    const rows = [];
+    const count = await context.store.count({ kind: kinds.order });
+    if (count > 10_000) throw new JtlError(503, 'Reservation scan unavailable');
+    for (let offset = 0; offset < count; offset += 1000)
+      for (const record of (
+        await context.store.page<OrderRecord>({
+          kind: kinds.order,
+          offset,
+          limit: 1000,
+        })
+      ).items) {
+        if (record.data.cancelled) continue;
+        for (const line of record.data.lines)
+          if (line.quantity > line.shipped)
+            rows.push({
+              itemId: configId(line.itemId),
+              salesOrderId: configId(record.data.id),
+              customerId: record.data.customerId
+                ? configId(record.data.customerId)
+                : 0,
+              amount: line.quantity - line.shipped,
+              createdAt: record.data.date,
+              platform: 'Luma simulator',
+            });
+      }
+
+    return memoryPage(rows, page);
+  }
+  if (request.method === 'GET' && path.length === 1 && path[0] === 'changes') {
+    const itemId = url.searchParams.get('itemId');
+
+    return storedPage<StockChange>(
+      context,
+      page,
+      { kind: 'stock-change', ...(itemId ? { parent: itemId } : {}) },
+      (rows) =>
+        rows.map(({ data }) => ({
+          ...data,
+          itemId: configId(data.itemId),
+          warehouseId: configId(data.warehouseId),
+          storageLocationId: null,
+          shelfLifeExpirationDate: null,
+          batchNumber: null,
+          username: 'simulator',
+        })),
+    );
+  }
+
+  return undefined;
+}
+
 async function route(context: JtlContext, request: ProviderRequest) {
   const url = new URL(request.url);
   const [root, ...path] = resourcePath(request.url) ?? [];
   const page = pageRequest(url);
   if (!page) throw new JtlError(400, 'Invalid page parameters');
+  if (root === 'stocks') return stocks(context, request, url, page, path);
   if (root === 'sales-orders') return salesOrders(context, request, page, path);
   if (root === 'purchase-orders')
     return purchaseOrders(context, request, url, page, path);

@@ -461,6 +461,28 @@ describe('detection monitor', () => {
     expect(f.exceptions.incidents[0]!.state).toBe('resolved');
   });
 
+  it('verifies a recovered sync failure opened under an earlier configuration', async () => {
+    const failing = stream({
+      attempts: 5,
+      errorCode: 'transient',
+      errorAt: ago(1),
+      failingSince: ago(20),
+    });
+    const f = fixture({ streams: [failing] });
+    await f.monitor.tick(context);
+    f.exceptions.incidents[0]!.configVersion = 'earlier';
+    f.state.streams[0] = {
+      ...failing,
+      attempts: 0,
+      failingSince: null,
+      lastCompleteAt: now.toISOString(),
+    };
+
+    await f.monitor.tick(context);
+
+    expect(f.exceptions.incidents[0]!.state).toBe('resolved');
+  });
+
   it('opens one case when the provider revokes access and verifies it after reconnecting', async () => {
     const lost = { active: false, accessLostAt: ago(2) };
     const f = fixture({

@@ -1,4 +1,9 @@
-import type { ReturnCaseDetail } from '@luma/api-contract';
+import type {
+  ReturnActionList,
+  ReturnCaseDetail,
+  ReturnExchangesView,
+  ReturnWaitingView,
+} from '@luma/api-contract';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -12,6 +17,10 @@ import { expect, userEvent, within } from 'storybook/test';
 
 import appStyles from '../../styles.css?inline';
 import { ReturnCaseView } from './case';
+import { ReturnExchange } from './case-exchange';
+import { ReturnSettlement } from './case-settlement';
+import { ReturnWaiting } from './case-waiting';
+import { detail as sourceDetail } from './returns-fixtures';
 
 const org = '99999999-9999-4999-8999-999999999999';
 const alex = {
@@ -205,14 +214,334 @@ const cancelled: ReturnCaseDetail = {
   creationAvailability: { ...open.creationAvailability, blocker: 'cancelled' },
 };
 
+function settlement(state: string): ReturnActionList {
+  const now = new Date().toISOString();
+
+  return {
+    available: true,
+    asOf: now,
+    targetStatus: 'not_configured',
+    targets: [],
+    items: [
+      {
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        caseId: proposed.case.id,
+        connectionId: proposed.case.connectionId,
+        orderLineId: null,
+        kind: 'refund',
+        plan: {
+          kind: 'refund',
+          order: { externalId: 'gid://shopify/Order/1', scopeKey: '' },
+          lines: [
+            {
+              orderLine: {
+                externalId: 'gid://shopify/LineItem/2',
+                scopeKey: 'gid://shopify/Order/1',
+              },
+              quantity: 2,
+            },
+          ],
+          amount: '48',
+          currency: 'EUR',
+          transactions: [
+            {
+              parentId: 'gid://shopify/OrderTransaction/3',
+              gateway: 'shopify_payments',
+              amount: '48',
+            },
+          ],
+        },
+        requestedBy: alex.id,
+        requestedAt: now,
+        expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+        decidedBy: sam.id,
+        decidedAt: now,
+        decisionId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        state:
+          state === 'stale'
+            ? 'verified'
+            : state === 'approval'
+              ? 'approval_required'
+              : state === 'failed'
+                ? 'failed'
+                : 'pending',
+        sent: state !== 'approval',
+        failure: null,
+        updatedAt: now,
+        proof:
+          state === 'approval'
+            ? null
+            : {
+                outcome:
+                  state === 'stale'
+                    ? 'passed'
+                    : state === 'failed'
+                      ? 'failed'
+                      : 'inconclusive',
+                payment:
+                  state === 'stale'
+                    ? 'paid'
+                    : state === 'failed'
+                      ? 'failed'
+                      : 'pending',
+                observedAt: state === 'stale' ? '2026-09-01T00:00:00Z' : now,
+                evidenceRefs: ['eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'],
+              },
+        canApprove: state === 'approval',
+        canCheck: state !== 'approval',
+        canSend: false,
+        observeOnly: false,
+      },
+    ],
+  };
+}
+
 const details: Record<string, ReturnCaseDetail> = {
   open,
   proposed,
   approval: awaitingApproval,
+  shopifyApproval: {
+    ...awaitingApproval,
+    order: {
+      ...open.order,
+      connection: {
+        ...open.order.connection,
+        label: 'Shopify',
+        provider: 'shopify',
+      },
+    },
+    sourceReturn: {
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      name: '#1042-R1',
+      status: 'requested',
+    },
+    creation: { ...awaitingApproval.creation!, operation: 'approve' },
+    creationAvailability: {
+      ...awaitingApproval.creationAvailability,
+      connection: { id: open.order.connection.id, label: 'Shopify' },
+    },
+  },
   cancelled,
 };
 
-function Preview({ state = 'open' }: { state?: string }) {
+function exchange(
+  state: 'approval' | 'pending' | 'paid' | 'failed' | 'unavailable' | 'stale',
+): ReturnExchangesView {
+  const now = new Date().toISOString(),
+    proofAt = state === 'stale' ? '2026-01-01T00:00:00Z' : now,
+    root = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    attempt = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const replacement = {
+    skuId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    mappingIds: [root, attempt],
+    inventoryItem: {
+      externalId: 'gid://shopify/InventoryItem/11',
+      scopeKey: '',
+    },
+    variantId: 'gid://shopify/ProductVariant/11',
+    wawiConnectionId: open.order.connection.id,
+    item: { externalId: '10', scopeKey: '' },
+    quantity: 1,
+  };
+  const request = {
+    kind: 'request' as const,
+    marker: `luma-ex:${root}:${attempt}`,
+    order: { externalId: 'gid://shopify/Order/1', scopeKey: '' },
+    lines: [
+      {
+        orderLineId: open.lines[0]!.orderLineId,
+        source: {
+          externalId: 'gid://shopify/LineItem/2',
+          scopeKey: 'gid://shopify/Order/1',
+        },
+        quantity: 1,
+        reason: 'OTHER',
+      },
+    ],
+    replacement,
+  };
+  const financial = {
+    kind: 'charge' as const,
+    amount: '5.00',
+    currency: 'EUR',
+    transactions: [],
+    priorSuccessfulTransactionIds: ['gid://shopify/OrderTransaction/3'],
+  };
+  const process = {
+    kind: 'process' as const,
+    marker: request.marker,
+    order: request.order,
+    returnId: 'gid://shopify/Return/4',
+    returnLines: [{ id: 'gid://shopify/ReturnLineItem/5', quantity: 1 }],
+    exchangeLine: { id: 'gid://shopify/ExchangeLineItem/6', quantity: 1 },
+    replacement,
+    financial,
+  };
+
+  return {
+    available: true,
+    asOf: now,
+    choices: [
+      {
+        ...replacement,
+        id: 'choice',
+        label: 'Linen shirt, replacement size L',
+        available: state === 'unavailable' ? 0 : 4,
+      },
+    ],
+    choiceStatus: 'ready',
+    operation: {
+      id: root,
+      tenantId: org,
+      caseId: open.case.id,
+      connectionId: open.order.connection.id,
+      startedBy: alex.id,
+      startedAt: now,
+      ownerId: sam.id,
+      revision: 2,
+      choice:
+        state === 'unavailable' ? { kind: 'wait', by: alex.id, at: now } : null,
+      currentAttemptId: attempt,
+      replacementName: 'Linen shirt, replacement size L',
+      request,
+      availability:
+        state === 'unavailable'
+          ? { available: false, observedAt: now, evidenceRefs: [root] }
+          : null,
+      processingStarted: state !== 'unavailable',
+      updatedAt: now,
+    },
+    steps: [
+      {
+        id: attempt,
+        actionId: attempt,
+        operationId: root,
+        tenantId: org,
+        caseId: open.case.id,
+        connectionId: open.order.connection.id,
+        plan: state === 'unavailable' ? request : process,
+        caseDigest: 'digest',
+        requestDigest: 'digest',
+        quote: { observedAt: now, evidenceRefs: [root] },
+        requestedBy: alex.id,
+        requestedAt: now,
+        expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+        decisionId: root,
+        decidedBy: null,
+        decidedAt: null,
+        state: state === 'approval' ? 'approval_required' : 'verified',
+        sent: state !== 'approval',
+        proof:
+          state === 'approval'
+            ? null
+            : {
+                outcome: 'passed',
+                observedAt: proofAt,
+                evidenceRefs: [root],
+                returnId: process.returnId,
+                processLines: {
+                  returnLines: process.returnLines,
+                  exchangeLine: process.exchangeLine,
+                },
+                fulfillmentOrderId:
+                  state === 'unavailable'
+                    ? null
+                    : 'gid://shopify/FulfillmentOrder/7',
+                paymentHoldId:
+                  state === 'paid' ? null : 'gid://shopify/FulfillmentHold/8',
+                fulfillmentReady: state === 'paid',
+                payment:
+                  state === 'paid'
+                    ? 'paid'
+                    : state === 'failed'
+                      ? 'failed'
+                      : 'pending',
+                financial,
+              },
+        failure: null,
+        updatedAt: now,
+        canApprove: state === 'approval',
+        canSend: false,
+        canCheck: state !== 'approval',
+        observeOnly: false,
+      },
+    ],
+  };
+}
+
+function waits(
+  reason: ReturnWaitingView['episodes'][number]['reason'],
+): ReturnWaitingView {
+  const base = {
+    caseId: proposed.case.id,
+    orderId: proposed.order.id,
+    connectionId: proposed.case.connectionId,
+    policyRevision: 1,
+    occurrence: 1,
+    state: 'escalated' as const,
+    ownerId: sam.id,
+    evidenceRefs: ['source-observation'],
+    openedAt: proposed.case.openedAt,
+    updatedAt: proposed.asOf,
+    endedAt: null,
+    observedAt: proposed.asOf,
+  };
+
+  return {
+    policy: {
+      revision: 1,
+      enabled: true,
+      receiptHours: 24,
+      inspectionHours: 4,
+      financialHours: 8,
+      sourceMaxAgeSeconds: 300,
+      updatedBy: alex.id,
+      updatedAt: proposed.case.openedAt,
+    },
+    ownerId: sam.id,
+    canManage: true,
+    asOf: proposed.asOf,
+    episodes: [
+      {
+        ...base,
+        id: '00000000-0000-4000-8000-000000000001',
+        phase: 'receipt',
+        anchorAt: proposed.case.openedAt,
+        anchorOrigin: 'case_opened',
+        dueAt: '2026-10-09T09:12:00.000Z',
+        reason: 'missing_units',
+        units: 1,
+      },
+      {
+        ...base,
+        id: '00000000-0000-4000-8000-000000000002',
+        phase: 'financial',
+        anchorAt: proposed.proposal!.at,
+        anchorOrigin: 'resolution_proposed',
+        dueAt: '2026-10-09T19:00:00.000Z',
+        reason,
+        units: null,
+      },
+    ],
+  };
+}
+
+function Preview({
+  state = 'open',
+  evidence,
+  settlementState,
+  exchangeState,
+  waitingState,
+  completionState,
+}: {
+  state?: string;
+  completionState?: 'verified' | 'unresolved' | 'stale';
+  waitingState?: ReturnWaitingView['episodes'][number]['reason'];
+  evidence?: 'fresh' | 'stale' | 'loading' | 'unavailable';
+  settlementState?: 'pending' | 'failed' | 'stale' | 'approval' | 'unavailable';
+  exchangeState?:
+    'approval' | 'pending' | 'paid' | 'failed' | 'unavailable' | 'stale';
+}) {
   const [client] = useState(() => new QueryClient());
   const [router] = useState(() =>
     createRouter({
@@ -223,7 +552,104 @@ function Preview({ state = 'open' }: { state?: string }) {
             <style>{appStyles}</style>
             <ReturnCaseView
               organizationId={org}
-              detail={details[state]}
+              detail={
+                exchangeState
+                  ? {
+                      ...proposed,
+                      case: {
+                        ...proposed.case,
+                        ...(completionState === 'verified' ||
+                        completionState === 'stale'
+                          ? {
+                              state: 'completed' as const,
+                              stage: 'completed' as const,
+                            }
+                          : {}),
+                      },
+                      order: {
+                        ...proposed.order,
+                        connection: {
+                          ...proposed.order.connection,
+                          label: 'Shopify',
+                          provider: 'shopify',
+                        },
+                      },
+                      proposal: { ...proposed.proposal!, kind: 'exchange' },
+                    }
+                  : details[state]
+              }
+              waiting={waitingState ? waits(waitingState) : undefined}
+              settlementStarted={
+                (!!settlementState && settlementState !== 'approval') ||
+                (!!exchangeState && exchangeState !== 'approval')
+              }
+              settlement={
+                waitingState ? (
+                  <ReturnWaiting
+                    organizationId={org}
+                    detail={proposed}
+                    data={waits(waitingState)}
+                  />
+                ) : exchangeState ? (
+                  <ReturnExchange
+                    organizationId={org}
+                    detail={{
+                      ...proposed,
+                      order: {
+                        ...proposed.order,
+                        connection: {
+                          ...proposed.order.connection,
+                          label: 'Shopify',
+                          provider: 'shopify',
+                        },
+                      },
+                      proposal: { ...proposed.proposal!, kind: 'exchange' },
+                    }}
+                    data={
+                      completionState
+                        ? completedExchange(completionState)
+                        : exchange(exchangeState)
+                    }
+                    loading={false}
+                    unavailable={false}
+                    retry={() => {}}
+                  />
+                ) : settlementState ? (
+                  <ReturnSettlement
+                    organizationId={org}
+                    detail={proposed}
+                    data={
+                      settlementState === 'unavailable'
+                        ? undefined
+                        : settlement(settlementState)
+                    }
+                    loading={false}
+                    unavailable={settlementState === 'unavailable'}
+                    retry={() => {}}
+                  />
+                ) : undefined
+              }
+              sourceDetail={
+                evidence === 'fresh' || evidence === 'stale'
+                  ? {
+                      ...sourceDetail,
+                      item: {
+                        ...sourceDetail.item,
+                        observedAt:
+                          evidence === 'fresh'
+                            ? open.asOf
+                            : '2026-09-01T00:00:00Z',
+                      },
+                      refunds: sourceDetail.refunds.map((r) => ({
+                        ...r,
+                        observedAt:
+                          evidence === 'fresh' ? open.asOf : r.observedAt,
+                      })),
+                    }
+                  : undefined
+              }
+              sourceLoading={evidence === 'loading'}
+              sourceUnavailable={evidence === 'unavailable'}
               loading={state === 'loading'}
               error={state === 'missing' ? 'missing' : undefined}
               refresh={() => {}}
@@ -315,3 +741,259 @@ export const Narrow: Story = {
 export const Missing: Story = { args: { state: 'missing' } };
 
 export const Loading: Story = { args: { state: 'loading' } };
+
+export const ShopifyApproval: Story = {
+  args: { state: 'shopifyApproval' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByRole('heading', {
+        name: 'Approve the request in Shopify',
+      }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByText(/Approve the existing customer return request/),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole('button', { name: 'Approve the return in Shopify' }),
+    ).toBeVisible();
+  },
+};
+
+export const SourceLoading: Story = {
+  args: { evidence: 'loading' },
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).getByText('Loading source evidence…'),
+    ).toBeVisible();
+  },
+};
+
+export const SourceUnavailable: Story = {
+  args: { evidence: 'unavailable' },
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(
+        within(canvasElement).getByRole('region', {
+          name: 'What you can tell the customer',
+        }),
+      ).getByText(
+        'Source evidence is unavailable. Financial status cannot be confirmed.',
+      ),
+    ).toBeVisible();
+  },
+};
+
+export const StaleSource: Story = {
+  args: { evidence: 'stale' },
+  play: async ({ canvasElement }) => {
+    const summary = within(
+      within(canvasElement).getByRole('region', {
+        name: 'What you can tell the customer',
+      }),
+    );
+    await expect(summary.queryByText('Observed money returned')).toBeNull();
+  },
+};
+
+export const SettlementPending: Story = {
+  args: { state: 'proposed', settlementState: 'pending' },
+  play: async ({ canvasElement }) => {
+    const section = within(canvasElement).getByRole('region', {
+      name: 'Stock and refund',
+    });
+    await expect(within(section).getByText('Refund processing')).toBeVisible();
+    await expect(
+      within(section).getByRole('button', { name: 'Check source' }),
+    ).toBeVisible();
+    await expect(
+      within(section).queryByText('Independently verified'),
+    ).not.toBeInTheDocument();
+  },
+};
+
+export const SettlementFailed: Story = {
+  args: { state: 'proposed', settlementState: 'failed' },
+};
+
+export const SettlementStale: Story = {
+  args: { state: 'proposed', settlementState: 'stale' },
+  play: async ({ canvasElement }) => {
+    const section = within(
+      within(canvasElement).getByRole('region', { name: 'Stock and refund' }),
+    );
+    await expect(
+      section.queryByText('Independently verified'),
+    ).not.toBeInTheDocument();
+  },
+};
+
+export const SettlementApproval: Story = {
+  args: { state: 'proposed', settlementState: 'approval' },
+};
+
+export const SettlementUnavailable: Story = {
+  args: { state: 'proposed', settlementState: 'unavailable' },
+};
+
+export const SettlementDark: Story = {
+  args: { state: 'proposed', settlementState: 'pending' },
+  globals: { theme: 'dark' },
+};
+
+export const SettlementNarrow: Story = {
+  args: { state: 'proposed', settlementState: 'pending' },
+  globals: { viewport: { value: 'mobile1', isRotated: false } },
+};
+
+export const ExchangeApproval: Story = {
+  args: { state: 'proposed', exchangeState: 'approval' },
+};
+
+export const ExchangePaymentPending: Story = {
+  args: { state: 'proposed', exchangeState: 'pending' },
+};
+
+export const ExchangePaymentPaid: Story = {
+  args: { state: 'proposed', exchangeState: 'paid' },
+};
+
+export const ExchangePaymentFailed: Story = {
+  args: { state: 'proposed', exchangeState: 'failed' },
+};
+
+export const ExchangeUnavailable: Story = {
+  args: { state: 'proposed', exchangeState: 'unavailable' },
+};
+
+export const ExchangeStale: Story = {
+  args: { state: 'proposed', exchangeState: 'stale' },
+};
+
+export const ExchangeNarrow: Story = {
+  args: { state: 'proposed', exchangeState: 'pending' },
+  parameters: { viewport: { value: 'mobile1' } },
+};
+
+export const ExchangeDark: Story = {
+  args: { state: 'proposed', exchangeState: 'pending' },
+  globals: { theme: 'dark' },
+};
+
+export const WaitingPartial: Story = {
+  args: { state: 'proposed', waitingState: 'partial_money' },
+};
+
+export const WaitingFailed: Story = {
+  args: { state: 'proposed', waitingState: 'failed_money' },
+};
+
+export const WaitingStale: Story = {
+  args: { state: 'proposed', waitingState: 'stale_evidence' },
+};
+
+export const WaitingNarrow: Story = {
+  args: { state: 'proposed', waitingState: 'pending_money' },
+  globals: { viewport: { value: 'mobile1' } },
+};
+
+export const WaitingDark: Story = {
+  args: { state: 'proposed', waitingState: 'unavailable_evidence' },
+  globals: { theme: 'dark' },
+};
+
+function completedExchange(
+  state: 'verified' | 'unresolved' | 'stale',
+): ReturnExchangesView {
+  const data = exchange('paid');
+  data.operation!.completion = {
+    state: state === 'unresolved' ? 'unresolved' : 'verified',
+    checkedAt:
+      state === 'stale' ? '2026-01-01T00:00:00Z' : new Date().toISOString(),
+    ownerId: sam.id,
+    caseRevision: proposed.case.revision,
+    evidenceRefs: [data.operation!.id],
+    replacementOrder: { externalId: '101', scopeKey: '' },
+    replacementTotal: { amount: '46', currency: 'EUR' },
+    checks: (
+      [
+        'receipt',
+        'inspection',
+        'stock',
+        'replacement',
+        'reservation',
+        'payment',
+        'fulfillment',
+      ] as const
+    ).map((id) => ({
+      id,
+      verified: state !== 'unresolved' || id !== 'reservation',
+      reason: 'reservation_missing',
+    })),
+  };
+
+  return data;
+}
+
+export const ExchangeCompleted: Story = {
+  args: {
+    state: 'proposed',
+    exchangeState: 'paid',
+    completionState: 'verified',
+  },
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).getByText('Exchange consistency verified'),
+    ).toBeVisible();
+    await expect(
+      within(canvasElement).queryByText(/Wawi allocation needs the case owner/),
+    ).not.toBeInTheDocument();
+    await expect(
+      within(canvasElement).getByText(
+        'This exchange was completed after independent checks in both systems.',
+      ),
+    ).toBeVisible();
+    await expect(
+      within(canvasElement).queryByText(
+        'No further work on this cancelled case.',
+      ),
+    ).not.toBeInTheDocument();
+  },
+};
+
+export const ExchangeUnresolved: Story = {
+  args: {
+    state: 'proposed',
+    exchangeState: 'paid',
+    completionState: 'unresolved',
+  },
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).getByText(
+        'Exchange unresolved · case owner must follow up',
+      ),
+    ).toBeVisible();
+  },
+};
+
+export const ExchangeCompletionStale: Story = {
+  args: { state: 'proposed', exchangeState: 'paid', completionState: 'stale' },
+};
+
+export const ExchangeCompletionNarrow: Story = {
+  args: {
+    state: 'proposed',
+    exchangeState: 'paid',
+    completionState: 'unresolved',
+  },
+  globals: { viewport: { value: 'mobile1', isRotated: false } },
+};
+
+export const ExchangeCompletionDark: Story = {
+  args: {
+    state: 'proposed',
+    exchangeState: 'paid',
+    completionState: 'verified',
+  },
+  globals: { theme: 'dark' },
+};

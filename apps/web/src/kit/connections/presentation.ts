@@ -42,6 +42,20 @@ export const capabilities = localized({
   'returns.options.read': m.connections_capability_returns_options_read,
   'returns.created.read': m.connections_capability_returns_created_read,
   'returns.create': m.connections_capability_returns_create,
+  'returns.settlement.quote.read': m.connections_capability_returns_quote,
+  'returns.settlement.proof.read': m.connections_capability_returns_proof,
+  'returns.exchange.options.read': m.connections_capability_exchange_options,
+  'returns.exchange.quote.read': m.connections_capability_exchange_quote,
+  'returns.exchange.proof.read': m.connections_capability_exchange_proof,
+  'returns.exchange.price.read': m.connections_capability_exchange_price,
+  'returns.exchange.reservation.read':
+    m.connections_capability_exchange_reservation,
+  'returns.exchange.request': m.connections_capability_exchange_request,
+  'returns.exchange.process': m.connections_capability_exchange_process,
+  'returns.exchange.cancel': m.connections_capability_exchange_cancel,
+  'returns.exchange.release': m.connections_capability_exchange_release,
+  'returns.refund': m.connections_capability_returns_refund,
+  'returns.restock': m.connections_capability_returns_restock,
 } satisfies Record<InstallationCapability, () => string>);
 
 export const statuses = localized({

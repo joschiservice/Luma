@@ -37,6 +37,7 @@ type QueryRoot {
     query: String
   ): InventoryItemConnection!
   node(id: ID!): Node
+  nodes(ids: [ID!]!): [Node]!
   orders(
     first: Int
     after: String
@@ -61,6 +62,7 @@ type QueryRoot {
   productsCount(query: String, savedSearchId: ID, limit: Int = 10000): Count
   shop: Shop!
   webhookSubscriptions(
+    callbackUrl: URL
     uri: String
     format: WebhookSubscriptionFormat
     topics: [WebhookSubscriptionTopic!]
@@ -92,6 +94,8 @@ type BulkOperation implements Node {
 interface Node {
   id: ID!
 }
+
+scalar DateTime
 
 enum BulkOperationErrorCode {
   ACCESS_DENIED
@@ -366,8 +370,6 @@ enum CurrencyCode {
   VEF
   XXX
 }
-
-scalar DateTime
 
 type MailingAddress implements Node {
   address1: String
@@ -698,6 +700,7 @@ type Order implements Node {
     reverse: Boolean = false
   ): LineItemConnection!
   name: String!
+  presentmentCurrencyCode: CurrencyCode!
   refunds(first: Int): [Refund!]!
   returns(
     first: Int
@@ -707,6 +710,14 @@ type Order implements Node {
     reverse: Boolean = false
     query: String
   ): ReturnConnection!
+  suggestedRefund(
+    shippingAmount: Money
+    refundShipping: Boolean
+    refundLineItems: [RefundLineItemInput!]
+    refundDuties: [RefundDutyInput!]
+    suggestFullRefund: Boolean = false
+    refundMethodAllocation: RefundMethodAllocation = ORIGINAL_PAYMENT_METHODS
+  ): SuggestedRefund
   taxesIncluded: Boolean!
   totalOutstandingSet: MoneyBag!
   transactions(
@@ -718,6 +729,7 @@ type Order implements Node {
 }
 
 type MoneyBag {
+  presentmentMoney: MoneyV2!
   shopMoney: MoneyV2!
 }
 
@@ -862,25 +874,34 @@ type FulfillmentOrderLineItem implements Node {
   totalQuantity: Int!
 }
 
-type TaxLine {
-  rate: Float
-}
-
 type LineItem implements Node {
-  originalUnitPriceSet: MoneyBag!
-  taxLines: [TaxLine!]!
   currentQuantity: Int!
+  discountedTotalSet(withCodeDiscounts: Boolean = false): MoneyBag!
   id: ID!
   name: String!
+  originalUnitPriceSet: MoneyBag!
   quantity: Int!
   sku: String
+  taxLines(first: Int): [TaxLine!]!
   variant: ProductVariant
 }
 
+type TaxLine {
+  priceSet: MoneyBag!
+  rate: Float
+}
+
+"""
+The `Float` scalar type represents signed double-precision fractional values as specified by [IEEE 754](https://en.wikipedia.org/wiki/IEEE_floating_point).
+"""
+scalar Float
+
 type ProductVariant implements Node {
   barcode: String
+  displayName: String!
   id: ID!
   inventoryItem: InventoryItem!
+  inventoryQuantity: Int
   price: Money!
   product: Product!
   sku: String
@@ -1133,6 +1154,7 @@ type LineItemEdge {
 type Refund implements Node {
   createdAt: DateTime
   id: ID!
+  note: String
   order: Order!
   refundLineItems(
     first: Int
@@ -1176,9 +1198,25 @@ type Return implements Node {
   closedAt: DateTime
   createdAt: DateTime!
   decline: ReturnDecline
+  exchangeLineItems(
+    includeRemovedItems: Boolean = false
+    processingStatus: ReturnProcessingStatusFilterInput
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): ExchangeLineItemConnection!
   id: ID!
   name: String!
   order: Order!
+  refunds(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): RefundConnection!
   requestApprovedAt: DateTime
   returnLineItems(
     processingStatus: ReturnProcessingStatusFilterInput
@@ -1196,6 +1234,14 @@ type Return implements Node {
     reverse: Boolean = false
   ): ReverseFulfillmentOrderConnection!
   status: ReturnStatus!
+  suggestedFinancialOutcome(
+    returnLineItems: [SuggestedOutcomeReturnLineItemInput!]!
+    exchangeLineItems: [SuggestedOutcomeExchangeLineItemInput!]!
+    refundShipping: RefundShippingInput
+    tipLineId: ID
+    refundDuties: [RefundDutyInput!]
+    refundMethodAllocation: RefundMethodAllocation = ORIGINAL_PAYMENT_METHODS
+  ): SuggestedReturnFinancialOutcome
 }
 
 type ReturnDecline {
@@ -1213,6 +1259,25 @@ enum ReturnProcessingStatusFilterInput {
   PROCESSABLE
 }
 
+type ExchangeLineItemConnection {
+  nodes: [ExchangeLineItem!]!
+  pageInfo: PageInfo!
+}
+
+type ExchangeLineItem implements Node {
+  id: ID!
+  lineItems: [LineItem!]
+  processableQuantity: Int!
+  processedQuantity: Int!
+  quantity: Int!
+  variantId: ID
+}
+
+type RefundConnection {
+  nodes: [Refund!]!
+  pageInfo: PageInfo!
+}
+
 type ReturnLineItemTypeConnection {
   nodes: [ReturnLineItemType!]!
   pageInfo: PageInfo!
@@ -1223,6 +1288,7 @@ interface ReturnLineItemType implements Node {
   quantity: Int!
   refundedQuantity: Int!
   returnReasonDefinition: ReturnReasonDefinition
+  returnReasonNote: String!
 }
 
 type ReturnReasonDefinition implements Node {
@@ -1286,9 +1352,68 @@ enum ReturnStatus {
   DECLINED
 }
 
-type OrderTransactionConnection {
-  nodes: [OrderTransaction!]!
-  pageInfo: PageInfo!
+input SuggestedOutcomeReturnLineItemInput {
+  id: ID!
+  quantity: Int!
+}
+
+input SuggestedOutcomeExchangeLineItemInput {
+  id: ID!
+  quantity: Int!
+}
+
+input RefundShippingInput {
+  shippingRefundAmount: MoneyInput
+  fullRefund: Boolean = false
+}
+
+input MoneyInput {
+  amount: Decimal!
+  currencyCode: CurrencyCode!
+}
+
+input RefundDutyInput {
+  dutyId: ID!
+  refundType: RefundDutyRefundType
+}
+
+enum RefundDutyRefundType {
+  PROPORTIONAL
+  FULL
+}
+
+enum RefundMethodAllocation {
+  ORIGINAL_PAYMENT_METHODS
+  STORE_CREDIT
+}
+
+type SuggestedReturnFinancialOutcome {
+  financialTransfer: ReturnOutcomeFinancialTransfer
+  maximumRefundable: MoneyBag!
+}
+
+union ReturnOutcomeFinancialTransfer =
+  | InvoiceReturnOutcome
+  | RefundReturnOutcome
+
+type InvoiceReturnOutcome {
+  amount: MoneyBag!
+}
+
+type RefundReturnOutcome {
+  amount: MoneyBag!
+  suggestedTransactions: [SuggestedOrderTransaction!]!
+}
+
+type SuggestedOrderTransaction {
+  amountSet: MoneyBag!
+  gateway: String
+  kind: SuggestedOrderTransactionKind!
+  parentTransaction: OrderTransaction
+}
+
+enum SuggestedOrderTransactionKind {
+  SUGGESTED_REFUND
 }
 
 type OrderTransaction implements Node {
@@ -1322,9 +1447,28 @@ enum OrderTransactionStatus {
   UNKNOWN
 }
 
+type OrderTransactionConnection {
+  nodes: [OrderTransaction!]!
+  pageInfo: PageInfo!
+}
+
 type ReturnConnection {
   nodes: [Return!]!
   pageInfo: PageInfo!
+}
+
+input RefundLineItemInput {
+  lineItemId: ID!
+  quantity: Int!
+  restockType: RefundLineItemRestockType
+  locationId: ID
+}
+
+type SuggestedRefund {
+  amountSet: MoneyBag!
+  maximumRefundableSet: MoneyBag!
+  refundLineItems: [RefundLineItem!]!
+  suggestedTransactions: [SuggestedOrderTransaction!]!
 }
 
 enum CustomerState {
@@ -1610,13 +1754,13 @@ enum WebhookSubscriptionSortKeys {
 }
 
 type WebhookSubscriptionConnection {
-  pageInfo: PageInfo!
   nodes: [WebhookSubscription!]!
+  pageInfo: PageInfo!
 }
 
 type WebhookSubscription implements Node {
-  topic: WebhookSubscriptionTopic!
   id: ID!
+  topic: WebhookSubscriptionTopic!
   uri: String!
 }
 
@@ -1639,6 +1783,13 @@ type Mutation {
   inventorySetQuantities(
     input: InventorySetQuantitiesInput!
   ): InventorySetQuantitiesPayload
+  refundCreate(input: RefundInput!): RefundCreatePayload
+  returnApproveRequest(
+    input: ReturnApproveRequestInput!
+  ): ReturnApproveRequestPayload
+  returnCancel(id: ID!, notifyCustomer: Boolean = false): ReturnCancelPayload
+  returnCreate(returnInput: ReturnInput!): ReturnCreatePayload
+  returnProcess(input: ReturnProcessInput!): ReturnProcessPayload
   webhookSubscriptionCreate(
     topic: WebhookSubscriptionTopic!
     webhookSubscription: WebhookSubscriptionInput!
@@ -1759,6 +1910,218 @@ enum InventorySetQuantitiesUserErrorCode {
   IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED
 }
 
+input RefundInput {
+  currency: CurrencyCode
+  orderId: ID!
+  note: String
+  notify: Boolean
+  shipping: ShippingRefundInput
+  processedAt: DateTime
+  refundLineItems: [RefundLineItemInput!]
+  refundDuties: [RefundDutyInput!]
+  transactions: [OrderTransactionInput!]
+  refundMethods: [RefundMethodInput!] = []
+  discrepancyReason: OrderAdjustmentInputDiscrepancyReason
+  allowOverRefunding: Boolean = false
+}
+
+input ShippingRefundInput {
+  amount: Money
+  fullRefund: Boolean
+}
+
+input OrderTransactionInput {
+  amount: Money!
+  gateway: String!
+  kind: OrderTransactionKind!
+  orderId: ID!
+  parentId: ID
+}
+
+input RefundMethodInput {
+  storeCreditRefund: StoreCreditRefundInput
+}
+
+input StoreCreditRefundInput {
+  amount: MoneyInput!
+  expiresAt: DateTime
+}
+
+enum OrderAdjustmentInputDiscrepancyReason {
+  RESTOCK
+  DAMAGE
+  CUSTOMER
+  OTHER
+}
+
+type RefundCreatePayload {
+  refund: Refund
+  userErrors: [UserError!]!
+}
+
+input ReturnApproveRequestInput {
+  id: ID!
+  notifyCustomer: Boolean = false
+  unprocessed: Boolean = false
+}
+
+type ReturnApproveRequestPayload {
+  return: Return
+  userErrors: [ReturnUserError!]!
+}
+
+type ReturnUserError {
+  code: ReturnErrorCode
+  field: [String!]
+  message: String!
+}
+
+enum ReturnErrorCode {
+  INTERNAL_ERROR
+  TOO_MANY_ARGUMENTS
+  BLANK
+  EQUAL_TO
+  GREATER_THAN
+  GREATER_THAN_OR_EQUAL_TO
+  INCLUSION
+  INVALID
+  LESS_THAN
+  LESS_THAN_OR_EQUAL_TO
+  NOT_A_NUMBER
+  PRESENT
+  TAKEN
+  TOO_BIG
+  TOO_LONG
+  TOO_SHORT
+  WRONG_LENGTH
+  ALREADY_EXISTS
+  CREATION_FAILED
+  FEATURE_NOT_ENABLED
+  INCOMPATIBLE_WITH_STANDARD_POLICY
+  INVALID_STATE
+  MISSING_PERMISSION
+  NOTIFICATION_FAILED
+  NOT_EDITABLE
+  NOT_FOUND
+}
+
+type ReturnCancelPayload {
+  return: Return
+  userErrors: [ReturnUserError!]!
+}
+
+input ReturnInput {
+  exchangeLineItems: [ExchangeLineItemInput!]
+  requestedAt: DateTime
+  orderId: ID!
+  returnLineItems: [ReturnLineItemInput!]!
+  returnShippingFee: ReturnShippingFeeInput
+  notifyCustomer: Boolean = false
+  unprocessed: Boolean = false
+}
+
+input ExchangeLineItemInput {
+  giftCardCodes: [String!]
+  variantId: ID
+  quantity: Int!
+  appliedDiscount: ExchangeLineItemAppliedDiscountInput
+}
+
+input ExchangeLineItemAppliedDiscountInput {
+  description: String
+  value: ExchangeLineItemAppliedDiscountValueInput!
+}
+
+input ExchangeLineItemAppliedDiscountValueInput {
+  amount: MoneyInput
+  percentage: Float
+}
+
+input ReturnLineItemInput {
+  quantity: Int!
+  returnReason: ReturnReason
+  returnReasonDefinitionId: ID
+  returnReasonNote: String = ""
+  fulfillmentLineItemId: ID!
+  restockingFee: RestockingFeeInput
+}
+
+enum ReturnReason {
+  SIZE_TOO_SMALL
+  SIZE_TOO_LARGE
+  UNWANTED
+  NOT_AS_DESCRIBED
+  WRONG_ITEM
+  DEFECTIVE
+  STYLE
+  COLOR
+  OTHER
+  UNKNOWN
+}
+
+input RestockingFeeInput {
+  percentage: Float!
+}
+
+input ReturnShippingFeeInput {
+  amount: MoneyInput!
+}
+
+type ReturnCreatePayload {
+  return: Return
+  userErrors: [ReturnUserError!]!
+}
+
+input ReturnProcessInput {
+  returnId: ID!
+  returnLineItems: [ReturnProcessReturnLineItemInput!] = []
+  exchangeLineItems: [ReturnProcessExchangeLineItemInput!] = []
+  refundDuties: [RefundDutyInput!] = []
+  refundShipping: RefundShippingInput
+  tipLineId: ID
+  note: String
+  notifyCustomer: Boolean = false
+  financialTransfer: ReturnProcessFinancialTransferInput
+}
+
+input ReturnProcessReturnLineItemInput {
+  id: ID!
+  quantity: Int!
+  dispositions: [ReverseFulfillmentOrderDisposeInput!]
+}
+
+input ReverseFulfillmentOrderDisposeInput {
+  reverseFulfillmentOrderLineItemId: ID!
+  quantity: Int!
+  locationId: ID
+  dispositionType: ReverseFulfillmentOrderDispositionType!
+}
+
+input ReturnProcessExchangeLineItemInput {
+  id: ID!
+  quantity: Int!
+}
+
+input ReturnProcessFinancialTransferInput {
+  issueRefund: ReturnProcessRefundInput
+}
+
+input ReturnProcessRefundInput {
+  allowOverRefunding: Boolean = false
+  orderTransactions: [ReturnRefundOrderTransactionInput!]!
+  refundMethods: [RefundMethodInput!] = []
+}
+
+input ReturnRefundOrderTransactionInput {
+  transactionAmount: MoneyInput!
+  parentId: ID!
+}
+
+type ReturnProcessPayload {
+  return: Return
+  userErrors: [ReturnUserError!]!
+}
+
 input WebhookSubscriptionInput {
   format: WebhookSubscriptionFormat
   includeFields: [String!]
@@ -1766,6 +2129,7 @@ input WebhookSubscriptionInput {
   metafieldNamespaces: [String!]
   metafields: [HasMetafieldsMetafieldIdentifierInput!]
   name: String
+  callbackUrl: URL
   uri: String
 }
 
@@ -1782,9 +2146,12 @@ type WebhookSubscriptionCreatePayload {
 type ReturnLineItem implements Node & ReturnLineItemType {
   fulfillmentLineItem: FulfillmentLineItem!
   id: ID!
+  processableQuantity: Int!
+  processedQuantity: Int!
   quantity: Int!
   refundedQuantity: Int!
   returnReasonDefinition: ReturnReasonDefinition
+  returnReasonNote: String!
   withCodeDiscountedTotalPriceSet: MoneyBag!
 }
 

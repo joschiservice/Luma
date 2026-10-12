@@ -46,6 +46,8 @@ export interface ReturnCreation {
   caseId: string;
   connectionId: string;
   order: SourceRef;
+  /** Present when this request approves a source return that already exists. */
+  requestedReturn?: SourceRef;
   warehouse: SourceRef & { name: string | null };
   reason: SourceRef & { name: string | null };
   lines: { orderLineId: string; source: SourceRef; quantity: number }[];
@@ -86,18 +88,29 @@ export interface FoundReturn {
  * Whether a found return holds exactly the approved lines and units. Lines without an order
  * line, extra lines and changed quantities do not match.
  */
-export function matchesCreation(creation: ReturnCreation, found: FoundReturn) {
-  const lines = found.lines;
+export function matchesCreation(
+  creation: Pick<ReturnCreation, 'lines'>,
+  found: FoundReturn,
+) {
+  const quantities = new Map<string, number>();
+  for (const line of found.lines) {
+    const quantity = Number(line.quantity);
+    if (!line.orderLine || !Number.isSafeInteger(quantity) || quantity <= 0)
+      return false;
+    const key = JSON.stringify([
+      line.orderLine.externalId,
+      line.orderLine.scopeKey,
+    ]);
+    quantities.set(key, (quantities.get(key) ?? 0) + quantity);
+  }
 
   return (
-    lines.length === creation.lines.length &&
-    creation.lines.every((line) =>
-      lines.some(
-        (l) =>
-          l.orderLine?.externalId === line.source.externalId &&
-          l.orderLine.scopeKey === line.source.scopeKey &&
-          Math.abs(Number(l.quantity) - line.quantity) < 1e-6,
-      ),
+    quantities.size === creation.lines.length &&
+    creation.lines.every(
+      (line) =>
+        quantities.get(
+          JSON.stringify([line.source.externalId, line.source.scopeKey]),
+        ) === line.quantity,
     )
   );
 }

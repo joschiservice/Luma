@@ -19,6 +19,10 @@ export interface RefundCandidate {
   /** Latest source event; never earlier than the receipt. */
   activityAt: string;
   value: string | null;
+  observedAt: string;
+  readable: boolean;
+  complete: boolean;
+  financialSettled: boolean;
 }
 
 /** An order as the payment follow-up sees it, from the orders read model. */
@@ -57,6 +61,8 @@ function followUpAdapter<T>(deps: {
   field: string;
   open(item: T): boolean;
   now(): Date;
+  ready?(item: T, now: Date): boolean;
+  observedAt?(item: T): string;
 }): CaseWorkflowAdapter {
   const recordId = (signalId: string) =>
     signalId.startsWith(deps.prefix) ? signalId.slice(deps.prefix.length) : '';
@@ -96,9 +102,12 @@ function followUpAdapter<T>(deps: {
 
       return item
         ? {
-            values: { ready: true, [deps.field]: deps.open(item) },
+            values: {
+              ready: deps.ready?.(item, deps.now()) ?? true,
+              [deps.field]: deps.open(item),
+            },
             evidenceRefs: [run.signal.id],
-            observedAt,
+            observedAt: deps.observedAt?.(item) ?? observedAt,
           }
         : {
             values: { ready: false, [deps.field]: false },
@@ -129,6 +138,13 @@ export function createRefundFollowUp(deps: {
   now?: () => Date;
 }): CaseWorkflowAdapter {
   const now = deps.now ?? (() => new Date());
+  const fresh = (item: RefundCandidate, at: Date) =>
+    item.readable &&
+    item.complete &&
+    Date.parse(item.observedAt) <= +at &&
+    +at - Date.parse(item.observedAt) <= 300_000;
+  const settled = (item: RefundCandidate) =>
+    fresh(item, now()) && item.financialSettled;
 
   return followUpAdapter({
     version: deps.version,
@@ -136,7 +152,7 @@ export function createRefundFollowUp(deps: {
       trigger: `When returned items arrived and no refund is recorded within ${hours(deps.waitMs)}`,
       steps: [
         'Read the return again',
-        'Stop when a refund is now recorded',
+        'Stop only when fresh complete evidence reports settled money',
         'Hand it to a person in Needs you with the order and refund details',
       ],
       success:
@@ -155,7 +171,7 @@ export function createRefundFollowUp(deps: {
       settled: {
         title: 'Check for a refund',
         description:
-          'Stops when a refund is recorded; otherwise hands the return to a person.',
+          'Stops only after fresh complete money evidence; otherwise hands the return to a person.',
       },
       done: {
         title: 'Finish',
@@ -194,8 +210,9 @@ export function createRefundFollowUp(deps: {
         firstDetectedAt: since,
         lastDetectedAt: at.toISOString(),
         open:
-          item.stage === 'awaiting_refund' &&
-          at.getTime() - Date.parse(since) >= deps.waitMs,
+          !!item.receivedAt &&
+          !settled(item) &&
+          at.getTime() - Date.parse(item.receivedAt) >= deps.waitMs,
         title: `Refund for return ${item.name ?? ''} on order ${order}`.replace(
           '  ',
           ' ',
@@ -206,7 +223,9 @@ export function createRefundFollowUp(deps: {
       };
     },
     field: 'waiting',
-    open: (item) => item.stage === 'awaiting_refund',
+    open: (item) => !settled(item),
+    ready: fresh,
+    observedAt: (item) => item.observedAt,
     now,
   });
 }

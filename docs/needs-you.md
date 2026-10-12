@@ -57,6 +57,12 @@ currently be in the reader's queue. Assignment never grants approval authority. 
 its optimistic assignment and audit are owned by Exceptions. Human task responsibility is
 published with the workflow and refreshed against the current membership.
 
+Return cases contribute receipt, inspection and settlement work under returns access. Their
+creation approvals retain independent approval and requester execution rules. The owning case's
+audited assignment is authoritative, and generic queue assignment commands cannot replace it.
+The source returns unavailable rather than silently dropping cases when its bounded read limit
+is exceeded. Source payment acceptance and a recorded proposal never count as completion.
+
 ## Live refresh
 
 Every table the queue reads for its items carries the `decisions` topic on the shared

@@ -29,6 +29,7 @@ import {
   returnCaseStage,
   type StoreReturn,
 } from '../domain/return-cases.js';
+import type { ExchangeConsistencyReport } from '../domain/return-consistency.js';
 import {
   type CreationFailure,
   type CreationState,
@@ -55,6 +56,7 @@ export interface OrderSource {
 export interface SourceReturnRecord extends StoreReturn {
   orderId: string;
   name: string | null;
+  source?: SourceRef;
 }
 
 export type ReturnCaseEventKind =
@@ -67,7 +69,9 @@ export type ReturnCaseEventKind =
   | 'creation_requested'
   | 'creation_approved'
   | 'creation_rejected'
-  | 'creation_created';
+  | 'creation_created'
+  | 'exchange_completed'
+  | 'exchange_reopened';
 
 /** One append-only entry of a case's history, keyed by the command that caused it. */
 export interface ReturnCaseEvent {
@@ -107,6 +111,22 @@ export interface Person {
 
 /** Reads and writes return cases; every transaction is tenant-scoped. */
 export interface ReturnCaseTransaction {
+  /** Persisted case search; customer scope follows explicit source order mappings. */
+  findCases(query: {
+    q: string;
+    customerId?: string;
+    openOnly?: boolean;
+    after?: { at: string; id: string };
+    limit: number;
+  }): Promise<
+    {
+      value: ReturnCase;
+      orderNumber: string | null;
+      creation: ReturnCreation | null;
+      assignment: ReturnCaseEvent | null;
+      completion?: ExchangeConsistencyReport | null;
+    }[]
+  >;
   /** Serializes case changes of one order until the transaction ends. */
   lockOrder(orderId: string): Promise<void>;
   /** Current order snapshots, one per source connection; empty when the order is unknown. */
@@ -178,7 +198,11 @@ export interface ReturnSystem {
   created(
     context: TenantContext,
     connectionId: string,
-    query: { order: SourceRef; lumaCaseId: string },
+    query: {
+      order: SourceRef;
+      lumaCaseId: string;
+      requestedReturn?: SourceRef;
+    },
   ): Promise<ReturnSystemResult<{ items: FoundReturn[]; complete: boolean }>>;
 }
 
@@ -275,6 +299,7 @@ export interface OpenCaseInput {
 
 /** Why a case's return can't be created in its order's system now; null when it can. */
 export type CreationBlocker =
+  | 'completed'
   | 'cancelled'
   | 'execution_disabled'
   | 'unsupported'
@@ -290,6 +315,7 @@ export interface PersonView {
 }
 
 export interface CreationView {
+  operation?: 'create' | 'approve';
   id: string;
   state: CreationState;
   connectionId: string;
@@ -325,6 +351,32 @@ export interface ReturnCaseSummary {
   externalNumber: string | null;
   openedAt: string;
   updatedAt: string;
+}
+
+/** A bounded search page of tenant-owned return cases. */
+export interface ReturnCaseList {
+  items: (ReturnCaseSummary & { orderNumber: string | null })[];
+  nextCursor: string | null;
+}
+
+/** Persisted work and creation controls currently waiting on a person. */
+export interface ReturnCaseAttention {
+  completion?: ExchangeConsistencyReport;
+  waiting?: {
+    dueAt: string;
+    reason: string;
+    observedAt: string | null;
+    ownerId: string;
+  };
+  case: ReturnCaseSummary & { orderNumber: string | null; revision: number };
+  creation: CreationView | null;
+  canManage: boolean;
+  assignment: {
+    assigneeId: string;
+    assignedBy: string;
+    assignedAt: string;
+    revision: number;
+  } | null;
 }
 
 export interface ReturnCaseDetail {
@@ -415,6 +467,8 @@ const auditSummaries: Record<ReturnCaseEventKind, string> = {
   creation_approved: 'Creating the return approved',
   creation_rejected: 'Creating the return rejected',
   creation_created: 'Return created and verified',
+  exchange_completed: 'Exchange independently verified across both systems',
+  exchange_reopened: 'Exchange reopened after an unresolved source check',
 };
 
 const conflict = (message: string): never => {
@@ -582,7 +636,11 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         if (!value) notFound('Return case not found');
         if (value!.revision !== input.expectedRevision)
           conflict('This return case changed. Refresh it and try again.');
-        const applied = await apply(value!, tx);
+        await tx.lockOrder(value!.orderId);
+        const current = await tx.case(caseId);
+        if (!current || current.revision !== input.expectedRevision)
+          conflict('This return case changed. Refresh it and try again.');
+        const applied = await apply(current!, tx);
         const next: ReturnCase = {
           ...applied.next,
           revision: value!.revision + 1,
@@ -644,6 +702,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     });
 
     return {
+      operation: creation.requestedReturn ? 'approve' : 'create',
       id: creation.id,
       state: expired ? 'expired' : creation.state,
       connectionId: creation.connectionId,
@@ -711,6 +770,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     value: ReturnCase,
     creation: ReturnCreation | null,
     mapped: boolean,
+    sourceReturn: SourceReturnRecord | null,
   ): ReturnCaseDetail['creationAvailability'] {
     const result = (blocker: CreationBlocker | null) => ({
       blocker,
@@ -718,10 +778,17 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         ? { id: connection.id, label: connection.label }
         : null,
     });
+    if (value.state === 'completed') return result('completed');
     if (value.state === 'cancelled') return result('cancelled');
     if (!connection?.offersCreation) return result('unsupported');
     if (!deps.admission) return result('execution_disabled');
-    if (creation?.state === 'created') return result('created');
+    if (
+      creation?.state === 'created' ||
+      (connection.provider === 'shopify' &&
+        sourceReturn &&
+        sourceReturn.status !== 'requested')
+    )
+      return result('created');
     if (
       creation &&
       liveCreationStates.includes(creation.state) &&
@@ -906,6 +973,7 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         value,
         latest,
         data!.mapped,
+        data!.sourceReturn,
       ),
       canManage: hasPermission(context, 'returns.manage'),
       asOf: deps.now().toISOString(),
@@ -955,6 +1023,9 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     const result = await deps.system.created(context, creation.connectionId, {
       order: creation.order,
       lumaCaseId: creation.caseId,
+      ...(creation.requestedReturn
+        ? { requestedReturn: creation.requestedReturn }
+        : {}),
     });
 
     return result.ok
@@ -985,9 +1056,16 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
     if (execution.state === 'withheld' || execution.state === 'failed')
       return save({ state: 'failed', failure: execution.failure });
     if (execution.state !== 'verified') return save({ state: 'uncertain' });
-    const { found } = await locate(context, creation);
+    const { found, complete } = await locate(context, creation);
     const match = found.length === 1 ? found[0]! : null;
-    if (!match || !matchesCreation(creation, match))
+    if (
+      !complete ||
+      !match ||
+      !Number.isFinite(Date.parse(match.observedAt)) ||
+      Date.parse(match.observedAt) < Date.parse(creation.requestedAt) ||
+      Date.parse(match.observedAt) > deps.now().getTime() ||
+      !matchesCreation(creation, match)
+    )
       return save({ state: 'uncertain' });
     await deps.store.transaction(context.tenantId, true, async (tx) => {
       const current = (await tx.creation(creationId))!;
@@ -1116,7 +1194,8 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
               status: r.status,
               caseId:
                 cases.find(
-                  (c) => c.sourceReturnId === r.entityId && c.state === 'open',
+                  (c) =>
+                    c.sourceReturnId === r.entityId && c.state !== 'cancelled',
                 )?.id ?? null,
             })),
           };
@@ -1124,6 +1203,172 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
         cases: cases.map((c) => summary(c, creations.get(c.id) ?? [], people)),
         canManage: hasPermission(context, 'returns.manage'),
       };
+    },
+
+    /** Searches persisted cases without provider reads; customer filtering also requires customer access. */
+    async list(
+      context: TenantContext,
+      query: {
+        q: string;
+        customerId?: string;
+        openOnly?: boolean;
+        cursor?: string;
+        limit: number;
+      },
+    ): Promise<ReturnCaseList> {
+      context = await authorize(context);
+      if (query.customerId) requirePermission(context, 'customers.read');
+      if (
+        !Number.isInteger(query.limit) ||
+        query.limit < 1 ||
+        query.limit > 50 ||
+        query.q.length > 120
+      )
+        invalidInput(
+          'Choose a page size from 1 to 50 and a search up to 120 characters.',
+        );
+      const scope = deps.digest([
+        context.tenantId,
+        query.q,
+        query.customerId ?? null,
+        !!query.openOnly,
+      ]);
+      let after: { at: string; id: string } | undefined;
+      if (query.cursor) {
+        try {
+          const decoded: unknown = JSON.parse(
+            Buffer.from(query.cursor, 'base64url').toString(),
+          );
+          if (
+            !decoded ||
+            typeof decoded !== 'object' ||
+            !('scope' in decoded) ||
+            decoded.scope !== scope ||
+            !('at' in decoded) ||
+            typeof decoded.at !== 'string' ||
+            !Number.isFinite(Date.parse(decoded.at)) ||
+            !('id' in decoded) ||
+            typeof decoded.id !== 'string' ||
+            !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
+              decoded.id,
+            )
+          )
+            throw new Error('Cursor');
+          after = { at: decoded.at, id: decoded.id };
+        } catch {
+          invalidInput(
+            'This page link no longer matches the case search. Start from the first page.',
+          );
+        }
+      }
+
+      return deps.store.transaction(context.tenantId, false, async (tx) => {
+        const rows = await tx.findCases({
+          q: query.q,
+          ...(query.customerId ? { customerId: query.customerId } : {}),
+          ...(query.openOnly ? { openOnly: true } : {}),
+          ...(after ? { after } : {}),
+          limit: query.limit + 1,
+        });
+        const page = rows.slice(0, query.limit);
+        const people = await tx.people(
+          page.flatMap(({ value }) => [
+            value.openedBy,
+            ...(value.assigneeId ? [value.assigneeId] : []),
+          ]),
+        );
+        const last = page.at(-1)?.value;
+
+        return {
+          items: page.map(({ value, orderNumber, creation }) => ({
+            ...summary(value, creation ? [creation] : [], people),
+            orderNumber,
+          })),
+          nextCursor:
+            rows.length > query.limit && last
+              ? Buffer.from(
+                  JSON.stringify({ scope, at: last.updatedAt, id: last.id }),
+                ).toString('base64url')
+              : null,
+        };
+      });
+    },
+
+    /** Lists bounded, persisted open case attention for the shared decision queue; never reads a provider. */
+    async pending(context: TenantContext): Promise<ReturnCaseAttention[]> {
+      context = await authorize(context);
+      const data = await deps.store.transaction(
+        context.tenantId,
+        false,
+        async (tx) => {
+          const rows = await tx.findCases({
+            q: '',
+            openOnly: true,
+            limit: 501,
+          });
+          if (rows.length > 500)
+            unavailable(
+              'Return attention exceeds this view’s read limit. Open return cases from their orders or search.',
+            );
+          const items = rows.map((row) => ({
+            ...row,
+            assignment:
+              row.value.assigneeId &&
+              row.assignment?.details.assigneeId === row.value.assigneeId
+                ? {
+                    assigneeId: row.value.assigneeId,
+                    assignedBy: row.assignment.actorId,
+                    assignedAt: row.assignment.occurredAt,
+                    revision: row.value.revision,
+                  }
+                : null,
+          }));
+          const people = await tx.people(
+            items.flatMap(({ value, creation }) => [
+              value.openedBy,
+              ...(value.assigneeId ? [value.assigneeId] : []),
+              ...(creation
+                ? [
+                    creation.requestedBy,
+                    ...(creation.decidedBy ? [creation.decidedBy] : []),
+                  ]
+                : []),
+            ]),
+          );
+
+          return { items, people };
+        },
+      );
+      const result = [];
+      for (const {
+        value,
+        orderNumber,
+        creation,
+        assignment,
+        completion,
+      } of data.items)
+        result.push({
+          case: {
+            ...summary(value, creation ? [creation] : [], data.people),
+            orderNumber,
+            revision: value.revision,
+          },
+          assignment,
+          ...(completion?.state === 'unresolved'
+            ? {
+                completion: {
+                  ...completion,
+                  ownerId: value.assigneeId ?? value.openedBy,
+                },
+              }
+            : {}),
+          creation: creation
+            ? await creationView(context, creation, data.people)
+            : null,
+          canManage: hasPermission(context, 'returns.manage'),
+        });
+
+      return result;
     },
 
     /** Reads one return case with its lines, decisions, history and creation state. */
@@ -1171,13 +1416,11 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
             if (
               cases.some(
                 (c) =>
-                  c.state === 'open' &&
+                  c.state !== 'cancelled' &&
                   c.sourceReturnId === input.sourceReturnId,
               )
             )
-              conflict(
-                'Another open return case already works this store return.',
-              );
+              conflict('Another return case already works this store return.');
           }
           const storeReturns = (await tx.storeReturns(orderId)).filter(
             (r) =>
@@ -1470,9 +1713,16 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
           existing.requestedBy !== context.actor.id ||
           canonicalJson([
             existing.warehouse.externalId,
+            existing.warehouse.scopeKey,
             existing.reason.externalId,
+            existing.reason.scopeKey,
           ]) !==
-            canonicalJson([input.warehouse.externalId, input.reason.externalId])
+            canonicalJson([
+              input.warehouse.externalId,
+              input.warehouse.scopeKey,
+              input.reason.externalId,
+              input.reason.scopeKey,
+            ])
         )
           conflict(
             'This request ID was already used. Refresh before trying again.',
@@ -1506,6 +1756,9 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
           'The return can’t be created in the order’s system right now.',
         );
 
+      const connection = (await deps.system!.connections(context)).find(
+        (c) => c.id === current!.connectionId,
+      );
       const creation = await deps.store.transaction(
         context.tenantId,
         true,
@@ -1535,6 +1788,15 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
             value!.lines.some((l) => !ids.lines.has(l.orderLineId))
           )
             conflict('Some lines are not linked to the order’s system.');
+          const sourceReturn = value!.sourceReturnId
+            ? await tx.sourceReturn(value!.sourceReturnId)
+            : null;
+          if (
+            connection?.provider === 'shopify' &&
+            sourceReturn &&
+            (sourceReturn.status !== 'requested' || !sourceReturn.source)
+          )
+            conflict('Only a requested Shopify return can be approved.');
           const now = deps.now();
           const created: ReturnCreation = {
             id: input.id,
@@ -1542,6 +1804,9 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
             caseId,
             connectionId: value!.connectionId,
             order: ids.order!,
+            ...(connection?.provider === 'shopify' && sourceReturn?.source
+              ? { requestedReturn: sourceReturn.source }
+              : {}),
             warehouse: {
               externalId: warehouse!.externalId,
               scopeKey: warehouse!.scopeKey,
@@ -1774,8 +2039,17 @@ export function createReturnCases(deps: ReturnCaseDependencies) {
       );
       if (!creation)
         return { outcome: 'inconclusive' as const, observationRefs: [] };
-      const { found } = await locate(context, creation);
-      if (found.length === 0)
+      const { found, complete } = await locate(context, creation);
+      if (
+        !complete ||
+        found.length === 0 ||
+        found.some(
+          (f) =>
+            !Number.isFinite(Date.parse(f.observedAt)) ||
+            Date.parse(f.observedAt) < Date.parse(creation.requestedAt) ||
+            Date.parse(f.observedAt) > deps.now().getTime(),
+        )
+      )
         return { outcome: 'inconclusive' as const, observationRefs: [] };
       if (found.length > 1)
         return {
@@ -1820,6 +2094,12 @@ function creationAction(creation: ReturnCreation): ProposedAction {
       returnCaseId: creation.caseId,
       orderId: creation.order.externalId,
       orderScope: creation.order.scopeKey,
+      ...(creation.requestedReturn
+        ? {
+            requestedReturnId: creation.requestedReturn.externalId,
+            requestedReturnScope: creation.requestedReturn.scopeKey,
+          }
+        : {}),
       warehouseId: creation.warehouse.externalId,
       warehouseScope: creation.warehouse.scopeKey,
       reasonId: creation.reason.externalId,

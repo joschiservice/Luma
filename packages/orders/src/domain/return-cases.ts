@@ -66,7 +66,7 @@ export interface ReturnCase {
   /** The connection whose order lines the case returns. */
   connectionId: string;
   sourceReturnId: string | null;
-  state: 'open' | 'cancelled';
+  state: 'open' | 'completed' | 'cancelled';
   lines: ReturnCaseLine[];
   assigneeId: string | null;
   receipt: Receipt | null;
@@ -91,10 +91,12 @@ export type ReturnCaseStage =
   | 'awaiting_inspection'
   | 'awaiting_proposal'
   | 'proposed'
-  | 'cancelled';
+  | 'cancelled'
+  | 'completed';
 
 /** Derives a case's stage from its state and the decisions recorded so far. */
 export function returnCaseStage(value: ReturnCase): ReturnCaseStage {
+  if (value.state === 'completed') return 'completed';
   if (value.state === 'cancelled') return 'cancelled';
   if (!value.receipt) return 'awaiting_receipt';
   if (!value.inspection) return 'awaiting_inspection';
@@ -149,7 +151,7 @@ const units = (value: string | null | undefined) => {
 
 /**
  * Counts each unit of an order line once. Non-cancelled cases count their requested units.
- * A store return counts only while no open case links it, because the linking case already
+ * A store return counts only while no non-cancelled case links it, because the linking case already
  * counts those units; declined and cancelled store returns count nothing. Ordered units exclude
  * units the source cancelled before fulfillment.
  */
@@ -236,7 +238,9 @@ function sameLines(
 
 function requireOpen(value: ReturnCase) {
   if (value.state !== 'open')
-    throw conflict('This return case is cancelled. Open a new case instead.');
+    throw conflict(
+      'This return case is closed. Recheck its exchange or open a new case.',
+    );
 }
 
 /**

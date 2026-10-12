@@ -46,6 +46,7 @@ describe('provider installation verification', () => {
     expect(await verify(connection, credentials)).toEqual([
       'products.read',
       'inventory.read',
+      'returns.exchange.options.read',
     ]);
     expect(fetch.mock.calls[0]?.[1]).toMatchObject({ redirect: 'error' });
     fetch.mockResolvedValueOnce(
@@ -55,7 +56,16 @@ describe('provider installation verification', () => {
     );
     expect(await verify(connection, credentials)).toEqual([
       'orders.read',
+      'returns.settlement.quote.read',
+      'returns.settlement.proof.read',
+      'returns.refund',
       'fulfillment.read',
+    ]);
+    fetch.mockResolvedValueOnce(Response.json(shopify(['read_orders'])));
+    expect(await verify(connection, credentials)).toEqual([
+      'orders.read',
+      'returns.settlement.quote.read',
+      'returns.settlement.proof.read',
     ]);
     fetch.mockResolvedValueOnce(
       Response.json(shopify(['read_orders'], 'foreign.myshopify.com')),

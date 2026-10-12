@@ -5,17 +5,19 @@ export const root = fileURLToPath(new URL('../../', import.meta.url));
 
 /**
  * Runs a command without a shell and forwards termination signals; resolves trimmed captured
- * output or rejects with the child exit code. Pass logFd to stream both outputs to
- * a caller-owned file descriptor instead of the terminal; it overrides capture.
+ * output or rejects with the child exit code. A repeated interrupt, or a graceful stop that
+ * takes over ten seconds, kills the child; exiting this process kills it too. Pass logFd to
+ * stream both outputs to a caller-owned file descriptor instead of the terminal; it overrides
+ * capture. Aborting `signal` stops the child as SIGTERM would.
  * @param {string} command
  * @param {string[]} args
- * @param {{ env?: NodeJS.ProcessEnv, capture?: boolean, cwd?: string, logFd?: number }} options
+ * @param {{ env?: NodeJS.ProcessEnv, capture?: boolean, cwd?: string, logFd?: number, signal?: AbortSignal }} options
  * @returns {Promise<string>}
  */
 export function run(
   command,
   args,
-  { env = process.env, capture = false, cwd = root, logFd } = {},
+  { env = process.env, capture = false, cwd = root, logFd, signal } = {},
 ) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
@@ -51,17 +53,31 @@ export function run(
       }
     };
     /** Forwards termination and schedules forced cleanup.
-     * @param {NodeJS.Signals} signal
+     * @param {NodeJS.Signals} received
      */
-    const stop = (signal) => {
-      stopped = signal;
-      kill(signal);
-      timer ??= setTimeout(() => kill('SIGKILL'), 10_000);
+    const stop = (received) => {
+      if (stopped) return;
+      stopped = received;
+      kill(received);
+      timer = setTimeout(() => kill('SIGKILL'), 10_000);
     };
-    const interrupt = () => stop('SIGINT');
-    const terminate = () => stop('SIGTERM');
-    process.once('SIGINT', interrupt);
-    process.once('SIGTERM', terminate);
+    /**
+     * Forwards a signal to the child, which runs in its own process group and so only gets the
+     * terminal's signals from here; a second signal kills it.
+     * @param {NodeJS.Signals} received
+     */
+    const forward = (received) => {
+      if (stopped) kill('SIGKILL');
+      else stop(received === 'SIGINT' ? 'SIGINT' : 'SIGTERM');
+    };
+    const orphan = () => kill('SIGKILL');
+    const abort = () => stop('SIGTERM');
+    process.on('SIGINT', forward);
+    process.on('SIGTERM', forward);
+    process.on('SIGHUP', forward);
+    process.on('exit', orphan);
+    if (signal?.aborted) abort();
+    else signal?.addEventListener('abort', abort, { once: true });
     child.stdout?.on('data', (chunk) => {
       output += chunk;
     });
@@ -70,14 +86,17 @@ export function run(
     });
     const clean = () => {
       clearTimeout(timer);
-      process.removeListener('SIGINT', interrupt);
-      process.removeListener('SIGTERM', terminate);
+      process.removeListener('SIGINT', forward);
+      process.removeListener('SIGTERM', forward);
+      process.removeListener('SIGHUP', forward);
+      process.removeListener('exit', orphan);
+      signal?.removeEventListener('abort', abort);
     };
     child.once('error', (error) => {
       clean();
       reject(error);
     });
-    child.once('close', (code, signal) => {
+    child.once('close', (code, exitSignal) => {
       clean();
       if (code === 0 && !stopped) resolve(output.trim());
       else
@@ -90,7 +109,7 @@ export function run(
               exitCode:
                 stopped === 'SIGINT'
                   ? 130
-                  : stopped || signal
+                  : stopped || exitSignal
                     ? 143
                     : code || 1,
             },
@@ -98,6 +117,34 @@ export function run(
         );
     });
   });
+}
+
+/**
+ * Runs long-lived commands side by side. When any exits, the others are stopped; settles with
+ * the first command's outcome only after all have exited, so callers can release shared
+ * resources such as a simulator afterwards.
+ * @param {Array<[string, string[], Parameters<typeof run>[2]?]>} commands
+ * @returns {Promise<void>}
+ */
+export async function runTogether(commands) {
+  const controller = new AbortController();
+  /** @type {{ error?: unknown } | undefined} */
+  let first;
+  await Promise.all(
+    commands.map(([command, args, options]) =>
+      run(command, args, { ...options, signal: controller.signal }).then(
+        () => {
+          first ??= {};
+          controller.abort();
+        },
+        (error) => {
+          first ??= { error };
+          controller.abort();
+        },
+      ),
+    ),
+  );
+  if (first && 'error' in first) throw first.error;
 }
 
 /**

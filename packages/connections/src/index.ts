@@ -107,3 +107,15 @@ export {
 } from './domain/metrics.js';
 
 export type { ConnectionMetricItem } from './domain/metrics.js';
+
+export type {
+  ReturnSettlementPlan,
+  ReturnSettlementQuote,
+  ReturnSettlementWrite,
+} from './domain/return-settlement.js';
+
+export type {
+  ReturnExchangePlan,
+  ReturnExchangeRead,
+  ReturnExchangeProof,
+} from './domain/return-exchanges.js';

@@ -243,3 +243,25 @@ pass and `returns.created.read` when the return probe passes. Probes cannot esta
 `returns.write` grant, so only simulated installations that pass both return probes and
 the sales-order probe receive `returns.create` until an installation-specific sandbox
 smoke test exists.
+
+### Case resale stock
+
+The simulator installation can grant `returns.restock` with `jtl:returns.restock`. The action adds only
+inspected resale units to one explicitly chosen active warehouse using the stock endpoint with
+automatic workflows disabled. It freezes the physical baseline and records a machine operation
+marker on the stock movement. The pinned API provides no stock-write idempotency guarantee, so an
+uncertain attempt is never replayed. Independent proof requires one exact movement and the expected
+warehouse total; incomplete movement history or concurrent stock changes remain uncertain. Live
+installations do not receive this write grant until their endpoint behavior is verified.
+
+### Exchange replacement reservations
+
+When adding a connection for exchanges, select **Read exchange replacement orders and reservations**.
+Basic order and inventory connections do not request this optional access.
+`returns.exchange.reservation.read` is a read-only capability. It requires successful sales-order,
+item and native stock-reservation probes. An operator creates a replacement sales order in Wawi with
+the exact reference shown in its Luma case; Luma does not create that ERP order. The read scans orders
+and `/stocks/reservations`, at most 500 records each, and requires complete pagination to establish
+one matching order. It reads that order's lines, gross total, payment status and reservations linked
+to its sales-order and item IDs. Customer fields and descriptive reservation text are not retained.
+Incomplete history, duplicate references or an unknown unit never establish a correct replacement.

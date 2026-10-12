@@ -103,6 +103,42 @@
         "$ref": "#/components/schemas/JTL.Framework.Api.Abstraction.Models.PagedListOfJTL.Wawi.Verkaufsverwaltung.PublicApi.DataTransferObjects.V2.SalesOrderDomain.SalesOrderListItem"
       }
     },
+    "/v2/stocks/reservations": {
+      "parameters": [
+        {
+          "name": "pageNumber",
+          "in": "query"
+        },
+        {
+          "name": "pageSize",
+          "in": "query"
+        },
+        {
+          "name": "sortBy",
+          "in": "query"
+        },
+        {
+          "name": "sortDescending",
+          "in": "query"
+        },
+        {
+          "name": "createdAtAfter",
+          "in": "query"
+        },
+        {
+          "name": "createdAtBefore",
+          "in": "query"
+        },
+        {
+          "name": "x-tenant-id",
+          "in": "header"
+        }
+      ],
+      "scopes": ["inventory.read"],
+      "response": {
+        "$ref": "#/components/schemas/JTL.Framework.Api.Abstraction.Models.PagedListOfJTL.Wawi.Warenlagerverwaltung.PublicApi.DataTransferObjects.V2.Stocks.StockReservationListItem"
+      }
+    },
     "/v2/sales-orders/{salesOrderId}/line-items": {
       "parameters": [
         {
@@ -1287,6 +1323,91 @@
       "format": "int32",
       "enum": [0, 1, 2]
     },
+    "JTL.Framework.Api.Abstraction.Models.PagedListOfJTL.Wawi.Warenlagerverwaltung.PublicApi.DataTransferObjects.V2.Stocks.StockReservationListItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalItems", "pageNumber", "pageSize", "items"],
+      "properties": {
+        "totalItems": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "pageNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "pageSize": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/JTL.Wawi.Warenlagerverwaltung.PublicApi.DataTransferObjects.V2.Stocks.StockReservationListItem"
+          }
+        },
+        "totalPages": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "hasPreviousPage": {
+          "type": "boolean"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "nextPageNumber": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "previousPageNumber": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "JTL.Wawi.Warenlagerverwaltung.PublicApi.DataTransferObjects.V2.Stocks.StockReservationListItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "itemId",
+        "salesOrderId",
+        "customerId",
+        "amount",
+        "createdAt",
+        "platform"
+      ],
+      "properties": {
+        "itemId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.ArtikelKey"
+        },
+        "salesOrderId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.VerkaufAuftragKey"
+        },
+        "customerId": {
+          "$ref": "#/components/schemas/JTL.Data.Contracts.Keys.KundeKey"
+        },
+        "amount": {
+          "type": "number",
+          "format": "decimal"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "ebayItemId": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        }
+      }
+    },
+    "JTL.Data.Contracts.Keys.ArtikelKey": {
+      "type": "string",
+      "format": "uuid",
+      "additionalProperties": false
+    },
     "JTL.Wawi.Rest.Contracts.Models.V1.SalesOrder.SalesOrderLineItem": {
       "type": "object",
       "additionalProperties": false,
@@ -1368,11 +1489,6 @@
       }
     },
     "JTL.Data.Contracts.Keys.VerkaufAuftragPositionKey": {
-      "type": "string",
-      "format": "uuid",
-      "additionalProperties": false
-    },
-    "JTL.Data.Contracts.Keys.ArtikelKey": {
       "type": "string",
       "format": "uuid",
       "additionalProperties": false

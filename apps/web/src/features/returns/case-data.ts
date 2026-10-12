@@ -44,11 +44,32 @@ export const uncertainFailure = (error: unknown) =>
 export const returnCaseKey = (organizationId: string) =>
   ['private', 'organization', organizationId, 'return-cases'] as const;
 
+/** Searches return cases with tenant-scoped source and customer filters. */
+export function returnCasesOptions(
+  organizationId: string,
+  query: {
+    q?: string;
+    customerId?: string;
+    openOnly?: boolean;
+    cursor?: string;
+    limit?: number;
+  } = {},
+) {
+  return queryOptions({
+    ...privateQueryDefaults,
+    queryKey: [...returnCaseKey(organizationId), 'list', query],
+    queryFn: ({ signal }) =>
+      api.list({ params: { organizationId }, query }, { signal }),
+  });
+}
+
 /** Loads one return case with its lines, decisions, history and creation state. */
 export function returnCaseOptions(organizationId: string, caseId: string) {
   return queryOptions({
     ...privateQueryDefaults,
     queryKey: [...returnCaseKey(organizationId), caseId],
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: 'always',
     refetchOnReconnect: 'always',
     queryFn: ({ signal }) =>
       api.get({ params: { organizationId, caseId } }, { signal }),
@@ -130,3 +151,97 @@ export const caseCommands = (organizationId: string, caseId: string) => {
       api.checkCreation({ params: { ...params, creationId }, body: {} }),
   };
 };
+
+/** Loads separately verified return stock and financial steps. */
+export function returnSettlementOptions(
+  organizationId: string,
+  caseId: string,
+) {
+  return queryOptions({
+    ...privateQueryDefaults,
+    queryKey: [...returnCaseKey(organizationId), caseId, 'settlement'],
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: 'always',
+    queryFn: ({ signal }) =>
+      api.actions({ params: { organizationId, caseId } }, { signal }),
+  });
+}
+
+/** Settlement commands keep request identity stable across uncertain HTTP responses. */
+export function settlementCommands(organizationId: string, caseId: string) {
+  const params = { organizationId, caseId };
+
+  return {
+    request: (body: Body<'requestAction'>) =>
+      api.requestAction({ params, body }),
+    decide: (actionId: string, body: Body<'decideAction'>) =>
+      api.decideAction({ params: { ...params, actionId }, body }),
+    send: (actionId: string) =>
+      api.sendAction({ params: { ...params, actionId }, body: {} }),
+    check: (actionId: string) =>
+      api.checkAction({ params: { ...params, actionId }, body: {} }),
+  };
+}
+
+/** Polls independently observed exchange state while the case is visible. */
+export function returnExchangeOptions(organizationId: string, caseId: string) {
+  return queryOptions({
+    ...privateQueryDefaults,
+    queryKey: [...returnCaseKey(organizationId), caseId, 'exchange'],
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: 'always',
+    queryFn: ({ signal }) =>
+      api.exchanges({ params: { organizationId, caseId } }, { signal }),
+  });
+}
+
+/** Commands preserve the operation and exact step identities across uncertain responses. */
+export function exchangeCommands(organizationId: string, caseId: string) {
+  const params = { organizationId, caseId };
+
+  return {
+    complete: () => api.completeExchange({ params, body: {} }),
+    request: (body: Body<'requestExchange'>) =>
+      api.requestExchange({ params, body }),
+    choose: (body: Body<'chooseExchange'>) =>
+      api.chooseExchange({ params, body }),
+    refund: (revision: number) =>
+      api.refundExchange({ params, body: { revision } }),
+    decide: (actionId: string, body: Body<'decideExchange'>) =>
+      api.decideExchange({ params: { ...params, actionId }, body }),
+    send: (actionId: string) =>
+      api.sendExchange({ params: { ...params, actionId }, body: {} }),
+    check: (actionId: string) =>
+      api.checkExchange({ params: { ...params, actionId }, body: {} }),
+  };
+}
+
+/** Loads durable waits without refreshing a provider. */
+export function returnWaitingOptions(organizationId: string, caseId: string) {
+  return queryOptions({
+    ...privateQueryDefaults,
+    queryKey: [...returnCaseKey(organizationId), caseId, 'waiting'],
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: 'always',
+    queryFn: ({ signal }) =>
+      api.waiting({ params: { organizationId, caseId } }, { signal }),
+  });
+}
+
+/** Reads merchant deadline configuration. */
+export function returnDeadlineOptions(organizationId: string) {
+  return queryOptions({
+    ...privateQueryDefaults,
+    queryKey: [...returnCaseKey(organizationId), 'deadlines'],
+    queryFn: ({ signal }) =>
+      api.deadlines({ params: { organizationId } }, { signal }),
+  });
+}
+
+/** Saves one immutable policy command and explicitly checks read-only return progress. */
+export const returnDeadlineCommands = (organizationId: string) => ({
+  configure: (body: Parameters<typeof api.configureDeadlines>[0]['body']) =>
+    api.configureDeadlines({ params: { organizationId }, body }),
+  check: (caseId: string) =>
+    api.checkWaiting({ params: { organizationId, caseId }, body: {} }),
+});

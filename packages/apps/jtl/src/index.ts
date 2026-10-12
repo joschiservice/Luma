@@ -39,6 +39,7 @@ const writeReads: Partial<
   'orders.shipping-method.write': 'orders.shipping-method.read',
   'purchase-orders.submit': 'purchase-orders.read',
   'returns.create': 'returns.created.read',
+  'returns.restock': 'returns.settlement.quote.read',
 };
 
 /** Creates the JTL connector contribution with deployment-approved network destinations. */
@@ -84,6 +85,12 @@ export function createJtlProvider(options: {
         // A write re-reads current provider state, so it also needs its read grant.
         const read = writeReads[capability];
         if (read) await runtime.installations.credential(context, id, read);
+        if (capability === 'returns.restock')
+          await runtime.installations.credential(
+            context,
+            id,
+            'returns.settlement.proof.read',
+          );
         const latest = await runtime.installations.credential(
           context,
           id,
@@ -127,6 +134,7 @@ export function createJtlProvider(options: {
         shippingMethodActions: true,
         purchaseOrderActions: true,
         returnActions: true,
+        settlementActions: !!simulated,
         customers: current.connection.granted.includes('customers.read'),
         connection:
           target.kind === 'jtl-cloud'
@@ -166,6 +174,13 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         { kind: 'jtl-onprem', name: 'JTL-Wawi on-premise' },
       ],
       permissions: [
+        {
+          key: jtlPermissions.restock,
+          label: 'Restock inspected returns',
+          description:
+            'Request approval for and restock only inspected resale units in a Wawi warehouse.',
+          consequential: true,
+        },
         {
           key: jtlPermissions.purchaseOrders,
           label: 'Send purchase orders to JTL',

@@ -83,6 +83,58 @@ it('counts partial returns once, keeps decisions apart from store records and en
     first.case.id,
     second.case.id,
   ]);
+  // Search is paged persisted data, and its cursor cannot be reused with another filter.
+  const found = await f.request(
+    f.member,
+    `${f.base}/return-cases?q=%231002&limit=1`,
+  );
+  expect(found.items).toHaveLength(1);
+  expect(found.items[0].orderNumber).toBe('#1002');
+  expect(found.nextCursor).toBeTruthy();
+  const next = await f.request(
+    f.member,
+    `${f.base}/return-cases?q=%231002&limit=1&cursor=${found.nextCursor}`,
+  );
+  expect(new Set([found.items[0].id, next.items[0].id])).toEqual(
+    new Set([first.case.id, second.case.id]),
+  );
+  await f.request(
+    f.member,
+    `${f.base}/return-cases?q=other&limit=1&cursor=${found.nextCursor}`,
+    'GET',
+    undefined,
+    422,
+  );
+
+  // A customer link uses the exact source order mapping, without copying contact details.
+  const customerId = randomUUID();
+  await f.db.owner.query(
+    `INSERT INTO customer_profiles(tenant_id,connection_id,external_id,id,state,contact_shared,address_shared,observed_at,observation_id) VALUES($1,$2,'customer-1002',$3,'enabled',false,false,now(),$4)`,
+    [f.org.id, r.store, customerId, randomUUID()],
+  );
+  await f.db.owner.query(
+    `INSERT INTO customer_orders(tenant_id,connection_id,order_scope_key,order_external_id,customer_external_id,observed_at) VALUES($1,$2,'','gid://shopify/Order/1002','customer-1002',now())`,
+    [f.org.id, r.store],
+  );
+  expect(
+    (
+      await f.request(
+        f.member,
+        `${f.base}/return-cases?customerId=${customerId}`,
+      )
+    ).items
+      .map((c) => c.id)
+      .sort(),
+  ).toEqual([first.case.id, second.case.id].sort());
+  expect(
+    (
+      await f.request(
+        f.member,
+        `${f.base}/return-cases?customerId=${randomUUID()}`,
+      )
+    ).items,
+  ).toEqual([]);
+
   // The store's own record is unchanged.
   const store = await f.request(
     f.member,
@@ -215,6 +267,27 @@ it('counts partial returns once, keeps decisions apart from store records and en
   });
   expect(detail.case.assignee).toEqual({ id: f.owner.id, name: 'Owner' });
 
+  // Needs you keeps the owning case assignment and offers members a read-only review.
+  const queue = await f.request(
+    f.member,
+    `${f.base}/decisions?view=all&limit=100`,
+  );
+  const attention = queue.items.find(
+    (item) => item.id === `return-case:${first.case.id}`,
+  );
+  expect(attention).toMatchObject({
+    kind: 'return_case',
+    response: 'view_only',
+    owner: { kind: 'return_case', caseId: first.case.id },
+    assignment: { assigneeId: f.owner.id, assignedBy: f.owner.id },
+  });
+  await post(
+    f.owner,
+    `${f.base}/decisions/assignments`,
+    { decisionId: attention.id, assigneeId: f.owner.id, revision: 0 },
+    404,
+  );
+
   // Cancelling frees the units; the store return no longer counts through the cancelled case.
   const cancelled = await post(
     f.owner,
@@ -267,11 +340,53 @@ it('counts partial returns once, keeps decisions apart from store records and en
     { commandId: randomUUID(), expectedRevision: 5, reason: 'Not mine' },
     404,
   );
+  expect(
+    (
+      await f.request(
+        f.outsider,
+        `/v1/organizations/${other.id}/return-cases?q=%231002&limit=20`,
+      )
+    ).items,
+  ).toEqual([]);
   const rows = await f.db.owner.query(
     'SELECT tenant_id FROM orders_return_cases WHERE id=$1',
     [first.case.id],
   );
   expect(rows.rows).toEqual([{ tenant_id: f.org.id }]);
+
+  const role = await f.app.inject({
+    method: 'POST',
+    url: `${f.base}/roles`,
+    headers: {
+      origin: f.config.baseURL,
+      cookie: f.owner.cookie,
+      'x-command-id': randomUUID(),
+    },
+    payload: {
+      name: 'Return reader',
+      description: '',
+      permissions: ['returns.read', 'orders.read'],
+    },
+  });
+  expect(role.statusCode, role.body).toBe(201);
+  await f.request(f.owner, `${f.base}/members/${f.membership.id}`, 'PATCH', {
+    roleId: role.json().id,
+  });
+  await f.request(
+    f.member,
+    `${f.base}/return-cases?customerId=${customerId}`,
+    'GET',
+    undefined,
+    403,
+  );
+  expect(
+    (
+      await f.request(f.member, `${f.base}/return-cases?openOnly=true`)
+    ).items.map((c) => c.id),
+  ).toEqual([first.case.id]);
+  expect(
+    (await f.request(f.member, `${f.base}/return-cases?openOnly=false`)).items,
+  ).toHaveLength(2);
 });
 
 /** Signs in a seeded pilot user and returns their session cookie. */
@@ -491,4 +606,164 @@ it('creates an approved return in JTL-Wawi once and verifies it with an independ
       'creation_created',
     ]),
   );
+});
+
+it('creates and approves Shopify returns through policy, links imported units once and reconciles independently', async (t) => {
+  const f = await setupSimulator(t);
+  const org = f.manifest.organizationId,
+    connectionId = f.manifest.connections.shopify;
+  const requester = await login(f, 'pilot-operator@example.test');
+  const approver = await login(f, 'pilot-requester@example.test');
+  const root = `/v1/organizations/${org}`;
+  const request = async (path, body, cookie = requester, status = 200) => {
+    const response = await f.pilot.app.inject({
+      method: body ? 'POST' : 'GET',
+      url: `${root}${path}`,
+      headers: { cookie, origin: 'http://127.0.0.1:3000' },
+      ...(body ? { payload: body } : {}),
+    });
+    expect(response.statusCode, response.body).toBe(status);
+
+    return response.json();
+  };
+  const variants = (
+    await f.call('runs/operations/records/shopify?kind=ProductVariant&limit=10')
+  ).items;
+  const oldOrders = new Set(
+    (
+      await f.call('runs/operations/records/shopify?kind=Order&limit=100')
+    ).items.map((o) => o.id),
+  );
+  const command = (command) =>
+    f.call('runs/operations/control', {
+      action: 'command',
+      instance: 'shopify',
+      command,
+    });
+  await f.call('runs/operations/control', {
+    action: 'order',
+    shop: 'shopify',
+    lines: [{ sku: variants[0].data.sku, quantity: 2 }],
+  });
+  const providerOrderId = (
+    await f.call('runs/operations/records/shopify?kind=Order&limit=100')
+  ).items.find((o) => !oldOrders.has(o.id)).id;
+  await command({
+    kind: 'fulfill',
+    order: providerOrderId,
+    carrier: 'DHL',
+    trackingNumber: 'return-test',
+    trackingUrl: 'https://example.test/tracking',
+  });
+  await f.pilot.observe({ check: false });
+  const mapped = await f.db.owner.query(
+    "SELECT canonical_id FROM connector_source_mappings WHERE tenant_id=$1 AND connection_id=$2 AND resource='order' AND external_id=$3",
+    [org, connectionId, `gid://shopify/Order/${providerOrderId}`],
+  );
+  const orderId = mapped.rows[0].canonical_id;
+  const available = await request(`/orders/${orderId}/return-cases`);
+  const line = available.sources.find((s) => s.connectionId === connectionId)
+    .lines[0];
+  const opened = await request(`/orders/${orderId}/return-cases`, {
+    id: randomUUID(),
+    connectionId,
+    sourceReturnId: null,
+    lines: [
+      {
+        orderLineId: line.orderLineId,
+        quantity: 1,
+        reason: 'size_or_fit',
+        note: null,
+      },
+    ],
+  });
+  expect(opened.creationAvailability.blocker).toBeNull();
+  const path = `/return-cases/${opened.case.id}`;
+  const options = await request(`${path}/creation-options`);
+  const choice = {
+    warehouse: { externalId: 'shopify', scopeKey: '' },
+    reason: { externalId: 'SIZE_TOO_SMALL', scopeKey: '' },
+  };
+  expect(options.warehouses).toContainEqual(
+    expect.objectContaining(choice.warehouse),
+  );
+  const pending = await request(`${path}/creations`, {
+    id: randomUUID(),
+    ...choice,
+  });
+  expect(pending.creation).toMatchObject({
+    state: 'approval_required',
+    operation: 'create',
+  });
+  await request(
+    `${path}/creations/${pending.creation.id}/decision`,
+    { decisionId: pending.creation.decisionId, outcome: 'approved' },
+    requester,
+    409,
+  );
+  const created = await request(
+    `${path}/creations/${pending.creation.id}/decision`,
+    { decisionId: pending.creation.decisionId, outcome: 'approved' },
+    approver,
+  );
+  expect(created.creation).toMatchObject({
+    state: 'created',
+    operation: 'create',
+  });
+  await f.pilot.observe({ check: false });
+  const bound = await request(path);
+  expect(bound.case.sourceReturnId).toBeTruthy();
+  const counted = await request(`/orders/${orderId}/return-cases`);
+  expect(
+    counted.sources.find((s) => s.connectionId === connectionId).lines[0],
+  ).toMatchObject({ inCases: 1, inStoreReturns: 0, returnable: 1 });
+  // A customer requests the remaining unit; Luma approves that request, without creating another return.
+  const providerLines = (
+    await f.call('runs/operations/records/shopify?kind=LineItem&limit=100')
+  ).items.filter((l) => l.data.order === providerOrderId);
+  await command({
+    kind: 'return',
+    order: providerOrderId,
+    lines: [{ lineItem: providerLines[0].id, quantity: 1 }],
+    reason: 'Wrong size',
+  });
+  await f.pilot.observe({ check: false });
+  const next = await request(`/orders/${orderId}/return-cases`);
+  const source = next.sources.find((s) => s.connectionId === connectionId);
+  const sourceReturn = source.storeReturns.find(
+    (r) => r.status === 'requested',
+  );
+  const second = await request(`/orders/${orderId}/return-cases`, {
+    id: randomUUID(),
+    connectionId,
+    sourceReturnId: sourceReturn.id,
+    lines: [
+      {
+        orderLineId: line.orderLineId,
+        quantity: 1,
+        reason: 'size_or_fit',
+        note: null,
+      },
+    ],
+  });
+  const secondPath = `/return-cases/${second.case.id}`;
+  const approval = await request(`${secondPath}/creations`, {
+    id: randomUUID(),
+    ...choice,
+  });
+  expect(approval.creation.operation).toBe('approve');
+  const approved = await request(
+    `${secondPath}/creations/${approval.creation.id}/decision`,
+    { decisionId: approval.creation.decisionId, outcome: 'approved' },
+    approver,
+  );
+  expect(approved.creation).toMatchObject({
+    state: 'created',
+    operation: 'approve',
+  });
+  expect(
+    (
+      await f.call('runs/operations/records/shopify?kind=Return&limit=100')
+    ).items.filter((r) => r.data.order === providerOrderId),
+  ).toHaveLength(2);
 });

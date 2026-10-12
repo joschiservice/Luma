@@ -28,6 +28,13 @@ it('says who a decision waits for and only asks the reader when they can act', (
   expect(
     decisionStatus({ reason: 'recovery', response: 'view_only' }).label,
   ).toBe('Outcome not confirmed');
+  expect(
+    decisionStatus({
+      kind: 'return_case',
+      reason: 'manual_intervention',
+      response: 'view_only',
+    }),
+  ).toEqual({ state: 'idle', label: 'View only' });
   expect(actionable({ response: 'check' })).toBe(true);
   expect(actionable({ response: 'awaiting_other' })).toBe(false);
 });

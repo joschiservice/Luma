@@ -63,5 +63,18 @@
   "connections_error_invalid": "Check the connection details and enter the credentials again.",
   "connections_error_unavailable": "The connection service is unavailable. Ask your administrator to check the app setup, then refresh.",
   "connections_error_unknown": "Luma couldn’t confirm the result. Refresh the list before trying again.",
-  "connections_write_mode_inherit": "Use workspace write mode"
+  "connections_write_mode_inherit": "Use workspace write mode",
+  "connections_capability_returns_quote": "Read refund and restock quotes",
+  "connections_capability_returns_proof": "Check refund and restock outcomes",
+  "connections_capability_returns_refund": "Refund received return units",
+  "connections_capability_returns_restock": "Restock inspected return units",
+  "connections_capability_exchange_options": "Read replacement choices",
+  "connections_capability_exchange_quote": "Read native exchange quotes",
+  "connections_capability_exchange_proof": "Verify exchange fulfillment and payment",
+  "connections_capability_exchange_request": "Request exchange replacement",
+  "connections_capability_exchange_process": "Process exchange replacement",
+  "connections_capability_exchange_cancel": "Cancel an unprocessed exchange",
+  "connections_capability_exchange_release": "Release a paid exchange hold",
+  "connections_capability_exchange_price": "Replacement price evidence",
+  "connections_capability_exchange_reservation": "Replacement order and reservation evidence"
 }

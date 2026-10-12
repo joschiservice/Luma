@@ -16,9 +16,16 @@ import { setupSimulator } from './simulator-fixture.mjs';
  */
 export async function caseWorkflowFixture(
   t,
-  { origin = 'http://127.0.0.1:3000', detection, demo } = {},
+  {
+    origin = 'http://127.0.0.1:3000',
+    detection,
+    demo,
+    timeSkipping = false,
+  } = {},
 ) {
-  const temporal = await TestWorkflowEnvironment.createLocal();
+  const temporal = timeSkipping
+    ? await TestWorkflowEnvironment.createTimeSkipping()
+    : await TestWorkflowEnvironment.createLocal();
   t.onTestFinished(() => temporal.teardown());
   const settings = {
     address: temporal.address,

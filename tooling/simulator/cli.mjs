@@ -10,7 +10,7 @@ import {
   state,
   stateDirectory,
 } from '../dev/environment.mjs';
-import { fail, run } from '../dev/process.mjs';
+import { fail, run, runTogether } from '../dev/process.mjs';
 import { startTelemetry } from '../observability/runtime.mjs';
 import { provisionSimulatorDatabase, simulatorPassword } from './database.mjs';
 import { createOperationsClient } from './platform-client.mjs';
@@ -219,17 +219,14 @@ try {
     ...generated,
     LUMA_PILOT_DIRECTORY: directory,
   };
-  const stop = () => void simulator.close();
-  process.once('SIGINT', stop);
-  process.once('SIGTERM', stop);
+  // The simulator stays up until the pilot has stopped, so its last pass can finish its reads.
   try {
-    await Promise.all([
-      run('node', ['tooling/pilot/process.mjs'], { env }),
-      run('node', ['tooling/pilot/process.mjs', '--worker'], { env }),
-      run('pnpm', ['--filter', '@luma/web', 'dev'], { env }),
+    await runTogether([
+      ['node', ['tooling/pilot/process.mjs'], { env }],
+      ['node', ['tooling/pilot/process.mjs', '--worker'], { env }],
+      ['pnpm', ['--filter', '@luma/web', 'dev'], { env }],
     ]);
   } finally {
-    process.emit('SIGTERM');
     await simulator.close();
     await telemetry?.shutdown();
   }

@@ -433,3 +433,41 @@ describe('JTL ERP API', () => {
     expect(jtl.drift(missing)).toBe(missing);
   });
 });
+
+it('reports order-specific reservations, reduces them after shipping and removes cancelled orders without changing stock on reads', async () => {
+  const { context } = await seeded();
+  await order(context, 3);
+  await order(context, 2);
+  const read = () =>
+    call(context, 'stocks/reservations?pageNumber=1&pageSize=100');
+  expect((await read()).body).toMatchObject({
+    totalItems: 2,
+    items: [
+      { itemId: 1, salesOrderId: 1, amount: 3 },
+      { itemId: 1, salesOrderId: 2, amount: 2 },
+    ],
+  });
+  await jtl.command(context, {
+    kind: 'ship',
+    id: '1',
+    warehouse: '1',
+    lines: [{ lineId: '1', quantity: 1 }],
+    trackingNumber: 'reservation-partial',
+    trackingUrl: 'https://example.test/tracking',
+  });
+  expect((await read()).body).toMatchObject({
+    items: [
+      { salesOrderId: 1, amount: 2 },
+      { salesOrderId: 2, amount: 2 },
+    ],
+  });
+  await jtl.command(context, { kind: 'cancel', id: '2' });
+  const stock = (await call(context, 'warehouses/1/items/1/stocks')).body;
+  expect((await read()).body).toMatchObject({
+    totalItems: 1,
+    items: [{ salesOrderId: 1, amount: 2 }],
+  });
+  expect((await call(context, 'warehouses/1/items/1/stocks')).body).toEqual(
+    stock,
+  );
+});

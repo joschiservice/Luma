@@ -64,6 +64,7 @@ const paths = {};
 
 for (const path of [
   '/v2/sales-orders',
+  '/v2/stocks/reservations',
   '/v2/sales-orders/{salesOrderId}/line-items',
   '/v2/items',
   '/v2/warehouses/{warehouseId}/items/{itemId}/stocks',

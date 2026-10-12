@@ -242,6 +242,21 @@ export async function seedPilot(
                         ? [
                             'inventory.available.reconcile',
                             'returns.read',
+                            'returns.options.read',
+                            'returns.created.read',
+                            'returns.create',
+                            'returns.exchange.options.read',
+                            'returns.exchange.quote.read',
+                            'returns.exchange.proof.read',
+                            'returns.exchange.price.read',
+                            'returns.exchange.request',
+                            'returns.exchange.process',
+                            'returns.exchange.cancel',
+                            'returns.exchange.release',
+
+                            'returns.settlement.quote.read',
+                            'returns.settlement.proof.read',
+                            'returns.refund',
                             'customers.read',
                             'fulfillment.hold.release',
                             'fulfillment.open',
@@ -264,6 +279,11 @@ export async function seedPilot(
                               'returns.options.read',
                               'returns.created.read',
                               'returns.create',
+
+                              'returns.settlement.quote.read',
+                              'returns.settlement.proof.read',
+                              'returns.exchange.reservation.read',
+                              'returns.restock',
                             ]),
                     ]
                   : []),

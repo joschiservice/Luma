@@ -1,4 +1,5 @@
 import type { TenantContext } from '@luma/identity';
+import type { ReturnCaseAttention } from '@luma/orders';
 
 import type {
   AppOwnedDecision,
@@ -18,6 +19,20 @@ import {
   presentReplySend,
   type ReplySendDecision,
 } from '../../domain/reply-decisions.js';
+import { presentReturnCase } from '../../domain/return-case-decisions.js';
+
+/** Contributes persisted return work and creation approvals without provider reads. */
+export function returnCaseDecisionProvider(
+  pending: (context: TenantContext) => Promise<ReturnCaseAttention[]>,
+): DecisionProvider {
+  return {
+    id: 'return-cases',
+    label: 'Returns',
+    permission: 'returns.read',
+    pending: async (context) =>
+      (await pending(context)).map((item) => presentReturnCase(item)),
+  };
+}
 
 /** Adapts the procurement owner's pending purchase-order proposals to the queue. */
 export function replenishmentDecisionProvider(

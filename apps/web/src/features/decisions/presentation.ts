@@ -10,6 +10,8 @@ import type { Domain } from '@luma/ui/components/primitives/domain-icon';
 import type { PersonOption } from '@luma/ui/components/primitives/person-picker';
 import type { OperationalState } from '@luma/ui/components/primitives/state';
 
+import { caseStageLabels } from '../returns/case-presentation';
+
 export const viewLabels: Record<DecisionView, () => string> = {
   all: m.decisions_view_all,
   mine: m.decisions_view_mine,
@@ -34,6 +36,7 @@ export const reasonLabels: Record<DecisionReason, () => string> = {
 
 export const kindLabels: Record<DecisionKind, () => string> = {
   case: m.decisions_kind_case,
+  return_case: m.returns_case_title_fallback,
   replenishment: m.decisions_kind_replenishment,
   fulfillment_recovery: m.decisions_kind_fulfillment_recovery,
   inventory_correction: m.decisions_kind_inventory_correction,
@@ -76,7 +79,8 @@ export const evidenceLabels: Record<
  * ask the reader to act; the others explain who the decision waits for.
  */
 export function decisionStatus(
-  item: Pick<DecisionItem, 'reason' | 'response'>,
+  item: Pick<DecisionItem, 'reason' | 'response'> &
+    Partial<Pick<DecisionItem, 'kind'>>,
 ): {
   state: OperationalState;
   label: string;
@@ -97,6 +101,9 @@ export function decisionStatus(
           ? { state: 'attention', label: m.decisions_status_expired() }
           : { state: 'attention', label: m.decisions_status_review() };
     case 'view_only':
+      if (item.kind === 'return_case')
+        return { state: 'idle', label: m.authoring_editor_view_only() };
+
       return item.reason === 'run'
         ? { state: 'waiting', label: m.decisions_status_waiting_requester() }
         : item.reason === 'recovery'
@@ -216,4 +223,51 @@ export function assigneeOptions(
     );
 
   return people.sort((a, b) => Number(b.id === self) - Number(a.id === self));
+}
+
+/** Localizes owned return work without changing its authority or evidence. */
+export function localizeReturnDecision(item: DecisionItem): DecisionItem {
+  if (item.kind !== 'return_case') return item;
+  const stage = item.change.find((fact) => fact.label === 'Stage')?.value;
+
+  return {
+    ...item,
+    why:
+      item.reason === 'approval'
+        ? m.returns_service_queue_approval()
+        : item.reason === 'uncertainty'
+          ? m.returns_service_queue_uncertain()
+          : item.change.some(
+                (fact) =>
+                  fact.label === 'Exchange completion' &&
+                  fact.value === 'unresolved',
+              )
+            ? m.returns_exchange_complete_unresolved()
+            : m.returns_service_queue_manual(),
+    consequences: [
+      {
+        response: m.returns_service_open_case(),
+        text: m.returns_service_queue_consequence(),
+      },
+    ],
+    change: item.change.map((fact) =>
+      fact.label === 'Units'
+        ? { label: m.returns_case_open_units(), value: fact.value }
+        : fact.label === 'Stage'
+          ? {
+              label: m.returns_column_stage(),
+              value:
+                Object.entries(caseStageLabels).find(
+                  ([key]) => key === stage,
+                )?.[1] ?? m.common_not_reported(),
+            }
+          : fact.label === 'Exchange completion'
+            ? {
+                label: m.returns_exchange_consistency_title(),
+                value: m.returns_exchange_complete_unresolved(),
+              }
+            : fact,
+    ),
+    group: { ...item.group, label: m.returns_service_cases() },
+  };
 }
