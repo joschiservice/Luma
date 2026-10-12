@@ -39,7 +39,13 @@ test('configures deadlines by keyboard and follows independently verified native
   await expect(
     page.getByRole('option', { name: 'Configured', exact: true }),
   ).toBeVisible();
+  await expect(
+    page.getByRole('option', { name: 'Disabled', exact: true }),
+  ).toHaveAttribute('data-highlighted', '');
   await page.keyboard.press('End');
+  await expect(
+    page.getByRole('option', { name: 'Configured', exact: true }),
+  ).toHaveAttribute('data-highlighted', '');
   await page.keyboard.press('Enter');
   await expect(select).toContainText('Configured');
   await page
