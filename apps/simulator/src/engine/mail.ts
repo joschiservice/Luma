@@ -1,4 +1,4 @@
-import { customer } from '@luma/simulator-commerce';
+import { customer, germanSpeaking } from '@luma/simulator-commerce';
 import { keyedRandom } from '@luma/simulator-core';
 import { csv, type DeliverAttachment, textPdf } from '@luma/simulator-gmail';
 import {
@@ -15,8 +15,29 @@ const day = 86_400_000;
 
 type ConfirmCommand = Extract<JtlCommand, { kind: 'purchase-order-confirm' }>;
 
-/** Suppliers in German-speaking countries write German; the others write English. */
-const german = (country: string) => ['DE', 'AT', 'CH'].includes(country);
+/**
+ * Whether the merchant and a supplier correspond in German: both must be German-speaking;
+ * otherwise they write English.
+ */
+const german = (world: World, supplier: SupplierRecord) =>
+  world.model.profile.company.language === 'de' &&
+  germanSpeaking(supplier.countryIso);
+
+/** The operations mailbox's labels for supplier and customer mail. */
+export const mailboxLabels = (language: 'de' | 'en') =>
+  language === 'de'
+    ? { suppliers: 'Lieferanten', customers: 'Kunden' }
+    : { suppliers: 'Suppliers', customers: 'Customers' };
+
+const labels = (world: World) =>
+  mailboxLabels(world.model.profile.company.language);
+
+/** The domain of the merchant's mailbox, which also signs its own Message-IDs. */
+const merchantDomain = (world: World) => {
+  const address = world.model.mailbox.config.address;
+
+  return address.slice(address.indexOf('@') + 1);
+};
 
 const addDays = (date: string, count: number) =>
   new Date(Date.parse(`${date.slice(0, 10)}T00:00:00Z`) + count * day)
@@ -30,8 +51,8 @@ const dateText = (date: string, de: boolean) => {
 };
 
 /** The RFC Message-ID of the ERP's email for a purchase order, so supplier answers can reply. */
-const orderMessageId = (order: PurchaseOrderRecord) =>
-  `po.${order.orderNumber.toLowerCase()}@luma-goods.example`;
+const orderMessageId = (world: World, order: PurchaseOrderRecord) =>
+  `po.${order.orderNumber.toLowerCase()}@${merchantDomain(world)}`;
 
 async function purchaseOrder(world: World, id: string) {
   const store = erpContext(world).store;
@@ -61,11 +82,14 @@ export async function purchaseOrderMail(
   const found = await purchaseOrder(world, id);
   if (!found) return;
   const { order, supplier } = found;
-  const de = german(supplier.countryIso);
+  const de = german(world, supplier);
   const lines = order.lineItems.map(
     (line) => `${line.quantity} x ${line.itemNumber} ${line.name}`,
   );
   const date = dateText(order.requestedDeliveryDate, de);
+  const company = world.model.profile.company;
+  // The ERP's own document follows the merchant's language, whoever receives it.
+  const merchantGerman = company.language === 'de';
   await mail(world, {
     kind: 'deliver',
     from: world.model.mailbox.config,
@@ -87,21 +111,32 @@ export async function purchaseOrderMail(
         : 'Please confirm quantities and delivery date.',
       '',
       de ? 'Mit freundlichen Grüßen' : 'Kind regards',
-      'Luma Goods GmbH, Einkauf, Hamburg',
+      `${company.name}, ${merchantGerman ? 'Einkauf' : 'Purchasing'}, ${company.city}`,
     ].join('\n'),
-    messageId: orderMessageId(order),
+    messageId: orderMessageId(world, order),
     attachments: [
       {
-        filename: `Bestellung-${order.orderNumber}.pdf`,
+        filename: `${merchantGerman ? 'Bestellung' : 'PO'}-${order.orderNumber}.pdf`,
         mimeType: 'application/pdf',
-        base64: textPdf([
-          'Luma Goods GmbH · Hamburg',
-          `Bestellung ${order.orderNumber}`,
-          `Lieferant: ${supplier.companyName} (${supplier.supplierNumber})`,
-          `Liefertermin: ${dateText(order.requestedDeliveryDate, true)}`,
-          '',
-          ...lines,
-        ]),
+        base64: textPdf(
+          merchantGerman
+            ? [
+                `${company.name} · ${company.city}`,
+                `Bestellung ${order.orderNumber}`,
+                `Lieferant: ${supplier.companyName} (${supplier.supplierNumber})`,
+                `Liefertermin: ${dateText(order.requestedDeliveryDate, true)}`,
+                '',
+                ...lines,
+              ]
+            : [
+                `${company.name} · ${company.city}`,
+                `Purchase order ${order.orderNumber}`,
+                `Supplier: ${supplier.companyName} (${supplier.supplierNumber})`,
+                `Delivery date: ${dateText(order.requestedDeliveryDate, false)}`,
+                '',
+                ...lines,
+              ],
+        ),
       },
     ],
     at,
@@ -150,16 +185,29 @@ function splitText(
   ].join('\n');
 }
 
-const schedule = (order: PurchaseOrderRecord, lines: AnswerLine[]) =>
+const schedule = (
+  order: PurchaseOrderRecord,
+  lines: AnswerLine[],
+  de: boolean,
+) =>
   csv([
-    [
-      'Bestellung',
-      'Artikelnummer',
-      'Bezeichnung',
-      'Bestellt',
-      'Menge',
-      'Liefertermin',
-    ],
+    de
+      ? [
+          'Bestellung',
+          'Artikelnummer',
+          'Bezeichnung',
+          'Bestellt',
+          'Menge',
+          'Liefertermin',
+        ]
+      : [
+          'Purchase order',
+          'SKU',
+          'Description',
+          'Ordered',
+          'Quantity',
+          'Delivery date',
+        ],
     ...lines.flatMap((line) => [
       [
         order.orderNumber,
@@ -195,7 +243,7 @@ async function answer(
     messageId: string;
   },
 ) {
-  const de = german(supplier.countryIso);
+  const de = german(world, supplier);
   const prefix = de ? 'AW' : 'RE';
   const base = de
     ? `Bestellung ${order.orderNumber}`
@@ -207,9 +255,9 @@ async function answer(
     // The subject keeps the ERP's wording, so Gmail threads the answer with the order email.
     subject: `${prefix}: ${base}`,
     text: input.text,
-    inReplyTo: orderMessageId(order),
+    inReplyTo: orderMessageId(world, order),
     messageId: input.messageId,
-    labels: ['Lieferanten'],
+    labels: [labels(world).suppliers],
     attachments: input.attachments,
     at: world.now,
   });
@@ -227,7 +275,7 @@ export async function supplierConfirmationMail(
   const found = await purchaseOrder(world, command.orderId);
   if (!found || !command.lines?.length) return;
   const { order, supplier } = found;
-  const de = german(supplier.countryIso);
+  const de = german(world, supplier);
   const lines: AnswerLine[] = command.lines.flatMap((confirmed) => {
     const line = order.lineItems.find(
       (item) => item.lineItemId === confirmed.lineItemId,
@@ -257,9 +305,9 @@ export async function supplierConfirmationMail(
       text: splitText(order, supplier, lines, de),
       attachments: [
         {
-          filename: `Lieferplan-${order.orderNumber}.csv`,
+          filename: `${de ? 'Lieferplan' : 'Delivery-schedule'}-${order.orderNumber}.csv`,
           mimeType: 'text/csv',
-          base64: schedule(order, lines),
+          base64: schedule(order, lines, de),
         },
       ],
       messageId: `split.${tag}@${domain}`,
@@ -349,7 +397,7 @@ export async function splitDeliveryMail(
   const found = await purchaseOrder(world, id);
   if (!found) throw new Error('Purchase order not found');
   const { order, supplier } = found;
-  const de = german(supplier.countryIso);
+  const de = german(world, supplier);
   const soon = new Date(world.now + 3 * day).toISOString().slice(0, 10);
   const lines: AnswerLine[] = order.lineItems.map((line) => {
     const now = Math.max(1, Math.floor(line.quantity * 0.6));
@@ -369,9 +417,9 @@ export async function splitDeliveryMail(
     text: splitText(order, supplier, lines, de),
     attachments: [
       {
-        filename: `Lieferplan-${order.orderNumber}.csv`,
+        filename: `${de ? 'Lieferplan' : 'Delivery-schedule'}-${order.orderNumber}.csv`,
         mimeType: 'text/csv',
-        base64: schedule(order, lines),
+        base64: schedule(order, lines, de),
       },
     ],
     messageId: `split.${order.orderNumber.toLowerCase()}.${reference}@${domain}`,
@@ -405,7 +453,8 @@ export async function customerDelayMail(
     order.shop,
     order.order,
   );
-  const de = random.chance(0.8);
+  // Most customers of German-speaking shops write German; the others write English.
+  const de = random.chance(0.8) && germanSpeaking(shopInstance.shop.country);
   const subject = random.pick(
     de
       ? [
@@ -446,7 +495,7 @@ export async function customerDelayMail(
     subject,
     text: text.join('\n'),
     messageId: `delay.${order.shop}.${order.order}.${reference}@customer.example`,
-    labels: ['Kunden'],
+    labels: [labels(world).customers],
     at: world.now,
   });
 }

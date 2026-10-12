@@ -7,6 +7,10 @@ import type { ProviderContext } from '@luma/simulator-core';
 export interface Cin7Config {
   accountId: string;
   company: string;
+  /** The account's base currency; customer and supplier records trade in it. */
+  baseCurrency: string;
+  /** Base-currency units per unit of each foreign customer currency. */
+  currencyRates?: Record<string, number> | undefined;
   warehouses: { id: string; name: string }[];
   shippingMethods: { id: string; name: string }[];
 }
@@ -77,6 +81,8 @@ export interface ErpOrder {
   paid: boolean;
   shippingMethodId: string;
   currency: string;
+  /** Sales tax in percent included in the line prices; none when absent. */
+  taxRate?: number | undefined;
   total: number;
   date: string;
   lines: {

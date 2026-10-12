@@ -210,6 +210,8 @@ export interface EngineEvents {
   supplier: { command: Record<string, unknown> };
   /** The ERP emails a new purchase order to its supplier from the operations mailbox. */
   'purchase-order-mail': { purchaseOrder: string };
+  /** A wholesale account pays its invoice. */
+  'wholesale-payment': { erpOrder: string };
 }
 
 /** A stored engine event. */

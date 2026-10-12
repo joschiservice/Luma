@@ -1,4 +1,8 @@
-import type { MerchantProfile } from '@luma/simulator-commerce';
+import {
+  type MerchantProfile,
+  merchantProfile,
+  merchantProfiles,
+} from '@luma/simulator-commerce';
 import type { ChaosProfile } from '@luma/simulator-core';
 import type { PoolClient } from 'pg';
 
@@ -29,7 +33,10 @@ interface Row {
   id: string;
   seed: string;
   profile_name: string;
-  profile: MerchantProfile;
+  /** Runs stored before profiles had a region lack `company`, `currency` and taxes. */
+  profile:
+    | MerchantProfile
+    | { company?: undefined; erp?: MerchantProfile['erp'] | undefined };
   chaos: ChaosProfile;
   status: RunRecord['status'];
   progress: RunRecord['progress'];
@@ -43,11 +50,27 @@ interface Row {
   created_at: string;
 }
 
+/**
+ * A stored run's profile. Runs created before profiles carried their region stored a preset
+ * with its ERP; those presets generate the same world today, so the current preset replaces
+ * them.
+ */
+function storedProfile(row: Row): MerchantProfile {
+  if (row.profile.company) return row.profile;
+  if (!Object.hasOwn(merchantProfiles, row.profile_name))
+    throw new Error(`Run ${row.id} uses unknown profile ${row.profile_name}`);
+  const profile = merchantProfile(
+    row.profile_name as keyof typeof merchantProfiles,
+  );
+
+  return { ...profile, erp: row.profile.erp ?? 'jtl' };
+}
+
 const fromRow = (row: Row): RunRecord => ({
   id: row.id,
   seed: Number(row.seed),
   profileName: row.profile_name,
-  profile: row.profile,
+  profile: storedProfile(row),
   chaos: row.chaos,
   status: row.status,
   progress: row.progress,

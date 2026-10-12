@@ -214,6 +214,54 @@ function PlaceOrder({ run }: { run: RunDetail }) {
   );
 }
 
+/** Books a retail account's wholesale order directly in the ERP; it has no shop order. */
+function PlaceWholesaleOrder({ run }: { run: RunDetail }) {
+  const control = useControl(run.id);
+  const id = useId();
+  const [placed, setPlaced] = useState(false);
+
+  return (
+    <Card as="section" aria-labelledby={`${id}-title`}>
+      <CardHeader>
+        <div>
+          <CardTitle id={`${id}-title`}>Place a wholesale order</CardTitle>
+          <CardDescription>
+            A retail account orders bestsellers in case quantities, booked
+            directly in the ERP in {run.merchant.baseCurrency} and paid on
+            invoice later. No shop order matches it.
+          </CardDescription>
+        </div>
+      </CardHeader>
+      <div className="sim-form">
+        <div aria-live="polite">
+          {control.isError ? (
+            <p className="sim-error-text" role="alert">
+              The order was not placed: {errorMessage(control.error)}
+            </p>
+          ) : placed ? (
+            <p>Wholesale order placed. Follow it in the journal.</p>
+          ) : null}
+        </div>
+        <div className="sim-actions">
+          <Button
+            type="button"
+            disabled={control.isPending}
+            onClick={() => {
+              setPlaced(false);
+              control.mutate(
+                { action: 'wholesale-order' },
+                { onSuccess: () => setPlaced(true) },
+              );
+            }}
+          >
+            {control.isPending ? 'Placing…' : 'Place wholesale order'}
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 /** Sends a raw provider command for expert reproduction. */
 function ProviderCommand({ run }: { run: RunDetail }) {
   const control = useControl(run.id);
@@ -300,6 +348,9 @@ export function MerchantActions({ run }: { run: RunDetail }) {
   return (
     <div className="sim-two-column">
       <PlaceOrder run={run} />
+      {run.merchant.wholesaleOrdersPerDay > 0 ? (
+        <PlaceWholesaleOrder run={run} />
+      ) : null}
       <ProviderCommand run={run} />
     </div>
   );

@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
 
+import { merchantProfiles } from '@luma/simulator-commerce';
 import type { RunDetail } from '@luma/simulator-contract';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -101,7 +102,7 @@ describe.skipIf(!adminUrl)('simulator host', () => {
     });
     expect(
       (await call<{ merchants: unknown[] }>('profiles')).merchants.length,
-    ).toBe(4);
+    ).toBe(Object.keys(merchantProfiles).length);
   });
 
   it('serves provider requests with service health and manual faults', async () => {
