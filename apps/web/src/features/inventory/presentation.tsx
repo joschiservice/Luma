@@ -5,7 +5,15 @@ import { StatePill } from '@luma/ui/components/primitives/state';
 
 import { formatSourceNumber } from '../../shared/orders/presentation';
 
-type StockField = 'onHand' | 'reserved' | 'available' | 'incoming';
+type StockField =
+  | 'onHand'
+  | 'reserved'
+  | 'available'
+  | 'incoming'
+  | 'committed'
+  | 'damaged'
+  | 'qualityControl'
+  | 'safetyStock';
 
 /** Column labels for each reported quantity. */
 export const quantityLabels: Record<StockField, () => string> = {
@@ -13,6 +21,10 @@ export const quantityLabels: Record<StockField, () => string> = {
   reserved: m.inventory_quantity_reserved,
   available: m.inventory_quantity_available,
   incoming: m.inventory_quantity_incoming,
+  committed: m.inventory_quantity_committed,
+  damaged: m.inventory_quantity_damaged,
+  qualityControl: m.inventory_quantity_quality_control,
+  safetyStock: m.inventory_quantity_safety_stock,
 };
 
 const quantityNames: Record<
@@ -33,8 +45,8 @@ export function differingQuantities(fields: StockPosition['differences']) {
  * Formats a reported quantity in the active language without rounding. A missing value shows as
  * not reported, never as zero.
  */
-export function stockQuantity(value: string | null) {
-  return value === null ? m.common_not_reported() : formatSourceNumber(value);
+export function stockQuantity(value: string | null | undefined) {
+  return value == null ? m.common_not_reported() : formatSourceNumber(value);
 }
 
 /**

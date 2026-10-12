@@ -98,5 +98,16 @@
   "inventory_history_removed": "An der Quelle entfernt",
   "inventory_history_current": "Aktuell",
   "inventory_history_earlier": "Früherer Abruf",
-  "inventory_history_truncated": "{count, plural, one {Der neueste Abruf wird angezeigt.} other {Die {count, number} neuesten Abrufe werden angezeigt.}}"
+  "inventory_history_truncated": "{count, plural, one {Der neueste Abruf wird angezeigt.} other {Die {count, number} neuesten Abrufe werden angezeigt.}}",
+  "inventory_quantity_committed": "Gebunden",
+  "inventory_quantity_damaged": "Beschädigt",
+  "inventory_quantity_quality_control": "Qualitätskontrolle",
+  "inventory_quantity_safety_stock": "Sicherheitsbestand",
+  "inventory_provider_states_title": "Nicht verfügbarer Bestand und Aktivierung",
+  "inventory_provider_states_note": "Shopifys gebundener Bestand und der separate reservierte Bestand haben unterschiedliche Bedeutungen. Mengen bleiben wie gemeldet; eingehender Bestand wird nicht zum verfügbaren Bestand addiert. Aktivierung legt keine Bestandshoheit fest.",
+  "inventory_location_active": "Standort aktiv",
+  "inventory_item_active": "Artikel am Standort aktiv",
+  "inventory_item_tracked": "Bestand erfasst",
+  "inventory_activation_yes": "Ja",
+  "inventory_activation_no": "Nein"
 }

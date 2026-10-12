@@ -11,7 +11,7 @@ import {
   RouterProvider,
 } from '@tanstack/react-router';
 import { useState } from 'react';
-import { expect, within } from 'storybook/test';
+import { expect, userEvent, within } from 'storybook/test';
 
 import appStyles from '../../styles.css?inline';
 import { IdentityLinksView } from '../sync/identity-links';
@@ -64,6 +64,29 @@ const position: StockPosition = {
       deleted: false,
     },
   ],
+};
+const providerStates: StockPosition = {
+  ...position,
+  differences: ['onHand', 'available'],
+  sources: position.sources.map((source) =>
+    source.label.startsWith('Shopify')
+      ? {
+          ...source,
+          onHand: '3',
+          committed: '5',
+          reserved: '1',
+          available: '-2',
+          incoming: '7',
+          damaged: '0',
+          qualityControl: null,
+          safetyStock: '3',
+          locationActive: true,
+          itemActive: false,
+          tracked: true,
+          inventorySemantics: 'shopify/1',
+        }
+      : source,
+  ),
 };
 // A gap Luma first saw a minute ago and lets the provider sync close.
 const syncing: StockPosition = {
@@ -149,12 +172,31 @@ const identity = (
 
 function Content({ state }: { state: string }) {
   const [search, change] = useState<InventorySearch>({});
-  if (state === 'detail' || state === 'syncing-detail')
+  if (
+    state === 'detail' ||
+    state === 'syncing-detail' ||
+    state === 'provider-states'
+  )
     return (
       <StockDetailView
         organizationId={org}
         detail={
-          state === 'syncing-detail' ? { ...detail, position: syncing } : detail
+          state === 'syncing-detail'
+            ? { ...detail, position: syncing }
+            : state === 'provider-states'
+              ? {
+                  ...detail,
+                  position: providerStates,
+                  history: {
+                    ...detail.history,
+                    entries: providerStates.sources.map((source, i) => ({
+                      ...source,
+                      id: String(i),
+                      current: true,
+                    })),
+                  },
+                }
+              : detail
         }
         refresh={() => {}}
         identity={identity}
@@ -276,3 +318,29 @@ export const Loading: Story = { args: { state: 'loading' } };
 export const Error: Story = { args: { state: 'error' } };
 
 export const Offline: Story = { args: { state: 'offline' } };
+
+/** Distinct provider states retain zero, unknown, negative stock and inactive item eligibility. */
+export const ProviderStates: Story = {
+  args: { state: 'provider-states' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      await canvas.findByText('Unavailable stock and activation', {
+        selector: 'summary',
+      }),
+    );
+    const states = canvas.getByRole('table', {
+      name: 'Unavailable stock and activation',
+    });
+    await expect(states).toBeVisible();
+    await expect(within(states).getByText('No')).toBeVisible();
+    await expect(
+      within(states).getAllByText('Not reported').length,
+    ).toBeGreaterThan(0);
+  },
+};
+
+export const ProviderStatesDark: Story = {
+  ...ProviderStates,
+  globals: { theme: 'dark' },
+};

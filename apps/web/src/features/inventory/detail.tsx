@@ -8,6 +8,7 @@ import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Card } from '@luma/ui/components/primitives/card';
 import { DataTable } from '@luma/ui/components/primitives/data-table';
+import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { RecordHeader } from '@luma/ui/components/workspace/record-header';
@@ -233,26 +234,32 @@ export function StockDetailView({
                   </div>
                 ),
               },
-              ...(['onHand', 'reserved', 'available', 'incoming'] as const).map(
-                (field) => ({
-                  key: field,
-                  header: quantityLabels[field](),
-                  numeric: true,
-                  cell: (source: StockSource) => (
-                    <span
-                      className={
-                        position.differences.some((value) => value === field)
-                          ? 'inventory-difference'
-                          : ''
-                      }
-                    >
-                      {source.deleted
-                        ? m.common_empty_value()
-                        : stockQuantity(source[field])}
-                    </span>
-                  ),
-                }),
-              ),
+              ...(
+                [
+                  'available',
+                  'onHand',
+                  'committed',
+                  'reserved',
+                  'incoming',
+                ] as const
+              ).map((field) => ({
+                key: field,
+                header: quantityLabels[field](),
+                numeric: true,
+                cell: (source: StockSource) => (
+                  <span
+                    className={
+                      position.differences.some((value) => value === field)
+                        ? 'inventory-difference'
+                        : ''
+                    }
+                  >
+                    {source.deleted
+                      ? m.common_empty_value()
+                      : stockQuantity(source[field])}
+                  </span>
+                ),
+              })),
               {
                 key: 'basis',
                 header: m.inventory_comparison_basis(),
@@ -288,6 +295,50 @@ export function StockDetailView({
               },
             ]}
           />
+          <Disclosure>
+            <summary>{m.inventory_provider_states_title()}</summary>
+            <p>{m.inventory_provider_states_note()}</p>
+            <DataTable
+              caption={m.inventory_provider_states_title()}
+              rows={position.sources}
+              rowKey={(source) => source.connectionId}
+              columns={[
+                {
+                  key: 'source',
+                  header: m.inventory_comparison_source(),
+                  cell: (source: StockSource) => source.label,
+                },
+                ...(['damaged', 'qualityControl', 'safetyStock'] as const).map(
+                  (field) => ({
+                    key: field,
+                    header: quantityLabels[field](),
+                    numeric: true,
+                    cell: (source: StockSource) =>
+                      source.deleted
+                        ? m.common_empty_value()
+                        : stockQuantity(source[field]),
+                  }),
+                ),
+                ...(['locationActive', 'itemActive', 'tracked'] as const).map(
+                  (field) => ({
+                    key: field,
+                    header:
+                      field === 'locationActive'
+                        ? m.inventory_location_active()
+                        : field === 'itemActive'
+                          ? m.inventory_item_active()
+                          : m.inventory_item_tracked(),
+                    cell: (source: StockSource) =>
+                      source.deleted || source[field] == null
+                        ? m.common_not_reported()
+                        : source[field]
+                          ? m.inventory_activation_yes()
+                          : m.inventory_activation_no(),
+                  }),
+                ),
+              ]}
+            />
+          </Disclosure>
           {correction}
           {replenishment}
           <div className="inventory-context-grid">
@@ -438,14 +489,23 @@ export function StockDetailView({
                     </div>
                   ),
                 },
-                ...(['onHand', 'reserved', 'available'] as const).map(
-                  (field) => ({
-                    key: field,
-                    header: quantityLabels[field](),
-                    numeric: true,
-                    cell: (entry: StockSource) => stockQuantity(entry[field]),
-                  }),
-                ),
+                ...(
+                  [
+                    'onHand',
+                    'committed',
+                    'reserved',
+                    'available',
+                    'incoming',
+                    'damaged',
+                    'qualityControl',
+                    'safetyStock',
+                  ] as const
+                ).map((field) => ({
+                  key: field,
+                  header: quantityLabels[field](),
+                  numeric: true,
+                  cell: (entry: StockSource) => stockQuantity(entry[field]),
+                })),
               ]}
             />
             {detail.history.truncated ? (

@@ -11,6 +11,22 @@ test('investigates stock differences, follows affected orders and preserves filt
     origin = `http://127.0.0.1:${port}`;
   const f = await settingsFixture(t, origin);
   const stock = await inventoryFixture(t, f);
+  await stock.stock({
+    onHand: '3',
+    reserved: '1',
+    amount: '-2',
+    states: {
+      committed: '5',
+      incoming: '7',
+      damaged: '0',
+      qualityControl: '2',
+      safetyStock: '3',
+      locationActive: true,
+      itemActive: false,
+      tracked: true,
+      inventorySemantics: 'shopify/1',
+    },
+  });
   const issueId = await stock.issue();
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
   const web = startProcess(
@@ -63,6 +79,20 @@ test('investigates stock differences, follows affected orders and preserves filt
       .getByRole('table', { name: 'Source quantity comparison' })
       .innerText(),
   ).toContain('Not reported');
+  const disclosure = page
+    .locator('summary')
+    .filter({ hasText: 'Unavailable stock and activation' });
+  await disclosure.focus();
+  await page.keyboard.press('Enter');
+  await expect(
+    page.getByRole('table', { name: 'Unavailable stock and activation' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('columnheader', { name: 'Committed', exact: true }).first(),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('table', { name: 'Unavailable stock and activation' }),
+  ).toContainText('No');
   await page.screenshot({
     path: '/tmp/luma99-detail-light.png',
     fullPage: true,

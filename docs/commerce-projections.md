@@ -178,3 +178,9 @@ it: Shopify's order setting, and false for JTL's net prices. Prices are never co
 between net and gross, because a rate can be missing or split across jurisdictions; an
 unstated or earlier-version flag is unknown. These facts do not establish an invoice total. Internal record publication uses the same owner transaction as
 Sales, unlike replay recovery across independent external observations.
+
+Inventory position schema version 2 preserves distinct provider stock states and activation.
+Older Shopify observations reported committed stock in the reserved field; replay labels it
+as committed and leaves the separate reserved state unknown. Earlier snapshots remain
+readable and immutable. Shopify availability remains a reported fact, regardless of whether
+its other state quantities are present.

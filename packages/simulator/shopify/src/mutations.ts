@@ -229,7 +229,15 @@ async function setQuantities(
   }[] = [];
   for (const { level, quantity } of changes) {
     const before = name === 'on_hand' ? level.onHand : available(level);
-    const onHand = name === 'on_hand' ? quantity : quantity + level.committed;
+    const onHand =
+      name === 'on_hand'
+        ? quantity
+        : quantity +
+          level.committed +
+          (level.reserved ?? 0) +
+          (level.damaged ?? 0) +
+          (level.qualityControl ?? 0) +
+          (level.safetyStock ?? 0);
     await writeLevel(context.shop, { ...level, onHand });
     applied.push({
       name: name ?? 'available',

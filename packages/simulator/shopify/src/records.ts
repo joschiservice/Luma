@@ -236,6 +236,13 @@ export interface InventoryLevelData {
   location: string;
   onHand: number;
   committed: number;
+  reserved?: number;
+  incoming?: number;
+  damaged?: number;
+  qualityControl?: number;
+  safetyStock?: number;
+  /** Item activation is independent of the location activity. */
+  isActive?: boolean;
 }
 
 export interface WebhookSubscriptionData {

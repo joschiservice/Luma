@@ -1,5 +1,7 @@
 .inventory-page {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 16px;
   max-width: 1440px;
   margin: 0 auto;

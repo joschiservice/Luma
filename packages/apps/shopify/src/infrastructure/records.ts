@@ -526,7 +526,7 @@ export function createShopifyRecordReader(
           (
             await children(
               'inventoryLevels',
-              'id updatedAt location { id name isActive } quantities(names: ["on_hand", "committed", "available", "incoming", "reserved"]) { name quantity }',
+              'id updatedAt isActive location { id name isActive } quantities(names: ["on_hand", "committed", "available", "incoming", "reserved", "damaged", "quality_control", "safety_stock"]) { name quantity }',
               s.inventoryLevel,
             )
           ).map((v) =>
@@ -535,7 +535,8 @@ export function createShopifyRecordReader(
               {
                 Location: v.location.name,
                 'Location ID': v.location.id,
-                Active: v.location.isActive,
+                'Location active': v.location.isActive,
+                'Item active': v.isActive ?? null,
                 ...Object.fromEntries(
                   v.quantities.map((q) => [q.name, q.quantity]),
                 ),

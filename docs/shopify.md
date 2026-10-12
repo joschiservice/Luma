@@ -50,8 +50,11 @@ scan rather than truncating it. Collection absence never emits tombstones. Indep
 - **Products:** per variant, the inventory-item SKU identity, variant title (none for
   `Default Title`), price in shop currency and barcode. SKU text preserves case and is
   never identity.
-- **Inventory:** `on_hand`, `committed` and `available` map to on-hand, reserved and
-  available in `each`. Untracked values stay null; zero and negative stock are kept.
+- **Inventory:** all eight states are retained separately in `each`: on hand, committed,
+  reserved, incoming, damaged, quality control, safety stock and available. Shopify committed
+  stock and its separate reserved state are distinct; neither establishes a native Luma
+  reservation. Location activity, item-level activation and tracking are separate nullable
+  facts. Untracked values stay null; zero and negative stock are kept.
   Identity is the InventoryItem scoped by Location; SKU and location references stay
   account-wide.
 - **Fulfillment work vs shipments:** each FulfillmentOrder is outstanding work

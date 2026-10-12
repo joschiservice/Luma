@@ -109,7 +109,11 @@ export const inventoryItem = z.object({
 export const level = z.object({
   id: z.string().regex(/^gid:\/\/shopify\/InventoryLevel\//),
   updatedAt: timestamp,
-  location: z.object({ id: gid('Location') }),
+  isActive: z.boolean().nullable().optional(),
+  location: z.object({
+    id: gid('Location'),
+    isActive: z.boolean().nullable().optional(),
+  }),
   quantities: z.array(
     z.object({
       name: z.string(),

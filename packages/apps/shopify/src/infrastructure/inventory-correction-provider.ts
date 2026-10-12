@@ -25,6 +25,7 @@ const nodeSchema = z.object({
   inventoryLevel: z
     .object({
       id: z.string(),
+      isActive: z.boolean(),
       updatedAt: z.string().datetime(),
       location: z.object({
         id: gid('Location'),
@@ -65,7 +66,7 @@ export function createInventoryCorrectionProvider(
     const raw = await request(
       `query LumaInventoryCorrection($id: ID!, $locationId: ID!) {
       node(id: $id) { ... on InventoryItem { id tracked inventoryLevel(locationId: $locationId) {
-        id updatedAt location { id name isActive } quantities(names: ["available"]) { name quantity }
+        id updatedAt isActive location { id name isActive } quantities(names: ["available"]) { name quantity }
       } } }
     }`,
       { id: inventoryItemId, locationId },
@@ -100,6 +101,7 @@ export function createInventoryCorrectionProvider(
       complete:
         !!level &&
         level.location.isActive &&
+        level.isActive &&
         level.quantities.length === 1 &&
         level.quantities[0]?.name === 'available',
       available:

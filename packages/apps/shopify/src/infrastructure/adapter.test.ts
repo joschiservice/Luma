@@ -224,7 +224,7 @@ describe('Shopify read capabilities', () => {
         items: [
           {
             source: { provider: 'shopify', externalId: commerce.order.id },
-            adapterVersion: 'shopify/7',
+            adapterVersion: 'shopify/8',
             data: {
               paymentStatus: 'paid',
               placedAt: '2026-09-14T08:30:00Z',
@@ -285,7 +285,20 @@ describe('Shopify read capabilities', () => {
         items: [
           {
             source: { scopeKey: 'gid://shopify/Location/41' },
-            data: { onHand: '3', reserved: '5', available: '-2' },
+            data: {
+              onHand: '3',
+              committed: '5',
+              reserved: '1',
+              available: '-2',
+              incoming: '7',
+              damaged: '0',
+              qualityControl: '2',
+              safetyStock: '3',
+              locationActive: true,
+              itemActive: false,
+              tracked: true,
+              inventorySemantics: 'shopify/1',
+            },
           },
           { data: { onHand: null, reserved: null, available: '0' } },
         ],
@@ -555,6 +568,12 @@ describe('Shopify read capabilities', () => {
               available: null,
               onHand: null,
               reserved: null,
+              committed: null,
+              incoming: null,
+              damaged: null,
+              qualityControl: null,
+              safetyStock: null,
+              tracked: false,
               availabilityBasis: 'unknown',
             },
           },

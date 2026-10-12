@@ -17,7 +17,7 @@ const product =
   'id updatedAt title status vendor publishedAt priceRangeV2 { minVariantPrice { currencyCode } }';
 const variant = 'id sku title price barcode inventoryItem { id }';
 const level =
-  'id updatedAt location { id } quantities(names: ["on_hand", "committed", "available"]) { name quantity }';
+  'id updatedAt isActive location { id isActive } quantities(names: ["on_hand", "committed", "reserved", "incoming", "damaged", "quality_control", "safety_stock", "available"]) { name quantity }';
 const work =
   'id updatedAt status fulfillAt fulfillBy fulfillmentHolds { reason } assignedLocation { name location { id } } deliveryMethod { methodType presentedName }';
 const workLine = 'id totalQuantity remainingQuantity lineItem { id }';

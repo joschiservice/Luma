@@ -11,6 +11,16 @@ type CommerceData =
       onHand: string | null;
       reserved: string | null;
       available: string | null;
+      committed?: string | null;
+      incoming?: string | null;
+      damaged?: string | null;
+      qualityControl?: string | null;
+      safetyStock?: string | null;
+      locationActive?: boolean | null;
+      itemActive?: boolean | null;
+      tracked?: boolean | null;
+      /** Versioned quantity meaning; absent for earlier or other provider reports. */
+      inventorySemantics?: 'shopify/1' | null;
       availabilityBasis: 'provider_reported' | 'derived' | 'unknown';
     }
   | {
@@ -42,7 +52,7 @@ export type Dependent = {
 };
 
 export interface CanonicalSnapshot {
-  /** Product snapshots use version 2 since they may carry listing and price facts. */
+  /** Version 2 includes product descriptions or distinct provider stock states. */
   schemaVersion: 1 | 2;
   entityId: string;
   kind: EntityKind;

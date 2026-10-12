@@ -15,7 +15,8 @@ export async function readStockContext(
     id: string;
     connectionId: string;
     document: {
-      data: Record<string, string | null>;
+      schemaVersion: number;
+      data: Record<string, string | boolean | null>;
       observedAt: string;
       sourceUpdatedAt: string | null;
       deleted: boolean;
@@ -72,6 +73,15 @@ export async function readStockContext(
           (s) => s.connectionId === row.connectionId,
         )!;
 
+        const data = row.document.data;
+        const quantity = (field: string) =>
+          typeof data[field] === 'string' ? data[field] : null;
+        const activation = (field: string) =>
+          typeof data[field] === 'boolean' ? data[field] : null;
+        const legacyShopify =
+          row.document.schemaVersion === 1 &&
+          source.inventorySemantics === 'shopify/1';
+
         return {
           ...source,
           id: row.id,
@@ -79,9 +89,18 @@ export async function readStockContext(
           observedAt: row.document.observedAt,
           sourceUpdatedAt: row.document.sourceUpdatedAt,
           deleted: row.document.deleted,
-          onHand: row.document.data.onHand ?? null,
-          reserved: row.document.data.reserved ?? null,
-          available: row.document.data.available ?? null,
+          onHand: quantity('onHand'),
+          reserved: legacyShopify ? null : quantity('reserved'),
+          committed: quantity(legacyShopify ? 'reserved' : 'committed'),
+          available: quantity('available'),
+          incoming: quantity('incoming'),
+          damaged: quantity('damaged'),
+          qualityControl: quantity('qualityControl'),
+          safetyStock: quantity('safetyStock'),
+          locationActive: activation('locationActive'),
+          itemActive: activation('itemActive'),
+          tracked: activation('tracked'),
+          inventorySemantics: source.inventorySemantics ?? null,
           availabilityBasis: row.document.data
             .availabilityBasis as typeof source.availabilityBasis,
         };

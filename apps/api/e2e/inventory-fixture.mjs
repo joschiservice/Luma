@@ -35,6 +35,7 @@ export async function inventoryFixture(t, f) {
     reserved = null,
     unit = 'each',
     deleted = false,
+    states = {},
     time = new Date().toISOString(),
   } = {}) {
     const source = {
@@ -64,6 +65,7 @@ export async function inventoryFixture(t, f) {
           reserved,
           available: amount,
           availabilityBasis: 'provider_reported',
+          ...states,
         },
       },
     };

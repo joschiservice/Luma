@@ -1200,6 +1200,84 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       await services.inventory.current(context(otherTenant), left.entityId),
     ).toEqual([]);
   });
+  it('retains distinct Shopify states and replays older commitments without inventing reservations', async () => {
+    const legacyInput = stock({ external: 'legacy-states' });
+    legacyInput.observation.data.reserved = '5';
+    const result = await mapStock(
+      legacyInput,
+      'legacy-states',
+      'legacy-states',
+    );
+    if (result.status === 'pending') throw new Error('Expected projection');
+    const initial = (
+      await services.inventory.current(context(), result.entityId)
+    )[0]!.snapshot;
+    if (initial.data.type !== 'position') throw new Error('Expected position');
+    expect(initial).toMatchObject({
+      schemaVersion: 2,
+      normalizerVersion: 'commerce/2',
+      data: { committed: '5', reserved: null, incoming: null },
+    });
+    const legacy = {
+      ...initial,
+      schemaVersion: 1 as const,
+      normalizerVersion: 'commerce/1',
+      data: {
+        type: 'position' as const,
+        skuId: initial.data.skuId,
+        locationId: initial.data.locationId,
+        unit: initial.data.unit,
+        onHand: null,
+        reserved: '5',
+        available: '3',
+        availabilityBasis: 'provider_reported' as const,
+      },
+    };
+    await services.inventory.project(context(), legacy);
+    await services.ingestion.replay(context(), connection, 'legacy-states');
+    expect(
+      await services.inventory.history(context(), result.entityId),
+    ).toContainEqual(legacy);
+    expect(
+      (await services.inventory.current(context(), result.entityId))[0]!
+        .snapshot,
+    ).toEqual(initial);
+    const current = stock({
+      external: 'legacy-states',
+      time: '2026-09-20T00:00:00Z',
+      observed: '2026-09-20T01:00:00Z',
+    });
+    Object.assign(current.observation.data, {
+      onHand: '3',
+      committed: '5',
+      reserved: '1',
+      available: '-2',
+      incoming: '7',
+      damaged: '0',
+      qualityControl: null,
+      safetyStock: '3',
+      locationActive: false,
+      itemActive: true,
+      tracked: true,
+      inventorySemantics: 'shopify/1',
+    });
+    await services.ingestion.ingest(context(), 'current-states', current);
+    expect(
+      (await services.inventory.current(context(), result.entityId))[0]!
+        .snapshot.data,
+    ).toMatchObject({
+      committed: '5',
+      reserved: '1',
+      available: '-2',
+      incoming: '7',
+      qualityControl: null,
+      locationActive: false,
+      itemActive: true,
+    });
+    expect(
+      await services.inventory.current(context(otherTenant), result.entityId),
+    ).toEqual([]);
+  });
   it('finds when two stock sources last agreed inside a window under tenant RLS', async () => {
     const at = (seconds: number) =>
       new Date(
