@@ -202,6 +202,18 @@ export const identityContract = {
         nextCursor: z.string().nullable(),
       }),
     ),
+  setLanguage: endpoint
+    .route({
+      method: 'PUT',
+      path: '/v1/account/language',
+      successStatus: 204,
+      summary: 'Set your email language',
+      description:
+        'Stores the interface language Luma uses for email to you, such as invitations, notifications and account notices. The web app calls this after you pick a language.',
+    })
+    .meta({ errors: [401, 403, 503] })
+    .input(z.object({ body: z.object({ language: z.enum(['en', 'de']) }) }))
+    .output(z.void()),
   listOrganizations: endpoint
     .route({
       method: 'GET',

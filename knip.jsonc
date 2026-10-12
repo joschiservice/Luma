@@ -8,6 +8,8 @@
     "packages/identity/src/infrastructure/schema.ts": ["exports"],
     // Hand-written declarations for vite.mjs.
     "packages/i18n/vite.d.mts": ["exports"],
+    // Consumers import the built package, since its JSX needs the package's own compiler settings.
+    "packages/email/src/index.ts": ["exports"],
   },
   "ignoreBinaries": ["docker", "mise", "hyperfine"],
   "workspaces": {
@@ -55,6 +57,11 @@
       "ignoreDependencies": ["tsx"],
     },
     // The inlang project settings load the ICU storage plugin from node_modules by path.
+    // The React Email preview server renders every file in previews and loads its UI package itself.
+    "packages/email": {
+      "entry": ["previews/**/*.tsx"],
+      "ignoreDependencies": ["@react-email/ui"],
+    },
     "packages/i18n": {
       "entry": ["scripts/compile.mjs", "vite.mjs"],
       "ignoreDependencies": ["@inlang/plugin-icu1"],

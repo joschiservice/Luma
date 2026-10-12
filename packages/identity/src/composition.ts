@@ -11,10 +11,8 @@ import { eraseDueAccounts } from './infrastructure/account-deletion.js';
 import type { AuthSettings } from './infrastructure/auth.js';
 import { createResendMail } from './infrastructure/mail.js';
 import { createMailDelivery } from './infrastructure/mail-delivery.js';
-import {
-  createPasswordMail,
-  drainPasswordMail,
-} from './infrastructure/password-mail.js';
+import { createMailEvents } from './infrastructure/mail-events.js';
+import { createPasswordMail } from './infrastructure/password-mail.js';
 import { createRepository } from './infrastructure/repository.js';
 import { createRolesRepository } from './infrastructure/roles.js';
 import { purgeSecurityEvents } from './infrastructure/security-events.js';
@@ -27,7 +25,12 @@ import { createSettingsRepository } from './infrastructure/settings.js';
 export function createIdentity(
   settings: AuthSettings & {
     databaseUrl: string;
-    mail?: { apiKey: string; from: string; origin: string };
+    mail?: {
+      apiKey: string;
+      from: string;
+      origin: string;
+      webhookSecret?: string;
+    };
     mailProvider?: MailProvider;
     mailOrigin?: string;
     /** Reports whether the current request may only read, as in a support view. */
@@ -64,10 +67,13 @@ export function createIdentity(
     token,
     hash: (value) => createHash('sha256').update(value).digest('hex'),
   });
+  const mailOrigin =
+    settings.mail?.origin ?? settings.mailOrigin ?? settings.baseURL;
   const mailDelivery = createMailDelivery(
     pool,
     provider,
-    settings.mail?.origin ?? settings.mailOrigin ?? settings.baseURL,
+    mailOrigin,
+    settings.secret,
     token,
   );
 
@@ -82,19 +88,14 @@ export function createIdentity(
         id: randomUUID,
         now: () => new Date(),
       }),
-    mailDelivery: {
-      /** Drains workspace and account security notices through the configured provider. */
-      async drain() {
-        await mailDelivery.drain();
-        if (provider)
-          await drainPasswordMail(
-            pool,
-            provider,
-            settings.mail?.origin ?? settings.mailOrigin ?? settings.baseURL,
-            settings.secret,
-          );
-      },
-    },
+    mailDelivery,
+    /** Records Resend delivery events; absent without a webhook secret. */
+    mailEvents: settings.mail?.webhookSecret
+      ? createMailEvents(pool, {
+          apiKey: settings.mail.apiKey,
+          webhookSecret: settings.mail.webhookSecret,
+        })
+      : undefined,
     /**
      * Applies security event retention as of `now`: clears IP addresses and user agents after
      * 90 days and deletes events after a year. Safe to run repeatedly and concurrently.

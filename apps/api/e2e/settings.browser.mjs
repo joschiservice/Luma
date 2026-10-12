@@ -1,6 +1,6 @@
 /* global document */
 import { expect, test } from './browser-fixtures.mjs';
-import { availablePort, startProcess } from './helpers.mjs';
+import { availablePort, startProcess, until } from './helpers.mjs';
 import { invitationProof, settingsFixture } from './settings-fixture.mjs';
 
 test('manages workspace preferences and the complete invitation journey on desktop and narrow screens', async ({
@@ -249,4 +249,53 @@ test('manages workspace preferences and the complete invitation journey on deskt
     await page.evaluate(() => document.documentElement.scrollWidth <= 390),
   ).toBe(true);
   expect(errors).toEqual([]);
+});
+
+test('stores the language picked in the browser on the account for email', async ({
+  resources: t,
+}) => {
+  const port = await availablePort();
+  const origin = `http://127.0.0.1:${port}`;
+  const f = await settingsFixture(t, origin);
+  const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
+  const web = startProcess(
+    t,
+    'e2e/web-server.mjs',
+    { TEST_API_ORIGIN: apiOrigin, TEST_WEB_PORT: String(port) },
+    true,
+  );
+  await web.message('listening');
+  const context = await t.newContext({ baseURL: origin });
+  await context.addCookies([
+    ...f.member.cookie.split('; ').map((value) => {
+      const [name, ...rest] = value.split('=');
+
+      return { name, value: rest.join('='), url: origin };
+    }),
+    { name: 'luma_locale', value: 'de', url: origin },
+  ]);
+  const page = await context.newPage();
+  await page.goto(`/app/${f.org.id}/settings/notifications`);
+  await page.getByRole('heading', { name: 'Benachrichtigungen' }).waitFor();
+  await until(
+    async () =>
+      (
+        await f.db.owner.query('SELECT locale FROM users WHERE id=$1', [
+          f.member.id,
+        ])
+      ).rows[0]?.locale === 'de',
+    'the account to store German',
+  );
+
+  // Email written after the change uses the stored language.
+  await page.getByRole('button', { name: 'Test-E-Mail senden' }).click();
+  await until(async () => {
+    await f.drain();
+
+    return [...f.messages.values()].some(
+      (message) =>
+        message.to === f.member.email &&
+        message.subject === 'Deine Luma-Test-E-Mail',
+    );
+  }, 'a German test email');
 });

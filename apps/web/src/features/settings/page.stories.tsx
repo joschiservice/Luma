@@ -36,6 +36,7 @@ const data: SettingsSnapshot = {
   },
   preferences: { issues: false, connections: false, revision: 0 },
   deliveryAvailable: true,
+  emailPaused: null,
   lastTest: null,
 };
 
@@ -104,7 +105,7 @@ function Preview({
   solo = false,
 }: {
   section?: SettingsSection;
-  state?: 'ready' | 'loading' | 'error' | 'mail-unavailable';
+  state?: 'ready' | 'loading' | 'error' | 'mail-unavailable' | 'mail-paused';
   member?: boolean;
   roleId?: string;
   team?: 'small' | 'large';
@@ -153,6 +154,7 @@ function Preview({
                         activeMemberCount: solo ? 1 : 2,
                       },
                       deliveryAvailable: state !== 'mail-unavailable',
+                      emailPaused: state === 'mail-paused' ? 'bounced' : null,
                     }
               }
               loading={state === 'loading'}
@@ -225,6 +227,16 @@ export const MemberAccess: Story = {
 
 export const DeliveryUnavailable: Story = {
   args: { section: 'notifications', state: 'mail-unavailable' },
+};
+
+export const DeliveryPaused: Story = {
+  args: { section: 'notifications', state: 'mail-paused' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await waitFor(() =>
+      expect(canvas.getByText('Email to you is paused')).toBeVisible(),
+    );
+  },
 };
 
 export const Loading: Story = { args: { state: 'loading' } };

@@ -36,6 +36,7 @@ conventions only; it does not list files.
 | Shared technical infrastructure, model gateway                                                  | `@luma/platform`; validated settings in `@luma/config`                                   |
 | Shared components and design tokens                                                             | `@luma/ui`                                                                               |
 | Interface languages, message catalogs, formatting                                               | `@luma/i18n`                                                                             |
+| Email templates, shared email layout and previews                                               | `@luma/email`; sending and queues in `@luma/identity`                                    |
 
 Processes: `apps/api` (HTTP), `apps/worker` (Temporal worker and the commerce sync process
 with scheduled detection), `apps/web` (product UI), `apps/simulator` and

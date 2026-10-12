@@ -20,6 +20,8 @@ export const ignoredPaths = [
   '.prettierignore',
   'knip.jsonc',
   'eslint.config.mjs',
+  // Email previews for the React Email preview server.
+  'packages/email/previews/**',
   // Marketing screenshot stories only.
   'apps/web/src/features/marketing/**',
   'tooling/{apps,architecture,benchmarks,orders,shopify,simulator,style}/**',
@@ -168,6 +170,8 @@ const syncWorker = [
   'packages/application-runtime/src/composition/{commerce-sync,sales}.ts',
 ];
 const detection = ['packages/exceptions/**', 'packages/resolution/**'];
+// Email templates and their wording; identity sends them.
+const email = ['packages/email/src/**', 'packages/i18n/messages/*/email.json'];
 const cases = [
   ...detection,
   'packages/api-contract/src/**/{cases,desk,diagnosis,learning,overview,events}.ts',
@@ -675,6 +679,7 @@ export const journeyAreas = {
   ],
   'decisions.e2e.mjs': [...simulator, ...replenishment, ...decisions, ...cases],
   'docs.browser.mjs': [...webDocs],
+  'email.e2e.mjs': [...email, ...detection],
   'fulfillment.browser.mjs': [
     ...ordersFixture,
     ...detectionFixture,
@@ -798,12 +803,16 @@ export const journeyAreas = {
     ...webOrders,
   ],
   'password-security.browser.mjs': [
+    ...email,
     ...webShell,
     ...webHome,
     ...webSettings,
     ...webAuthRecovery,
   ],
-  'password-security.e2e.mjs': ['packages/i18n/messages/*/identity.json'],
+  'password-security.e2e.mjs': [
+    ...email,
+    'packages/i18n/messages/*/identity.json',
+  ],
   // The pilot process is spawned by path, so it is outside the import closure.
   'pilot.e2e.mjs': [
     ...pilot,
@@ -999,12 +1008,13 @@ export const journeyAreas = {
   ],
   'seed.e2e.mjs': [...detectionFixture],
   'settings.browser.mjs': [
+    ...email,
     ...homeServer,
     ...webShell,
     ...webHome,
     ...webSettings,
   ],
-  'settings.e2e.mjs': [...detection, ...connections],
+  'settings.e2e.mjs': [...detection, ...connections, ...email],
   'shadow.browser.mjs': [
     ...appHost,
     ...detectionFixture,

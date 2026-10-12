@@ -74,6 +74,11 @@ export function identityRoutes(service?: IdentityService) {
       async ({ context: { request }, input: { query } }) =>
         use().listSecurityEvents(credentials(request), query.cursor),
     ),
+    setLanguage: os.setLanguage.handler(
+      async ({ context: { request }, input: { body } }) => {
+        await use().setLanguage(credentials(request), body.language);
+      },
+    ),
     listOrganizations: os.listOrganizations.handler(
       async ({ context: { request } }) => ({
         items: await use().listOrganizations(credentials(request), request.id),
@@ -154,6 +159,7 @@ const supportViewRoutes = new Set([
 const accountRoutes = new Set([
   '/v1/organizations',
   '/v1/account/security-events',
+  '/v1/account/language',
   '/v1/invitations/preview',
   '/v1/invitations/accept',
 ]);

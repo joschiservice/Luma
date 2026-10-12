@@ -16,6 +16,7 @@ import { sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { describeUserAgent } from '../domain/sessions.js';
+import { requestLocale } from './locale.js';
 import { passwordMailLocale } from './password-mail.js';
 import * as schema from './schema.js';
 
@@ -86,6 +87,28 @@ function refuseDisabledAccounts(db: NodePgDatabase<typeof schema>) {
         message:
           'This account is disabled. Contact your workspace owner or Luma support.',
       });
+  };
+}
+
+/**
+ * Records the language of the browser a person signs in with, so email sent later uses it. A
+ * language picked in Luma replaces the stored one; a browser preference only fills an empty
+ * one. Failing to record it never blocks sign-in.
+ */
+function recordLanguage(db: NodePgDatabase<typeof schema>) {
+  return async (
+    session: { userId: string },
+    context: { headers?: Headers | undefined } | null,
+  ) => {
+    if (!context?.headers) return;
+    const { locale, chosen } = requestLocale(context.headers);
+    await db
+      .execute(
+        chosen
+          ? sql`UPDATE users SET locale=${locale} WHERE id=${session.userId} AND locale IS DISTINCT FROM ${locale}`
+          : sql`UPDATE users SET locale=${locale} WHERE id=${session.userId} AND locale IS NULL`,
+      )
+      .catch(() => undefined);
   };
 }
 
@@ -209,7 +232,12 @@ export function createAuth(
     },
     hooks: { before: accountSecurityMiddleware(db) },
     databaseHooks: {
-      session: { create: { before: refuseDisabledAccounts(db) } },
+      session: {
+        create: {
+          before: refuseDisabledAccounts(db),
+          after: recordLanguage(db),
+        },
+      },
     },
     advanced: {
       ...(settings.cookiePrefix ? { cookiePrefix: settings.cookiePrefix } : {}),

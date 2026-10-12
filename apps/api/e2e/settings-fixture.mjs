@@ -9,7 +9,7 @@ import { database, secret } from './helpers.mjs';
 export async function settingsFixture(
   t,
   origin = 'http://localhost:3000',
-  { connections, observability } = {},
+  { connections, observability, mailWebhookSecret } = {},
 ) {
   const db = await database(t);
   await db.migrate();
@@ -17,17 +17,31 @@ export async function settingsFixture(
   const messages = new Map();
   let fail = false;
   let beforeSend = async () => {};
+  let failWith;
   const config = {
     databaseUrl: db.runtimeUrl,
     secret,
     baseURL: origin,
     trustedOrigins: [origin],
     mailOrigin: origin,
+    ...(mailWebhookSecret
+      ? {
+          mail: {
+            apiKey: 're_test_key',
+            from: 'Luma <notifications@example.test>',
+            origin,
+            webhookSecret: mailWebhookSecret,
+          },
+        }
+      : {}),
     mailProvider: {
       async send(message) {
         await beforeSend();
         if (fail) throw new Error('Deterministic mail failure');
+        if (failWith) throw failWith;
         messages.set(message.id, message);
+
+        return { providerId: `provider-${message.id}` };
       },
     },
   };
@@ -116,6 +130,10 @@ export async function settingsFixture(
     },
     setFail(value) {
       fail = value;
+    },
+    /** Makes every send throw this error, such as a provider rate limit, until cleared. */
+    setFailWith(error) {
+      failWith = error;
     },
     drain: () => identity.mailDelivery.drain(),
   };

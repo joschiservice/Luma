@@ -226,6 +226,7 @@ function fixture() {
     refreshContext: vi.fn(async (context) => context),
     authenticate: vi.fn(),
     listSecurityEvents: vi.fn(),
+    setLanguage: vi.fn(),
     listOrganizations: vi.fn(),
     createOrganization: vi.fn(),
     listMembers: vi.fn(),

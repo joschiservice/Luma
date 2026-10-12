@@ -34,7 +34,13 @@ export function readApiConfig(
 }
 
 export interface IdentityConfig {
-  mail?: { apiKey: string; from: string; origin: string };
+  mail?: {
+    apiKey: string;
+    from: string;
+    origin: string;
+    /** Signing secret of the Resend webhook that reports delivery, bounces and complaints. */
+    webhookSecret?: string;
+  };
   databaseUrl: string;
   secret: string;
   baseURL: string;
@@ -110,12 +116,24 @@ export function readIdentityConfig(
       (env.NODE_ENV === 'production' && origin.protocol !== 'https:')
     )
       throw new Error('MAIL_PUBLIC_ORIGIN must be the public web origin');
+    const webhookSecret = env.MAIL_RESEND_WEBHOOK_SECRET;
+    if (
+      webhookSecret !== undefined &&
+      !/^whsec_[A-Za-z0-9+/=]{16,}$/.test(webhookSecret)
+    )
+      throw new Error(
+        'MAIL_RESEND_WEBHOOK_SECRET must be a Resend signing secret',
+      );
     mail = {
       apiKey: env.MAIL_RESEND_API_KEY,
       from: env.MAIL_FROM,
       origin: origin.origin,
+      ...(webhookSecret ? { webhookSecret } : {}),
     };
-  }
+  } else if (env.MAIL_RESEND_WEBHOOK_SECRET)
+    throw new Error(
+      'MAIL_RESEND_WEBHOOK_SECRET needs MAIL_RESEND_API_KEY, MAIL_FROM and MAIL_PUBLIC_ORIGIN',
+    );
 
   return {
     ...(mail ? { mail } : {}),

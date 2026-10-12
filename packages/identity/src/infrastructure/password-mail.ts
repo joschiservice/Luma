@@ -1,22 +1,19 @@
 import { randomUUID } from 'node:crypto';
 
-import { m } from '@luma/i18n/messages';
 import { symmetricDecrypt, symmetricEncrypt } from 'better-auth/crypto';
 import type { Pool } from 'pg';
 
 import type { MailProvider } from '../application/mail.js';
+import { requestLocale } from './locale.js';
+import {
+  dispatchMail,
+  maxAttempts,
+  retryDelaySeconds,
+} from './mail-dispatch.js';
 
-/** Chooses a supported language from the browser preference; it is never an authority input. */
-export function passwordMailLocale(request: Request | undefined): 'en' | 'de' {
-  const cookie = request?.headers
-    .get('cookie')
-    ?.match(/(?:^|;\s*)luma_locale=(en|de)(?:;|$)/)?.[1];
-
-  return cookie === 'de' ||
-    (!cookie &&
-      request?.headers.get('accept-language')?.toLowerCase().startsWith('de'))
-    ? 'de'
-    : 'en';
+/** Chooses the language of the browser that asked; it is never an authority input. */
+export function passwordMailLocale(request: Request | undefined) {
+  return requestLocale(request?.headers).locale;
 }
 
 /** Queues reset links and mandatory password notices using the existing delivery provider. */
@@ -39,8 +36,10 @@ export function createPasswordMail(pool: Pool, secret: string) {
 }
 
 /**
- * Delivers account security mail outside auth requests, with stable provider keys and five
- * bounded attempts. Expired links are never dispatched and encrypted credentials are cleared.
+ * Delivers account security mail outside auth requests, in the language of the browser that
+ * started it, with stable provider keys and five bounded attempts. Expired links are never
+ * dispatched and encrypted credentials are cleared. Returns false when the provider's rate
+ * limit ended the pass.
  */
 export async function drainPasswordMail(
   pool: Pool,
@@ -61,7 +60,7 @@ export async function drainPasswordMail(
         reset_token: string | null;
         attempts: number;
       }>(
-        `WITH next AS (SELECT id FROM password_security_mail WHERE state='queued' AND expires_at>now() AND next_attempt_at<=now() AND attempts<5 ORDER BY next_attempt_at FOR UPDATE SKIP LOCKED LIMIT 1)
+        `WITH next AS (SELECT id FROM password_security_mail WHERE state='queued' AND expires_at>now() AND next_attempt_at<=now() AND attempts<${maxAttempts} ORDER BY next_attempt_at FOR UPDATE SKIP LOCKED LIMIT 1)
        UPDATE password_security_mail m SET attempts=attempts+1,first_attempt_at=COALESCE(first_attempt_at,now()),next_attempt_at=now()+interval '60 seconds'
        FROM next WHERE m.id=next.id RETURNING m.id,m.user_id,m.kind,m.locale,m.reset_token,m.attempts`,
       )
@@ -74,38 +73,50 @@ export async function drainPasswordMail(
       )
     ).rows[0];
     if (!user) continue;
-    let sent = false;
-    try {
-      const token = message.reset_token
-        ? await symmetricDecrypt({ key: secret, data: message.reset_token })
-        : null;
-      await provider.send({
-        id: message.id,
-        to: user.email,
-        subject: token
-          ? m.identity_password_mail_reset_subject(
-              {},
-              { locale: message.locale },
-            )
-          : m.identity_password_mail_changed_subject(
-              {},
-              { locale: message.locale },
-            ),
-        text: token
-          ? `${m.identity_password_mail_reset_body({}, { locale: message.locale })}\n\n${new URL('/reset-password', origin).href}#${token}`
-          : m.identity_password_mail_changed_body(
-              {},
-              { locale: message.locale },
-            ),
-      });
-      sent = true;
-    } catch {
-      // A retry uses the same provider key, including after uncertain network responses.
+    const token = message.reset_token
+      ? await symmetricDecrypt({
+          key: secret,
+          data: message.reset_token,
+        }).catch(() => null)
+      : null;
+    if (message.reset_token && !token) {
+      // A link that can't be decrypted, such as after a secret rotation, is never sent.
+      await pool.query(
+        "UPDATE password_security_mail SET state='failed',reset_token=NULL WHERE id=$1",
+        [message.id],
+      );
+      continue;
     }
+    const outcome = await dispatchMail(pool, provider, {
+      id: message.id,
+      to: user.email,
+      locale: message.locale,
+      email: token
+        ? {
+            kind: 'password_reset',
+            link: `${new URL('/reset-password', origin).href}#${token}`,
+          }
+        : {
+            kind: 'password_changed',
+            resetLink: new URL('/forgot-password', origin).href,
+          },
+    });
+    if (outcome.status === 'deferred') {
+      // A rate-limited request was never processed, so it doesn't use up an attempt.
+      await pool.query(
+        "UPDATE password_security_mail SET attempts=attempts-1,next_attempt_at=now()+($3*interval '1 second') WHERE id=$1 AND attempts=$2",
+        [message.id, message.attempts, outcome.seconds],
+      );
+
+      return false;
+    }
+    const sent = outcome.status === 'sent';
     await pool.query(
-      `UPDATE password_security_mail SET state=CASE WHEN $3 THEN 'sent' WHEN attempts>=5 THEN 'failed' ELSE 'queued' END,
-       reset_token=CASE WHEN $3 OR attempts>=5 THEN NULL ELSE reset_token END,next_attempt_at=now()+($4*interval '1 second') WHERE id=$1 AND attempts=$2`,
-      [message.id, message.attempts, sent, 30 * 2 ** message.attempts],
+      `UPDATE password_security_mail SET state=CASE WHEN $3 THEN 'sent' WHEN attempts>=${maxAttempts} THEN 'failed' ELSE 'queued' END,
+       reset_token=CASE WHEN $3 OR attempts>=${maxAttempts} THEN NULL ELSE reset_token END,next_attempt_at=now()+($4*interval '1 second') WHERE id=$1 AND attempts=$2`,
+      [message.id, message.attempts, sent, retryDelaySeconds(message.attempts)],
     );
   }
+
+  return true;
 }

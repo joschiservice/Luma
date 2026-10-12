@@ -1,0 +1,33 @@
+{
+  "name": "@luma/email",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "preview": "email dev --dir previews --port 3883"
+  },
+  "dependencies": {
+    "@luma/i18n": "workspace:*",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-email": "6.11.1"
+  },
+  "devDependencies": {
+    "@luma/typescript-config": "workspace:*",
+    "@react-email/ui": "6.11.1",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "typescript": "catalog:typescript-compatible-5-9-3",
+    "vitest": "catalog:"
+  }
+}

@@ -1,0 +1,399 @@
+import type { Locale } from '@luma/i18n/locales';
+import { m } from '@luma/i18n/messages';
+import type { ReactElement } from 'react';
+
+import { formatEmailDate, formatEmailDateTime } from './format.js';
+import {
+  Action,
+  EmailLayout,
+  Facts,
+  Paragraph,
+  Quote,
+  SecondaryLink,
+} from './layout.js';
+
+/** A built-in role, translated in the email, or the name of a workspace's custom role. */
+type EmailRole = { builtIn: 'owner' | 'admin' | 'member' } | { custom: string };
+
+/**
+ * Every email Luma sends, with the facts it shows. Links are absolute. Times are shown in
+ * `timeZone`, an IANA zone such as the workspace's. Values are shown as text and never parsed
+ * as markup.
+ */
+export type Email =
+  | {
+      kind: 'invitation';
+      workspace: string;
+      inviter: string;
+      role: EmailRole;
+      expiresAt: Date;
+      timeZone: string;
+      link: string;
+    }
+  | { kind: 'test'; workspace: string; preferencesLink: string }
+  | {
+      kind: 'issue' | 'connection';
+      workspace: string;
+      link: string;
+      preferencesLink: string;
+    }
+  | {
+      kind: 'support_access_requested';
+      workspace: string;
+      days: number;
+      reason: string;
+      link: string;
+    }
+  | {
+      kind: 'support_view_started';
+      workspace: string;
+      member: string | null;
+      startedAt: Date;
+      endsAt: Date;
+      timeZone: string;
+      activityLink: string;
+      endLink: string;
+    }
+  | {
+      kind: 'support_view_emergency';
+      workspace: string;
+      member: string | null;
+      from: Date;
+      until: Date;
+      timeZone: string;
+      activityLink: string;
+    }
+  | { kind: 'password_reset'; link: string }
+  | { kind: 'password_changed'; resetLink: string }
+  | { kind: 'account_deletion_scheduled'; eraseAfter: Date }
+  | { kind: 'account_restored'; signInLink: string }
+  | { kind: 'account_erased' };
+
+/** The subject line and the document of one email in the recipient's language. */
+export function emailContent(
+  email: Email,
+  locale: Locale,
+): { subject: string; document: ReactElement } {
+  const o = { locale };
+  switch (email.kind) {
+    case 'invitation': {
+      const role =
+        'custom' in email.role
+          ? email.role.custom
+          : {
+              owner: m.permissions_role_owner_name,
+              admin: m.permissions_role_admin_name,
+              member: m.permissions_role_member_name,
+            }[email.role.builtIn]({}, o);
+      const values = {
+        workspace: email.workspace,
+        inviter: email.inviter,
+        role,
+      };
+
+      return {
+        subject: m.email_invitation_subject(values, o),
+        document: (
+          <EmailLayout
+            locale={locale}
+            preview={m.email_invitation_preview(values, o)}
+            heading={m.email_invitation_heading(values, o)}
+            reason={{ kind: 'invitation' }}
+          >
+            <Paragraph>{m.email_invitation_body(values, o)}</Paragraph>
+            <Facts
+              items={[
+                {
+                  label: m.email_invitation_workspace_label({}, o),
+                  value: email.workspace,
+                },
+                { label: m.email_invitation_role_label({}, o), value: role },
+                {
+                  label: m.email_invitation_inviter_label({}, o),
+                  value: email.inviter,
+                },
+                {
+                  label: m.email_invitation_expires_label({}, o),
+                  value: formatEmailDateTime(
+                    email.expiresAt,
+                    locale,
+                    email.timeZone,
+                  ),
+                },
+              ]}
+            />
+            <Paragraph>{m.email_invitation_instructions({}, o)}</Paragraph>
+            <Action locale={locale} href={email.link}>
+              {m.email_invitation_action({}, o)}
+            </Action>
+          </EmailLayout>
+        ),
+      };
+    }
+    case 'test':
+      return {
+        subject: m.email_test_subject({}, o),
+        document: (
+          <EmailLayout
+            locale={locale}
+            preview={m.email_test_preview({}, o)}
+            heading={m.email_test_heading({}, o)}
+            reason={{
+              kind: 'workspace',
+              workspace: email.workspace,
+              preferencesLink: email.preferencesLink,
+            }}
+          >
+            <Paragraph>
+              {m.email_test_body({ workspace: email.workspace }, o)}
+            </Paragraph>
+            <Action locale={locale} href={email.preferencesLink}>
+              {m.email_test_action({}, o)}
+            </Action>
+          </EmailLayout>
+        ),
+      };
+    case 'issue':
+    case 'connection': {
+      const text =
+        email.kind === 'issue'
+          ? {
+              subject: m.email_issue_subject,
+              preview: m.email_issue_preview,
+              heading: m.email_issue_heading,
+              body: m.email_issue_body,
+              action: m.email_issue_action,
+            }
+          : {
+              subject: m.email_connection_subject,
+              preview: m.email_connection_preview,
+              heading: m.email_connection_heading,
+              body: m.email_connection_body,
+              action: m.email_connection_action,
+            };
+      const values = { workspace: email.workspace };
+
+      return {
+        subject: text.subject(values, o),
+        document: (
+          <EmailLayout
+            locale={locale}
+            preview={text.preview({}, o)}
+            heading={text.heading({}, o)}
+            reason={{
+              kind: 'workspace',
+              workspace: email.workspace,
+              preferencesLink: email.preferencesLink,
+            }}
+          >
+            <Paragraph>{text.body(values, o)}</Paragraph>
+            <Action locale={locale} href={email.link}>
+              {text.action({}, o)}
+            </Action>
+          </EmailLayout>
+        ),
+      };
+    }
+    case 'support_access_requested': {
+      const values = {
+        workspace: email.workspace,
+        duration: m.email_support_request_duration({ days: email.days }, o),
+      };
+
+      return {
+        subject: m.email_support_request_subject(values, o),
+        document: (
+          <EmailLayout
+            locale={locale}
+            preview={m.email_support_request_preview(values, o)}
+            heading={m.email_support_request_heading({}, o)}
+            reason={{ kind: 'workspace', workspace: email.workspace }}
+          >
+            <Paragraph>{m.email_support_request_body(values, o)}</Paragraph>
+            <Quote label={m.email_support_request_reason({}, o)}>
+              {email.reason}
+            </Quote>
+            <Action locale={locale} href={email.link}>
+              {m.email_support_request_action({}, o)}
+            </Action>
+          </EmailLayout>
+        ),
+      };
+    }
+    case 'support_view_started': {
+      const end = formatEmailDateTime(email.endsAt, locale, email.timeZone);
+      const values = {
+        workspace: email.workspace,
+        member: email.member ?? m.email_support_member_unknown({}, o),
+        end,
+      };
+
+      return {
+        subject: m.email_support_view_subject(values, o),
+        document: (
+          <EmailLayout
+            locale={locale}
+            preview={m.email_support_view_preview(values, o)}
+            heading={m.email_support_view_heading({}, o)}
+            reason={{ kind: 'workspace', workspace: email.workspace }}
+          >
+            <Paragraph>{m.email_support_view_body(values, o)}</Paragraph>
+            <Facts
+              items={[
+                {
+                  label: m.email_support_view_started_label({}, o),
+                  value: formatEmailDateTime(
+                    email.startedAt,
+                    locale,
+                    email.timeZone,
+                  ),
+                },
+                { label: m.email_support_view_ends_label({}, o), value: end },
+              ]}
+            />
+            <Action locale={locale} href={email.activityLink}>
+              {m.email_support_view_action({}, o)}
+            </Action>
+            <SecondaryLink href={email.endLink}>
+              {m.email_support_view_end({}, o)}
+            </SecondaryLink>
+          </EmailLayout>
+        ),
+      };
+    }
+    case 'support_view_emergency': {
+      const values = {
+        workspace: email.workspace,
+        member: email.member ?? m.email_support_member_unknown({}, o),
+      };
+
+      return {
+        subject: m.email_support_emergency_subject(values, o),
+        document: (
+          <EmailLayout
+            locale={locale}
+            preview={m.email_support_emergency_preview({}, o)}
+            heading={m.email_support_emergency_heading({}, o)}
+            reason={{ kind: 'workspace', workspace: email.workspace }}
+          >
+            <Paragraph>{m.email_support_emergency_body(values, o)}</Paragraph>
+            <Facts
+              items={[
+                {
+                  label: m.email_support_emergency_from_label({}, o),
+                  value: formatEmailDateTime(
+                    email.from,
+                    locale,
+                    email.timeZone,
+                  ),
+                },
+                {
+                  label: m.email_support_emergency_until_label({}, o),
+                  value: formatEmailDateTime(
+                    email.until,
+                    locale,
+                    email.timeZone,
+                  ),
+                },
+              ]}
+            />
+            <Action locale={locale} href={email.activityLink}>
+              {m.email_support_emergency_action({}, o)}
+            </Action>
+          </EmailLayout>
+        ),
+      };
+    }
+    case 'password_reset':
+      return {
+        subject: m.email_password_reset_subject({}, o),
+        document: (
+          <EmailLayout
+            locale={locale}
+            preview={m.email_password_reset_preview({}, o)}
+            heading={m.email_password_reset_heading({}, o)}
+            reason={{ kind: 'account' }}
+          >
+            <Paragraph>{m.email_password_reset_body({}, o)}</Paragraph>
+            <Action locale={locale} href={email.link}>
+              {m.email_password_reset_action({}, o)}
+            </Action>
+            <Paragraph tone="muted">
+              {m.email_password_reset_ignore({}, o)}
+            </Paragraph>
+          </EmailLayout>
+        ),
+      };
+    case 'password_changed':
+      return {
+        subject: m.email_password_changed_subject({}, o),
+        document: (
+          <EmailLayout
+            locale={locale}
+            preview={m.email_password_changed_preview({}, o)}
+            heading={m.email_password_changed_heading({}, o)}
+            reason={{ kind: 'account' }}
+          >
+            <Paragraph>{m.email_password_changed_body({}, o)}</Paragraph>
+            <Paragraph>{m.email_password_changed_warning({}, o)}</Paragraph>
+            <Action locale={locale} href={email.resetLink}>
+              {m.email_password_changed_action({}, o)}
+            </Action>
+          </EmailLayout>
+        ),
+      };
+    case 'account_deletion_scheduled': {
+      const date = formatEmailDate(email.eraseAfter, locale, 'UTC');
+
+      return {
+        subject: m.email_account_scheduled_subject({}, o),
+        document: (
+          <EmailLayout
+            locale={locale}
+            preview={m.email_account_scheduled_preview({ date }, o)}
+            heading={m.email_account_scheduled_heading({}, o)}
+            reason={{ kind: 'account' }}
+          >
+            <Paragraph>{m.email_account_scheduled_body({}, o)}</Paragraph>
+            <Paragraph>
+              {m.email_account_scheduled_erase({ date }, o)}
+            </Paragraph>
+            <Paragraph>{m.email_account_scheduled_keep({}, o)}</Paragraph>
+          </EmailLayout>
+        ),
+      };
+    }
+    case 'account_restored':
+      return {
+        subject: m.email_account_restored_subject({}, o),
+        document: (
+          <EmailLayout
+            locale={locale}
+            preview={m.email_account_restored_preview({}, o)}
+            heading={m.email_account_restored_heading({}, o)}
+            reason={{ kind: 'account' }}
+          >
+            <Paragraph>{m.email_account_restored_body({}, o)}</Paragraph>
+            <Action locale={locale} href={email.signInLink}>
+              {m.email_account_restored_action({}, o)}
+            </Action>
+          </EmailLayout>
+        ),
+      };
+    case 'account_erased':
+      return {
+        subject: m.email_account_erased_subject({}, o),
+        document: (
+          <EmailLayout
+            locale={locale}
+            preview={m.email_account_erased_preview({}, o)}
+            heading={m.email_account_erased_heading({}, o)}
+            reason={{ kind: 'account' }}
+          >
+            <Paragraph>{m.email_account_erased_body({}, o)}</Paragraph>
+            <Paragraph>{m.email_account_erased_records({}, o)}</Paragraph>
+          </EmailLayout>
+        ),
+      };
+  }
+}

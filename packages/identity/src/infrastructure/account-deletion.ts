@@ -1,6 +1,12 @@
+import type { Email } from '@luma/email';
 import type { Pool } from 'pg';
 
 import type { MailProvider } from '../application/mail.js';
+import {
+  dispatchMail,
+  maxAttempts,
+  retryDelaySeconds,
+} from './mail-dispatch.js';
 
 /**
  * Erases accounts whose deletion is due, each in its own transaction, up to 20 per pass. With
@@ -49,26 +55,22 @@ interface AccountMessage {
   attempts: number;
 }
 
-const formatDate = (value: Date) => value.toISOString().slice(0, 10);
-
 /** Builds the notice for the person; the address is read from the account at sending time. */
-function accountNotice(message: AccountMessage, eraseAfter: Date) {
+function accountNotice(
+  message: AccountMessage,
+  eraseAfter: Date,
+  origin: string,
+): Email {
   switch (message.kind) {
     case 'deletion_scheduled':
-      return {
-        subject: 'Your Luma account is scheduled for deletion',
-        text: `Luma support scheduled your Luma account for deletion. You can no longer sign in.\n\nOn ${formatDate(eraseAfter)} your account and the personal data linked to it will be erased permanently. Workspaces you belong to keep their records of your work, shown as a former member.\n\nTo keep your account, contact Luma support before then.`,
-      };
+      return { kind: 'account_deletion_scheduled', eraseAfter };
     case 'deletion_restored':
       return {
-        subject: 'Your Luma account was restored',
-        text: 'Luma support cancelled the deletion of your Luma account. Your workspaces and roles are as they were before.',
+        kind: 'account_restored',
+        signInLink: new URL('/sign-in', origin).href,
       };
     default:
-      return {
-        subject: 'Your Luma account has been deleted',
-        text: 'Luma is erasing your account and the personal data linked to it now. You can’t sign in again, and the account can’t be restored.\n\nWorkspaces you belonged to keep their records of your work, shown as a former member.',
-      };
+      return { kind: 'account_erased' };
   }
 }
 
@@ -76,13 +78,18 @@ function accountNotice(message: AccountMessage, eraseAfter: Date) {
  * Delivers queued account notices: deletion scheduled, restored and completed. Each attempt is
  * committed before sending, so the provider's idempotency key covers uncertain responses. A
  * notice fails after five attempts or 23 hours, and is cancelled when the account is gone.
+ * Notices use the person's language. Returns false when the provider's rate limit ended the pass.
  */
-export async function drainAccountMail(pool: Pool, provider: MailProvider) {
+export async function drainAccountMail(
+  pool: Pool,
+  provider: MailProvider,
+  origin: string,
+) {
   for (let count = 0; count < 20; count++) {
     const message = (
       await pool.query<AccountMessage>(
         `WITH next AS (SELECT id FROM account_mail WHERE state='queued' AND next_attempt_at<=now() ORDER BY next_attempt_at LIMIT 1 FOR UPDATE SKIP LOCKED),
-        expired AS (SELECT m.id,m.attempts>=5 OR m.first_attempt_at<=now()-interval '23 hours' AS expired FROM account_mail m JOIN next ON next.id=m.id)
+        expired AS (SELECT m.id,m.attempts>=${maxAttempts} OR m.first_attempt_at<=now()-interval '23 hours' AS expired FROM account_mail m JOIN next ON next.id=m.id)
         UPDATE account_mail m SET state=CASE WHEN e.expired THEN 'failed' ELSE 'queued' END,
           attempts=CASE WHEN e.expired THEN m.attempts ELSE m.attempts+1 END,
           first_attempt_at=COALESCE(m.first_attempt_at,now()),next_attempt_at=now()+interval '60 seconds'
@@ -90,11 +97,15 @@ export async function drainAccountMail(pool: Pool, provider: MailProvider) {
         RETURNING m.id,m.user_id,m.deletion_id,m.kind,m.state,m.attempts`,
       )
     ).rows[0];
-    if (!message) return;
+    if (!message) return true;
     if (message.state === 'failed') continue;
     const recipient = (
-      await pool.query<{ email: string; erase_after: Date }>(
-        'SELECT u.email,d.erase_after FROM users u JOIN account_deletions d ON d.user_id=u.id WHERE u.id=$1 AND d.id=$2',
+      await pool.query<{
+        email: string;
+        locale: string | null;
+        erase_after: Date;
+      }>(
+        'SELECT u.email,u.locale,d.erase_after FROM users u JOIN account_deletions d ON d.user_id=u.id WHERE u.id=$1 AND d.id=$2',
         [message.user_id, message.deletion_id],
       )
     ).rows[0];
@@ -105,24 +116,31 @@ export async function drainAccountMail(pool: Pool, provider: MailProvider) {
       );
       continue;
     }
-    let sent = false;
-    try {
-      await provider.send({
-        id: message.id,
-        to: recipient.email,
-        ...accountNotice(message, recipient.erase_after),
-      });
-      sent = true;
-    } catch {
-      // The committed attempt and provider key make uncertain responses safe to retry.
+    const outcome = await dispatchMail(pool, provider, {
+      id: message.id,
+      to: recipient.email,
+      locale: recipient.locale === 'de' ? 'de' : 'en',
+      email: accountNotice(message, recipient.erase_after, origin),
+    });
+    if (outcome.status === 'deferred') {
+      // A rate-limited request was never processed, so it doesn't use up an attempt.
+      await pool.query(
+        "UPDATE account_mail SET attempts=attempts-1,next_attempt_at=now()+($3*interval '1 second') WHERE id=$1 AND state='queued' AND attempts=$2",
+        [message.id, message.attempts, outcome.seconds],
+      );
+
+      return false;
     }
+    const sent = outcome.status === 'sent';
     await pool.query(
       `UPDATE account_mail SET
-        state=CASE WHEN $3 THEN 'sent' WHEN attempts>=5 THEN 'failed' ELSE 'queued' END,
+        state=CASE WHEN $3 THEN 'sent' WHEN attempts>=${maxAttempts} THEN 'failed' ELSE 'queued' END,
         sent_at=CASE WHEN $3 THEN now() ELSE sent_at END,
         next_attempt_at=now()+($4 * interval '1 second')
        WHERE id=$1 AND state='queued' AND attempts=$2`,
-      [message.id, message.attempts, sent, 30 * 2 ** message.attempts],
+      [message.id, message.attempts, sent, retryDelaySeconds(message.attempts)],
     );
   }
+
+  return true;
 }

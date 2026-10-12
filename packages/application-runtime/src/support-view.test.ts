@@ -68,6 +68,7 @@ function supportApp() {
     refreshContext: vi.fn(async (context) => context),
     authenticate: vi.fn(fail),
     listSecurityEvents: vi.fn(fail),
+    setLanguage: vi.fn(fail),
     listOrganizations: vi.fn(),
     createOrganization: vi.fn(fail),
     listMembers: vi.fn(),

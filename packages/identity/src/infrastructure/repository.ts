@@ -109,6 +109,12 @@ export function createRepository(pool: Pool, settings: AuthSettings) {
     supportViews: createSupportViewCredentials(pool, settings),
     listSecurityEvents: (userId, after, limit) =>
       listSecurityEvents(pool, userId, after, limit),
+    async setLanguage(userId, language) {
+      await pool.query('UPDATE users SET locale=$2 WHERE id=$1', [
+        userId,
+        language,
+      ]);
+    },
     async withUser(userId, operation) {
       try {
         return await db.transaction(async (tx) => {

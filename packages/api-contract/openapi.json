@@ -83365,6 +83365,120 @@
         }
       }
     },
+    "/v1/account/language": {
+      "put": {
+        "operationId": "identity.setLanguage",
+        "summary": "Set your email language",
+        "description": "Stores the interface language Luma uses for email to you, such as invitations, notifications and account notices. The web app calls this after you pick a language.",
+        "tags": ["identity"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "language": {
+                    "enum": ["en", "de"],
+                    "type": "string"
+                  }
+                },
+                "required": ["language"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "not": {}
+                    },
+                    {
+                      "not": {}
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/organizations": {
       "get": {
         "operationId": "identity.listOrganizations",
@@ -84906,6 +85020,17 @@
                     "deliveryAvailable": {
                       "type": "boolean"
                     },
+                    "emailPaused": {
+                      "anyOf": [
+                        {
+                          "enum": ["bounced", "complained"],
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "lastTest": {
                       "anyOf": [
                         {
@@ -84932,6 +85057,7 @@
                     "workspace",
                     "preferences",
                     "deliveryAvailable",
+                    "emailPaused",
                     "lastTest"
                   ]
                 }
@@ -85162,6 +85288,17 @@
                     "deliveryAvailable": {
                       "type": "boolean"
                     },
+                    "emailPaused": {
+                      "anyOf": [
+                        {
+                          "enum": ["bounced", "complained"],
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "lastTest": {
                       "anyOf": [
                         {
@@ -85188,6 +85325,7 @@
                     "workspace",
                     "preferences",
                     "deliveryAvailable",
+                    "emailPaused",
                     "lastTest"
                   ]
                 }
@@ -85413,6 +85551,17 @@
                     "deliveryAvailable": {
                       "type": "boolean"
                     },
+                    "emailPaused": {
+                      "anyOf": [
+                        {
+                          "enum": ["bounced", "complained"],
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "lastTest": {
                       "anyOf": [
                         {
@@ -85439,6 +85588,7 @@
                     "workspace",
                     "preferences",
                     "deliveryAvailable",
+                    "emailPaused",
                     "lastTest"
                   ]
                 }
@@ -85666,6 +85816,17 @@
                     "deliveryAvailable": {
                       "type": "boolean"
                     },
+                    "emailPaused": {
+                      "anyOf": [
+                        {
+                          "enum": ["bounced", "complained"],
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "lastTest": {
                       "anyOf": [
                         {
@@ -85692,6 +85853,7 @@
                     "workspace",
                     "preferences",
                     "deliveryAvailable",
+                    "emailPaused",
                     "lastTest"
                   ]
                 }
@@ -85918,6 +86080,17 @@
                     "deliveryAvailable": {
                       "type": "boolean"
                     },
+                    "emailPaused": {
+                      "anyOf": [
+                        {
+                          "enum": ["bounced", "complained"],
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "lastTest": {
                       "anyOf": [
                         {
@@ -85944,6 +86117,7 @@
                     "workspace",
                     "preferences",
                     "deliveryAvailable",
+                    "emailPaused",
                     "lastTest"
                   ]
                 }
@@ -86611,6 +86785,17 @@
                     "deliveryAvailable": {
                       "type": "boolean"
                     },
+                    "emailPaused": {
+                      "anyOf": [
+                        {
+                          "enum": ["bounced", "complained"],
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "lastTest": {
                       "anyOf": [
                         {
@@ -86637,6 +86822,7 @@
                     "workspace",
                     "preferences",
                     "deliveryAvailable",
+                    "emailPaused",
                     "lastTest"
                   ]
                 }

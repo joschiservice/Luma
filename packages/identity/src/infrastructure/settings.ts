@@ -178,7 +178,21 @@ function transaction(
           )
         ).rows[0] ?? null;
 
-      return { workspace: org, preferences, deliveryAvailable, lastTest };
+      // Only a suppression of the account's current address pauses email.
+      const paused = (
+        await tx.query<{ reason: 'bounced' | 'complained' }>(
+          'SELECT s.reason FROM mail_suppressions s JOIN users u ON u.id=s.user_id WHERE s.user_id=$1 AND lower(s.email)=lower(u.email)',
+          [userId],
+        )
+      ).rows[0];
+
+      return {
+        workspace: org,
+        preferences,
+        deliveryAvailable,
+        emailPaused: paused?.reason ?? null,
+        lastTest,
+      };
     },
     async command(id) {
       return (
