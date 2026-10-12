@@ -110,6 +110,25 @@ export interface DetectionSources {
     },
   ): Promise<StockPosition[]>;
   /**
+   * The latest stored report in `(since, until]` from either connection that agreed within
+   * `tolerance` with the other connection's latest report in the same window, and the first
+   * report after it (`until` when none followed). Null when no report agreed.
+   */
+  stockAgreement(
+    context: TenantContext,
+    options: {
+      positionId: string;
+      connectionIds: [string, string];
+      since: string;
+      until: string;
+      tolerance: string;
+    },
+  ): Promise<{
+    agreedAt: string;
+    mismatchSince: string;
+    snapshotIds: [string, string];
+  } | null>;
+  /**
    * Open fulfillments without progress since `before`, plus the fulfillments named in
    * `include`, oldest progress first.
    */
@@ -269,6 +288,16 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
       now,
       project: (context, observation) =>
         options.project(context, observation, positionId),
+      agreement: (context, window) =>
+        sources.stockAgreement(context, {
+          ...window,
+          positionId,
+          connectionIds: [
+            mapping.left.source.connectionId,
+            mapping.right.source.connectionId,
+          ],
+          tolerance: configuration.inventoryTolerance,
+        }),
     });
   }
 

@@ -1,5 +1,10 @@
 import { evaluate } from './evaluate.js';
-import type { Configuration, Decision, EvaluationInput } from './facts.js';
+import type {
+  Configuration,
+  Decision,
+  EvaluationInput,
+  Facts,
+} from './facts.js';
 import { decimalString, decimalUnits } from './facts.js';
 
 export const diagnosisVersion = 'diagnosis-v1';
@@ -108,6 +113,35 @@ export interface DiagnosisInput {
     source: Diagnosis['provenance']['evidence'][number]['source'];
     facts: Record<string, unknown>;
   }[];
+}
+
+/**
+ * Explains why a detected stock gap did not wait for provider sync, or how long it waited.
+ * Returns null for legacy input without agreement history.
+ */
+function syncBackstory(
+  f: Facts<'inventory_mismatch'>,
+  now: string,
+  thresholds: Configuration['thresholds'],
+): { code: string; text: string } | null {
+  if (f.mismatchSince === undefined) return null;
+  if (f.mismatchSince === null)
+    return {
+      code: 'no_recent_agreement',
+      text: 'Luma has no record of the sources agreeing in the last 24 hours.',
+    };
+  const age = (Date.parse(now) - Date.parse(f.mismatchSince)) / 1000;
+  if (age < 0) return null;
+  if (age > thresholds.propagationSeconds)
+    return {
+      code: 'sync_did_not_close_gap',
+      text: `Luma first saw this gap at ${f.mismatchSince} and waited ${Math.floor(age / 60)} minutes for sync; the gap is still open.`,
+    };
+
+  return {
+    code: 'raised_oversell_guard',
+    text: 'The selling source shows more stock than the authority can cover, so Luma raised the gap without waiting for sync.',
+  };
 }
 
 /**
@@ -259,6 +293,9 @@ export function diagnose(snapshot: DiagnosisInput, now: string): Diagnosis {
             'Fresh observations of equivalent stock pools disagree.',
           ),
         );
+        const backstory = syncBackstory(f, now, configuration.thresholds);
+        if (backstory)
+          result.facts.push(finding(backstory.code, backstory.text));
         result.summary =
           'Equivalent stock pools report different available quantities.';
         if (decision.reason === 'oversell_risk') {

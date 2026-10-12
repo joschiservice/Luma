@@ -20,16 +20,24 @@ async function driftedStock(f) {
     target: 'LUMA-001',
   });
   await f.pilot.observe({ check: false });
-  await f.pilot.detect();
-  const [opened] = (await f.pilot.detection.exceptions.list(f.actor)).filter(
-    (item) =>
-      item.exceptionClass === 'inventory_mismatch' &&
-      item.state !== 'resolved' &&
-      !f.pilot.inventoryScenario?.matches(item),
-  );
+  const opened = await stockCase(f);
   expect(opened, JSON.stringify(f.pilot.detectionErrors)).toBeDefined();
 
   return { incident, opened };
+}
+
+/** Runs detection passes until a new stock gap outlasts the journey's sync window. */
+async function stockCase(f) {
+  return until(async () => {
+    await f.pilot.detect();
+
+    return (await f.pilot.detection.exceptions.list(f.actor)).find(
+      (item) =>
+        item.exceptionClass === 'inventory_mismatch' &&
+        item.state !== 'resolved' &&
+        !f.pilot.inventoryScenario?.matches(item),
+    );
+  }, 'detection opens the stock case after the sync window');
 }
 
 const shopStock = async (f) =>
@@ -494,7 +502,7 @@ test('the simulator demo turns workflows on and shows a scenario’s run on the 
     scenario: 'stock-correction',
   });
   await f.pilot.observe({ check: false });
-  await f.pilot.detect();
+  await stockCase(f);
   await f.pilot.caseWorkflows.tick(await f.pilot.context());
   const [run] = await f.runs(stock);
   await f.waitFor(stock, run.id, 'awaiting_decision');

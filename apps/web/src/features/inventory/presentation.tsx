@@ -1,5 +1,5 @@
 import type { StockPosition, StockSource } from '@luma/api-contract';
-import { formatList, formatRelativeTime } from '@luma/i18n/format';
+import { formatList, formatRelativeTime, formatTime } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { StatePill } from '@luma/ui/components/primitives/state';
 
@@ -37,10 +37,32 @@ export function stockQuantity(value: string | null) {
   return value === null ? m.common_not_reported() : formatSourceNumber(value);
 }
 
+/**
+ * Explains a gap Luma is letting provider sync close: when Luma first saw it and when it is
+ * raised as an issue if still open.
+ */
+export function syncExplanation(
+  sync: NonNullable<StockPosition['sync']>,
+  fields: StockPosition['differences'],
+) {
+  return m.inventory_explanation_syncing_body({
+    fields: differingQuantities(fields),
+    since: formatTime(sync.since),
+    until: formatTime(sync.until),
+  });
+}
+
 /** Explains whether the same linked position has known conflicting quantities. */
 export function StockState({ position }: { position: StockPosition }) {
   if (position.differences.length)
-    return (
+    return position.sync ? (
+      <StatePill
+        state="waiting"
+        title={syncExplanation(position.sync, position.differences)}
+      >
+        {m.inventory_state_syncing()}
+      </StatePill>
+    ) : (
       <StatePill state="attention">{m.inventory_state_differs()}</StatePill>
     );
   if (position.sources.every((source) => source.deleted))

@@ -127,7 +127,15 @@ export function createDetectionRepository(
           });
         }
         let reviewRequired = false;
-        if (decision.decision === 'defer') {
+        // Waiting for sync is bounded by the rule itself, so it never accumulates uncertainty.
+        const waiting =
+          decision.decision === 'defer' &&
+          decision.reason === 'propagation_pending' &&
+          input.exceptionClass === 'inventory_mismatch' &&
+          input.facts.mismatchSince
+            ? input.facts.mismatchSince
+            : null;
+        if (decision.decision === 'defer' && !waiting) {
           const uncertainty = await tx.query<{
             first_deferred_at: Date;
             review_required: boolean;
@@ -164,6 +172,29 @@ export function createDetectionRepository(
             [tenantId, fingerprint],
           );
         }
+        if (waiting) {
+          const subject = identity(input);
+          await tx.query(
+            `INSERT INTO exception_pending_sync(tenant_id,fingerprint,subject_kind,subject_id,scope,mismatch_since,wait_until,evaluated_at)
+     VALUES($1,$2,$3,$4,$5,$6,$6::timestamptz+make_interval(secs=>$7),$8)
+     ON CONFLICT(tenant_id,fingerprint) DO UPDATE SET subject_kind=EXCLUDED.subject_kind,subject_id=EXCLUDED.subject_id,
+      scope=EXCLUDED.scope,mismatch_since=EXCLUDED.mismatch_since,wait_until=EXCLUDED.wait_until,evaluated_at=EXCLUDED.evaluated_at`,
+            [
+              tenantId,
+              fingerprint,
+              subject.subjectKind,
+              subject.subjectId,
+              JSON.stringify(subject.scope),
+              waiting,
+              configuration.thresholds.propagationSeconds,
+              now,
+            ],
+          );
+        } else
+          await tx.query(
+            'DELETE FROM exception_pending_sync WHERE tenant_id=$1 AND fingerprint=$2',
+            [tenantId, fingerprint],
+          );
         if (decision.decision === 'detect') {
           const duplicate = await tx.query<{ document: Incident }>(
             `SELECT e.document FROM exception_evidence ev JOIN exceptions e ON e.tenant_id=ev.tenant_id AND e.id=ev.exception_id

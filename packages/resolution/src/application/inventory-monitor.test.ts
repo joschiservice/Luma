@@ -115,7 +115,7 @@ function fixture() {
     lastDetectedAt: now.toISOString(),
     occurrenceCount: 1,
     previousExceptionId: null,
-    ruleVersion: 'v0.1',
+    ruleVersion: 'v0.2',
     configVersion: defaultConfiguration.version,
   };
   const ingest = vi.fn<DetectionService['ingest']>(async (_actor, request) => ({

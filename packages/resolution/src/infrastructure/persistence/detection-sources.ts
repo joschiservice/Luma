@@ -219,6 +219,54 @@ export function createDetectionSources(db: TenantDatabase): DetectionSources {
         (position) => position.sources.length > 1,
       );
     },
+    async stockAgreement(
+      context,
+      { positionId, connectionIds: [left, right], since, until, tolerance },
+    ) {
+      // Each stored report is compared with the other side's latest report observed no later,
+      // both inside the window: what Luma knew both sources said at that moment.
+      const rows = await db.transaction(context.tenantId, async (tx) => {
+        const result = await tx.query(
+          `WITH agreed AS (SELECT s.observed_at AS at,s.id AS "snapshotId",o.id AS "otherId",s.connection_id=$3 AS "isLeft"
+          FROM inventory_snapshots s
+          JOIN LATERAL (SELECT o.id,o.available FROM inventory_snapshots o
+            WHERE o.tenant_id=$1 AND o.entity_id=$2 AND o.kind='position'
+             AND o.connection_id=CASE WHEN s.connection_id=$3 THEN $4::uuid ELSE $3::uuid END
+             AND o.observed_at>$5 AND o.observed_at<=s.observed_at
+            ORDER BY o.observed_at DESC LIMIT 1) o ON true
+          WHERE s.tenant_id=$1 AND s.entity_id=$2 AND s.kind='position' AND s.connection_id IN ($3,$4)
+           AND s.observed_at>$5 AND s.observed_at<=$6 AND abs(s.available-o.available)<=$7::numeric
+          ORDER BY s.observed_at DESC,s.id LIMIT 1)
+          SELECT agreed.*,COALESCE((SELECT min(n.observed_at) FROM inventory_snapshots n
+            WHERE n.tenant_id=$1 AND n.entity_id=$2 AND n.kind='position' AND n.connection_id IN ($3,$4)
+             AND n.observed_at>agreed.at AND n.observed_at<=$6),$6) AS "mismatchSince"
+          FROM agreed`,
+          [context.tenantId, positionId, left, right, since, until, tolerance],
+        );
+
+        return z
+          .array(
+            z.object({
+              at: time,
+              mismatchSince: time,
+              snapshotId: z.string().uuid(),
+              otherId: z.string().uuid(),
+              isLeft: z.boolean(),
+            }),
+          )
+          .parse(result.rows);
+      });
+      const row = rows[0];
+      if (!row) return null;
+
+      return {
+        agreedAt: row.at,
+        mismatchSince: row.mismatchSince,
+        snapshotIds: row.isLeft
+          ? [row.snapshotId, row.otherId]
+          : [row.otherId, row.snapshotId],
+      };
+    },
     async fulfillments(context, { before, include, limit }) {
       const named = include.map(
         (item) => `${item.fulfillmentId}/${item.connectionId}`,

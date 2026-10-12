@@ -30,6 +30,7 @@ import {
   createOperationalMetrics,
   createRecordExplorer,
 } from '@luma/read-models/composition';
+import { createDetectionSources } from '@luma/resolution/composition';
 import {
   createSalesPersistence,
   createSalesSource,
@@ -77,6 +78,7 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       amount?: string | null;
       time?: string | null;
       external?: string;
+      observed?: string;
     } = {},
   ): CommerceObservation & { capability: 'inventory.read' } {
     return {
@@ -92,7 +94,7 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
           scopeKey: '',
         },
         kind: 'snapshot',
-        observedAt: '2026-09-19T00:00:00Z',
+        observedAt: options.observed ?? '2026-09-19T00:00:00Z',
         sourceUpdatedAt:
           options.time === undefined ? '2026-09-18T00:00:00Z' : options.time,
         sourceRevision: 'opaque-A',
@@ -1198,6 +1200,64 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       await services.inventory.current(context(otherTenant), left.entityId),
     ).toEqual([]);
   });
+  it('finds when two stock sources last agreed inside a window under tenant RLS', async () => {
+    const at = (seconds: number) =>
+      new Date(
+        Date.parse('2026-09-20T00:00:00Z') + seconds * 1000,
+      ).toISOString();
+    const report = (connectionId: string, amount: string, seconds: number) =>
+      stock({
+        connectionId,
+        amount,
+        external: 'agreement',
+        observed: at(seconds),
+        time: at(seconds),
+      });
+    const first = await mapStock(
+      report(connection, '3', 0),
+      'agree-l0',
+      'agree-sku',
+    );
+    const second = await mapStock(
+      report(secondConnection, '3', 10),
+      'agree-r10',
+      'agree-sku',
+    );
+    if (first.status === 'pending' || second.status === 'pending')
+      throw new Error('Expected projection');
+    // The left source sells one unit; the right source has not caught up.
+    await services.ingestion.ingest(
+      context(),
+      'agree-l60',
+      report(connection, '2', 60),
+    );
+    const sources = createDetectionSources(createTenantDatabase(runtime));
+    const window = (since: number, until = 120) => ({
+      positionId: first.entityId,
+      connectionIds: [connection, secondConnection] as [string, string],
+      since: at(since),
+      until: at(until),
+      tolerance: '0',
+    });
+
+    // The gap was first seen in the left report after the agreement.
+    expect(await sources.stockAgreement(context(), window(-1))).toEqual({
+      agreedAt: at(10),
+      mismatchSince: at(60),
+      snapshotIds: [expect.any(String), expect.any(String)],
+    });
+    // Without a later report, the gap is first seen at the end of the window.
+    expect(await sources.stockAgreement(context(), window(-1, 30))).toEqual(
+      expect.objectContaining({ agreedAt: at(10), mismatchSince: at(30) }),
+    );
+    // Agreement needs both reports inside the window; reports after `until` are not history.
+    expect(await sources.stockAgreement(context(), window(5))).toBeNull();
+    expect(await sources.stockAgreement(context(), window(-1, 5))).toBeNull();
+    expect(
+      await sources.stockAgreement(context(otherTenant), window(-1)),
+    ).toBeNull();
+  });
+
   it('deduplicates concurrent retries and rejects changed content under one ingest key', async () => {
     await mapStock(stock(), 'seed');
     const input = stock({ time: '2026-09-18T01:00:00Z' });

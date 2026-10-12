@@ -2615,6 +2615,87 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
     expect(repeat.incident?.state).toBe('escalated');
     expect(repeat.incident?.occurrenceCount).toBe(2);
   });
+  it('records stock waiting for sync without escalating it and clears the wait on a decision', async () => {
+    const sku = randomUUID(),
+      pool = randomUUID(),
+      store = randomUUID();
+    const stock = (event: string, facts: Record<string, unknown>) => {
+      const refs = [`${event}-left`, `${event}-right`];
+
+      return {
+        key: event,
+        input: parseInput('inventory_mismatch', {
+          ...corpus.bases.inventory_mismatch,
+          tenantId,
+          evidenceTenantId: tenantId,
+          evidenceRefs: refs,
+          subjectId: sku,
+          canonicalLocationId: pool,
+          connectionIds: [connectionId, store],
+          leftObservedAt: now.toISOString(),
+          rightObservedAt: now.toISOString(),
+          leftAvailable: '100',
+          rightAvailable: '101',
+          ...facts,
+        }),
+        configuration: structuredClone(defaultConfiguration),
+        evidence: refs.map((key) => ({
+          key,
+          tenantId,
+          connectionId: null,
+          observedAt: now.toISOString(),
+          sourceUpdatedAt: null,
+          adapterVersion: 'fixture-v1',
+          schemaVersion: 1 as const,
+          source: null,
+          facts: {},
+        })),
+      } satisfies DetectionRequest;
+    };
+    const waits = async () =>
+      (
+        await owner.query(
+          'SELECT subject_id,scope,mismatch_since,wait_until FROM exception_pending_sync WHERE tenant_id=$1',
+          [tenantId],
+        )
+      ).rows;
+
+    // Each sale opens a new gap that syncs; the waits never add up to uncertainty.
+    for (const step of [0, 1, 2, 3]) {
+      now = new Date(Date.parse(corpus.now) + step * 1_800_000);
+      const result = await services.exceptions.ingest(
+        context(),
+        stock(`gap-${step}`, { mismatchSince: now.toISOString() }),
+      );
+      expect(result).toMatchObject({
+        decision: { decision: 'defer', reason: 'propagation_pending' },
+        incident: null,
+        reviewRequired: false,
+      });
+    }
+    expect(await waits()).toEqual([
+      {
+        subject_id: sku,
+        scope: [pool, ...[connectionId, store].sort()],
+        mismatch_since: now,
+        wait_until: new Date(now.getTime() + 1_800_000),
+      },
+    ]);
+    expect(
+      (await runtime.query('SELECT 1 FROM exception_pending_sync')).rowCount,
+    ).toBe(0);
+
+    // A gap that outlasts the window is raised and is no longer shown as waiting.
+    now = new Date(now.getTime() + 1_801_000);
+    const raised = await services.exceptions.ingest(
+      context(),
+      stock('gap-late', {
+        mismatchSince: new Date(now.getTime() - 1_801_000).toISOString(),
+      }),
+    );
+    expect(raised.decision).toMatchObject({ decision: 'detect' });
+    expect(await waits()).toEqual([]);
+  });
   it('emits a review task without inventing an incident for prolonged uncertainty', async () => {
     const uncertain = request();
     if (uncertain.input.exceptionClass === 'sync_failure')
@@ -2639,12 +2720,14 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
       [initial.incident!.id],
     );
     const next = request('event-2');
-    next.configuration.version = 'v0.2';
+    next.configuration.version = `${defaultConfiguration.version}-next`;
     next.configuration.thresholds.freshnessSeconds = 120;
     const result = await services.exceptions.ingest(context(), next);
     expect(result.incident?.id).toBe(initial.incident?.id);
     expect(result.incident?.state).toBe('failed');
-    expect(result.incident?.configVersion).toBe('v0.2');
+    expect(result.incident?.configVersion).toBe(
+      `${defaultConfiguration.version}-next`,
+    );
     const invalid = request('event-3');
     invalid.configuration.thresholds.freshnessSeconds = 1;
     await expect(
@@ -3414,7 +3497,10 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
     expect(await services.diagnoses.get(context(), incident.id)).toMatchObject({
       status: 'pending',
       revision: 4,
-      provenance: { configVersion: 'v0.1', evidence: [{ id: 'newest' }] },
+      provenance: {
+        configVersion: defaultConfiguration.version,
+        evidence: [{ id: 'newest' }],
+      },
     });
     expect(
       (await services.diagnoses.history(context(), incident.id))

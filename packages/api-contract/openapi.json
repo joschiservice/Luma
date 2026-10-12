@@ -51528,6 +51528,27 @@
                                     "enum": ["onHand", "reserved", "available"],
                                     "type": "string"
                                   }
+                                },
+                                "sync": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "since": {
+                                          "type": "string",
+                                          "format": "date-time"
+                                        },
+                                        "until": {
+                                          "type": "string",
+                                          "format": "date-time"
+                                        }
+                                      },
+                                      "required": ["since", "until"]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
                                 }
                               },
                               "required": [
@@ -51539,7 +51560,8 @@
                                 "location",
                                 "unit",
                                 "sources",
-                                "differences"
+                                "differences",
+                                "sync"
                               ]
                             }
                           },
@@ -52091,6 +52113,27 @@
                                     "enum": ["onHand", "reserved", "available"],
                                     "type": "string"
                                   }
+                                },
+                                "sync": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "since": {
+                                          "type": "string",
+                                          "format": "date-time"
+                                        },
+                                        "until": {
+                                          "type": "string",
+                                          "format": "date-time"
+                                        }
+                                      },
+                                      "required": ["since", "until"]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
                                 }
                               },
                               "required": [
@@ -52102,7 +52145,8 @@
                                 "location",
                                 "unit",
                                 "sources",
-                                "differences"
+                                "differences",
+                                "sync"
                               ]
                             }
                           },
@@ -95605,6 +95649,12 @@
                                 "type": "null"
                               }
                             ]
+                          },
+                          "occurrences": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "exclusiveMinimum": 0
                           }
                         },
                         "required": [
@@ -95614,7 +95664,8 @@
                           "severity",
                           "relationship",
                           "needsYou",
-                          "lastDetectedAt"
+                          "lastDetectedAt",
+                          "occurrences"
                         ]
                       }
                     },
@@ -96202,6 +96253,27 @@
                               "enum": ["onHand", "reserved", "available"],
                               "type": "string"
                             }
+                          },
+                          "sync": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "since": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "until": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  }
+                                },
+                                "required": ["since", "until"]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           }
                         },
                         "required": [
@@ -96213,7 +96285,8 @@
                           "location",
                           "unit",
                           "sources",
-                          "differences"
+                          "differences",
+                          "sync"
                         ]
                       }
                     },
@@ -96507,6 +96580,27 @@
                             "enum": ["onHand", "reserved", "available"],
                             "type": "string"
                           }
+                        },
+                        "sync": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "since": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "until": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              },
+                              "required": ["since", "until"]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -96518,7 +96612,8 @@
                         "location",
                         "unit",
                         "sources",
-                        "differences"
+                        "differences",
+                        "sync"
                       ]
                     },
                     "history": {
@@ -98040,6 +98135,27 @@
                               "enum": ["onHand", "reserved", "available"],
                               "type": "string"
                             }
+                          },
+                          "sync": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "since": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "until": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  }
+                                },
+                                "required": ["since", "until"]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           }
                         },
                         "required": [
@@ -98051,7 +98167,8 @@
                           "location",
                           "unit",
                           "sources",
-                          "differences"
+                          "differences",
+                          "sync"
                         ]
                       }
                     },
@@ -100170,6 +100287,12 @@
                                 "type": "null"
                               }
                             ]
+                          },
+                          "occurrences": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "exclusiveMinimum": 0
                           }
                         },
                         "required": [
@@ -100179,8 +100302,30 @@
                           "severity",
                           "relationship",
                           "needsYou",
-                          "lastDetectedAt"
+                          "lastDetectedAt",
+                          "occurrences"
                         ]
+                      }
+                    },
+                    "stockSync": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "skuId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "since": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "until": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": ["skuId", "since", "until"]
                       }
                     },
                     "workflows": {
@@ -101064,6 +101209,7 @@
                     "fulfillments",
                     "returns",
                     "issues",
+                    "stockSync",
                     "workflows",
                     "history",
                     "activity",

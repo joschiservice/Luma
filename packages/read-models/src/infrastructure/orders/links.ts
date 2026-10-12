@@ -38,6 +38,8 @@ export async function readDirectRunIds(
 /**
  * Lists up to 50 issues about the order, its fulfillments, its ordered SKUs or its workflow
  * runs. Issues may name a record by Luma ID or by source ID within a connection scope.
+ * Resolved issues of one class about the same record collapse into their latest, with the
+ * number of resolved occurrences; open issues are listed one by one.
  */
 export async function readIssues(
   tx: SqlTransaction,
@@ -53,6 +55,7 @@ export async function readIssues(
     severity: string | null;
     lastDetectedAt: string | null;
     subjectKind: string;
+    occurrences: number;
   }>(
     `WITH subjects(kind,subject_id,scope) AS (
       SELECT 'order',id::text,NULL::text FROM unnest($2::uuid[]) id
@@ -69,11 +72,17 @@ export async function readIssues(
       SELECT DISTINCT e.id FROM subjects JOIN exceptions e ON e.tenant_id=$1
        AND e.subject_kind=subjects.kind AND e.subject_id=subjects.subject_id
        AND (subjects.scope IS NULL OR e.document->'subject'->'scope'->>0=subjects.scope)
+     ), grouped AS (
+      SELECT e.id,e.document->>'exceptionClass' AS class,e.state,e.document->>'severity' AS severity,
+      e.document->>'lastDetectedAt' AS "lastDetectedAt",e.subject_kind AS "subjectKind",
+      (count(*) OVER w)::int AS occurrences,row_number() OVER (w ORDER BY e.document->>'lastDetectedAt' DESC,e.id) AS rank
+      FROM linked JOIN exceptions e ON e.tenant_id=$1 AND e.id=linked.id
+      WINDOW w AS (PARTITION BY CASE WHEN e.state='resolved'
+       THEN concat_ws(':',e.document->>'exceptionClass',e.subject_kind,e.subject_id,e.document->'subject'->>'scope')
+       ELSE e.id::text END)
      )
-     SELECT e.id,e.document->>'exceptionClass' AS class,e.state,e.document->>'severity' AS severity,
-     e.document->>'lastDetectedAt' AS "lastDetectedAt",e.subject_kind AS "subjectKind"
-     FROM linked JOIN exceptions e ON e.tenant_id=$1 AND e.id=linked.id
-     ORDER BY e.state='resolved',e.document->>'lastDetectedAt' DESC,e.id LIMIT 50`,
+     SELECT id,class,state,severity,"lastDetectedAt","subjectKind",occurrences FROM grouped WHERE rank=1
+     ORDER BY state='resolved',"lastDetectedAt" DESC,id LIMIT 50`,
     [
       tenantId,
       refs.orderIds ?? [refs.orderId],
@@ -96,6 +105,7 @@ export async function readIssues(
           : 'fulfillment',
     needsYou: needsYou.has(row.id),
     lastDetectedAt: iso(row.lastDetectedAt),
+    occurrences: row.occurrences,
   }));
 }
 

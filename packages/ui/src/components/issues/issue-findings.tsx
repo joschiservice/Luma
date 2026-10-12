@@ -127,12 +127,35 @@ function Sources({
   );
 }
 
+/**
+ * Localizes the facts that tell how a raised stock gap relates to provider sync. They use the
+ * exact templates inventory diagnosis emits; other facts keep their recorded text.
+ */
+function factText(fact: Fact) {
+  if (fact.code === 'sync_did_not_close_gap') {
+    const match = fact.text.match(
+      /^Luma first saw this gap at (\S+) and waited (\d+) minutes for sync; the gap is still open\.$/,
+    );
+    if (match)
+      return rich(m.issues_findings_sync_not_closed, {
+        time: <WorkspaceDate value={match[1]!} />,
+        minutes: Number(match[2]),
+      });
+  }
+  if (fact.code === 'raised_oversell_guard')
+    return m.issues_findings_raised_oversell_guard();
+  if (fact.code === 'no_recent_agreement')
+    return m.issues_findings_no_recent_agreement();
+
+  return fact.text;
+}
+
 function Facts({ facts, diagnosis }: { facts: Fact[]; diagnosis: Diagnosis }) {
   return (
     <ul className="issue-finding-rows">
       {facts.map((fact) => (
         <li key={fact.code}>
-          <p>{fact.text}</p>
+          <p>{factText(fact)}</p>
           <Sources refs={fact.evidenceRefs} diagnosis={diagnosis} />
         </li>
       ))}

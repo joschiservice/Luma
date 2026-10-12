@@ -129,6 +129,7 @@ describe('order presentation', () => {
               relationship: 'fulfillment',
               needsYou: true,
               lastDetectedAt: null,
+              occurrences: 1,
             },
           ],
         }),

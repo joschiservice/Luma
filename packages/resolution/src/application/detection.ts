@@ -93,6 +93,22 @@ function inventoryEvidence(observation: Observation<InventorySnapshot>) {
   });
 }
 
+/** When both sides of a stock comparison last agreed, read from stored reports. */
+export interface StockAgreement {
+  /** The searched lookback of Luma observation time. */
+  since: string;
+  until: string;
+  /** Observation time of the latest agreeing report, or null when none agreed in the lookback. */
+  agreedAt: string | null;
+  /**
+   * First report after that agreement, which therefore disagreed; `until` when no report
+   * followed it, because the gap is first seen in the fresh reads. Null without agreement.
+   */
+  mismatchSince: string | null;
+  /** The stored left and right reports that agreed. */
+  snapshotIds: string[];
+}
+
 export interface InventoryDetectionInput {
   left: Observation<InventorySnapshot>;
   right: Observation<InventorySnapshot>;
@@ -100,6 +116,8 @@ export interface InventoryDetectionInput {
   complete: boolean;
   projectionCurrent: boolean;
   configuration: Configuration;
+  /** Recent agreement history; when absent, the rule cannot wait for sync. */
+  agreement?: StockAgreement;
 }
 
 /** Builds inventory facts and evidence for detection and independent verification. */
@@ -124,11 +142,20 @@ export function inventoryRequest(
     externalMatches(left.data.location, mapping.left.location) &&
     externalMatches(right.data.location, mapping.right.location);
   const mappingKey = `mapping:${key(['inventory', mapping])}`;
+  const { agreement } = input;
+  const agreementKey = agreement
+    ? `agreement:${key(['inventory-agreement', mapping.version, agreement])}`
+    : null;
   const facts: Facts<'inventory_mismatch'> = {
     tenantId: context.tenantId,
     evidenceTenantId: context.tenantId,
     subjectId: mapping.skuId,
-    evidenceRefs: [left.id, right.id, mappingKey],
+    evidenceRefs: [
+      left.id,
+      right.id,
+      mappingKey,
+      ...(agreementKey ? [agreementKey] : []),
+    ],
     connectionIds: [left.source.connectionId, right.source.connectionId],
     canonicalLocationId: mapping.locationId,
     leftAvailable: left.data.available,
@@ -158,6 +185,7 @@ export function inventoryRequest(
     authority: mapping.authority,
     sellingSource: mapping.sellingSource,
     tolerance: configuration.inventoryTolerance,
+    ...(agreement ? { mismatchSince: agreement.mismatchSince } : {}),
   };
   const mappingEvidence: Evidence = {
     key: mappingKey,
@@ -179,12 +207,28 @@ export function inventoryRequest(
       mappingKey,
       input.complete,
       input.projectionCurrent,
+      agreementKey,
     ]),
     input: { exceptionClass: 'inventory_mismatch', facts },
     evidence: [
       inventoryEvidence(left),
       inventoryEvidence(right),
       mappingEvidence,
+      ...(agreement && agreementKey
+        ? [
+            {
+              key: agreementKey,
+              tenantId: context.tenantId,
+              connectionId: null,
+              source: null,
+              observedAt: agreement.until,
+              sourceUpdatedAt: null,
+              adapterVersion: 'stock-agreement-v1',
+              schemaVersion: 1,
+              facts: { ...agreement },
+            } satisfies Evidence,
+          ]
+        : []),
     ],
     configuration,
   };

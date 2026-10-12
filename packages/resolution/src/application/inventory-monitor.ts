@@ -13,7 +13,7 @@ import { evaluateException } from '@luma/exceptions';
 import type { TenantContext } from '@luma/identity';
 import { requireTenant } from '@luma/identity';
 
-import type { InventoryMapping } from './detection.js';
+import type { InventoryMapping, StockAgreement } from './detection.js';
 import { inventoryRequest } from './detection.js';
 
 export interface InventoryMonitorOptions {
@@ -27,8 +27,23 @@ export interface InventoryMonitorOptions {
     context: TenantContext,
     observation: Observation<InventorySnapshot>,
   ): Promise<boolean>;
+  /**
+   * Finds when both sides last agreed and when Luma first saw them disagree afterwards, so a
+   * new gap can wait for provider sync. Without it, every gap is evaluated at once.
+   */
+  agreement?(
+    context: TenantContext,
+    window: { since: string; until: string },
+  ): Promise<Pick<
+    StockAgreement,
+    'agreedAt' | 'mismatchSince' | 'snapshotIds'
+  > | null>;
   now?: () => Date;
 }
+
+// Luma reads agreeing positions only during sync, so the last agreement can be hours old when
+// a sale opens a gap. A gap with no agreement in a day is old and is not waited on.
+const agreementLookbackSeconds = 86_400;
 
 /** Reads a mapped stock pool completely and verifies recovery with independent provider evidence. */
 export function createInventoryMonitor(options: InventoryMonitorOptions) {
@@ -85,7 +100,28 @@ export function createInventoryMonitor(options: InventoryMonitorOptions) {
     return matches[0]!;
   }
 
+  async function agreement(
+    context: TenantContext,
+  ): Promise<StockAgreement | undefined> {
+    if (!options.agreement) return undefined;
+    const until = now();
+    const window = {
+      since: new Date(+until - agreementLookbackSeconds * 1000).toISOString(),
+      until: until.toISOString(),
+    };
+    const found = await options.agreement(context, window);
+
+    return {
+      ...window,
+      agreedAt: found?.agreedAt ?? null,
+      mismatchSince: found?.mismatchSince ?? null,
+      snapshotIds: found?.snapshotIds ?? [],
+    };
+  }
+
   async function read(context: TenantContext) {
+    // History is read before the fresh pair is recorded, so it describes the time before it.
+    const agreed = await agreement(context);
     const left = await readSide(context, mapping.left);
     const right = await readSide(context, mapping.right);
     const leftCurrent = await project(context, left);
@@ -100,6 +136,7 @@ export function createInventoryMonitor(options: InventoryMonitorOptions) {
         configuration,
         complete: true,
         projectionCurrent: leftCurrent && rightCurrent,
+        ...(agreed ? { agreement: agreed } : {}),
       },
       hash,
     );

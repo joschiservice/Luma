@@ -1,4 +1,5 @@
 import type { OrderDetail } from '@luma/api-contract';
+import { formatTime } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { rich } from '@luma/i18n/rich';
 import { issueKind } from '@luma/ui/components/issues/case-presentation';
@@ -54,6 +55,54 @@ function InspectorCard({
   );
 }
 
+/** The first SKU code or title any source reports for an ordered SKU. */
+function skuLabel(detail: OrderDetail, skuId: string) {
+  const line = detail.sources
+    .flatMap((source) => source.lines)
+    .find((item) => item.skuId === skuId && (item.skuCode || item.title));
+
+  return line?.skuCode ?? line?.title ?? m.orders_inspector_stock_item();
+}
+
+/** Ordered SKUs whose stock gap Luma is letting provider sync close; they are not issues yet. */
+function StockSync({
+  detail,
+  organizationId,
+}: {
+  detail: OrderDetail;
+  organizationId: string;
+}) {
+  if (!detail.stockSync.length) return null;
+
+  return (
+    <ul className="order-list">
+      {detail.stockSync.map((wait) => (
+        <li key={wait.skuId}>
+          <Link
+            className="order-row-link"
+            to="/app/$organizationId/inventory"
+            params={{ organizationId }}
+            search={{ skuId: wait.skuId }}
+          >
+            <span className="orders-cell-stack">
+              <strong>{skuLabel(detail, wait.skuId)}</strong>
+              <small>
+                {m.orders_inspector_stock_syncing({
+                  until: formatTime(wait.until),
+                })}
+              </small>
+            </span>
+            <StatePill state="waiting">
+              {m.orders_inspector_syncing()}
+            </StatePill>
+            <ChevronRight className="order-row-chevron" aria-hidden="true" />
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function OrderIssues({
   issues,
   organizationId,
@@ -91,6 +140,9 @@ function OrderIssues({
                   : issue.relationship === 'fulfillment'
                     ? m.orders_inspector_issue_fulfillment()
                     : m.orders_inspector_issue_order()}
+                {issue.occurrences > 1
+                  ? ` · ${m.orders_inspector_issue_occurrences({ count: issue.occurrences })}`
+                  : null}
               </small>
             </span>
             {issue.needsYou ? (
@@ -207,6 +259,7 @@ export function OrderInspector({
   return (
     <aside className="order-inspector" aria-label={m.orders_inspector_label()}>
       <InspectorCard title={m.orders_inspector_issues()} icon={Inbox}>
+        <StockSync detail={detail} organizationId={organizationId} />
         <OrderIssues issues={detail.issues} organizationId={organizationId} />
       </InspectorCard>
       <InspectorCard title={m.orders_inspector_runs()} icon={Workflow}>
