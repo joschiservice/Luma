@@ -46,6 +46,12 @@ export interface AttachmentMeta {
  * read only metadata. `headers` keeps the original header order and spelling.
  */
 export interface MessageRecord {
+  /** Structured permanent delivery failure for the exact original outgoing message. */
+  deliveryFailure?: {
+    originalMessageId: string;
+    recipient: string;
+    status: string;
+  };
   id: string;
   threadId: string;
   labelIds: string[];

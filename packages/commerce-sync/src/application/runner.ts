@@ -7,6 +7,7 @@ import type {
   CustomerSnapshot,
   Observation,
   OrderSnapshot,
+  ProductSnapshot,
   ReadCapability,
 } from '@luma/connections';
 import type { CustomerProfiles } from '@luma/customers';
@@ -68,6 +69,12 @@ export interface SyncRunnerDependencies {
       reason: string,
     ): Promise<unknown>;
   };
+  /** Records purchasing metadata after canonical SKU mappings exist; exact retries are harmless. */
+  recordPurchasingTerms?(
+    context: TenantContext,
+    observations: Observation<ProductSnapshot>[],
+    complete: boolean,
+  ): Promise<void>;
   customers: Pick<
     CustomerProfiles,
     'upsert' | 'recordOrders' | 'recordOrderAddresses' | 'remove'
@@ -506,6 +513,13 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
       }
       const page = result.value;
       if (page.completeness !== 'complete') {
+        // Returned purchasing evidence remains useful, but an incomplete scan never establishes absence.
+        if (claimed.recordType === 'products' && deps.recordPurchasingTerms)
+          await deps.recordPurchasingTerms(
+            tenant,
+            page.items as Observation<ProductSnapshot>[],
+            false,
+          );
         await fail('invalid_response');
 
         return true;
@@ -557,6 +571,13 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
         claimed.recordType,
         changed.map((item) => item.observation),
       );
+      if (claimed.recordType === 'products' && deps.recordPurchasingTerms) {
+        await deps.recordPurchasingTerms(
+          tenant,
+          page.items as Observation<ProductSnapshot>[],
+          page.completeness === 'complete',
+        );
+      }
       if (claimed.recordType === 'orders') {
         await deps.customers.recordOrders(
           tenant,

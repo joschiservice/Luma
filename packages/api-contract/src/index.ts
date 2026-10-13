@@ -23,6 +23,7 @@ import { procurementContract } from './contracts/procurement.js';
 import { procurementContextContract } from './contracts/procurement-context.js';
 import { productsContract } from './contracts/products.js';
 import { connectorProvidersContract } from './contracts/providers.js';
+import { procurementChangesContract } from './contracts/purchase-order-changes.js';
 import { recordsContract } from './contracts/records.js';
 import { returnCasesContract } from './contracts/return-cases.js';
 import { returnsContract } from './contracts/returns.js';
@@ -30,6 +31,7 @@ import { rolesContract } from './contracts/roles.js';
 import { salesContract } from './contracts/sales.js';
 import { settingsContract } from './contracts/settings.js';
 import { shadowContract } from './contracts/shadow.js';
+import { supplierEmailContract } from './contracts/supplier-email.js';
 import { syncContract } from './contracts/sync.js';
 import { systemContract } from './contracts/system.js';
 import { workflowDraftsContract } from './contracts/workflow-drafts.js';
@@ -49,6 +51,8 @@ type ApiContract = {
   workflowGeneration: typeof workflowGenerationContract;
   draftTests: typeof draftTestsContract;
   procurement: typeof procurementContract;
+  procurementChanges: typeof procurementChangesContract;
+  procurementEmail: typeof supplierEmailContract;
   procurementContext: typeof procurementContextContract;
   messaging: typeof messagingContract;
   resolutionLearning: typeof resolutionLearningContract;
@@ -93,6 +97,8 @@ export const apiContract: ApiContract = {
   workflowGeneration: workflowGenerationContract,
   draftTests: draftTestsContract,
   procurement: procurementContract,
+  procurementChanges: procurementChangesContract,
+  procurementEmail: supplierEmailContract,
   procurementContext: procurementContextContract,
   messaging: messagingContract,
   resolutionLearning: resolutionLearningContract,
@@ -249,3 +255,20 @@ export type {
 } from './return-deadlines.js';
 
 export * from './native-stock.js';
+
+export { supplierTermsInputSchema } from './supplier-terms.js';
+
+export type {
+  SupplierProductTerms,
+  SupplierTermsInput,
+} from './supplier-terms.js';
+
+export * from './supplier-email.js';
+
+export * from './purchasing.js';
+
+export * from './purchasing-outcomes.js';
+
+export * from './incoming-stock.js';
+
+export type { PurchaseOrderChangeInput } from './purchase-order-changes.js';

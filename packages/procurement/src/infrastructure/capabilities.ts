@@ -46,7 +46,8 @@ export function createProcurementCapabilities(service: ProcurementService) {
 
       return purchaseOrderOutputSchema.parse(
         await service.createOrder(context, request, {
-          preventDuplicateSku: !!request.origin.workflowRunId,
+          preventDuplicateSku:
+            !!request.origin.workflowRunId || !!request.origin.outcomeId,
         }),
       );
     },

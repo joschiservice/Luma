@@ -1,3 +1,4 @@
+import { IdentityError } from '@luma/identity';
 import type { SqlTransaction } from '@luma/platform';
 
 import type { OutboundRepository, OutboundRow } from '../application/store.js';
@@ -48,23 +49,38 @@ export function outboundRepository(
       return row ? outbound(row) : null;
     },
     async insert(o) {
-      await tx.query(
-        `INSERT INTO messaging_outbound(tenant_id,id,thread_id,connection_id,document,state,action_id,requested_by,
+      try {
+        await tx.query(
+          `INSERT INTO messaging_outbound(tenant_id,id,thread_id,connection_id,document,state,action_id,requested_by,
           revision,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-        [
-          tenantId,
-          o.id,
-          o.threadId,
-          o.connectionId,
-          o.document,
-          o.state,
-          o.actionId,
-          o.requestedBy,
-          o.revision,
-          o.createdAt,
-          o.updatedAt,
-        ],
-      );
+          [
+            tenantId,
+            o.id,
+            o.threadId,
+            o.connectionId,
+            o.document,
+            o.state,
+            o.actionId,
+            o.requestedBy,
+            o.revision,
+            o.createdAt,
+            o.updatedAt,
+          ],
+        );
+      } catch (error) {
+        if (
+          typeof error === 'object' &&
+          error !== null &&
+          'code' in error &&
+          error.code === '23505'
+        )
+          throw new IdentityError(
+            409,
+            'CONFLICT',
+            'A submission already exists for this order. Refresh the Operations Inbox before drafting again.',
+          );
+        throw error;
+      }
     },
     async update(o) {
       await tx.query(
@@ -86,6 +102,16 @@ export function outboundRepository(
         await rows(
           `SELECT * FROM messaging_outbound WHERE tenant_id=$1
           AND state IN ('approval_required','approved','sending','uncertain') ORDER BY updated_at,id LIMIT $2`,
+          [tenantId, limit],
+        )
+      ).map(outbound);
+    },
+    async supplierChecks(limit) {
+      return (
+        await rows(
+          `SELECT * FROM messaging_outbound WHERE tenant_id=$1 AND document ? 'procurement'
+        AND state IN ('sent','failed') AND (document->>'ownerHandoffAt' IS NULL OR (state='sent' AND created_at > now()-interval '60 days' AND COALESCE(document->>'deliveryCheckedAt',created_at::text)::timestamptz < now()-interval '10 minutes'))
+        ORDER BY COALESCE(document->>'deliveryCheckedAt',created_at::text)::timestamptz,id LIMIT $2`,
           [tenantId, limit],
         )
       ).map(outbound);

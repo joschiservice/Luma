@@ -14,7 +14,7 @@ export interface ItemStock {
   total: number;
   /** Open quantity of uncancelled sales orders. */
   reserved: number;
-  /** Physical minus reserved; negative when orders oversell. */
+  /** Physical minus reserved and quarantined units; negative when orders oversell. */
   available: number;
   warehouses: Record<string, number>;
 }
@@ -29,7 +29,13 @@ function stockOf(item: ItemRecord): ItemStock {
   return {
     total,
     reserved: item.reserved,
-    available: total - item.reserved,
+    available:
+      total -
+      item.reserved -
+      Object.values(item.quarantinedStock ?? {}).reduce(
+        (sum, value) => sum + value,
+        0,
+      ),
     warehouses: { ...item.stock },
   };
 }

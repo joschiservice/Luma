@@ -34,6 +34,7 @@
       "./messages/{locale}/overview.json",
       "./messages/{locale}/permissions.json",
       "./messages/{locale}/procurement.json",
+      "./messages/{locale}/purchasing.json",
       "./messages/{locale}/products.json",
       "./messages/{locale}/records.json",
       "./messages/{locale}/returns.json",

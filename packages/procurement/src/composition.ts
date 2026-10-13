@@ -8,16 +8,42 @@ import {
   type CommitmentDependencies,
   createSupplierCommitments,
 } from './application/commitments.js';
+import { createIncomingStock as assembleIncomingStock } from './application/incoming.js';
 import { createProcurementService } from './application/procurement.js';
+import { createPurchaseOrderChangeService } from './application/purchase-order-changes.js';
+import { createPurchasingService } from './application/purchasing.js';
+import { createPurchasingOutcomes } from './application/purchasing-outcomes.js';
+import { createSupplierEmail } from './application/supplier-email.js';
+import { createSupplierTermsService } from './application/supplier-terms.js';
 import type { PurchasingObservation } from './domain/commitments.js';
 import { createCommitmentStore } from './infrastructure/commitment-store.js';
 import { extractionOutput } from './infrastructure/extraction-schema.js';
+import { incomingStockQuerySchema } from './infrastructure/incoming-stock-validation.js';
+import { createPurchaseOrderChangeStore } from './infrastructure/purchase-order-changes-store.js';
+import { purchaseOrderChangeInputSchema } from './infrastructure/purchase-order-changes-validation.js';
+import { purchaseOrderPdf } from './infrastructure/purchase-order-pdf.js';
+import { createPurchasingInputs } from './infrastructure/purchasing-inputs.js';
+import { purchasingIgnoreSchema } from './infrastructure/purchasing-outcomes-validation.js';
+import { createPurchasingOverview } from './infrastructure/purchasing-overview.js';
+import { createPurchasingStore } from './infrastructure/purchasing-store.js';
+import {
+  purchasingPlanInputSchema,
+  purchasingSettingsSchema,
+} from './infrastructure/purchasing-validation.js';
 import { createProcurementStore } from './infrastructure/store.js';
+import {
+  supplierContactInputSchema,
+  supplierEmailInputSchema,
+  supplierFollowUpInputSchema,
+} from './infrastructure/supplier-email-validation.js';
+import { createSupplierTermsStore } from './infrastructure/supplier-terms-store.js';
+import { supplierTermsInputSchema } from './infrastructure/supplier-terms-validation.js';
 import {
   commitmentInputSchema,
   followUpInputSchema,
   messageInputSchema,
   purchaseOrderInputSchema,
+  receiptInputSchema,
   reviewInputSchema,
   submissionDecisionSchema,
   submissionInputSchema,
@@ -33,10 +59,13 @@ export function createProcurement(
   db: TenantDatabase,
   refreshContext: (context: TenantContext) => Promise<TenantContext>,
   audit: (db: TenantDatabase) => AuditLog,
+  changed?: (context: TenantContext, orderId: string) => Promise<void>,
 ) {
   return createProcurementService({
     store: createProcurementStore(db, audit),
+    ...(changed ? { changed } : {}),
     parseSupplier: (input) => supplierInputSchema.parse(input),
+    parseSupplierContact: (input) => supplierContactInputSchema.parse(input),
     parseOrder: (input) => purchaseOrderInputSchema.parse(input),
     parseTransition: (input) => transitionInputSchema.parse(input),
     refreshContext,
@@ -81,6 +110,10 @@ export function createSupplierCommitmentService(
     | 'principal'
     | 'openOrder'
     | 'trace'
+    | 'reconciliationAvailable'
+    | 'shortfallAvailable'
+    | 'incomingChanged'
+    | 'additionalTimeline'
   > & {
     model: Omit<CommitmentDependencies['model'], 'output'>;
     retentionDays?: number;
@@ -120,6 +153,7 @@ export function createSupplierCommitmentService(
       decision: (input) => submissionDecisionSchema.parse(input),
       message: (input) => messageInputSchema.parse(input),
       commitment: (input) => commitmentInputSchema.parse(input),
+      receipt: (input) => receiptInputSchema.parse(input),
       review: (input) => reviewInputSchema.parse(input),
       followUp: (input) => followUpInputSchema.parse(input),
     },
@@ -135,3 +169,112 @@ export type {
 } from './application/commitments.js';
 
 export { supplierExtractionProfile } from './application/extraction.js';
+
+export {
+  createPurchasingStore,
+  createPurchasingInputs,
+  createPurchasingOverview,
+};
+
+/** Supplies owner validation independently of the HTTP contract. */
+export function createPurchasing(
+  deps: Omit<
+    Parameters<typeof createPurchasingService>[0],
+    'parsePlan' | 'parseSettings'
+  >,
+) {
+  return createPurchasingService({
+    ...deps,
+    parsePlan: (input) => purchasingPlanInputSchema.parse(input),
+    parseSettings: (input) => purchasingSettingsSchema.parse(input),
+  });
+}
+
+export type {
+  PurchasingService,
+  PurchasingAdmission,
+} from './application/purchasing.js';
+
+/** Composes validation for recorded recommendation decisions. */
+export function createPurchasingOutcomesService(
+  deps: Omit<Parameters<typeof createPurchasingOutcomes>[0], 'parse'>,
+) {
+  return createPurchasingOutcomes({
+    ...deps,
+    parse: (input) => purchasingIgnoreSchema.parse(input),
+  });
+}
+
+export { createPurchasingOutcomePersistence } from './infrastructure/purchasing-outcomes.js';
+
+export type { PurchasingOutcomes } from './application/purchasing-outcomes.js';
+
+/** Composes append-only terms with authorization, release control and transactional audit. */
+export function createSupplierTerms(
+  db: TenantDatabase,
+  refreshContext: (context: TenantContext) => Promise<TenantContext>,
+  audit: (db: TenantDatabase) => AuditLog,
+  released: (context: TenantContext) => Promise<boolean>,
+) {
+  return createSupplierTermsService({
+    store: createSupplierTermsStore(db, audit),
+    refreshContext,
+    released,
+    parse: (input) => supplierTermsInputSchema.parse(input),
+    digest,
+    id: randomUUID,
+    now: () => new Date(),
+  });
+}
+
+export type { SupplierTermsService } from './application/supplier-terms.js';
+
+export type { SupplierEmail } from './application/supplier-email.js';
+
+/** Composes tenant-scoped arrivals with bounded canonical identity validation. */
+export function createIncomingStock(
+  deps: Omit<Parameters<typeof assembleIncomingStock>[0], 'parse'>,
+) {
+  return assembleIncomingStock({
+    ...deps,
+    parse: (input) => incomingStockQuerySchema.parse(input),
+  });
+}
+
+export { createIncomingStockReader } from './infrastructure/incoming-stock.js';
+
+/** Composes supplier work over the existing inbox's persistence, admission and verification. */
+export function createSupplierEmailService(
+  deps: Omit<
+    Parameters<typeof createSupplierEmail>[0],
+    'parseSubmission' | 'parseFollowUp' | 'pdf'
+  >,
+) {
+  return createSupplierEmail({
+    ...deps,
+    pdf: purchaseOrderPdf,
+    parseSubmission: (input) => supplierEmailInputSchema.parse(input),
+    parseFollowUp: (input) => supplierFollowUpInputSchema.parse(input),
+  });
+}
+
+/** Composes one-operation source revisions with immutable snapshots and transactional audit. */
+export function createPurchaseOrderChanges(
+  db: TenantDatabase,
+  audit: (db: TenantDatabase) => AuditLog,
+  deps: Omit<
+    Parameters<typeof createPurchaseOrderChangeService>[0],
+    'store' | 'parse' | 'digest' | 'uuid' | 'now'
+  >,
+) {
+  return createPurchaseOrderChangeService({
+    ...deps,
+    store: createPurchaseOrderChangeStore(db, audit),
+    parse: (input) => purchaseOrderChangeInputSchema.parse(input),
+    digest,
+    uuid: nameUuid,
+    now: () => new Date(),
+  });
+}
+
+export type { PurchaseOrderChanges } from './application/purchase-order-changes.js';

@@ -24,16 +24,20 @@ export class ProcurementError extends IdentityError {
   }
 }
 
-const client = createWebApiClient(
-  undefined,
-  (status, body) =>
-    new ProcurementError(
-      status,
-      typeof body === 'object' && body !== null && 'message' in body
-        ? String(body.message)
-        : m.procurement_error_unavailable(),
-    ),
-);
+/** Creates a procurement client that preserves known rejection statuses and server feedback. */
+export function createProcurementClient() {
+  return createWebApiClient(
+    undefined,
+    (status, body) =>
+      new ProcurementError(
+        status,
+        typeof body === 'object' && body !== null && 'message' in body
+          ? String(body.message)
+          : m.procurement_error_unavailable(),
+      ),
+  );
+}
+const client = createProcurementClient();
 const api = client.procurement;
 const contextApi = client.procurementContext;
 
@@ -317,4 +321,16 @@ export async function respondToAttention(
   body: FollowUpInput,
 ) {
   return api.respond({ params: { organizationId, purchaseOrderId }, body });
+}
+
+/** Records cumulative receipt quantities with sourced evidence and an optimistic concurrency check. */
+export async function recordReceipt(
+  organizationId: string,
+  purchaseOrderId: string,
+  body: Parameters<typeof api.recordReceipt>[0]['body'],
+) {
+  return api.recordReceipt({
+    params: { organizationId, purchaseOrderId },
+    body,
+  });
 }

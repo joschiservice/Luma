@@ -56,3 +56,7 @@ export { createNativeStockReader } from './infrastructure/native-stock-reader.js
 export { createNativeStockSourceReader } from './infrastructure/native-stock-source-reader.js';
 
 export { createNativePublicationFence } from './infrastructure/publication-fence.js';
+
+export { createPurchaseIncoming } from './application/purchase-incoming.js';
+
+export { createPurchaseIncomingStore } from './infrastructure/purchase-incoming-store.js';

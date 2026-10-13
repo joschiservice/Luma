@@ -322,3 +322,126 @@ describe('commitment review rules', () => {
     ).toBe(false);
   });
 });
+
+it('reconciles a partial manual receipt while damaged units need a decision', () => {
+  const receipt = fact({
+    kind: 'received',
+    quantity: 40,
+    source: {
+      kind: 'manual_receipt',
+      receivedAt: '2026-10-01T11:00:00.000Z',
+      condition: 'mixed',
+      reason: 'Delivery note DN-1',
+      evidence: ['photo:broken-carton'],
+    },
+  });
+  const damage = fact({ kind: 'damaged', quantity: 2, source: receipt.source });
+  const state = progress({ commitments: [receipt, damage] });
+  expect(state.lines[0]).toMatchObject({
+    ordered: 100,
+    received: 40,
+    damaged: 2,
+    goodReceived: 38,
+    outstanding: 60,
+  });
+  expect(state.attention).toContainEqual(
+    expect.objectContaining({
+      kind: 'receipt_difference',
+      commitmentId: damage.id,
+    }),
+  );
+  const writtenOff = progress({
+    commitments: [receipt, damage],
+    followUps: [
+      {
+        id: 'decision',
+        tenantId: 'tenant',
+        purchaseOrderId: 'order',
+        key: `receipt_difference:${damage.id}`,
+        response: 'written_off',
+        note: 'Supplier declined replacement',
+        nextCheckAt: null,
+        respondedBy: 'buyer',
+        respondedAt: '2026-10-01T12:00:00.000Z',
+      },
+    ],
+  });
+  expect(
+    writtenOff.attention.some((item) => item.kind === 'receipt_difference'),
+  ).toBe(false);
+  expect(writtenOff.lines[0]?.goodReceived).toBe(38);
+});
+
+it('returns a changed commitment after a wait, then respects a final decision', () => {
+  const changed = fact({ quantity: 60 });
+  const key = `commitment_changed:${changed.id}`;
+  const wait: FollowUp = {
+    id: 'wait',
+    tenantId: 'tenant',
+    purchaseOrderId: 'order',
+    key,
+    response: 'following_up',
+    note: 'Waiting for the remainder',
+    nextCheckAt: '2026-10-04T09:00:00.000Z',
+    respondedBy: 'buyer',
+    respondedAt: '2026-10-01T12:00:00.000Z',
+  };
+  expect(
+    progress({
+      commitments: [changed],
+      followUps: [wait],
+      now: '2026-10-03T12:00:00.000Z',
+    }).attention.some((item) => item.kind === 'commitment_changed'),
+  ).toBe(false);
+  const returned = progress({
+    commitments: [changed],
+    followUps: [wait],
+    now: '2026-10-04T10:00:00.000Z',
+  });
+  expect(returned.attention).toContainEqual(
+    expect.objectContaining({ key: `${key}:${wait.nextCheckAt}` }),
+  );
+  const accepted: FollowUp = {
+    ...wait,
+    id: 'accept',
+    key: `${key}:${wait.nextCheckAt}`,
+    response: 'accepted',
+    note: 'Accept lower quantity',
+    nextCheckAt: null,
+  };
+  expect(
+    progress({
+      commitments: [changed],
+      followUps: [wait, accepted],
+      now: '2026-10-04T10:00:00.000Z',
+    }).attention.some((item) => item.kind === 'commitment_changed'),
+  ).toBe(false);
+});
+
+it('removes credited shortages from expected arrivals and preserves receipt evidence', () => {
+  const receipt = fact({ kind: 'received', quantity: 40 });
+  const shortage = fact({ kind: 'shortage', quantity: 60 });
+  const state = progress({
+    commitments: [receipt, shortage],
+    followUps: [
+      {
+        id: 'credit',
+        tenantId: 'tenant',
+        purchaseOrderId: 'order',
+        key: `receipt_difference:${shortage.id}`,
+        response: 'credited',
+        note: 'Credit note CN-7',
+        nextCheckAt: null,
+        respondedBy: 'buyer',
+        respondedAt: '2026-10-01T12:00:00.000Z',
+      },
+    ],
+  });
+  expect(state.lines[0]).toMatchObject({
+    ordered: 100,
+    received: 40,
+    outstanding: 0,
+    goodReceived: 40,
+    stage: 'received',
+  });
+});

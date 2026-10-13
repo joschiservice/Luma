@@ -40,6 +40,26 @@ try {
       'api-contract',
       'web',
     ],
+    purchasing: [
+      'procurement',
+      'messaging',
+      'execution',
+      'policies',
+      'inventory',
+      'app-jtl',
+      'connector-jtl',
+      'app-shopify',
+      'connector-shopify',
+      'app-gmail',
+      'connector-gmail',
+      'simulator',
+      'simulator-jtl',
+      'simulator-gmail',
+      'simulator-shopify',
+      'application-runtime',
+      'api-contract',
+      'web',
+    ],
     inbox: [
       'messaging',
       'app-gmail',
@@ -53,7 +73,7 @@ try {
   };
   if (process.argv.length !== 3 || !Object.hasOwn(packages, feature))
     throw new Error(
-      'Usage: pnpm verify:feature <simulator|workflows|orders|inbox>',
+      'Usage: pnpm verify:feature <simulator|workflows|orders|inbox|purchasing>',
     );
 
   const directory = await mkdtemp(join(tmpdir(), `luma-verify-${feature}-`));

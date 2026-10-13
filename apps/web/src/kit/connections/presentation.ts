@@ -43,6 +43,7 @@ export const capabilities = localized({
   'suppliers.read': m.connections_capability_suppliers_read,
   'purchase-orders.read': m.connections_capability_purchase_orders_read,
   'purchase-orders.submit': m.connections_capability_purchase_orders_submit,
+  'purchase-orders.revise': m.connections_capability_purchase_orders_revise,
   'messages.read': m.connections_capability_messages_read,
   'message-threads.read': m.connections_capability_message_threads_read,
   'message-attachments.read': m.connections_capability_message_attachments_read,

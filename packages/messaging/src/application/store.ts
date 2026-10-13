@@ -149,6 +149,24 @@ interface OutboundDocument {
   cc: Address[];
   subject: string;
   text: string;
+  attachments?: { filename: string; mimeType: string; base64: string }[];
+  composeDigest?: string;
+  ownerHandoffAt?: string | null;
+  attachmentsExpireAt?: string;
+  deliveryCheckedAt?: string;
+  /** Supplier work metadata is bound with the exact approved content. */
+  procurement?: {
+    purchaseOrderId: string;
+    supplierId: string;
+    kind: 'submission' | 'follow_up';
+    requestedDeliveryDate?: string;
+    attentionKey?: string;
+    nextCheckAt?: string;
+    reason?: string;
+    orderRevision?: number;
+    supplierRevision?: number;
+    requestDigest?: string;
+  };
   citations?: Citation[];
   consequential?: ConsequentialReason[];
   stateReason?: string | null;
@@ -312,6 +330,8 @@ export interface OutboundRepository {
   live(limit: number): Promise<OutboundRow[]>;
   /** Marks a stored message as sent by Luma. */
   markMessageSent(messageId: string): Promise<void>;
+  /** Supplier sends needing an owner handoff or a later read for delivery failures. */
+  supplierChecks?(limit: number): Promise<OutboundRow[]>;
 }
 
 interface CommandRepository {

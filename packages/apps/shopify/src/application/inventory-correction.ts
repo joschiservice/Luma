@@ -142,24 +142,45 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
     if (accepted || withheld || record?.state === 'succeeded')
       await deps.store.settle(context, run.id);
     const verified = record?.attempt.businessOutcome === 'satisfied';
-    const current =
-      !record && !expired && snapshot !== null
-        ? (snapshot ?? (await deps.read(context, run.target)))
-        : null;
+    let current: CorrectionSnapshot | null = null;
+    let sourceChanged = false;
+    if (!record && !expired && snapshot !== null) {
+      try {
+        current = snapshot ?? (await deps.read(context, run.target));
+      } catch (error) {
+        if (
+          run.target.receipt &&
+          error instanceof IdentityError &&
+          [404, 409].includes(error.statusCode)
+        )
+          sourceChanged = true;
+        else throw error;
+      }
+    }
     const changed =
-      current !== null &&
-      (current.revision !== run.before.revision ||
-        !!correctionBlocker(
-          current,
-          run.choice,
-          await deps.authorize(context, run.target.connectionId),
-          deps.now(),
-        ));
+      sourceChanged ||
+      (current !== null &&
+        (current.revision !== run.before.revision ||
+          !!correctionBlocker(
+            current,
+            run.choice,
+            await deps.authorize(context, run.target.connectionId),
+            deps.now(),
+          )));
     const policyChanged =
       decision !== null &&
       decision.policyVersion !==
         (await deps.policies.currentVersion(context.tenantId));
     const rejected = decision?.approval?.outcome === 'rejected';
+    if (
+      !record &&
+      (changed ||
+        expired ||
+        rejected ||
+        policyChanged ||
+        decision?.outcome === 'denied')
+    )
+      await deps.store.settle(context, run.id);
     const state: CorrectionView['state'] = verified
       ? 'verified'
       : withheld
@@ -180,9 +201,11 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
     const message = withheld
       ? 'No change was accepted by Shopify. Refresh the inventory and review its eligibility before another correction.'
       : verified
-        ? run.target.nativeAllocation
-          ? 'A fresh Shopify read verifies the approved stored allocation and unchanged inventory eligibility.'
-          : 'A fresh Shopify read matches the approved ERP quantity.'
+        ? run.target.receipt
+          ? 'A fresh Shopify read verifies stock after booking the approved undamaged receipt units.'
+          : run.target.nativeAllocation
+            ? 'A fresh Shopify read verifies the approved stored allocation and unchanged inventory eligibility.'
+            : 'A fresh Shopify read matches the approved ERP quantity.'
         : record
           ? accepted
             ? 'Shopify accepted the correction. The quantity is not yet verified. Verify stock or review the inventory in Shopify.'
@@ -235,7 +258,7 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
           : 'not_sent',
       message,
       canExecute:
-        (!run.target.nativeAllocation ||
+        (!(run.target.nativeAllocation || run.target.receipt) ||
           hasPermission(context, 'inventory.manage')) &&
         !observeOnly &&
         decision !== null &&
@@ -249,7 +272,7 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
         (decision?.outcome !== 'approval_required' ||
           decision.approval?.outcome === 'approved'),
       canApprove:
-        (!run.target.nativeAllocation ||
+        (!(run.target.nativeAllocation || run.target.receipt) ||
           hasPermission(context, 'inventory.approve')) &&
         !observeOnly &&
         !record &&
@@ -332,7 +355,7 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
       context = await authorize(context);
       const parsed = correctionPreviewInput.parse(input);
       const { requestId, ...target } = parsed;
-      if (target.nativeAllocation) {
+      if (target.nativeAllocation || target.receipt) {
         requirePermission(context, 'inventory.manage');
         requireChangesAllowed(context);
       }
@@ -390,9 +413,11 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
         target: { kind: 'shopify_inventory_correction', id: requestId },
         parameters: {
           referenceDocumentUri: `luma://inventory-corrections/v0:${requestId}`,
-          policy: target.nativeAllocation
-            ? 'native_stock_to_shopify'
-            : 'erp_to_shopify',
+          policy: target.receipt
+            ? 'purchase_receipt_to_shopify'
+            : target.nativeAllocation
+              ? 'native_stock_to_shopify'
+              : 'erp_to_shopify',
           ...(before.source.nativeAllocation
             ? {
                 nativeScopeVersion:
@@ -433,7 +458,7 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
       context = await authorize(context);
       const { id } = z.object({ id: z.string().uuid() }).strict().parse(input);
       const run = await load(context, id);
-      if (run.target.nativeAllocation) {
+      if (run.target.nativeAllocation || run.target.receipt) {
         requirePermission(context, 'inventory.manage');
         requireChangesAllowed(context);
       }
@@ -478,7 +503,7 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
         .strict()
         .parse(input);
       const run = await load(context, id);
-      if (run.target.nativeAllocation) {
+      if (run.target.nativeAllocation || run.target.receipt) {
         requirePermission(context, 'inventory.approve');
         requireChangesAllowed(context);
       }

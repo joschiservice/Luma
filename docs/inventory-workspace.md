@@ -26,10 +26,7 @@ and existing read grants.
 
 The detail read includes up to 100 observed snapshots and 50 entries per related record
 type. Order lines use canonical SKU relationships and retain source and unit. Purchase
-orders match the canonical SKU ID or reconciliation key. They are commitments, not
-confirmed receipts or incoming stock; the model has no receipt progress or location
-allocation. Provider incoming quantities remain distinct from these commitments and are shown only when
-reported. They are never added to available stock.
+orders match the canonical SKU ID or reconciliation key. Incoming stock uses outstanding open supplier orders and their effective confirmation, receipt and difference decisions. Each arrival retains its receiving location, source evidence and date confidence. Confirmed quantities supersede requested quantities; past arrival dates remain overdue. Cancelled and fully received orders contribute no incoming stock. In-transit location transfers remain a separate source. At native-owned locations the incoming ledger balance replaces supplier and transfer calculations. Independently verified supplier submissions and confirmations project into the incoming bucket through Inventory’s journal. The projection preserves each order line, receiving location, quantity, arrival date and evidence. A reviewed receipt consumes its tracked incoming units before booking available or damaged stock. Quantity changes and cancellation release the corresponding incoming units. Missing or incomplete projection evidence remains unavailable rather than an empty balance. Incoming stock never augments available stock.
 
 Linking or unlinking matching SKUs from other sources requires `sync.manage`.
 
@@ -65,7 +62,7 @@ Transfers and shipments are separate source records with separate read grants. A
 retains requested, allocated-to-draft-shipment, ready and shipped line quantities. A shipment
 retains accepted, rejected and unreceived line quantities and the provider's receipt total.
 Shopify's receipt total includes cancellations; it is not an accepted-stock balance. Transfer
-and shipment quantities never augment position available or incoming quantities.
+and shipment quantities never augment position available quantities. The incoming-arrivals view shows independently outstanding shipment units separately from supplier orders; it does not add transfer totals to a provider-reported incoming balance.
 
 Location names, addresses and snapshot times describe the historical request. A missing live
 location identity stays unknown; matching names never establish a pool. Relationships use
@@ -206,3 +203,9 @@ incoming and non-promisable states. The peer review binds that channel reading s
 from physical drift evidence. Returned inspection and in-transit units must be cleared.
 Handback records the authority transition; it does not activate a location, move states or
 close cases.
+
+## Manual purchase receipts
+
+Receipt booking binds the latest cumulative manual receipt and damaged quantity to an exact receiving stock pool. Good units can enter available stock only after a reviewed booking. Shopify stock authority uses the existing governed compare-and-set correction: a changed baseline stops the write, uncertain dispatch is reconciled by reading, and receipt claims prevent another stock revision from booking the same units again. Write attribution recognises the resulting sync read without creating another receipt.
+
+Native-owned locations use Inventory’s reviewed receipt postings. Good and damaged units enter separate balanced buckets through the owner ledger. Current receipt evidence, ownership and account versions are checked again before posting. Independent verification reads the recorded entry and current balances; later stock changes can make this exact quantity check inconclusive. Purchasing-system receipts remain owned by that purchasing system.

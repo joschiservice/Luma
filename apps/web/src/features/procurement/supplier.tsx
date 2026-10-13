@@ -26,6 +26,8 @@ import { type ReactNode, useState } from 'react';
 import { SignInRedirect } from '../../kit/identity/common';
 import { IdentityError } from '../../kit/identity/data';
 import { RecordMessages } from '../../kit/record-messages';
+import { PurchasingOutcomePanel } from '../../shared/procurement/purchasing-outcomes';
+import { SupplierTermsSection } from '../../shared/procurement/supplier-terms';
 import { stockQuantity } from '../inventory/presentation';
 import {
   procurementError,
@@ -35,6 +37,7 @@ import {
 import { OrderDialog } from './forms';
 import { calendarDate, ownerLabels, quantity, StagePill } from './presentation';
 import { LinkSupplierDialog } from './record-dialogs';
+import { SupplierContact } from './supplier-contact';
 
 /** Loads a supplier record with its orders, commitments and supplied stock. */
 export function SupplierPage() {
@@ -361,6 +364,19 @@ function SupplierRecordView({
                   }
                 />
               </section>
+              <SupplierContact
+                organizationId={organizationId}
+                supplier={supplier}
+                canManage={record.canManage}
+              />
+              <SupplierTermsSection
+                organizationId={organizationId}
+                supplierId={supplier.id}
+              />
+              <PurchasingOutcomePanel
+                organizationId={organizationId}
+                supplierId={supplier.id}
+              />
               <SuppliedStock
                 organizationId={organizationId}
                 context={context}

@@ -403,3 +403,23 @@ export const discardOutbound = (
     params: { organizationId, outboundId },
     body: { id },
   });
+
+/** Downloads the exact reviewed supplier PDF retained with an outgoing inbox message. */
+export async function downloadSupplierPdf(
+  organizationId: string,
+  purchaseOrderId: string,
+  outboundId: string,
+) {
+  const file = await createWebApiClient().procurementEmail.document({
+    params: { organizationId, purchaseOrderId, outboundId },
+  });
+  const bytes = Uint8Array.from(atob(file.base64), (char) =>
+    char.charCodeAt(0),
+  );
+  const url = URL.createObjectURL(new Blob([bytes], { type: file.mimeType }));
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = file.filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}

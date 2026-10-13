@@ -11,6 +11,7 @@ import { useCaseObservation } from '../exceptions/observation';
 import { CaseResolution } from '../exceptions/resolution';
 import { ThreadReview } from '../inbox/thread';
 import { PurchaseOrderReview } from '../procurement/detail';
+import { PurchasingPlanReview } from '../procurement/purchasing-workbench';
 import { workflowRunsOptions } from '../workflows/data';
 import { HumanTaskReview } from '../workflows/human-task';
 import { ReplenishmentRunReview } from '../workflows/replenishment';
@@ -125,6 +126,14 @@ export function OwnerReview({
           key={owner.purchaseOrderId}
           organizationId={organizationId}
           purchaseOrderId={owner.purchaseOrderId}
+        />
+      );
+    case 'purchasing_plan':
+      return (
+        <PurchasingPlanReview
+          organizationId={organizationId}
+          planId={owner.planId}
+          done={onChange}
         />
       );
     case 'message_thread':

@@ -521,3 +521,5 @@ export { createShopifyUnsettledStockReader } from './infrastructure/stock-effect
 
 /** Order edit persistence, exported so runtime tests can prove its claims, fence and isolation on PostgreSQL. */
 export { createOrderEditStore } from './infrastructure/order-edit-store.js';
+
+export { createCorrectionStore } from './infrastructure/inventory-correction-store.js';

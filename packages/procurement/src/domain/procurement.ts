@@ -8,6 +8,8 @@ export interface ExternalReference {
 export interface SupplierInput {
   id: string;
   name: string;
+  email?: string | undefined;
+  language?: 'en' | 'de' | undefined;
   externalReferences: ExternalReference[];
 }
 
@@ -44,6 +46,11 @@ export interface PurchaseOrderLine {
   description: string;
   quantity: number;
   unit: string;
+  requestedDeliveryDate?: string | undefined;
+  /** Explicit receiving location; absent means the destination is still unknown. */
+  locationId?: string | undefined;
+  unitPrice?: { amount: string; currency: string } | undefined;
+  supplierArticleNumber?: string | undefined;
 }
 
 export interface PurchaseOrderInput {
@@ -56,6 +63,9 @@ export interface PurchaseOrderInput {
     workflowRunId?: string | undefined;
     actionId?: string | undefined;
     outcomeId?: string | undefined;
+    /** Source shortfall whose remainder this governed order covers. */
+    sourcePurchaseOrderId?: string | undefined;
+    sourceAttentionKey?: string | undefined;
   };
   lines: PurchaseOrderLine[];
 }

@@ -88,6 +88,9 @@ export interface MessagingOptions {
       }
     | undefined;
   log?: ((message: string, error?: unknown) => void) | undefined;
+  /** Idempotent record-owner handoff for outgoing supplier messages. */
+  settled?: import('./application/replies.js').ReplyDependencies['settled'];
+  eligibleOwner?: import('./application/replies.js').ReplyDependencies['eligibleOwner'];
 }
 
 /**
@@ -137,6 +140,9 @@ export function createMessaging(db: TenantDatabase, options: MessagingOptions) {
     digest,
     uuid: nameUuid,
     log,
+    retentionDays: options.retentionDays ?? 365,
+    settled: options.settled,
+    eligibleOwner: options.eligibleOwner,
   });
   const documents = createDocuments({
     store,

@@ -62,6 +62,28 @@ const suites = {
       'workflow|playbooks|code-steps|replenishment|order-quantity-change',
     ],
   ],
+  purchasing: [
+    [
+      '--filter',
+      '@luma/api',
+      'test:e2e',
+      'purchasing-cycle.e2e.mjs',
+      'purchasing-native-receipt.e2e.mjs',
+      'native-purchase-incoming.e2e.mjs',
+      'purchase-order-changes.e2e.mjs',
+      'supplier-commitments.e2e.mjs',
+      'inbox.e2e.mjs',
+    ],
+    [
+      '--filter',
+      '@luma/api',
+      'test:browser',
+      'supplier-commitments.browser.mjs',
+      'purchasing-workbench.browser.mjs',
+      'replenishment.browser.mjs',
+      'inbox.browser.mjs',
+    ],
+  ],
   orders: [
     [
       '--filter',

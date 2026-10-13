@@ -168,7 +168,7 @@ describe('JTL read adapter', () => {
             {
               source: { provider: 'jtl', externalId: key(10) },
               sourceUpdatedAt: null,
-              adapterVersion: 'jtl/7',
+              adapterVersion: 'jtl/8',
               data: {
                 externalOrderNumber: '#1001',
                 status: 'open',
@@ -989,4 +989,76 @@ it('does not certify uniqueness when the native order scan exceeds its complete-
     }),
   ).toMatchObject({ ok: true, value: { complete: false, orders: [] } });
   expect(f.fetch).toHaveBeenCalledTimes(6);
+});
+
+it('reads documented supplier terms only when enabled, keeping unsupported validity and order minimum unknown', async () => {
+  const f = fixture({ purchasingTerms: true });
+  const original = f.fetch.getMockImplementation()!;
+  f.fetch.mockImplementation(async (input, init) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith('/items/20/suppliers'))
+      return Response.json({
+        totalItems: 1,
+        pageNumber: 1,
+        pageSize: 100,
+        items: [
+          {
+            id: 5,
+            itemId: 20,
+            supplierId: 7,
+            supplierItemNumber: 'SUP-TOTE',
+            supplierCurrency: 'EUR',
+            netPurchasePrice: 4.5,
+            packageUnitQuantity: 6,
+            minimumPurchaseQuantity: 12,
+            deliveryTimeInDays: 3,
+            supplierDeliveryTimeInDays: 7,
+            useSupplierDeliveryTime: true,
+            isDefaultSupplier: true,
+          },
+        ],
+      });
+
+    return original(input, init);
+  });
+  expect(await f.read('products.read')).toMatchObject({
+    ok: true,
+    value: {
+      items: [
+        {
+          data: {
+            skus: [
+              {
+                purchasingTerms: [
+                  {
+                    supplier: ref('7'),
+                    sourceRecordId: '5',
+                    complete: true,
+                    supplierArticleNumber: 'SUP-TOTE',
+                    unitPrice: {
+                      amount: '4.5',
+                      currency: 'EUR',
+                      validFrom: null,
+                    },
+                    packSize: 6,
+                    lineMinimumQuantity: 12,
+                    leadTimeDays: 7,
+                    preferred: true,
+                    orderMinimumValue: null,
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    },
+  });
+  const disabled = fixture();
+  expect(await disabled.read('products.read')).toMatchObject({ ok: true });
+  expect(
+    disabled.fetch.mock.calls.some(([input]) =>
+      String(input).includes('/suppliers'),
+    ),
+  ).toBe(false);
 });

@@ -20,6 +20,12 @@ export interface ParsedAttachment {
 
 /** A Gmail message normalized into mailbox-independent fields. */
 export interface ParsedMessage {
+  /** A structured permanent delivery failure; normal message text is never a bounce signal. */
+  deliveryFailure?: {
+    originalMessageId: string;
+    recipient: string;
+    status: string;
+  };
   id: string;
   threadId: string;
   rfcMessageId: string | null;
@@ -271,6 +277,52 @@ export function findPart(
   return null;
 }
 
+/** Reads permanent failures only from MIME delivery-status reports linked to an original ID. */
+function deliveryFailure(
+  part: MessagePart | undefined,
+): ParsedMessage['deliveryFailure'] {
+  if (
+    !part ||
+    (part.mimeType ?? '').toLowerCase() !== 'multipart/report' ||
+    !/report-type\s*=\s*"?delivery-status/i.test(
+      headerOf(part, 'Content-Type') ?? '',
+    )
+  )
+    return undefined;
+  const status = part.parts?.find(
+    (p) => p.mimeType?.toLowerCase() === 'message/delivery-status',
+  );
+  if (!status?.body?.data) return undefined;
+  const report = decodeCharset(decodeBase64(status.body.data), 'utf-8');
+  const originalPart = part.parts?.find((p) =>
+    ['message/rfc822', 'text/rfc822-headers'].includes(
+      p.mimeType?.toLowerCase() ?? '',
+    ),
+  );
+  const original = originalPart?.body?.data
+    ? decodeCharset(decodeBase64(originalPart.body.data), 'utf-8')
+    : '';
+  const originalMessageId = messageIds(
+    /^Original-Message-ID:\s*(.+)$/im.exec(report)?.[1] ??
+      /^Message-ID:\s*(.+)$/im.exec(original)?.[1] ??
+      headerOf(originalPart, 'Message-ID') ??
+      headerOf(part, 'In-Reply-To'),
+  )[0];
+  const recipient = /^Final-Recipient:\s*rfc822;\s*(\S+)$/im
+    .exec(report)?.[1]
+    ?.toLowerCase();
+  const code = /^Status:\s*(5\.\d{1,3}\.\d{1,3})\s*$/im.exec(report)?.[1];
+  if (
+    !originalMessageId ||
+    !recipient ||
+    !code ||
+    !/^Action:\s*failed\s*$/im.test(report)
+  )
+    return undefined;
+
+  return { originalMessageId, recipient, status: code };
+}
+
 const validTime = (value: number) =>
   Number.isFinite(value) && value > 0 && value < 8.64e15;
 
@@ -296,6 +348,9 @@ export function parseMessage(
   const text = body?.text ?? '';
 
   return {
+    ...(deliveryFailure(payload)
+      ? { deliveryFailure: deliveryFailure(payload)! }
+      : {}),
     id: message.id,
     threadId: message.threadId,
     rfcMessageId: messageIds(headerOf(payload, 'Message-ID'))[0] ?? null,

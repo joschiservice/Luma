@@ -13,7 +13,10 @@ export interface ApprovedJtlEndpoint {
  */
 export function approvedJtlFetch(
   endpoint: ApprovedJtlEndpoint,
-  options: { writeMethod?: 'PATCH' | 'POST' } = {},
+  options: {
+    writeMethod?: 'PATCH' | 'POST';
+    writeMethods?: readonly ('PATCH' | 'POST' | 'DELETE')[];
+  } = {},
 ): typeof globalThis.fetch {
   const base = new URL(endpoint.baseUrl);
 
@@ -28,7 +31,11 @@ export function approvedJtlFetch(
       url.username ||
       url.password ||
       (method !== 'GET' &&
-        !(method === options.writeMethod && typeof init?.body === 'string'))
+        !(
+          (method === options.writeMethod ||
+            options.writeMethods?.some((allowed) => allowed === method)) &&
+          typeof init?.body === 'string'
+        ))
     )
       throw new Error('JTL destination is not approved');
 

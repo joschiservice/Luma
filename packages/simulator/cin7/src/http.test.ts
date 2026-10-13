@@ -241,3 +241,55 @@ describe('Cin7 Core API', () => {
     expect(drifted.body).toEqual({ Total: 0, Page: 1, SaleListItems: [] });
   });
 });
+
+it('serves supplier product terms including changed and missing values on the next incremental product read', async () => {
+  const context = await seeded(1),
+    record = await context.store.get<ErpItem>(kinds.item, '1');
+  if (!record) throw Error('Item missing');
+  await context.store.put<ErpItem>(kinds.item, '1', {
+    ...record.data,
+    purchasingSuppliers: [
+      {
+        supplierId: '10',
+        netPrice: 4.25,
+        supplierArticleNumber: 'SUP-1',
+        leadTimeDays: 4,
+      },
+    ],
+  });
+  expect((await get(context, 'product?Page=1&Limit=10')).body).toMatchObject({
+    Products: [
+      {
+        Suppliers: [
+          {
+            SupplierID: guid('supplier', '10'),
+            SupplierInventoryCode: 'SUP-1',
+            Cost: 4.25,
+            Currency: 'EUR',
+            ProductSupplierOptions: [{ Lead: 4 }],
+          },
+        ],
+      },
+    ],
+  });
+  await context.store.put<ErpItem>(
+    kinds.item,
+    '1',
+    {
+      ...record.data,
+      modified: '2026-10-02T08:00:00.000Z',
+      purchasingSuppliers: [{ supplierId: '10', netPrice: 5 }],
+    },
+    { updatedAt: Date.parse('2026-10-02T08:00:00.000Z') },
+  );
+  expect(
+    (
+      await get(
+        context,
+        'product?Page=1&Limit=10&ModifiedSince=2026-10-01T09:00:00',
+      )
+    ).body,
+  ).toMatchObject({
+    Products: [{ Suppliers: [{ SupplierInventoryCode: '', Cost: 5 }] }],
+  });
+});

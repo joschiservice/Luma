@@ -2,24 +2,25 @@
 
 Procurement follows a Luma purchase order after it is drafted: an approval-controlled
 submission to the supplier's purchasing system, the supplier's confirmation, and booked
-goods receipt. Each milestone needs its own evidence, and only the purchasing system
-establishes receipt. The first channel is JTL-Wawi purchase orders; see
+goods receipt. Each milestone needs its own evidence. A purchasing-system order gets receipt
+from that system; an open Luma order without a purchasing system may have a manual receipt. The first channel is JTL-Wawi purchase orders; see
 [Procurement records](procurement.md) for the order lifecycle and
 [JTL](jtl.md#purchase-orders) for the provider behavior.
 
 ## Evidence model
 
-| Milestone          | Evidence                                                                                     |
-| ------------------ | -------------------------------------------------------------------------------------------- |
-| Drafted            | The Luma order; replenishment drafts add the run's independent verification                  |
-| Sent to supplier   | An independent read finds exactly one purchasing-system order with the Luma marker and lines |
-| Supplier confirmed | Confirmed quantities and dates, read from the purchasing system or recorded from a message   |
-| Goods received     | Delivered quantities read from the purchasing system; nothing else establishes receipt       |
+| Milestone          | Evidence                                                                                                       |
+| ------------------ | -------------------------------------------------------------------------------------------------------------- |
+| Drafted            | The Luma order; replenishment drafts add the run's independent verification                                    |
+| Sent to supplier   | An independent read finds the purchasing-system order, or the inbox verifies the approved outgoing order email |
+| Supplier confirmed | Confirmed quantities and dates, read from the purchasing system or recorded from a message                     |
+| Goods received     | Delivered quantities read from the purchasing system, or an explicit manual receipt for orders without one     |
 
 Commitments are append-only facts (confirmed quantity, promised date, shipped, condition,
 received), each with its source: a purchasing-system observation, a supplier message span,
-or a correction with a reason. A database check rejects `received` from any other source,
-and a trigger allows only a pending review to be answered. Corrections add a commitment
+or a correction with a reason. A database check requires purchasing-system or explicit manual-receipt evidence,
+and a trigger rejects manual receipt for purchasing-system orders. Only a pending review may
+change a commitment. Corrections add a commitment
 that supersedes the earlier one; values are never edited.
 
 Line progress, milestones, the expected date, attention items and the next owner are
@@ -54,6 +55,23 @@ inserts commitments keyed by submission, line, kind and value. Repeated reads an
 values never add a second commitment. A submission settles when every line is received or
 the Luma order is closed or cancelled.
 
+## Email submission and follow-ups
+
+A Luma-owned order whose supplier has no purchasing-system link may be submitted through a
+connected Operations Inbox. Procurement drafts an English or German PDF from the immutable
+order and explicit company details, then leaves review, approval and sending to the inbox.
+The inbox's independent acceptance read records an email submission and opens the draft.
+It never creates a confirmed quantity or supplier commitment. A permanent bounce becomes a
+failed submission in Needs you; the original acceptance time and outgoing message stay as
+evidence. Uncertain sends are reconciled only by reading.
+
+Overdue confirmation and delivery items offer an inbox follow-up draft showing what was
+promised and what remains outstanding. Its verified send records the outgoing message and
+next check time. Concurrent deadline decisions are not overwritten. Supplier replies return
+through the same linked thread and message extraction path. Without an inbox, manual
+follow-up remains available. Both email entry points default off behind tenant-scoped
+PostHog releases; turning one off prevents pending dispatch, while reads keep prior evidence.
+
 ## Supplier messages
 
 Messages are stored once per message ID, or per digest of sender, subject, time and text.
@@ -72,7 +90,48 @@ the text exists.
 
 Attention covers approvals, uncertain sends, facts to review, changed commitments, missed
 confirmations (submission time plus the supplier's confirmation hours) and overdue
-deliveries (expected date passed with units outstanding). People accept a change or record
+deliveries (expected date passed with units outstanding). People decide on missing or damaged goods, accept a change or record
 a follow-up with the next check time; the follow-up moves the deadline and the item returns
 when it passes. Needs you shows these items under the purchase order, whose review uses the
 order's own controls.
+
+## Receipt reconciliation
+
+Manual receipts are cumulative per line. Receipt and damaged quantities are persisted in the
+same transaction. Good received quantity excludes damage; it does not itself prove available
+stock changed. Missing and damaged units remain attention items until a person records a
+decision, a reason and evidence. Waiting postpones attention only until its check time.
+Credited or written-off shortages reduce the remaining expected arrival without altering
+the receipt observation. Earlier facts stay in history, and corrections name the current
+fact they supersede. Exact command retries return the original result; a stale correction or
+a competing decision fails and requires review.
+
+## Submitted order revisions
+
+An order revision freezes the current local order and a complete, current source read.
+Approval binds one position operation and its reason. Received positions cannot be changed,
+the final position cannot be removed, and only one active revision may exist per order.
+Quantity changes that affect supplier commitments remain visible in review. Existing
+commitments retain the order revision against which they were recorded.
+
+JTL permits quantity/date updates, addition and removal of positions while the source order
+is Open or Released. These writes have no provider idempotency guarantee. An execution
+attempt is recorded before dispatch and sent once; after uncertainty or process restart,
+Luma reconciles through an independent read. It appends the previous and new local revisions
+only after the full requested source shape is verified. An incomplete or stale read does not
+advance the local revision. Local lifecycle transitions cannot run while a revision awaits
+approval or verification.
+
+JTL-Wawi 2.2 does not expose purchase-order cancellation. Marking a source order Completed
+is not cancellation and is never used as a substitute. Native submitted orders therefore
+have no cancellation action; arrange cancellation in the purchasing system and reconcile
+its evidence before replacing an order. Live revision grants remain withheld until the
+installation's endpoint behavior has been verified; simulator installations exercise the
+same admitted operation and independent verification path.
+
+The purchasing timeline combines saved plans and approvals, submission, supplier messages,
+append-only commitment and receipt facts, buyer follow-ups, revisions and stock booking proof.
+A recorded manual receipt, an email sent and a supplier observation retain separate labels;
+only independent verification establishes the action's result. Stock proof is visible only
+to readers with inventory access. The history is tenant-scoped and shows at most the latest
+500 events, with truncation reported rather than treated as complete evidence.

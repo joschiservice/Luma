@@ -30,6 +30,7 @@ export interface DeliverAttachment {
 
 /** Merchant, supplier and customer actions on a simulated mailbox. */
 export type GmailCommand =
+  | { kind: 'bounce'; message: string; recipient: string; status: string }
   | {
       kind: 'seed-mailbox';
       address: string;
@@ -215,6 +216,49 @@ export async function command(
   input: GmailCommand,
 ): Promise<GmailCommandResult> {
   if (input.kind === 'deliver') return deliver(context, input);
+  if (input.kind === 'bounce') {
+    const originalMessage = await original(context, input.message);
+    const recipient = input.recipient.trim().toLowerCase();
+    if (
+      !originalMessage ||
+      ![...originalMessage.to, ...originalMessage.cc].some(
+        (a) => a.address === recipient,
+      ) ||
+      !/^5\.\d{1,3}\.\d{1,3}$/.test(input.status)
+    )
+      throw new GmailCommandError(
+        'A bounce needs an original outgoing message, its recipient and permanent status',
+      );
+    const result = await deliver(context, {
+      kind: 'deliver',
+      from: { address: 'mailer-daemon@mail.example.invalid' },
+      threadOf: originalMessage.id,
+      text: `Delivery failed (${input.status})`,
+      messageId: `bounce.${originalMessage.id}.${recipient.replace(/[^a-z0-9]/g, '')}@mail.example.invalid`,
+    });
+    if (result.kind === 'message') {
+      const saved = await context.store.get<MessageRecord>(
+        kinds.message,
+        result.id,
+      );
+      if (saved)
+        await context.store.put(
+          kinds.message,
+          result.id,
+          {
+            ...saved.data,
+            deliveryFailure: {
+              originalMessageId: originalMessage.messageId,
+              recipient,
+              status: input.status,
+            },
+          },
+          { createdAt: saved.createdAt, updatedAt: context.now },
+        );
+    }
+
+    return result;
+  }
   const record: MailboxRecord = {
     address: input.address.trim().toLowerCase(),
     name: input.name.trim(),

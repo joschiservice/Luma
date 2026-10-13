@@ -48,7 +48,15 @@ export interface JtlSeedItem {
   shopActive: boolean;
   /** Physical stock per warehouse ID. */
   stock: Record<string, number>;
-  suppliers: { supplierId: string; netPrice: number; isDefault: boolean }[];
+  suppliers: {
+    supplierId: string;
+    netPrice: number;
+    isDefault: boolean;
+    supplierArticleNumber?: string;
+    packSize?: number;
+    minimumQuantity?: number;
+    leadTimeDays?: number;
+  }[];
 }
 
 export interface JtlSeedSupplier {
@@ -145,7 +153,21 @@ export type JtlCommand =
       kind: 'purchase-order-receive';
       orderId: string;
       warehouse?: string | undefined;
-      lines: { lineItemId: string; quantity: number }[];
+      lines: {
+        lineItemId: string;
+        quantity: number;
+        damagedQuantity?: number;
+      }[];
+    }
+  | {
+      kind: 'supplier-terms';
+      itemId: string;
+      supplierId: string;
+      netPrice?: number;
+      supplierArticleNumber?: string | null;
+      packSize?: number | null;
+      minimumQuantity?: number | null;
+      leadTimeDays?: number | null;
     }
   | { kind: 'supplier-profile'; supplierId: string; profile: SupplierProfile };
 

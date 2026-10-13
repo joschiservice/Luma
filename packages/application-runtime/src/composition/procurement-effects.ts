@@ -18,6 +18,8 @@ const createParameters = z
     workflowRunId: z.string().uuid().optional(),
     actionId: z.string().trim().min(1).max(200).optional(),
     outcomeId: z.string().trim().min(1).max(200).optional(),
+    sourcePurchaseOrderId: z.string().uuid().optional(),
+    sourceAttentionKey: z.string().min(1).max(400).optional(),
   })
   .strict();
 const transitionParameters = z
@@ -53,6 +55,12 @@ function inputFor(intent: EffectIntent) {
             : {}),
           ...(params.actionId ? { actionId: params.actionId } : {}),
           ...(params.outcomeId ? { outcomeId: params.outcomeId } : {}),
+          ...(params.sourcePurchaseOrderId
+            ? { sourcePurchaseOrderId: params.sourcePurchaseOrderId }
+            : {}),
+          ...(params.sourceAttentionKey
+            ? { sourceAttentionKey: params.sourceAttentionKey }
+            : {}),
         },
       });
     } catch {

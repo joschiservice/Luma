@@ -32,6 +32,8 @@ export async function setupSimulator(
     detection,
     demo,
     observability,
+    modelGateway,
+    supplierExtraction,
     featureFlagOverrides,
   } = {},
 ) {
@@ -61,6 +63,8 @@ export async function setupSimulator(
     },
     demo,
     observability,
+    modelGateway,
+    supplierExtraction,
     env: {
       ...(featureFlagOverrides
         ? {

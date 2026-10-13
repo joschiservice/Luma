@@ -51,6 +51,16 @@ write release prevents new dispatch without turning an uncertain send into a saf
 
 Flags never decide authorization, policy admission or approval. Keep tenant entitlements and execution controls in their owning domain, where they are scoped and audited. Temporal workflow code cannot evaluate flags: evaluate in an activity or before starting the workflow and pass the value as input, so replays see the same value. Change workflow code with Temporal versioning, not flags.
 
+Purchasing releases also default off. `supplier-purchasing-terms` gates terms and provider
+term reads; `purchasing-workbench` gates recommendations and `purchasing-plans` gates new
+governed drafts. Supplier email submission and follow-up drafting use
+`procurement-email-submission` and `procurement-supplier-follow-ups`. Receipt facts,
+shortfall decisions, incoming visibility, supplier revisions, stock booking and outcome
+reporting use `purchasing-receipts`, `purchasing-shortfall-decisions`, `purchasing-incoming`,
+`purchasing-order-changes`, `purchasing-stock-booking` and `purchasing-outcomes`. Reads that
+settle an uncertain dispatched effect remain available when its write release is disabled.
+Use explicit development overrides for synthetic runs.
+
 ## Data policy
 
 General telemetry contains deployment metadata, correlation IDs, tenant HMACs, fixed operation names, status, timing, approved model names, token counts, model latency and reported cost. [Error reports](#error-reports) add diagnostic fields. There is no general-purpose metadata bag.

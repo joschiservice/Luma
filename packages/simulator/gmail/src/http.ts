@@ -358,6 +358,29 @@ const textPart = (partId: string, mimeType: string, text: string) => {
  * Gmail, attachment IDs differ between reads; any of them fetches the attachment.
  */
 function payloadOf(message: MessageRecord, read: number) {
+  if (message.deliveryFailure) {
+    const report = `Original-Message-ID: <${message.deliveryFailure.originalMessageId}>\r\n\r\nFinal-Recipient: rfc822; ${message.deliveryFailure.recipient}\r\nAction: failed\r\nStatus: ${message.deliveryFailure.status}\r\n`;
+
+    return {
+      partId: '',
+      mimeType: 'multipart/report',
+      filename: '',
+      headers: [
+        ...message.headers.filter(
+          (h) => h.name.toLowerCase() !== 'content-type',
+        ),
+        {
+          name: 'Content-Type',
+          value: `multipart/report; report-type=delivery-status; boundary="report-${message.id}"`,
+        },
+      ],
+      body: { size: 0 },
+      parts: [
+        textPart('0', 'text/plain', message.text),
+        textPart('1', 'message/delivery-status', report),
+      ],
+    };
+  }
   const prefix = message.attachments.length ? '0' : '';
   const child = (index: number) =>
     prefix ? `${prefix}.${index}` : String(index);

@@ -447,3 +447,40 @@ describe('messages.send', () => {
     ).toThrow();
   });
 });
+
+describe('new supplier email threads', () => {
+  it('verifies a newly composed send through a read-only Message-ID lookup', async () => {
+    const outboundId = '11111111-1111-4111-8111-111111111111';
+    const gmail = fakeGmail({
+      messages: (url) => {
+        expect(url.searchParams.get('q')).toBe(
+          `rfc822msgid:luma.${outboundId}@shop.example`,
+        );
+
+        return { messages: [{ id: 'sent', threadId: 't-new' }] };
+      },
+      'threads/t-new': () => ({
+        id: 't-new',
+        messages: [gmailMessage('sent', mailbox, { labels: ['SENT'] })],
+      }),
+      labels,
+    });
+    const result = await run(connector(gmail.fetch), 'message-threads.read', {
+      thread: { externalId: `outbound:${outboundId}`, scopeKey: '' },
+      limit: 50,
+    });
+    expect(result.items).toHaveLength(1);
+    expect(gmail.calls.every((call) => call.init?.method !== 'POST')).toBe(
+      true,
+    );
+  });
+  it('keeps a not-yet-indexed send inconclusive and never dispatches it again', async () => {
+    const gmail = fakeGmail({ messages: () => ({}) });
+    const result = await run(connector(gmail.fetch), 'message-threads.read', {
+      thread: { externalId: 'outbound:pending', scopeKey: '' },
+      limit: 50,
+    });
+    expect(result.items).toEqual([]);
+    expect(gmail.calls).toHaveLength(1);
+  });
+});

@@ -305,6 +305,7 @@ const sales = [
   'packages/api-contract/src/**/sales.ts',
 ];
 const messaging = [
+  'apps/web/src/shared/messaging/**',
   'packages/messaging/**',
   'packages/apps/gmail/**',
   'packages/connectors/gmail/**',
@@ -716,6 +717,38 @@ export const journeyAreas = {
     ...webInbox,
     ...webNeedsYou,
   ],
+  'purchasing-cycle.e2e.mjs': [
+    'apps/api/e2e/purchasing-reconciliation-worker.mjs',
+    ...simulator,
+    ...procurement,
+    ...decisions,
+    ...inventory,
+    'packages/api-contract/src/**/{supplier-email,supplier-terms,purchasing,incoming-stock}.ts',
+  ],
+  'purchase-order-changes.e2e.mjs': [
+    ...simulator,
+    ...procurement,
+    ...decisions,
+    ...jtl,
+    'packages/api-contract/src/**/purchase-order-changes.ts',
+    'packages/application-runtime/src/composition/purchase-order-changes.ts',
+  ],
+  'native-purchase-incoming.e2e.mjs': [
+    ...simulator,
+    ...procurement,
+    ...decisions,
+    ...inventory,
+    'packages/inventory/**',
+    'packages/application-runtime/src/composition/native-purchase-incoming.ts',
+  ],
+  'purchasing-native-receipt.e2e.mjs': [
+    ...simulator,
+    ...procurement,
+    ...decisions,
+    ...inventory,
+    'packages/inventory/**',
+    'packages/application-runtime/src/composition/native-stock.ts',
+  ],
   'inbox.e2e.mjs': [...simulator, ...procurement, ...decisions],
   'insights.browser.mjs': [
     ...ordersFixture,
@@ -976,6 +1009,15 @@ export const journeyAreas = {
     ...webShell,
     ...webProcurement,
     ...webActivity,
+  ],
+  'purchasing-workbench.browser.mjs': [
+    ...simulator,
+    ...procurement,
+    ...decisions,
+    ...inventory,
+    ...webShell,
+    ...webProcurement,
+    'packages/api-contract/src/**/{supplier-terms,purchasing,incoming-stock}.ts',
   ],
   'procurement.e2e.mjs': [...procurement, ...activity],
   'products.browser.mjs': [

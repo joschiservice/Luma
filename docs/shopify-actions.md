@@ -2,7 +2,7 @@
 
 The Shopify app offers governed writes for **returns**, **fulfillment recovery** (release a hold,
 reopen, or move remaining items), **inventory corrections** (set Shopify's available
-quantity from a selected JTL ERP source) and **order quantity edits** (change quantities of
+quantity from a selected JTL ERP source or an explicit manual purchase receipt) and **order quantity edits** (change quantities of
 unfulfilled order lines), and **shipment publishing** (record an independently observed physical
 dispatch or update its tracking). They run as exact, persisted previews that
 someone with approval permission approves under the [workspace rules](workspace-settings.md#approval-preference), dispatch through shared policy, audit, Action Admission and
@@ -235,6 +235,12 @@ independent reads verify the marker, quantities, native processed lines and exac
 fulfillment. Payment verification remains separate. Cancellation is limited to the exact unprocessed
 intent; hold release removes only its independently observed awaiting-payment hold. Truncated source
 collections, changed mappings, unexpected transactions and unavailable reads leave work unverified.
+
+## Purchase receipt stock booking
+
+Manual purchasing receipts without a purchasing system can authorize an available-stock increase only when workspace stock authority selects Shopify and the order line has an exact receiving location. Receipt booking is separately release gated. The preview binds the current receipt, damage evidence, previously verified cumulative units, stock authority and exact mappings. Only undamaged whole units are booked. Native-owned locations must use Inventory’s receipt ledger path.
+
+The preview captures the independently read Shopify baseline and its exact increment. Approval and dispatch use the same stock correction controls; a moved baseline is withheld. A durable receipt identity claim prevents a new preview or changing stock revision from duplicating accepted or uncertain receipt work. Uncertain attempts retain the claim and reconcile through fresh reads without another mutation. A confirmed withheld attempt can be reviewed again. Later cumulative receipts deduct previously verified booked units. Receipt and ownership evidence stay locked during the admitted send.
 
 ## Shipment publishing
 

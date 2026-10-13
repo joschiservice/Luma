@@ -429,10 +429,12 @@ export interface SupplierCommitmentDecision {
   kind:
     | 'submission_approval'
     | 'submission_uncertain'
+    | 'submission_failed'
     | 'review_commitment'
     | 'commitment_changed'
     | 'confirmation_overdue'
-    | 'delivery_overdue';
+    | 'delivery_overdue'
+    | 'receipt_difference';
   purchaseOrderId: string;
   reference: string;
   supplierName: string;
@@ -617,6 +619,24 @@ export function presentSupplierCommitment(
         response: respond,
         group: { key: 'supplier:review', label: 'Supplier messages to review' },
       };
+    case 'submission_failed':
+      return {
+        ...base,
+        reason: 'manual_intervention',
+        title: item.summary,
+        why: 'The supplier did not receive a verified submission. Review the failure before requesting a new send.',
+        consequences: [],
+        change: [order, supplier],
+        impact: { level: 'medium', text: null },
+        deadline: null,
+        evidence: { observedAt: item.dueAt, validUntil: null },
+        response: respond,
+        group: {
+          key: 'supplier:failed',
+          label: 'Supplier submissions needing attention',
+        },
+      };
+    case 'receipt_difference':
     case 'commitment_changed':
       return {
         ...base,

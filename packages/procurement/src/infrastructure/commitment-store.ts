@@ -12,6 +12,7 @@ import type {
   Submission,
 } from '../domain/commitments.js';
 import type { PurchaseOrder, Supplier } from '../domain/procurement.js';
+import { readPurchasingActionTimeline } from './purchasing-timeline.js';
 
 const live = ['approved', 'submitting', 'uncertain', 'submitted'];
 
@@ -66,12 +67,15 @@ export function createCommitmentStore(
               [tenantId, supplier.id, supplier],
             );
           },
+          timeline: (id, includeStock) =>
+            readPurchasingActionTimeline(tx, tenantId, id, includeStock),
           history: async (id) =>
             (await log.list(tenantId, id))
               .filter((e) =>
                 [
                   'purchase_order.created',
                   'purchase_order.status_changed',
+                  'purchase_order.revised',
                 ].includes(e.eventType),
               )
               .map((e): ProcurementEvent => ({
@@ -199,7 +203,7 @@ export function createCommitmentStore(
           insertCommitment: async (c, sourceKey) => {
             await tx.query(
               `INSERT INTO procurement_commitments(tenant_id,id,purchase_order_id,source_key,document,recorded_at)
-               VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(tenant_id,source_key) DO NOTHING`,
+               VALUES($1,$2,$3,$4,$5::jsonb || jsonb_build_object('orderRevision',COALESCE($5::jsonb->'orderRevision',(SELECT document->'revision' FROM procurement_purchase_orders WHERE tenant_id=$1 AND id=$3))),$6) ON CONFLICT(tenant_id,source_key) DO NOTHING`,
               [tenantId, c.id, c.purchaseOrderId, sourceKey, c, c.recordedAt],
             );
 

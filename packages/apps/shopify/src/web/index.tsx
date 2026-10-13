@@ -12,6 +12,7 @@ import { ShopifyAccess } from './access.js';
 import { ShopifyFulfillmentRecovery } from './fulfillment-recovery.js';
 import { ShopifyInventoryCorrection } from './inventory-correction.js';
 import { ShopifyOrderContext } from './order-context.js';
+import { ShopifyReceiptStock } from './receipt-stock.js';
 import { ShopifyRecordPage } from './record-page.js';
 import { ShopifyRecords } from './records.js';
 import { ShopifyShipmentPublishing } from './shipment-publishing.js';
@@ -19,7 +20,13 @@ import { ShopifyShipmentPublishing } from './shipment-publishing.js';
 /** Renders Shopify authorization, the record browser page or live context for a host record. */
 export default function ShopifySettings(props: AppUiProps) {
   if (props.slot === 'inventory')
-    return props.inventory ? (
+    return props.inventory && 'receipt' in props.inventory ? (
+      <ShopifyReceiptStock
+        receipt={props.inventory.receipt}
+        services={props.services}
+        done={props.done}
+      />
+    ) : props.inventory ? (
       <ShopifyInventoryCorrection
         key={props.inventory.positionId}
         positionId={props.inventory.positionId}

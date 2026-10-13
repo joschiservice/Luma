@@ -63,6 +63,29 @@ export function nativeStockRoutes(service?: NativeStockRuntime) {
   }
 
   return os.router({
+    verifyPurchaseReceipt: os.verifyPurchaseReceipt.handler(
+      async ({ context, input }) =>
+        await call(context, (service, tenant) =>
+          service.ledger.verifyPurchaseReceipt(tenant, input.params.reviewId),
+        ),
+    ),
+    preparePurchaseReceipt: os.preparePurchaseReceipt.handler(
+      async ({ context, input }) =>
+        nativeLedgerReviewSchema.parse(
+          await call(context, (service, tenant) =>
+            service.ledger.preparePurchaseReceipt(tenant, input.body),
+          ),
+        ),
+    ),
+    purchaseReceiptReviews: os.purchaseReceiptReviews.handler(
+      async ({ context, input }) =>
+        await call(context, (service, tenant) =>
+          service.ledger.purchaseReceiptReviews(
+            tenant,
+            input.params.purchaseOrderId,
+          ),
+        ),
+    ),
     readStock: os.readStock.handler(async ({ context, input }) =>
       nativeStockEvidenceSchema.parse(
         await call(context, (service, tenant) =>

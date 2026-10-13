@@ -165,6 +165,9 @@ export interface AppFactoryContext {
   featureEnabled?(
     tenantId: string,
     flag:
+      | 'supplier-purchasing-terms'
+      | 'purchasing-stock-booking'
+      | 'purchasing-order-changes'
       | 'starshipit-fulfillment'
       | 'starshipit-actions'
       | 'shopify-shipment-publishing',

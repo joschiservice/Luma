@@ -93,6 +93,7 @@ const decisionOwnerSchema = z.discriminatedUnion('kind', [
     kind: z.literal('purchase_order'),
     purchaseOrderId: z.string().uuid(),
   }),
+  z.object({ kind: z.literal('purchasing_plan'), planId: z.string().uuid() }),
   z.object({ kind: z.literal('message_thread'), threadId: z.string().uuid() }),
 ]);
 

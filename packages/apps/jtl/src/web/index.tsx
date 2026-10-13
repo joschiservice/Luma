@@ -102,6 +102,7 @@ export default function JtlSettings({
                 'suppliers.read',
                 'purchase-orders.read',
                 'purchase-orders.submit',
+                'purchase-orders.revise',
               ] as const)
             : []),
           ...(value.returns

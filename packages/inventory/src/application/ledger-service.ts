@@ -105,7 +105,53 @@ export function createLedgerService(deps: LedgerDependencies) {
       );
   }
 
-  async function currentSources(tx: LedgerTransaction, review: LedgerReview) {
+  async function currentSources(
+    tx: LedgerTransaction,
+    review: LedgerReview,
+    context: TenantContext,
+  ) {
+    if (review.command.purchaseReceipt) {
+      requirePermission(context, 'procurement.manage');
+      if (!(await deps.purchaseReceiptsEnabled?.(context)))
+        throw new LedgerError(
+          'review_required',
+          'Purchase receipt booking is not enabled.',
+        );
+      const binding = review.command.purchaseReceipt;
+      const current = await tx.purchaseReceipt?.(
+        binding.purchaseOrderId,
+        binding.lineId,
+      );
+      if (
+        !current ||
+        current.commitmentId !== binding.commitmentId ||
+        current.damagedCommitmentId !== binding.damagedCommitmentId ||
+        current.scopeVersion !== binding.scopeVersion ||
+        current.cumulativeGood !== binding.cumulativeGood ||
+        current.cumulativeDamaged !== binding.cumulativeDamaged ||
+        current.bookedGood !== binding.previousGood ||
+        current.bookedDamaged !== binding.previousDamaged
+      )
+        throw new LedgerError(
+          'stale',
+          'Receipt, damage, native ownership or previously booked quantity changed. Prepare a fresh receipt review.',
+        );
+      const delta =
+        quantityUnits(binding.cumulativeGood) +
+        quantityUnits(binding.cumulativeDamaged) -
+        quantityUnits(binding.previousGood) -
+        quantityUnits(binding.previousDamaged);
+      const tracked = quantityUnits(current.trackedIncoming);
+      const expectedIncoming = tracked < delta ? tracked : delta;
+      const debit = review.command.postings
+        .filter((p) => p.account.state === 'incoming')
+        .reduce((sum, p) => sum - quantityUnits(p.quantity), 0n);
+      if (debit !== expectedIncoming)
+        throw new LedgerError(
+          'stale',
+          'Incoming purchase stock changed. Prepare a fresh receipt review.',
+        );
+    }
     for (const original of review.sources) {
       const current = await tx.stockEvidence(original.snapshotId);
       requireSource(current);
@@ -172,6 +218,9 @@ export function createLedgerService(deps: LedgerDependencies) {
         const review = await tx.review(id);
         if (!review)
           throw new IdentityError(404, 'NOT_FOUND', 'Stock review not found');
+
+        if (review.command.purchaseReceipt)
+          requirePermission(fresh, 'procurement.read');
 
         return review;
       });
@@ -348,6 +397,261 @@ export function createLedgerService(deps: LedgerDependencies) {
         await tx.saveComparison(comparison);
 
         return comparison;
+      });
+    },
+    /** Lists unposted receipt approvals from retained local state only. */
+    async pendingPurchaseReceipts(context: TenantContext) {
+      const fresh = await access(context, 'inventory.read');
+      requirePermission(fresh, 'procurement.read');
+      if (!(await deps.purchaseReceiptsEnabled?.(fresh))) return [];
+
+      return deps.store.transaction(fresh, async (tx) => {
+        const reviews = (await tx.purchaseReceiptReviews?.(null)) ?? [];
+        const pending = [];
+        for (const review of reviews)
+          if (
+            review.state !== 'rejected' &&
+            !(await tx.receipt(review.command.key, review.commandHash))
+          )
+            pending.push(review);
+
+        return pending;
+      });
+    },
+    /** Independently reads the committed entry and current accounts after receipt booking. No posting is repeated. */
+    async verifyPurchaseReceipt(context: TenantContext, id: string) {
+      const fresh = await access(context, 'inventory.read');
+      requirePermission(fresh, 'procurement.read');
+
+      return deps.store.transaction(fresh, async (tx) => {
+        const review = await tx.review(id);
+        if (!review?.command.purchaseReceipt)
+          throw new IdentityError(
+            404,
+            'NOT_FOUND',
+            'Purchase receipt review not found.',
+          );
+        const receipt = await tx.receipt(
+          review.command.key,
+          review.commandHash,
+        );
+        const accounts = receipt
+          ? await tx.accounts(
+              receipt.accounts.map((a) => a.address),
+              false,
+            )
+          : [];
+        const verified =
+          !!receipt &&
+          !!receipt.entryId &&
+          accounts.length === receipt.accounts.length &&
+          receipt.accounts.every((expected) =>
+            accounts.some(
+              (a) =>
+                a.id === expected.id &&
+                a.version === expected.version &&
+                a.balance === expected.balance,
+            ),
+          );
+
+        return {
+          outcome: verified ? ('verified' as const) : ('inconclusive' as const),
+          receipt,
+          accounts,
+          evidenceRefs: receipt?.entryId ? [receipt.entryId] : [],
+          observedAt: now().toISOString(),
+        };
+      });
+    },
+    /** Lists native receipt reviews without provider reads or writes. */
+    async purchaseReceiptReviews(
+      context: TenantContext,
+      purchaseOrderId: string,
+      options: { includeHistory?: boolean } = {},
+    ) {
+      const fresh = await access(context, 'inventory.read');
+      requirePermission(fresh, 'procurement.read');
+      const enabled = (await deps.purchaseReceiptsEnabled?.(fresh)) ?? false;
+
+      return deps.store.transaction(fresh, async (tx) => ({
+        enabled,
+        items:
+          enabled || options.includeHistory
+            ? ((await tx.purchaseReceiptReviews?.(purchaseOrderId)) ?? [])
+            : [],
+        ownedLineIds: (await tx.nativeReceiptLines?.(purchaseOrderId)) ?? [],
+      }));
+    },
+    /** Prepares only the unbooked good and damaged quantities of an exact manual receipt for a native-owned location. */
+    async preparePurchaseReceipt(
+      context: TenantContext,
+      input: {
+        id: string;
+        purchaseOrderId: string;
+        lineId: string;
+        reason: string;
+      },
+    ): Promise<LedgerReview> {
+      const fresh = await access(context, 'inventory.manage', true);
+      requirePermission(fresh, 'procurement.manage');
+      if (!(await deps.purchaseReceiptsEnabled?.(fresh)))
+        throw new LedgerError(
+          'review_required',
+          'Purchase receipt booking is not enabled.',
+        );
+      const request = validation.purchaseReceipt(input);
+
+      return deps.store.transaction(fresh, async (tx) => {
+        await tx.lockCommand(
+          `purchase-receipt:${request.purchaseOrderId}:${request.lineId}`,
+        );
+        const receipt = await tx.purchaseReceipt?.(
+          request.purchaseOrderId,
+          request.lineId,
+        );
+        if (!receipt)
+          throw new LedgerError(
+            'source_incomplete',
+            'Choose a manual receipt with an exact SKU and native-owned receiving location.',
+          );
+        const key = `purchase-receipt:${receipt.purchaseOrderId}:${receipt.lineId}:${receipt.commitmentId}:${receipt.damagedCommitmentId ?? 'none'}`;
+        const previous = await tx.reviewByKey(key);
+        if (previous) {
+          if (previous.command.reason !== request.reason)
+            throw new LedgerError(
+              'changed_command',
+              'This receipt already has a different review.',
+            );
+
+          return previous;
+        }
+        const good =
+          quantityUnits(receipt.cumulativeGood) -
+          quantityUnits(receipt.bookedGood);
+        const damaged =
+          quantityUnits(receipt.cumulativeDamaged) -
+          quantityUnits(receipt.bookedDamaged);
+        if (good < 0n || damaged < 0n)
+          throw new LedgerError(
+            'review_required',
+            'A corrected receipt is below booked stock. Review a reversal before booking again.',
+          );
+        if (good + damaged <= 0n)
+          throw new LedgerError(
+            'changed_command',
+            'These receipt quantities are already booked.',
+          );
+        if (!(await tx.opened(receipt.skuId, receipt.locationId, receipt.unit)))
+          throw new LedgerError(
+            'review_required',
+            'Review this native stock pool opening first.',
+          );
+        const address = {
+          skuId: receipt.skuId,
+          locationId: receipt.locationId,
+          unit: receipt.unit,
+        };
+        const tracked = quantityUnits(receipt.trackedIncoming);
+        const incoming = tracked < good + damaged ? tracked : good + damaged;
+        const supplier = good + damaged - incoming;
+        const postings: Posting[] = [
+          ...(good > 0n
+            ? [
+                {
+                  account: { ...address, state: 'available' as const },
+                  quantity: decimalQuantity(good),
+                },
+              ]
+            : []),
+          ...(damaged > 0n
+            ? [
+                {
+                  account: { ...address, state: 'damaged' as const },
+                  quantity: decimalQuantity(damaged),
+                },
+              ]
+            : []),
+          ...(incoming > 0n
+            ? [
+                {
+                  account: { ...address, state: 'incoming' as const },
+                  quantity: decimalQuantity(-incoming),
+                },
+              ]
+            : []),
+          ...(supplier > 0n
+            ? [
+                {
+                  account: { ...address, state: 'supplier' as const },
+                  quantity: decimalQuantity(-supplier),
+                },
+              ]
+            : []),
+        ];
+        const accounts = await tx.accounts(
+          postings.map((p) => p.account),
+          true,
+        );
+        const command: PostingCommand = {
+          id: request.id,
+          key,
+          purpose: 'purchase_receipt',
+          reason: request.reason,
+          effectiveAt: receipt.receivedAt,
+          evidence: [
+            { kind: 'observation', id: receipt.commitmentId },
+            ...(receipt.damagedCommitmentId
+              ? [
+                  {
+                    kind: 'observation' as const,
+                    id: receipt.damagedCommitmentId,
+                  },
+                ]
+              : []),
+          ],
+          postings,
+          expected: accounts.map((a) => ({
+            account: a.address,
+            balance: a.balance,
+            version: a.version,
+          })),
+          purchaseReceipt: {
+            purchaseOrderId: receipt.purchaseOrderId,
+            lineId: receipt.lineId,
+            commitmentId: receipt.commitmentId,
+            damagedCommitmentId: receipt.damagedCommitmentId,
+            cumulativeGood: receipt.cumulativeGood,
+            cumulativeDamaged: receipt.cumulativeDamaged,
+            previousGood: receipt.bookedGood,
+            previousDamaged: receipt.bookedDamaged,
+            scopeVersion: receipt.scopeVersion,
+          },
+        };
+        const normalized = validation.command(command);
+        planPostings(normalized, accounts);
+        const review: LedgerReview = {
+          id: reviewId(hash, fresh.tenantId, key),
+          commandKey: key,
+          commandHash: hash(normalized),
+          intentHash: hash(normalized),
+          command: normalized,
+          sources: [],
+          preparedBy: fresh.actor.id,
+          reviewedBy: null,
+          reviewedAt: null,
+          state: 'pending',
+          createdAt: now().toISOString(),
+        };
+        await tx.saveReview(review);
+
+        const persisted = await tx.review(review.id);
+        if (!persisted)
+          throw new LedgerError(
+            'stale',
+            'The receipt review was not retained. Retry the same receipt.',
+          );
+
+        return persisted;
       });
     },
     /** Prepares an explicit correction or production movement, binding exact balances and fresh source identities. */
@@ -539,9 +843,13 @@ export function createLedgerService(deps: LedgerDependencies) {
       const fresh = await access(context, 'inventory.manage', true),
         command: PostingCommand = validation.command(input);
       if (
-        ['opening', 'correction', 'reversal', 'production'].includes(
-          command.purpose,
-        )
+        [
+          'opening',
+          'correction',
+          'reversal',
+          'production',
+          'purchase_receipt',
+        ].includes(command.purpose)
       )
         throw new LedgerError(
           'review_required',
@@ -720,6 +1028,8 @@ export function createLedgerService(deps: LedgerDependencies) {
         const review = await tx.review(id);
         if (!review)
           throw new IdentityError(404, 'NOT_FOUND', 'Stock review not found');
+        if (review.command.purchaseReceipt)
+          requirePermission(fresh, 'procurement.manage');
         if (review.preparedBy === fresh.actor.id)
           throw new LedgerError(
             'review_required',
@@ -736,7 +1046,7 @@ export function createLedgerService(deps: LedgerDependencies) {
             'This review already has a final decision.',
           );
         }
-        if (approved) await currentSources(tx, review);
+        if (approved) await currentSources(tx, review, fresh);
 
         return tx.decide(review, approved, fresh.actor.id);
       });
@@ -749,6 +1059,8 @@ export function createLedgerService(deps: LedgerDependencies) {
         const review = await tx.review(id);
         if (!review)
           throw new IdentityError(404, 'NOT_FOUND', 'Stock review not found');
+        if (review.command.purchaseReceipt)
+          requirePermission(fresh, 'procurement.manage');
         await tx.lockCommand(review.command.key);
         const receipt = await tx.receipt(
           review.command.key,
@@ -773,7 +1085,7 @@ export function createLedgerService(deps: LedgerDependencies) {
         requirePermission(reviewer, 'inventory.read');
         requirePermission(reviewer, 'inventory.approve');
         requireChangesAllowed(reviewer);
-        await currentSources(tx, review);
+        await currentSources(tx, review, fresh);
         const command: PostingCommand = validation.command(review.command);
         if (hash(command) !== review.commandHash)
           throw new LedgerError(

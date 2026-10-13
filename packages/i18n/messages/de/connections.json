@@ -82,5 +82,6 @@
   "connections_capability_inventory_shipments_read": "Bestandssendungen lesen",
   "connections_capability_orders_quantity_update": "Mengen in einer unversandten nachgelagerten Bestellung korrigieren",
   "connections_capability_fulfillment_shipment_create": "Versandte Sendungen in Shopify veröffentlichen",
-  "connections_capability_fulfillment_tracking_update": "Sendungsverfolgung in Shopify aktualisieren"
+  "connections_capability_fulfillment_tracking_update": "Sendungsverfolgung in Shopify aktualisieren",
+  "connections_capability_purchase_orders_revise": "Genehmigte Lieferantenbestellpositionen ändern"
 }

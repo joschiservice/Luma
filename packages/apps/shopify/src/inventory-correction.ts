@@ -19,10 +19,11 @@ import {
   parseAction,
 } from '@luma/execution/composition';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError } from '@luma/identity';
+import { IdentityError, requirePermission } from '@luma/identity';
 import { createNativePublicationFence } from '@luma/inventory/composition';
 import { canonicalJson } from '@luma/platform';
 import { createPolicies } from '@luma/policies/composition';
+import { z } from 'zod';
 
 import {
   type CorrectionRun,
@@ -51,6 +52,9 @@ export function createShopifyInventoryCorrection(
   const query = createCorrectionQuery(
     context.database,
     context.sourceAuthority,
+    (tenantId) =>
+      context.featureEnabled?.(tenantId, 'purchasing-stock-booking') ??
+      Promise.resolve(false),
   );
   const operation = {
     app: 'shopify',
@@ -201,7 +205,58 @@ export function createShopifyInventoryCorrection(
                 );
               }),
           }
-        : { allowInactiveStorage }),
+        : nativeRun?.target.receipt
+          ? {
+              allowInactiveStorage,
+              dispatchFence: async <T>(operation: () => Promise<T>) => {
+                let started = false;
+                try {
+                  return await context.database.transaction(
+                    tenant.tenantId,
+                    async (tx) => {
+                      await tx.query(
+                        'SELECT pg_advisory_xact_lock_shared(hashtextextended($1,0))',
+                        [`procurement:${tenant.tenantId}`],
+                      );
+                      await tx.query(
+                        `SELECT scope.location_id FROM inventory_stock_ownership_scopes scope JOIN procurement_purchase_orders o ON o.tenant_id=scope.tenant_id CROSS JOIN LATERAL jsonb_array_elements(o.document->'lines') line WHERE scope.tenant_id=$1 AND o.id=$2 AND line->>'id'=$3 AND scope.location_id=(line->>'locationId')::uuid FOR SHARE OF scope`,
+                        [
+                          tenant.tenantId,
+                          nativeRun.target.receipt!.purchaseOrderId,
+                          nativeRun.target.receipt!.lineId,
+                        ],
+                      );
+                      const source = await query.authority(
+                        tenant,
+                        nativeRun.target,
+                      );
+                      if (
+                        source.source.revision !==
+                        nativeRun.before.source.revision
+                      )
+                        throw new IdentityError(
+                          409,
+                          'CONFLICT',
+                          'Receipt stock evidence changed.',
+                        );
+                      started = true;
+
+                      return await operation();
+                    },
+                  );
+                } catch (error) {
+                  if (!started)
+                    throw new ConnectorError({
+                      code: 'conflict',
+                      effect: 'none',
+                      retry: 'never',
+                      dispatch: 'not_dispatched',
+                    });
+                  throw error;
+                }
+              },
+            }
+          : { allowInactiveStorage }),
       record: (evidence) => store.record(tenant, connectionId, evidence),
       receipts: (inventoryItemId, locationId) =>
         readInventoryWriteReceipts(context.database, tenant, connectionId, [
@@ -220,10 +275,11 @@ export function createShopifyInventoryCorrection(
   const read = async (
     tenant: TenantContext,
     target: CorrectionRun['target'],
+    receiptProof = false,
   ) => {
     // Stock moves while people decide; read stale sources again before judging them.
     await context.refreshStock?.(tenant, target.positionId);
-    const authority = await query.authority(tenant, target);
+    const authority = await query.authority(tenant, target, receiptProof);
     const snapshot = await (
       await provider(
         tenant,
@@ -320,7 +376,7 @@ export function createShopifyInventoryCorrection(
             );
           },
           verify: async () =>
-            verifyCorrection(run, await read(tenant, run.target)),
+            verifyCorrection(run, await read(tenant, run.target, true)),
         })
         .resolve(tenant, intent);
     },
@@ -385,5 +441,115 @@ export function createShopifyInventoryCorrection(
     },
   });
 
-  return service;
+  return {
+    ...service,
+    /** Resolves immutable manual receipt evidence and the live stock baseline before governed approval. */
+    async receiptPreview(tenant: TenantContext, input: unknown) {
+      tenant = await context.refreshContext(tenant);
+      requirePermission(tenant, 'procurement.manage');
+      await context.requirePermission(tenant, operation);
+      const request = z
+        .object({
+          requestId: z.string().uuid(),
+          purchaseOrderId: z.string().uuid(),
+          lineId: z.string().uuid(),
+        })
+        .strict()
+        .parse(input);
+      const existing = await store.get(tenant, request.requestId);
+      if (existing) {
+        if (
+          existing.target.receipt?.purchaseOrderId !==
+            request.purchaseOrderId ||
+          existing.target.receipt.lineId !== request.lineId
+        )
+          throw new IdentityError(
+            409,
+            'CONFLICT',
+            'This request belongs to another receipt.',
+          );
+
+        return service.preview(tenant, {
+          requestId: request.requestId,
+          ...existing.target,
+        });
+      }
+      const receipt = await query.receipts.evidence(
+        tenant,
+        request.purchaseOrderId,
+        request.lineId,
+      );
+      if (receipt.quantity <= 0)
+        throw new IdentityError(
+          409,
+          'CONFLICT',
+          'All undamaged units in this receipt have already been booked.',
+        );
+      await context.refreshStock?.(tenant, receipt.positionId);
+      const target = {
+        positionId: receipt.positionId,
+        connectionId: receipt.connectionId,
+        sourceConnectionId: receipt.connectionId,
+        receipt: {
+          purchaseOrderId: request.purchaseOrderId,
+          lineId: request.lineId,
+          commitmentId: receipt.receiptId,
+          damagedCommitmentId: receipt.damagedId,
+          baselineAvailable: 0,
+          quantity: receipt.quantity,
+          cumulativeGood: receipt.cumulativeGood,
+        },
+      };
+      const mapping = await query.authority(tenant, target);
+      const baseline = await (
+        await provider(tenant, receipt.connectionId)
+      ).read(mapping.inventoryItemId, mapping.locationId);
+      if (baseline.available === null)
+        throw new IdentityError(
+          409,
+          'CONFLICT',
+          'Read Shopify stock before booking this receipt.',
+        );
+      target.receipt.baselineAvailable = baseline.available;
+
+      return service.preview(tenant, {
+        requestId: request.requestId,
+        ...target,
+      });
+    },
+    /** Lists persisted receipt stock work, including uncertain attempts, without proposing another write. */
+    async receiptState(tenant: TenantContext, input: unknown) {
+      tenant = await context.refreshContext(tenant);
+      await context.requirePermission(tenant, operation);
+      requirePermission(tenant, 'procurement.read');
+      const request = z
+        .object({
+          purchaseOrderId: z.string().uuid(),
+          lineId: z.string().uuid(),
+        })
+        .strict()
+        .parse(input);
+      const enabled =
+        (await context.featureEnabled?.(
+          tenant.tenantId,
+          'purchasing-stock-booking',
+        )) ?? false;
+      if (!enabled) return { enabled, runs: [] };
+      const ids = await context.database.transaction(
+        tenant.tenantId,
+        async (tx) =>
+          (
+            await tx.query<{ id: string }>(
+              `SELECT id FROM shopify_inventory_corrections WHERE tenant_id=$1 AND document->'target'->'receipt'->>'purchaseOrderId'=$2 AND document->'target'->'receipt'->>'lineId'=$3 ORDER BY created_at DESC,id LIMIT 20`,
+              [tenant.tenantId, request.purchaseOrderId, request.lineId],
+            )
+          ).rows,
+      );
+      const runs = await Promise.all(
+        ids.map((row) => service.check(tenant, { id: row.id })),
+      );
+
+      return { enabled, runs };
+    },
+  };
 }

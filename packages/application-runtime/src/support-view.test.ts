@@ -118,7 +118,13 @@ it('lists every route with a request body that support views may call', () => {
       .filter((route) => route.meta.readOnly)
       .map((route) => route.key)
       .sort(),
-  ).toEqual(['metrics.operationalQuery', 'metrics.query', 'metrics.summary']);
+  ).toEqual([
+    'metrics.operationalQuery',
+    'metrics.query',
+    'metrics.summary',
+    'nativeStock.verifyPurchaseReceipt',
+    'procurement.incomingStock',
+  ]);
 });
 
 it('restricts handlers of allowed reads to read-only database transactions', async () => {

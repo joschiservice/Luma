@@ -50,6 +50,20 @@ type ExpectedAccount = {
 
 /** Inputs retain business-effective time separately from the server's recording time. */
 export interface PostingCommand {
+  /** Immutable manual receipt and native ownership binding; only the receipt preparation service builds it. */
+  purchaseReceipt?:
+    | {
+        purchaseOrderId: string;
+        lineId: string;
+        commitmentId: string;
+        damagedCommitmentId: string | null;
+        cumulativeGood: string;
+        cumulativeDamaged: string;
+        previousGood: string;
+        previousDamaged: string;
+        scopeVersion: string;
+      }
+    | undefined;
   id: string;
   key: string;
   purpose:
@@ -61,7 +75,8 @@ export interface PostingCommand {
     | 'release'
     | 'dispatch'
     | 'reconciliation'
-    | 'production';
+    | 'production'
+    | 'purchase_receipt';
   reason: string;
   effectiveAt: string | null;
   evidence: {

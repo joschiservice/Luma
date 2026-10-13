@@ -202,6 +202,9 @@ export function createGmailConnector(
       adapterVersion,
       schemaVersion: 1,
       data: {
+        ...(parsed.deliveryFailure
+          ? { deliveryFailure: parsed.deliveryFailure }
+          : {}),
         thread: { externalId: parsed.threadId, scopeKey: '' },
         rfcMessageId: parsed.rfcMessageId,
         inReplyTo: parsed.inReplyTo,
@@ -369,7 +372,24 @@ export function createGmailConnector(
           );
           const offset = readCursor(input.cursor, expected) ?? 0;
           if (typeof offset !== 'number') fail('invalid_input');
-          const thread = await client.getThread(input.thread.externalId);
+          let providerThreadId = input.thread.externalId;
+          if (providerThreadId.startsWith('outbound:')) {
+            const messageId = outboundMessageId(
+              providerThreadId.slice(9),
+              mailbox,
+            );
+            const found = (
+              await client.listMessages({
+                q: `rfc822msgid:${messageId}`,
+                maxResults: 1,
+                includeSpamTrash: true,
+              })
+            ).messages?.[0];
+            if (!found)
+              return { items: [], nextCursor: null, completeness: 'complete' };
+            providerThreadId = found.threadId;
+          }
+          const thread = await client.getThread(providerThreadId);
           const names = await labelNames(client);
           const all = thread.messages ?? [];
           const slice = all.slice(offset, offset + input.limit);
@@ -463,6 +483,7 @@ export function createGmailConnector(
               inReplyTo: input.inReplyTo,
               references: input.references,
               date: now(),
+              attachments: input.attachments ?? [],
             });
           } catch {
             fail('invalid_input');

@@ -58,6 +58,8 @@ export interface Cin7ConnectorOptions extends Cin7TransportOptions {
    * `customers.read`.
    */
   customers?: boolean;
+  /** Exposes supplier product metadata only for authorized purchasing reads. */
+  purchasingTerms?: boolean;
   now?: () => Date;
   id?: () => string;
 }
@@ -383,7 +385,11 @@ export function createCin7Connector(
               'product',
               ref(product.ID),
               product.LastModifiedOn ?? null,
-              productSnapshot(product),
+              productSnapshot(
+                options.purchasingTerms
+                  ? product
+                  : { ...product, Suppliers: undefined },
+              ),
             );
         } else if (capability === 'inventory.read') {
           ({ hasNext, last } = await readStock(

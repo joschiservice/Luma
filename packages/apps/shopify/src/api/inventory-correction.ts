@@ -11,7 +11,16 @@ import type { createInventoryCorrection } from '../application/inventory-correct
 /** Registers private inventory previews, approvals and reference-only execution commands. */
 export function registerInventoryCorrectionRoutes(
   server: FastifyInstance,
-  service: ReturnType<typeof createInventoryCorrection>,
+  service: ReturnType<typeof createInventoryCorrection> & {
+    receiptPreview(
+      context: import('@luma/identity').TenantContext,
+      input: unknown,
+    ): Promise<unknown>;
+    receiptState(
+      context: import('@luma/identity').TenantContext,
+      input: unknown,
+    ): Promise<unknown>;
+  },
 ) {
   for (const command of [
     'candidates',
@@ -20,9 +29,11 @@ export function registerInventoryCorrectionRoutes(
     'execute',
     'approve',
     'check',
+    'receiptPreview',
+    'receiptState',
   ] as const) {
     server.post(
-      `/v1/organizations/:organizationId/apps/shopify/inventory-correction-${command}`,
+      `/v1/organizations/:organizationId/apps/shopify/inventory-correction-${command === 'receiptPreview' ? 'receipt-preview' : command === 'receiptState' ? 'receipt-state' : command}`,
       {
         config: {
           access: { permission: 'shopify:inventory_corrections.apply' },
@@ -43,7 +54,7 @@ export function registerInventoryCorrectionRoutes(
             throw new IdentityError(
               422,
               'CONFLICT',
-              'Choose a valid stock position and ERP source.',
+              'Choose a valid stock position and approved source.',
             );
           if (error instanceof AdmissionRejected)
             throw new IdentityError(

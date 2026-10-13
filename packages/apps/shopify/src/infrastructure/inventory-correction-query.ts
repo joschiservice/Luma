@@ -11,6 +11,7 @@ import {
   correctionTarget,
 } from '../domain/inventory-correction.js';
 import { createNativeAllocationQuery } from './native-allocation-query.js';
+import { createReceiptStockQuery } from './receipt-stock-query.js';
 
 const rowSchema = z.object({
   connectionId: z.string().uuid(),
@@ -41,7 +42,13 @@ type Row = z.infer<typeof rowSchema>;
 export function createCorrectionQuery(
   database: TenantDatabase,
   sourceAuthority?: AuthorityReader,
+  receiptReleased: (tenantId: string) => Promise<boolean> = async () => false,
 ) {
+  const receipts = createReceiptStockQuery(
+    database,
+    sourceAuthority,
+    receiptReleased,
+  );
   const nativeAllocation = createNativeAllocationQuery(database);
 
   async function rows(
@@ -86,6 +93,7 @@ export function createCorrectionQuery(
   }
 
   return {
+    receipts,
     /** Finds the stock position that projects a canonical SKU at a canonical location. */
     position: (context: TenantContext, skuId: string, locationId: string) =>
       database.transaction(context.tenantId, async (tx) => {
@@ -171,8 +179,60 @@ export function createCorrectionQuery(
     async authority(
       context: TenantContext,
       target: z.infer<typeof correctionTarget>,
+      receiptProof = false,
     ) {
       const authority = await sourceAuthority?.read(context);
+      if (target.receipt) {
+        if (
+          target.nativeAllocation ||
+          target.sourceConnectionId !== target.connectionId
+        )
+          throw new IdentityError(
+            409,
+            'CONFLICT',
+            'A receipt must use one stock authority.',
+          );
+        const source = (await rows(context, target.positionId)).find(
+          (row) => row.connectionId === target.connectionId,
+        );
+        if (
+          !source ||
+          source.provider !== 'shopify' ||
+          !source.active ||
+          !source.installed ||
+          !source.readable ||
+          source.deleted ||
+          source.unit !== 'each'
+        )
+          throw new IdentityError(
+            409,
+            'CONFLICT',
+            'Receipt stock needs an active, readable Shopify position.',
+          );
+        const inventoryItemId = exact(source, 'sku'),
+          locationId = exact(source, 'location');
+        if (
+          !/^gid:\/\/shopify\/InventoryItem\/[0-9]+$/.test(inventoryItemId) ||
+          !/^gid:\/\/shopify\/Location\/[0-9]+$/.test(locationId)
+        )
+          throw new IdentityError(
+            409,
+            'CONFLICT',
+            'Confirm exact Shopify item and location mappings.',
+          );
+
+        return {
+          inventoryItemId,
+          locationId,
+          source: await receipts.source(
+            context,
+            target.receipt,
+            target.connectionId,
+            target.positionId,
+            receiptProof,
+          ),
+        };
+      }
       if (target.nativeAllocation) {
         if (!authority)
           throw new IdentityError(

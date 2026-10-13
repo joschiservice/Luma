@@ -27,6 +27,7 @@ import {
   purchaseOrderLabels,
   statusLabels as orderStatusLabels,
 } from '../../shared/orders/presentation';
+import { IncomingStockSection } from '../../shared/procurement/incoming-stock';
 import { AppExtension } from '../apps/extension';
 import { recordReturnPath } from '../records/data';
 import { IdentityLinks } from '../sync/identity-links';
@@ -67,6 +68,15 @@ export function StockPage() {
       refreshing={query.isFetching}
       offline={query.isPaused}
       refresh={() => void query.refetch()}
+      incoming={
+        query.data ? (
+          <IncomingStockSection
+            organizationId={organizationId}
+            skuId={query.data.position.skuId}
+            locationId={query.data.position.locationId}
+          />
+        ) : null
+      }
       nativeStock={
         query.data ? (
           <NativeStockPool
@@ -126,6 +136,7 @@ export function StockDetailView({
   identity,
   correction,
   nativeStock,
+  incoming,
   replenishment,
 }: {
   organizationId: string;
@@ -141,6 +152,7 @@ export function StockDetailView({
   /** Installed provider correction controls for this stock position. */
   correction?: ReactNode;
   nativeStock?: ReactNode;
+  incoming?: ReactNode;
   /** Workflow coverage and readiness for this stock position. */
   replenishment?: ReactNode;
 }) {
@@ -378,6 +390,7 @@ export function StockDetailView({
               ]}
             />
           </Disclosure>
+          {incoming}
           {nativeStock}
           {correction}
           {replenishment}

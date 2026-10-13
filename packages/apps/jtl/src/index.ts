@@ -5,6 +5,7 @@ import {
   type InstallationCapability,
 } from '@luma/connections';
 import { simulationTransport } from '@luma/connections/adapters';
+import { hasPermission } from '@luma/identity';
 import { z } from 'zod';
 
 import { type JtlEndpoint, readJtlEndpoints } from './config.js';
@@ -26,10 +27,17 @@ export type { JtlEndpoint };
 
 // Each write capability may send exactly one HTTP method through the pinned on-premise transport.
 const writeMethods: Partial<
-  Record<InstallationCapability, { writeMethod: 'PATCH' | 'POST' }>
+  Record<
+    InstallationCapability,
+    {
+      writeMethod?: 'PATCH' | 'POST';
+      writeMethods?: readonly ('PATCH' | 'POST' | 'DELETE')[];
+    }
+  >
 > = {
   'orders.shipping-method.write': { writeMethod: 'PATCH' },
   'purchase-orders.submit': { writeMethod: 'POST' },
+  'purchase-orders.revise': { writeMethods: ['PATCH', 'POST', 'DELETE'] },
   'returns.create': { writeMethod: 'POST' },
 };
 
@@ -38,6 +46,7 @@ const writeReads: Partial<
 > = {
   'orders.shipping-method.write': 'orders.shipping-method.read',
   'purchase-orders.submit': 'purchase-orders.read',
+  'purchase-orders.revise': 'purchase-orders.read',
   'returns.create': 'returns.created.read',
   'returns.restock': 'returns.settlement.quote.read',
 };
@@ -45,6 +54,8 @@ const writeReads: Partial<
 /** Creates the JTL connector contribution with deployment-approved network destinations. */
 export function createJtlProvider(options: {
   jtlEndpoints: readonly JtlEndpoint[];
+  purchaseOrderChangesEnabled?: (tenantId: string) => Promise<boolean>;
+  purchasingTermsEnabled?: (tenantId: string) => Promise<boolean>;
   fetch?: typeof globalThis.fetch;
   simulation?: Parameters<typeof createInstallationVerifier>[0]['simulation'];
   approveJtlEndpoint?: (
@@ -130,9 +141,16 @@ export function createJtlProvider(options: {
         tenantId: context.tenantId,
         connectionId: id,
         recordObservations: runtime.recordObservations,
+        purchasingTerms:
+          current.connection.granted.includes('suppliers.read') &&
+          hasPermission(context, 'procurement.read') &&
+          ((await options.purchasingTermsEnabled?.(context.tenantId)) ?? false),
         ...(fetch ? { fetch } : {}),
         shippingMethodActions: true,
         purchaseOrderActions: true,
+        purchaseOrderRevisions:
+          (await options.purchaseOrderChangesEnabled?.(context.tenantId)) ??
+          false,
         returnActions: true,
         settlementActions: !!simulated,
         customers: current.connection.granted.includes('customers.read'),
@@ -220,6 +238,12 @@ export function createApp(context: AppFactoryContext): AppDefinition {
     },
     connector: createJtlProvider({
       jtlEndpoints: readJtlEndpoints(context.env),
+      purchaseOrderChangesEnabled: (tenantId) =>
+        context.featureEnabled?.(tenantId, 'purchasing-order-changes') ??
+        Promise.resolve(false),
+      purchasingTermsEnabled: (tenantId) =>
+        context.featureEnabled?.(tenantId, 'supplier-purchasing-terms') ??
+        Promise.resolve(false),
     }),
   };
 }

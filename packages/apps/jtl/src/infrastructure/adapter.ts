@@ -65,10 +65,14 @@ export interface JtlConnectorOptions extends JtlTransportOptions {
   /** Persist the validated batch before resolving. */
   recordObservations(evidence: JtlEvidence): Promise<void>;
   rawRetentionMs?: number;
+  /** Adds bounded supplier reads only for the released purchasing feature. */
+  purchasingTerms?: boolean;
   /** Enable only after confirming sales-order read/write grants and endpoint support. */
   shippingMethodActions?: boolean;
   /** Enable only after confirming purchase-order write and item read grants and endpoint support. */
   purchaseOrderActions?: boolean;
+  /** Releases one-operation purchase-order revisions after grant verification. */
+  purchaseOrderRevisions?: boolean;
   /** Enable only after confirming return write, return read and sales-order read grants. */
   returnActions?: boolean;
   /** Writes are currently verified only in the installed simulator. */
@@ -426,6 +430,54 @@ export function createJtlConnector(
           });
         }
 
+        async function readPurchasingTerms(itemId: string | number) {
+          const assignments: ReturnType<typeof s.itemSupplier.parse>[] = [];
+          let complete = false;
+          for (let n = 1; n <= 10; n++) {
+            const result = await page(
+              `items/${encodeURIComponent(String(itemId))}/suppliers`,
+              s.itemSupplier,
+              n,
+              100,
+            );
+            assignments.push(...result.items);
+            if (!result.hasNext) {
+              complete = true;
+              break;
+            }
+          }
+
+          return assignments.slice(0, 100).map((a) => ({
+            supplier: ref(a.supplierId),
+            sourceRecordId: String(a.id),
+            complete: complete && assignments.length <= 100,
+            supplierArticleNumber: text(a.supplierItemNumber),
+            unitPrice:
+              a.netPurchasePrice != null
+                ? {
+                    amount: a.netPurchasePrice,
+                    currency:
+                      a.supplierCurrency &&
+                      /^[A-Z]{3}$/.test(a.supplierCurrency)
+                        ? a.supplierCurrency
+                        : null,
+                    validFrom: null,
+                  }
+                : null,
+            packSize:
+              a.packageUnitQuantity != null && Number(a.packageUnitQuantity) > 0
+                ? Number(a.packageUnitQuantity)
+                : null,
+            lineMinimumQuantity: a.minimumPurchaseQuantity ?? null,
+            orderMinimumValue: null,
+            leadTimeDays:
+              (a.useSupplierDeliveryTime
+                ? a.supplierDeliveryTimeInDays
+                : a.deliveryTimeInDays) ?? null,
+            preferred: a.isDefaultSupplier ?? null,
+          }));
+        }
+
         let hasNext: boolean;
         // Sales orders and items map one-to-one to observations, so their count estimates progress.
         let total: number | undefined;
@@ -540,6 +592,9 @@ export function createJtlConnector(
                         ? null
                         : { amount: item.salesPriceGross, currency: null },
                     barcode: text(item.gTIN),
+                    ...(options.purchasingTerms
+                      ? { purchasingTerms: await readPurchasingTerms(item.id) }
+                      : {}),
                   },
                 ],
               } satisfies ProductSnapshot);

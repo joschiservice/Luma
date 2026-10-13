@@ -5,6 +5,7 @@ import type {
   InventoryShipmentSnapshot,
   InventoryTransferSnapshot,
 } from './inventory-transfers.js';
+import type { PurchaseOrderRevisionInput } from './purchase-order-revisions.js';
 import type {
   ReturnExchangeProof,
   ReturnExchangeQuoted,
@@ -451,6 +452,24 @@ interface ListPrice {
  * A product and its variants as the source reports them. Optional fields are omitted when the
  * adapter does not read them; null means the source did not report a value.
  */
+/** Supplier-specific product terms observed in a purchasing system, never inferred defaults. */
+interface ProductPurchasingTerms {
+  supplier: ExternalId;
+  sourceRecordId: string;
+  complete: boolean;
+  supplierArticleNumber: string | null;
+  unitPrice: {
+    amount: string;
+    currency: string | null;
+    validFrom: string | null;
+  } | null;
+  packSize: number | null;
+  lineMinimumQuantity: number | null;
+  orderMinimumValue: { amount: string; currency: string } | null;
+  leadTimeDays: number | null;
+  preferred: boolean | null;
+}
+
 export interface ProductSnapshot {
   title: string | null;
   status: 'active' | 'draft' | 'archived' | 'unknown';
@@ -470,6 +489,7 @@ export interface ProductSnapshot {
     price?: ListPrice | null;
     /** Variant composition; omitted when the source does not report it. */
     bundle?: ProductBundle;
+    purchasingTerms?: ProductPurchasingTerms[];
     /** GTIN, EAN or UPC text; descriptive only. */
     barcode?: string | null;
   }[];
@@ -739,6 +759,12 @@ interface MessageAttachmentRef {
  * messaging owner, never as commerce observations.
  */
 export interface MessageSnapshot {
+  /** A structured permanent delivery failure; normal message text is never a bounce signal. */
+  deliveryFailure?: {
+    originalMessageId: string;
+    recipient: string;
+    status: string;
+  };
   thread: ExternalId;
   /** RFC 5322 Message-ID without angle brackets. */
   rfcMessageId: string | null;
@@ -785,6 +811,7 @@ interface OutboundMessage {
   cc: MessageAddress[];
   subject: string;
   text: string;
+  attachments?: { filename: string; mimeType: string; base64: string }[];
 }
 
 interface CapabilityContract {
@@ -880,6 +907,10 @@ interface CapabilityContract {
   /** Acceptance means the purchasing system recorded the order, not that a supplier saw it. */
   'purchase-orders.submit': {
     input: PurchaseOrderSubmission;
+    output: WriteReceipt;
+  };
+  'purchase-orders.revise': {
+    input: PurchaseOrderRevisionInput;
     output: WriteReceipt;
   };
   'orders.write': {

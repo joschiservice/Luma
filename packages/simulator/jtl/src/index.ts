@@ -19,6 +19,7 @@ import {
 } from './purchasing.js';
 import type { JtlContext } from './records.js';
 import { countStock } from './stock.js';
+import { setSupplierTerms } from './supplier-terms.js';
 import type { JtlCommand, JtlCommandResult, JtlConfig } from './types.js';
 
 export { readOrder, openOrders } from './orders.js';
@@ -77,6 +78,8 @@ async function command(
       return confirmPurchaseOrder(context, value);
     case 'purchase-order-receive':
       return receivePurchaseOrder(context, value);
+    case 'supplier-terms':
+      return setSupplierTerms(context, value);
     case 'supplier-profile':
       return setSupplierProfile(context, value.supplierId, value.profile);
   }

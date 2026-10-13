@@ -33,6 +33,9 @@ import {
   purchaseOrderLabels,
   statusLabels as orderStatusLabels,
 } from '../../shared/orders/presentation';
+import { IncomingStockSection } from '../../shared/procurement/incoming-stock';
+import { PurchasingOutcomePanel } from '../../shared/procurement/purchasing-outcomes';
+import { SupplierTermsSection } from '../../shared/procurement/supplier-terms';
 import { stockQuantity, StockState } from '../inventory/presentation';
 import { recordReturnPath } from '../records/data';
 import { IdentityLinks } from '../sync/identity-links';
@@ -88,6 +91,16 @@ export function ProductPage() {
       refreshing={query.isFetching}
       offline={!online}
       refresh={() => void query.refetch()}
+      purchasing={
+        <>
+          <IncomingStockSection organizationId={organizationId} skuId={skuId} />
+          <SupplierTermsSection organizationId={organizationId} skuId={skuId} />
+          <PurchasingOutcomePanel
+            organizationId={organizationId}
+            skuId={skuId}
+          />
+        </>
+      }
       identity={
         query.data ? (
           <IdentityLinks
@@ -315,6 +328,7 @@ export function ProductDetailView({
   offline = false,
   refresh,
   identity,
+  purchasing,
 }: {
   organizationId: string;
   search?: ProductsSearch;
@@ -326,6 +340,7 @@ export function ProductDetailView({
   refresh: () => void;
   /** The sources behind this SKU and link controls. */
   identity?: ReactNode;
+  purchasing?: ReactNode;
 }) {
   const item = detail?.item;
   const from = recordReturnPath(organizationId, search.from);
@@ -619,6 +634,7 @@ export function ProductDetailView({
           {detail.relatedTruncated ? (
             <Alert>{m.products_related_truncated()}</Alert>
           ) : null}
+          {purchasing}
           <BundleRecipes
             detail={detail}
             organizationId={organizationId}

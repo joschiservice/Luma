@@ -41,6 +41,10 @@ import type {
   SupplierLinkInput,
 } from '../domain/procurement.js';
 import {
+  purchasingTimeline,
+  type PurchasingTimelineEntry,
+} from '../domain/purchasing-timeline.js';
+import {
   extractFacts,
   type ExtractionOutput,
   messageText,
@@ -161,6 +165,11 @@ export interface CommitmentTransaction {
   supplier(id: string): Promise<Supplier | null>;
   updateSupplier(supplier: Supplier): Promise<void>;
   history(orderId: string): Promise<ProcurementEvent[]>;
+  /** Reads admitted plans, revisions and stock-action proof without provider calls. */
+  timeline?(
+    orderId: string,
+    includeStock: boolean,
+  ): Promise<PurchasingTimelineEntry[]>;
   /** Newest first. Without IDs, returns every submission. */
   submissions(orderIds?: string[]): Promise<Submission[]>;
   submission(id: string): Promise<Submission | null>;
@@ -215,6 +224,11 @@ export interface CommitmentStore {
 }
 
 export interface CommitmentDependencies {
+  /** Reads owner-provided stock receipt proof; observation remains distinct from a recorded receipt. */
+  additionalTimeline?(
+    context: TenantContext,
+    orderId: string,
+  ): Promise<PurchasingTimelineEntry[]>;
   store: CommitmentStore;
   purchasing: PurchasingSystem | null;
   admission: SubmissionAdmission | null;
@@ -245,12 +259,31 @@ export interface CommitmentDependencies {
   };
   trace(context: TenantContext): TraceContext;
   retentionDays: number;
+  /** Workspace flag admission for manual receipt and reconciliation writes. */
+  shortfallAvailable?(context: TenantContext): Promise<boolean>;
+  reconciliationAvailable?(context: TenantContext): Promise<boolean>;
+  /** Projects verified expected arrivals through Inventory after procurement commits; no provider stock is changed. */
+  incomingChanged?(context: TenantContext, orderId: string): Promise<void>;
+
   digest(value: unknown): string;
   id(): string;
   /** Stable UUID derived from a name. */
   uuid(name: string): string;
   now(): Date;
   parse: {
+    receipt?(input: unknown): {
+      id: string;
+      lineId: string;
+      kind: 'received' | 'shortage' | 'damaged';
+      quantity: number;
+      expectedCommitmentId: string | null;
+      damagedQuantity?: number | undefined;
+      expectedDamagedCommitmentId?: string | null | undefined;
+      receivedAt: string;
+      condition: 'good' | 'mixed' | 'damaged';
+      reason: string;
+      evidence: string[];
+    };
     link(input: unknown): SupplierLinkInput;
     submission(input: unknown): { id: string; requestedDeliveryDate: string };
     decision(input: unknown): {
@@ -268,7 +301,7 @@ export interface CommitmentDependencies {
     };
     commitment(input: unknown): {
       id: string;
-      kind: Exclude<CommitmentKind, 'received'>;
+      kind: Exclude<CommitmentKind, 'received' | 'shortage' | 'damaged'>;
       lineId: string | null;
       quantity: number | null;
       date: string | null;
@@ -493,6 +526,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
       state: expired ? 'expired' : submission.state,
       approvalOutcome: decision?.approval?.outcome ?? null,
       canApprove:
+        submission.channel !== 'email' &&
         !observeOnly &&
         !expired &&
         approver &&
@@ -500,12 +534,15 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         submission.state === 'approval_required' &&
         !decision?.approval,
       canSend:
+        submission.channel !== 'email' &&
         !observeOnly &&
         !expired &&
         requester &&
         submission.state === 'approved',
       canCheck:
-        manager && ['uncertain', 'submitting'].includes(submission.state),
+        submission.channel !== 'email' &&
+        manager &&
+        ['uncertain', 'submitting'].includes(submission.state),
       message: observeOnly
         ? messages.not_executed
         : expired
@@ -664,17 +701,38 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
   }
 
   /** Records an observation and the commitments it evidences; repeated values are not duplicated. */
+  async function incomingResult<T>(
+    context: TenantContext,
+    orderId: string,
+    result: Promise<T>,
+  ): Promise<T> {
+    const value = await result;
+    await deps.incomingChanged?.(context, orderId);
+
+    return value;
+  }
+
   async function observe(
     context: TenantContext,
     submission: Submission,
     found: PurchasingOrder,
   ) {
-    return deps.store.transaction(context.tenantId, true, async (tx) => {
+    await deps.store.transaction(context.tenantId, true, async (tx) => {
       const order = await tx.order(submission.purchaseOrderId);
       if (!order) return;
+      const mappedLines = await lineMapping(tx, order, submission.connectionId);
       const lineFor = (sku: ExternalId | null) =>
-        submission.lines.find((l) => l.sku.externalId === sku?.externalId)
-          ?.lineId ?? null;
+        mappedLines.find(
+          (entry) =>
+            entry.sku?.externalId === sku?.externalId &&
+            entry.sku?.scopeKey === sku?.scopeKey,
+        )?.line.id ??
+        submission.lines.find(
+          (entry) =>
+            entry.sku.externalId === sku?.externalId &&
+            entry.sku.scopeKey === sku?.scopeKey,
+        )?.lineId ??
+        null;
       const lines = found.data.lines.map((l) => ({
         lineId: lineFor(l.sku),
         externalLineId: l.id.externalId,
@@ -787,6 +845,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         settled,
       );
     });
+    await deps.incomingChanged?.(context, submission.purchaseOrderId);
   }
 
   /** Applies an execution result to a submission and, once verified, locates the order. */
@@ -1039,6 +1098,11 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         order: order!,
         supplier,
         history: await tx.history(orderId),
+        timelineEntries:
+          (await tx.timeline?.(
+            orderId,
+            hasPermission(context, 'inventory.read'),
+          )) ?? [],
         submissions,
         commitments,
         followUps,
@@ -1159,8 +1223,18 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
       });
       const canManage = hasPermission(context, 'procurement.manage');
 
+      const { timelineEntries, ...recordData } = data;
+      const timeline = purchasingTimeline({
+        ...recordData,
+        extra: [
+          ...timelineEntries,
+          ...((await deps.additionalTimeline?.(context, orderId)) ?? []),
+        ],
+      });
+
       return {
-        ...data,
+        ...recordData,
+        timeline,
         submission: submission
           ? await submissionView(context, submission)
           : null,
@@ -1170,6 +1244,15 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
           !!data.order.origin.workflowRunId &&
           verifiedRuns.has(data.order.origin.workflowRunId),
         canManage,
+        reconciliation: {
+          available: (await deps.reconciliationAvailable?.(context)) ?? false,
+          decisions: (await deps.shortfallAvailable?.(context)) ?? false,
+          manualReceipt:
+            data.order.authority === 'luma' &&
+            data.order.status === 'open' &&
+            !data.supplier?.link &&
+            !data.submissions.some((s) => s.channel !== 'email'),
+        },
         extraction: {
           available: deps.model.available && !!deps.model.gateway,
           reason: deps.model.available ? null : deps.model.reason,
@@ -1547,6 +1630,10 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         (tx) => tx.submission(submissionId),
       );
       if (!submission) notFound('Submission not found');
+      if (submission!.channel === 'email')
+        conflict(
+          'Review and send this supplier email in the Operations Inbox.',
+        );
       const view = await submissionView(context, submission!);
       if (!view.canApprove || submission!.decisionId !== request.decisionId)
         conflict(
@@ -1611,6 +1698,22 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         (tx) => tx.submission(submissionId),
       );
       if (!submission) notFound('Submission not found');
+      if (submission!.channel === 'email')
+        conflict(
+          'Review and send this supplier email in the Operations Inbox.',
+        );
+      if (
+        context.actor.id === submission!.requestedBy &&
+        [
+          'submitted',
+          'failed',
+          'rejected',
+          'expired',
+          'uncertain',
+          'submitting',
+        ].includes(submission!.state)
+      )
+        return submissionView(context, submission!);
       const view = await submissionView(context, submission!);
       if (!view.canSend)
         conflict('Only the requester can send an approved submission.');
@@ -1634,6 +1737,8 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
       if (!submission) notFound('Submission not found');
       if (!deps.admission)
         unavailable('Sending orders is unavailable on this server.');
+      if (submission!.channel === 'email')
+        conflict('Check the existing supplier email in the Operations Inbox.');
       if (!['uncertain', 'submitting'].includes(submission!.state))
         return submissionView(context, submission!);
       const principal = await deps
@@ -1811,6 +1916,336 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         return purged;
       });
     },
+    /** Returns the current bounded remainder for an active decision; proposals must recheck it before effects. */
+    async shortfall(
+      context: TenantContext,
+      orderId: string,
+      attentionKey: string,
+    ) {
+      context = await authorize(context);
+
+      return deps.store.transaction(context.tenantId, false, async (tx) => {
+        const order = await tx.order(orderId);
+        if (!order) notFound('Purchase order not found');
+        const commitments = await tx.commitments([orderId]);
+        const { progress } = progressFor(order!, {
+          submissions: await tx.submissions([orderId]),
+          commitments,
+          followUps: await tx.followUps([orderId]),
+          supplier: await tx.supplier(order!.supplierId),
+          verified: new Set(),
+        });
+        const attention = progress.attention.find(
+          (a) => a.key === attentionKey,
+        );
+        if (
+          !attention ||
+          !['commitment_changed', 'receipt_difference'].includes(attention.kind)
+        )
+          conflict(
+            'This difference no longer needs a decision. Refresh the order.',
+          );
+        const fact = commitments.find((c) => c.id === attention!.commitmentId);
+        const affected = attention!.lineId
+          ? progress.lines.filter((line) => line.lineId === attention!.lineId)
+          : progress.lines;
+
+        return {
+          supplierId: order!.supplierId,
+          quantities: affected
+            .map((line) => ({
+              sku: line.sku,
+              lineId: line.lineId,
+              quantity:
+                fact?.kind === 'confirmed_quantity'
+                  ? Math.max(0, line.ordered - (fact.quantity ?? line.ordered))
+                  : fact?.kind === 'shortage' || fact?.kind === 'damaged'
+                    ? (fact.quantity ?? 0)
+                    : line.outstanding,
+            }))
+            .filter((line) => line.quantity > 0),
+          evidenceRefs: [orderId, ...(fact ? [fact.id] : [])],
+        };
+      });
+    },
+    /** Records cumulative manual receipts or differences without changing provider evidence. */
+    async recordReceipt(
+      context: TenantContext,
+      orderId: string,
+      input: unknown,
+    ) {
+      context = await authorize(context, true);
+      if (
+        !deps.parse.receipt ||
+        !(await deps.reconciliationAvailable?.(context))
+      )
+        unavailable(
+          'Receipt reconciliation is not enabled for this workspace.',
+        );
+      const request = deps.parse.receipt!(input);
+
+      return incomingResult(
+        context,
+        orderId,
+        command(
+          context,
+          request.id,
+          { command: 'receipt', orderId, ...request },
+          async (tx) => {
+            const order = await tx.order(orderId);
+            if (!order) notFound('Purchase order not found');
+            if (order!.authority !== 'luma' || order!.status !== 'open')
+              conflict('Only an open Luma purchase order can be reconciled.');
+            if (!order!.lines.some((line) => line.id === request.lineId))
+              conflict('That order line does not exist.');
+            if (Date.parse(request.receivedAt) > deps.now().getTime())
+              conflict('Receipt time cannot be in the future.');
+            const supplier = await tx.supplier(order!.supplierId);
+            const submissions = await tx.submissions([orderId]);
+            if (
+              request.kind === 'received' &&
+              (supplier?.link || submissions.some((s) => s.channel !== 'email'))
+            )
+              conflict(
+                'Record receipt in the purchasing system that owns this order.',
+              );
+            const commitments = await tx.commitments([orderId]);
+            const latest = commitments
+              .filter(
+                (c) =>
+                  c.lineId === request.lineId &&
+                  c.kind === request.kind &&
+                  c.status === 'confirmed',
+              )
+              .at(-1);
+            if ((latest?.id ?? null) !== request.expectedCommitmentId)
+              conflict(
+                'This quantity changed. Refresh the order before recording it.',
+              );
+            const receipt = commitments
+              .filter(
+                (c) =>
+                  c.lineId === request.lineId &&
+                  c.kind === 'received' &&
+                  c.status === 'confirmed',
+              )
+              .at(-1);
+            const damaged = commitments
+              .filter(
+                (c) =>
+                  c.lineId === request.lineId &&
+                  c.kind === 'damaged' &&
+                  c.status === 'confirmed',
+              )
+              .at(-1);
+            if (
+              request.kind === 'received' &&
+              request.damagedQuantity !== undefined &&
+              (damaged?.id ?? null) !== request.expectedDamagedCommitmentId
+            )
+              conflict(
+                'Damaged quantities changed. Refresh the order before recording receipt.',
+              );
+            if (
+              request.kind === 'damaged' &&
+              request.quantity > (receipt?.quantity ?? 0)
+            )
+              conflict('Damaged units cannot exceed the recorded receipt.');
+            if (
+              request.kind === 'received' &&
+              request.damagedQuantity !== undefined &&
+              request.damagedQuantity > request.quantity
+            )
+              conflict('Damaged units cannot exceed the receipt.');
+            if (
+              request.kind === 'received' &&
+              request.quantity <
+                (request.damagedQuantity ?? damaged?.quantity ?? 0)
+            )
+              conflict(
+                'Receipt cannot be less than the recorded damaged units.',
+              );
+            const commitment = await tx.insertCommitment(
+              {
+                id: request.id,
+                tenantId: context.tenantId,
+                purchaseOrderId: orderId,
+                lineId: request.lineId,
+                kind: request.kind,
+                quantity: request.quantity,
+                date: null,
+                text: null,
+                source: {
+                  kind: 'manual_receipt',
+                  receivedAt: request.receivedAt,
+                  condition: request.condition,
+                  reason: request.reason,
+                  evidence: request.evidence,
+                },
+                status: 'confirmed',
+                reviewReasons: [],
+                supersedes: latest?.id ?? null,
+                recordedAt: deps.now().toISOString(),
+                recordedBy: { kind: 'user', id: context.actor.id },
+                review: null,
+              },
+              `receipt:${request.id}`,
+            );
+            if (
+              request.kind === 'received' &&
+              request.damagedQuantity !== undefined
+            )
+              await tx.insertCommitment(
+                {
+                  ...commitment,
+                  id: deps.uuid(`receipt-damage:${request.id}`),
+                  kind: 'damaged',
+                  quantity: request.damagedQuantity,
+                  supersedes: damaged?.id ?? null,
+                },
+                `receipt-damage:${request.id}`,
+              );
+            await tx.audit(
+              audit(
+                context,
+                'purchase_order.receipt_recorded',
+                request.id,
+                orderId,
+                {
+                  commitmentId: request.id,
+                  kind: request.kind,
+                  quantity: String(request.quantity),
+                  lineId: request.lineId,
+                  reason: request.reason,
+                },
+                request.evidence,
+              ),
+            );
+
+            return commitment;
+          },
+        ),
+      );
+    },
+    /** Records the independently verified result of an admitted Operations Inbox submission. */
+    async recordEmailSubmission(
+      context: TenantContext,
+      request: {
+        id: string;
+        purchaseOrderId: string;
+        outboundId: string;
+        threadId: string;
+        connectionId: string;
+        requestedDeliveryDate: string;
+        state: 'submitted' | 'failed' | 'uncertain';
+        sentMessageId?: string;
+        reason?: string;
+      },
+    ) {
+      context = await authorize(context, true);
+      const result = await deps.store.transaction(
+        context.tenantId,
+        true,
+        async (tx) => {
+          const order = await tx.order(request.purchaseOrderId);
+          if (!order) notFound('Purchase order not found');
+          const supplier = await tx.supplier(order!.supplierId);
+          const prior = await tx.submission(request.id);
+          if (
+            !prior &&
+            (supplier?.link ||
+              order!.authority !== 'luma' ||
+              !['draft', 'open'].includes(order!.status))
+          )
+            conflict('This order cannot be sent through email.');
+          if (
+            prior &&
+            (prior.channel !== 'email' ||
+              prior.purchaseOrderId !== request.purchaseOrderId ||
+              prior.outgoing?.outboundId !== request.outboundId ||
+              prior.requestedBy !== context.actor.id)
+          )
+            conflict('This email submission ID was already used.');
+          if (prior?.state === 'submitted' && request.state === 'submitted')
+            return { submission: prior, order: order! };
+          if (
+            !prior &&
+            (await tx.submissions([order!.id])).some(
+              (s) => !['failed', 'rejected', 'expired'].includes(s.state),
+            )
+          )
+            conflict('An active submission already exists for this order.');
+          const now = deps.now().toISOString();
+          const submission: Submission = {
+            id: request.id,
+            tenantId: context.tenantId,
+            purchaseOrderId: order!.id,
+            channel: 'email',
+            outgoing: {
+              outboundId: request.outboundId,
+              threadId: request.threadId,
+              sentMessageId: request.sentMessageId ?? null,
+            },
+            connectionId: request.connectionId,
+            supplier: { externalId: order!.supplierId, scopeKey: '' },
+            requestedDeliveryDate:
+              prior?.requestedDeliveryDate ?? request.requestedDeliveryDate,
+            lines: order!.lines.map((line) => ({
+              lineId: line.id,
+              sku: { externalId: line.sku, scopeKey: '' },
+              quantity: line.quantity,
+              unit: line.unit,
+            })),
+            actionId: request.outboundId,
+            decisionId: null,
+            requestedBy: context.actor.id,
+            requestedAt: prior?.requestedAt ?? now,
+            expiresAt: prior?.expiresAt ?? now,
+            state: request.state,
+            externalOrder: null,
+            submittedAt:
+              prior?.submittedAt ??
+              (request.state === 'submitted' ? now : null),
+            decidedBy: null,
+            decidedAt: null,
+            failure: request.reason ?? null,
+            updatedAt: now,
+          };
+          if (prior) await tx.saveSubmission(submission, true);
+          else {
+            await tx.insertSubmission(submission);
+            await tx.saveSubmission(submission, true);
+          }
+          await tx.audit(
+            audit(
+              context,
+              'purchase_order.email_submission',
+              `${request.id}:${request.state}`,
+              order!.id,
+              {
+                state: request.state,
+                outboundId: request.outboundId,
+                threadId: request.threadId,
+              },
+              [request.outboundId],
+            ),
+          );
+
+          return { submission, order: order! };
+        },
+      );
+      if (request.state === 'submitted' && result.order.status === 'draft')
+        await deps.openOrder(
+          context,
+          result.order,
+          deps.uuid(`email-open:${request.id}`),
+          'Approved email submission verified by the mail provider',
+        );
+
+      await deps.incomingChanged?.(context, request.purchaseOrderId);
+
+      return result.submission;
+    },
     /** Records what a supplier said by hand, citing a message, or corrects a commitment. */
     async recordCommitment(
       context: TenantContext,
@@ -1820,128 +2255,136 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
       context = await authorize(context, true);
       const request = deps.parse.commitment(input);
 
-      return command(
+      return incomingResult(
         context,
-        request.id,
-        { command: 'commitment', orderId, ...request },
-        async (tx) => {
-          const order = await tx.order(orderId);
-          if (!order) notFound('Purchase order not found');
-          const line = request.lineId
-            ? order!.lines.find((l) => l.id === request.lineId)
-            : null;
-          if (request.lineId && !line)
-            conflict('That order line does not exist.');
-          if (
-            request.kind === 'confirmed_quantity' &&
-            (!line || request.quantity === null)
-          )
-            conflict('A confirmed quantity needs a line and a quantity.');
-          if (request.kind === 'promised_date' && !request.date)
-            conflict('A promised date needs a date.');
-          if (request.kind === 'condition' && !request.text?.trim())
-            conflict('Describe the condition.');
-          let source: Commitment['source'];
-          if (request.supersedes) {
-            const prior = await tx.commitment(request.supersedes);
-            if (!prior || prior.purchaseOrderId !== orderId)
-              notFound('The commitment to correct was not found.');
-            if (prior!.kind === 'received')
-              conflict(
-                'Receipts come from the purchasing system and cannot be corrected here.',
-              );
-            if (!request.reason?.trim()) conflict('Explain the correction.');
-            source = { kind: 'correction', reason: request.reason!.trim() };
-          } else {
-            if (!request.communicationId || !request.span)
-              conflict(
-                'Select the words in a supplier message that state this.',
-              );
-            const communication = await tx.communication(
-              request.communicationId!,
-            );
-            if (!communication || communication.purchaseOrderId !== orderId)
-              notFound('Message not found');
-            if (!communication!.body && communication!.subject === null)
-              conflict('The message text was removed.');
-            const text = messageText({
-              subject: communication!.subject ?? '',
-              body: communication!.body ?? '',
-            });
+        orderId,
+        command(
+          context,
+          request.id,
+          { command: 'commitment', orderId, ...request },
+          async (tx) => {
+            const order = await tx.order(orderId);
+            if (!order) notFound('Purchase order not found');
+            const line = request.lineId
+              ? order!.lines.find((l) => l.id === request.lineId)
+              : null;
+            if (request.lineId && !line)
+              conflict('That order line does not exist.');
             if (
-              request.span!.start < 0 ||
-              request.span!.end > text.length ||
-              request.span!.end <= request.span!.start
+              request.kind === 'confirmed_quantity' &&
+              (!line || request.quantity === null)
             )
-              conflict('The selected words are not in the message.');
-            source = {
-              kind: 'communication',
-              communicationId: communication!.id,
-              span: request.span!,
-              extraction: null,
-            };
-          }
-          const now = deps.now().toISOString();
-          const submission = (await tx.submissions([orderId]))[0] ?? null;
-          const commitment = await tx.insertCommitment(
-            {
-              id: request.id,
-              tenantId: context.tenantId,
-              purchaseOrderId: orderId,
-              lineId: request.lineId,
-              kind: request.kind,
-              quantity:
-                request.kind === 'confirmed_quantity' ? request.quantity : null,
-              date: ['promised_date', 'shipped'].includes(request.kind)
-                ? request.date
-                : null,
-              text: request.kind === 'condition' ? request.text!.trim() : null,
-              source: source!,
-              status: 'confirmed',
-              reviewReasons: [],
-              supersedes: request.supersedes,
-              recordedAt: now,
-              recordedBy: { kind: 'user', id: context.actor.id },
-              review: null,
-            },
-            `manual:${request.id}`,
-          );
-          // A person who records a change has seen it; record that they accepted it.
-          if (
-            isMaterialChange(
-              commitment,
-              line ?? undefined,
-              submission?.requestedDeliveryDate ?? null,
-            )
-          )
-            await tx.insertFollowUp({
-              id: deps.uuid(`follow-up:commitment_changed:${commitment.id}`),
-              tenantId: context.tenantId,
-              purchaseOrderId: orderId,
-              key: `commitment_changed:${commitment.id}`,
-              response: 'accepted',
-              note: 'Recorded by hand',
-              nextCheckAt: null,
-              respondedBy: context.actor.id,
-              respondedAt: now,
-            });
-          await tx.audit(
-            audit(
-              context,
-              'purchase_order.commitment_recorded',
-              request.id,
-              orderId,
+              conflict('A confirmed quantity needs a line and a quantity.');
+            if (request.kind === 'promised_date' && !request.date)
+              conflict('A promised date needs a date.');
+            if (request.kind === 'condition' && !request.text?.trim())
+              conflict('Describe the condition.');
+            let source: Commitment['source'];
+            if (request.supersedes) {
+              const prior = await tx.commitment(request.supersedes);
+              if (!prior || prior.purchaseOrderId !== orderId)
+                notFound('The commitment to correct was not found.');
+              if (prior!.kind === 'received')
+                conflict(
+                  'Receipts come from the purchasing system and cannot be corrected here.',
+                );
+              if (!request.reason?.trim()) conflict('Explain the correction.');
+              source = { kind: 'correction', reason: request.reason!.trim() };
+            } else {
+              if (!request.communicationId || !request.span)
+                conflict(
+                  'Select the words in a supplier message that state this.',
+                );
+              const communication = await tx.communication(
+                request.communicationId!,
+              );
+              if (!communication || communication.purchaseOrderId !== orderId)
+                notFound('Message not found');
+              if (!communication!.body && communication!.subject === null)
+                conflict('The message text was removed.');
+              const text = messageText({
+                subject: communication!.subject ?? '',
+                body: communication!.body ?? '',
+              });
+              if (
+                request.span!.start < 0 ||
+                request.span!.end > text.length ||
+                request.span!.end <= request.span!.start
+              )
+                conflict('The selected words are not in the message.');
+              source = {
+                kind: 'communication',
+                communicationId: communication!.id,
+                span: request.span!,
+                extraction: null,
+              };
+            }
+            const now = deps.now().toISOString();
+            const submission = (await tx.submissions([orderId]))[0] ?? null;
+            const commitment = await tx.insertCommitment(
               {
-                commitmentId: request.id,
+                id: request.id,
+                tenantId: context.tenantId,
+                purchaseOrderId: orderId,
+                lineId: request.lineId,
                 kind: request.kind,
-                lineId: request.lineId ?? '',
-                supersedes: request.supersedes ?? '',
+                quantity: ['confirmed_quantity', 'shipped'].includes(
+                  request.kind,
+                )
+                  ? request.quantity
+                  : null,
+                date: ['promised_date', 'shipped'].includes(request.kind)
+                  ? request.date
+                  : null,
+                text:
+                  request.kind === 'condition' ? request.text!.trim() : null,
+                source: source!,
+                status: 'confirmed',
+                reviewReasons: [],
+                supersedes: request.supersedes,
+                recordedAt: now,
+                recordedBy: { kind: 'user', id: context.actor.id },
+                review: null,
               },
-            ),
-          );
+              `manual:${request.id}`,
+            );
+            // A person who records a change has seen it; record that they accepted it.
+            if (
+              isMaterialChange(
+                commitment,
+                line ?? undefined,
+                submission?.requestedDeliveryDate ?? null,
+              )
+            )
+              await tx.insertFollowUp({
+                id: deps.uuid(`follow-up:commitment_changed:${commitment.id}`),
+                tenantId: context.tenantId,
+                purchaseOrderId: orderId,
+                key: `commitment_changed:${commitment.id}`,
+                response: 'accepted',
+                note: 'Recorded by hand',
+                nextCheckAt: null,
+                respondedBy: context.actor.id,
+                respondedAt: now,
+              });
+            await tx.audit(
+              audit(
+                context,
+                'purchase_order.commitment_recorded',
+                request.id,
+                orderId,
+                {
+                  commitmentId: request.id,
+                  kind: request.kind,
+                  lineId: request.lineId ?? '',
+                  supersedes: request.supersedes ?? '',
+                },
+              ),
+            );
 
-          return commitment;
-        },
+            return commitment;
+          },
+        ),
       );
     },
     /** Confirms or rejects an extracted commitment; values are never edited. */
@@ -1953,110 +2396,150 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
       context = await authorize(context, true);
       const request = deps.parse.review(input);
 
-      return deps.store.transaction(context.tenantId, true, async (tx) => {
-        const commitment = await tx.commitment(commitmentId);
-        if (!commitment) notFound('Commitment not found');
-        if (commitment!.status !== 'needs_review') {
-          if (commitment!.review?.outcome === request.outcome)
-            return commitment!;
-          conflict('This commitment was already reviewed. Refresh it.');
-        }
-        const now = deps.now().toISOString();
-        const reviewed: Commitment = {
-          ...commitment!,
-          status: request.outcome,
-          review: { outcome: request.outcome, by: context.actor.id, at: now },
-        };
-        await tx.reviewCommitment(reviewed);
-        if (request.outcome === 'confirmed' && request.acceptChange)
-          await tx.insertFollowUp({
-            id: deps.uuid(`follow-up:commitment_changed:${commitmentId}`),
-            tenantId: context.tenantId,
-            purchaseOrderId: commitment!.purchaseOrderId,
-            key: `commitment_changed:${commitmentId}`,
-            response: 'accepted',
-            note: 'Accepted while reviewing the supplier message',
-            nextCheckAt: null,
-            respondedBy: context.actor.id,
-            respondedAt: now,
-          });
-        await tx.audit(
-          audit(
-            context,
-            'purchase_order.commitment_reviewed',
-            commitmentId,
-            commitment!.purchaseOrderId,
-            { commitmentId, outcome: request.outcome },
-          ),
-        );
+      const result = await deps.store.transaction(
+        context.tenantId,
+        true,
+        async (tx) => {
+          const commitment = await tx.commitment(commitmentId);
+          if (!commitment) notFound('Commitment not found');
+          if (commitment!.status !== 'needs_review') {
+            if (commitment!.review?.outcome === request.outcome)
+              return commitment!;
+            conflict('This commitment was already reviewed. Refresh it.');
+          }
+          const now = deps.now().toISOString();
+          const reviewed: Commitment = {
+            ...commitment!,
+            status: request.outcome,
+            review: { outcome: request.outcome, by: context.actor.id, at: now },
+          };
+          await tx.reviewCommitment(reviewed);
+          if (request.outcome === 'confirmed' && request.acceptChange)
+            await tx.insertFollowUp({
+              id: deps.uuid(`follow-up:commitment_changed:${commitmentId}`),
+              tenantId: context.tenantId,
+              purchaseOrderId: commitment!.purchaseOrderId,
+              key: `commitment_changed:${commitmentId}`,
+              response: 'accepted',
+              note: 'Accepted while reviewing the supplier message',
+              nextCheckAt: null,
+              respondedBy: context.actor.id,
+              respondedAt: now,
+            });
+          await tx.audit(
+            audit(
+              context,
+              'purchase_order.commitment_reviewed',
+              commitmentId,
+              commitment!.purchaseOrderId,
+              { commitmentId, outcome: request.outcome },
+            ),
+          );
 
-        return reviewed;
-      });
+          return reviewed;
+        },
+      );
+      await deps.incomingChanged?.(context, result.purchaseOrderId);
+
+      return result;
     },
     /** Accepts a supplier change, or records a follow-up and when to check again. */
     async respond(context: TenantContext, orderId: string, input: unknown) {
       context = await authorize(context, true);
       const request = deps.parse.followUp(input);
-      const current = await service.order(context, orderId);
-      const attention = current.progress.attention.find(
-        (a) => a.key === request.key,
+
+      return incomingResult(
+        context,
+        orderId,
+        command(
+          context,
+          request.id,
+          { command: 'follow_up', orderId, ...request },
+          async (tx) => {
+            const order = await tx.order(orderId);
+            if (!order) notFound('Purchase order not found');
+            const current = {
+              followUps: await tx.followUps([orderId]),
+              progress: progressFor(order!, {
+                submissions: await tx.submissions([orderId]),
+                commitments: await tx.commitments([orderId]),
+                followUps: await tx.followUps([orderId]),
+                supplier: await tx.supplier(order!.supplierId),
+                verified: new Set(),
+              }).progress,
+            };
+            const attention = current.progress.attention.find(
+              (a) => a.key === request.key,
+            );
+            if (!attention) {
+              conflict('This no longer needs a response. Refresh the order.');
+            }
+            if (
+              ![
+                'commitment_changed',
+                'confirmation_overdue',
+                'delivery_overdue',
+                'receipt_difference',
+              ].includes(attention!.kind)
+            )
+              conflict('Respond to this from its own review.');
+            if (
+              request.response === 'accepted' &&
+              !['commitment_changed', 'receipt_difference'].includes(
+                attention!.kind,
+              )
+            )
+              conflict('Record a follow-up and when to check again.');
+            if (
+              ['credited', 'written_off'].includes(request.response) &&
+              attention!.kind !== 'receipt_difference'
+            )
+              conflict(
+                'Only a received-goods difference can be credited or written off.',
+              );
+            const now = deps.now();
+            if (request.response === 'following_up') {
+              const next = request.nextCheckAt
+                ? Date.parse(request.nextCheckAt)
+                : NaN;
+              if (
+                !(next > now.getTime()) ||
+                next > now.getTime() + 60 * 24 * hour
+              )
+                conflict(
+                  'Choose when to check again, within the next 60 days.',
+                );
+            }
+            const followUp: FollowUp = {
+              id: request.id,
+              tenantId: context.tenantId,
+              purchaseOrderId: orderId,
+              key: request.key,
+              response: request.response,
+              note: request.note.trim(),
+              nextCheckAt:
+                request.response === 'following_up'
+                  ? request.nextCheckAt
+                  : null,
+              respondedBy: context.actor.id,
+              respondedAt: now.toISOString(),
+            };
+
+            if (!(await tx.insertFollowUp(followUp)))
+              conflict('Someone already responded. Refresh the order.');
+            await tx.audit(
+              audit(context, 'purchase_order.follow_up', request.id, orderId, {
+                key: request.key,
+                response: request.response,
+                nextCheckAt: followUp.nextCheckAt ?? '',
+                reason: followUp.note,
+              }),
+            );
+
+            return followUp;
+          },
+        ),
       );
-      if (!attention) {
-        const answered = current.followUps.find((f) => f.key === request.key);
-        if (
-          answered?.response === request.response &&
-          answered.respondedBy === context.actor.id
-        )
-          return answered;
-        conflict('This no longer needs a response. Refresh the order.');
-      }
-      if (
-        ![
-          'commitment_changed',
-          'confirmation_overdue',
-          'delivery_overdue',
-        ].includes(attention!.kind)
-      )
-        conflict('Respond to this from its own review.');
-      if (
-        request.response === 'accepted' &&
-        attention!.kind !== 'commitment_changed'
-      )
-        conflict('Record a follow-up and when to check again.');
-      const now = deps.now();
-      if (request.response === 'following_up') {
-        const next = request.nextCheckAt
-          ? Date.parse(request.nextCheckAt)
-          : NaN;
-        if (!(next > now.getTime()) || next > now.getTime() + 60 * 24 * hour)
-          conflict('Choose when to check again, within the next 60 days.');
-      }
-      const followUp: FollowUp = {
-        id: request.id,
-        tenantId: context.tenantId,
-        purchaseOrderId: orderId,
-        key: request.key,
-        response: request.response,
-        note: request.note.trim(),
-        nextCheckAt:
-          request.response === 'following_up' ? request.nextCheckAt : null,
-        respondedBy: context.actor.id,
-        respondedAt: now.toISOString(),
-      };
-
-      return deps.store.transaction(context.tenantId, true, async (tx) => {
-        if (!(await tx.insertFollowUp(followUp)))
-          conflict('Someone already responded. Refresh the order.');
-        await tx.audit(
-          audit(context, 'purchase_order.follow_up', request.id, orderId, {
-            key: request.key,
-            response: request.response,
-            nextCheckAt: followUp.nextCheckAt ?? '',
-          }),
-        );
-
-        return followUp;
-      });
     },
     /**
      * Background step for one principal: dispatches approved submissions, settles uncertain
@@ -2068,6 +2551,10 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
         tx.liveSubmissions(context.actor.id),
       );
       for (const submission of live) {
+        if (submission.channel === 'email') {
+          await deps.incomingChanged?.(context, submission.purchaseOrderId);
+          continue;
+        }
         if (submission.state === 'approved')
           await dispatch(context, submission);
         else if (

@@ -24,6 +24,7 @@ import {
 import {
   createAutomaticLinkStore,
   createCommerceSyncService,
+  createPurchasingTermsRecorder,
 } from '@luma/application-runtime/sync';
 import { createAutoLinkRunner, createSyncRunner } from '@luma/commerce-sync';
 import { createSyncStore } from '@luma/commerce-sync/composition';
@@ -86,6 +87,8 @@ export async function createPilot(
     pause = () => delay(20_000),
     proposalFreshnessMs = 300_000,
     observability,
+    modelGateway,
+    supplierExtraction,
     role = 'api',
     // Detection timing for scheduled detection: `configuration` and `holdOverdueSeconds`.
     // Simulator workspaces provisioned for the workflow demo default to faster windows.
@@ -320,6 +323,15 @@ export async function createPilot(
             record: async () => undefined,
           }),
           ingestion: commerce.ingestion,
+          recordPurchasingTerms: createPurchasingTermsRecorder(
+            db,
+            identity.service.refreshContext,
+            (actor) =>
+              syntheticFeatureRelease(
+                env,
+                createTenantFeatureRelease(observability),
+              )(actor.tenantId, 'supplier-purchasing-terms'),
+          ),
           customers: createCustomerProfiles(db),
           recordRead: createReadChecks(db),
           resolveContext: identity.service.resolveWorkflowContext,
@@ -491,6 +503,8 @@ export async function createPilot(
       : undefined;
     const application = createApplicationServices({
       observability,
+      ...(modelGateway ? { modelGateway } : {}),
+      ...(supplierExtraction ? { supplierExtraction } : {}),
       ...(processClient ? { replenishmentTransport: processClient } : {}),
       database: db,
       identity: identity.service,

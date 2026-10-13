@@ -15,6 +15,17 @@ export const featureFlags = [
   'starshipit-fulfillment',
   'starshipit-actions',
   'shopify-shipment-publishing',
+  'supplier-purchasing-terms',
+  'purchasing-workbench',
+  'purchasing-plans',
+  'purchasing-receipts',
+  'purchasing-shortfall-decisions',
+  'procurement-supplier-follow-ups',
+  'procurement-email-submission',
+  'purchasing-order-changes',
+  'purchasing-stock-booking',
+  'purchasing-outcomes',
+  'purchasing-incoming',
 ] as const;
 
 export type FeatureFlag = (typeof featureFlags)[number];

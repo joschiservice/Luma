@@ -18,7 +18,7 @@ import { Input } from '@luma/ui/components/primitives/input';
 import { Select } from '@luma/ui/components/primitives/select';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { type RefObject, useState } from 'react';
 
 import {
   createOrder,
@@ -45,6 +45,14 @@ export function useCommand<T, R>(
     onSuccess: (value) => {
       void client.invalidateQueries({
         queryKey: procurementKey(organizationId),
+      });
+      void client.invalidateQueries({
+        queryKey: [
+          'private',
+          'organization',
+          organizationId,
+          'purchasing-outcomes',
+        ],
       });
       saved(value);
     },
@@ -115,9 +123,11 @@ function ExternalFields({
 export function SupplierDialog({
   organizationId,
   close,
+  returnFocus,
 }: {
   organizationId: string;
   close: () => void;
+  returnFocus?: RefObject<HTMLButtonElement | null>;
 }) {
   const [id] = useState(() => crypto.randomUUID());
   const [name, setName] = useState('');
@@ -137,7 +147,7 @@ export function SupplierDialog({
         if (!open && !command.locked) close();
       }}
     >
-      <DialogContent showCloseButton={!command.locked}>
+      <DialogContent showCloseButton={!command.locked} finalFocus={returnFocus}>
         <DialogTitle>{m.procurement_supplier_dialog_title()}</DialogTitle>
         <DialogDescription>
           {m.procurement_supplier_dialog_description()}
@@ -204,11 +214,13 @@ export function OrderDialog({
   suppliers,
   close,
   saved,
+  returnFocus,
 }: {
   organizationId: string;
   suppliers: Supplier[];
   close: () => void;
   saved: (order: PurchaseOrder) => void;
+  returnFocus?: RefObject<HTMLButtonElement | null>;
 }) {
   const [id] = useState(() => crypto.randomUUID());
   const [supplierId, setSupplierId] = useState(suppliers[0]?.id ?? '');
@@ -247,6 +259,7 @@ export function OrderDialog({
       <DialogContent
         className="procurement-order-dialog"
         showCloseButton={!command.locked}
+        finalFocus={returnFocus}
       >
         <DialogTitle>{m.procurement_order_dialog_title()}</DialogTitle>
         <DialogDescription>

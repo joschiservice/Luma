@@ -56,6 +56,7 @@ export const postingCommandSchema = z
       'dispatch',
       'reconciliation',
       'production',
+      'purchase_receipt',
     ]),
     reason: z.string().trim().min(1).max(1024),
     effectiveAt: z.string().datetime({ offset: true }).nullable(),
@@ -73,6 +74,20 @@ export const postingCommandSchema = z
       .array(z.object({ account: addressSchema, quantity }).strict())
       .max(5000),
     expected: z.array(expected).max(5000),
+    purchaseReceipt: z
+      .object({
+        purchaseOrderId: uuid,
+        lineId: uuid,
+        commitmentId: uuid,
+        damagedCommitmentId: uuid.nullable(),
+        cumulativeGood: quantity,
+        cumulativeDamaged: quantity,
+        previousGood: quantity,
+        previousDamaged: quantity,
+        scopeVersion: z.string().regex(/^\d+$/),
+      })
+      .strict()
+      .optional(),
     reversalOf: uuid.optional(),
   })
   .strict()
@@ -81,6 +96,11 @@ export const postingCommandSchema = z
       value.postings.length >= 2 ||
       (value.purpose === 'opening' && value.postings.length === 0),
     'An entry needs at least two postings.',
+  )
+  .refine(
+    (value) =>
+      (value.purpose === 'purchase_receipt') === !!value.purchaseReceipt,
+    'Receipt postings need an exact receipt binding.',
   );
 
 const openingInputSchema = z
@@ -124,6 +144,16 @@ export const ledgerReceiptSchema = z
   .strict();
 
 export const ledgerInputParser: LedgerInputParser = {
+  purchaseReceipt: (input) =>
+    z
+      .object({
+        id: uuid,
+        purchaseOrderId: uuid,
+        lineId: uuid,
+        reason: z.string().trim().min(1).max(1024),
+      })
+      .strict()
+      .parse(input),
   command: (input) => postingCommandSchema.parse(input),
   opening: (input) => openingInputSchema.parse(input),
   historical: (input) =>

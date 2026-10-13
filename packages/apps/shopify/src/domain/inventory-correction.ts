@@ -8,12 +8,25 @@ export const correctionCapabilities = [
   'inventory.available.reconcile',
 ] as const;
 
+export const receiptStockBindingSchema = z
+  .object({
+    purchaseOrderId: z.string().uuid(),
+    lineId: z.string().uuid(),
+    commitmentId: z.string().uuid(),
+    damagedCommitmentId: z.string().uuid().nullable(),
+    baselineAvailable: z.number().int(),
+    quantity: z.number().int().positive(),
+    cumulativeGood: z.number().int().positive(),
+  })
+  .strict();
+
 export const correctionTarget = z
   .object({
     positionId: z.string().uuid(),
     connectionId: z.string().uuid(),
     sourceConnectionId: z.string().uuid(),
     nativeAllocation: nativePublicationChoiceSchema.optional(),
+    receipt: receiptStockBindingSchema.optional(),
   })
   .strict();
 
@@ -55,6 +68,7 @@ export const correctionSnapshot = z.object({
     revision: z.string(),
     available: z.number().int().nonnegative(),
     nativeAllocation: nativePublicationBindingSchema.optional(),
+    receipt: receiptStockBindingSchema.optional(),
   }),
 });
 
@@ -77,7 +91,7 @@ const correctionBlockerText: Record<CorrectionBlockerReason, string> = {
 };
 
 /**
- * Admits only ERP-to-Shopify reconciliation of fresh, known, whole-unit available quantities.
+ * Admits fresh, source-bound whole-unit stock changes, including an exact manual receipt baseline.
  * Returns the reason a correction is blocked, or null when it may be reviewed.
  */
 export function correctionBlockerReason(
@@ -94,6 +108,11 @@ export function correctionBlockerReason(
     const age = now.getTime() - Date.parse(observedAt);
     if (age < 0 || age >= 5 * 60_000) return 'stale';
   }
+  if (
+    snapshot.source.receipt &&
+    snapshot.available !== snapshot.source.receipt.baselineAvailable
+  )
+    return 'stale';
   if (snapshot.available === snapshot.source.available)
     return 'already_matches';
 
@@ -109,10 +128,13 @@ export function correctionBlocker(
 ): string | null {
   const reason = correctionBlockerReason(snapshot, choice, granted, now);
 
+  if (reason === 'stale' && snapshot.source.receipt)
+    return 'Receipt or stock evidence is stale or changed. Read stock and review a fresh receipt booking.';
+
   return reason ? correctionBlockerText[reason] : null;
 }
 
-/** Requires a new complete Shopify read of the exact target and unchanged ERP authority. */
+/** Requires a new complete Shopify read of the exact target and unchanged approved source authority. */
 export function inventoryReconciled(
   before: CorrectionSnapshot,
   after: CorrectionSnapshot,

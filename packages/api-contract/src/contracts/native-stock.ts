@@ -24,6 +24,79 @@ const base = '/v1/organizations/{organizationId}/inventory/native';
 const errors = [400, 401, 403, 404, 409, 422, 503] as const;
 
 export const nativeStockContract = {
+  verifyPurchaseReceipt: endpoint
+    .route({
+      method: 'POST',
+      path: `${base}/purchase-receipt-reviews/{reviewId}/check`,
+      summary: 'Independently read booked native receipt stock',
+      description:
+        'Reads the committed entry and current balances. Repeats no posting. Later unrelated stock changes are inconclusive for the original exact quantity.',
+    })
+    .meta({
+      access: requires('inventory.read'),
+      errors: [...errors],
+      readOnly: true,
+    })
+    .input(
+      z.object({
+        params: organizationParamsSchema.extend({
+          reviewId: z.string().uuid(),
+        }),
+      }),
+    )
+    .output(
+      z.object({
+        outcome: z.enum(['verified', 'inconclusive']),
+        receipt: nativeLedgerReceiptSchema.nullable(),
+        accounts: nativeLedgerReceiptSchema.shape.accounts,
+        evidenceRefs: z.array(z.string().uuid()),
+        observedAt: z.string().datetime(),
+      }),
+    ),
+  preparePurchaseReceipt: endpoint
+    .route({
+      method: 'POST',
+      path: `${base}/purchase-receipt-reviews`,
+      summary: 'Prepare a manual purchase receipt for native stock',
+      description:
+        'Binds the current manual receipt, damage and native location ownership. Another current member approves before good units enter available and damaged units enter damaged stock. Exact retries reuse the review.',
+    })
+    .meta({ access: requires('inventory.manage'), errors: [...errors] })
+    .input(
+      z.object({
+        params: organizationParamsSchema,
+        body: z
+          .object({
+            id: z.string().uuid(),
+            purchaseOrderId: z.string().uuid(),
+            lineId: z.string().uuid(),
+            reason: z.string().trim().min(1).max(1024),
+          })
+          .strict(),
+      }),
+    )
+    .output(nativeLedgerReviewSchema),
+  purchaseReceiptReviews: endpoint
+    .route({
+      method: 'GET',
+      path: `${base}/purchase-receipt-reviews/{purchaseOrderId}`,
+      summary: 'Read native stock reviews for one purchase order',
+    })
+    .meta({ access: requires('inventory.read'), errors: [...errors] })
+    .input(
+      z.object({
+        params: organizationParamsSchema.extend({
+          purchaseOrderId: z.string().uuid(),
+        }),
+      }),
+    )
+    .output(
+      z.object({
+        enabled: z.boolean(),
+        items: z.array(nativeLedgerReviewSchema),
+        ownedLineIds: z.array(z.string().uuid()),
+      }),
+    ),
   readStock: endpoint
     .route({
       method: 'POST',

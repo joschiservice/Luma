@@ -355,3 +355,147 @@ describe('JTL purchasing', () => {
     expect(plan('silent')).toEqual([]);
   });
 });
+
+it('changes purchasing terms independently of stock and keeps explicit missing values', async () => {
+  const { context } = await seeded();
+  await jtl.command(context, {
+    kind: 'supplier-terms',
+    itemId: '1',
+    supplierId: '1',
+    netPrice: 10.25,
+    supplierArticleNumber: 'TOTE-1',
+    packSize: 6,
+    leadTimeDays: 4,
+  });
+  const terms = (
+    await call(context, 'items/1/suppliers?pageNumber=1&pageSize=10')
+  ).body;
+  expect(terms).toMatchObject({
+    items: expect.arrayContaining([
+      expect.objectContaining({
+        supplierId: 1,
+        netPurchasePrice: 10.25,
+        supplierItemNumber: 'TOTE-1',
+        packageUnitQuantity: 6,
+        deliveryTimeInDays: 4,
+      }),
+    ]),
+  });
+  await jtl.command(context, {
+    kind: 'supplier-terms',
+    itemId: '1',
+    supplierId: '1',
+    packSize: null,
+  });
+  expect(
+    (await call(context, 'items/1/suppliers?pageNumber=1&pageSize=10')).body,
+  ).toMatchObject({
+    items: expect.arrayContaining([
+      expect.objectContaining({
+        netPurchasePrice: 10.25,
+        packageUnitQuantity: undefined,
+      }),
+    ]),
+  });
+  expect(await readItemStock(context, '1')).toMatchObject({ total: 120 });
+});
+
+describe('receiving quarantine', () => {
+  it('books all physically delivered goods but excludes damaged units from availability', async () => {
+    const { context } = await seeded();
+    await call(context, 'purchase-orders', 'POST', body);
+    const before = await readItemStock(context, '1');
+    await jtl.command(context, {
+      kind: 'purchase-order-receive',
+      orderId: '1',
+      lines: [{ lineItemId: '1001', quantity: 4, damagedQuantity: 1 }],
+    });
+    const after = await readItemStock(context, '1');
+    expect(after?.total).toBe(before!.total + 4);
+    expect(after?.available).toBe(before!.available + 3);
+    expect((await call(context, 'purchase-orders/1')).body).toMatchObject({
+      lineItems: [{ deliveredQuantity: 4, openQuantity: 6 }],
+    });
+    await expect(
+      jtl.command(context, {
+        kind: 'purchase-order-receive',
+        orderId: '1',
+        lines: [{ lineItemId: '1001', quantity: 2, damagedQuantity: 3 }],
+      }),
+    ).rejects.toThrow('Invalid goods receipt');
+    expect((await readItemStock(context, '1'))?.available).toBe(
+      after?.available,
+    );
+  });
+});
+
+it('supports one-position revisions and refuses received lines and fabricated cancellation', async () => {
+  const { context } = await seeded();
+  const created = await call(context, 'purchase-orders', 'POST', body, {
+    'idempotency-key': 'revision-test',
+  });
+  const orderId = String(
+    (created.body as { purchaseOrderId: number }).purchaseOrderId,
+  );
+  const changed = await call(
+    context,
+    `purchase-orders/${orderId}/line-items/${Number(orderId) * 1000 + 1}`,
+    'PATCH',
+    { quantity: 8, deliveryDate: '2026-10-15T12:00:00Z' },
+  );
+  expect(changed).toMatchObject({
+    status: 200,
+    committed: true,
+    body: {
+      lineItems: [{ quantity: 8, deliveryDate: '2026-10-15T12:00:00Z' }],
+    },
+  });
+  const added = await call(
+    context,
+    `purchase-orders/${orderId}/line-items`,
+    'POST',
+    {
+      itemId: '2',
+      quantity: 3,
+      deliveryDate: '2026-10-16T12:00:00Z',
+      netPurchasePriceAmount: 21,
+      vatRatePercentage: 19,
+    },
+  );
+  expect(added).toMatchObject({
+    status: 200,
+    body: {
+      lineItems: expect.arrayContaining([
+        expect.objectContaining({ itemId: 2, quantity: 3 }),
+      ]),
+    },
+  });
+  const removed = await call(
+    context,
+    `purchase-orders/${orderId}/line-items/${Number(orderId) * 1000 + 2}`,
+    'DELETE',
+    {},
+  );
+  expect(removed).toMatchObject({
+    status: 200,
+    body: { lineItems: [{ quantity: 8 }] },
+  });
+  await jtl.command(context, {
+    kind: 'purchase-order-receive',
+    orderId,
+    lines: [{ lineItemId: String(Number(orderId) * 1000 + 1), quantity: 1 }],
+  });
+  expect(
+    await call(
+      context,
+      `purchase-orders/${orderId}/line-items/${Number(orderId) * 1000 + 1}`,
+      'PATCH',
+      { quantity: 5 },
+    ),
+  ).toMatchObject({ status: 409 });
+  expect(
+    await call(context, `purchase-orders/${orderId}`, 'PATCH', {
+      status: 1000,
+    }),
+  ).toMatchObject({ status: 404 });
+});

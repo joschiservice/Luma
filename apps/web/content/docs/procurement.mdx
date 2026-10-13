@@ -22,13 +22,42 @@ Switch between **Purchase orders** and **Suppliers** at the top. For orders, the
 
 You can also find suppliers and purchase orders from search with ⌘ K or Ctrl K.
 
+## Review supplier purchasing terms
+
+On a supplier or Product record, **Purchasing terms** shows each supplier's article number,
+price, pack size, minimum quantity, lead time and preference. Missing values show **Missing**,
+so you can distinguish an unknown term from a zero minimum. Purchasing-system values show
+when they were read and whether the read was incomplete.
+
+Choose **Add terms**, or **Edit** beside a product, to record one value with a reason. Your
+value appears next to the observed value it replaces; a later sync keeps both. **Sources
+and price history** keeps previous prices and the person and reason behind each change.
+A draft takes the current supplier article number and price when its currency is known.
+Changing terms later does not change an existing draft.
+
 ## Create a draft
+
+### Review a purchasing plan
+
+When **Purchasing** is available, compare requirements by supplier. Each product shows stock,
+its demand assumption, lead time, the order deadline and the quantity before and after pack
+rounding. Expand **Inputs and sources** to check read times and active replenishment rules.
+Missing or stale inputs withhold a suggestion. Existing drafts and orders link to ongoing work.
+
+Choose the demand period to update recommendations. Select products for a supplier, choose
+the receiving location and adjust quantities. The plan shows order value and the resulting
+days of cover. Record a reason for a minimum-value exception, then request draft approval.
+Each supplier has its own approval and verified draft. Sending remains a separate action.
+If creation is uncertain, check the saved order; that check creates or sends nothing.
+
+You can also record why you ignored a recommendation. **Insights** separates later observed
+stock and receipt outcomes from results whose evidence remains unknown.
 
 1. Choose **Add supplier** and enter the **Supplier name**. If the supplier exists in another system, add its ID as an external reference.
 2. Choose **New purchase order**, enter an **Order reference**, pick the supplier and add lines with SKU, description, quantity and unit.
 3. Choose **Create draft**. Nothing goes to the supplier until you send it.
 
-**Mark as open** records that the order is in progress without sending it. **Close order** marks it complete in Luma and doesn’t cancel it in your purchasing system. **Cancel order** ends it. Each status change needs a reason, and closed or canceled orders keep their history. Orders marked **Managed outside Luma** belong to another system and can’t be changed here.
+**Mark as open** records that the order is in progress without sending it. **Close order** marks it complete in Luma and doesn’t cancel it in your purchasing system. **Cancel order** ends an unsent local order. Submitted purchasing-system orders cannot be cancelled here unless the purchasing system supports a verified cancellation. Each status change needs a reason, and closed or canceled orders keep their history. Orders marked **Managed outside Luma** belong to another system and can’t be changed here.
 
 Replenishment Workflows can draft orders too. Such an order shows **Why it was ordered**: the stock that fell below the rule’s minimum, the proposed quantity, who approved it and whether Luma checked the draft.
 
@@ -87,3 +116,52 @@ A supplier’s page shows the counts **Open orders**, **Waiting on supplier**, *
 ## Replenishment
 
 The **Replenishment** panel on Procurement shows how many stock positions your replenishment rules watch and what to fix next. **Manage stock rules** opens the replenishment Workflow; see [Workflows](/docs/workflows).
+
+## Email orders and supplier follow-ups
+
+For a supplier without a purchasing system, add its email address and language on the
+supplier record. On the order, choose **Draft order email**, select the Operations Inbox,
+and review your company address and requested delivery date. Open the draft in the Inbox
+to review its text and PDF, then request approval. Luma sends after approval. Verified email
+acceptance does not mean the supplier confirmed the order.
+
+For an overdue confirmation or delivery, **Draft overdue follow-up** uses the promised and
+outstanding quantities. Its next check time moves only after the send is independently
+verified. Replies remain on the same thread and order; changed quantities or dates need
+review. Manual follow-up stays available without a connected Inbox. If an email bounces,
+check the address and review a new submission.
+
+## Record received goods and book stock
+
+For an order sent without a purchasing system, record received quantities per line, when they arrived, their condition and the delivery evidence. Quantities are cumulative: if another delivery arrives, enter the new received total. Record damaged units separately. The order keeps earlier values and your reason. Orders whose purchasing system owns receiving must be received there.
+
+A manual receipt records what arrived. Review its stock booking to make undamaged units available in the system that owns the receiving location. Shopify bookings show the stock before and after; another authorised person approves, and Luma checks Shopify independently after the write. If stock moved while awaiting approval, review a fresh proposal. If the outcome is uncertain, check the existing booking; Luma does not send it again.
+
+Locations owned by Luma use the native stock ledger. Another authorised member reviews the exact postings. Good units enter available stock and damaged units stay in the damaged bucket. Check stock independently after posting. Later stock movements may leave the original exact quantity check inconclusive; the receipt and journal entry remain visible.
+
+## Check incoming stock
+
+Inventory and Product records show outstanding supplier arrivals and transfers separately, including their destination, quantity, evidence time and arrival confidence. A supplier-confirmed date is distinct from a requested or estimated date. Past dates are marked overdue. Stale evidence stays labelled. At locations owned by Luma, the native incoming ledger balance supplies the quantity. Incoming units do not become available stock until they are received and booked.
+
+## Change a submitted order
+
+When your connection supports revisions, open the order and choose **Request an order change**.
+Review the existing and proposed lines, choose one quantity or delivery-date change, add a
+product, or remove a position, and give a reason. An approver reviews that exact change.
+Luma then reads the purchasing system again and keeps both order revisions in history after
+verification. A received position cannot be changed, and an order must retain at least one
+position. Make multiple position changes as separate revisions.
+
+If an attempt is uncertain, choose **Check the purchasing system** to reconcile it. The
+original change is not sent again. Supplier commitments remain visible alongside the
+revision, so reducing the ordered quantity never erases what the supplier promised.
+
+JTL-Wawi permits position revisions while an order is Open or Released. Its API does not
+support purchase-order cancellation. Arrange cancellation in your purchasing system; marking
+an order complete is not a cancellation. Orders with received goods cannot be cancelled.
+
+The **Purchasing timeline** keeps plans, approvals, sent orders, supplier messages, receipts,
+your decisions and stock verification together. Expand an event's evidence to see its
+references. **Recorded in Luma**, **Provider observation** and **Independently verified**
+mean different things: a supplier message or recorded receipt does not by itself prove
+available stock changed. Stock booking history requires permission to view inventory.

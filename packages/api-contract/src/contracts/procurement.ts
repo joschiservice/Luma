@@ -16,6 +16,7 @@ import {
   purchaseOrderSchema,
   purchasingConnectionSchema,
   purchasingSupplierSchema,
+  receiptInputSchema,
   reviewInputSchema,
   submissionDecisionSchema,
   submissionInputSchema,
@@ -26,6 +27,12 @@ import {
   supplierSchema,
   transitionInputSchema,
 } from '../procurement.js';
+import {
+  supplierProductTermsSchema,
+  supplierTermsInputSchema,
+} from '../supplier-terms.js';
+import { incomingStockContract } from './incoming-stock.js';
+import { purchasingContract } from './purchasing.js';
 
 const path = '/v1/organizations/{organizationId}/procurement';
 const orderParams = organizationParamsSchema.extend({
@@ -48,6 +55,53 @@ const connectionParams = organizationParamsSchema.extend({
 });
 
 export const procurementContract = {
+  ...incomingStockContract,
+  supplierTerms: endpoint
+    .route({
+      method: 'GET',
+      path: `${path}/supplier-terms`,
+      summary: 'Read supplier purchasing terms and their sources',
+    })
+    .meta({
+      access: requires('procurement.read'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(
+      z.object({
+        params: organizationParamsSchema,
+        query: z.object({
+          supplierId: z.string().uuid().optional(),
+          skuId: z.string().uuid().optional(),
+        }),
+      }),
+    )
+    .output(
+      z.object({
+        items: z.array(supplierProductTermsSchema),
+        canManage: z.boolean(),
+        enabled: z.boolean(),
+      }),
+    ),
+  saveSupplierTerms: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/supplier-terms`,
+      summary: 'Record a purchasing term override',
+      description:
+        'Records a separate override with its reason. Preserves provider observations and price history. Provide the current revision and reuse the ID and body after an uncertain response.',
+    })
+    .meta({
+      access: requires('procurement.manage'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(
+      z.object({
+        params: organizationParamsSchema,
+        body: supplierTermsInputSchema,
+      }),
+    )
+    .output(supplierProductTermsSchema),
+  ...purchasingContract,
   suppliers: endpoint
     .route({
       method: 'GET',
@@ -356,6 +410,20 @@ export const procurementContract = {
     })
     .input(z.object({ params: orderParams, body: commitmentInputSchema }))
     .output(commitmentSchema),
+  recordReceipt: endpoint
+    .route({
+      method: 'POST',
+      path: `${path}/purchase-orders/{purchaseOrderId}/receipts`,
+      summary: 'Record receipt or reconcile missing and damaged goods',
+      description:
+        'Requires procurement.manage. Records cumulative quantities with a person, time, reason and evidence. Manual receipt is allowed only for open Luma orders without a purchasing system. Corrections append evidence and require the current commitment ID.',
+    })
+    .meta({
+      access: requires('procurement.manage'),
+      errors: [400, 401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: orderParams, body: receiptInputSchema }))
+    .output(commitmentSchema),
   reviewCommitment: endpoint
     .route({
       method: 'POST',
@@ -390,7 +458,7 @@ export const procurementContract = {
       path: `${path}/purchase-orders/{purchaseOrderId}/transitions`,
       summary: 'Change purchase order status',
       description:
-        'Requires `procurement.manage`. Moves drafts to open or cancelled, and open orders to closed or cancelled. Provide the current revision and a reason. Reuse the command ID and body on retry. Closing records completion; it does not record a warehouse receipt.',
+        'Requires `procurement.manage`. Moves drafts to open or cancelled, and open orders to closed. Unsent local open orders may be cancelled; native orders already submitting, uncertain or submitted require supported and verified source cancellation. Provide the current revision and a reason. Reuse the command ID and body on retry. Closing records completion; it does not record a warehouse receipt.',
     })
     .meta({
       access: requires('procurement.manage'),

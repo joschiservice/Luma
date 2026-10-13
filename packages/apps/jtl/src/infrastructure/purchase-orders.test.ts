@@ -209,6 +209,36 @@ function fixture(overrides: Partial<JtlConnectorOptions> = {}) {
           })),
       );
     }
+    const revision =
+      /^purchase-orders\/([\w-]+)\/line-items(?:\/([\w-]+))?$/.exec(path);
+    if (revision) {
+      const found = orders.find(
+        (value) => value.purchaseOrderId === revision[1],
+      );
+      if (!found) return new Response('missing', { status: 404 });
+      const body = JSON.parse(String(init?.body ?? '{}')) as Record<
+        string,
+        unknown
+      >;
+      if (init?.method === 'PATCH') {
+        const position = found.lineItems.find(
+          (value) => value.lineItemId === revision[2],
+        );
+        if (!position) return new Response('missing', { status: 404 });
+        Object.assign(position, body);
+      } else if (init?.method === 'DELETE')
+        found.lineItems = found.lineItems.filter(
+          (value) => value.lineItemId !== revision[2],
+        );
+      else if (init?.method === 'POST')
+        found.lineItems.push({
+          ...line('502', String(body.itemId)),
+          ...body,
+          deliveredQuantity: 0,
+        });
+
+      return Response.json(found);
+    }
     const order = /^purchase-orders\/([\w-]+)$/.exec(path);
     if (order) {
       const found = orders.find((value) => value.purchaseOrderId === order[1]);
@@ -289,6 +319,7 @@ function fixture(overrides: Partial<JtlConnectorOptions> = {}) {
     submit,
     submission,
     methods,
+    write,
   };
 }
 
@@ -660,5 +691,121 @@ describe('JTL purchase-order submission', () => {
       supplierId: cloudId(1),
       items: [{ itemId: cloudId(20), netPurchasePriceAmount: 3.75 }],
     });
+  });
+});
+
+describe('JTL approved position revisions', () => {
+  async function prepared() {
+    const f = fixture({ purchaseOrderRevisions: true });
+    f.orders[0]!.status = 5;
+    f.orders[0]!.lineItems[0]!.deliveredQuantity = 0;
+    const read = await f.read('purchase-orders.read', {
+      order: ref('50'),
+      limit: 1,
+    });
+    if (!read.ok) throw Error('Read failed');
+
+    return { f, expected: read.value.items[0]!.data };
+  }
+
+  it('dispatches one documented PATCH after exact source comparison and checks changes with an independent read', async () => {
+    const { f, expected } = await prepared();
+    const result = await f.write('purchase-orders.revise', {
+      order: ref('50'),
+      expected,
+      operation: {
+        kind: 'update_line',
+        line: { externalId: '500', scopeKey: '50' },
+        quantity: 6,
+        requestedDeliveryDate: '2026-10-20',
+      },
+    });
+    expect(result).toMatchObject({ ok: true, value: { status: 'accepted' } });
+    expect(f.methods().filter((method) => method === 'PATCH')).toHaveLength(1);
+    const call = f.fetch.mock.calls.find(
+      (call) => call[1]?.method === 'PATCH',
+    )!;
+    expect(String(call[0])).toContain('/purchase-orders/50/line-items/500');
+    expect(JSON.parse(String(call[1]!.body))).toEqual({
+      quantity: 6,
+      deliveryDate: '2026-10-20T12:00:00Z',
+    });
+    expect(
+      await f.read('purchase-orders.read', { order: ref('50'), limit: 1 }),
+    ).toMatchObject({
+      ok: true,
+      value: {
+        items: [
+          {
+            data: {
+              lines: [
+                {
+                  quantity: { amount: '6' },
+                  requestedDeliveryDate: '2026-10-20',
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+  });
+  it('refuses stale source and received positions before sending any mutation', async () => {
+    const { f, expected } = await prepared();
+    f.orders[0]!.lineItems[0]!.quantity = 9;
+    const input = {
+      order: ref('50'),
+      expected,
+      operation: {
+        kind: 'update_line' as const,
+        line: { externalId: '500', scopeKey: '50' },
+        quantity: 6,
+      },
+    };
+    expect(await f.write('purchase-orders.revise', input)).toMatchObject({
+      ok: false,
+      error: { code: 'conflict', effect: 'none' },
+    });
+    f.orders[0]!.lineItems[0]!.quantity = 10;
+    f.orders[0]!.lineItems[0]!.deliveredQuantity = 1;
+    const read = await f.read('purchase-orders.read', {
+      order: ref('50'),
+      limit: 1,
+    });
+    if (!read.ok) throw Error('Read failed');
+    expect(
+      await f.write('purchase-orders.revise', {
+        ...input,
+        expected: read.value.items[0]!.data,
+      }),
+    ).toMatchObject({ ok: false, error: { code: 'conflict', effect: 'none' } });
+    expect(
+      f
+        .methods()
+        .filter((method) => ['POST', 'PATCH', 'DELETE'].includes(method ?? '')),
+    ).toEqual([]);
+  });
+  it('does not replay a lost response after dispatch', async () => {
+    const { f, expected } = await prepared();
+    f.fetch
+      .mockImplementationOnce(async () => Response.json(f.orders[0]!))
+      .mockImplementationOnce(async () => {
+        throw Error('Lost write response');
+      });
+    expect(
+      await f.write('purchase-orders.revise', {
+        order: ref('50'),
+        expected,
+        operation: {
+          kind: 'update_line',
+          line: { externalId: '500', scopeKey: '50' },
+          quantity: 6,
+        },
+      }),
+    ).toMatchObject({
+      ok: false,
+      error: { effect: 'unknown', retry: 'reconcile' },
+    });
+    expect(f.methods().filter((method) => method === 'PATCH')).toHaveLength(1);
   });
 });

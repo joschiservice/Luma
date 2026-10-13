@@ -200,6 +200,33 @@ deterministic and in German when the inbound message reads German, otherwise Eng
 and the inbound text are never quoted. Edits check the revision and keep only citations
 whose statement is still in the text.
 
+### Supplier purchasing mail
+
+Procurement composes order emails and overdue follow-ups into this inbox. A new order starts
+an outgoing thread; independent reads learn its provider thread identity while its local ID
+and approval remain stable. Exact supplier-address rules bring replies back to the linked
+supplier and order. Adding such a rule needs `messages.manage`; drafting and sending need
+`messages.send` and `procurement.manage`.
+
+An order PDF snapshots the reviewed company identity, line quantities, supplier article
+numbers, optional prices and requested delivery date in the supplier's known English or
+German language. Missing prices stay explicit. The draft retains its exact attachment bytes
+for review, and approval binds those bytes with the message content. All supplier order and
+follow-up sends need consequential approval. Procurement rechecks the order revision,
+supplier revision, active deadline and tenant release before dispatch.
+
+Fresh acceptance evidence hands the outgoing message back to procurement. A follow-up moves
+its check time only after that read; a draft alone never changes it. If another decision
+changed the deadline, the email stays sent with a reason explaining why its follow-up could
+not be recorded. An owner handoff interrupted by a restart is retried without another send.
+
+For 60 days after sending, periodic thread reads check for structured permanent delivery
+reports. Only a MIME delivery-status report naming the exact original Message-ID and an
+approved recipient marks the send failed; text saying "delivery failed" is insufficient.
+A bounce is separate evidence and does not erase the original acceptance. Gmail acceptance
+does not establish supplier confirmation or guarantee final delivery. Stored draft PDF
+copies follow the mailbox retention policy, as do attachments read back from the provider.
+
 ### Consequential replies need approval
 
 A reply is consequential when its subject or text states a date or deadline (dates such as

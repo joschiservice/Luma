@@ -384,7 +384,7 @@ async function sales(
   );
 }
 
-function productJson(record: StoredRecord<ItemRecord>) {
+function productJson(context: Cin7Context, record: StoredRecord<ItemRecord>) {
   const item = record.data;
 
   return {
@@ -400,6 +400,27 @@ function productJson(record: StoredRecord<ItemRecord>) {
     Status: item.active ? 'Active' : 'Deprecated',
     PriceTier1: item.price,
     LastModifiedOn: item.modified,
+    ...(item.purchasingSuppliers
+      ? {
+          Suppliers: item.purchasingSuppliers.map((assignment) => ({
+            SupplierID: guid('supplier', assignment.supplierId),
+            SupplierInventoryCode: assignment.supplierArticleNumber ?? '',
+            Cost: assignment.netPrice,
+            Currency: context.config.baseCurrency,
+            ...(assignment.leadTimeDays !== undefined
+              ? {
+                  ProductSupplierOptions: [
+                    {
+                      LocationID: null,
+                      LocationName: '',
+                      Lead: assignment.leadTimeDays,
+                    },
+                  ],
+                }
+              : {}),
+          })),
+        }
+      : {}),
   };
 }
 
@@ -711,7 +732,7 @@ async function route(
         guid: 'product',
         since: 'ModifiedSince',
         ...(deprecated ? {} : { keep: (record) => record.data.active }),
-        row: productJson,
+        row: (record) => productJson(context, record),
       });
     case 'ref/productavailability':
       return availability(context, kinds, url, page);

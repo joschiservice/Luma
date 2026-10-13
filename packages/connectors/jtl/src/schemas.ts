@@ -186,6 +186,19 @@ export const itemSupplier = z.object({
   id,
   itemId: id,
   supplierId: id,
+  supplierItemNumber: z.string().nullable().optional(),
+  supplierCurrency: z.string().nullable().optional(),
+  packageUnitQuantity: decimal.nullable().optional(),
+  minimumPurchaseQuantity: z.number().int().nonnegative().nullable().optional(),
+  deliveryTimeInDays: z.number().int().nonnegative().nullable().optional(),
+  supplierDeliveryTimeInDays: z
+    .number()
+    .int()
+    .nonnegative()
+    .nullable()
+    .optional(),
+  useSupplierDeliveryTime: z.boolean().nullable().optional(),
+  isDefaultSupplier: z.boolean().nullable().optional(),
   netPurchasePrice: decimal.nullable().optional(),
   vatRate: decimal.nullable().optional(),
 });

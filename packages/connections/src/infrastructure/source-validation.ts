@@ -6,6 +6,7 @@ import {
   productBundleSchema,
   stockCompositionSchema,
 } from './bundle-validation.js';
+import { productPurchasingTermsSchema } from './purchasing-terms-validation.js';
 import {
   shipmentSnapshotSchema,
   transferSnapshotSchema,
@@ -608,6 +609,10 @@ export const commerceSchema = z.discriminatedUnion('capability', [
                     price: listPrice.nullable().optional(),
                     barcode: z.string().max(512).nullable().optional(),
                     bundle: productBundleSchema.optional(),
+                    purchasingTerms: z
+                      .array(productPurchasingTermsSchema)
+                      .max(100)
+                      .optional(),
                   })
                   .strict(),
               )

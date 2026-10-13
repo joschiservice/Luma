@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 import type { AppFactoryContext } from '@luma/app-host';
 import { createWorkspaceAssistant } from '@luma/assistant/composition';
@@ -28,6 +28,11 @@ import {
   orderAttentionQuery,
 } from '@luma/exceptions/composition';
 import type { IdentityService, TenantContext } from '@luma/identity';
+import { hasPermission } from '@luma/identity';
+import {
+  createPurchaseIncoming,
+  createPurchaseIncomingStore,
+} from '@luma/inventory/composition';
 import { createMessaging } from '@luma/messaging/composition';
 import {
   createOrderMetricReader,
@@ -46,12 +51,24 @@ import type {
   Observability,
   TenantDatabase,
 } from '@luma/platform';
+import { canonicalJson } from '@luma/platform';
 import { createReplenishmentScenarios } from '@luma/procurement';
 import {
+  createIncomingStock,
+  createIncomingStockReader,
   createProcurement,
   createProcurementMetricReader,
+  createPurchaseOrderChanges,
+  createPurchasing,
+  createPurchasingInputs,
+  createPurchasingOutcomePersistence,
+  createPurchasingOutcomesService,
+  createPurchasingOverview,
+  createPurchasingStore,
   createStockRiskReader,
   createSupplierCommitmentService,
+  createSupplierEmailService,
+  createSupplierTerms,
   type SupplierCommitments,
 } from '@luma/procurement/composition';
 import {
@@ -70,6 +87,7 @@ import {
   createReturnWorkspace,
   createSourceOrderLines,
   messageReplyDecisionProvider,
+  procurementActionDecisionProvider,
   replenishmentDecisionProvider,
   replySendDecisionProvider,
   returnCaseDecisionProvider,
@@ -115,6 +133,7 @@ import {
   createFollowUpWorkflows,
   type FollowUpTiming,
 } from './case-workflows.js';
+import { createTenantFeatureRelease } from './feature-release.js';
 import { createInventoryLedgerRuntime } from './inventory-ledger.js';
 import {
   createMailboxConnections,
@@ -132,6 +151,7 @@ import {
   createReplyAdmission,
   createReplyEffects,
 } from './messaging-replies.js';
+import { readNativePurchaseIncoming } from './native-purchase-incoming.js';
 import { createNativeStockRuntime } from './native-stock.js';
 import { createPersistentPlaybookLibrary } from './playbook-library.js';
 import { createProcurementEffects } from './procurement-effects.js';
@@ -140,6 +160,12 @@ import {
   createSubmissionAdmission,
   createSubmissionEffects,
 } from './procurement-submissions.js';
+import {
+  createPurchaseOrderChangeAdmission,
+  createPurchaseOrderChangeEffects,
+} from './purchase-order-changes.js';
+import { createPurchaseReceiptTimeline } from './purchase-receipt-timeline.js';
+import { createPurchasingAdmission } from './purchasing-admission.js';
 import {
   createReplenishmentRuntime,
   type ReplenishmentTransport,
@@ -211,7 +237,13 @@ export interface ApplicationServices {
     workflowGeneration: ReturnType<typeof createDraftGenerations>;
     workflowTemplates: ReturnType<typeof createWorkflowTemplates>;
     procurement: ReturnType<typeof createProcurement>;
+    supplierTerms: ReturnType<typeof createSupplierTerms>;
+    incoming: ReturnType<typeof createIncomingStock>;
+    purchasing: ReturnType<typeof createPurchasing>;
+    purchasingOutcomes: ReturnType<typeof createPurchasingOutcomesService>;
     commitments: SupplierCommitments;
+    orderChanges: ReturnType<typeof createPurchaseOrderChanges>;
+    supplierEmail: ReturnType<typeof createSupplierEmailService>;
     messaging: ReturnType<typeof createMessaging>['service'];
     messagingReplies: ReturnType<typeof createMessaging>['replies'];
     messagingDocuments: ReturnType<typeof createMessaging>['documents'];
@@ -373,10 +405,50 @@ export function createApplicationServices(
     authority(database),
     identity,
   );
+  const purchasingRelease = createTenantFeatureRelease(options.observability);
+  const nativeIncomingHash = (value: unknown) =>
+    createHash('sha256').update(canonicalJson(value)).digest('hex');
+  const nativeIncoming = createPurchaseIncoming({
+    store: createPurchaseIncomingStore(
+      database,
+      createAuditLog,
+      readNativePurchaseIncoming,
+    ),
+    refreshContext: identity.refreshContext,
+    enabled: (context) =>
+      purchasingRelease(context.tenantId, 'purchasing-incoming'),
+    hash: nativeIncomingHash,
+    uuid: (key) => {
+      const hex = nativeIncomingHash(key);
+
+      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+    },
+  });
+  const projectIncoming = async (
+    context: import('@luma/identity').TenantContext,
+    orderId: string,
+  ) => {
+    await nativeIncoming.reconcile(context, orderId);
+  };
+  const incoming = createIncomingStock({
+    refreshContext: identity.refreshContext,
+    enabled: (context) =>
+      purchasingRelease(context.tenantId, 'purchasing-incoming'),
+    read: createIncomingStockReader(database),
+    now: () => new Date(),
+  });
+  const supplierTerms = createSupplierTerms(
+    database,
+    identity.refreshContext,
+    createAuditLog,
+    (context) =>
+      purchasingRelease(context.tenantId, 'supplier-purchasing-terms'),
+  );
   const procurement = createProcurement(
     database,
     identity.refreshContext,
     createAuditLog,
+    projectIncoming,
   );
   const procurementEffects =
     options.execution.kind === 'enabled'
@@ -386,6 +458,13 @@ export function createApplicationServices(
   const submissionEffects =
     options.execution.kind === 'enabled' && options.purchasing
       ? createSubmissionEffects(options.purchasing.runtime, () => commitments)
+      : { resolve: async () => null };
+  const orderChangeEffects =
+    options.execution.kind === 'enabled' && options.purchasing
+      ? createPurchaseOrderChangeEffects(
+          options.purchasing.runtime,
+          () => orderChanges,
+        )
       : { resolve: async () => null };
   // Sending replies is an external effect too; replies are composed below.
   const sender = options.messaging?.sender;
@@ -416,6 +495,7 @@ export function createApplicationServices(
     resolve: async (context, intent) =>
       (await procurementEffects.resolve(context, intent)) ??
       (await submissionEffects.resolve(context, intent)) ??
+      (await orderChangeEffects.resolve(context, intent)) ??
       (await replyEffects.resolve(context, intent)) ??
       (await returnCreationEffects.resolve(context, intent)) ??
       (await settlementEffects.resolve(context, intent)) ??
@@ -425,24 +505,77 @@ export function createApplicationServices(
   const resolutionEligible = createAdmissionEligibility(detection.diagnoses);
   const safety = createSafetyServices(database, identity, combinedEffects, {
     eligible: (context, step) =>
-      step.subject?.kind === 'purchase_order_submission'
-        ? commitments.eligible(context, step)
-        : step.subject?.kind === 'message_outbound'
-          ? messaging.replies.eligible(context, step)
-          : step.subject?.kind === 'return_case_creation'
-            ? returnCases.eligible(context, step)
-            : step.subject?.kind === 'return_case_settlement'
-              ? returnActions.eligible(context, step)
-              : step.subject?.kind === 'return_case_exchange'
-                ? returnExchanges.eligible(context, step)
-                : step.subject
-                  ? replenishment.eligible(context, step)
-                  : resolutionEligible(context, step),
+      step.subject?.kind === 'purchase_order_change'
+        ? orderChanges.eligible(context, step)
+        : step.subject?.kind === 'purchasing_plan'
+          ? purchasing.eligible(context, step)
+          : step.subject?.kind === 'purchase_order_submission'
+            ? commitments.eligible(context, step)
+            : step.subject?.kind === 'message_outbound'
+              ? messaging.replies.eligible(context, step)
+              : step.subject?.kind === 'return_case_creation'
+                ? returnCases.eligible(context, step)
+                : step.subject?.kind === 'return_case_settlement'
+                  ? returnActions.eligible(context, step)
+                  : step.subject?.kind === 'return_case_exchange'
+                    ? returnExchanges.eligible(context, step)
+                    : step.subject
+                      ? replenishment.eligible(context, step)
+                      : resolutionEligible(context, step),
+  });
+  const purchasing = createPurchasing({
+    store: createPurchasingStore(database, createAuditLog),
+    overview: createPurchasingOverview({
+      terms: supplierTerms,
+      procurement,
+      inputs: createPurchasingInputs(database, authority(database)),
+      incoming: createIncomingStockReader(database),
+    }),
+    refreshContext: identity.refreshContext,
+    principal: (tenantId, actorId, requestId) =>
+      identity.resolveWorkflowContext(actorId, tenantId, requestId),
+    released: (context, key) => purchasingRelease(context.tenantId, key),
+    admission:
+      options.execution.kind === 'enabled'
+        ? createPurchasingAdmission(safety, combinedEffects)
+        : null,
+    shortfall: (context, orderId, key) =>
+      commitments.shortfall(context, orderId, key),
+    acknowledgeShortfall: async (context, plan) => {
+      await commitments.respond(context, plan.request.sourceOrderId!, {
+        id: plan.id,
+        key: plan.request.attentionKey!,
+        response: 'accepted',
+        note: `Remainder covered by verified draft ${plan.order.reference}`,
+        nextCheckAt: null,
+      });
+    },
+    now: () => new Date(),
+    uuid: (key) => {
+      const hex = createHash('sha256')
+        .update(`luma:purchasing:${key}`)
+        .digest('hex');
+
+      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+    },
+  });
+  const purchasingOutcomes = createPurchasingOutcomesService({
+    ...createPurchasingOutcomePersistence(database, createAuditLog),
+    refreshContext: identity.refreshContext,
+    overview: (context) => purchasing.overview(context),
+    enabled: (context) =>
+      purchasingRelease(context.tenantId, 'purchasing-outcomes'),
   });
   const commitments: SupplierCommitments = createSupplierCommitmentService(
     database,
     createAuditLog,
     {
+      incomingChanged: projectIncoming,
+      additionalTimeline: createPurchaseReceiptTimeline(
+        () => nativeStock.ledger,
+      ),
+      reconciliationAvailable: (context) =>
+        purchasingRelease(context.tenantId, 'purchasing-receipts'),
       observed: async (db, observation) => {
         if (observation.confirmed)
           await createWorkflowEventSink(db)(observation.tenantId, {
@@ -487,6 +620,36 @@ export function createApplicationServices(
         : {}),
     },
   );
+  const orderChanges = createPurchaseOrderChanges(database, createAuditLog, {
+    commitments,
+    changed: projectIncoming,
+    purchasing: options.purchasing
+      ? createPurchasingSystem(
+          options.purchasing.runtime,
+          options.purchasing.installations,
+        )
+      : null,
+    admission:
+      options.execution.kind === 'enabled' && options.purchasing
+        ? createPurchaseOrderChangeAdmission(safety, combinedEffects)
+        : null,
+    refreshContext: identity.refreshContext,
+    principal: (actorId, tenantId) =>
+      identity.resolveWorkflowContext(
+        actorId,
+        tenantId,
+        `purchase-order-change:${actorId}`,
+      ),
+    released: (context) =>
+      purchasingRelease(context.tenantId, 'purchasing-order-changes'),
+    canRevise: async (context, connectionId) =>
+      !!(await options.purchasing?.installations.list(context))?.find(
+        (c) =>
+          c.id === connectionId &&
+          c.status === 'active' &&
+          c.granted.includes('purchase-orders.revise'),
+      ),
+  });
   const directory = createRecordDirectory(database);
   const messaging = createMessaging(database, {
     audit: createAuditLog,
@@ -502,6 +665,9 @@ export function createApplicationServices(
       ? createMessageReader(options.messaging.reader)
       : undefined,
     handoff: createProcurementHandoff(() => commitments),
+    settled: (context, outbound) => supplierEmail.settled(context, outbound),
+    eligibleOwner: (context, outbound) =>
+      supplierEmail.eligible(context, outbound),
     // The order workspace is composed below; drafts read it only once requests arrive.
     records: createRecordStates({
       orders: () => orders,
@@ -529,6 +695,35 @@ export function createApplicationServices(
     retentionDays: options.messaging?.retentionDays,
     pollMs: options.messaging?.pollMs,
     log: options.messaging?.log,
+  });
+  const supplierEmail = createSupplierEmailService({
+    commitments,
+    refreshContext: identity.refreshContext,
+    available: (context, feature) =>
+      purchasingRelease(
+        context.tenantId,
+        feature === 'submission'
+          ? 'procurement-email-submission'
+          : 'procurement-supplier-follow-ups',
+      ),
+    digest: (value) =>
+      createHash('sha256').update(JSON.stringify(value)).digest('hex'),
+    now: () => new Date(),
+    inbox: {
+      mailboxes: (context) => messaging.service.mailboxes(context),
+      work: (context, id) => messaging.replies.supplierWork(context, id),
+      attachment: (context, orderId, outboundId) =>
+        messaging.replies.supplierAttachment(context, orderId, outboundId),
+      compose: (context, input) => messaging.replies.compose(context, input),
+      threads: async (context, id) =>
+        (
+          await messaging.service.recordThreads(context, 'purchase_order', id)
+        ).items.map((t) => ({
+          id: t.id,
+          connectionId: t.connectionId,
+          address: t.correspondent?.address ?? null,
+        })),
+    },
   });
   const returnCases: ReturnCases = createReturnCaseService(
     database,
@@ -736,6 +931,15 @@ export function createApplicationServices(
     createWorkspacePeople(database),
     coordination,
   );
+  const nativeStock = createNativeStockRuntime(
+    database,
+    identity,
+    (context) => erpEnabledForTenant(context.tenantId),
+    authority,
+    options.nativeStockReader,
+    (context) =>
+      purchasingRelease(context.tenantId, 'purchasing-stock-booking'),
+  );
   const decisions = createDecisionQueue(database, {
     cases: caseDecisionQuery,
     providers: [
@@ -791,6 +995,49 @@ export function createApplicationServices(
           })),
       },
       replenishmentDecisionProvider(replenishment.pending),
+      procurementActionDecisionProvider(async (context) => {
+        const plans = (await purchasing.plans(context)).items.filter((p) =>
+          ['approval_required', 'approved', 'uncertain'].includes(p.state),
+        );
+        const revisions = await orderChanges.pending(context);
+        const receipts = hasPermission(context, 'inventory.read')
+          ? await nativeStock.ledger.pendingPurchaseReceipts(context)
+          : [];
+
+        return [
+          ...plans.map((p) => ({
+            id: p.id,
+            kind: 'plan' as const,
+            orderId: null,
+            reference: p.order.reference,
+            state: p.state as 'approval_required' | 'approved' | 'uncertain',
+            requestedBy: p.requestedBy,
+            requestedAt: p.createdAt,
+            expiresAt: p.expiresAt,
+            canApprove: p.canApprove ?? false,
+            quantity: p.order.lines.reduce((sum, l) => sum + l.quantity, 0),
+          })),
+          ...revisions,
+          ...receipts.map((r) => ({
+            id: r.id,
+            kind: 'native_receipt' as const,
+            orderId: r.command.purchaseReceipt!.purchaseOrderId,
+            reference: 'Received native stock',
+            state:
+              r.state === 'approved'
+                ? ('approved' as const)
+                : ('approval_required' as const),
+            requestedBy: r.preparedBy,
+            requestedAt: r.createdAt,
+            expiresAt: null,
+            canApprove:
+              r.preparedBy !== context.actor.id &&
+              hasPermission(context, 'inventory.approve') &&
+              hasPermission(context, 'procurement.manage'),
+            quantity: Number(r.command.purchaseReceipt!.cumulativeGood),
+          })),
+        ];
+      }),
       returnCaseDecisionProvider(async (context) => {
         const [cases, waits] = await Promise.all([
           returnCases.pending(context),
@@ -950,6 +1197,7 @@ export function createApplicationServices(
     library,
     messaging,
     http: {
+      supplierEmail,
       messaging: messaging.service,
       messagingReplies: messaging.replies,
       messagingDocuments: messaging.documents,
@@ -959,7 +1207,12 @@ export function createApplicationServices(
       workflowGeneration: generation,
       workflowTemplates: templates,
       procurement,
+      supplierTerms,
+      incoming,
+      purchasing,
+      purchasingOutcomes,
       commitments,
+      orderChanges,
       shadow: createShadowEvaluations(database, identity.refreshContext),
       cases: detection.cases,
       desk,
@@ -1000,13 +1253,7 @@ export function createApplicationServices(
       records: createRecordExplorer(database, hiddenOrderSources),
       orders,
       inventoryLedger: createInventoryLedgerRuntime(database, identity),
-      nativeStock: createNativeStockRuntime(
-        database,
-        identity,
-        (context) => erpEnabledForTenant(context.tenantId),
-        authority,
-        options.nativeStockReader,
-      ),
+      nativeStock,
       sales: createSalesRuntime(
         database,
         identity,

@@ -356,6 +356,45 @@ export function productSnapshot(
             ? { amount: product.PriceTier1, currency: null }
             : null,
         barcode: text(product.Barcode),
+        ...(product.Suppliers
+          ? {
+              purchasingTerms: product.Suppliers.map((supplier) => ({
+                supplier: ref(supplier.SupplierID),
+                sourceRecordId:
+                  supplier.ProductSupplierID ??
+                  `${product.ID}:${supplier.SupplierID}`,
+                complete: true,
+                supplierArticleNumber: text(supplier.SupplierInventoryCode),
+                unitPrice:
+                  (supplier.FixedCost ?? supplier.Cost) != null
+                    ? {
+                        amount: (supplier.FixedCost ?? supplier.Cost)!,
+                        currency:
+                          supplier.Currency &&
+                          /^[A-Z]{3}$/.test(supplier.Currency)
+                            ? supplier.Currency
+                            : null,
+                        validFrom: null,
+                      }
+                    : null,
+                packSize: null,
+                lineMinimumQuantity: null,
+                orderMinimumValue: null,
+                leadTimeDays: (() => {
+                  const defaults =
+                    supplier.ProductSupplierOptions?.filter(
+                      (option) =>
+                        !option.LocationID && !option.LocationName?.trim(),
+                    ) ?? [];
+
+                  return defaults.length === 1
+                    ? (defaults[0]?.Lead ?? null)
+                    : null;
+                })(),
+                preferred: null,
+              })),
+            }
+          : {}),
       },
     ],
   };

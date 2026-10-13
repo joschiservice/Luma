@@ -269,3 +269,56 @@ it('does not dispatch when requested bundle metadata is missing', async () => {
   });
   expect(f.mutations).toHaveLength(0);
 });
+
+it('binds a manual receipt increment to the exact baseline and verifies only a separate stock read', async () => {
+  const f = fixture();
+  const receipt = {
+    purchaseOrderId: randomUUID(),
+    lineId: randomUUID(),
+    commitmentId: randomUUID(),
+    damagedCommitmentId: randomUUID(),
+    baselineAvailable: 12,
+    quantity: 40,
+    cumulativeGood: 40,
+  };
+  const before = {
+    ...(await f.provider.read(inventoryItemId, locationId)),
+    revision: 'receipt-before',
+    source: {
+      connectionId: randomUUID(),
+      label: 'Manual receipt',
+      observationId: receipt.commitmentId,
+      observedAt: new Date().toISOString(),
+      revision: 'receipt-1',
+      available: 52,
+      receipt,
+    },
+  };
+  expect(
+    correctionBlocker(before, { capability: 'inventory.available.reconcile' }, [
+      'inventory.available.reconcile',
+    ]),
+  ).toBeNull();
+  expect(
+    correctionBlocker(
+      { ...before, available: 13 },
+      { capability: 'inventory.available.reconcile' },
+      ['inventory.available.reconcile'],
+    ),
+  ).toContain('stale');
+  expect(
+    inventoryReconciled(before, { ...before, id: randomUUID(), available: 52 }),
+  ).toBe(true);
+  expect(inventoryReconciled(before, { ...before, available: 52 })).toBe(false);
+  expect(
+    inventoryReconciled(before, { ...before, id: randomUUID(), available: 50 }),
+  ).toBe(false);
+  expect(
+    inventoryReconciled(before, {
+      ...before,
+      id: randomUUID(),
+      available: 52,
+      source: { ...before.source, revision: 'changed-receipt' },
+    }),
+  ).toBe(false);
+});

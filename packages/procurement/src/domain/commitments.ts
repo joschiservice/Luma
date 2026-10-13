@@ -5,7 +5,13 @@ import type { PurchaseOrder, PurchaseOrderLine } from './procurement.js';
  * receipt and may only come from a purchasing-system read; `shipped` is a supplier claim.
  */
 export type CommitmentKind =
-  'confirmed_quantity' | 'promised_date' | 'shipped' | 'received' | 'condition';
+  | 'confirmed_quantity'
+  | 'promised_date'
+  | 'shipped'
+  | 'received'
+  | 'condition'
+  | 'shortage'
+  | 'damaged';
 
 /** Where a commitment came from. Every source stays attached to the commitment it produced. */
 type CommitmentSource =
@@ -24,7 +30,14 @@ type CommitmentSource =
       /** Null when a person recorded the fact by hand. */
       extraction: { id: string; factId: string; model: string } | null;
     }
-  | { kind: 'correction'; reason: string };
+  | { kind: 'correction'; reason: string }
+  | {
+      kind: 'manual_receipt';
+      receivedAt: string;
+      condition: 'good' | 'mixed' | 'damaged';
+      reason: string;
+      evidence: string[];
+    };
 
 /**
  * Confirmed commitments count. `needs_review` is a candidate a person must check; `rejected`
@@ -35,6 +48,7 @@ type CommitmentStatus = 'confirmed' | 'needs_review' | 'rejected';
 export interface Commitment {
   id: string;
   tenantId: string;
+  orderRevision?: number | undefined;
   purchaseOrderId: string;
   /** Null for facts about the whole order. */
   lineId: string | null;
@@ -79,6 +93,12 @@ export interface Submission {
   id: string;
   tenantId: string;
   purchaseOrderId: string;
+  channel?: 'purchasing_system' | 'email';
+  outgoing?: {
+    outboundId: string;
+    threadId: string;
+    sentMessageId: string | null;
+  };
   connectionId: string;
   supplier: { externalId: string; scopeKey: string };
   requestedDeliveryDate: string;
@@ -119,7 +139,7 @@ export interface FollowUp {
   tenantId: string;
   purchaseOrderId: string;
   key: string;
-  response: 'accepted' | 'following_up';
+  response: 'accepted' | 'following_up' | 'credited' | 'written_off';
   note: string;
   /** When Luma should check again; null for accepted changes. */
   nextCheckAt: string | null;
@@ -155,6 +175,13 @@ interface LineProgress {
   /** Units still expected: confirmed (or ordered) minus received, never negative. */
   outstanding: number;
   shippedDate: string | null;
+  shipped: number | null;
+  damaged: number;
+  shortage: number;
+  goodReceived: number;
+  orderedDifference: number | null;
+  shippedDifference: number | null;
+  receivedDifference: number | null;
   stage: LineStage;
   overdue: boolean;
 }
@@ -181,10 +208,12 @@ interface Milestone {
 type AttentionKind =
   | 'submission_approval'
   | 'submission_uncertain'
+  | 'submission_failed'
   | 'review_commitment'
   | 'commitment_changed'
   | 'confirmation_overdue'
-  | 'delivery_overdue';
+  | 'delivery_overdue'
+  | 'receipt_difference';
 
 /** Something a person must decide about this order now. */
 export interface Attention {
@@ -322,6 +351,8 @@ export function orderProgress(input: {
   const requestedDate = submission?.requestedDeliveryDate ?? null;
   const responded = new Map(followUps.map((f) => [f.key, f]));
   const lines: LineProgress[] = order.lines.map((line) => {
+    const requestedDate =
+      line.requestedDeliveryDate ?? submission?.requestedDeliveryDate ?? null;
     const confirmed = effective(commitments, line.id, 'confirmed_quantity');
     const promised =
       effective(commitments, line.id, 'promised_date') ??
@@ -331,8 +362,22 @@ export function orderProgress(input: {
       effective(commitments, line.id, 'shipped') ??
       effective(commitments, null, 'shipped');
     const receivedQuantity = received?.quantity ?? 0;
+    const damaged = effective(commitments, line.id, 'damaged')?.quantity ?? 0;
+    const shortageFact = effective(commitments, line.id, 'shortage');
+    const shortage = shortageFact?.quantity ?? 0;
+    const disposition = shortageFact
+      ? latestResponse(responded, `receipt_difference:${shortageFact.id}`)
+      : undefined;
+    const settledShortage =
+      disposition &&
+      ['credited', 'written_off', 'accepted'].includes(disposition.response)
+        ? shortage
+        : 0;
     const target = confirmed?.quantity ?? line.quantity;
-    const outstanding = Math.max(0, target - receivedQuantity);
+    const outstanding = Math.max(
+      0,
+      target - receivedQuantity - settledShortage,
+    );
     // A requested date is an expectation only once the supplier has the order.
     const expectedDate = promised?.date ?? (submitted ? requestedDate : null);
     const changed =
@@ -374,7 +419,25 @@ export function orderProgress(input: {
       receivedObservedAt:
         received?.source.kind === 'purchasing_system'
           ? received.source.observedAt
-          : null,
+          : received?.source.kind === 'manual_receipt'
+            ? received.source.receivedAt
+            : null,
+      damaged,
+      shortage,
+      goodReceived: Math.max(0, receivedQuantity - damaged),
+      shipped: shipped?.quantity ?? null,
+      orderedDifference:
+        confirmed?.quantity === null || !confirmed
+          ? null
+          : line.quantity - confirmed.quantity,
+      shippedDifference:
+        shipped?.quantity === null || !shipped
+          ? null
+          : (confirmed?.quantity ?? line.quantity) - shipped.quantity,
+      receivedDifference:
+        shipped?.quantity === null || !shipped
+          ? null
+          : shipped.quantity - receivedQuantity,
       outstanding,
       shippedDate: shipped?.date ?? null,
       stage,
@@ -435,6 +498,18 @@ export function orderProgress(input: {
       dueAt: submission.updatedAt,
       summary: `Check whether ${order.reference} reached the purchasing system`,
     });
+  if (submission?.state === 'failed')
+    attention.push({
+      key: `submission_failed:${submission.id}`,
+      kind: 'submission_failed',
+      lineId: null,
+      commitmentId: null,
+      submissionId: submission.id,
+      dueAt: submission.updatedAt,
+      summary:
+        submission.failure ??
+        `Sending ${order.reference} to the supplier failed`,
+    });
   if (!cancelled) {
     for (const c of commitments.filter((c) => c.status === 'needs_review'))
       attention.push({
@@ -459,14 +534,46 @@ export function orderProgress(input: {
           latestByLineKind.set(key, c);
       }
     for (const c of latestByLineKind.values()) {
+      if (c.kind === 'shortage' || c.kind === 'damaged') {
+        const base = `receipt_difference:${c.id}`;
+        const due = followUpDate(responded, base, c.recordedAt)!;
+        const answer = latestResponse(responded, base);
+        if (
+          (c.quantity ?? 0) > 0 &&
+          (!answer ||
+            (answer.response === 'following_up' &&
+              Date.parse(due) <= now.getTime()))
+        )
+          attention.push({
+            key: due === c.recordedAt ? base : `${base}:${due}`,
+            kind: 'receipt_difference',
+            lineId: c.lineId,
+            commitmentId: c.id,
+            submissionId: null,
+            dueAt: due,
+            summary: `${formatQuantity(c.quantity ?? 0)} ${c.kind === 'damaged' ? 'damaged' : 'missing'} units on ${order.reference} need a decision`,
+          });
+        continue;
+      }
       const line = order.lines.find((l) => l.id === c.lineId);
       const progress = lines.find((l) => l.lineId === c.lineId);
       if (progress?.stage === 'received') continue;
       const key = `commitment_changed:${c.id}`;
-      if (!isMaterialChange(c, line, requestedDate) || responded.has(key))
+      const answer = latestResponse(responded, key);
+      const due = followUpDate(responded, key, c.recordedAt)!;
+      if (
+        !isMaterialChange(
+          c,
+          line,
+          line?.requestedDeliveryDate ?? requestedDate,
+        ) ||
+        (answer &&
+          (answer.response !== 'following_up' ||
+            Date.parse(due) > now.getTime()))
+      )
         continue;
       attention.push({
-        key,
+        key: due === c.recordedAt ? key : `${key}:${due}`,
         kind: 'commitment_changed',
         lineId: c.lineId,
         commitmentId: c.id,
@@ -516,7 +623,10 @@ export function orderProgress(input: {
     submitting: 'Luma is placing it in the purchasing system.',
     uncertain:
       'The purchasing system did not confirm the request. Luma is checking whether it was created.',
-    submitted: 'Found in the purchasing system by an independent read.',
+    submitted:
+      submission?.channel === 'email'
+        ? 'The mail provider independently verified the sent message. This does not confirm supplier acceptance.'
+        : 'Found in the purchasing system by an independent read.',
     failed: 'The purchasing system did not create it.',
   };
   const lastReceipt = lines
@@ -623,10 +733,18 @@ export function orderProgress(input: {
       evidence: !submitted
         ? 'Receipt is read from the purchasing system after the order is sent.'
         : allReceived
-          ? 'All units booked as received in the purchasing system.'
+          ? lines.some(
+              (line) => line.received < (line.confirmed ?? line.ordered),
+            )
+            ? 'No further units expected. Recorded quantity differences have a decision.'
+            : submission?.channel === 'email'
+              ? 'All expected units recorded as a manual receipt. Available stock needs independent verification.'
+              : 'All units booked as received in the purchasing system.'
           : receivedLines
             ? `${plural(receivedLines, 'line')} partly or fully booked as received.`
-            : 'No goods receipt booked in the purchasing system yet.',
+            : submission?.channel === 'email'
+              ? 'No manual receipt recorded yet.'
+              : 'No goods receipt booked in the purchasing system yet.',
     },
   ];
 
@@ -658,6 +776,18 @@ export function orderProgress(input: {
       confirmationDueAt,
     }),
   };
+}
+
+/** Finds the final decision after any bounded sequence of scheduled waits. */
+function latestResponse(responded: Map<string, FollowUp>, key: string) {
+  let response = responded.get(key);
+  for (let index = 0; response?.nextCheckAt && index < 20; index++) {
+    const next = responded.get(`${key}:${response.nextCheckAt}`);
+    if (!next) break;
+    response = next;
+  }
+
+  return response;
 }
 
 function followUpDate(
@@ -734,6 +864,13 @@ function nextAction(input: {
       owner: 'buyer',
       title: 'Review supplier message',
       detail: 'Check the highlighted facts before they count as commitments.',
+    };
+  if (first?.kind === 'receipt_difference')
+    return {
+      owner: 'buyer',
+      title: 'Decide on missing or damaged goods',
+      detail:
+        'Record whether the units are still expected, credited by the supplier or written off. Damaged units do not count as available goods.',
     };
   if (first?.kind === 'commitment_changed')
     return {

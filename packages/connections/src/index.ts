@@ -126,3 +126,5 @@ export type {
 } from './domain/return-exchanges.js';
 
 export type { ProductBundle } from './domain/bundles.js';
+
+export type { PurchaseOrderRevisionInput } from './domain/purchase-order-revisions.js';

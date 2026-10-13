@@ -24,6 +24,22 @@ Lieferanten und Lieferantenbestellungen findest du auch über die Suche mit ⌘ 
 
 ## Entwurf erstellen [#create-a-draft]
 
+### Einen Einkaufsplan prüfen
+
+Wenn **Einkauf** verfügbar ist, vergleiche den Bedarf nach Lieferant. Jedes Produkt zeigt
+Bestand, Bedarfsannahme, Lieferzeit, Bestelltermin und Menge vor und nach Verpackungsrundung.
+Unter **Eingaben und Quellen** findest du Abfragezeiten und aktive Nachbestellregeln. Fehlende
+oder veraltete Eingaben verhindern einen Vorschlag. Bestehende Bestellungen verlinken die Arbeit.
+
+Ändere den Bedarfszeitraum, um Vorschläge zu aktualisieren. Wähle Produkte eines Lieferanten,
+lege den Empfangsstandort fest und passe Mengen an. Der Plan zeigt Bestellwert und Reichweite.
+Begründe Mindestwertausnahmen und frage die Entwurfsfreigabe an. Jeder Lieferant hat eine eigene
+Freigabe und einen geprüften Entwurf. Das Senden bleibt ein eigener Schritt. Bei ungewisser
+Erstellung prüfst du die gespeicherte Bestellung; die Prüfung erstellt oder sendet nichts.
+
+Du kannst begründen, warum du eine Empfehlung ignorierst. **Insights** trennt spätere
+beobachtete Bestands- und Wareneingangsergebnisse von unbekannten Ergebnissen.
+
 1. Wähle **Lieferant hinzufügen** und fülle **Name des Lieferanten** aus. Gibt es den Lieferanten auch in einem anderen System, ergänze seine ID als externe Referenz.
 2. Wähle **Neue Lieferantenbestellung**, gib eine **Bestellreferenz** ein, wähle den Lieferanten und füge Positionen mit SKU, Beschreibung, Menge und Einheit hinzu.
 3. Wähle **Entwurf erstellen**. An den Lieferanten geht nichts, bis du die Bestellung sendest.
@@ -87,3 +103,18 @@ Die Seite eines Lieferanten zeigt die Zahlen **Offene Bestellungen**, **Wartet a
 ## Nachschub [#replenishment]
 
 Der Bereich **Nachschub** in der Beschaffung zeigt, wie viele Bestandspositionen deine Nachschubregeln überwachen und was als Nächstes zu beheben ist. **Bestandsregeln verwalten** öffnet den Nachschub-Workflow; siehe [Workflows](/docs/workflows).
+
+## Bestellungen per E-Mail und Nachfragen
+
+Wenn ein Lieferant kein Einkaufssystem nutzt, hinterlege seine E-Mail-Adresse und Sprache
+im Lieferantendatensatz. Öffne auf der Bestellung **Bestell-E-Mail entwerfen**, wähle deinen
+operativen Posteingang und prüfe Firmenanschrift und gewünschten Liefertermin. Im Posteingang
+kannst du Text und PDF prüfen und eine Genehmigung beantragen. Luma sendet erst nach der
+Genehmigung. Die verifizierte E-Mail-Annahme ist keine Bestätigung des Lieferanten.
+
+Bei einer überfälligen Bestätigung oder Lieferung erstellt **Nachfrage zur Überschreitung
+entwerfen** einen Entwurf aus den zugesagten und offenen Mengen. Der neue Prüftermin wird
+erst nach dem verifizierten Versand gespeichert. Antworten bleiben am selben Thread und
+an der Bestellung; abweichende Mengen und Termine brauchen eine Prüfung. Ohne verbundenen
+Posteingang kannst du weiterhin manuell nachfassen. Wenn die E-Mail zurückkommt, prüfe die
+Adresse und erstelle eine neue Übermittlung.

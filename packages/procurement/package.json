@@ -36,6 +36,7 @@
     "@luma/workflows": "workspace:*",
     "@orpc/server": "catalog:",
     "fastify": "catalog:",
+    "pdf-lib": "1.17.1",
     "zod": "catalog:"
   },
   "devDependencies": {

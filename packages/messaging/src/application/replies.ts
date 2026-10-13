@@ -15,6 +15,7 @@ import {
   composeReply,
   liveStates,
   replyActions,
+  replySubject,
   stateMessages,
 } from '../domain/replies.js';
 import type { Address } from '../domain/threads.js';
@@ -64,6 +65,15 @@ export interface ReplyDependencies {
   digest(value: unknown): string;
   uuid(name: string): string;
   log(message: string, error?: unknown): void;
+  retentionDays?: number;
+  /** Idempotent handoff to the record owner, after a verified send or failure. */
+  settled?:
+    | ((context: TenantContext, outbound: OutboundRow) => Promise<void>)
+    | undefined;
+  /** Rechecks record-owner authority and the reviewed state immediately before dispatch. */
+  eligibleOwner?:
+    | ((context: TenantContext, outbound: OutboundRow) => Promise<boolean>)
+    | undefined;
 }
 
 export interface ReplyEdit {
@@ -108,6 +118,8 @@ function replyContent(outbound: OutboundRow, providerThreadId: string) {
     text: document.text,
     inReplyTo: document.inReplyTo ?? null,
     references: document.references ?? [],
+    attachments: document.attachments ?? [],
+    procurement: document.procurement ?? null,
   };
 }
 
@@ -396,6 +408,48 @@ export function createReplies(deps: ReplyDependencies) {
     });
   }
 
+  async function notifyOwner(context: TenantContext, outboundId: string) {
+    if (!deps.settled) return;
+    const outbound = await load(context.tenantId, outboundId);
+    if (!outbound.document.procurement) return;
+    if (
+      outbound.document.ownerHandoffAt &&
+      ['sent', 'failed'].includes(outbound.state)
+    )
+      return;
+    try {
+      await deps.settled(context, outbound);
+    } catch (error) {
+      if (
+        !(error instanceof IdentityError) ||
+        error.statusCode !== 409 ||
+        outbound.state !== 'sent'
+      )
+        throw error;
+      await deps.store.transaction(context.tenantId, async (tx) => {
+        const current = await tx.outbound.get(outboundId, true);
+        if (current?.state === 'sent')
+          await save(tx, current, {
+            document: {
+              stateReason:
+                'The email was sent, but the order or its deadline changed before the follow-up could be recorded. Review the order.',
+              ownerHandoffAt: deps.now().toISOString(),
+            },
+          });
+      });
+
+      return;
+    }
+    if (['sent', 'failed'].includes(outbound.state))
+      await deps.store.transaction(context.tenantId, async (tx) => {
+        const current = await tx.outbound.get(outboundId, true);
+        if (current && current.state === outbound.state)
+          await save(tx, current, {
+            document: { ownerHandoffAt: deps.now().toISOString() },
+          });
+      });
+  }
+
   /** Sends once as `context`, which must be the requester. */
   async function dispatch(context: TenantContext, outboundId: string) {
     const admission = deps.admission!;
@@ -429,6 +483,7 @@ export function createReplies(deps: ReplyDependencies) {
         };
     }
     await settle(context, outboundId, execution);
+    await notifyOwner(context, outboundId);
   }
 
   /** Reads the requester's current membership; suspended requesters block sends and checks. */
@@ -468,7 +523,12 @@ export function createReplies(deps: ReplyDependencies) {
         context,
         tx.thread.connectionId,
         {
-          thread: { externalId: tx.thread.providerThreadId, scopeKey: '' },
+          thread: {
+            externalId:
+              tx.thread.document.resolvedProviderThreadId ??
+              tx.thread.providerThreadId,
+            scopeKey: '',
+          },
           cursor,
         },
       );
@@ -500,13 +560,23 @@ export function createReplies(deps: ReplyDependencies) {
       const document = outbound.document;
       const message: ReplyMessage = {
         outboundId: outbound.id,
-        thread: { externalId: thread.providerThreadId, scopeKey: '' },
+        thread:
+          thread.providerThreadId.startsWith('outbound:') &&
+          !thread.document.resolvedProviderThreadId
+            ? null
+            : {
+                externalId:
+                  thread.document.resolvedProviderThreadId ??
+                  thread.providerThreadId,
+                scopeKey: '',
+              },
         inReplyTo: document.inReplyTo ?? null,
         references: document.references ?? [],
         to: document.to,
         cc: document.cc,
         subject: document.subject,
         text: document.text,
+        attachments: document.attachments ?? [],
       };
 
       return {
@@ -518,6 +588,280 @@ export function createReplies(deps: ReplyDependencies) {
   }
 
   return {
+    /**
+     * Composes a new message, or a reply on an existing operational thread, from a record
+     * owner's deterministic content. Linked records must be readable. Attachments and owner
+     * metadata become part of the exact content that approval binds.
+     */
+    async compose(
+      context: TenantContext,
+      input: {
+        id: string;
+        connectionId: string;
+        threadId?: string;
+        to: Address[];
+        subject: string;
+        text: string;
+        language: 'en' | 'de';
+        records: { kind: 'purchase_order' | 'supplier'; id: string }[];
+        attachments?: { filename: string; mimeType: string; base64: string }[];
+        procurement: NonNullable<OutboundRow['document']['procurement']>;
+      },
+    ) {
+      context = await authorize(context, 'messages.send');
+      requirePermission(context, 'procurement.manage');
+      requirePermission(context, 'procurement.read');
+      await sendingConnection(context, input.connectionId);
+      const labels = await deps.directory.labels(context, input.records);
+      if (input.records.some((ref) => !labels.has(recordKey(ref))))
+        notFound('Linked record not found');
+      if (
+        !input.to.length ||
+        input.to.some((a) => !/^[^\s@<>]+@[^\s@<>]+$/.test(a.address)) ||
+        /[\r\n]/.test(input.subject)
+      )
+        conflict('Invalid message');
+      const requestDigest = deps.digest({
+        ...input,
+        actorId: context.actor.id,
+      });
+      const outbound = await deps.store.transaction(
+        context.tenantId,
+        async (tx) => {
+          if (
+            !(await once(tx, context, input.id, { compose: requestDigest }))
+          ) {
+            const prior = await tx.outbound.get(input.id);
+            if (!prior) conflict('Message draft not found');
+
+            return prior!;
+          }
+          const mailbox = await tx.mailboxes.get(input.connectionId);
+          if (!mailbox) notFound('Mailbox not found');
+          const at = deps.now().toISOString();
+          const rules = await tx.rules.active(input.connectionId);
+          const supplierAddress = input.to[0]!.address.toLowerCase();
+          const domain = supplierAddress.slice(
+            supplierAddress.lastIndexOf('@') + 1,
+          );
+          const covered = rules.some(
+            (rule) =>
+              (rule.kind === 'sender_address' &&
+                rule.value === supplierAddress) ||
+              (rule.kind === 'sender_domain' &&
+                (domain === rule.value || domain.endsWith(`.${rule.value}`))) ||
+              (rule.kind === 'recipient_address' &&
+                rule.value === mailbox!.address),
+          );
+          if (!covered) {
+            requirePermission(context, 'messages.manage');
+            await tx.rules.insert({
+              id: deps.id(),
+              connectionId: input.connectionId,
+              kind: 'sender_address',
+              value: supplierAddress,
+              party: {
+                kind: 'supplier',
+                supplierId: input.procurement.supplierId,
+              },
+              backfilledAt: null,
+              createdBy: context.actor.id,
+              createdAt: at,
+            });
+            await tx.mailboxes.update({
+              ...mailbox!,
+              hintAt: at,
+              dueAt: at,
+              updatedAt: at,
+            });
+          }
+          const threadId =
+            input.threadId ??
+            deps.uuid(`compose-thread:${context.tenantId}:${input.id}`);
+          let thread = input.threadId ? await tx.threads.get(threadId) : null;
+          if (
+            input.threadId &&
+            (!thread || thread.connectionId !== input.connectionId)
+          )
+            notFound('Thread not found');
+          if (!thread) {
+            thread = {
+              id: threadId,
+              connectionId: input.connectionId,
+              providerThreadId: `outbound:${input.id}`,
+              subject: input.subject,
+              document: {
+                participants: input.to,
+                correspondent: input.to[0] ?? null,
+                snippet: '',
+                attachmentCount: input.attachments?.length ?? 0,
+              },
+              status: 'open',
+              ownerId: context.actor.id,
+              manualDueAt: null,
+              replyDueAt: null,
+              lastMessageAt: at,
+              lastInboundAt: null,
+              lastOutboundAt: null,
+              messageCount: 0,
+              revision: 1,
+              createdAt: at,
+              updatedAt: at,
+            };
+            await tx.threads.insert(thread);
+          }
+          const messages = await tx.messages.forThread(threadId);
+          const latest = messages
+            .filter((m) => !m.document.deliveryFailure)
+            .at(-1);
+          const lastInbound = messages
+            .filter(
+              (m) => m.direction === 'inbound' && !m.document.deliveryFailure,
+            )
+            .at(-1);
+          const recipient =
+            lastInbound?.document.replyTo[0] ?? lastInbound?.document.from;
+          const to =
+            recipient && recipient.address !== mailbox!.address
+              ? [recipient]
+              : input.to;
+          const row: OutboundRow = {
+            id: input.id,
+            threadId,
+            connectionId: input.connectionId,
+            document: {
+              to,
+              cc: [],
+              subject: input.threadId
+                ? replySubject(latest?.document.subject ?? thread.subject)
+                : input.subject,
+              text: input.text,
+              language: input.language,
+              references: latest
+                ? [
+                    ...latest.document.references,
+                    ...(latest.rfcMessageId ? [latest.rfcMessageId] : []),
+                  ].slice(-100)
+                : [],
+              inReplyTo: latest?.rfcMessageId ?? null,
+              attachments: input.attachments ?? [],
+              procurement: input.procurement,
+              composeDigest: requestDigest,
+              attachmentsExpireAt: new Date(
+                deps.now().getTime() + (deps.retentionDays ?? 365) * 86_400_000,
+              ).toISOString(),
+              consequential: ['workspace_policy'],
+              citations: [],
+            },
+            state: 'draft',
+            actionId: null,
+            requestedBy: context.actor.id,
+            revision: 1,
+            createdAt: at,
+            updatedAt: at,
+          };
+          await tx.outbound.insert(row);
+          for (const ref of input.records) {
+            const existing = await tx.links.latest(threadId, ref.kind, ref.id);
+            if (existing?.state === 'active') continue;
+            if (existing)
+              conflict(
+                'The operational record was removed from this thread. Link it again before drafting.',
+              );
+            await tx.links.insert({
+              id: deps.id(),
+              threadId,
+              kind: ref.kind,
+              recordId: ref.id,
+              method: 'manual',
+              state: 'active',
+              evidence: {
+                messageId: null,
+                ruleId: null,
+                text: null,
+                span: null,
+              },
+              createdBy: context.actor.id,
+              createdAt: at,
+              removedBy: null,
+              removedAt: null,
+            });
+          }
+          await tx.audit(
+            audit(context, context.tenantId, {
+              type: 'reply.drafted',
+              key: input.id,
+              outbound: row,
+              details: {
+                language: input.language,
+                attachments: String(input.attachments?.length ?? 0),
+              },
+            }),
+          );
+
+          return row;
+        },
+      );
+
+      return outboundView(outbound, context);
+    },
+    /** Reads one person's draft or a requested message without exposing attachment bytes. */
+    /** Reads the exact persisted order PDF for review, restricted to its linked tenant order. */
+    async supplierAttachment(
+      context: TenantContext,
+      purchaseOrderId: string,
+      outboundId: string,
+    ) {
+      context = await authorize(context, 'messages.read');
+      requirePermission(context, 'procurement.read');
+
+      return deps.store.transaction(context.tenantId, async (tx) => {
+        const row = await tx.outbound.get(outboundId);
+        const attached = row?.document.attachments?.find(
+          (a) => a.mimeType === 'application/pdf',
+        );
+        if (
+          !row ||
+          row.document.procurement?.purchaseOrderId !== purchaseOrderId ||
+          !attached
+        )
+          notFound('Order document not found');
+
+        return attached!;
+      });
+    },
+    /** Reads stored supplier work on threads linked to one purchase order, for its owner. */
+    async supplierWork(context: TenantContext, purchaseOrderId: string) {
+      context = await authorize(context, 'messages.read');
+      requirePermission(context, 'procurement.read');
+
+      return deps.store.transaction(context.tenantId, async (tx) => {
+        const threads = await tx.threads.forRecord(
+          'purchase_order',
+          purchaseOrderId,
+        );
+        const rows = (
+          await Promise.all(
+            threads.map((thread) => tx.outbound.forThread(thread.id)),
+          )
+        ).flat();
+
+        return rows
+          .filter(
+            (row) =>
+              row.document.procurement?.purchaseOrderId === purchaseOrderId,
+          )
+          .map((row) => ({
+            outbound: outboundView(row, context),
+            work: row.document.procurement!,
+          }));
+      });
+    },
+    async get(context: TenantContext, outboundId: string) {
+      context = await authorize(context, 'messages.read');
+
+      return present(context, outboundId);
+    },
     /**
      * Drafts a reply to the latest inbound message from the current state of the thread's
      * linked records, citing each one. The ID identifies the draft; an exact retry returns it.
@@ -653,6 +997,8 @@ export function createReplies(deps: ReplyDependencies) {
           conflict('Only drafts can change. Draft a new reply instead.');
         if (outbound!.revision !== input.expectedRevision)
           conflict('This reply changed. Refresh and try again.');
+        if (outbound!.document.procurement)
+          requirePermission(context, 'procurement.manage');
         const mailbox = await tx.mailboxes.get(outbound!.connectionId);
         const known = new Map(
           [...outbound!.document.to, ...outbound!.document.cc].map((a) => [
@@ -689,7 +1035,9 @@ export function createReplies(deps: ReplyDependencies) {
             consequential: consequentialReasons({
               subject,
               text,
-              approveAll: mailbox?.settings.approveAll ?? false,
+              approveAll:
+                !!outbound!.document.procurement ||
+                (mailbox?.settings.approveAll ?? false),
             }),
           },
         });
@@ -718,6 +1066,8 @@ export function createReplies(deps: ReplyDependencies) {
       if (!deps.admission)
         unavailable('Sending replies is unavailable on this server.');
       const outbound = await load(context.tenantId, outboundId);
+      if (outbound.document.procurement)
+        requirePermission(context, 'procurement.manage');
       await sendingConnection(context, outbound.connectionId);
       const prepared = await deps.store.transaction(
         context.tenantId,
@@ -741,7 +1091,8 @@ export function createReplies(deps: ReplyDependencies) {
           const reasons = consequentialReasons({
             subject: current!.document.subject,
             text: current!.document.text,
-            approveAll: mailbox!.settings.approveAll,
+            approveAll:
+              !!current!.document.procurement || mailbox!.settings.approveAll,
           });
           const now = deps.now();
           const pending: OutboundRow = {
@@ -961,6 +1312,7 @@ export function createReplies(deps: ReplyDependencies) {
         `reply-check:${outboundId}`,
       );
       await settle(principal, outboundId, await reconcile(principal, outbound));
+      await notifyOwner(principal, outboundId);
 
       return present(context, outboundId);
     },
@@ -1052,16 +1404,19 @@ export function createReplies(deps: ReplyDependencies) {
             requestedBy: outbound.requestedBy,
             requestedAt: outbound.document.requestedAt ?? outbound.updatedAt,
             expiresAt: outbound.document.expiresAt ?? null,
-            response: actions.canApprove
-              ? ('decide' as const)
-              : actions.canSend
-                ? ('run' as const)
-                : actions.canCheck
-                  ? ('check' as const)
-                  : outbound.requestedBy === context.actor.id &&
-                      actions.state === 'approval_required'
-                    ? ('awaiting_other' as const)
-                    : ('view_only' as const),
+            response:
+              actions.canApprove &&
+              (!outbound.document.procurement ||
+                context.permissions.has('procurement.manage'))
+                ? ('decide' as const)
+                : actions.canSend
+                  ? ('run' as const)
+                  : actions.canCheck
+                    ? ('check' as const)
+                    : outbound.requestedBy === context.actor.id &&
+                        actions.state === 'approval_required'
+                      ? ('awaiting_other' as const)
+                      : ('view_only' as const),
           },
         ];
       });
@@ -1085,6 +1440,54 @@ export function createReplies(deps: ReplyDependencies) {
           .filter((m) => m.principalId === context.actor.id)
           .map((m) => m.connectionId),
       );
+      const supplierChecks = await deps.store.transaction(
+        context.tenantId,
+        (tx) => tx.outbound.supplierChecks?.(100) ?? Promise.resolve([]),
+      );
+      for (const outbound of supplierChecks.filter((o) =>
+        own.has(o.connectionId),
+      )) {
+        try {
+          const principal = await requester(
+            outbound,
+            context.tenantId,
+            `supplier-mail-check:${outbound.id}`,
+          );
+          // Refresh permissions for every mailbox read; a check never sends again.
+          requirePermission(principal, 'messages.read');
+          if (outbound.state === 'sent') {
+            const data = await deps.store.transaction(
+              context.tenantId,
+              async (tx) => {
+                const thread = await tx.threads.get(outbound.threadId);
+                const mailbox = await tx.mailboxes.get(outbound.connectionId);
+
+                return thread && mailbox
+                  ? {
+                      thread,
+                      mailbox,
+                      rules: await tx.rules.active(outbound.connectionId),
+                    }
+                  : null;
+              },
+            );
+            if (data && deps.reader) await readThread(principal, data);
+            await deps.store.transaction(context.tenantId, async (tx) => {
+              const current = await tx.outbound.get(outbound.id, true);
+              if (current)
+                await save(tx, current, {
+                  document: { deliveryCheckedAt: deps.now().toISOString() },
+                });
+            });
+          }
+          await notifyOwner(principal, outbound.id);
+        } catch (error) {
+          deps.log(
+            'Supplier mail evidence could not be checked; retrying.',
+            error,
+          );
+        }
+      }
       for (const outbound of live.filter((o) => own.has(o.connectionId))) {
         try {
           if (outbound.state === 'approval_required') {
@@ -1120,6 +1523,7 @@ export function createReplies(deps: ReplyDependencies) {
           if (execution.state === 'not_started' && outbound.state === 'sending')
             await dispatch(principal, outbound.id);
           else await settle(principal, outbound.id, execution);
+          await notifyOwner(principal, outbound.id);
         } catch (error) {
           deps.log('A reply could not be checked; retrying.', error);
         }
@@ -1136,7 +1540,12 @@ export function createReplies(deps: ReplyDependencies) {
       return (
         !!bound &&
         ['approval_required', 'approved', 'sending'].includes(bound.state) &&
-        canonicalJson(bound.action) === canonicalJson(step.action)
+        canonicalJson(bound.action) === canonicalJson(step.action) &&
+        (!deps.eligibleOwner ||
+          (await deps.eligibleOwner(
+            context,
+            await load(context.tenantId, step.subject.id),
+          )))
       );
     },
     forAction,

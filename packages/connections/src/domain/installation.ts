@@ -7,6 +7,7 @@ export type InstallationCapability =
   | 'orders.quantity.edit'
   | 'orders.quantity.update'
   | 'purchase-orders.submit'
+  | 'purchase-orders.revise'
   | 'returns.create'
   | 'returns.refund'
   | 'returns.restock'

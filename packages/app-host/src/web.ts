@@ -25,7 +25,12 @@ export interface AppUiProps {
     | { connectionId: string; orderId: string; fulfillmentId: string }
     | undefined;
   /** Canonical stock position whose provider corrections the host is showing. */
-  inventory?: { positionId: string } | undefined;
+  inventory?:
+    | (
+        | { positionId: string }
+        | { receipt: { purchaseOrderId: string; lineId: string } }
+      )
+    | undefined;
   connection?: InstalledConnection | undefined;
   /** The source record the host is showing, identified by its connection and source ID. */
   record?:

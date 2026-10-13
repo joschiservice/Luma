@@ -204,6 +204,28 @@ export const product = z.object({
   Barcode: text,
   PriceTier1: decimal.nullable().optional().catch(null),
   LastModifiedOn: time,
+  Suppliers: z
+    .array(
+      z.object({
+        SupplierID: guid,
+        ProductSupplierID: guid.nullable().optional(),
+        SupplierInventoryCode: text,
+        Cost: decimal.nullable().optional(),
+        FixedCost: decimal.nullable().optional(),
+        Currency: text,
+        ProductSupplierOptions: z
+          .array(
+            z.object({
+              LocationID: guid.nullable().optional(),
+              LocationName: text,
+              Lead: z.number().int().nonnegative().nullable().optional(),
+            }),
+          )
+          .optional(),
+      }),
+    )
+    .max(100)
+    .optional(),
 });
 
 export const availability = z.object({

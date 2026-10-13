@@ -163,6 +163,13 @@ export function createInstallationVerifier(options: {
       (await readable('items', jtl.item))
     )
       granted.push('purchase-orders.submit');
+    if (
+      simulated &&
+      connection.permissions.includes('purchase-orders.revise') &&
+      granted.includes('purchase-orders.read') &&
+      granted.includes('products.read')
+    )
+      granted.push('purchase-orders.revise');
     // Creation checks the sales order and finds earlier returns, so it needs all three reads.
     if (
       simulated &&

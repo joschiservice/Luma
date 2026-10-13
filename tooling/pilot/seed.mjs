@@ -304,6 +304,7 @@ export async function seedPilot(
                                 'suppliers.read',
                                 'purchase-orders.read',
                                 'purchase-orders.submit',
+                                'purchase-orders.revise',
                                 'returns.options.read',
                                 'returns.created.read',
                                 'returns.create',

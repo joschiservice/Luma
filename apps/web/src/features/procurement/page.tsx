@@ -40,7 +40,7 @@ import {
   PackageCheck,
   Plus,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { SignInRedirect } from '../../kit/identity/common';
 import { IdentityError } from '../../kit/identity/data';
@@ -59,6 +59,8 @@ import {
   stages,
   statusLabels,
 } from './presentation';
+import { purchasingOptions } from './purchasing-data';
+import { PurchasingWorkbench } from './purchasing-workbench';
 import { ReplenishmentOverview } from './replenishment-overview';
 
 function orderColumns(
@@ -262,7 +264,8 @@ function stageOptions(status: string) {
 
 /** Keeps procurement views and filters shareable without accepting unsupported statuses. */
 export function parseProcurementSearch(value: Record<string, unknown>): {
-  view: 'orders' | 'suppliers';
+  view: 'orders' | 'suppliers' | 'purchasing';
+  demandPeriodDays?: number;
   q: string;
   status: string;
   stage?: OrderStage | 'attention';
@@ -274,7 +277,15 @@ export function parseProcurementSearch(value: Record<string, unknown>): {
       : undefined;
 
   return {
-    view: value.view === 'suppliers' ? 'suppliers' : 'orders',
+    view:
+      value.view === 'purchasing'
+        ? 'purchasing'
+        : value.view === 'suppliers'
+          ? 'suppliers'
+          : 'orders',
+    ...([7, 30, 60, 90, 180].includes(Number(value.demandPeriodDays))
+      ? { demandPeriodDays: Number(value.demandPeriodDays) }
+      : {}),
     q: typeof value.q === 'string' ? value.q.slice(0, 200) : '',
     status:
       typeof value.status === 'string' &&
@@ -296,7 +307,11 @@ export function ProcurementPage() {
     ? new Map(progress.data.items.map((item) => [item.id, item]))
     : undefined;
   const suppliers = useQuery(suppliersOptions(organizationId));
+  const purchasing = useQuery(
+    purchasingOptions(organizationId, filters.demandPeriodDays ?? 30),
+  );
   const [dialog, setDialog] = useState<'supplier' | 'order' | null>(null);
+  const dialogTrigger = useRef<HTMLButtonElement | null>(null);
   const selected = filters.view === 'orders' ? orders : suppliers;
   const query = filters.q.trim().toLowerCase();
   const visibleOrders = orders.data?.items.filter(
@@ -357,13 +372,14 @@ export function ProcurementPage() {
         actions={
           canManage ? (
             <Button
-              onClick={() =>
+              onClick={(event) => {
+                dialogTrigger.current = event.currentTarget;
                 setDialog(
                   filters.view === 'suppliers' || !suppliers.data?.items.length
                     ? 'supplier'
                     : 'order',
-                )
-              }
+                );
+              }}
               disabled={suppliers.isPending || !!suppliers.error}
             >
               <Plus size={16} />
@@ -444,6 +460,15 @@ export function ProcurementPage() {
               label={m.procurement_list_views()}
               value={filters.view}
               views={[
+                ...(purchasing.data?.enabled
+                  ? [
+                      {
+                        value: 'purchasing' as const,
+                        label: m.purchasing_title(),
+                        icon: <PackageCheck aria-hidden="true" />,
+                      },
+                    ]
+                  : []),
                 {
                   value: 'orders',
                   label: m.procurement_list_view_orders(),
@@ -464,13 +489,17 @@ export function ProcurementPage() {
             value: filters.q || undefined,
             onChange: (q) => change({ q: q ?? '' }),
             label:
-              filters.view === 'orders'
-                ? m.procurement_list_search_orders()
-                : m.procurement_list_search_suppliers(),
+              filters.view === 'purchasing'
+                ? m.purchasing_search_label()
+                : filters.view === 'orders'
+                  ? m.procurement_list_search_orders()
+                  : m.procurement_list_search_suppliers(),
             placeholder:
-              filters.view === 'orders'
-                ? m.procurement_list_search_orders_placeholder()
-                : m.procurement_list_search_suppliers_placeholder(),
+              filters.view === 'purchasing'
+                ? m.purchasing_search_placeholder()
+                : filters.view === 'orders'
+                  ? m.procurement_list_search_orders_placeholder()
+                  : m.procurement_list_search_suppliers_placeholder(),
             maxLength: 200,
           }}
           filters={
@@ -504,11 +533,23 @@ export function ProcurementPage() {
           onRefresh={() => {
             void orders.refetch();
             void suppliers.refetch();
+            if (filters.view === 'purchasing') void purchasing.refetch();
           }}
-          refreshing={orders.isFetching || suppliers.isFetching}
+          refreshing={
+            orders.isFetching ||
+            suppliers.isFetching ||
+            (filters.view === 'purchasing' && purchasing.isFetching)
+          }
           refreshLabel={m.procurement_list_refresh()}
         />
-        {selected.isPending ? (
+        {filters.view === 'purchasing' ? (
+          <PurchasingWorkbench
+            organizationId={organizationId}
+            search={filters.q}
+            period={filters.demandPeriodDays ?? 30}
+            onPeriod={(demandPeriodDays) => change({ demandPeriodDays })}
+          />
+        ) : selected.isPending ? (
           <div className="procurement-loading" role="status">
             {filters.view === 'orders'
               ? m.procurement_list_loading_orders()
@@ -549,11 +590,12 @@ export function ProcurementPage() {
                   <Button
                     variant="outline"
                     disabled={suppliers.isPending || !!suppliers.error}
-                    onClick={() =>
+                    onClick={(event) => {
+                      dialogTrigger.current = event.currentTarget;
                       setDialog(
                         suppliers.data?.items.length ? 'order' : 'supplier',
-                      )
-                    }
+                      );
+                    }}
                   >
                     {suppliers.data?.items.length
                       ? m.procurement_list_create_order()
@@ -591,7 +633,13 @@ export function ProcurementPage() {
               </Button>
             ) : (
               canManage && (
-                <Button variant="outline" onClick={() => setDialog('supplier')}>
+                <Button
+                  variant="outline"
+                  onClick={(event) => {
+                    dialogTrigger.current = event.currentTarget;
+                    setDialog('supplier');
+                  }}
+                >
                   {m.procurement_list_add_first_supplier()}
                 </Button>
               )
@@ -623,12 +671,14 @@ export function ProcurementPage() {
       {dialog === 'supplier' && (
         <SupplierDialog
           organizationId={organizationId}
+          returnFocus={dialogTrigger}
           close={() => setDialog(null)}
         />
       )}
       {dialog === 'order' && suppliers.data && (
         <OrderDialog
           organizationId={organizationId}
+          returnFocus={dialogTrigger}
           suppliers={suppliers.data.items}
           close={() => setDialog(null)}
           saved={(order) => {

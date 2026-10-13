@@ -2,8 +2,9 @@
 
 `@luma/procurement` owns suppliers and purchase orders, separate from connector commerce
 projections. Every write is revision-checked, idempotent and audited in the same
-transaction. A purchase order holds immutable lines (ID, SKU, description, quantity, unit)
-and a supplier name snapshot; it does not model prices, invoices or warehouse movements.
+transaction. A purchase order holds versioned lines (ID, SKU, description, quantity, unit)
+and a supplier name snapshot. Drafting also snapshots the supplier article number and unit
+price when terms report a currency. Governed callers must supply that snapshot in their admitted intent; drafting never enriches already approved parameters. It does not model invoices or warehouse movements.
 Submission to a supplier, confirmations and receipts are covered in
 [Supplier commitments](supplier-commitments.md).
 
@@ -39,7 +40,7 @@ All new orders start as drafts.
 Opening records an operational commitment; it does not send the order. A verified
 submission moves a draft to open. Closing records completion, not receipt; receipt is read
 from the purchasing system. Transitions need a reason and the current revision. Terminal
-orders cannot reopen. Correct a draft by cancelling it and creating a new order.
+orders cannot reopen. Correct a draft by cancelling it and creating a new order. An uncertain or submitted native order cannot be cancelled through a local lifecycle transition: cancellation requires a supported and verified provider change.
 
 ## Concurrency and retries
 
@@ -71,3 +72,58 @@ Verification is an independent read of tenant, ownership, status, revision and t
 audit record; creation also compares supplier, reference, lines and origin. An unavailable
 read is inconclusive. The in-memory simulated owner keeps the same validation, retry and
 audit behavior for deterministic scenario evaluation.
+
+## Supplier purchasing terms
+
+Purchasing terms belong to the supplier and canonical SKU pair. Missing values stay unknown;
+pack size, minimum quantity and lead time never acquire a silent default. A product can have
+terms for several suppliers. A manager records a reason when choosing a preferred supplier
+or changing a term, and must remove an existing preference before choosing another.
+
+Provider reads and imports remain observations. Human overrides apply only to the fields
+they name and remain separate from those observations. A later provider read cannot erase
+an override. Each changed value appends a version, preserving prices, actor, source identity,
+read time and completeness; stale reads cannot replace newer evidence. A partial read never
+removes pairs it did not return. Draft prices are fixed at drafting time, so a later price
+change never rewrites an existing order.
+
+Supplier terms are released per workspace through the `supplier-purchasing-terms` flag.
+Both the API and worker enforce it. Reading requires current `procurement.read`; recording
+terms or importing purchasing-system observations requires current `procurement.manage`.
+The same tenant transaction commits a term, its retry result and its audit evidence.
+
+## Reviewed purchasing plans
+
+The purchasing workbench groups canonical products by supplier. Available stock already
+accounts for source reservations; reservations are shown separately and are never subtracted
+again. Competing sources are not summed. Native-owned locations use ledger balances.
+Incoming supplier orders, transfers and native incoming balances use the same projection as
+Inventory and Products. Incoming units never increase available stock.
+
+Demand is an explicit average over a selected, completely imported order-history window.
+Missing history, stale stock, missing pack sizes or minimum quantities withhold a quantity.
+An active replenishment rule can supply its minimum and target without inventing demand.
+Open drafts and orders suppress a second suggestion. A saved plan retains manual quantity
+changes beside the original suggestion and evidence.
+
+Each supplier plan has one immutable request and one governed action. Workspace approval
+rules apply. Independent readback verifies the exact draft, including price and location
+snapshots. A process interruption can resume the original approval and action. An uncertain
+creation is reconciled by reading. Pending and uncertain plans reserve their products, and
+the procurement transaction checks existing orders again before inserting the draft.
+
+`purchasing-workbench` releases the view; `purchasing-plans` releases new governed drafts.
+Disabling a write release does not prevent reconciliation of existing attempts.
+
+## Observed purchasing outcomes
+
+Plans retain the suggestion and chosen quantity. Explicit ignored decisions capture the
+server recommendation with the person's reason. Later stock and receipt observations
+establish outcomes; a saved plan or a manual receipt claim alone does not.
+
+Availability through receipt requires independently verified receipt evidence, usable stock
+reads no more than five minutes apart, and a fresh positive stock read after receipt. Gaps
+remain unknown. Stockout duration is an observed interval between reads, never an estimated
+duration across a gap. These observations do not prove counterfactual prevented loss.
+Insights separates observed availability, observed stockouts and unknowns under
+`purchasing-outcomes`.

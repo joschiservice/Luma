@@ -367,7 +367,7 @@ function repositories(
       },
       async byProvider(connectionId, providerThreadId, lock = false) {
         const [row] = await rows(
-          `SELECT * FROM messaging_threads WHERE tenant_id=$1 AND connection_id=$2 AND provider_thread_id=$3${lock ? ' FOR UPDATE' : ''}`,
+          `SELECT * FROM messaging_threads WHERE tenant_id=$1 AND connection_id=$2 AND (provider_thread_id=$3 OR document->>'resolvedProviderThreadId'=$3)${lock ? ' FOR UPDATE' : ''}`,
           [tenantId, connectionId, providerThreadId],
         );
 

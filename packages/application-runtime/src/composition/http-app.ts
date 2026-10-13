@@ -54,8 +54,20 @@ import { returnCaseRoutes } from '@luma/orders/http';
 import type { ModelGateway, Observability, Observation } from '@luma/platform';
 import { describeError } from '@luma/platform';
 import type { ProcurementService } from '@luma/procurement';
-import type { SupplierCommitments } from '@luma/procurement/composition';
-import { procurementRoutes } from '@luma/procurement/http';
+import type {
+  createIncomingStock,
+  PurchaseOrderChanges,
+  PurchasingOutcomes,
+  PurchasingService,
+  SupplierCommitments,
+  SupplierEmail,
+  SupplierTermsService,
+} from '@luma/procurement/composition';
+import {
+  procurementRoutes,
+  purchaseOrderChangeRoutes,
+  supplierEmailRoutes,
+} from '@luma/procurement/http';
 import type {
   CustomerWorkspace,
   DecisionAssignments,
@@ -143,7 +155,13 @@ export interface AppDependencies {
   draftTests?: DraftTests;
   workflowGeneration?: DraftGeneration;
   procurement?: ProcurementService;
+  supplierTerms?: SupplierTermsService;
+  incoming?: ReturnType<typeof createIncomingStock>;
+  purchasing?: PurchasingService;
+  purchasingOutcomes?: PurchasingOutcomes;
   commitments?: SupplierCommitments;
+  orderChanges?: PurchaseOrderChanges;
+  supplierEmail?: SupplierEmail;
   messaging?: MessagingService;
   messagingReplies?: Replies;
   messagingDocuments?: DocumentService;
@@ -391,9 +409,18 @@ export function buildApp(
       workflowGeneration: workflowGenerationRoutes(
         dependencies.workflowGeneration,
       ),
+      procurementChanges: purchaseOrderChangeRoutes(dependencies.orderChanges),
       procurement: procurementRoutes(
         dependencies.procurement,
         dependencies.commitments,
+        dependencies.supplierTerms,
+        dependencies.purchasing,
+        dependencies.purchasingOutcomes,
+        dependencies.incoming,
+      ),
+      procurementEmail: supplierEmailRoutes(
+        dependencies.supplierEmail,
+        dependencies.procurement,
       ),
       messaging: messagingRoutes(
         dependencies.messaging,

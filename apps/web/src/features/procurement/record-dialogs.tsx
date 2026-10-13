@@ -41,6 +41,7 @@ import {
   quantity,
   today,
 } from './presentation';
+import { ShortfallImpact } from './shortfall-impact';
 
 function Footer({
   command,
@@ -408,8 +409,15 @@ export function CommitmentDialog({
 }) {
   const prior = draft.mode === 'correction' ? draft.commitment : null;
   const [id] = useState(() => crypto.randomUUID());
-  const [kind, setKind] = useState<Exclude<Commitment['kind'], 'received'>>(
-    prior && prior.kind !== 'received' ? prior.kind : 'confirmed_quantity',
+  const [kind, setKind] = useState<
+    Exclude<Commitment['kind'], 'received' | 'shortage' | 'damaged'>
+  >(
+    prior &&
+      prior.kind !== 'received' &&
+      prior.kind !== 'shortage' &&
+      prior.kind !== 'damaged'
+      ? prior.kind
+      : 'confirmed_quantity',
   );
   const [lineId, setLineId] = useState(
     prior?.lineId ?? record.order.lines[0]?.id ?? '',
@@ -588,11 +596,12 @@ export function RespondDialog({
   attention: Attention;
   close: () => void;
 }) {
-  const change = attention.kind === 'commitment_changed';
+  const difference = attention.kind === 'receipt_difference';
+  const change = attention.kind === 'commitment_changed' || difference;
   const [id] = useState(() => crypto.randomUUID());
-  const [response, setResponse] = useState<'accepted' | 'following_up'>(
-    change ? 'accepted' : 'following_up',
-  );
+  const [response, setResponse] = useState<
+    'accepted' | 'following_up' | 'credited' | 'written_off'
+  >(change ? 'accepted' : 'following_up');
   const [note, setNote] = useState('');
   const [next, setNext] = useState(() => addDays(today(), 2));
   const command = useCommand(
@@ -605,9 +614,11 @@ export function RespondDialog({
   return (
     <Frame
       title={
-        change
-          ? m.procurement_respond_change_title()
-          : m.procurement_respond_follow_up_title()
+        difference
+          ? m.procurement_receipt_decision_title()
+          : change
+            ? m.procurement_respond_change_title()
+            : m.procurement_respond_follow_up_title()
       }
       description={attention.summary}
       locked={command.locked}
@@ -629,6 +640,13 @@ export function RespondDialog({
           });
         }}
       >
+        {change ? (
+          <ShortfallImpact
+            organizationId={organizationId}
+            orderId={orderId}
+            attention={attention}
+          />
+        ) : null}
         <fieldset disabled={command.locked}>
           {change ? (
             <div
@@ -638,6 +656,20 @@ export function RespondDialog({
             >
               {(
                 [
+                  ...(difference
+                    ? ([
+                        [
+                          'credited',
+                          m.procurement_receipt_credited,
+                          m.procurement_receipt_credited_hint,
+                        ],
+                        [
+                          'written_off',
+                          m.procurement_receipt_written_off,
+                          m.procurement_receipt_written_off_hint,
+                        ],
+                      ] as const)
+                    : []),
                   [
                     'accepted',
                     m.procurement_respond_accept,

@@ -265,3 +265,31 @@ and `/stocks/reservations`, at most 500 records each, and requires complete pagi
 one matching order. It reads that order's lines, gross total, payment status and reservations linked
 to its sales-order and item IDs. Customer fields and descriptive reservation text are not retained.
 Incomplete history, duplicate references or an unknown unit never establish a correct replacement.
+
+## Supplier purchasing terms
+
+When purchasing terms are released and the sync principal can read procurement, product
+reads also page through the documented item supplier overview. This exposes supplier
+article number, net purchase price and supplier currency, pack quantity, minimum purchase
+quantity, default supplier and configured delivery days. When the item uses the supplier's
+delivery time, that supplier value is used instead of the item-specific value. Price
+validity and supplier minimum order value are unavailable in this read and stay unknown.
+
+The child read is bounded to ten pages and retains at most 100 assignments per SKU. A
+truncated overview is incomplete and does not establish absence. Terms are projected only
+through existing supplier links and canonical SKU mappings; names and SKU text never
+establish a supplier identity. Product sync pacing applies to these reads. Without the
+release flag there are no additional supplier calls.
+
+## Purchase-order revisions
+
+The documented ERP 2.2 position endpoints accept one PATCH, POST or DELETE against an Open
+or Released purchase order. Luma freezes and compares the complete source snapshot before
+sending the admitted operation. Adding a position requires one current supplier assignment
+with net price and VAT. Received positions and removal of the final position are refused.
+The write has no provider idempotency guarantee, so an uncertain response is reconciled by
+reading rather than dispatching again. Live installations do not receive the revision grant
+until endpoint support has been verified.
+
+The API's header status transitions do not expose cancellation. Transitioning to Completed
+is not a supported cancellation and is not offered for that purpose.

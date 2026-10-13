@@ -25,6 +25,7 @@ export function createNativeStockRuntime(
   enabled: (context: TenantContext) => Promise<boolean>,
   authority: (db: TenantDatabase) => AuthorityReader,
   reader?: CapabilityReader,
+  purchaseReceiptsEnabled?: (context: TenantContext) => Promise<boolean>,
 ): NativeStockRuntime {
   const store = createNativeStockStore(db, createAuditLog, {
     demand: (scoped, context, orderId, requireAuthority) =>
@@ -106,7 +107,7 @@ export function createNativeStockRuntime(
   return {
     readStock,
     store,
-    ledger: createInventoryLedgerRuntime(db, identity),
+    ledger: createInventoryLedgerRuntime(db, identity, purchaseReceiptsEnabled),
     readShipments,
     read: createNativeStockReader(
       db,

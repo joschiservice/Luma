@@ -16,6 +16,12 @@ export interface AttachmentRef {
 
 /** A provider message as the mailbox holds it; mirrors the `messages.read` snapshot. */
 export interface MessageData {
+  /** A structured permanent delivery failure; normal message text is never a bounce signal. */
+  deliveryFailure?: {
+    originalMessageId: string;
+    recipient: string;
+    status: string;
+  };
   thread: { externalId: string; scopeKey: string };
   rfcMessageId: string | null;
   inReplyTo: string | null;
@@ -41,6 +47,8 @@ export type ThreadStatus = 'open' | 'waiting' | 'closed';
 
 /** Derived thread content kept with the thread for lists. */
 export interface ThreadDocument {
+  /** The mailbox thread learned by independently reading a newly composed send. */
+  resolvedProviderThreadId?: string;
   participants: Address[];
   /** Latest correspondent outside the mailbox. */
   correspondent: Address | null;

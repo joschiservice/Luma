@@ -145,6 +145,8 @@ export interface DocumentSummary {
 }
 
 export interface OutboundView {
+  purchaseOrderId?: string;
+  attachments?: { filename: string; mimeType: string; size: number }[];
   id: string;
   threadId: string;
   connectionId: string;
@@ -463,6 +465,16 @@ export function outboundView(
 
   return {
     id: outbound.id,
+    ...(document.procurement && hasPermission(context, 'procurement.read')
+      ? { purchaseOrderId: document.procurement.purchaseOrderId }
+      : {}),
+    attachments: (document.attachments ?? []).map((a) => ({
+      filename: a.filename,
+      mimeType: a.mimeType,
+      size:
+        Math.floor((a.base64.length * 3) / 4) -
+        (a.base64.endsWith('==') ? 2 : a.base64.endsWith('=') ? 1 : 0),
+    })),
     threadId: outbound.threadId,
     connectionId: outbound.connectionId,
     to: document.to,
@@ -489,7 +501,9 @@ export function outboundView(
     sentMessageId: document.sentMessageId ?? null,
     canEdit: actions.canEdit,
     canRequest: actions.canRequest,
-    canApprove: actions.canApprove,
+    canApprove:
+      actions.canApprove &&
+      (!document.procurement || hasPermission(context, 'procurement.manage')),
     canSend: actions.canSend,
     canCheck: actions.canCheck,
     revision: outbound.revision,

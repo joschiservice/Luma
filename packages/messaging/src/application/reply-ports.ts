@@ -35,13 +35,14 @@ export interface ReplyAction {
 /** The provider message a reply maps to at dispatch. */
 export interface ReplyMessage {
   outboundId: string;
-  thread: { externalId: string; scopeKey: string };
+  thread: { externalId: string; scopeKey: string } | null;
   inReplyTo: string | null;
   references: string[];
   to: { address: string; name: string | null }[];
   cc: { address: string; name: string | null }[];
   subject: string;
   text: string;
+  attachments?: { filename: string; mimeType: string; base64: string }[];
 }
 
 /** Execution state of a reply's send, as Action Admission recorded it. */

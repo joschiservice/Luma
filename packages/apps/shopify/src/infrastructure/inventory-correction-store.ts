@@ -37,6 +37,38 @@ export function createCorrectionStore(
         await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
           `${context.tenantId}:${run.target.connectionId}:${run.before.inventoryItemId}:${run.before.locationId}`,
         ]);
+        if (run.target.receipt) {
+          const receiptId = run.target.receipt.commitmentId;
+          await tx.query(
+            'SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
+            [`${context.tenantId}:purchase-receipt:${receiptId}`],
+          );
+          const previous = (
+            await tx.query<{ run_id: string; dispatch: string | null }>(
+              `SELECT c.run_id,e.document->'attempt'->>'dispatch' AS dispatch FROM shopify_receipt_stock_claims c JOIN shopify_inventory_corrections r ON r.tenant_id=c.tenant_id AND r.id=c.run_id LEFT JOIN executed_actions e ON e.tenant_id=c.tenant_id AND e.proposal_id=c.run_id WHERE c.tenant_id=$1 AND c.receipt_id=$2 AND NOT c.withheld AND (r.document->'target'->'receipt'->>'damagedCommitmentId') IS NOT DISTINCT FROM $3::text`,
+              [
+                context.tenantId,
+                receiptId,
+                run.target.receipt.damagedCommitmentId,
+              ],
+            )
+          ).rows;
+          if (
+            previous.some(
+              (row) =>
+                row.run_id !== run.id && row.dispatch !== 'not_dispatched',
+            )
+          )
+            throw new IdentityError(
+              409,
+              'CONFLICT',
+              'This receipt already has a stock booking. Check that booking instead of applying it again.',
+            );
+          await tx.query(
+            'INSERT INTO shopify_receipt_stock_claims(tenant_id,run_id,receipt_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',
+            [context.tenantId, run.id, receiptId],
+          );
+        }
         const pending = (
           await tx.query<{ run_id: string }>(
             'SELECT run_id FROM shopify_inventory_claims WHERE tenant_id=$1 AND connection_id=$2 AND target_key=$3 AND NOT settled',
@@ -78,6 +110,10 @@ export function createCorrectionStore(
       }),
     settle: (context, id) =>
       database.transaction(context.tenantId, async (tx) => {
+        await tx.query(
+          `UPDATE shopify_receipt_stock_claims c SET withheld=true WHERE c.tenant_id=$1 AND c.run_id=$2 AND NOT c.withheld AND NOT EXISTS(SELECT 1 FROM executed_actions e WHERE e.tenant_id=c.tenant_id AND e.proposal_id=c.run_id AND e.document->'attempt'->>'dispatch' IS DISTINCT FROM 'not_dispatched')`,
+          [context.tenantId, id],
+        );
         await tx.query(
           'UPDATE shopify_inventory_claims SET settled=true WHERE tenant_id=$1 AND run_id=$2 AND NOT settled',
           [context.tenantId, id],

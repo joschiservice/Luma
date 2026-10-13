@@ -18,9 +18,29 @@ import {
 /** Composes every adapter for local simulator fixtures, in the order of `factories`. */
 function fixtureProviders(options) {
   return [
-    createJtlProvider({ ...options, jtlEndpoints: options.jtlEndpoints ?? [] }),
+    createJtlProvider({
+      ...options,
+      jtlEndpoints: options.jtlEndpoints ?? [],
+      purchaseOrderChangesEnabled:
+        options.purchaseOrderChangesEnabled ??
+        ((tenantId) =>
+          options.featureEnabled?.(tenantId, 'purchasing-order-changes') ??
+          Promise.resolve(false)),
+      purchasingTermsEnabled:
+        options.purchasingTermsEnabled ??
+        ((tenantId) =>
+          options.featureEnabled?.(tenantId, 'supplier-purchasing-terms') ??
+          Promise.resolve(false)),
+    }),
     createShopifyProvider(options),
-    createCin7Provider(options),
+    createCin7Provider({
+      ...options,
+      purchasingTermsEnabled:
+        options.purchasingTermsEnabled ??
+        ((tenantId) =>
+          options.featureEnabled?.(tenantId, 'supplier-purchasing-terms') ??
+          Promise.resolve(false)),
+    }),
     createStarshipitProvider(options),
     // Token-based mailbox access through the simulator; no Google OAuth or push in fixtures.
     createGmailProvider({

@@ -17,6 +17,7 @@ import {
   salesOrderDetailJson,
   salesOrderJson,
 } from './orders.js';
+import { revisePurchaseOrder } from './purchase-order-changes.js';
 import {
   assignmentJson,
   isDate,
@@ -120,7 +121,9 @@ export function identify(request: ProviderRequest): ProviderTarget {
                   ? 'customers.read'
                   : root === 'purchase-orders'
                     ? write
-                      ? 'purchase-orders.submit'
+                      ? id
+                        ? 'purchase-orders.revise'
+                        : 'purchase-orders.submit'
                       : 'purchase-orders.read'
                     : root === 'returns'
                       ? write
@@ -452,9 +455,32 @@ async function purchaseOrders(
   request: ProviderRequest,
   url: URL,
   page: PageRequest,
-  [id, ...rest]: string[],
+  [id, child, lineId, ...rest]: string[],
 ) {
-  if (rest.length) return undefined;
+  if (
+    id &&
+    child === 'line-items' &&
+    !rest.length &&
+    ['PATCH', 'POST', 'DELETE'].includes(request.method)
+  ) {
+    const method = request.method;
+    if (method !== 'PATCH' && method !== 'POST' && method !== 'DELETE')
+      return undefined;
+    const order = await revisePurchaseOrder(
+      context,
+      id,
+      method,
+      lineId,
+      body(request),
+    );
+    const names = await supplierNames(context, [order.supplierId]);
+
+    return {
+      ...json(purchaseOrderJson(order, names.get(order.supplierId) ?? null)),
+      committed: true,
+    };
+  }
+  if (child || lineId || rest.length) return undefined;
   if (request.method === 'POST' && !id) {
     const result = await submitPurchaseOrder(
       context,

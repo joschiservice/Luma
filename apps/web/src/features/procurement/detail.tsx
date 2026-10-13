@@ -59,6 +59,7 @@ import {
   sendSubmission,
 } from './data';
 import { TransitionDialog, transitionLabels } from './forms';
+import { OrderRevisionDialog, PurchaseOrderChanges } from './order-changes';
 import {
   calendarDate,
   commitmentKinds,
@@ -73,6 +74,8 @@ import {
   StagePill,
   statusLabels,
 } from './presentation';
+import { PurchasingTimeline } from './purchasing-timeline';
+import { ReceiptDialog } from './receipt-dialog';
 import {
   CommitmentDialog,
   type CommitmentDraft,
@@ -81,6 +84,9 @@ import {
   RespondDialog,
   SubmitDialog,
 } from './record-dialogs';
+import { ShortfallDialog } from './shortfall-dialog';
+import { ReceiptStockBooking } from './stock-booking';
+import { SupplierEmailPanel } from './supplier-email';
 
 const subscribe = (changed: () => void) => onlineManager.subscribe(changed);
 const onlineSnapshot = () => onlineManager.isOnline();
@@ -115,6 +121,9 @@ const verificationLabels = {
 >;
 
 type Dialog =
+  | { kind: 'receipt' }
+  | { kind: 'reorder'; attention: Attention }
+  | { kind: 'cancel_remainder'; attention: Attention }
   | { kind: 'submit' }
   | { kind: 'message' }
   | { kind: 'link' }
@@ -350,10 +359,62 @@ function PurchaseOrderRecordView({
           <Milestones record={record} />
           <div className="procurement-record-layout">
             <div className="procurement-record-main">
+              <SupplierEmailPanel
+                organizationId={organizationId}
+                record={record}
+              />
               <NextStep
                 organizationId={organizationId}
                 record={record}
                 open={setDialog}
+              />
+              {record.canManage &&
+              record.reconciliation.available &&
+              order.status === 'open' ? (
+                <Button
+                  variant="outline"
+                  disabled={offline}
+                  onClick={() => setDialog({ kind: 'receipt' })}
+                >
+                  {m.procurement_receipt_title()}
+                </Button>
+              ) : null}
+              {dialog?.kind === 'receipt' ? (
+                <ReceiptDialog
+                  organizationId={organizationId}
+                  record={record}
+                  close={() => setDialog(null)}
+                />
+              ) : null}
+              {dialog?.kind === 'reorder' ? (
+                <ShortfallDialog
+                  organizationId={organizationId}
+                  record={record}
+                  context={context}
+                  attention={dialog.attention}
+                  close={() => setDialog(null)}
+                />
+              ) : null}
+              <PurchaseOrderChanges
+                organizationId={organizationId}
+                order={order}
+              />
+              {dialog?.kind === 'cancel_remainder' ? (
+                <OrderRevisionDialog
+                  organizationId={organizationId}
+                  order={order}
+                  initialLineId={dialog.attention.lineId ?? undefined}
+                  initialQuantity={
+                    record.commitments.find(
+                      (fact) => fact.id === dialog.attention.commitmentId,
+                    )?.quantity ?? undefined
+                  }
+                  close={() => setDialog(null)}
+                />
+              ) : null}
+              <ReceiptStockBooking
+                organizationId={organizationId}
+                record={record}
               />
               <Lines
                 organizationId={organizationId}
@@ -368,7 +429,7 @@ function PurchaseOrderRecordView({
               />
               {messages}
               <CommitmentHistory record={record} open={setDialog} />
-              <Lifecycle record={record} />
+              <PurchasingTimeline record={record} />
             </div>
             <aside className="procurement-record-aside">
               <SupplierCard
@@ -653,20 +714,60 @@ function NextStep({
                     ? m.procurement_next_attention_read()
                     : attention.kind === 'commitment_changed'
                       ? m.procurement_next_attention_changed()
-                      : rich(m.procurement_next_attention_overdue, {
-                          date: <WorkspaceDate value={attention.dueAt} />,
-                        })}
+                      : attention.kind === 'receipt_difference'
+                        ? m.procurement_receipt_difference()
+                        : rich(m.procurement_next_attention_overdue, {
+                            date: <WorkspaceDate value={attention.dueAt} />,
+                          })}
                 </small>
               </span>
-              {canManage && attention.kind !== 'review_commitment' ? (
+              {canManage &&
+              record.reconciliation.decisions &&
+              ['commitment_changed', 'receipt_difference'].includes(
+                attention.kind,
+              ) &&
+              attention.lineId ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => open({ kind: 'reorder', attention })}
+                >
+                  {m.procurement_shortfall_title()}
+                </Button>
+              ) : null}
+              {canManage &&
+              record.supplier?.link &&
+              attention.kind === 'commitment_changed' &&
+              attention.lineId &&
+              record.commitments.some(
+                (fact) =>
+                  fact.id === attention.commitmentId &&
+                  fact.kind === 'confirmed_quantity' &&
+                  fact.quantity !== null &&
+                  fact.quantity > 0,
+              ) ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => open({ kind: 'cancel_remainder', attention })}
+                >
+                  {m.procurement_shortfall_cancel_remainder()}
+                </Button>
+              ) : null}
+              {canManage &&
+              !['review_commitment', 'submission_failed'].includes(
+                attention.kind,
+              ) ? (
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => open({ kind: 'respond', attention })}
                 >
-                  {attention.kind === 'commitment_changed'
-                    ? m.procurement_next_accept_or_follow_up()
-                    : m.procurement_next_record_follow_up()}
+                  {attention.kind === 'receipt_difference'
+                    ? m.procurement_receipt_difference()
+                    : attention.kind === 'commitment_changed'
+                      ? m.procurement_next_accept_or_follow_up()
+                      : m.procurement_next_record_follow_up()}
                 </Button>
               ) : attention.kind === 'review_commitment' && !inline ? (
                 <a
@@ -770,12 +871,48 @@ function Lines({
               ),
           },
           {
+            key: 'shipped',
+            header: m.procurement_lines_shipped(),
+            numeric: true,
+            cell: ({ line }) =>
+              line.shipped === null
+                ? m.common_empty_value()
+                : quantity(line.shipped),
+          },
+          {
+            key: 'ordered_difference',
+            header: m.procurement_lines_ordered_difference(),
+            numeric: true,
+            hideOnNarrow: true,
+            cell: ({ line }) =>
+              line.orderedDifference === null
+                ? m.common_empty_value()
+                : quantity(line.orderedDifference),
+          },
+          {
+            key: 'shipped_difference',
+            header: m.procurement_lines_shipped_difference(),
+            numeric: true,
+            hideOnNarrow: true,
+            cell: ({ line }) =>
+              line.shippedDifference === null
+                ? m.common_empty_value()
+                : quantity(line.shippedDifference),
+          },
+          {
             key: 'received',
             header: m.procurement_lines_received(),
             numeric: true,
             cell: ({ line }) => (
               <span className="procurement-cell procurement-cell-end">
                 <span>{quantity(line.received)}</span>
+                {line.damaged > 0 ? (
+                  <small>
+                    {m.procurement_receipt_good({
+                      quantity: quantity(line.goodReceived),
+                    })}
+                  </small>
+                ) : null}
                 {line.outstanding > 1e-9 && line.received > 0 ? (
                   <small>
                     {m.procurement_lines_outstanding({
@@ -785,6 +922,29 @@ function Lines({
                 ) : null}
               </span>
             ),
+          },
+          {
+            key: 'received_difference',
+            header: m.procurement_lines_received_difference(),
+            numeric: true,
+            hideOnNarrow: true,
+            cell: ({ line }) =>
+              line.receivedDifference === null
+                ? m.common_empty_value()
+                : quantity(line.receivedDifference),
+          },
+          {
+            key: 'damaged',
+            header: m.procurement_lines_damage(),
+            numeric: true,
+            cell: ({ line }) => quantity(line.damaged),
+          },
+          {
+            key: 'shortage',
+            header: m.procurement_lines_shortage(),
+            numeric: true,
+            hideOnNarrow: true,
+            cell: ({ line }) => quantity(line.shortage),
           },
           {
             key: 'expected',
@@ -1323,7 +1483,8 @@ function CommitmentHistory({
               <li key={c.id} data-status={c.status} data-corrected={corrected}>
                 <StateDot
                   state={
-                    c.kind === 'received'
+                    c.kind === 'received' &&
+                    c.source.kind === 'purchasing_system'
                       ? 'verified'
                       : c.status === 'needs_review'
                         ? 'approval'
@@ -1346,16 +1507,32 @@ function CommitmentHistory({
                     · {commitmentSource(c, label)} ·{' '}
                     <WorkspaceDate value={c.recordedAt} />
                   </small>
-                  {c.source.kind === 'correction' ? (
+                  {c.orderRevision ? (
+                    <small>
+                      {m.procurement_changes_revision({
+                        revision: c.orderRevision,
+                      })}
+                    </small>
+                  ) : null}
+                  <small>
+                    {m.procurement_receipt_recorded_by({
+                      actor: c.recordedBy.id,
+                    })}
+                  </small>
+                  {c.source.kind === 'correction' ||
+                  c.source.kind === 'manual_receipt' ? (
                     <small>
                       {m.procurement_history_reason({
                         reason: c.source.reason,
                       })}
                     </small>
                   ) : null}
+                  {c.source.kind === 'manual_receipt' ? (
+                    <small>{c.source.evidence.join(' · ')}</small>
+                  ) : null}
                 </span>
                 {record.canManage &&
-                c.kind !== 'received' &&
+                !['received', 'shortage', 'damaged'].includes(c.kind) &&
                 c.status === 'confirmed' &&
                 !corrected ? (
                   <Button
@@ -1401,41 +1578,6 @@ function CommitmentHistory({
           </ol>
         </Disclosure>
       ) : null}
-    </section>
-  );
-}
-
-/** Audited lifecycle changes recorded in Luma. */
-function Lifecycle({ record }: { record: PurchaseOrderRecord }) {
-  return (
-    <section
-      className="procurement-section"
-      aria-labelledby="lifecycle-history"
-    >
-      <div className="procurement-section-heading">
-        <h2 id="lifecycle-history">{m.procurement_lifecycle_title()}</h2>
-      </div>
-      <ol className="procurement-commitments">
-        {record.history.map((event) => (
-          <li key={event.id}>
-            <StateDot state="idle" />
-            <span className="procurement-cell">
-              <strong>
-                {event.from
-                  ? m.procurement_status_change({
-                      from: statusLabels[event.from](),
-                      to: statusLabels[event.to](),
-                    })
-                  : m.procurement_lifecycle_created()}
-              </strong>
-              <small>
-                <WorkspaceDate value={event.occurredAt} />
-                {event.from ? ` · ${event.reason}` : ''}
-              </small>
-            </span>
-          </li>
-        ))}
-      </ol>
     </section>
   );
 }
@@ -1714,12 +1856,21 @@ function OrderCard({
   open: (dialog: Dialog) => void;
 }) {
   const { order } = record;
+  const sourceCancellationUnavailable =
+    record.submission?.channel !== 'email' &&
+    ['submitting', 'uncertain', 'submitted'].includes(
+      record.submission?.state ?? '',
+    );
   const allowed = record.canManage
     ? order.authority === 'luma'
       ? order.status === 'draft'
-        ? (['open', 'cancelled'] as const)
+        ? sourceCancellationUnavailable
+          ? (['open'] as const)
+          : (['open', 'cancelled'] as const)
         : order.status === 'open'
-          ? (['closed', 'cancelled'] as const)
+          ? sourceCancellationUnavailable
+            ? (['closed'] as const)
+            : (['closed', 'cancelled'] as const)
           : []
       : []
     : [];

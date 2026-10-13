@@ -143,6 +143,8 @@ export const commitmentKinds = {
   shipped: m.procurement_commitment_kind_shipped,
   received: m.procurement_commitment_kind_received,
   condition: m.procurement_commitment_kind_condition,
+  shortage: m.procurement_commitment_kind_shortage,
+  damaged: m.procurement_commitment_kind_damaged,
 } satisfies Record<Commitment['kind'], () => string>;
 
 export const reviewReasonLabels = {
@@ -162,7 +164,9 @@ export function quantity(value: number) {
 export function commitmentValue(commitment: Commitment, unit?: string) {
   if (
     commitment.kind === 'confirmed_quantity' ||
-    commitment.kind === 'received'
+    commitment.kind === 'received' ||
+    commitment.kind === 'shortage' ||
+    commitment.kind === 'damaged'
   )
     return unit
       ? quantityWithUnit(
@@ -189,6 +193,7 @@ export function commitmentSource(
     return purchasingLabel
       ? m.procurement_commitment_source_system({ system: purchasingLabel })
       : m.procurement_commitment_source_system_generic();
+  if (source.kind === 'manual_receipt') return m.procurement_receipt_source();
   if (source.kind === 'correction')
     return m.procurement_commitment_source_correction();
 

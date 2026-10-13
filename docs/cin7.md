@@ -101,3 +101,17 @@ records no supplier confirmation, and a voided purchase has no Luma status, so i
 - The [simulator](simulator.md#cin7-core-as-the-erp) implements the endpoints and fields
   Luma reads. Simulator compatibility does not prove live-provider compatibility; run a
   smoke test against a Cin7 trial account before relying on a mapping change.
+
+## Supplier purchasing terms
+
+Released purchasing reads retain the product's documented nested supplier records. They
+report supplier inventory code, fixed cost where present (otherwise the latest purchase
+cost) and supplier currency. Lead time comes from one unambiguous default supplier option set (no location).
+Location-specific option sets cannot become a product-wide lead time. Price validity,
+pack size, purchase minimums and preferred supplier are unavailable and stay unknown; product reorder quantities are not
+supplier purchasing terms.
+
+The metadata travels with the existing incremental product scan and shares its call
+budget. Luma records it only for explicitly linked suppliers and mapped canonical SKUs.
+A changed purchasing-system value appends history without replacing a person's override.
+A product response without supplier metadata cannot establish that earlier terms disappeared.

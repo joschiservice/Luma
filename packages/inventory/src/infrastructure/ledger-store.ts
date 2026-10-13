@@ -13,16 +13,19 @@ import type {
   LedgerReview,
   LedgerStore,
   LedgerTransaction,
+  PurchaseReceiptEvidence,
   ShadowComparison,
   StockEvidence,
 } from '../application/ledger.js';
 import {
   type AccountAddress,
   accountKey,
+  decimalQuantity,
   type LedgerAccount,
   LedgerError,
   planPostings,
   type PostingCommand,
+  quantityUnits,
 } from '../domain/ledger.js';
 import {
   addressSchema,
@@ -132,6 +135,17 @@ const review = (row: ReviewRow): LedgerReview => ({
 export function createLedgerStore(
   db: TenantDatabase,
   audit: (db: TenantDatabase) => AuditLog,
+  options: {
+    purchaseReceipt?: (
+      scoped: TenantDatabase,
+      context: import('@luma/identity').TenantContext,
+      purchaseOrderId: string,
+      lineId: string,
+    ) => Promise<Omit<
+      PurchaseReceiptEvidence,
+      'bookedGood' | 'bookedDamaged' | 'trackedIncoming'
+    > | null>;
+  } = {},
 ): LedgerStore {
   return {
     transaction: (context, operation) =>
@@ -428,6 +442,63 @@ export function createLedgerStore(
               ],
             );
           },
+          nativeReceiptLines: async (purchaseOrderId) => {
+            const result = await tx.query<{ id: string }>(
+              `SELECT line->>'id' AS id FROM procurement_purchase_orders o CROSS JOIN LATERAL jsonb_array_elements(o.document->'lines') line JOIN inventory_stock_ownership_scopes scope ON scope.tenant_id=o.tenant_id AND scope.location_id=(line->>'locationId')::uuid AND scope.mode='own' WHERE o.tenant_id=$1 AND o.id=$2`,
+              [tenant, purchaseOrderId],
+            );
+
+            return result.rows.map((r) => r.id);
+          },
+          purchaseReceiptReviews: async (purchaseOrderId) => {
+            const rows = await tx.query<ReviewRow>(
+              `SELECT * FROM inventory_ledger_reviews WHERE tenant_id=$1 AND command_document ? 'purchaseReceipt' AND ($2::text IS NULL OR command_document->'purchaseReceipt'->>'purchaseOrderId'=$2) ORDER BY created_at DESC LIMIT 100`,
+              [tenant, purchaseOrderId],
+            );
+
+            return rows.rows.map(review);
+          },
+          purchaseReceipt: async (purchaseOrderId, lineId) => {
+            await tx.query(
+              'SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
+              [`native-purchase-order:${tenant}:${purchaseOrderId}`],
+            );
+            await tx.query(
+              'SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
+              [`native-receipt:${tenant}:${purchaseOrderId}:${lineId}`],
+            );
+            await tx.query(
+              'SELECT pg_advisory_xact_lock_shared(hashtextextended($1,0))',
+              [`procurement:${tenant}`],
+            );
+            const source = await options.purchaseReceipt?.(
+              { transaction: async (_tenant, operation) => operation(tx) },
+              context,
+              purchaseOrderId,
+              lineId,
+            );
+            if (!source) return null;
+            const booked = (
+              await tx.query<{ good: string; damaged: string }>(
+                'SELECT trim_scale(good)::text AS good,trim_scale(damaged)::text AS damaged FROM inventory_purchase_receipt_bookings WHERE tenant_id=$1 AND purchase_order_id=$2 AND line_id=$3',
+                [tenant, purchaseOrderId, lineId],
+              )
+            ).rows[0];
+
+            const tracked = (
+              await tx.query<{ outstanding: string }>(
+                'SELECT trim_scale(outstanding_quantity)::text AS outstanding FROM inventory_purchase_incoming WHERE tenant_id=$1 AND purchase_order_id=$2 AND line_id=$3',
+                [tenant, purchaseOrderId, lineId],
+              )
+            ).rows[0];
+
+            return {
+              ...source,
+              bookedGood: booked?.good ?? '0',
+              bookedDamaged: booked?.damaged ?? '0',
+              trackedIncoming: tracked?.outstanding ?? '0',
+            };
+          },
           review: (id) =>
             getReview(
               'SELECT * FROM inventory_ledger_reviews WHERE tenant_id=$1 AND id=$2',
@@ -603,6 +674,35 @@ export function createLedgerStore(
                 );
               if (BigInt(change.version) % 100n === 0n)
                 await checkpoint(tx, tenant, change.accountId, change.version);
+            }
+
+            if (command.purchaseReceipt) {
+              const receipt = command.purchaseReceipt;
+              const incomingDebit = command.postings
+                .filter((p) => p.account.state === 'incoming')
+                .reduce((sum, p) => sum - quantityUnits(p.quantity), 0n);
+              if (incomingDebit > 0n)
+                await tx.query(
+                  'UPDATE inventory_purchase_incoming SET outstanding_quantity=outstanding_quantity-$4,updated_at=clock_timestamp() WHERE tenant_id=$1 AND purchase_order_id=$2 AND line_id=$3 AND outstanding_quantity>=$4',
+                  [
+                    tenant,
+                    receipt.purchaseOrderId,
+                    receipt.lineId,
+                    decimalQuantity(incomingDebit),
+                  ],
+                );
+              await tx.query(
+                'INSERT INTO inventory_purchase_receipt_bookings(tenant_id,purchase_order_id,line_id,good,damaged,entry_id,recorded_at) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(tenant_id,purchase_order_id,line_id) DO UPDATE SET good=excluded.good,damaged=excluded.damaged,entry_id=excluded.entry_id,recorded_at=excluded.recorded_at',
+                [
+                  tenant,
+                  receipt.purchaseOrderId,
+                  receipt.lineId,
+                  receipt.cumulativeGood,
+                  receipt.cumulativeDamaged,
+                  command.id,
+                  recorded.recorded_at,
+                ],
+              );
             }
 
             return remember(command, hash, {

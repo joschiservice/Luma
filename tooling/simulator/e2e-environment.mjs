@@ -28,6 +28,8 @@ export async function createSimulatorEnvironment({
   detection,
   demo,
   observability,
+  modelGateway,
+  supplierExtraction,
 }) {
   env = {
     FEATURE_FLAG_OVERRIDES:
@@ -83,6 +85,8 @@ export async function createSimulatorEnvironment({
       ...(demo ? { demo } : {}),
     });
     pilot = await createPilot(env, directory, manifest, temporal, {
+      ...(modelGateway ? { modelGateway } : {}),
+      ...(supplierExtraction ? { supplierExtraction } : {}),
       ...(detection ? { detection } : {}),
       ...(observability ? { observability } : {}),
     });
@@ -105,6 +109,8 @@ export async function createSimulatorEnvironment({
       simulatorOrigin,
       apiOrigin,
       token,
+      /** Private in-memory inputs for a separately restarted synthetic reconciliation worker. */
+      purchasingWorkerConfiguration: () => ({ env, directory, manifest }),
       /** Waits until the run is ready again, for example after a reset. */
       ready: () => waitForRun(call, 'operations'),
       /** Recreates every API service against the same isolated state, exercising restart fences. */
@@ -118,6 +124,8 @@ export async function createSimulatorEnvironment({
               .join(','),
           };
         pilot = await createPilot(env, directory, manifest, temporal, {
+          ...(modelGateway ? { modelGateway } : {}),
+          ...(supplierExtraction ? { supplierExtraction } : {}),
           ...(detection ? { detection } : {}),
           ...(observability ? { observability } : {}),
         });

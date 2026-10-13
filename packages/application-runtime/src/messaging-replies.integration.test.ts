@@ -17,6 +17,7 @@ import type {
 } from '@luma/messaging';
 import { createMessaging } from '@luma/messaging/composition';
 import { createTenantDatabase } from '@luma/platform/composition';
+import { createProcurement } from '@luma/procurement/composition';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -42,6 +43,8 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
   const memberId = randomUUID();
   const outsiderId = randomUUID();
   const orderId = randomUUID();
+  const supplierEvents: { id: string; state: string }[] = [];
+  let rebuildMessaging: () => ReturnType<typeof createMessaging>;
 
   const context = (
     userId: string,
@@ -105,7 +108,11 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
       return {
         ok: true,
         items: mailbox.filter(
-          (m) => m.data.thread.externalId === input.thread.externalId,
+          (m) =>
+            m.data.thread.externalId === input.thread.externalId ||
+            (input.thread.externalId.startsWith('outbound:') &&
+              m.data.rfcMessageId ===
+                `luma.${input.thread.externalId.slice(9)}@shop.example`),
         ),
         nextCursor: null,
       };
@@ -138,7 +145,10 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
               mailbox.push({
                 providerMessageId: `sent-${sends.length}`,
                 data: {
-                  thread: input.thread ?? { externalId: 'new', scopeKey: '' },
+                  thread: input.thread ?? {
+                    externalId: `new-${input.outboundId}`,
+                    scopeKey: '',
+                  },
                   rfcMessageId: messageId,
                   inReplyTo: input.inReplyTo,
                   references: input.references,
@@ -153,7 +163,15 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
                   sentAt: at,
                   receivedAt: at,
                   labels: ['SENT'],
-                  attachments: [],
+                  attachments: (input.attachments ?? []).map((file, index) => ({
+                    attachment: {
+                      externalId: String(index),
+                      scopeKey: `sent-${sends.length}`,
+                    },
+                    filename: file.filename,
+                    mimeType: file.mimeType,
+                    size: Buffer.from(file.base64, 'base64').length,
+                  })),
                 },
               });
             }
@@ -203,6 +221,7 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
     },
   };
   let messaging: ReturnType<typeof createMessaging>;
+  let procurement: ReturnType<typeof createProcurement>;
   let safety: ReturnType<typeof createSafetyServices>;
   let threadId: string;
 
@@ -262,6 +281,7 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
     );
 
     const database = createTenantDatabase(runtime);
+    procurement = createProcurement(database, async (c) => c, createAuditLog);
     const effects = createReplyEffects(sender, () => messaging.replies);
     safety = createSafetyServices(
       database,
@@ -273,25 +293,30 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
       [aliceId, alice],
       [bobId, bob],
     ]);
-    messaging = createMessaging(database, {
-      audit: createAuditLog,
-      refreshContext: async (c) => c,
-      resolveContext: async (userId, tenantId) => {
-        const make = contexts.get(userId);
-        if (!make || tenantId !== tenant) throw new Error('unknown');
+    rebuildMessaging = () =>
+      createMessaging(database, {
+        audit: createAuditLog,
+        refreshContext: async (c) => c,
+        resolveContext: async (userId, tenantId) => {
+          const make = contexts.get(userId);
+          if (!make || tenantId !== tenant) throw new Error('unknown');
 
-        return make();
-      },
-      connections: {
-        list: async (c) => (c.tenantId === tenant ? [connection] : []),
-      },
-      directory: createRecordDirectory(database),
-      members: { canReadMessages: async () => true },
-      reader,
-      records,
-      replyAdmission: createReplyAdmission(safety, effects),
-    });
+          return make();
+        },
+        connections: {
+          list: async (c) => (c.tenantId === tenant ? [connection] : []),
+        },
+        directory: createRecordDirectory(database),
+        members: { canReadMessages: async () => true },
+        reader,
+        records,
+        replyAdmission: createReplyAdmission(safety, effects),
+        settled: async (_context, outbound) => {
+          supplierEvents.push({ id: outbound.id, state: outbound.state });
+        },
+      });
 
+    messaging = rebuildMessaging();
     await messaging.service.mailboxes(alice());
     await messaging.service.addRule(alice(), connectionId, {
       id: randomUUID(),
@@ -340,6 +365,304 @@ describe.skipIf(!databaseUrl)('replies on PostgreSQL', () => {
   async function sendCount(outboundId: string) {
     return sends.filter((id) => id === outboundId).length;
   }
+
+  async function supplierDraft() {
+    const supplierId = randomUUID();
+    const purchaseOrderId = randomUUID();
+    const id = randomUUID();
+    await owner.query(
+      'INSERT INTO procurement_suppliers(tenant_id,id,document) VALUES($1,$2,$3)',
+      [
+        tenant,
+        supplierId,
+        {
+          id: supplierId,
+          tenantId: tenant,
+          name: 'Acme',
+          externalReferences: [],
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    );
+    await owner.query(
+      'INSERT INTO procurement_purchase_orders(tenant_id,id,supplier_id,document,created_at) VALUES($1,$2,$3,$4,now())',
+      [
+        tenant,
+        purchaseOrderId,
+        supplierId,
+        {
+          id: purchaseOrderId,
+          tenantId: tenant,
+          supplierId,
+          supplierName: 'Acme',
+          reference: `PO-${id}`,
+          authority: 'luma',
+          externalReferences: [],
+          origin: {},
+          status: 'draft',
+          revision: 1,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          lines: [
+            {
+              id: randomUUID(),
+              sku: 'SKU-1',
+              description: 'Item',
+              quantity: 40,
+              unit: 'each',
+            },
+          ],
+        },
+      ],
+    );
+    const input = {
+      id,
+      connectionId,
+      to: [anna],
+      subject: `Purchase order PO-${id}`,
+      text: 'Please confirm the attached order.',
+      language: 'en' as const,
+      records: [
+        { kind: 'purchase_order' as const, id: purchaseOrderId },
+        { kind: 'supplier' as const, id: supplierId },
+      ],
+      attachments: [
+        {
+          filename: 'order.pdf',
+          mimeType: 'application/pdf',
+          base64: Buffer.from('%PDF sample').toString('base64'),
+        },
+      ],
+      procurement: {
+        purchaseOrderId,
+        supplierId,
+        kind: 'submission' as const,
+        requestedDeliveryDate: '2026-10-20',
+      },
+    };
+
+    return {
+      input,
+      reply: await messaging.replies.compose(alice(), input),
+      purchaseOrderId,
+    };
+  }
+
+  it('edits supplier contact with audit, revision checks, idempotent retries and tenant isolation', async () => {
+    const supplier = await procurement.createSupplier(alice(), {
+      id: randomUUID(),
+      name: 'Supplier contact',
+      externalReferences: [],
+    });
+    const request = {
+      id: randomUUID(),
+      expectedRevision: 1,
+      email: 'orders@supplier.example',
+      language: 'de',
+    };
+    const updated = await procurement.updateSupplierContact(
+      alice(),
+      supplier.id,
+      request,
+    );
+    expect(updated).toMatchObject({
+      email: request.email,
+      language: 'de',
+      revision: 2,
+    });
+    expect(
+      await procurement.updateSupplierContact(alice(), supplier.id, request),
+    ).toEqual(updated);
+    await expect(
+      procurement.updateSupplierContact(alice(), supplier.id, {
+        ...request,
+        id: randomUUID(),
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    await expect(
+      procurement.updateSupplierContact(alice(), supplier.id, {
+        ...request,
+        email: 'other@supplier.example',
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    await expect(
+      procurement.updateSupplierContact(
+        context(memberId, 'member'),
+        supplier.id,
+        { ...request, id: randomUUID(), expectedRevision: 2 },
+      ),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    await expect(
+      procurement.updateSupplierContact(
+        context(outsiderId, 'admin', otherTenant),
+        supplier.id,
+        { ...request, id: randomUUID() },
+      ),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    const cleared = await procurement.updateSupplierContact(
+      alice(),
+      supplier.id,
+      { id: randomUUID(), expectedRevision: 2, email: null, language: null },
+    );
+    expect(cleared.email).toBeUndefined();
+    expect(cleared.language).toBeUndefined();
+    const audit = await owner.query(
+      "SELECT count(*)::int AS n FROM audit_entries WHERE tenant_id=$1 AND document->>'eventType'='supplier.contact_updated' AND proposal_id=$2",
+      [tenant, supplier.id],
+    );
+    expect(audit.rows[0].n).toBe(2);
+  });
+
+  it('approves a supplier PDF, sends once after a process restart, and keeps the linked order thread', async () => {
+    const { input, reply, purchaseOrderId } = await supplierDraft();
+    expect(await messaging.replies.compose(alice(), input)).toMatchObject({
+      id: reply.id,
+      state: 'draft',
+    });
+    const pdf = await messaging.replies.supplierAttachment(
+      alice(),
+      purchaseOrderId,
+      reply.id,
+    );
+    expect(Buffer.from(pdf.base64, 'base64').toString()).toBe('%PDF sample');
+    const requested = await messaging.replies.request(alice(), reply.id, {
+      id: randomUUID(),
+    });
+    expect(requested.state).toBe('approval_required');
+    expect(await sendCount(reply.id)).toBe(0);
+    await expect(
+      messaging.replies.decide(alice(), reply.id, {
+        decisionId: requested.decisionId!,
+        outcome: 'approved',
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    messaging = rebuildMessaging();
+    const sent = await messaging.replies.decide(bob(), reply.id, {
+      decisionId: requested.decisionId!,
+      outcome: 'approved',
+    });
+    expect(sent.state).toBe('sent');
+    messaging = rebuildMessaging();
+    await messaging.replies.pass(alice());
+    await messaging.replies.send(alice(), reply.id, { id: randomUUID() });
+    expect(await sendCount(reply.id)).toBe(1);
+    expect(
+      (
+        await messaging.service.recordThreads(
+          alice(),
+          'purchase_order',
+          purchaseOrderId,
+        )
+      ).items,
+    ).toHaveLength(1);
+    expect(
+      supplierEvents.filter(
+        (event) => event.id === reply.id && event.state === 'sent',
+      ),
+    ).toHaveLength(1);
+    const detail = await messaging.service.thread(alice(), reply.threadId);
+    expect(detail.messages).toHaveLength(1);
+    expect(detail.documents[0]?.filename).toBe('order.pdf');
+    const followUp = await messaging.replies.compose(alice(), {
+      ...input,
+      id: randomUUID(),
+      threadId: reply.threadId,
+      subject: 'A proposed new subject must not split the supplier thread',
+      attachments: [],
+      procurement: {
+        ...input.procurement,
+        kind: 'follow_up',
+        attentionKey: 'confirmation_overdue:current',
+        nextCheckAt: '2026-10-21T00:00:00Z',
+      },
+    });
+    expect(followUp.subject).toBe(`Re: ${input.subject}`);
+    expect(followUp.threadId).toBe(reply.threadId);
+    await expect(
+      messaging.replies.supplierAttachment(
+        context(outsiderId, 'admin', otherTenant),
+        purchaseOrderId,
+        reply.id,
+      ),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    await expect(
+      messaging.replies.compose(alice(), { ...input, id: randomUUID() }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it('reconciles an uncertain supplier send after restart and records a permanent bounce independently', async () => {
+    const { reply, purchaseOrderId } = await supplierDraft();
+    const requested = await messaging.replies.request(alice(), reply.id, {
+      id: randomUUID(),
+    });
+    loseResponse = true;
+    await messaging.replies.decide(bob(), reply.id, {
+      decisionId: requested.decisionId!,
+      outcome: 'approved',
+    });
+    messaging = rebuildMessaging();
+    loseResponse = false;
+    const checked = await messaging.replies.check(alice(), reply.id);
+    expect(checked.state).toBe('sent');
+    expect(await sendCount(reply.id)).toBe(1);
+    const at = new Date().toISOString();
+    mailbox.push({
+      providerMessageId: `bounce-${reply.id}`,
+      data: {
+        thread: { externalId: `new-${reply.id}`, scopeKey: '' },
+        rfcMessageId: `bounce.${reply.id}@mail.example`,
+        inReplyTo: `luma.${reply.id}@shop.example`,
+        references: [],
+        direction: 'inbound',
+        from: { address: 'mailer-daemon@mail.example', name: null },
+        to: [ops],
+        cc: [],
+        replyTo: [],
+        subject: 'Delivery failure',
+        text: 'Permanent failure',
+        truncated: false,
+        sentAt: at,
+        receivedAt: at,
+        labels: ['INBOX'],
+        attachments: [],
+        deliveryFailure: {
+          originalMessageId: `luma.${reply.id}@shop.example`,
+          recipient: anna.address,
+          status: '5.1.1',
+        },
+      },
+    });
+    await messaging.store.transaction(tenant, async (tx) => {
+      const row = await tx.outbound.get(reply.id, true);
+      if (row)
+        await tx.outbound.update({
+          ...row,
+          document: {
+            ...row.document,
+            deliveryCheckedAt: '2026-01-01T00:00:00Z',
+          },
+        });
+    });
+    await messaging.replies.pass(alice());
+    expect(await messaging.replies.get(alice(), reply.id)).toMatchObject({
+      state: 'failed',
+    });
+    expect(
+      supplierEvents.some(
+        (event) => event.id === reply.id && event.state === 'failed',
+      ),
+    ).toBe(true);
+    expect(await sendCount(reply.id)).toBe(1);
+    expect(
+      (
+        await messaging.service.recordThreads(
+          alice(),
+          'purchase_order',
+          purchaseOrderId,
+        )
+      ).items,
+    ).toHaveLength(1);
+  });
 
   it('drafts from linked records with citations', async () => {
     // Order projections belong to another owner; the link is what drafting reads.

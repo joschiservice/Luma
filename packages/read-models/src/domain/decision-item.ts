@@ -42,6 +42,7 @@ export type DecisionOwner =
   | { kind: 'app_inventory'; appId: string; positionId: string }
   | { kind: 'app_order'; appId: string; connectionId: string; orderId: string }
   | { kind: 'purchase_order'; purchaseOrderId: string }
+  | { kind: 'purchasing_plan'; planId: string }
   | { kind: 'message_thread'; threadId: string };
 
 export interface DecisionAssignment {

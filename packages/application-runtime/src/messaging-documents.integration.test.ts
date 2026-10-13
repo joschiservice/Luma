@@ -17,7 +17,7 @@ import { createMessaging } from '@luma/messaging/composition';
 import type { ModelGateway } from '@luma/platform';
 import { createTenantDatabase } from '@luma/platform/composition';
 import { Pool } from 'pg';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { createRecordDirectory } from './composition/messaging.js';
 import { createDocumentDirectory } from './composition/messaging-documents.js';
@@ -755,7 +755,35 @@ describe.skipIf(!databaseUrl)('documents on PostgreSQL', () => {
       ]),
     );
     await messaging.service.syncMailbox(adminContext(), connectionId);
-    await drain();
+    // A queued read may not yet be due on PostgreSQL's clock, even after the caller requested sync.
+    await owner.query(
+      "UPDATE messaging_mailboxes SET hint_at=clock_timestamp()+interval '250 milliseconds' WHERE tenant_id=$1 AND connection_id=$2",
+      [tenant, connectionId],
+    );
+    await vi.waitFor(
+      async () => {
+        await drain();
+        const detail = await thread('t1');
+        expect(detail.messages.map((item) => item.source.messageId)).toContain(
+          'm2',
+        );
+        expect(
+          detail.documents.map((document) => [
+            document.filename,
+            document.state,
+          ]),
+        ).toEqual(
+          expect.arrayContaining([
+            ['AB-AMB-77 (1).pdf', 'duplicate'],
+            ['Lieferplan PO-1001 v2.csv', 'ready'],
+          ]),
+        );
+        expect((await documentNamed('t5', 'Kopie.csv')).state).toBe(
+          'duplicate',
+        );
+      },
+      { interval: 25, timeout: 5000 },
+    );
     const v1 = await documentNamed('t1', 'Lieferplan PO-1001.csv');
     const original = await documentNamed('t1', 'AB-AMB-77.pdf');
     const copy = await documentNamed('t1', 'AB-AMB-77 (1).pdf');

@@ -1,8 +1,9 @@
-import type { AppDefinition } from '@luma/app-host';
+import type { AppDefinition, AppFactoryContext } from '@luma/app-host';
 import { type ConnectionProvider, ConnectorError } from '@luma/connections';
 import { simulationTransport } from '@luma/connections/adapters';
 import type { SimulationTransport } from '@luma/connections/composition';
 import { createRequestPacer, type RequestPacer } from '@luma/connector-cin7';
+import { hasPermission } from '@luma/identity';
 
 import { createCin7Connector } from './infrastructure/adapter.js';
 import {
@@ -28,6 +29,8 @@ export { createCin7Connector, createInstallationVerifier };
  */
 export function createCin7Provider(
   options: {
+    purchasingTermsEnabled?:
+      ((tenantId: string) => Promise<boolean>) | undefined;
     fetch?: typeof globalThis.fetch | undefined;
     simulation?: SimulationTransport | undefined;
   } = {},
@@ -79,6 +82,10 @@ export function createCin7Provider(
         tenantId: context.tenantId,
         connectionId: id,
         recordObservations: runtime.recordObservations,
+        purchasingTerms:
+          current.connection.granted.includes('suppliers.read') &&
+          hasPermission(context, 'procurement.read') &&
+          ((await options.purchasingTermsEnabled?.(context.tenantId)) ?? false),
         ...(fetch ? { fetch } : {}),
         pacer: state.pacer,
         units: state.units,
@@ -112,7 +119,7 @@ export function createCin7Provider(
 }
 
 /** Registers Cin7 Core connection setup and read capabilities. */
-export function createApp(): AppDefinition {
+export function createApp(context?: AppFactoryContext): AppDefinition {
   return {
     manifest: {
       id: 'cin7',
@@ -138,6 +145,10 @@ export function createApp(): AppDefinition {
         settings: 'connections.manage',
       },
     },
-    connector: createCin7Provider(),
+    connector: createCin7Provider({
+      purchasingTermsEnabled: (tenantId) =>
+        context?.featureEnabled?.(tenantId, 'supplier-purchasing-terms') ??
+        Promise.resolve(false),
+    }),
   };
 }

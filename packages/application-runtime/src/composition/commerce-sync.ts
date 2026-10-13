@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { createAppHost } from '@luma/app-catalog';
+import { createAuditLog } from '@luma/audit/composition';
 import {
   autoLinkEvidence,
   createAutoLinkRunner,
@@ -34,6 +35,7 @@ import {
   createModelGateway,
   createTenantDatabase,
 } from '@luma/platform/composition';
+import { createSupplierTerms } from '@luma/procurement/composition';
 import { Pool } from 'pg';
 
 import { createDetectionWorker } from './detection-worker.js';
@@ -43,6 +45,7 @@ import { createResourceScope } from './resources.js';
 import { createSalesReadSource, createSalesTenantRelease } from './sales.js';
 import { createCommerceServices } from './services.js';
 import { createSupplierFollowUpWorker } from './supplier-follow-up.js';
+import { createPurchasingTermsImporter } from './supplier-terms-sync.js';
 
 const digest = (value: string) =>
   createHash('sha256').update(value).digest('hex');
@@ -95,6 +98,19 @@ export function createCommerceSyncWorker(options: {
     store: createSyncStore(options.database),
     reader,
     ingestion: commerce.ingestion,
+    recordPurchasingTerms: createPurchasingTermsImporter(
+      options.database,
+      createSupplierTerms(
+        options.database,
+        options.identity.refreshContext,
+        createAuditLog,
+        (context) =>
+          createTenantFeatureRelease(options.observability)(
+            context.tenantId,
+            'supplier-purchasing-terms',
+          ),
+      ),
+    ),
     customers: createCustomerProfiles(options.database),
     recordRead: createReadChecks(options.database),
     resolveContext: options.identity.resolveWorkflowContext,
@@ -291,4 +307,16 @@ export function createAutomaticLinkStore(database: TenantDatabase) {
       evidence.method,
     );
   });
+}
+
+/** Composes the term owner and audit for product sync in workers and synthetic pilot runtimes. */
+export function createPurchasingTermsRecorder(
+  database: TenantDatabase,
+  refreshContext: IdentityService['refreshContext'],
+  released: Parameters<typeof createSupplierTerms>[3],
+) {
+  return createPurchasingTermsImporter(
+    database,
+    createSupplierTerms(database, refreshContext, createAuditLog, released),
+  );
 }

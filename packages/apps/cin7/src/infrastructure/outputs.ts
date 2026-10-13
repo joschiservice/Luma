@@ -1,10 +1,11 @@
+import { productPurchasingTermsSchema } from '@luma/connections/composition';
 import { z } from 'zod';
 
 /**
  * Version of this adapter's normalized output, recorded as observation provenance. Bump it
  * whenever the same provider response would normalize differently.
  */
-export const adapterVersion = 'cin7/1';
+export const adapterVersion = 'cin7/2';
 
 const timestamp = z.string().datetime({ offset: true });
 
@@ -171,6 +172,10 @@ export const outputs = {
                   .strict()
                   .nullable(),
                 barcode: text,
+                purchasingTerms: z
+                  .array(productPurchasingTermsSchema)
+                  .max(100)
+                  .optional(),
               })
               .strict(),
           ),

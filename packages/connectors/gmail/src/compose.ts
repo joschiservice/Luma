@@ -15,6 +15,7 @@ export interface ComposeInput {
   inReplyTo: string | null;
   references: string[];
   date: Date;
+  attachments?: { filename: string; mimeType: string; base64: string }[];
 }
 
 const atext = /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+$/;
@@ -115,12 +116,50 @@ export function composeMessage(input: ComposeInput): string {
       ? [`References: ${input.references.map(messageId).join('\r\n ')}`]
       : []),
     'MIME-Version: 1.0',
-    'Content-Type: text/plain; charset=UTF-8',
-    'Content-Transfer-Encoding: base64',
   ];
   const text = input.text.replace(/\r\n?/g, '\n').replace(/\n/g, '\r\n');
 
-  return `${headers.join('\r\n')}\r\n\r\n${base64Lines(text)}\r\n`;
+  const body = [
+    'Content-Type: text/plain; charset=UTF-8',
+    'Content-Transfer-Encoding: base64',
+    '',
+    base64Lines(text),
+  ].join('\r\n');
+  if (!input.attachments?.length)
+    return `${headers.join('\r\n')}\r\n${body}\r\n`;
+  if (input.attachments.length > 10) invalid();
+  const boundary = `luma-${Buffer.from(input.messageId).toString('hex')}`;
+  const parts = input.attachments.map((attachment) => {
+    if (
+      !/^[A-Za-z0-9][A-Za-z0-9._ -]{0,199}$/.test(attachment.filename) ||
+      !/^[a-z0-9.+-]+\/[a-z0-9.+-]+$/.test(attachment.mimeType) ||
+      !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
+        attachment.base64,
+      ) ||
+      Buffer.byteLength(attachment.base64, 'base64') > 10 * 1024 * 1024
+    )
+      invalid();
+
+    return [
+      `--${boundary}`,
+      `Content-Type: ${attachment.mimeType}; name="${attachment.filename}"`,
+      `Content-Disposition: attachment; filename="${attachment.filename}"`,
+      'Content-Transfer-Encoding: base64',
+      '',
+      attachment.base64.match(/.{1,76}/g)?.join('\r\n') ?? '',
+    ].join('\r\n');
+  });
+
+  return [
+    ...headers,
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    '',
+    `--${boundary}`,
+    body,
+    ...parts,
+    `--${boundary}--`,
+    '',
+  ].join('\r\n');
 }
 
 /** Encodes a composed message for the Gmail `raw` field. */

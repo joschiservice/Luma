@@ -11,6 +11,7 @@ const installationPermissions = z.enum([
   'suppliers.read',
   'purchase-orders.read',
   'purchase-orders.submit',
+  'purchase-orders.revise',
   'returns.options.read',
   'returns.created.read',
   'returns.create',

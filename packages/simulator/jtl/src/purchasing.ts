@@ -397,7 +397,8 @@ export async function confirmPurchaseOrder(
 /**
  * Books a goods receipt: delivered quantities rise, open quantities fall and the units are added
  * to the receiving warehouse, by default the order's warehouse. The order becomes partially
- * delivered (30) or completed (500).
+ * delivered (30) or completed (500). The receiving operator may quarantine damaged units;
+ * they remain physical receipt evidence and never increase available stock.
  */
 export async function receivePurchaseOrder(
   context: JtlContext,
@@ -417,7 +418,11 @@ export async function receivePurchaseOrder(
       command.lines.length ||
     targets.some(
       ([target, value]) =>
-        !(value.quantity > 0) || value.quantity > target.openQuantity,
+        !(value.quantity > 0) ||
+        value.quantity > target.openQuantity ||
+        !Number.isFinite(value.damagedQuantity ?? 0) ||
+        (value.damagedQuantity ?? 0) < 0 ||
+        (value.damagedQuantity ?? 0) > value.quantity,
     )
   )
     refuse('Invalid goods receipt');
@@ -430,6 +435,11 @@ export async function receivePurchaseOrder(
     target.deliveredQuantity += value.quantity;
     target.openQuantity -= value.quantity;
     item.stock[warehouse] = (item.stock[warehouse] ?? 0) + value.quantity;
+    if (value.damagedQuantity) {
+      item.quarantinedStock ??= {};
+      item.quarantinedStock[warehouse] =
+        (item.quarantinedStock[warehouse] ?? 0) + value.damagedQuantity;
+    }
   }
   order.status = order.lineItems.every((line) => line.openQuantity === 0)
     ? 500
@@ -502,6 +512,10 @@ export function assignmentJson(
     netPurchasePrice: assignment.netPrice,
     vatRate: assignment.vatRate,
     isDefaultSupplier: assignment.isDefault,
+    supplierItemNumber: assignment.supplierArticleNumber,
+    packageUnitQuantity: assignment.packSize,
+    minimumPurchaseQuantity: assignment.minimumQuantity,
+    deliveryTimeInDays: assignment.leadTimeDays,
   };
 }
 

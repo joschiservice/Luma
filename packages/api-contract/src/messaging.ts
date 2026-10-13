@@ -470,6 +470,16 @@ const outboundStateSchema = z.enum([
 ]);
 
 export const outboundSchema = z.object({
+  purchaseOrderId: id.optional(),
+  attachments: z
+    .array(
+      z.object({
+        filename: z.string(),
+        mimeType: z.string(),
+        size: z.number().int().min(0),
+      }),
+    )
+    .optional(),
   id,
   threadId: id,
   connectionId: id,

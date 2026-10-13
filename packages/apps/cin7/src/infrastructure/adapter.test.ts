@@ -3,6 +3,7 @@ import { createCapabilityRuntime } from '@luma/connections/adapters';
 import { createRequestPacer } from '@luma/connector-cin7';
 import type { TenantContext } from '@luma/identity';
 import { describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 
 import { type Cin7ConnectorOptions, createCin7Connector } from './adapter.js';
 
@@ -51,7 +52,7 @@ function saleOf(n: number, overrides: Record<string, unknown> = {}) {
   };
 }
 
-function fixture() {
+function fixture(overrides: Partial<Cin7ConnectorOptions> = {}) {
   const sales = [
     saleOf(1, {
       Fulfilments: [
@@ -320,6 +321,7 @@ function fixture() {
     },
     now: () => new Date('2026-10-06T12:00:00Z'),
     id: () => `00000000-0000-4000-8000-${String(++next).padStart(12, '0')}`,
+    ...overrides,
   };
   const connector = createCin7Connector(options);
   const runtime = createCapabilityRuntime({
@@ -667,4 +669,50 @@ describe('Cin7 customers and purchasing', () => {
       ],
     });
   });
+});
+
+it('reads supplier product metadata without inventing unsupported pack, lead time or preference', async () => {
+  const f = fixture({ purchasingTerms: true });
+  const original = f.fetch.getMockImplementation()!;
+  f.fetch.mockImplementation(async (input, init) => {
+    const response = await original(input, init);
+    if (new URL(String(input)).pathname.endsWith('/product')) {
+      const body = z
+        .object({ Products: z.array(z.record(z.string(), z.unknown())) })
+        .passthrough()
+        .parse(await response.json());
+      body.Products[0]!.Suppliers = [
+        {
+          SupplierID: id(701),
+          ProductSupplierID: id(901),
+          SupplierInventoryCode: 'SUP-BREAD',
+          Cost: 3.5,
+          FixedCost: 3.25,
+          Currency: 'EUR',
+          ProductSupplierOptions: [
+            { LocationID: null, LocationName: '', Lead: 5 },
+          ],
+        },
+      ];
+
+      return Response.json(body);
+    }
+
+    return response;
+  });
+  const read = await f.read('products.read', { limit: 10 });
+  expect(read.items[0]?.data.skus[0]?.purchasingTerms).toEqual([
+    {
+      supplier: ref(id(701)),
+      sourceRecordId: id(901),
+      complete: true,
+      supplierArticleNumber: 'SUP-BREAD',
+      unitPrice: { amount: '3.25', currency: 'EUR', validFrom: null },
+      packSize: null,
+      lineMinimumQuantity: null,
+      orderMinimumValue: null,
+      leadTimeDays: 5,
+      preferred: null,
+    },
+  ]);
 });

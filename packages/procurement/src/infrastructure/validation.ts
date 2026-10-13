@@ -16,6 +16,8 @@ export const supplierInputSchema = z
     id: z.string().uuid(),
     name: text,
     externalReferences,
+    email: z.string().email().max(254).optional(),
+    language: z.enum(['en', 'de']).optional(),
   })
   .strict();
 
@@ -57,6 +59,8 @@ export const purchaseOrderInputSchema = z
         workflowRunId: z.string().uuid().optional(),
         actionId: text.optional(),
         outcomeId: text.optional(),
+        sourcePurchaseOrderId: z.string().uuid().optional(),
+        sourceAttentionKey: z.string().min(1).max(400).optional(),
       })
       .strict()
       .default({}),
@@ -68,6 +72,19 @@ export const purchaseOrderInputSchema = z
             sku: text,
             description: text,
             quantity: z.number().finite().positive().max(1_000_000_000),
+            unitPrice: z
+              .object({
+                amount: z
+                  .string()
+                  .regex(/^\d+(?:\.\d{1,8})?$/)
+                  .max(30),
+                currency: z.string().regex(/^[A-Z]{3}$/),
+              })
+              .strict()
+              .optional(),
+            locationId: z.string().uuid().optional(),
+            supplierArticleNumber: z.string().trim().min(1).max(256).optional(),
+            requestedDeliveryDate: z.string().date().optional(),
             unit: z.string().trim().min(1).max(40),
           })
           .strict(),
@@ -186,8 +203,25 @@ export const followUpInputSchema = z
   .object({
     id: z.string().uuid(),
     key: z.string().min(1).max(400),
-    response: z.enum(['accepted', 'following_up']),
+    response: z.enum(['accepted', 'following_up', 'credited', 'written_off']),
     note: z.string().trim().min(1).max(1000),
     nextCheckAt: z.string().datetime({ offset: true }).nullable().default(null),
+  })
+  .strict();
+
+/** Records cumulative receipt or difference quantities; retries reuse the same command ID. */
+export const receiptInputSchema = z
+  .object({
+    id: z.string().uuid(),
+    lineId: z.string().uuid(),
+    kind: z.enum(['received', 'shortage', 'damaged']),
+    quantity: z.number().finite().min(0).max(1_000_000_000),
+    expectedCommitmentId: z.string().uuid().nullable(),
+    expectedDamagedCommitmentId: z.string().uuid().nullable().optional(),
+    damagedQuantity: z.number().finite().min(0).max(1_000_000_000).optional(),
+    receivedAt: z.string().datetime({ offset: true }),
+    condition: z.enum(['good', 'mixed', 'damaged']),
+    reason: z.string().trim().min(1).max(1000),
+    evidence: z.array(z.string().trim().min(1).max(2000)).min(1).max(20),
   })
   .strict();

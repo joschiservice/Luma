@@ -109,3 +109,7 @@ export {
   productBundleSchema,
   stockCompositionSchema,
 } from './infrastructure/bundle-validation.js';
+
+export { productPurchasingTermsSchema } from './infrastructure/purchasing-terms-validation.js';
+
+export { purchaseOrderRevisionInputSchema } from './infrastructure/purchase-order-revision-validation.js';

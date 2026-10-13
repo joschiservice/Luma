@@ -1,10 +1,11 @@
+import { productPurchasingTermsSchema } from '@luma/connections/composition';
 import { z } from 'zod';
 
 /**
  * Version of this adapter's normalized output, recorded as observation provenance. Bump it
  * whenever the same provider response would normalize differently.
  */
-export const adapterVersion = 'jtl/7';
+export const adapterVersion = 'jtl/8';
 
 const timestamp = z.string().datetime({ offset: true });
 
@@ -219,6 +220,10 @@ export const outputs = {
             title: z.null(),
             price: z.object({ amount: decimal, currency: z.null() }).nullable(),
             barcode: text,
+            purchasingTerms: z
+              .array(productPurchasingTermsSchema)
+              .max(100)
+              .optional(),
           }),
         ),
       }),

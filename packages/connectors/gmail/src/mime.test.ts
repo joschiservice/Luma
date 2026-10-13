@@ -250,3 +250,98 @@ describe('composeMessage', () => {
     expect(decodeWords(words.join(' '))).toBe('ä'.repeat(100));
   });
 });
+
+describe('supplier purchasing mail', () => {
+  it('preserves binary PDF bytes in a multipart send and rejects attachment header injection', () => {
+    const bytes = Buffer.from([37, 80, 68, 70, 0, 255, 1]);
+    const input = {
+      from: { address: 'ops@shop.example', name: null },
+      to: [{ address: 'sales@supplier.example', name: null }],
+      cc: [],
+      subject: 'Purchase order',
+      text: 'Please confirm.',
+      messageId: 'luma.test@shop.example',
+      inReplyTo: null,
+      references: [],
+      date: new Date('2026-10-01T00:00:00Z'),
+      attachments: [
+        {
+          filename: 'order.pdf',
+          mimeType: 'application/pdf',
+          base64: bytes.toString('base64'),
+        },
+      ],
+    };
+    const raw = composeMessage(input);
+    expect(raw).toContain('Content-Type: multipart/mixed;');
+    expect(raw).toContain(
+      'Content-Disposition: attachment; filename="order.pdf"',
+    );
+    const encoded =
+      /Content-Disposition: attachment;[^]*?\r\n\r\n([^]*?)\r\n--/.exec(
+        raw,
+      )?.[1];
+    expect(Buffer.from(encoded ?? '', 'base64')).toEqual(bytes);
+    expect(() =>
+      composeMessage({
+        ...input,
+        attachments: [
+          {
+            ...input.attachments[0]!,
+            filename: 'order.pdf"\r\nBcc: evil@example.com',
+          },
+        ],
+      }),
+    ).toThrow();
+  });
+  it('only treats a structured permanent DSN with the original message and recipient as a bounce', () => {
+    const report =
+      'Original-Message-ID: <luma.test@shop.example>\r\n\r\nFinal-Recipient: rfc822; sales@supplier.example\r\nAction: failed\r\nStatus: 5.1.1\r\n';
+    const payload = {
+      mimeType: 'multipart/report',
+      headers: headers({
+        'Content-Type': 'multipart/report; report-type=delivery-status',
+        From: 'mailer-daemon@mail.example',
+        To: 'ops@shop.example',
+      }),
+      parts: [
+        { mimeType: 'text/plain', body: { data: b64('Delivery failed') } },
+        { mimeType: 'message/delivery-status', body: { data: b64(report) } },
+      ],
+    };
+    expect(
+      parseMessage(message(payload), 'ops@shop.example').deliveryFailure,
+    ).toEqual({
+      originalMessageId: 'luma.test@shop.example',
+      recipient: 'sales@supplier.example',
+      status: '5.1.1',
+    });
+    expect(
+      parseMessage(
+        message({
+          ...payload,
+          parts: [{ mimeType: 'text/plain', body: { data: b64(report) } }],
+        }),
+        'ops@shop.example',
+      ).deliveryFailure,
+    ).toBeUndefined();
+    expect(
+      parseMessage(
+        message({
+          ...payload,
+          parts: [
+            {
+              mimeType: 'message/delivery-status',
+              body: {
+                data: b64(
+                  report.replace('5.1.1', '4.2.0').replace('failed', 'delayed'),
+                ),
+              },
+            },
+          ],
+        }),
+        'ops@shop.example',
+      ).deliveryFailure,
+    ).toBeUndefined();
+  });
+});

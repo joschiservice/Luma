@@ -373,6 +373,7 @@ export const nativeLedgerReviewSchema = z.object({
       'dispatch',
       'reconciliation',
       'production',
+      'purchase_receipt',
     ]),
     reason: z.string(),
     effectiveAt: time.nullable(),
@@ -396,6 +397,19 @@ export const nativeLedgerReviewSchema = z.object({
         }),
       )
       .max(5000),
+    purchaseReceipt: z
+      .object({
+        purchaseOrderId: uuid,
+        lineId: uuid,
+        commitmentId: uuid,
+        damagedCommitmentId: uuid.nullable(),
+        cumulativeGood: stockQuantitySchema,
+        cumulativeDamaged: stockQuantitySchema,
+        previousGood: stockQuantitySchema,
+        previousDamaged: stockQuantitySchema,
+        scopeVersion: stockVersionSchema,
+      })
+      .optional(),
     reversalOf: uuid.optional(),
   }),
   sources: z.array(nativeStockEvidenceSchema).max(5000),

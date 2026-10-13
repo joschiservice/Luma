@@ -302,10 +302,27 @@ export const jtlCommandSchema = z.discriminatedUnion('kind', [
         z.object({
           lineItemId: id,
           quantity: z.number().positive().max(1_000_000),
+          damagedQuantity: z.number().nonnegative().max(1_000_000).optional(),
         }),
       )
       .min(1)
       .max(500),
+  }),
+  z.object({
+    kind: z.literal('supplier-terms'),
+    itemId: id,
+    supplierId: id,
+    netPrice: z.number().nonnegative().max(1e9).optional(),
+    supplierArticleNumber: z.string().max(200).nullable().optional(),
+    packSize: z.number().positive().max(1e9).nullable().optional(),
+    minimumQuantity: z.number().nonnegative().max(1e9).nullable().optional(),
+    leadTimeDays: z
+      .number()
+      .int()
+      .nonnegative()
+      .max(3650)
+      .nullable()
+      .optional(),
   }),
   z.object({
     kind: z.literal('supplier-profile'),
@@ -321,6 +338,12 @@ const mailAddress = z.object({
 
 /** Mailbox actions accepted from the control API: seeding and mail from external senders. */
 export const gmailCommandSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('bounce'),
+    message: z.string().min(1).max(300),
+    recipient: z.string().email().max(320),
+    status: z.string().regex(/^5\.\d{1,3}\.\d{1,3}$/),
+  }),
   z.object({
     kind: z.literal('seed-mailbox'),
     address: z.string().email().max(254),

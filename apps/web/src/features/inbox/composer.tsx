@@ -17,6 +17,7 @@ import {
   checkOutbound,
   decideOutbound,
   discardOutbound,
+  downloadSupplierPdf,
   draftReply,
   requestOutbound,
   sendOutbound,
@@ -164,6 +165,7 @@ function ReplyCard({
   const [cc, setCc] = useState(() => reply.cc.map((a) => a.address).join(', '));
   const [subject, setSubject] = useState(reply.subject);
   const [text, setText] = useState(reply.text);
+  const [downloadError, setDownloadError] = useState(false);
   const [invalid, setInvalid] = useState<string>();
   const dirty =
     to !== reply.to.map((a) => a.address).join(', ') ||
@@ -336,6 +338,36 @@ function ReplyCard({
           <div className="messaging-message-text">{reply.text}</div>
         </div>
       )}
+      {reply.attachments?.length ? (
+        <div className="messaging-inline-actions">
+          <p>
+            {reply.attachments
+              .map((attachment) => attachment.filename)
+              .join(', ')}
+          </p>
+          {reply.purchaseOrderId ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setDownloadError(false);
+                void downloadSupplierPdf(
+                  organizationId,
+                  reply.purchaseOrderId!,
+                  reply.id,
+                ).catch(() => setDownloadError(true));
+              }}
+            >
+              {m.procurement_email_pdf()}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+      {downloadError ? (
+        <Alert tone="danger" role="alert">
+          {m.procurement_email_unavailable()}
+        </Alert>
+      ) : null}
       {reply.citations.length ? (
         <div className="messaging-citations">
           <h4 className="messaging-subheading">

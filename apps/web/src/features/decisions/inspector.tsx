@@ -142,6 +142,15 @@ function RecordLinks({
         >
           {m.decisions_open_run()} <ArrowUpRight aria-hidden="true" />
         </Link>
+      ) : owner.kind === 'purchasing_plan' ? (
+        <Link
+          className={link}
+          to="/app/$organizationId/procurement"
+          params={{ organizationId }}
+          search={{ view: 'purchasing', q: '', status: '' }}
+        >
+          {m.purchasing_title()} <ArrowUpRight aria-hidden="true" />
+        </Link>
       ) : owner.kind === 'message_thread' ? (
         <Link
           className={link}

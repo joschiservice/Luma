@@ -153,6 +153,15 @@ export function createIngest(deps: IngestDependencies) {
     const updated: ThreadRow = {
       ...thread,
       ...aggregate,
+      document: {
+        ...aggregate.document,
+        ...(thread.document.resolvedProviderThreadId
+          ? {
+              resolvedProviderThreadId:
+                thread.document.resolvedProviderThreadId,
+            }
+          : {}),
+      },
       status,
       replyDueAt: replyDeadline({
         ...aggregate,
@@ -361,7 +370,36 @@ export function createIngest(deps: IngestDependencies) {
             }),
             at,
           );
-          if (data.direction === 'inbound') {
+          if (data.deliveryFailure) {
+            const failedId = /^luma\.([A-Za-z0-9-]{1,64})@/.exec(
+              data.deliveryFailure.originalMessageId,
+            )?.[1];
+            const outbound = failedId
+              ? await tx.outbound.get(failedId, true)
+              : null;
+            if (
+              outbound &&
+              outbound.connectionId === mailbox.connectionId &&
+              ['sent', 'uncertain', 'sending'].includes(outbound.state) &&
+              [...outbound.document.to, ...outbound.document.cc].some(
+                (a) =>
+                  a.address.toLowerCase() === data.deliveryFailure!.recipient,
+              )
+            ) {
+              await tx.outbound.update({
+                ...outbound,
+                state: 'failed',
+                document: {
+                  ...outbound.document,
+                  stateReason: `Mail delivery failed (${data.deliveryFailure.status}). Check the supplier address before drafting another submission.`,
+                  ownerHandoffAt: null,
+                },
+                revision: outbound.revision + 1,
+                updatedAt: at,
+              });
+            }
+          }
+          if (data.direction === 'inbound' && !data.deliveryFailure) {
             entry.reopen ||= entry.thread.status !== 'open';
             candidates.push({
               messageId,
@@ -407,6 +445,27 @@ export function createIngest(deps: IngestDependencies) {
     data: MessageData,
     at: string,
   ): Promise<ThreadRow> {
+    const ownId = /^luma\.([A-Za-z0-9-]{1,64})@/.exec(
+      data.rfcMessageId ?? '',
+    )?.[1];
+    if (ownId) {
+      const outbound = await tx.outbound.get(ownId);
+      if (outbound?.connectionId === mailbox.connectionId) {
+        const pending = await tx.threads.get(outbound.threadId, true);
+        if (pending?.providerThreadId.startsWith('outbound:')) {
+          const resolved = {
+            ...pending,
+            document: {
+              ...pending.document,
+              resolvedProviderThreadId: data.thread.externalId,
+            },
+          };
+          await tx.threads.update(resolved);
+
+          return resolved;
+        }
+      }
+    }
     const existing = await tx.threads.byProvider(
       mailbox.connectionId,
       data.thread.externalId,

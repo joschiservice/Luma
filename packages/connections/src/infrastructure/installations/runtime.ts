@@ -136,6 +136,22 @@ export function createInstalledShippingMethodEffects(
   return createShippingMethodEffects(installedRuntime(options), binding);
 }
 
+/** Maps revision operations to the same installation-controlled runtime as submissions. */
+export interface PurchaseOrderRevisionBinding {
+  map(
+    context: TenantContext,
+    intent: EffectIntent,
+  ): Promise<CapabilityInput<'purchase-orders.revise'> | null>;
+  checkPreconditions(
+    context: TenantContext,
+    intent: EffectIntent,
+  ): Promise<boolean>;
+  verify(
+    context: TenantContext,
+    intent: EffectIntent,
+  ): Promise<VerificationResult>;
+}
+
 /** Maps, prechecks and verifies purchase-order submissions; the runtime fixes the capability. */
 export interface PurchaseOrderSubmissionBinding {
   map(
@@ -164,6 +180,8 @@ export function createInstalledPurchaseOrderRuntime(
   return Object.freeze({
     read: runtime.read,
     discover: runtime.discover,
+    revisionEffects: (binding: PurchaseOrderRevisionBinding) =>
+      runtime.effects({ capability: 'purchase-orders.revise', ...binding }),
     submissionEffects: (binding: PurchaseOrderSubmissionBinding) =>
       runtime.effects({ capability: 'purchase-orders.submit', ...binding }),
   });

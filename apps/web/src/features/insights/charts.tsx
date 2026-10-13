@@ -14,6 +14,7 @@ import {
 import { useContext, useEffect, useId } from 'react';
 
 import { connectionsOptions } from '../../kit/connections/data';
+import { PurchasingOutcomePanel } from '../../shared/procurement/purchasing-outcomes';
 import { ChartCard, type Selection } from './chart-card';
 import {
   insightChartOptions,
@@ -176,6 +177,7 @@ export function OperationalCharts({
           );
         })}
       </div>
+      <PurchasingOutcomePanel organizationId={organizationId} />
       {search.chart && drill && !queryFor(search.chart).isError && (
         <RecordsSheet
           organizationId={organizationId}

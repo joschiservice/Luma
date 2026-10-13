@@ -95,9 +95,20 @@ test('records receipt and inspection, approves stock and exchange separately, th
   const select = section.getByRole('combobox', { name: 'Replacement item' });
   await select.focus();
   await requester.keyboard.press('Enter');
-  await expect(requester.getByRole('option').first()).toBeVisible();
+  const options = requester.getByRole('option');
+  await expect(options.first()).toBeFocused();
   await requester.keyboard.press('Home');
+  await expect(options.first()).toBeFocused();
+  const labels = await options.allTextContents();
+  const replacementIndex = labels.findIndex((label) =>
+    label.startsWith(`${replacement.label} · `),
+  );
+  expect(replacementIndex).toBeGreaterThanOrEqual(0);
+  for (let index = 0; index < replacementIndex; index++)
+    await requester.keyboard.press('ArrowDown');
+  await expect(options.nth(replacementIndex)).toBeFocused();
   await requester.keyboard.press('Enter');
+  await expect(select).toContainText(replacement.label);
   await section.getByRole('spinbutton').fill('2');
   await section
     .getByRole('button', { name: 'Request replacement approval' })
@@ -105,6 +116,10 @@ test('records receipt and inspection, approves stock and exchange separately, th
   await expect(
     section.getByText('Waiting for approval', { exact: true }),
   ).toBeVisible();
+  const replacementRequest = (await f.request(`${f.path}/exchange`)).operation
+    .request;
+  expect(replacementRequest.replacement.variantId).toBe(replacement.variantId);
+  expect(replacementRequest.replacement.skuId).toBe(replacement.skuId);
   const approver = await pageFor(f.approver),
     review = approver.getByRole('region', { name: 'Exchange', exact: true });
   await review.getByRole('button', { name: 'Approve and send' }).click();

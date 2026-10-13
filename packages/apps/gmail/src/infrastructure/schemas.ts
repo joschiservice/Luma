@@ -43,7 +43,20 @@ export const inputs = {
   'messages.read': z
     .object({ ...page, filter: mailboxFilter, receivedSince: timestamp })
     .strict(),
-  'message-threads.read': z.object({ ...page, thread: gmailRef }).strict(),
+  'message-threads.read': z
+    .object({
+      ...page,
+      thread: z
+        .object({
+          externalId: z.union([
+            gmailId,
+            z.string().regex(/^outbound:[A-Za-z0-9-]{1,64}$/),
+          ]),
+          scopeKey: z.literal(''),
+        })
+        .strict(),
+    })
+    .strict(),
   'message-attachments.read': z
     .object({
       message: gmailRef,
@@ -73,6 +86,18 @@ export const inputs = {
         .max(998)
         .regex(/^[^\r\n]*$/),
       text: z.string().max(500_000),
+      attachments: z
+        .array(
+          z
+            .object({
+              filename: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._ -]{0,199}$/),
+              mimeType: z.string().regex(/^[a-z0-9.+-]+\/[a-z0-9.+-]+$/),
+              base64: z.string().max(14_000_000),
+            })
+            .strict(),
+        )
+        .max(10)
+        .optional(),
     })
     .strict()
     .refine((value) => value.to.length + value.cc.length > 0),
@@ -108,6 +133,14 @@ const message = z
         to: z.array(address),
         cc: z.array(address),
         replyTo: z.array(address),
+        deliveryFailure: z
+          .object({
+            originalMessageId: rfcId,
+            recipient: z.string(),
+            status: z.string().regex(/^5\.\d{1,3}\.\d{1,3}$/),
+          })
+          .strict()
+          .optional(),
         subject: z.string(),
         text: z.string().max(100_000),
         truncated: z.boolean(),

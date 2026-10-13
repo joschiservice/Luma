@@ -1,0 +1,11 @@
+.incoming-stock {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.incoming-stock-cell {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

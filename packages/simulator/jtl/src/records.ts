@@ -48,10 +48,18 @@ export interface ItemRecord {
   shopActive: boolean;
   /** Physical quantity per warehouse ID; missing warehouses hold nothing. */
   stock: Record<string, number>;
+  /** Physical units the receiving operator quarantined, excluded from sellable availability. */
+  quarantinedStock?: Record<string, number>;
   /** Open quantity of uncancelled sales orders. */
   reserved: number;
   /** Time of the last stock change; strictly increasing per item. */
   modified: string;
+  purchasingSuppliers?: {
+    supplierId: string;
+    netPrice: number;
+    supplierArticleNumber?: string;
+    leadTimeDays?: number | undefined;
+  }[];
 }
 
 export interface AssignmentRecord {
@@ -61,6 +69,10 @@ export interface AssignmentRecord {
   netPrice: number;
   vatRate: number;
   isDefault: boolean;
+  supplierArticleNumber?: string | undefined;
+  packSize?: number | undefined;
+  minimumQuantity?: number | undefined;
+  leadTimeDays?: number | undefined;
 }
 
 export interface SupplierRecord {

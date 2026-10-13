@@ -114,8 +114,37 @@ export interface LedgerAgingCandidate {
   kind: 'transit' | 'inspection' | 'drift';
 }
 
+/** A procurement fact read under the owner transaction; it does not itself establish native stock. */
+export interface PurchaseReceiptEvidence {
+  purchaseOrderId: string;
+  lineId: string;
+  commitmentId: string;
+  damagedCommitmentId: string | null;
+  skuId: string;
+  locationId: string;
+  unit: string;
+  receivedAt: string;
+  scopeVersion: string;
+  cumulativeGood: string;
+  cumulativeDamaged: string;
+  bookedGood: string;
+  bookedDamaged: string;
+  trackedIncoming: string;
+}
+
 /** Inventory owns every write performed by this transaction. No provider effects are exposed. */
 export interface LedgerTransaction {
+  /** Reads exact manual receipt evidence and current native scope under the procurement lock. */
+  purchaseReceipt?(
+    purchaseOrderId: string,
+    lineId: string,
+  ): Promise<PurchaseReceiptEvidence | null>;
+  /** Lists persisted receipt reviews for cross-member approval. */
+  purchaseReceiptReviews?(
+    purchaseOrderId: string | null,
+  ): Promise<LedgerReview[]>;
+  /** Identifies order lines whose receiving location is currently native-owned. */
+  nativeReceiptLines?(purchaseOrderId: string): Promise<string[]>;
   /** Serializes a stable command or preparation key within this tenant. */
   lockCommand(key: string): Promise<void>;
   /** Returns the original accepted result or rejects changed content. */
@@ -188,6 +217,8 @@ export interface LedgerStore {
 }
 
 export interface LedgerDependencies {
+  /** Defaults off; this release never supplies authorization or approval. */
+  purchaseReceiptsEnabled?(context: TenantContext): Promise<boolean>;
   store: LedgerStore;
   hash(value: unknown): string;
   validation: LedgerInputParser;
@@ -203,6 +234,12 @@ export interface LedgerDependencies {
 
 /** Boundary parsers normalize exact quantities before application rules run. */
 export interface LedgerInputParser {
+  purchaseReceipt(input: {
+    id: string;
+    purchaseOrderId: string;
+    lineId: string;
+    reason: string;
+  }): { id: string; purchaseOrderId: string; lineId: string; reason: string };
   command(input: PostingCommand): PostingCommand;
   opening(input: OpeningInput): OpeningInput;
   historical(input: {

@@ -20,6 +20,7 @@ import { z } from 'zod';
 import { jtlPermissions } from '../domain/permissions.js';
 import type { JtlConnectorOptions } from './adapter.js';
 import { adapterVersion, outputs } from './outputs.js';
+import { createJtlPurchaseOrderRevision } from './purchase-order-revisions.js';
 import * as s from './schemas.js';
 
 /** Derives a version-5-shaped UUID from the given parts; equal parts give equal IDs. */
@@ -629,6 +630,14 @@ export function createJtlPurchaseOrderCapabilities(
   return {
     'suppliers.read': suppliers,
     'purchase-orders.read': purchaseOrders,
+    ...(options.purchaseOrderRevisions
+      ? {
+          'purchase-orders.revise': createJtlPurchaseOrderRevision(
+            options,
+            toSupplierOrder,
+          ),
+        }
+      : {}),
     ...(options.purchaseOrderActions
       ? { 'purchase-orders.submit': submit }
       : {}),

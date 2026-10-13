@@ -28,6 +28,11 @@ import type { Domain } from '@luma/ui/components/primitives/domain-icon';
 import { columnName } from '@luma/ui/components/primitives/source-view';
 import type { OperationalState } from '@luma/ui/components/primitives/state';
 
+export {
+  outboundStateLabels,
+  outboundStates,
+} from '../../shared/messaging/outbound-state';
+
 type Text = () => string;
 
 /** Inbox views in tab order. */
@@ -307,20 +312,6 @@ export const matchLabels: Record<Fact['match']['state'], Text> = {
   not_applicable: m.messaging_fact_match_not_applicable,
 };
 
-export const outboundStateLabels: Record<OutboundState, Text> = {
-  draft: m.messaging_reply_state_draft,
-  approval_required: m.messaging_reply_state_approval_required,
-  approved: m.messaging_reply_state_approved,
-  rejected: m.messaging_reply_state_rejected,
-  expired: m.messaging_reply_state_expired,
-  sending: m.messaging_reply_state_sending,
-  uncertain: m.messaging_reply_state_uncertain,
-  sent: m.messaging_reply_state_sent,
-  failed: m.messaging_reply_state_failed,
-  withheld: m.messaging_reply_state_withheld,
-  discarded: m.messaging_reply_state_discarded,
-};
-
 /** What each reply state means for the reader, stated without overclaiming. */
 export const outboundStateText: Record<OutboundState, Text> = {
   draft: m.messaging_reply_text_draft,
@@ -334,20 +325,6 @@ export const outboundStateText: Record<OutboundState, Text> = {
   failed: m.messaging_reply_text_failed,
   withheld: m.messaging_reply_text_withheld,
   discarded: m.messaging_reply_text_discarded,
-};
-
-export const outboundStates: Record<OutboundState, OperationalState> = {
-  draft: 'idle',
-  approval_required: 'approval',
-  approved: 'waiting',
-  rejected: 'error',
-  expired: 'idle',
-  sending: 'running',
-  uncertain: 'attention',
-  sent: 'verified',
-  failed: 'error',
-  withheld: 'attention',
-  discarded: 'idle',
 };
 
 /** Replies that are finished and no longer need a control. */

@@ -579,3 +579,43 @@ describe('Mailbox commands', () => {
     expect(textPdf(['a'])).toBe(textPdf(['a']));
   });
 });
+
+describe('supplier order delivery failures', () => {
+  it('emits a permanent MIME report tied to an outgoing message and keeps its thread', async () => {
+    const context = createContext();
+    const call = client(context);
+    const original = await gmail.command(context, {
+      kind: 'deliver',
+      from: { address: context.config.address },
+      to: [{ address: 'sales@supplier.example' }],
+      subject: 'Purchase order PO-1001',
+      text: 'Please confirm.',
+      messageId: 'luma.purchase@luma-goods.example',
+    });
+    if (original.kind !== 'message') throw new Error('Expected message');
+    const bounce = await gmail.command(context, {
+      kind: 'bounce',
+      message: original.id,
+      recipient: 'sales@supplier.example',
+      status: '5.1.1',
+    });
+    if (bounce.kind !== 'message') throw new Error('Expected bounce');
+    expect(bounce.threadId).toBe(original.threadId);
+    const message = (await call(`messages/${bounce.id}?format=full`)).body;
+    expect(message.payload.mimeType).toBe('multipart/report');
+    const report = message.payload.parts.find(
+      (part) => part.mimeType === 'message/delivery-status',
+    );
+    expect(
+      Buffer.from(report?.body.data ?? '', 'base64url').toString(),
+    ).toContain('Original-Message-ID: <luma.purchase@luma-goods.example>');
+    await expect(
+      gmail.command(context, {
+        kind: 'bounce',
+        message: original.id,
+        recipient: 'other@supplier.example',
+        status: '5.1.1',
+      }),
+    ).rejects.toThrow();
+  });
+});

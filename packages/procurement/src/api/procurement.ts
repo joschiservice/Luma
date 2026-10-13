@@ -7,12 +7,20 @@ import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
 import type { SupplierCommitments } from '../application/commitments.js';
+import type { createIncomingStock } from '../application/incoming.js';
 import type { ProcurementService } from '../application/procurement.js';
+import type { PurchasingService } from '../application/purchasing.js';
+import type { PurchasingOutcomes } from '../application/purchasing-outcomes.js';
+import type { SupplierTermsService } from '../application/supplier-terms.js';
 
 /** Registers tenant-authenticated procurement reads and permission-gated writes. */
 export function procurementRoutes(
   service?: ProcurementService,
   commitments?: SupplierCommitments,
+  terms?: SupplierTermsService,
+  purchasing?: PurchasingService,
+  outcomes?: PurchasingOutcomes,
+  incoming?: ReturnType<typeof createIncomingStock>,
 ) {
   function use(request: FastifyRequest) {
     if (!request.tenantContext)
@@ -29,7 +37,133 @@ export function procurementRoutes(
 
   const os = implement(apiContract.procurement).$context<HttpContext>();
 
+  function purchases(request: FastifyRequest) {
+    const s = use(request);
+    if (!purchasing)
+      throw new IdentityError(
+        503,
+        'SERVICE_UNAVAILABLE',
+        'Purchasing is unavailable.',
+      );
+
+    return { context: s.context, service: purchasing };
+  }
+
   return os.router({
+    purchasingOutcomes: os.purchasingOutcomes.handler(
+      async ({ context: { request } }) => {
+        const s = use(request);
+        if (!outcomes)
+          throw new IdentityError(
+            503,
+            'SERVICE_UNAVAILABLE',
+            'Purchasing outcomes are unavailable.',
+          );
+
+        return outcomes.read(s.context);
+      },
+    ),
+    purchasingIgnore: os.purchasingIgnore.handler(
+      async ({ context: { request }, input: { body } }) => {
+        const s = use(request);
+        if (!outcomes)
+          throw new IdentityError(
+            503,
+            'SERVICE_UNAVAILABLE',
+            'Purchasing outcomes are unavailable.',
+          );
+
+        return outcomes.ignore(s.context, body);
+      },
+    ),
+    incomingStock: os.incomingStock.handler(
+      async ({ context: { request }, input: { body } }) => {
+        const s = use(request);
+        if (!incoming)
+          throw new IdentityError(
+            503,
+            'SERVICE_UNAVAILABLE',
+            'Incoming stock is unavailable.',
+          );
+
+        return await incoming.read(s.context, body);
+      },
+    ),
+    purchasingOverview: os.purchasingOverview.handler(
+      async ({ context: { request }, input: { query } }) => {
+        const s = purchases(request);
+
+        return s.service.overview(s.context, query.demandPeriodDays);
+      },
+    ),
+    purchasingSettings: os.purchasingSettings.handler(
+      async ({ context: { request }, input: { body } }) => {
+        const s = purchases(request);
+
+        return s.service.settings(s.context, body);
+      },
+    ),
+    purchasingPlans: os.purchasingPlans.handler(
+      async ({ context: { request } }) => {
+        const s = purchases(request);
+
+        return s.service.plans(s.context);
+      },
+    ),
+    purchasingPlan: os.purchasingPlan.handler(
+      async ({ context: { request }, input: { body } }) => {
+        const s = purchases(request);
+
+        return s.service.propose(s.context, body);
+      },
+    ),
+    purchasingDecision: os.purchasingDecision.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = purchases(request);
+
+        return s.service.decide(s.context, params.planId, body);
+      },
+    ),
+    purchasingExecute: os.purchasingExecute.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = purchases(request);
+
+        return s.service.execute(s.context, params.planId);
+      },
+    ),
+    purchasingReconcile: os.purchasingReconcile.handler(
+      async ({ context: { request }, input: { params } }) => {
+        const s = purchases(request);
+
+        return s.service.reconcile(s.context, params.planId);
+      },
+    ),
+    supplierTerms: os.supplierTerms.handler(
+      async ({ context: { request }, input: { query } }) => {
+        const s = use(request);
+        if (!terms)
+          throw new IdentityError(
+            503,
+            'SERVICE_UNAVAILABLE',
+            'Purchasing terms are unavailable.',
+          );
+
+        return terms.list(s.context, query);
+      },
+    ),
+    saveSupplierTerms: os.saveSupplierTerms.handler(
+      async ({ context: { request }, input: { body } }) => {
+        const s = use(request);
+        if (!terms)
+          throw new IdentityError(
+            503,
+            'SERVICE_UNAVAILABLE',
+            'Purchasing terms are unavailable.',
+          );
+
+        return terms.save(s.context, body);
+      },
+    ),
     suppliers: os.suppliers.handler(async ({ context: { request } }) => {
       const s = use(request);
 
@@ -194,6 +328,17 @@ export function procurementRoutes(
         const s = use(request);
 
         return await s.commitments.recordCommitment(
+          s.context,
+          params.purchaseOrderId,
+          body,
+        );
+      },
+    ),
+    recordReceipt: os.recordReceipt.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = use(request);
+
+        return await s.commitments.recordReceipt(
           s.context,
           params.purchaseOrderId,
           body,

@@ -210,7 +210,7 @@ try {
           'turbo',
           'run',
           'dev',
-          '--concurrency=20',
+          '--concurrency=32',
           ...(command === 'staff'
             ? ['--filter=@luma/staff-web', '--filter=@luma/staff-api']
             : []),

@@ -82,5 +82,6 @@
   "connections_capability_inventory_shipments_read": "Read inventory shipments",
   "connections_capability_orders_quantity_update": "Correct quantities in an unshipped downstream order",
   "connections_capability_fulfillment_shipment_create": "Publish dispatched shipments to Shopify",
-  "connections_capability_fulfillment_tracking_update": "Update shipment tracking in Shopify"
+  "connections_capability_fulfillment_tracking_update": "Update shipment tracking in Shopify",
+  "connections_capability_purchase_orders_revise": "Revise approved purchase-order positions"
 }

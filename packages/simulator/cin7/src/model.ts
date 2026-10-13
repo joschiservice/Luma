@@ -47,6 +47,12 @@ export interface ErpItem {
   stock: Record<string, number>;
   reserved: number;
   modified: string;
+  purchasingSuppliers?: {
+    supplierId: string;
+    netPrice: number;
+    supplierArticleNumber?: string;
+    leadTimeDays?: number | undefined;
+  }[];
 }
 
 export interface ErpCustomer {

@@ -83,7 +83,7 @@ export function createClient(options: JtlTransportOptions) {
     query: Record<string, string> = {},
     write?: {
       /** Defaults to PATCH. */
-      method?: 'PATCH' | 'POST';
+      method?: 'PATCH' | 'POST' | 'DELETE';
       body: unknown;
       idempotencyKey: string;
       receipt?(requestId: string | null): void;

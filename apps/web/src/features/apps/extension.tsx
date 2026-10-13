@@ -132,7 +132,7 @@ export function AppExtension({
 
   return (
     <ExtensionBoundary
-      key={`${session.data?.sessionId ?? ''}/${organizationId}/${appId}/${slot}/${record?.connectionId ?? ''}/${record?.externalId ?? ''}/${inventory?.positionId ?? ''}/${fulfillment?.fulfillmentId ?? ''}`}
+      key={`${session.data?.sessionId ?? ''}/${organizationId}/${appId}/${slot}/${record?.connectionId ?? ''}/${record?.externalId ?? ''}/${(inventory && 'positionId' in inventory ? inventory.positionId : inventory && 'receipt' in inventory ? `${inventory.receipt.purchaseOrderId}:${inventory.receipt.lineId}` : undefined) ?? ''}/${fulfillment?.fulfillmentId ?? ''}`}
     >
       <Suspense fallback={<p role="status">{m.apps_loading_app()}</p>}>
         {createElement(Extension, {

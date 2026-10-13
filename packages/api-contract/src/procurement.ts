@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { stockPositionSchema } from './inventory.js';
+import { purchasingTimelineSchema } from './purchasing-timeline.js';
 
 const text = z.string().trim().min(1).max(200);
 
@@ -18,6 +19,8 @@ export const supplierInputSchema = z
     id: z.string().uuid(),
     name: text,
     externalReferences,
+    email: z.string().email().max(254).optional(),
+    language: z.enum(['en', 'de']).optional(),
   })
   .strict();
 
@@ -59,6 +62,8 @@ export const purchaseOrderInputSchema = z
         workflowRunId: z.string().uuid().optional(),
         actionId: text.optional(),
         outcomeId: text.optional(),
+        sourcePurchaseOrderId: z.string().uuid().optional(),
+        sourceAttentionKey: z.string().min(1).max(400).optional(),
       })
       .strict()
       .default({}),
@@ -70,6 +75,19 @@ export const purchaseOrderInputSchema = z
             sku: text,
             description: text,
             quantity: z.number().finite().positive().max(1_000_000_000),
+            unitPrice: z
+              .object({
+                amount: z
+                  .string()
+                  .regex(/^\d+(?:\.\d{1,8})?$/)
+                  .max(30),
+                currency: z.string().regex(/^[A-Z]{3}$/),
+              })
+              .strict()
+              .optional(),
+            locationId: z.string().uuid().optional(),
+            supplierArticleNumber: z.string().trim().min(1).max(256).optional(),
+            requestedDeliveryDate: z.string().date().optional(),
             unit: z.string().trim().min(1).max(40),
           })
           .strict(),
@@ -187,6 +205,14 @@ const submissionSchema = z.object({
   id: z.string().uuid(),
   tenantId: z.string().uuid(),
   purchaseOrderId: z.string().uuid(),
+  channel: z.enum(['purchasing_system', 'email']).optional(),
+  outgoing: z
+    .object({
+      outboundId: z.string().uuid(),
+      threadId: z.string().uuid(),
+      sentMessageId: z.string().nullable(),
+    })
+    .optional(),
   connectionId: z.string().uuid(),
   supplier: externalIdSchema,
   requestedDeliveryDate: isoDate,
@@ -229,9 +255,12 @@ const commitmentKindSchema = z.enum([
   'shipped',
   'received',
   'condition',
+  'shortage',
+  'damaged',
 ]);
 
 export const commitmentSchema = z.object({
+  orderRevision: z.number().int().positive().optional(),
   id: z.string().uuid(),
   tenantId: z.string().uuid(),
   purchaseOrderId: z.string().uuid(),
@@ -257,6 +286,13 @@ export const commitmentSchema = z.object({
         .nullable(),
     }),
     z.object({ kind: z.literal('correction'), reason: z.string() }),
+    z.object({
+      kind: z.literal('manual_receipt'),
+      receivedAt: z.string().datetime({ offset: true }),
+      condition: z.enum(['good', 'mixed', 'damaged']),
+      reason: z.string(),
+      evidence: z.array(z.string()),
+    }),
   ]),
   status: z.enum(['confirmed', 'needs_review', 'rejected']),
   reviewReasons: z.array(
@@ -319,7 +355,7 @@ export const followUpSchema = z.object({
   tenantId: z.string().uuid(),
   purchaseOrderId: z.string().uuid(),
   key: z.string(),
-  response: z.enum(['accepted', 'following_up']),
+  response: z.enum(['accepted', 'following_up', 'credited', 'written_off']),
   note: z.string(),
   nextCheckAt: z.string().datetime({ offset: true }).nullable(),
   respondedBy: z.string(),
@@ -370,10 +406,12 @@ const attentionSchema = z.object({
   kind: z.enum([
     'submission_approval',
     'submission_uncertain',
+    'submission_failed',
     'review_commitment',
     'commitment_changed',
     'confirmation_overdue',
     'delivery_overdue',
+    'receipt_difference',
   ]),
   lineId: z.string().uuid().nullable(),
   commitmentId: z.string().uuid().nullable(),
@@ -417,7 +455,12 @@ const orderProgressSchema = z.object({
       ordered: z.number(),
       confirmed: z.number().nullable(),
       confirmedSource: z
-        .enum(['purchasing_system', 'communication', 'correction'])
+        .enum([
+          'purchasing_system',
+          'communication',
+          'correction',
+          'manual_receipt',
+        ])
         .nullable(),
       promisedDate: isoDate.nullable(),
       requestedDate: isoDate.nullable(),
@@ -426,6 +469,13 @@ const orderProgressSchema = z.object({
       receivedObservedAt: z.string().nullable(),
       outstanding: z.number(),
       shippedDate: isoDate.nullable(),
+      shipped: z.number().nullable(),
+      damaged: z.number(),
+      shortage: z.number(),
+      goodReceived: z.number(),
+      orderedDifference: z.number().nullable(),
+      shippedDifference: z.number().nullable(),
+      receivedDifference: z.number().nullable(),
       stage: z.enum([
         'not_submitted',
         'awaiting_confirmation',
@@ -449,6 +499,7 @@ const orderProgressSchema = z.object({
 });
 
 export const purchaseOrderRecordSchema = z.object({
+  timeline: purchasingTimelineSchema,
   order: purchaseOrderSchema,
   supplier: supplierSchema.nullable(),
   history: z.array(procurementEventSchema),
@@ -471,6 +522,11 @@ export const purchaseOrderRecordSchema = z.object({
   stage: orderStageSchema,
   draftVerified: z.boolean(),
   canManage: z.boolean(),
+  reconciliation: z.object({
+    available: z.boolean(),
+    decisions: z.boolean(),
+    manualReceipt: z.boolean(),
+  }),
   extraction: z.object({
     available: z.boolean(),
     reason: z.string().nullable(),
@@ -567,7 +623,7 @@ export const followUpInputSchema = z
   .object({
     id: z.string().uuid(),
     key: z.string().min(1).max(400),
-    response: z.enum(['accepted', 'following_up']),
+    response: z.enum(['accepted', 'following_up', 'credited', 'written_off']),
     note: z.string().trim().min(1).max(1000),
     nextCheckAt: z.string().datetime({ offset: true }).nullable().default(null),
   })
@@ -672,3 +728,20 @@ export type PurchaseOrderContext = z.infer<typeof purchaseOrderContextSchema>;
 export type SupplierContext = z.infer<typeof supplierContextSchema>;
 
 export type Attention = z.infer<typeof attentionSchema>;
+
+/** Records cumulative receipt or difference quantities; retries reuse the same command ID. */
+export const receiptInputSchema = z
+  .object({
+    id: z.string().uuid(),
+    lineId: z.string().uuid(),
+    kind: z.enum(['received', 'shortage', 'damaged']),
+    quantity: z.number().finite().min(0).max(1_000_000_000),
+    expectedCommitmentId: z.string().uuid().nullable(),
+    expectedDamagedCommitmentId: z.string().uuid().nullable().optional(),
+    damagedQuantity: z.number().finite().min(0).max(1_000_000_000).optional(),
+    receivedAt: z.string().datetime({ offset: true }),
+    condition: z.enum(['good', 'mixed', 'damaged']),
+    reason: z.string().trim().min(1).max(1000),
+    evidence: z.array(z.string().trim().min(1).max(2000)).min(1).max(20),
+  })
+  .strict();

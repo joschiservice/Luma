@@ -147,6 +147,7 @@ export async function seedCatalog(
       stock: { ...item.stock },
       reserved: 0,
       modified: iso(now),
+      purchasingSuppliers: item.suppliers,
     };
     records.push({ kind: kinds.item, id: item.id, data, ...time });
     for (const assignment of item.suppliers) {
@@ -157,6 +158,10 @@ export async function seedCatalog(
         netPrice: assignment.netPrice,
         vatRate: SEED_VAT_RATE,
         isDefault: assignment.isDefault,
+        supplierArticleNumber: assignment.supplierArticleNumber,
+        packSize: assignment.packSize,
+        minimumQuantity: assignment.minimumQuantity,
+        leadTimeDays: assignment.leadTimeDays,
       };
       assignments.push({
         kind: kinds.assignment,
