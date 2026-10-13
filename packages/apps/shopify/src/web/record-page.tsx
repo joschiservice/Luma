@@ -11,7 +11,11 @@ const connections = z.array(
 );
 
 /** Opens Shopify records for an active store in the current workspace. */
-export function ShopifyRecordPage({ services, organizationId }: AppUiProps) {
+export function ShopifyRecordPage({
+  services,
+  organizationId,
+  can,
+}: AppUiProps) {
   const [stores, setStores] = useState<z.infer<typeof connections>>([]);
   const [selected, setSelected] = useState('');
   const [message, setMessage] = useState('');
@@ -86,6 +90,7 @@ export function ShopifyRecordPage({ services, organizationId }: AppUiProps) {
             key={`${organizationId}:${selected}`}
             connectionId={selected}
             services={services}
+            canEdit={can('shopify:order_edits.apply')}
           />
         </>
       )}

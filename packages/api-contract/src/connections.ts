@@ -9,6 +9,7 @@ const installationPermissions = z.enum([
   'fulfillment.hold.release',
   'fulfillment.open',
   'fulfillment.move',
+  'orders.quantity.edit',
   'customers.read',
   'returns.read',
   'orders.shipping-method.read',
@@ -80,7 +81,8 @@ export const installedConnectionSchema = z.object({
   granted: z.array(installationPermissions),
   status: z.enum(['pending', 'active', 'degraded', 'disconnected', 'revoked']),
   version: z.number().int().positive(),
-  credentialVersion: z.number().int().positive(),
+  /** Zero for Luma's built-in sources, which hold no credential. */
+  credentialVersion: z.number().int().nonnegative(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });

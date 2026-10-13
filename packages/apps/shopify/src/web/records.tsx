@@ -12,6 +12,7 @@ import {
   type ShopifyRecordKind,
 } from '../domain/records.js';
 import { ShopifyFulfillmentRecovery } from './fulfillment-recovery.js';
+import { ShopifyOrderEdits } from './order-edits.js';
 import { recordError } from './record-error.js';
 import { ShopifyRecordSections } from './sections.js';
 
@@ -30,9 +31,12 @@ const kindLabels = {
 export function ShopifyRecords({
   connectionId,
   services,
+  canEdit = false,
 }: {
   connectionId: string;
   services: AppUiProps['services'];
+  /** Whether the reader may change order quantities; the server checks again. */
+  canEdit?: boolean;
 }) {
   const [kind, setKind] = useState<ShopifyRecordKind>('Order');
   const [id, setId] = useState('');
@@ -173,6 +177,15 @@ export function ShopifyRecords({
                   />
                 ))
             : null}
+          {canEdit && /^gid:\/\/shopify\/Order\/\d+$/.test(detail.id) ? (
+            <ShopifyOrderEdits
+              key={`${connectionId}:${detail.id}`}
+              connectionId={connectionId}
+              orderId={detail.id}
+              services={services}
+              headingLevel={3}
+            />
+          ) : null}
           <ShopifyRecordSections
             detail={detail}
             pending={pending}

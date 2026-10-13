@@ -11,6 +11,7 @@ const decisionKindSchema = z.enum([
   'replenishment',
   'fulfillment_recovery',
   'inventory_correction',
+  'order_edit',
   'supplier_commitment',
   'workflow_handover',
   'human_task',
@@ -80,6 +81,12 @@ const decisionOwnerSchema = z.discriminatedUnion('kind', [
     kind: z.literal('app_inventory'),
     appId: z.string().min(1),
     positionId: z.string().uuid(),
+  }),
+  z.object({
+    kind: z.literal('app_order'),
+    appId: z.string().min(1),
+    connectionId: z.string().uuid(),
+    orderId: z.string().min(1),
   }),
   z.object({
     kind: z.literal('purchase_order'),

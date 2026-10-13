@@ -1,4 +1,8 @@
-import { orderComparisonState } from '@luma/orders';
+import {
+  lineComparisonKeys,
+  orderComparisonState,
+  sharedComparisonLines,
+} from '@luma/orders';
 import type { SqlTransaction } from '@luma/platform';
 
 import type {
@@ -6,6 +10,7 @@ import type {
   OrderDifference,
   OrderSourceFacts,
 } from '../../application/orders.js';
+import { commercialFacts, lineCommercialFacts } from './commercial-facts.js';
 import type { OrderReadQueries } from './list-query.js';
 import { connectionLabel, iso, money, object, text } from './values.js';
 
@@ -31,7 +36,7 @@ type SourceRow = {
 };
 
 // $1 tenant, $2 as-of time, $3 order ID.
-function sourcesSql({ state }: OrderReadQueries) {
+function sourcesSql({ state }: Pick<OrderReadQueries, 'state'>) {
   return `WITH ${state.currentOrderSources('order_sources', 'p.entity_id=$3')},
  ${state.orderProgress('order_sources')}, ${state.sourceComparison('order_sources', 'order_sources')}
 SELECT o.connection_id AS "connectionId",s.document,ci.document AS connection,
@@ -59,7 +64,7 @@ ORDER BY o.connection_id`;
  */
 export async function readSourceFacts(
   tx: SqlTransaction,
-  queries: OrderReadQueries,
+  queries: Pick<OrderReadQueries, 'state'>,
   tenantId: string,
   orderId: string,
   asOf: string,
@@ -97,6 +102,7 @@ export async function readSourceFacts(
           unit: String(line.unit),
           fulfilledQuantity: progress?.fulfilled ?? '0',
           remainingQuantity: progress?.remaining ?? null,
+          ...lineCommercialFacts(line),
         };
       },
     );
@@ -121,28 +127,16 @@ export async function readSourceFacts(
       dueAt: iso(data.dueAt),
       fulfillment: row.fulfillment,
       open: row.open,
+      ...commercialFacts(data),
       lines,
     };
   });
-  const lineConnections = new Map<string, Set<string>>();
-  for (const source of sources)
-    for (const line of source.lines) {
-      const seen = lineConnections.get(line.id) ?? new Set<string>();
-      seen.add(source.connectionId);
-      lineConnections.set(line.id, seen);
-    }
+  // Line keys follow the comparison owner's matching rules exactly.
+  const shared = sharedComparisonLines(sources);
   for (const source of sources) {
-    const skuCounts = new Map<string, number>();
+    const keys = lineComparisonKeys(source, shared);
     for (const line of source.lines)
-      if (line.skuId)
-        skuCounts.set(line.skuId, (skuCounts.get(line.skuId) ?? 0) + 1);
-    for (const line of source.lines)
-      line.comparisonKey =
-        (lineConnections.get(line.id)?.size ?? 0) > 1
-          ? line.id
-          : line.skuId && skuCounts.get(line.skuId) === 1
-            ? line.skuId
-            : null;
+      line.comparisonKey = keys.get(line.id) ?? null;
   }
   const differences = rows[0]!.differences;
   const timing = rows[0]!.timing;
@@ -160,6 +154,8 @@ export async function readSourceFacts(
     sources,
     differences,
     comparisonState,
+    /** The maintained comparison's timing and whether a contributing read failed or was partial. */
+    comparison: { timing, incomplete: rows[0]!.incomplete === true },
     overdue: rows.find((row) => row.selected)?.overdue ?? null,
   };
 }

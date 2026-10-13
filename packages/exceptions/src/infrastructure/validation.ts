@@ -111,6 +111,42 @@ export const factSchemas = {
       mismatchSince: timestamp.nullable().optional(),
     })
     .strict(),
+  order_quantity_mismatch: z
+    .object({
+      ...common,
+      lineKey: z.string().min(1).max(200),
+      connectionIds: z.array(z.string().min(1)).min(2).max(20),
+      authorityState: z.enum(['resolved', 'unknown', 'conflicting']),
+      authorityConnectionId: z.string().min(1).nullable(),
+      quantities: z
+        .array(
+          z
+            .object({
+              connectionId: z.string().min(1),
+              quantity: decimal.nullable(),
+            })
+            .strict(),
+        )
+        .min(2)
+        .max(20),
+      unit: z.string().min(1),
+      complete: z.boolean(),
+      changedAt: timestamp,
+      oldestReadAt: timestamp,
+      latestReadAt: timestamp,
+    })
+    .strict()
+    .refine(
+      (facts) =>
+        new Set(facts.connectionIds).size === facts.connectionIds.length &&
+        facts.quantities.length === facts.connectionIds.length &&
+        facts.quantities.every((item) =>
+          facts.connectionIds.includes(item.connectionId),
+        ) &&
+        new Set(facts.quantities.map((item) => item.connectionId)).size ===
+          facts.quantities.length,
+      'Every source reports one quantity entry',
+    ),
   workflow_failure: z
     .object({
       ...common,
@@ -232,6 +268,7 @@ const resolutionSchema = z.discriminatedUnion('kind', [
                 'sync_failure',
                 'stuck_fulfillment',
                 'inventory_mismatch',
+                'order_quantity_mismatch',
                 'workflow_failure',
               ]),
               subject: z
@@ -263,6 +300,9 @@ export const detectionBoundary = {
     z.string().uuid().parse(identity(input).subjectId);
     if (input.exceptionClass === 'inventory_mismatch') {
       z.string().uuid().parse(input.facts.canonicalLocationId);
+      z.array(z.string().uuid()).parse(input.facts.connectionIds);
+    } else if (input.exceptionClass === 'order_quantity_mismatch') {
+      z.string().uuid().parse(input.facts.lineKey);
       z.array(z.string().uuid()).parse(input.facts.connectionIds);
     } else if (input.exceptionClass === 'stuck_fulfillment')
       z.string().uuid().parse(input.facts.connectionId);

@@ -25,9 +25,16 @@ export interface CapabilityDescriptor {
   idempotency: 'provider_key' | 'conditional_write' | 'none';
   /** Retry advice never authorizes replay of an uncertain write. */
   retry: { maxAttempts: number; initialDelayMs: number };
-  /** Optional read filters the handler honors; absent means none. */
+  /**
+   * Optional read filters the handler honors; absent means none. `order` is a point read of
+   * one record by source ID.
+   */
   filters?: (
-    'updatedSince' | 'createdSince' | 'historyImport' | 'confirmMissing'
+    | 'updatedSince'
+    | 'createdSince'
+    | 'historyImport'
+    | 'confirmMissing'
+    | 'order'
   )[];
   /**
    * App permission needed to propose, approve and run this write capability, as

@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 import { endpoint, organizationParamsSchema, requires } from '../common.js';
 import {
+  orderChangePlanQuerySchema,
+  orderChangePlansSchema,
   orderDetailSchema,
   orderListQuerySchema,
   orderListSchema,
@@ -42,4 +44,23 @@ export const ordersContract = {
       }),
     )
     .output(orderDetailSchema),
+  changePlan: endpoint
+    .route({
+      method: 'GET',
+      path: '/v1/organizations/{organizationId}/orders/{orderId}/change-plan',
+      summary: 'Plan an order change',
+      description:
+        'Plans a proposed change, or each change source comparison detected: which systems show it, what has shipped (counted once, never added across mirrored systems), whether the change is still safe and the ordered steps. Each step says whether Luma runs it through a governed capability or a person with a role does it. Missing, stale or incomplete fulfilment evidence makes safety unknown, never safe; without access to fulfilment, safety is unknown. Plans change nothing; Luma steps still need a preview, approval and verification. A line that is not on the order returns 422.',
+    })
+    .meta({
+      access: requires('orders.read'),
+      errors: [400, 401, 404, 422, 503],
+    })
+    .input(
+      z.object({
+        params: organizationParamsSchema.extend({ orderId: z.string().uuid() }),
+        query: orderChangePlanQuerySchema,
+      }),
+    )
+    .output(orderChangePlansSchema),
 };

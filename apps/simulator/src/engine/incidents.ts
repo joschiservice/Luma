@@ -3,6 +3,7 @@ import { type IncidentKindName, incidentKinds } from '@luma/simulator-core';
 import {
   kinds as erpKinds,
   type PurchaseOrderRecord,
+  readOrder as readErpOrder,
   type SupplierProfile,
   type SupplierRecord,
 } from '@luma/simulator-jtl';
@@ -28,6 +29,7 @@ import {
   type EngineEvents,
   erp,
   erpContext,
+  erpResource,
   type Incident,
   instance,
   openIncident,
@@ -137,6 +139,7 @@ export async function injectIncident(world: World, input: InjectIncident) {
     return incident;
   }
   if (kind === 'refund-missing') return refundMissing(world, input);
+  if (kind === 'order-quantity-change') return quantityChange(world, input);
   if (kind === 'supplier-split-delivery-mail')
     return supplierSplitMail(world, input);
   if (kind === 'customer-delay-mail') return customerMail(world, input);
@@ -235,6 +238,68 @@ const orderResource = (shopName: string, order: string, name: string) => ({
   id: `gid://shopify/Order/${order}`,
   label: name,
 });
+
+/**
+ * Records a customer's request for one unit less on the newest open order of the shop that the
+ * ERP imported and has not shipped. The change itself happens in Luma, where support edits the
+ * order record that holds order-line authority; the providers keep the original order.
+ */
+async function quantityChange(world: World, input: InjectIncident) {
+  const shopName = firstShop(world, input.instance).name;
+  const page = await world.store(worldInstance).page<WorldOrder>({
+    kind: 'order',
+    order: 'updated',
+    reverse: true,
+    limit: 500,
+  });
+  for (const { data: order } of page.items) {
+    const line = order.lines.find((item) => item.quantity >= 2);
+    if (order.shop !== shopName || !order.erpOrder || !line) continue;
+    const imported = await readErpOrder(erpContext(world), order.erpOrder);
+    if (
+      !imported ||
+      imported.cancelled ||
+      imported.lines.some((item) => item.open !== item.quantity)
+    )
+      continue;
+
+    return openIncident(world, {
+      id: input.id,
+      kind: 'order-quantity-change',
+      origin: 'injected',
+      instance: shopName,
+      summary: `The customer of ${order.name} asks for ${line.quantity - 1} instead of ${line.quantity} units; support changes the order in Luma.`,
+      resources: [
+        orderResource(shopName, order.order, order.name),
+        {
+          instance: shopName,
+          kind: 'LineItem',
+          id: `gid://shopify/LineItem/${line.lineItem}`,
+          label: `${line.quantity} units on ${order.name}`,
+        },
+        erpResource(world, 'salesOrder', order.erpOrder),
+        {
+          instance: shopName,
+          kind: 'InventoryItem',
+          id: `gid://shopify/InventoryItem/${line.variant}`,
+          label: `Shop item ${line.variant}`,
+        },
+        erpResource(world, 'item', line.variant),
+      ],
+      detail: {
+        order: order.order,
+        erpOrder: order.erpOrder,
+        lineItem: line.lineItem,
+        variant: line.variant,
+        from: line.quantity,
+        to: line.quantity - 1,
+      },
+    });
+  }
+  throw new Error(
+    'No open imported order of this shop has a line with two or more units',
+  );
+}
 
 /**
  * Places an order the merchant ships by hand, returns one unit and receives it at once. No refund
@@ -441,8 +506,12 @@ export async function recoverIncident(world: World, id: string) {
       });
   else if (incident.kind === 'supplier-split-delivery-mail')
     await bookSplitConfirmation(world, incident);
-  else if (incident.kind === 'customer-delay-mail') {
-    // Answering the customer is the merchant's part; the provider has nothing to repair.
+  else if (
+    incident.kind === 'customer-delay-mail' ||
+    incident.kind === 'order-quantity-change'
+  ) {
+    // Answering the customer and carrying the change are the merchant's and Luma's part; the
+    // providers have nothing to repair.
   } else if (incident.kind === 'refund-missing' && order)
     await shop(world, shopName, { kind: 'refund', order, outcome: 'success' });
   else if (incident.kind === 'payment-stuck' && order)

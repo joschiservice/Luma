@@ -7,13 +7,142 @@
     "closed": false,
     "displayFinancialStatus": "PAID",
     "taxesIncluded": true,
+    "dutiesIncluded": false,
+    "currencyCode": "EUR",
+    "presentmentCurrencyCode": "CHF",
     "createdAt": "2026-09-14T08:30:00Z",
     "currentTotalPriceSet": {
       "shopMoney": {
         "amount": "42.50",
         "currencyCode": "EUR"
+      },
+      "presentmentMoney": {
+        "amount": "41.10",
+        "currencyCode": "CHF"
       }
-    }
+    },
+    "originalTotalPriceSet": {
+      "shopMoney": {
+        "amount": "52.00",
+        "currencyCode": "EUR"
+      },
+      "presentmentMoney": {
+        "amount": "50.30",
+        "currencyCode": "CHF"
+      }
+    },
+    "subtotalPriceSet": {
+      "shopMoney": {
+        "amount": "43.50",
+        "currencyCode": "EUR"
+      },
+      "presentmentMoney": {
+        "amount": "42.10",
+        "currencyCode": "CHF"
+      }
+    },
+    "currentSubtotalPriceSet": {
+      "shopMoney": {
+        "amount": "37.00",
+        "currencyCode": "EUR"
+      },
+      "presentmentMoney": {
+        "amount": "35.80",
+        "currencyCode": "CHF"
+      }
+    },
+    "totalShippingPriceSet": {
+      "shopMoney": {
+        "amount": "4.90",
+        "currencyCode": "EUR"
+      },
+      "presentmentMoney": {
+        "amount": "4.70",
+        "currencyCode": "CHF"
+      }
+    },
+    "currentShippingPriceSet": {
+      "shopMoney": {
+        "amount": "4.90",
+        "currencyCode": "EUR"
+      },
+      "presentmentMoney": {
+        "amount": "4.70",
+        "currencyCode": "CHF"
+      }
+    },
+    "totalDiscountsSet": {
+      "shopMoney": {
+        "amount": "4.35",
+        "currencyCode": "EUR"
+      },
+      "presentmentMoney": {
+        "amount": "4.21",
+        "currencyCode": "CHF"
+      }
+    },
+    "currentTotalDiscountsSet": {
+      "shopMoney": {
+        "amount": "3.70",
+        "currencyCode": "EUR"
+      },
+      "presentmentMoney": {
+        "amount": "3.58",
+        "currencyCode": "CHF"
+      }
+    },
+    "totalTaxSet": {
+      "shopMoney": {
+        "amount": "8.30",
+        "currencyCode": "EUR"
+      },
+      "presentmentMoney": {
+        "amount": "8.03",
+        "currencyCode": "CHF"
+      }
+    },
+    "currentTotalTaxSet": {
+      "shopMoney": {
+        "amount": "not a number",
+        "currencyCode": "EUR"
+      }
+    },
+    "originalTotalDutiesSet": null,
+    "currentTotalDutiesSet": null,
+    "currentTaxLines": [
+      {
+        "title": "MwSt",
+        "rate": 0.19,
+        "priceSet": {
+          "shopMoney": {
+            "amount": "6.78",
+            "currencyCode": "EUR"
+          },
+          "presentmentMoney": {
+            "amount": "6.56",
+            "currencyCode": "CHF"
+          }
+        }
+      }
+    ],
+    "tags": ["wholesale", "  ", "priority"],
+    "edited": true,
+    "requiresShipping": true,
+    "test": false,
+    "cancelReason": null,
+    "closedAt": null,
+    "processedAt": "2026-09-14T08:30:05Z",
+    "sourceName": "web",
+    "displayFulfillmentStatus": "PARTIALLY_FULFILLED",
+    "shippingAddress": {
+      "address1": "Hafenstrasse 1",
+      "address2": null,
+      "city": "Hamburg",
+      "provinceCode": "HH",
+      "zip": "20457",
+      "countryCodeV2": "DE"
+    },
+    "billingAddress": null
   },
   "orderLines": [
     {
@@ -31,13 +160,42 @@
         "shopMoney": {
           "amount": "14.50",
           "currencyCode": "EUR"
+        },
+        "presentmentMoney": {
+          "amount": "14.03",
+          "currencyCode": "CHF"
         }
       },
       "taxLines": [
         {
           "rate": 0.19
         }
-      ]
+      ],
+      "variantTitle": "Blue",
+      "requiresShipping": true,
+      "discountedUnitPriceAfterAllDiscountsSet": {
+        "shopMoney": {
+          "amount": "13.05",
+          "currencyCode": "EUR"
+        },
+        "presentmentMoney": {
+          "amount": "12.63",
+          "currencyCode": "CHF"
+        }
+      },
+      "totalDiscountSet": {
+        "shopMoney": {
+          "amount": "4.35",
+          "currencyCode": "EUR"
+        },
+        "presentmentMoney": {
+          "amount": "4.21",
+          "currencyCode": "CHF"
+        }
+      },
+      "product": {
+        "id": "gid://shopify/Product/2"
+      }
     },
     {
       "id": "gid://shopify/LineItem/12",
@@ -45,7 +203,10 @@
       "name": " ",
       "sku": null,
       "variant": null,
-      "currentQuantity": 1
+      "currentQuantity": 1,
+      "variantTitle": null,
+      "requiresShipping": false,
+      "product": null
     }
   ],
   "product": {
@@ -343,6 +504,117 @@
           "amount": "42.50",
           "currencyCode": "EUR"
         }
+      }
+    }
+  ],
+  "shippingLines": [
+    {
+      "id": "gid://shopify/ShippingLine/71",
+      "title": "Standard",
+      "code": "STANDARD",
+      "source": "shopify",
+      "carrierIdentifier": null,
+      "isRemoved": false,
+      "originalPriceSet": {
+        "shopMoney": {
+          "amount": "4.90",
+          "currencyCode": "EUR"
+        },
+        "presentmentMoney": {
+          "amount": "4.70",
+          "currencyCode": "CHF"
+        }
+      },
+      "discountedPriceSet": {
+        "shopMoney": {
+          "amount": "4.90",
+          "currencyCode": "EUR"
+        },
+        "presentmentMoney": {
+          "amount": "4.70",
+          "currencyCode": "CHF"
+        }
+      },
+      "currentDiscountedPriceSet": {
+        "shopMoney": {
+          "amount": "4.90",
+          "currencyCode": "EUR"
+        },
+        "presentmentMoney": {
+          "amount": "4.70",
+          "currencyCode": "CHF"
+        }
+      }
+    },
+    {
+      "id": "gid://shopify/ShippingLine/72",
+      "title": "Express",
+      "code": "EXPRESS",
+      "source": "shopify",
+      "carrierIdentifier": "dhl",
+      "isRemoved": true,
+      "originalPriceSet": {
+        "shopMoney": {
+          "amount": "9.90",
+          "currencyCode": "EUR"
+        },
+        "presentmentMoney": {
+          "amount": "9.50",
+          "currencyCode": "CHF"
+        }
+      },
+      "discountedPriceSet": {
+        "shopMoney": {
+          "amount": "9.90",
+          "currencyCode": "EUR"
+        },
+        "presentmentMoney": {
+          "amount": "9.50",
+          "currencyCode": "CHF"
+        }
+      },
+      "currentDiscountedPriceSet": {
+        "shopMoney": {
+          "amount": "0.0",
+          "currencyCode": "EUR"
+        },
+        "presentmentMoney": {
+          "amount": "0.0",
+          "currencyCode": "CHF"
+        }
+      }
+    }
+  ],
+  "discounts": [
+    {
+      "__typename": "DiscountCodeApplication",
+      "index": 0,
+      "code": "WELCOME10",
+      "allocationMethod": "ACROSS",
+      "targetType": "LINE_ITEM",
+      "value": {
+        "percentage": 10.0
+      }
+    },
+    {
+      "__typename": "AutomaticDiscountApplication",
+      "index": 1,
+      "title": "Free mug",
+      "allocationMethod": "EACH",
+      "targetType": "LINE_ITEM",
+      "value": {
+        "amount": "2.00",
+        "currencyCode": "EUR"
+      }
+    },
+    {
+      "__typename": "ManualDiscountApplication",
+      "index": 2,
+      "title": "Goodwill",
+      "allocationMethod": "ACROSS",
+      "targetType": "SHIPPING_LINE",
+      "value": {
+        "percentage": 12.5
       }
     }
   ]

@@ -19,6 +19,7 @@ const scopeLabels: Record<string, () => string> = {
   read_third_party_fulfillment_orders: m.shopify_scope_fulfillment,
   write_merchant_managed_fulfillment_orders: m.shopify_scope_fulfillment_write,
   write_third_party_fulfillment_orders: m.shopify_scope_fulfillment_write,
+  write_order_edits: m.shopify_scope_order_edits_write,
   read_returns: m.shopify_scope_returns,
   read_locations: m.shopify_scope_locations,
   read_customers: m.shopify_scope_customers,

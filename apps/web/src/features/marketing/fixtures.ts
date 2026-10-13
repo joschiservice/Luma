@@ -902,6 +902,7 @@ export function orderDetail(): OrderDetail {
       ],
       truncated: false,
     },
+    hidden: [],
     asOf: minutesAgo(0),
   };
 }

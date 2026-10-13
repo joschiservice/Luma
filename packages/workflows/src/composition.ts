@@ -226,7 +226,8 @@ export function createCaseWorkflowRuntime(
     identity: Pick<
       IdentityService,
       'refreshContext' | 'resolveWorkflowContext'
-    >;
+    > &
+      Partial<Pick<IdentityService, 'suspendedMembers' | 'listMembers'>>;
     policies: Pick<PolicyService, 'approvalRequirement' | 'currentVersion'>;
     audit: { append(entry: WorkflowAuditEntry): Promise<void> };
     transport?: CaseRunTransport;
