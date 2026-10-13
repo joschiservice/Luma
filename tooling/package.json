@@ -8,7 +8,11 @@
   },
   "devDependencies": {
     "@luma/app-catalog": "workspace:*",
+    "@luma/app-cin7": "workspace:*",
+    "@luma/app-gmail": "workspace:*",
     "@luma/app-host": "workspace:*",
+    "@luma/app-jtl": "workspace:*",
+    "@luma/app-shopify": "workspace:*",
     "@luma/application-runtime": "workspace:*",
     "@luma/commerce-sync": "workspace:*",
     "@luma/connections": "workspace:*",
@@ -29,10 +33,8 @@
     "@luma/staff": "workspace:*",
     "@luma/workflow-temporal": "workspace:*",
     "@luma/workflows": "workspace:*",
+    "@types/proper-lockfile": "4.1.4",
     "playwright": "catalog:",
-    "@luma/app-cin7": "workspace:*",
-    "@luma/app-gmail": "workspace:*",
-    "@luma/app-jtl": "workspace:*",
-    "@luma/app-shopify": "workspace:*"
+    "proper-lockfile": "4.1.2"
   }
 }

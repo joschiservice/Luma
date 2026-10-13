@@ -15,6 +15,14 @@ const build = [
 
 /** @type {Record<string, string[][]>} */
 const suites = {
+  check: [
+    ['format:check'],
+    ['lint'],
+    ['knip:check'],
+    ['typecheck'],
+    ['test'],
+    ['build'],
+  ],
   // Runs without provisioning PostgreSQL; database suites skip.
   local: [
     ['test:tooling'],
@@ -23,6 +31,7 @@ const suites = {
     ['exec', 'turbo', 'run', 'test'],
   ],
   test: [['test:local']],
+  ui: [['--filter', '@luma/ui', 'test']],
   e2e: [build, ['--filter', '@luma/api', 'test:e2e']],
   browser: [build, ['--filter', '@luma/api', 'test:browser']],
   full: [
@@ -153,9 +162,9 @@ export function testCommands(suite, extraArgs = [], journeys) {
     : undefined;
   if (!commands) throw new Error(`Unknown test suite: ${suite}`);
   if (!extraArgs.length) return commands;
-  if (!['local', 'test', 'e2e', 'browser'].includes(suite))
+  if (!['local', 'test', 'ui', 'e2e', 'browser'].includes(suite))
     throw new Error(
-      'Test arguments are supported only for local, test, e2e and browser',
+      'Test arguments are supported only for local, test, ui, e2e and browser',
     );
   let args = extraArgs;
   if ((suite === 'e2e' || suite === 'browser') && args.includes('--affected')) {

@@ -14,6 +14,7 @@
     "dev/process.mjs",
     "dev/environment.mjs",
     "dev/test-plan.mjs",
+    "dev/validation-lock.mjs",
     "dev/affected.mjs",
     "evaluation/state.mjs",
     "shopify/read-costs.mjs"

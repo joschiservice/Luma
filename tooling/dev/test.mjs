@@ -6,8 +6,10 @@ import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import { affectedJourneys } from './affected.mjs';
 import { fail, root, run } from './process.mjs';
 import { testCommands } from './test-plan.mjs';
+import { acquireValidation } from './validation-lock.mjs';
 
 let container;
+let validation;
 
 /**
  * Names the optional test dependencies present for this run. Turbo hashes the value so cached
@@ -39,8 +41,15 @@ try {
     );
   }
   const commands = testCommands(suite, args, journeys);
+  validation = await acquireValidation(root, {
+    owner: process.env.LUMA_VALIDATION_OWNER,
+    onWait: () =>
+      console.log(
+        'Another validation run is active in this checkout; waiting for it to finish.',
+      ),
+  });
   let url = process.env.TEST_DATABASE_URL;
-  if (!url && suite !== 'local' && commands.length) {
+  if (!url && !['local', 'ui'].includes(suite) && commands.length) {
     console.log('Starting disposable PostgreSQL 17 with Testcontainers…');
     // Suites drop their databases during teardown, and DROP DATABASE waits for a checkpoint.
     // Durable writes made each checkpoint take seconds under parallel suites; this server is disposable.
@@ -62,9 +71,14 @@ try {
   }
   const env = { ...process.env, ...(url ? { TEST_DATABASE_URL: url } : {}) };
   env.LUMA_TEST_CAPABILITIES = capabilities(env);
+  env.LUMA_VALIDATION_OWNER = validation.owner;
   for (const args of commands) await run('pnpm', args, { env });
 } catch (error) {
   fail(error);
 } finally {
-  await container?.stop();
+  try {
+    await container?.stop();
+  } finally {
+    await validation?.release();
+  }
 }

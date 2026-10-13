@@ -140,6 +140,11 @@ suites cannot run. Report that limitation when relying on it.
 - Use `pnpm run test --filter=<package>` (with `run`) so pnpm forwards the filter to the
   database runner.
 
+The shared validation runner queues commands per checkout so overlapping runs do not compete for database,
+Chromium and build resources. Nested commands in `check` and `test:full` share the active
+run; independent worktrees keep separate queues. Interrupted runs release the lease or
+expire its heartbeat automatically. Direct package tests and Turbo commands bypass this coordination.
+
 ### Cached and affected tests
 
 Turbo caches each package's `test` result. The hash covers the package's files, the builds

@@ -14,6 +14,10 @@ function leaves(command) {
   return command.split(' && ').flatMap((part) => {
     const match = part.match(/^pnpm (?:run )?([\w:-]+)(?: .*)?$/);
     if (match && manifest.scripts[match[1]]) {
+      if (match[1] === 'check')
+        return testCommands('check').flatMap((args) =>
+          leaves(`pnpm ${args.join(' ')}`),
+        );
       if (['test', 'test:local'].includes(match[1]))
         return testCommands('local').flatMap((args) =>
           leaves(`pnpm ${args.join(' ')}`),
@@ -104,5 +108,12 @@ test('affected suite builds once and skips empty journey suites', () => {
     '--filter',
     '@luma/api',
     'test:browser',
+  ]);
+});
+
+test('component tests use the shared runner and keep forwarded story filters', () => {
+  assert.equal(manifest.scripts['test:ui'], 'node tooling/dev/test.mjs ui');
+  assert.deepEqual(testCommands('ui', ['orders.stories.tsx']), [
+    ['--filter', '@luma/ui', 'test', 'orders.stories.tsx'],
   ]);
 });
