@@ -41,6 +41,7 @@ export async function main(
       },
       readConnectionsConfig(process.env),
       process.env,
+      observability,
     );
     const shutdown = () => worker.shutdown();
     for (const signal of ['SIGINT', 'SIGTERM'] as const)

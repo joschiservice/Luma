@@ -10,6 +10,7 @@ import type {
 } from '@luma/connections';
 import type {
   Configuration,
+  DetectionRequest,
   DetectionService,
   Evidence,
   Facts,
@@ -17,7 +18,11 @@ import type {
   VerificationEvaluator,
   VerificationResult,
 } from '@luma/exceptions';
-import { evaluateException } from '@luma/exceptions';
+import {
+  decimalUnits,
+  evaluateException,
+  verificationPostconditions,
+} from '@luma/exceptions';
 import type { TenantContext } from '@luma/identity';
 import { requirePermission } from '@luma/identity';
 
@@ -142,8 +147,73 @@ export interface DetectionSources {
   ): Promise<FulfillmentWork[]>;
 }
 
+/** A read supporting one source's report of an order, on Luma's clock. */
+interface OrderReadEvidence {
+  snapshotId: string;
+  observationId: string;
+  observedAt: string;
+}
+
+/** One source's current units of an order line, with the reads they come from. */
+export interface OrderLineSource {
+  connectionId: string;
+  provider: string;
+  /** The source's order ID; null when no mapping names it. */
+  order: ExternalId | null;
+  sourceUpdatedAt: string | null;
+  /** Current units; null when the source doesn't report them or its line can't be matched. */
+  quantity: string | null;
+  /** The order read first, then the source's fulfilment reads. */
+  evidence: OrderReadEvidence[];
+}
+
+/** An order's current comparison of line units across its sources, as the orders owner keeps it. */
+export interface OrderQuantities {
+  orderId: string;
+  /** Lines match unambiguously and no contributing collection read failed or was partial. */
+  complete: boolean;
+  /** Latest business-state change of any source; null when the sources were never compared. */
+  changedAt: string | null;
+  oldestReadAt: string | null;
+  latestReadAt: string | null;
+  authority: {
+    state: 'resolved' | 'unknown' | 'conflicting';
+    connectionId: string | null;
+    revision: number;
+  };
+  /** Every line matched across sources, with each current source's units. */
+  lines: { lineKey: string; unit: string; sources: OrderLineSource[] }[];
+}
+
+/** Order comparisons for scheduled detection, read through the orders owner. */
+export interface OrderQuantitySources {
+  /**
+   * Orders whose maintained comparison shows a current-units difference that changed before
+   * `changedBefore`, plus the orders named in `include`, least recently read first.
+   */
+  candidates(
+    context: TenantContext,
+    options: { include: string[]; changedBefore: string; limit: number },
+  ): Promise<string[]>;
+  quantities(
+    context: TenantContext,
+    orderId: string,
+  ): Promise<OrderQuantities | null>;
+  /**
+   * Rereads the order's sources whose stored reads are older than `maxAgeMs` through installed
+   * capabilities and stores them as current.
+   */
+  refresh(
+    context: TenantContext,
+    orderId: string,
+    maxAgeMs: number,
+  ): Promise<unknown>;
+}
+
 export interface DetectionMonitorOptions {
   sources: DetectionSources;
+  /** Order line quantity checks; without them, order quantity cases are neither opened nor verified. */
+  orders?: OrderQuantitySources;
   capabilities: Pick<CapabilityReader, 'read'>;
   exceptions: Pick<DetectionService, 'ingest' | 'list' | 'verify'>;
   /** Prepares a diagnosis for a newly detected case so people see its cause and options. */
@@ -158,8 +228,8 @@ export interface DetectionMonitorOptions {
   authority: AuthorityReader;
   configuration: Configuration;
   hash(value: string): string;
-  /** Fresh stock and fulfillment checks per workspace and pass. */
-  limits?: { stock?: number; fulfillment?: number };
+  /** Fresh stock, fulfillment and order checks per workspace and pass. */
+  limits?: { stock?: number; fulfillment?: number; orders?: number };
   /**
    * How long a hold may explain missing progress. After it, the hold counts as the reason the
    * order is stuck. Defaults to 24 hours.
@@ -203,6 +273,7 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
   const limits = {
     stock: options.limits?.stock ?? 25,
     fulfillment: options.limits?.fulfillment ?? 25,
+    orders: options.limits?.orders ?? 25,
   };
   const holdOverdueSeconds = options.holdOverdueSeconds ?? 86_400;
 
@@ -609,6 +680,180 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
     }
   }
 
+  /**
+   * Builds the evaluation of one order line from a fresh comparison: one evidence item per source
+   * read, plus one naming the whole comparison so changed authority or fulfilment reads are new
+   * evidence. Returns null when a source has no read to cite.
+   */
+  function orderRequest(
+    context: TenantContext,
+    read: OrderQuantities,
+    line: OrderQuantities['lines'][number],
+  ): DetectionRequest | null {
+    if (
+      !read.changedAt ||
+      !read.oldestReadAt ||
+      !read.latestReadAt ||
+      line.sources.length < 2 ||
+      line.sources.some((source) => !source.evidence.length)
+    )
+      return null;
+    const sources = [...line.sources].sort((a, b) =>
+      a.connectionId.localeCompare(b.connectionId),
+    );
+    const evidence: Evidence[] = sources.map((source) => {
+      const [order] = source.evidence;
+
+      return {
+        key: `order-line:${order!.snapshotId}:${line.lineKey}`,
+        tenantId: context.tenantId,
+        connectionId: source.connectionId,
+        source: {
+          provider: source.provider,
+          resource: 'order',
+          externalId: source.order?.externalId ?? order!.snapshotId,
+          scopeKey: source.order?.scopeKey ?? '',
+        },
+        observedAt: order!.observedAt,
+        sourceUpdatedAt: source.sourceUpdatedAt,
+        adapterVersion: 'orders-comparison-v1',
+        schemaVersion: 1,
+        facts: {
+          orderId: read.orderId,
+          lineKey: line.lineKey,
+          quantity: source.quantity,
+          unit: line.unit,
+          snapshotId: order!.snapshotId,
+          observationId: order!.observationId,
+        },
+      };
+    });
+    const material = {
+      reads: sources.map((source) => [
+        source.connectionId,
+        source.evidence.map((item) => item.snapshotId),
+      ]),
+      authority: read.authority,
+      changedAt: read.changedAt,
+      complete: read.complete,
+    };
+    const comparison: Evidence = {
+      key: `order-comparison:${read.orderId}:${line.lineKey}:${hash(JSON.stringify(material))}`,
+      tenantId: context.tenantId,
+      connectionId: null,
+      source: null,
+      observedAt: read.oldestReadAt,
+      sourceUpdatedAt: null,
+      adapterVersion: 'orders-comparison-v1',
+      schemaVersion: 1,
+      facts: {
+        orderId: read.orderId,
+        lineKey: line.lineKey,
+        changedAt: read.changedAt,
+        latestReadAt: read.latestReadAt,
+        authority: read.authority,
+        reads: material.reads,
+      },
+    };
+    const all = [...evidence, comparison];
+
+    return {
+      key: hash(JSON.stringify(['order-line', comparison.key])),
+      input: {
+        exceptionClass: 'order_quantity_mismatch',
+        facts: {
+          tenantId: context.tenantId,
+          evidenceTenantId: context.tenantId,
+          subjectId: read.orderId,
+          evidenceRefs: all.map((item) => item.key),
+          lineKey: line.lineKey,
+          connectionIds: sources.map((source) => source.connectionId),
+          authorityState: read.authority.state,
+          authorityConnectionId: read.authority.connectionId,
+          quantities: sources.map((source) => ({
+            connectionId: source.connectionId,
+            quantity: source.quantity,
+          })),
+          unit: line.unit,
+          complete: read.complete,
+          changedAt: read.changedAt,
+          oldestReadAt: read.oldestReadAt,
+          latestReadAt: read.latestReadAt,
+        },
+      },
+      configuration,
+      evidence: all,
+    };
+  }
+
+  /** The age at which a stored read predates `time`, at most a minute. */
+  const rereadBefore = (time: number) =>
+    Math.max(0, Math.min(60_000, now().getTime() - time));
+
+  const differs = (line: OrderQuantities['lines'][number]) =>
+    new Set(
+      line.sources.flatMap((source) =>
+        source.quantity === null ? [] : [decimalUnits(source.quantity)],
+      ),
+    ).size > 1;
+
+  async function orderQuantities(
+    context: TenantContext,
+    incidents: Incident[],
+  ) {
+    const orders = options.orders;
+    if (!orders) return;
+    const tracked = incidents.filter(
+      (item) => item.exceptionClass === 'order_quantity_mismatch',
+    );
+    const candidates = await orders.candidates(context, {
+      include: [...new Set(tracked.map((item) => item.subject.subjectId))],
+      changedBefore: new Date(
+        +now() - configuration.thresholds.propagationSeconds * 1000,
+      ).toISOString(),
+      limit: limits.orders,
+    });
+    for (const orderId of candidates) {
+      try {
+        let read = await orders.quantities(context, orderId);
+        // Sources read before the propagation window ended are read again; later reads count.
+        if (read?.changedAt) {
+          await orders.refresh(
+            context,
+            orderId,
+            rereadBefore(
+              Date.parse(read.changedAt) +
+                configuration.thresholds.propagationSeconds * 1000,
+            ),
+          );
+          read = await orders.quantities(context, orderId);
+        }
+        if (!read) continue;
+        const open = tracked.filter(
+          (item) => item.subject.subjectId === orderId,
+        );
+        for (const line of read.lines) {
+          const incident = open.find(
+            (item) => item.subject.scope[0] === line.lineKey,
+          );
+          if (!incident && !differs(line)) continue;
+          const request = orderRequest(context, read, line);
+          if (!request) continue;
+          const result = await exceptions.ingest(context, request);
+          if (result.decision.decision === 'detect')
+            await diagnoseNew(context, result, incident);
+          else if (result.decision.decision === 'clear' && incident)
+            await verify(context, incident);
+        }
+      } catch (error) {
+        log(
+          'An order quantity check could not complete; it runs again next pass.',
+          error,
+        );
+      }
+    }
+  }
+
   async function diagnoseNew(
     context: TenantContext,
     result: { incident: Incident | null },
@@ -640,7 +885,9 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
     handles: (incident) =>
       ['sync_failure', 'inventory_mismatch', 'stuck_fulfillment'].includes(
         incident.exceptionClass,
-      ),
+      ) ||
+      (incident.exceptionClass === 'order_quantity_mismatch' &&
+        !!options.orders),
     async evaluate(context, incident): Promise<VerificationResult> {
       // Stock and fulfillment verdicts apply this configuration's thresholds, so they wait until
       // the next pass re-evaluates the case under it. Sync recovery uses no thresholds, and a
@@ -659,6 +906,37 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
           found.mapping,
           found.positionId,
         ).verifier.evaluate(context, incident);
+      }
+      if (incident.exceptionClass === 'order_quantity_mismatch') {
+        const orders = options.orders;
+        if (!orders) throw new Error('Order quantities are not checked here');
+        const [lineKey, ...connectionIds] = incident.subject.scope;
+        // Verification needs reads taken after the latest detection.
+        await orders.refresh(
+          context,
+          incident.subject.subjectId,
+          rereadBefore(Date.parse(incident.lastDetectedAt)),
+        );
+        const read = await orders.quantities(
+          context,
+          incident.subject.subjectId,
+        );
+        const line = read?.lines.find((item) => item.lineKey === lineKey);
+        // The case covers the sources it was detected across; another source set is another case.
+        if (
+          !read ||
+          !line ||
+          JSON.stringify(
+            line.sources.map((source) => source.connectionId).sort(),
+          ) !== JSON.stringify(connectionIds)
+        )
+          throw new Error(
+            'The order line is no longer compared across these sources',
+          );
+        const request = orderRequest(context, read, line);
+        if (!request) throw new Error('The order line has no current reads');
+
+        return outcome(request.input, request.evidence, incident);
       }
       if (incident.exceptionClass === 'stuck_fulfillment') {
         const [work] = await sources.fulfillments(context, {
@@ -758,9 +1036,9 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
       evidence: sourced,
       bindings: sourced.map((item) => ({
         evidenceKey: item.key,
-        exceptionClass: 'stuck_fulfillment',
+        exceptionClass: incident.exceptionClass,
         subject: incident.subject,
-        postcondition: 'fulfillment_disposition_verified',
+        postcondition: verificationPostconditions[incident.exceptionClass],
       })),
     };
   }
@@ -778,6 +1056,7 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
         ['Sync failure detection', syncFailures],
         ['Stock detection', stock],
         ['Fulfillment detection', fulfillments],
+        ['Order quantity detection', orderQuantities],
       ] as const)
         await run(context, incidents).catch((error: unknown) =>
           log(`${name} could not complete; retrying next pass.`, error),

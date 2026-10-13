@@ -36,10 +36,10 @@ import { workflowGenerationContract } from './contracts/workflow-generation.js';
 import { workflowsContract } from './contracts/workflows.js';
 
 /**
- * Every customer API route, keyed by area. Route keys form OpenAPI operation IDs, such as
- * `orders.list`.
+ * The route record's type, named so declaration output references each area's contract instead
+ * of expanding every route schema into one type that exceeds the compiler's serialization limit.
  */
-export const apiContract: {
+type ApiContract = {
   shadow: typeof shadowContract;
   activity: typeof activityContract;
   playbooks: typeof playbooksContract;
@@ -76,7 +76,13 @@ export const apiContract: {
   insights: typeof insightsContract;
   assistant: typeof assistantContract;
   sourceAuthority: typeof sourceAuthorityContract;
-} = {
+};
+
+/**
+ * Every customer API route, keyed by area. Route keys form OpenAPI operation IDs, such as
+ * `orders.list`.
+ */
+export const apiContract: ApiContract = {
   shadow: shadowContract,
   activity: activityContract,
   playbooks: playbooksContract,

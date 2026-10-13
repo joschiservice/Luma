@@ -65,6 +65,8 @@ function fixture(overrides: Partial<ShopifyConnectorOptions> = {}) {
       const order = {
         ...data.order,
         lineItems: page(data.orderLines),
+        shippingLines: page(data.shippingLines),
+        discountApplications: page(data.discounts),
         fulfillmentOrders: page(
           data.work.map((item) => ({
             ...item,
@@ -107,27 +109,31 @@ function fixture(overrides: Partial<ShopifyConnectorOptions> = {}) {
     if (query.includes('children:')) {
       const nodes = query.includes('children: returns(')
         ? data.returns
-        : query.includes('returnLineItems(')
-          ? data.returnLines
-          : query.includes('reverseFulfillmentOrders(')
-            ? data.reverseOrders
-            : variables.id?.includes('/ReverseFulfillmentOrder/')
-              ? data.reverseLines
-              : query.includes('refundLineItems(')
-                ? data.refundLines
-                : query.includes('children: transactions(')
-                  ? data.refundTransactions
-                  : query.includes('inventoryLevels(')
-                    ? data.levels
-                    : query.includes('variants(')
-                      ? data.variants
-                      : query.includes('fulfillmentOrders(')
-                        ? data.work
-                        : query.includes('fulfillmentLineItems(')
-                          ? data.shipmentLines
-                          : variables.id?.includes('/FulfillmentOrder/')
-                            ? data.workLines
-                            : data.orderLines;
+        : query.includes('children: shippingLines(')
+          ? data.shippingLines
+          : query.includes('children: discountApplications(')
+            ? data.discounts
+            : query.includes('returnLineItems(')
+              ? data.returnLines
+              : query.includes('reverseFulfillmentOrders(')
+                ? data.reverseOrders
+                : variables.id?.includes('/ReverseFulfillmentOrder/')
+                  ? data.reverseLines
+                  : query.includes('refundLineItems(')
+                    ? data.refundLines
+                    : query.includes('children: transactions(')
+                      ? data.refundTransactions
+                      : query.includes('inventoryLevels(')
+                        ? data.levels
+                        : query.includes('variants(')
+                          ? data.variants
+                          : query.includes('fulfillmentOrders(')
+                            ? data.work
+                            : query.includes('fulfillmentLineItems(')
+                              ? data.shipmentLines
+                              : variables.id?.includes('/FulfillmentOrder/')
+                                ? data.workLines
+                                : data.orderLines;
 
       return response({ node: { children: page(nodes) } });
     }
@@ -231,6 +237,91 @@ describe('Shopify read capabilities', () => {
               paymentStatus: 'paid',
               placedAt: '2026-09-14T08:30:00Z',
               total: { amount: '42.50', currency: 'EUR' },
+              addresses: { shared: false },
+              currencies: { shop: 'EUR', presentment: 'CHF' },
+              amounts: {
+                total: {
+                  original: {
+                    shop: { amount: '52.00', currency: 'EUR' },
+                    presentment: { amount: '50.30', currency: 'CHF' },
+                  },
+                  current: {
+                    shop: { amount: '42.50', currency: 'EUR' },
+                    presentment: { amount: '41.10', currency: 'CHF' },
+                  },
+                },
+                subtotal: {
+                  current: { shop: { amount: '37.00', currency: 'EUR' } },
+                },
+                // A malformed amount is unknown, never a parse failure of the order.
+                tax: {
+                  original: { shop: { amount: '8.30' } },
+                  current: null,
+                },
+                duties: { original: null, current: null },
+              },
+              taxesIncluded: true,
+              dutiesIncluded: false,
+              taxLines: [
+                {
+                  title: 'MwSt',
+                  rate: '0.19',
+                  amount: { presentment: { amount: '6.56', currency: 'CHF' } },
+                },
+              ],
+              shippingLines: [
+                {
+                  id: 'gid://shopify/ShippingLine/71',
+                  title: 'Standard',
+                  code: 'STANDARD',
+                  carrier: null,
+                  removed: false,
+                },
+                {
+                  title: 'Express',
+                  carrier: 'dhl',
+                  removed: true,
+                  original: { shop: { amount: '9.90', currency: 'EUR' } },
+                  current: { shop: { amount: '0.0', currency: 'EUR' } },
+                },
+              ],
+              discounts: [
+                {
+                  index: 0,
+                  kind: 'code',
+                  label: 'WELCOME10',
+                  target: 'line_item',
+                  allocation: 'across',
+                  value: { type: 'percentage', percentage: '10' },
+                },
+                {
+                  kind: 'automatic',
+                  label: 'Free mug',
+                  allocation: 'each',
+                  value: {
+                    type: 'fixed',
+                    amount: { amount: '2.00', currency: 'EUR' },
+                  },
+                },
+                {
+                  kind: 'manual',
+                  label: 'Goodwill',
+                  target: 'shipping_line',
+                  value: { type: 'percentage', percentage: '12.5' },
+                },
+              ],
+              tags: ['wholesale', 'priority'],
+              attributes: {
+                edited: true,
+                requiresShipping: true,
+                test: false,
+                cancelReason: null,
+                cancelledAt: null,
+                closedAt: null,
+                processedAt: '2026-09-14T08:30:05Z',
+                channel: 'web',
+                fulfillmentStatus: 'partially_fulfilled',
+              },
               lines: [
                 {
                   sku: ref(commerce.inventoryItem.id),
@@ -242,6 +333,17 @@ describe('Shopify read capabilities', () => {
                   taxRate: '0.19',
                   skuCode: 'MUG-Blue',
                   title: 'Blue mug',
+                  variantTitle: 'Blue',
+                  requiresShipping: true,
+                  catalog: 'variant',
+                  prices: {
+                    originalUnit: {
+                      shop: { amount: '14.50', currency: 'EUR' },
+                      presentment: { amount: '14.03', currency: 'CHF' },
+                    },
+                    discountedUnit: { shop: { amount: '13.05' } },
+                    totalDiscount: { shop: { amount: '4.35' } },
+                  },
                 },
                 {
                   sku: null,
@@ -250,6 +352,10 @@ describe('Shopify read capabilities', () => {
                   unitPrice: null,
                   taxIncluded: null,
                   taxRate: null,
+                  variantTitle: null,
+                  requiresShipping: false,
+                  // No variant and no product: a custom item or a deleted product.
+                  catalog: 'no_product',
                 },
               ],
             },
@@ -422,6 +528,8 @@ describe('Shopify read capabilities', () => {
             {
               ...commerce.order,
               lineItems: page([commerce.orderLines[0]], 'line-page-2'),
+              shippingLines: page(commerce.shippingLines),
+              discountApplications: page([]),
             },
           ]),
         });
@@ -904,17 +1012,25 @@ describe('Shopify edited order lines', () => {
         },
       });
       if (!result.ok) throw new Error('Expected order read');
+      const item = result.value.items[0]!;
+      const observation = {
+        ...item,
+        source: {
+          ...item.source,
+          tenantId: '00000000-0000-4000-8000-000000000001',
+          connectionId: '00000000-0000-4000-8000-000000000002',
+        },
+      };
+      // Sync removes addresses before recording; recorded evidence refuses them.
+      expect(() =>
+        commerceSchema.parse({ capability: 'orders.read', observation }),
+      ).toThrow();
+      const data = { ...item.data };
+      delete data.addresses;
       expect(() =>
         commerceSchema.parse({
           capability: 'orders.read',
-          observation: {
-            ...result.value.items[0],
-            source: {
-              ...result.value.items[0]!.source,
-              tenantId: '00000000-0000-4000-8000-000000000001',
-              connectionId: '00000000-0000-4000-8000-000000000002',
-            },
-          },
+          observation: { ...observation, data },
         }),
       ).not.toThrow();
     },
@@ -1210,6 +1326,54 @@ describe('Shopify history import reads', () => {
       value: { items: [{ data: { customer: null } }] },
     });
   });
+  it('reads order addresses only with address approval and never captures them as evidence', async () => {
+    const queries = (f: ReturnType<typeof fixture>) =>
+      f.fetch.mock.calls.map(
+        ([, init]) => JSON.parse(String(init?.body)).query as string,
+      );
+    const unapproved = fixture({
+      customerAccess: { contact: true, address: false },
+    });
+    expect(await unapproved.read('orders.read')).toMatchObject({
+      ok: true,
+      value: { items: [{ data: { addresses: { shared: false } } }] },
+    });
+    expect(queries(unapproved).some((q) => q.includes('shippingAddress'))).toBe(
+      false,
+    );
+
+    const f = fixture({
+      customerAccess: { contact: false, address: true },
+      rawRetentionMs: 1000,
+    });
+    expect(await f.read('orders.read')).toMatchObject({
+      ok: true,
+      value: {
+        items: [
+          {
+            data: {
+              addresses: {
+                shared: true,
+                shipping: {
+                  line1: 'Hafenstrasse 1',
+                  line2: null,
+                  city: 'Hamburg',
+                  region: 'HH',
+                  postalCode: '20457',
+                  country: 'DE',
+                },
+                billing: null,
+              },
+            },
+          },
+        ],
+      },
+    });
+    expect(queries(f).some((q) => q.includes('shippingAddress {'))).toBe(true);
+    const raw = f.recordObservations.mock.calls[0]![0].raw;
+    expect(raw?.payloads.length).toBeGreaterThan(0);
+    expect(JSON.stringify(raw)).not.toMatch(/Hafenstrasse|20457/);
+  });
 });
 
 describe('Shopify query contract', () => {
@@ -1247,7 +1411,7 @@ describe('Shopify query contract', () => {
     }
     expect(await customers.read('customers.read')).toMatchObject({ ok: true });
     const buyers = fixture({
-      customerAccess: { contact: false, address: false },
+      customerAccess: { contact: false, address: true },
       orderCustomers: true,
     });
     expect(await buyers.read('orders.read')).toMatchObject({ ok: true });
@@ -1474,5 +1638,124 @@ describe('Shopify independent deletion confirmation', () => {
       value: { confirmation: 'present', items: [] },
     });
     expect(f.recordObservations).not.toHaveBeenCalled();
+  });
+});
+
+describe('Shopify single-order reads', () => {
+  const schema = buildSchema(
+    readFileSync(
+      new URL('./fixtures/admin-2026-07.graphql', import.meta.url),
+      'utf8',
+    ),
+  );
+
+  function orderFixture(node: (id: string) => unknown) {
+    const f = fixture();
+    const fallback = f.fetch.getMockImplementation()!;
+    f.fetch.mockImplementation(async (url, init) => {
+      const { query, variables } = JSON.parse(String(init?.body)) as {
+        query: string;
+        variables: { id: string };
+      };
+      expect(
+        validate(schema, parse(query)).map((error) => error.message),
+      ).toEqual([]);
+      if (query.includes('LumaOrder'))
+        return response({ node: node(variables.id) });
+
+      return fallback(url, init);
+    });
+    const read = (input: Record<string, unknown>) =>
+      f.runtime.read(context, {
+        capability: 'orders.read',
+        connectionId: f.connection.id,
+        version: '0',
+        input: { limit: 1, ...input },
+      });
+
+    return { ...f, readOrder: read };
+  }
+
+  const stored = (id: string) =>
+    id === commerce.order.id
+      ? {
+          ...commerce.order,
+          lineItems: page(commerce.orderLines),
+          shippingLines: page(commerce.shippingLines),
+          discountApplications: page(commerce.discounts),
+        }
+      : null;
+
+  it('reads one order in one request, observed exactly as an order page observes it', async () => {
+    const f = orderFixture(stored);
+    expect(
+      (await f.runtime.discover(context, 'connection-a')).find(
+        (item) => item.capability === 'orders.read',
+      )?.filters,
+    ).toContain('order');
+    const scanned = await f.read('orders.read');
+    const calls = f.fetch.mock.calls.length;
+    const single = await f.readOrder({ order: ref(commerce.order.id) });
+    expect(f.fetch.mock.calls.length - calls).toBe(1);
+    if (!scanned.ok || !single.ok) throw new Error('Expected order reads');
+    expect(single.value).toMatchObject({
+      nextCursor: null,
+      completeness: 'complete',
+    });
+    expect(single.value).not.toHaveProperty('total');
+    // Only the observation's own ID differs.
+    expect(single.value.items).toEqual([
+      { ...scanned.value.items[0], id: expect.any(String) },
+    ]);
+    expect(f.recordObservations).toHaveBeenLastCalledWith(
+      expect.objectContaining({ observations: single.value.items }),
+    );
+  });
+
+  it('returns an empty complete page with the history limit when Shopify has no such order', async () => {
+    const f = orderFixture(stored);
+    expect(
+      await f.readOrder({ order: ref('gid://shopify/Order/999') }),
+    ).toMatchObject({
+      ok: true,
+      value: {
+        items: [],
+        nextCursor: null,
+        completeness: 'complete',
+        history: { requirement: 'read_all_orders' },
+      },
+    });
+    f.data.scopes.push({ handle: 'read_all_orders' });
+    const full = await f.readOrder({ order: ref('gid://shopify/Order/999') });
+    expect(full.ok && full.value.history).toBeNull();
+  });
+
+  it('rejects an order Shopify returns under another ID', async () => {
+    const f = orderFixture(() => stored(commerce.order.id));
+    expect(
+      await f.readOrder({ order: ref('gid://shopify/Order/2') }),
+    ).toMatchObject({ ok: false, error: { code: 'invalid_response' } });
+    expect(f.recordObservations).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { cursor: 'next' },
+    { updatedSince: '2026-09-01T00:00:00.000Z' },
+    { createdSince: '2026-09-01T00:00:00.000Z' },
+    { historyImport: { key: '00000000-0000-4000-8000-000000000001' } },
+    {
+      confirmMissing: {
+        externalId: 'gid://shopify/Order/1',
+        scopeKey: '',
+        createdAt: null,
+      },
+    },
+    { order: ref('gid://shopify/Product/1') },
+  ])('rejects a point read combined with scan input: %j', async (input) => {
+    const f = orderFixture(stored);
+    expect(
+      await f.readOrder({ order: ref(commerce.order.id), ...input }),
+    ).toMatchObject({ ok: false, error: { code: 'invalid_input' } });
+    expect(f.fetch).not.toHaveBeenCalled();
   });
 });

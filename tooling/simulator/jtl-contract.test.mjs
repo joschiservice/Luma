@@ -342,6 +342,28 @@ test('orders.read pages sales orders with lines, totals and statuses', async () 
   );
 });
 
+test('orders.read rereads one sales order exactly as a page reports it', async () => {
+  const jtlEnv = await createEnvironment();
+  const page = await jtlEnv.read('orders.read', { limit: 3 });
+  const single = await jtlEnv.read('orders.read', {
+    limit: 1,
+    order: { externalId: '2', scopeKey: '' },
+  });
+  assert.equal(single.nextCursor, null);
+  assert.equal(single.completeness, 'complete');
+  assert.deepEqual(
+    observations(single, 'order'),
+    observations(page, 'order').filter(
+      ({ source }) => source.externalId === '2',
+    ),
+  );
+  const missing = await jtlEnv.read('orders.read', {
+    limit: 1,
+    order: { externalId: '99', scopeKey: '' },
+  });
+  assert.deepEqual(missing.items, []);
+});
+
 test('products.read reports catalog facts with the stock modification time', async () => {
   const jtlEnv = await createEnvironment();
   const page = await jtlEnv.read('products.read', { limit: 100 });

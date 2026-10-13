@@ -95,6 +95,9 @@ const mutationCapabilities: Record<string, string> = {
   returnProcess: 'returns.exchange.process',
   returnCancel: 'returns.exchange.cancel',
   inventorySetQuantities: 'inventory.available.reconcile',
+  orderEditBegin: 'orders.quantity.calculate',
+  orderEditSetQuantity: 'orders.quantity.calculate',
+  orderEditCommit: 'orders.quantity.edit',
   fulfillmentOrderReleaseHold: 'fulfillment.hold.release',
   fulfillmentOrderOpen: 'fulfillment.open',
   fulfillmentOrderMove: 'fulfillment.move',
@@ -129,6 +132,8 @@ const namedCapabilities: Record<string, string> = {
   LumaInventoryCorrection: 'inventory.available.reconcile',
   LumaFulfillmentRecovery: 'fulfillment.read',
   LumaFulfillmentLocations: 'fulfillment.read',
+  LumaOrderEditRead: 'orders.quantity.read',
+  LumaOrderEditProof: 'orders.quantity.read',
 };
 
 /** Read capabilities by the fields and type conditions a query selects, most specific first. */

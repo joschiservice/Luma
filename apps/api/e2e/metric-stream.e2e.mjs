@@ -40,7 +40,7 @@ it('fans out committed changes, coalesces bursts and recovers listeners, subscri
   const triggers = await f.db.owner.query(
     "SELECT count(*)::int AS total, count(*) FILTER (WHERE tgnargs=0)::int AS untagged FROM pg_trigger WHERE tgname='metric_change'",
   );
-  expect(triggers.rows[0]).toEqual({ total: 65, untagged: 0 });
+  expect(triggers.rows[0]).toEqual({ total: 68, untagged: 0 });
   expect(coverage.rows.map((row) => row.event_object_table)).toEqual(
     expect.arrayContaining([
       'resolution_measurement_facts',
@@ -53,6 +53,9 @@ it('fans out committed changes, coalesces bursts and recovers listeners, subscri
       'case_owners',
       'workflow_events',
       'workflow_human_tasks',
+      'shopify_order_edits',
+      'shopify_order_edit_claims',
+      'shopify_order_edit_fences',
     ]),
   );
   expect(

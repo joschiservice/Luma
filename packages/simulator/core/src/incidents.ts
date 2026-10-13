@@ -16,6 +16,7 @@ export interface IncidentKind {
   /** Luma exception class that should open a case, when a detection rule covers it. */
   exceptionClass:
     | 'inventory_mismatch'
+    | 'order_quantity_mismatch'
     | 'stuck_fulfillment'
     | 'sync_failure'
     | 'workflow_failure'
@@ -149,6 +150,14 @@ export const incidentKinds = {
     unit: 'day',
     exceptionClass: null,
     surface: 'inbox',
+  },
+  'order-quantity-change': {
+    label: 'Customer changes a quantity',
+    description:
+      'A customer asks support for fewer units of an open order. Support changes the order in Luma, which holds order-line authority; the shop still shows the old quantity and the warehouse still has the original order.',
+    unit: 'day',
+    exceptionClass: 'order_quantity_mismatch',
+    surface: 'case',
   },
   'auth-revoked': {
     label: 'Access revoked',

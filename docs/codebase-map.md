@@ -21,7 +21,7 @@ conventions only; it does not list files.
 | Editable Luma order records                                                                     | `@luma/sales`                                                                            |
 | Canonical orders, fulfillment, returns, refunds, return cases                                   | `@luma/orders`                                                                           |
 | Canonical SKUs, locations, stock, product catalog rows                                          | `@luma/inventory`                                                                        |
-| Customer profiles                                                                               | `@luma/customers`                                                                        |
+| Customer profiles, customer order links and order addresses                                     | `@luma/customers`                                                                        |
 | Observation → canonical projection                                                              | `@luma/commerce-ingestion`                                                               |
 | History import, incremental sync, reconciliation                                                | `@luma/commerce-sync`                                                                    |
 | Detection rules, cases, evidence, diagnosis, verification                                       | `@luma/exceptions`                                                                       |

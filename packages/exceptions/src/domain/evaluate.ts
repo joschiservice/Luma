@@ -170,6 +170,33 @@ export function evaluate(
 
       return detect('medium', 'quantity_mismatch');
     }
+    case 'order_quantity_mismatch': {
+      const f = parsed.facts;
+      if (!f.complete) return result('defer', 'incomplete_evidence');
+      const stale = freshness(f.oldestReadAt, f.latestReadAt);
+      if (stale) return stale;
+      const known = f.quantities.flatMap((item) =>
+        item.quantity === null ? [] : [decimalUnits(item.quantity)],
+      );
+      // Sources that don't report the line's units never count as agreeing or differing.
+      if (new Set(known).size < 2) return result('clear', 'quantities_agree');
+      if (f.authorityState !== 'resolved' || !f.authorityConnectionId)
+        return result('defer', 'inconclusive_authority');
+      const authority = f.quantities.find(
+        (item) => item.connectionId === f.authorityConnectionId,
+      );
+      if (!authority || authority.quantity === null)
+        return result('defer', 'unknown_value');
+      if (age(f.changedAt) < 0) return result('defer', 'future_evidence');
+      // Every source must be read again after the window, so elapsed time alone confirms nothing.
+      if (
+        (Date.parse(f.oldestReadAt) - Date.parse(f.changedAt)) / 1000 <
+        t.propagationSeconds
+      )
+        return result('defer', 'propagation_pending');
+
+      return detect('medium', 'quantity_mismatch');
+    }
     case 'workflow_failure': {
       const f = parsed.facts;
       if (!f.durable) return result('defer', 'missing_durable_evidence');
@@ -218,6 +245,13 @@ export function identity(input: EvaluationInput) {
           input.facts.canonicalLocationId,
           ...[...input.facts.connectionIds].sort(),
         ],
+      };
+    case 'order_quantity_mismatch':
+      return {
+        ruleIdentity: 'order-line-quantity',
+        subjectKind: 'order',
+        subjectId: input.facts.subjectId,
+        scope: [input.facts.lineKey, ...[...input.facts.connectionIds].sort()],
       };
     case 'workflow_failure':
       return {

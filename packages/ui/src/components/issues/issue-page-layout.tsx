@@ -6,7 +6,12 @@ import { Button } from '../primitives/button';
 import { SectionNavigation } from '../primitives/section-navigation';
 import { WorkspaceHeaderSlot } from '../workspace/workspace-header-slot';
 import { CaseStatus } from './case-investigation';
-import { freshnessLabel, issueKind, sourceLabel } from './case-presentation';
+import {
+  caseSummaryText,
+  freshnessLabel,
+  issueKind,
+  sourceLabel,
+} from './case-presentation';
 import { IssueDetailViews } from './issue-collection';
 import { IssueRecordDetails } from './issue-record-details';
 import { IssuePageNavigation, IssueSection } from './issue-section';
@@ -39,7 +44,9 @@ export function IssuePageLayout({
     hasActions: Boolean(actions),
     issueId: item?.id,
   });
-  const title = item?.summary.replace(/\.+$/, '') ?? m.issues_section_details();
+  const title =
+    (item && caseSummaryText(item.summary))?.replace(/\.+$/, '') ??
+    m.issues_section_details();
 
   useEffect(() => {
     root.current?.focus({ preventScroll: true });

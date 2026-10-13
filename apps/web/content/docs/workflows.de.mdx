@@ -73,6 +73,7 @@ Manche Workflows starten von selbst, wenn Luma ein Problem erkennt:
 
 - **Correct Shopify stock from the ERP** startet, wenn Shopify und dein ERP beim verknüpften Bestand voneinander abweichen. Er schlägt vor, Shopify auf die ERP-Menge zu setzen, und bestätigt das mit einem neuen Lesevorgang in Shopify. Den ERP-Bestand ändert er nie.
 - **Release an overdue fulfillment hold** startet, wenn eine Shopify-Bestellung zu lange in einer Betrugsprüfung oder manuellen Sperre hängt. Er schlägt vor, die Sperre aufzuheben, und bestätigt in Shopify, dass sie weg ist. Sperren wegen Zahlung, Adresse oder Bestand gehen an eine Person, weil zuerst ihre Ursache behoben werden muss.
+- **Carry an order quantity change to every system** startet, wenn eine Bestellposition in Shopify eine andere Menge zeigt als im System, das für Bestellpositionen führend ist, etwa nachdem der Support die Menge in Lumas eigener Bestellung geändert hat. Das Problem sagt, was jedes System zeigt, zum Beispiel „Luma ERP legt diese Menge auf 1 fest; Shopify zeigt noch 2; JTL meldet sie nicht.“ Zuerst fordert eine Lageraufgabe unter „Wartet auf dich“ jemanden mit der Rolle Mitglied auf, dafür zu sorgen, dass der Versand die neue Menge übernimmt: die Bestellung vor dem Kommissionieren anpassen oder eine begonnene Kommissionierung anpassen oder zurücksetzen, dann **Adjusted** oder **Cannot adjust** mit einer kurzen Notiz zum Vorgehen antworten. Nach vier Stunden geht die Aufgabe an die Admins, das Problem behält eine verantwortliche Person, und die Aufgabe bleibt offen. Danach liest Luma jedes System erneut; nur wenn das zeigt, dass die Änderung sicher ist, schlägt Luma die Änderung in Shopify zur Genehmigung vor. Eine Prüfung bestätigt die Änderung in Shopify und liest jedes System erneut: Jedes System, das die Position meldet, muss die neue Menge zeigen. Systeme, die keine Mengen melden, werden als „meldet nicht“ aufgeführt, nie als übereinstimmend.
 - **Check a failing connection** startet, wenn Lesevorgänge einer Verbindung wiederholt fehlschlagen oder ein System Luma nicht mehr akzeptiert. Ein verlorener Zugriff geht sofort an eine Person, und das Problem bietet an, die Verbindung neu zu verbinden. Sonst wartet der Workflow 15 Minuten, prüft erneut und übergibt das Problem nur, wenn die Lesevorgänge weiter fehlschlagen. Er ändert nichts.
 
 Jede Änderung wartet unter [Wartet auf dich](/docs/needs-you) auf eine Genehmigung gemäß deinen [Workspace-Regeln](/docs/workspace-settings#approvals). Ein Vorschlag bleibt vier Stunden offen. Direkt vor dem Handeln liest Luma den Bestand erneut: Ist die Änderung noch dieselbe, wird sie ausgeführt. Würde sie abweichen, bereitet Luma im selben Eintrag unter „Wartet auf dich“ einen neuen Vorschlag vor. Eine abgelehnte Änderung, eine Änderung, die Luma nicht sicher ausführen kann, oder ein unklares Ergebnis übergibt das Problem an eine Person. Ohne dich wird nichts wiederholt.
@@ -104,7 +105,10 @@ Um einen neuen Workflow zu erstellen, wähle **Neuer Workflow**. Siehe [Workflow
 Eine **Menschliche Aufgabe** fordert eine Person oder Rolle auf, eine Antwort auszuwählen
 und den erforderlichen Nachweis einzutragen. Bei Fälligkeit übernimmt die Ersatzperson
 oder Ersatzrolle; die Aufgabe bleibt offen. Antworte unter [Deine Aufgaben](/docs/needs-you).
-Eine Antwort genehmigt keine spätere Änderung.
+Eine Aufgabe zu einer Bestellung verlinkt die Bestellung, deren Änderungsplan zeigt, was zu tun
+ist. Eine Antwort genehmigt keine spätere Änderung. Übergibt ein Workflow, der bei einem
+Problem startet, Arbeit an Personen und hat das Problem noch keine verantwortliche Person,
+wird die Person verantwortlich, die den Workflow eingeschaltet hat.
 
 **Auf Ereignis warten** wartet auf ein Ereignis mit dem passenden Korrelationsschlüssel
 und den erforderlichen Feldern. Lege das Zeitlimit fest und ob ein Timeout den Lauf beendet

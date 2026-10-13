@@ -67,6 +67,109 @@ const page = <T extends z.ZodTypeAny>(item: T) =>
 
 const optionalText = (max: number) => z.string().min(1).max(max).nullable();
 
+const currency = z.string().regex(/^[A-Z]{3}$/);
+const cash = z.object({ amount: decimal, currency });
+const pair = z.object({ shop: cash, presentment: cash }).nullable();
+const amount = z.object({ original: pair, current: pair });
+const address = z
+  .object({
+    line1: optionalText(512),
+    line2: optionalText(512),
+    city: optionalText(256),
+    region: optionalText(256),
+    postalCode: optionalText(64),
+    country: optionalText(128),
+  })
+  .nullable();
+
+const orderFacts = {
+  addresses: z.union([
+    z.object({
+      shared: z.literal(true),
+      shipping: address,
+      billing: address,
+    }),
+    z.object({ shared: z.literal(false) }),
+  ]),
+  currencies: z.object({
+    shop: currency.nullable(),
+    presentment: currency.nullable(),
+  }),
+  amounts: z.object({
+    subtotal: amount,
+    shipping: amount,
+    discounts: amount,
+    tax: amount,
+    duties: amount,
+    total: amount,
+  }),
+  taxesIncluded: z.boolean().nullable(),
+  dutiesIncluded: z.boolean().nullable(),
+  taxLines: z
+    .array(z.object({ title: text, rate: decimal.nullable(), amount: pair }))
+    .max(100)
+    .optional(),
+  shippingLines: z
+    .array(
+      z.object({
+        id: optionalText(1024),
+        title: text,
+        code: text,
+        source: text,
+        carrier: text,
+        removed: z.boolean().nullable(),
+        original: pair,
+        discounted: pair,
+        current: pair,
+      }),
+    )
+    .max(100),
+  discounts: z
+    .array(
+      z.object({
+        index: z.number().int().min(0).nullable(),
+        kind: z.enum(['code', 'automatic', 'manual', 'script', 'unknown']),
+        label: text,
+        target: z.enum(['line_item', 'shipping_line', 'unknown']),
+        allocation: z.enum(['across', 'each', 'unknown']),
+        value: z
+          .discriminatedUnion('type', [
+            z.object({ type: z.literal('percentage'), percentage: decimal }),
+            z.object({ type: z.literal('fixed'), amount: cash }),
+          ])
+          .nullable(),
+      }),
+    )
+    .max(250)
+    // Absent when an export read the order; exports cannot include discounts.
+    .optional(),
+  tags: z.array(z.string().min(1).max(255)).max(250).optional(),
+  attributes: z.object({
+    edited: z.boolean().nullable(),
+    requiresShipping: z.boolean().nullable(),
+    test: z.boolean().nullable(),
+    cancelReason: z
+      .enum([
+        'customer',
+        'declined',
+        'fraud',
+        'inventory',
+        'staff',
+        'other',
+        'unknown',
+      ])
+      .nullable(),
+    cancelledAt: timestamp.nullable(),
+    closedAt: timestamp.nullable(),
+    processedAt: timestamp.nullable(),
+    channel: text,
+    fulfillmentStatus: z.string().nullable(),
+  }),
+};
+
+// Deletion tombstones carry no commercial facts.
+const optionalOrderFacts = z.object(orderFacts).partial().shape;
+
 const count6 = decimal.refine((value) => !value.startsWith('-'));
 
 const returnData = z.object({
@@ -134,6 +237,7 @@ export const outputs = {
         placedAt: timestamp.nullable(),
         total,
         customer: externalId.nullable().optional(),
+        ...optionalOrderFacts,
         status: z.enum(['open', 'completed', 'cancelled', 'unknown']),
         paymentStatus: z.enum([
           'pending',
@@ -163,6 +267,18 @@ export const outputs = {
             skuCode: text,
             title: text,
             bundleGroup: orderBundleGroupSchema.nullable().optional(),
+            variantTitle: text.optional(),
+            prices: z
+              .object({
+                originalUnit: pair,
+                discountedUnit: pair,
+                totalDiscount: pair,
+              })
+              .optional(),
+            requiresShipping: z.boolean().nullable().optional(),
+            catalog: z
+              .enum(['variant', 'variant_removed', 'no_product'])
+              .optional(),
           }),
         ),
       }),
@@ -389,6 +505,7 @@ export const inputs = {
     confirmMissing: scoped('Order')
       .extend({ createdAt: timestamp.nullable() })
       .optional(),
+    order: scoped('Order').optional(),
   }),
   'products.read': changedInput.extend({
     confirmMissing: scoped('Product')

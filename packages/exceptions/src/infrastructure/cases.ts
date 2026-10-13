@@ -241,6 +241,7 @@ function project(row: Row, now: Date): CaseDetail {
   }
   const summaries: Record<string, string> = {
     inventory_mismatch: 'Inventory quantities differ across mapped sources.',
+    order_quantity_mismatch: 'Order line quantities differ between systems.',
     sync_failure: 'A connection read failed.',
     stuck_fulfillment: 'Fulfillment progress needs investigation.',
     workflow_failure: 'A workflow did not reach its expected outcome.',

@@ -78,6 +78,139 @@ const listPrice = z
 
 const text = z.string().min(1).max(512);
 
+const currency = z.string().regex(/^[A-Z]{3}$/);
+const moneyPair = z.object({ shop: money, presentment: money }).strict();
+const amount = z
+  .object({ original: moneyPair.nullable(), current: moneyPair.nullable() })
+  .strict();
+const timestampOrNull = timestamp.nullable();
+
+/**
+ * Optional commercial and delivery facts of an order; each rule is repeated in the orders
+ * owner's snapshot schema. Addresses are not accepted: they are erasable personal data.
+ */
+const orderCommercialFacts = {
+  currencies: z
+    .object({ shop: currency.nullable(), presentment: currency.nullable() })
+    .strict()
+    .optional(),
+  amounts: z
+    .object({
+      subtotal: amount,
+      shipping: amount,
+      discounts: amount,
+      tax: amount,
+      duties: amount,
+      total: amount,
+    })
+    .strict()
+    .optional(),
+  taxesIncluded: z.boolean().nullable().optional(),
+  dutiesIncluded: z.boolean().nullable().optional(),
+  taxLines: z
+    .array(
+      z
+        .object({
+          title: text.nullable(),
+          rate: decimal
+            .refine((v) => !v.startsWith('-') && Number(v) <= 1)
+            .nullable(),
+          amount: moneyPair.nullable(),
+        })
+        .strict(),
+    )
+    .max(100)
+    .optional(),
+  shippingLines: z
+    .array(
+      z
+        .object({
+          id: z.string().min(1).max(1024).nullable(),
+          title: text.nullable(),
+          code: text.nullable(),
+          source: text.nullable(),
+          carrier: text.nullable(),
+          removed: z.boolean().nullable(),
+          original: moneyPair.nullable(),
+          discounted: moneyPair.nullable(),
+          current: moneyPair.nullable(),
+        })
+        .strict(),
+    )
+    .max(100)
+    .optional(),
+  discounts: z
+    .array(
+      z
+        .object({
+          index: z.number().int().min(0).nullable(),
+          kind: z.enum(['code', 'automatic', 'manual', 'script', 'unknown']),
+          label: text.nullable(),
+          target: z.enum(['line_item', 'shipping_line', 'unknown']),
+          allocation: z.enum(['across', 'each', 'unknown']),
+          value: z
+            .discriminatedUnion('type', [
+              z
+                .object({
+                  type: z.literal('percentage'),
+                  percentage: decimal.refine(
+                    (v) => !v.startsWith('-') && Number(v) <= 100,
+                  ),
+                })
+                .strict(),
+              z.object({ type: z.literal('fixed'), amount: money }).strict(),
+            ])
+            .nullable(),
+        })
+        .strict(),
+    )
+    .max(250)
+    .optional(),
+  tags: z.array(z.string().min(1).max(255)).max(250).optional(),
+  attributes: z
+    .object({
+      edited: z.boolean().nullable(),
+      requiresShipping: z.boolean().nullable(),
+      test: z.boolean().nullable(),
+      cancelReason: z
+        .enum([
+          'customer',
+          'declined',
+          'fraud',
+          'inventory',
+          'staff',
+          'other',
+          'unknown',
+        ])
+        .nullable(),
+      cancelledAt: timestampOrNull,
+      closedAt: timestampOrNull,
+      processedAt: timestampOrNull,
+      channel: text.nullable(),
+      fulfillmentStatus: z
+        .string()
+        .regex(/^[a-z][a-z0-9_]{0,63}$/)
+        .nullable(),
+    })
+    .strict()
+    .optional(),
+};
+
+/** Optional order line facts; each rule is repeated in the orders owner's snapshot schema. */
+const orderLineFacts = {
+  variantTitle: text.nullable().optional(),
+  prices: z
+    .object({
+      originalUnit: moneyPair.nullable(),
+      discountedUnit: moneyPair.nullable(),
+      totalDiscount: moneyPair.nullable(),
+    })
+    .strict()
+    .optional(),
+  requiresShipping: z.boolean().nullable().optional(),
+  catalog: z.enum(['variant', 'variant_removed', 'no_product']).optional(),
+};
+
 /** Optional fulfillment facts; each rule is repeated in the orders owner's snapshot schema. */
 const fulfillmentFacts = {
   kind: z.enum(['fulfillment_order', 'shipment']).nullable().optional(),
@@ -287,6 +420,7 @@ export const commerceSchema = z.discriminatedUnion('capability', [
               'failed',
               'unknown',
             ]),
+            ...orderCommercialFacts,
             lines: z.array(
               z
                 .object({
@@ -307,6 +441,7 @@ export const commerceSchema = z.discriminatedUnion('capability', [
                   skuCode: text.nullable().optional(),
                   title: text.nullable().optional(),
                   bundleGroup: orderBundleGroupSchema.nullable().optional(),
+                  ...orderLineFacts,
                 })
                 .strict()
                 .refine(

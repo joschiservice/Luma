@@ -30,7 +30,11 @@ import type { FastifyServerOptions } from 'fastify';
 import { Pool } from 'pg';
 
 import { createMetricListener } from '../infrastructure/metric-listener.js';
-import { createApplicationServices } from './application.js';
+import {
+  type ApplicationServices,
+  createApplicationServices,
+  createOrderLineReader,
+} from './application.js';
 import {
   assistantAvailability,
   authoringAvailability,
@@ -38,10 +42,14 @@ import {
   supplierExtractionAvailability,
 } from './authoring.js';
 import { createCommerceSyncService } from './commerce-sync.js';
-import { createStockRefreshService } from './detection-worker.js';
+import {
+  createOrderRefreshService,
+  createStockRefreshService,
+} from './detection-worker.js';
 import { buildApp } from './http-app.js';
 import { createReadinessCheck } from './readiness.js';
 import { createResourceScope } from './resources.js';
+import { createSalesReadSource, createSalesTenantRelease } from './sales.js';
 
 /**
  * Creates the configured API and its database-backed services. Closing the app releases its
@@ -85,8 +93,11 @@ export async function buildRuntimeApp(
       typeof connections === 'function'
         ? connections(identity.service)
         : undefined;
-    // Owners reread stale stock right before they act; the reread needs the host's providers.
+    // Owners reread stale stock and order sources right before they act; the rereads need the
+    // host's providers. Plans come from the Orders workspace composed below.
     let stockRefresh: ReturnType<typeof createStockRefreshService> | undefined;
+    let orderRefresh: ReturnType<typeof createOrderRefreshService> | undefined;
+    const composed: { orders?: ApplicationServices['http']['orders'] } = {};
     const refreshStock = async (context: TenantContext, positionId: string) =>
       stockRefresh?.refresh(context, positionId);
     const installedConnections =
@@ -98,19 +109,37 @@ export async function buildRuntimeApp(
               : {}),
             refreshContext: identity.service.refreshContext,
             refreshStock,
+            sourceOrderLines: createOrderLineReader(tenantDatabase()),
+            refreshOrder: async (context, orderId, maxAgeMs) => {
+              await orderRefresh?.refresh(context, orderId, maxAgeMs);
+            },
+            internalOrdersEnabled: createSalesTenantRelease(observability),
+            orderChangePlans: async (context, orderId, request) => {
+              if (!composed.orders)
+                throw new Error('Order plans are not composed yet');
+
+              return composed.orders.changePlan(context, orderId, request);
+            },
           });
     if (connections && typeof connections !== 'function') {
+      const capabilities = createInstalledRuntime({
+        internalSource: createSalesReadSource(tenantDatabase(), observability),
+        installations: installedConnections.connections,
+        providers: installedConnections.registry.providers(),
+        // Owners record the reads they use as evidence; telemetry has no sink here.
+        record: async () => undefined,
+        recordObservations: async () => undefined,
+      });
       stockRefresh = createStockRefreshService({
         database: tenantDatabase(),
-        capabilities: createInstalledRuntime({
-          installations: installedConnections.connections,
-          providers: installedConnections.registry.providers(),
-          // Owners record the reads they use as evidence; telemetry has no sink here.
-          record: async () => undefined,
-          recordObservations: async () => undefined,
-        }),
+        capabilities,
       });
       resources.add(stockRefresh.close);
+      orderRefresh = createOrderRefreshService({
+        database: tenantDatabase(),
+        capabilities,
+      });
+      resources.add(orderRefresh.close);
     }
     const connectionService =
       configured && !('registry' in configured)
@@ -167,6 +196,7 @@ export async function buildRuntimeApp(
         ? {
             decisionSources: installedConnections.decisionSources(),
             workflowSources: installedConnections.registry.workflowSources(),
+            actionPermission: installedConnections.registry.actionPermission,
             ...(stockRefresh ? { refreshStock } : {}),
           }
         : {}),
@@ -219,6 +249,7 @@ export async function buildRuntimeApp(
           }
         : {}),
     });
+    composed.orders = application.http.orders;
     const metricEvents = createMetricListener(settings.databaseUrl);
     resources.add(metricEvents.close);
     const app = buildApp(options, {

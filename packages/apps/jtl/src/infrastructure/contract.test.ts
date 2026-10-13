@@ -174,6 +174,23 @@ describe('JTL 2.2 published contract', () => {
       s.order.parse(cloudPayload(commerce.orders[0])),
       response('/v2/sales-orders', true),
     );
+    // A point read consumes the same facts from the single-order response's detail objects.
+    const order = cloudPayload(commerce.orders[0]) as Record<string, unknown>;
+    validate(
+      s.orderDetailFields.parse({
+        ...order,
+        externalDetails: {
+          externalSalesOrderNumber: order.externalSalesOrderNumber,
+        },
+        paymentDetails: { currencyIso: order.currencyIso },
+        keyFigures: {
+          deliveryStatus: order.deliveryStatus,
+          paymentStatus: order.paymentStatus,
+          totalGrossAmount: order.totalGrossAmount,
+        },
+      }),
+      response('/v2/sales-orders/{salesOrderId}'),
+    );
     validate(
       s.orderLine.parse(cloudPayload(commerce.orderLines[0])),
       response('/v2/sales-orders/{salesOrderId}/line-items', true),
