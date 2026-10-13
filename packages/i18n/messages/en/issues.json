@@ -3,6 +3,7 @@
   "issues_kind_sync_failure": "Connection issue",
   "issues_kind_stuck_fulfillment": "Fulfillment delay",
   "issues_kind_workflow_failure": "Workflow issue",
+  "issues_kind_order_quantity_mismatch": "Quantity difference",
   "issues_kind_other": "Operational issue",
   "issues_state_detected": "Detected",
   "issues_state_diagnosed": "Investigation ready",
@@ -446,5 +447,9 @@
   "issues_close_running_title": "Work may still be in progress",
   "issues_close_running_body": "Closing blocks new changes for this issue. It cannot cancel a change already sent or undo its effects. Running workflows may finish their current work and outcome checks; an uncertain change can still be reconciled.",
   "issues_close_running_confirm": "I understand that work already in progress may continue.",
-  "issues_event_closed": "Issue closed"
+  "issues_event_closed": "Issue closed",
+  "issues_summary_quantity_authority": "{system} sets this quantity to {quantity}",
+  "issues_summary_quantity_differs": "{system} still shows {quantity}",
+  "issues_summary_quantity_not_reported": "{system} doesn’t report it",
+  "issues_summary_quantity_generic": "Order line quantities differ between systems."
 }

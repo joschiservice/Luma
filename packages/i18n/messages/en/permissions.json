@@ -91,6 +91,8 @@
   "permissions_shopify_fulfillment_recovery_run_description": "Preview, request approval for, and run recovery of stuck Shopify fulfillments.",
   "permissions_shopify_inventory_corrections_apply_label": "Correct Shopify inventory",
   "permissions_shopify_inventory_corrections_apply_description": "Preview, request approval for, and apply stock corrections at Shopify locations.",
+  "permissions_shopify_order_edits_apply_label": "Change Shopify order quantities",
+  "permissions_shopify_order_edits_apply_description": "Preview, request approval for, and send quantity changes to unfulfilled Shopify order lines.",
   "permissions_jtl_purchase_orders_submit_label": "Send purchase orders to JTL",
   "permissions_jtl_purchase_orders_submit_description": "Propose, approve, and send purchase orders to JTL. Approving also needs the permission to approve changes.",
   "permissions_jtl_orders_shipping_method_write_label": "Change JTL shipping methods",

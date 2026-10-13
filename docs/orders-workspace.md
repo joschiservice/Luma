@@ -77,8 +77,10 @@ from the Shopify app's live read.
 ### Comparison evidence and propagation
 
 Comparisons use explicitly shared canonical line IDs, or a mapped SKU that occurs once
-per source. Repeated SKU lines without line mappings are inconclusive; quantities are never
-summed to guess line identity. Ordered, current, cancelled, fulfilled and remaining units,
+per source. A source that reports a shared line under its own ID, such as an ERP import of
+an order a Luma record copied, matches that line by SKU when the SKU occurs once in every
+source and on no other shared line; otherwise its line stays unmatched. Repeated SKU lines
+without line mappings are inconclusive; quantities are never summed to guess line identity. Ordered, current, cancelled, fulfilled and remaining units,
 unit, fulfillment state and mapped location allocations are compared independently. A
 missing line in a complete order report has zero current units. Other missing facts stay
 unknown. Display numbers, timestamps and location names never establish equivalence.
@@ -103,6 +105,83 @@ List reads apply time checks to maintained scalar metadata. During a projection 
 orders without refreshed comparison metadata are inconclusive. Rebuild with the existing
 resumable procedure below; ingestion refreshes affected orders under the same owner locks.
 
+### Refreshing an order's sources
+
+Stored reads go stale after five minutes, and incremental sync rereads only records that
+changed, so owners that judge one order reread its sources first. The refresh reads each
+current source whose stored read is older than the caller's limit (a minute by default):
+the order through the `orders.read` point read and its fulfilment records through a
+complete, order-scoped `fulfillment.read`. Reads are stored through the normal ingestion,
+which updates projections and comparisons; customer references and addresses are dropped,
+as sync does. A source without a point read, or whose read fails or is incomplete, keeps
+its stored reads, so freshness checks fail honestly.
+
+Unshipped fulfilment work that a complete order-scoped reread no longer returns is retired
+with a tombstone: the source removed it, as a warehouse that stops packing deletes a JTL
+delivery note. Shipped, delivered and completed records are never retired this way.
+Scheduled detection, the [order quantity workflow](workflows.md#case-workflows) and the
+Shopify quantity edit's authoritative read use the refresh.
+
+## Change plans
+
+A change plan says what a supported order change still needs: which systems show it, what
+has shipped, whether the change is still safe, and the ordered steps with who does each.
+Plans read the same snapshot, comparison rules, line identities and five-minute freshness
+as detail; they change nothing and do not create cases or tasks. `@luma/orders` owns the
+rules; the read model supplies facts, authority, grants and write modes.
+
+Without parameters a plan covers each change the comparison detected while it is pending
+or confirmed: current units (a zero means a line added or removed), cancellation and
+location. Inconclusive comparisons plan nothing. Addresses are not compared, so address
+plans exist only as proposals. A proposal names the kind; quantity and line removal name
+the line by comparison key.
+
+| Change            | Safe only while                                                                                                       |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Quantity decrease | No fulfilment source has started work on the line and the new quantity is at least the shipped units.                 |
+| Quantity increase | The lifecycle authority reports the order neither cancelled nor completed. Started work only adds a warehouse notice. |
+| Line added        | As an increase. A removal is a decrease to zero.                                                                      |
+| Address           | No work has started and nothing has shipped on any line.                                                              |
+| Location          | Work for the line is still pending.                                                                                   |
+| Cancellation      | No work has started on any line. Shipped units add a return or refund step for finance.                               |
+
+Work has started on a line when any current fulfilment record of a source with fulfilment
+access covers it with units and is `processing` or `failed`, or is a shipment that shipped,
+delivered or completed. Fulfilment work counts alone do not start work, and every source is
+checked, so mirrored work in another system still counts. Shipped units are summed within
+one source and line, as comparisons do; across sources the fulfilment authority's count
+wins, else the largest report, never a sum.
+
+Safety is unsafe when a rule above fails, otherwise unknown when Luma lacks evidence, and
+safe only when neither applies. Unknown comes from a contributing order or fulfilment read
+older than five minutes or in the future; a failed, partial or unfinished latest collection
+read; unknown fulfilment status on the line; lines that cannot be matched across sources;
+unresolved or conflicting authority for the fact the change needs (lines, lifecycle or
+fulfilment); no intended value; no source with fulfilment access; or a reader without
+`fulfillment.read`. A system whose own value is unknown, such as JTL without current units,
+is listed as unknown but does not by itself make the change unsafe.
+
+A detected quantity plan reads as one sentence on the order and its case, led by the system
+that holds order-line authority: what it sets, what each other system still shows, and which
+systems don't report the value.
+
+Steps are ordered: stop, hold or confirm work that may be in progress (or ask a person to
+check progress when it is unknown), then return or refund work, then update each system
+that does not show the change with the authoritative system first, then notices, and an
+escalation last when the plan is not safe. A step is a Luma step only when the target
+connection's app declares a governed capability for the change; today that is Shopify's
+`orders.quantity.edit` for quantity and line removal. Every other system update, hold,
+reassignment, redirect and refund is a person step with a role. A Luma step is executable
+only when the plan is safe, the capability is granted, the connection is available,
+authority allows it, the source lines are mapped, the quantity is whole and writes are
+enabled; otherwise it names the first reason. Authority allows a connection to amend a fact
+group it holds, or to receive the value of the connection that holds it: the target must
+equal what that source reports for the same line, read fresh and complete (otherwise
+`unknown`). Any other value, and unknown or conflicting authority, is `authority`. The
+provider action applies the same rule again at preview and dispatch. Whether the reader holds the app's `actionAccess`
+permission is reported separately. Executable steps still go through the app's preview,
+approval, admission and verification; the plan only prefills the app's `record` slot.
+
 ## Source facts and live context
 
 Adapters populate optional canonical facts: `placedAt`, `total` and line `skuCode` and
@@ -111,10 +190,23 @@ them keep working and gain them with the next source update. Current units and o
 ordered units stay separate; source comparisons use mapped line business state. Unknown
 reductions remain unknown. Outstanding units are never negative after refunds.
 Returns and refunds are order children (see [Returns workspace](returns-workspace.md)).
-Customer and payment transaction details are not stored. For those, the web app mounts the
-owning app's `record` UI slot per source connection (see [workspace apps](apps.md)). The
-Shopify app reads the order live through its authorized `records` operation, so installed
-capabilities, granted scopes and protected customer data approval apply unchanged.
+
+Delivery and charges show each source's commercial facts as that source reported them
+(order schema version 6, see [projection rules](commerce-projections.md)): currencies,
+amounts as placed and current, shipping lines, discounts, tax lines, tags and operational
+attributes, with the source read and update times. A group a source does not report is
+labeled as not reported by that source, never shown as zero or empty. Amounts are not
+compared across sources and have no authority rule.
+
+Order addresses are customer data kept in the erasable customer store, not in order
+evidence. Detail returns them per source only to readers who can also read customers;
+otherwise `hidden` lists `addresses` and the page says access is restricted. A source
+reports them as shared, not shared (the deployment is not approved to read them) or not
+imported (no read recorded them). Customer names, contact details and payment transactions
+are not stored. For those, the web app mounts the owning app's `record` UI slot per source
+connection (see [workspace apps](apps.md)). The Shopify app reads the order live through its
+authorized `records` operation, so installed capabilities, granted scopes and protected
+customer data approval apply unchanged.
 
 ## Maintained list projection
 
@@ -195,7 +287,9 @@ instead of scanning stored search values.
 
 ## Luma-owned records
 
-The `luma-erp-orders` release flag defaults to false. When enabled, people with
+The `luma-erp-orders` release flag defaults to false. Without it, source authority, order
+reads and the connection list leave Luma ERP out, including the authority apps and
+workflows read. When enabled, people with
 `sales.manage` and `sync.manage` can accept a known Shopify order into one Luma record.
 Intake links the sources using canonical identities, never their numbers. It is retry-safe
 and does not change workspace authority. Select Luma ERP for order lifecycle and lines
@@ -208,8 +302,9 @@ the imported total because discounts, shipping and tax adjustments are not recal
 Cancellation preserves original units and publishes zero current units; reopening is refused.
 
 Line unit price and fractional tax rates use canonical order schema version 4; version 5
-adds whether the unit price includes tax. They are source-reported facts, not invoices.
-Missing prices, ambiguous tax rates and unstated tax inclusion remain unknown.
+adds whether the unit price includes tax, and version 6 the commercial facts above. They
+are source-reported facts, not invoices. Missing prices, ambiguous tax rates and unstated
+tax inclusion remain unknown.
 Stored earlier schema versions remain readable. See
 [ADR-012](architecture/012-native-order-records.md) for ownership and retention.
 

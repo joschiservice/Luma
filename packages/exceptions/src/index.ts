@@ -11,6 +11,8 @@ export type {
   VerificationResult,
 } from './application/detection.js';
 
+export { verificationPostconditions } from './application/detection.js';
+
 export {
   decimalString,
   decimalUnits,

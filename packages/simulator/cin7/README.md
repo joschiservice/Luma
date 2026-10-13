@@ -6,7 +6,7 @@ Simulates a Cin7 Core account behind the API v2 reads that Luma's Cin7 adapter u
 
 ## Model
 
-- **Sales** are the model's sales orders. Each delivery note is a fulfilment with authorised pick, pack and ship steps; unshipped work has no fulfilment yet. Orders with a shop order number report it as the customer reference from the `Shopify` channel.
+- **Sales** are the model's sales orders. Each delivery note is a fulfilment with authorised pick, pack and ship steps; a note still being packed has an authorised pick, a draft pack and no shipment, and unshipped work has no fulfilment yet. Orders with a shop order number report it as the customer reference from the `Shopify` channel.
 - **Stock** has one row per product and location. Reservations are per item in the model, so `allocation` spreads them over locations in configured order up to each location's stock and puts the rest on the first location; `availableAt` gives the per-location availability the host's stock sync pushes to shops.
 - **Credit notes** are always empty; the simulated merchant handles returns in the shops.
 - **Purchases** report receipts booked on the order as one authorised stock receipt.

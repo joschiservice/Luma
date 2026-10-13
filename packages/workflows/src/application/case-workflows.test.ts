@@ -118,6 +118,11 @@ function fixture(
     maxOpenRuns?: number;
     /** People whose membership is suspended. */
     suspended?: string[];
+    /** The adapter keeps cases it hands to people with the run's principal. */
+    caseOwner?: boolean;
+    /** Workspace members with their roles; the version then asks a Member and escalates to Admins. */
+    members?: { userId: string; role: { id: string; name: string } }[];
+    claim?: (id: string, userId: string) => Promise<unknown>;
   } = {},
 ) {
   const activations: CaseActivation[] = [];
@@ -125,7 +130,26 @@ function fixture(
   const started: string[] = [];
   const cases = options.cases ?? [];
   const signals = options.signals;
-  const version = signals ? signalVersion : caseVersion;
+  const version = signals
+    ? signalVersion
+    : options.members
+      ? {
+          ...caseVersion,
+          steps: [
+            {
+              id: 'ask',
+              kind: 'human_task' as const,
+              assignee: { kind: 'role' as const, key: 'member' },
+              instructions: 'Check the shelf.',
+              choices: ['Done'],
+              evidence: 'text' as const,
+              dueAfterSeconds: 60,
+              escalationTarget: { kind: 'role' as const, key: 'admin' },
+            },
+            ...caseVersion.steps,
+          ],
+        }
+      : caseVersion;
   const adapter: CaseWorkflowAdapter = {
     ...(signals
       ? {
@@ -138,6 +162,7 @@ function fixture(
         }
       : {}),
     version,
+    ...(options.caseOwner ? { caseOwner: 'principal' as const } : {}),
     template: { trigger: 't', steps: ['s'], success: 'ok' },
     stepCopy: {},
     requirements: async () => [
@@ -251,12 +276,35 @@ function fixture(
       open: async () => cases.filter((item) => item.open),
       get: async (_context, id) => cases.find((item) => item.id === id) ?? null,
       evidence: async () => [],
+      ...(options.claim
+        ? {
+            claim: (_context: unknown, id: string, userId: string) =>
+              options.claim!(id, userId),
+          }
+        : {}),
     },
     identity: {
       refreshContext: async (value) => value,
       resolveWorkflowContext: async (actorId) => context(actorId),
       suspendedMembers: async (_context, ids) =>
         new Set(ids.filter((id) => options.suspended?.includes(id))),
+      ...(options.members
+        ? {
+            listMembers: async () =>
+              options.members!.map((member) => ({
+                id: `membership-${member.userId}`,
+                organizationId: tenantId,
+                userId: member.userId,
+                role: {
+                  ...member.role,
+                  key: member.role.id as 'member',
+                  builtIn: true,
+                  revision: 1,
+                },
+                status: 'active' as const,
+              })),
+          }
+        : {}),
     },
     policies: {
       currentVersion: async () => 'policy-1',
@@ -401,6 +449,101 @@ describe('case workflows', () => {
     });
 
     expect(read.mock.calls[0]![1].stop).toBe('activation_revoked');
+  });
+
+  it('keeps a case it hands to people with the person whose access the run uses', async () => {
+    const claim = vi.fn(async () => undefined);
+    const f = fixture({ cases: [signal('a')], caseOwner: true, claim });
+    await f.turnOn();
+    await f.workflows.tick(context('operator'));
+    const [run] = f.runs.values();
+    const output = (state: ProcessStepOutput['state'], kind = 'human_task') =>
+      ({
+        stepId: 'ask',
+        kind,
+        state,
+        values: {},
+        evidenceRefs: ['e'],
+        recordedAt: now.toISOString(),
+      }) as ProcessStepOutput;
+
+    await f.workflows.activities.record(run!, output('completed', 'read'));
+    expect(claim).not.toHaveBeenCalled();
+    await f.workflows.activities.record(run!, output('waiting'));
+    await f.workflows.activities.record(run!, output('escalated', 'condition'));
+    expect(claim.mock.calls).toEqual([
+      ['a', 'operator'],
+      ['a', 'operator'],
+    ]);
+
+    // Without assignment access, the case keeps its current owner and the run continues.
+    claim.mockRejectedValueOnce(new IdentityError(403, 'FORBIDDEN', 'No.'));
+    await expect(
+      f.workflows.activities.record(run!, output('waiting')),
+    ).resolves.toBeUndefined();
+    const other = fixture({ cases: [signal('a')], claim });
+    await other.turnOn();
+    await other.workflows.tick(context('operator'));
+    await other.workflows.activities.record(
+      [...other.runs.values()][0]!,
+      output('waiting'),
+    );
+    expect(claim).toHaveBeenCalledTimes(3);
+  });
+
+  it('needs an active person in each role its tasks name before it can be turned on', async () => {
+    const missing = fixture({
+      cases: [signal('a')],
+      members: [{ userId: 'operator', role: { id: 'admin', name: 'Admin' } }],
+    });
+    const detail = await missing.workflows.detail(
+      context('operator'),
+      'test-case',
+    );
+    expect(detail.summary.readiness.issues).toContainEqual(
+      expect.objectContaining({
+        severity: 'blocking',
+        message:
+          'Nobody active has the Member role, so this workflow’s tasks would have nobody to answer them. Give someone the role in Team.',
+      }),
+    );
+    await expect(missing.turnOn()).rejects.toMatchObject({ statusCode: 409 });
+
+    const staffed = fixture({
+      cases: [signal('a')],
+      members: [
+        { userId: 'operator', role: { id: 'admin', name: 'Admin' } },
+        { userId: 'picker', role: { id: 'member', name: 'Member' } },
+      ],
+    });
+    await expect(staffed.turnOn()).resolves.toMatchObject({ active: true });
+  });
+
+  it('gives reads the run’s recorded outputs', async () => {
+    const outputs = new Map<string, ProcessStepOutput[]>();
+    const f = fixture({ cases: [signal('a')], outputs });
+    await f.turnOn();
+    await f.workflows.tick(context('operator'));
+    const [run] = f.runs.values();
+    const earlier: ProcessStepOutput = {
+      stepId: 'look',
+      kind: 'read',
+      state: 'completed',
+      values: { ok: true },
+      evidenceRefs: ['e'],
+      recordedAt: now.toISOString(),
+    };
+    outputs.set(run!.id, [earlier]);
+    const read = vi.spyOn(f.adapter, 'read');
+
+    await f.workflows.activities.read(run!, {
+      id: 'look',
+      kind: 'read',
+      source: 'test',
+      fields: { ok: 'boolean' },
+    });
+
+    expect(read.mock.calls[0]![3]).toEqual([earlier]);
   });
 
   it('starts one run per owner follow-up, with signal inputs', async () => {

@@ -252,10 +252,28 @@ export async function placeOrder(
       ? ['HIGH_RISK_OF_FRAUD' as const]
       : [];
   const buyer = await customerFor(world, shopName, random);
+  // Discounts and tags draw from their own stream, so the rest of the world stays unchanged.
+  const extras = keyedRandom(
+    world.run.seed,
+    'order-extras',
+    shopName,
+    options.identity,
+  );
+  const discounts = extras.chance(0.15)
+    ? [{ kind: 'code' as const, label: 'WELCOME10', percentage: 10 }]
+    : extras.chance(0.1)
+      ? [{ kind: 'automatic' as const, label: 'Seasonal sale', percentage: 5 }]
+      : [];
+  const tags = [
+    ...(express ? ['express'] : []),
+    ...(extras.chance(0.1) ? ['gift'] : []),
+  ];
   const result = await shop(world, shopName, {
     kind: 'order',
     ...(options.id ? { id: options.id } : {}),
     customer: buyer?.id ?? null,
+    ...(discounts.length ? { discounts } : {}),
+    ...(tags.length ? { tags } : {}),
     lines: lines.map(({ variant, quantity }) => ({
       variant: variant.id,
       quantity,

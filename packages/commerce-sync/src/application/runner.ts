@@ -68,7 +68,10 @@ export interface SyncRunnerDependencies {
       reason: string,
     ): Promise<unknown>;
   };
-  customers: Pick<CustomerProfiles, 'upsert' | 'recordOrders' | 'remove'>;
+  customers: Pick<
+    CustomerProfiles,
+    'upsert' | 'recordOrders' | 'recordOrderAddresses' | 'remove'
+  >;
   /** Records the read outcome for connection freshness. Customer records are never passed. */
   recordRead(
     context: TenantContext,
@@ -246,7 +249,9 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
       input: {
         capability: recordCapabilities[recordType],
         observation:
-          recordType === 'orders' ? withoutCustomer(observation) : observation,
+          recordType === 'orders'
+            ? withoutPersonalData(observation)
+            : observation,
       } as CommerceObservation,
     });
     try {
@@ -552,12 +557,18 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
         claimed.recordType,
         changed.map((item) => item.observation),
       );
-      if (claimed.recordType === 'orders')
+      if (claimed.recordType === 'orders') {
         await deps.customers.recordOrders(
           tenant,
           claimed.connectionId,
           changed.flatMap(({ observation }) => customerOrder(observation)),
         );
+        await deps.customers.recordOrderAddresses(
+          tenant,
+          claimed.connectionId,
+          changed.flatMap(({ observation }) => orderAddresses(observation)),
+        );
+      }
       const forget =
         claimed.recordType === 'customers' &&
         !page.nextCursor &&
@@ -782,14 +793,39 @@ function customerOrder(observation: Observation<unknown>) {
   ];
 }
 
-// Customer references are erasable personal data; order observations are retained evidence.
-function withoutCustomer(observation: Observation<unknown>) {
-  if ((observation.data as Partial<OrderSnapshot>).customer === undefined)
-    return observation;
-  const data = { ...(observation.data as Partial<OrderSnapshot>) };
-  delete data.customer;
+/** The order's addresses as a customer-store record; none when the read omits them. */
+function orderAddresses(observation: Observation<unknown>) {
+  const data = observation.data as Partial<OrderSnapshot>;
+  if (data.addresses === undefined) return [];
 
-  return { ...observation, data };
+  return [
+    {
+      order: {
+        externalId: observation.source.externalId,
+        scopeKey: observation.source.scopeKey,
+      },
+      ...(data.customer === undefined
+        ? {}
+        : { customerExternalId: data.customer?.externalId ?? null }),
+      shared: data.addresses.shared,
+      shipping: data.addresses.shared ? data.addresses.shipping : null,
+      billing: data.addresses.shared ? data.addresses.billing : null,
+      observedAt: observation.observedAt,
+    },
+  ];
+}
+
+// Customer references and addresses are erasable personal data; order observations are
+// retained evidence.
+function withoutPersonalData(observation: Observation<unknown>) {
+  const data = observation.data as Partial<OrderSnapshot>;
+  if (data.customer === undefined && data.addresses === undefined)
+    return observation;
+  const retained = { ...data };
+  delete retained.customer;
+  delete retained.addresses;
+
+  return { ...observation, data: retained };
 }
 
 function grantedTypes(connection: SyncConnection): RecordType[] {

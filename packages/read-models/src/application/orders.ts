@@ -1,6 +1,13 @@
 import type { FactAuthority } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
-import type { ComparisonDifference, ComparisonState } from '@luma/orders';
+import type {
+  ComparisonDifference,
+  ComparisonState,
+  OrderChangePlan,
+  OrderChangeRequest,
+  OrderCommercialData,
+  OrderLineCommercialData,
+} from '@luma/orders';
 import type { ActivityActor } from '@luma/resolution';
 
 import type { ReturnListItem } from './returns.js';
@@ -87,7 +94,36 @@ export interface OrderList {
   asOf: string;
 }
 
-export interface OrderSourceFacts extends OrderSource {
+/** A postal address as the source reported it. Protected customer data. */
+export interface OrderAddress {
+  line1: string | null;
+  line2: string | null;
+  city: string | null;
+  region: string | null;
+  postalCode: string | null;
+  country: string | null;
+}
+
+/**
+ * The addresses one source reported for an order. `shared` carries them, null when the order
+ * has none; `not_shared` means the deployment is not approved to read addresses; `not_imported`
+ * means no read has recorded addresses for this source.
+ */
+export type OrderSourceAddresses =
+  | {
+      state: 'shared';
+      shipping: OrderAddress | null;
+      billing: OrderAddress | null;
+      observedAt: string;
+    }
+  | { state: 'not_shared'; observedAt: string }
+  | { state: 'not_imported' };
+
+/**
+ * One source's report of an order. Commercial facts are absent when the source does not report
+ * them; see `OrderCommercialData`.
+ */
+export interface OrderSourceFacts extends OrderSource, OrderCommercialData {
   appId: string | null;
   mappingMethod: string | null;
   displayNumber: string | null;
@@ -98,7 +134,9 @@ export interface OrderSourceFacts extends OrderSource {
   dueAt: string | null;
   fulfillment: FulfillmentState;
   open: boolean | null;
-  lines: {
+  /** Absent when the reader can't read customers; the detail then lists `addresses` as hidden. */
+  addresses?: OrderSourceAddresses;
+  lines: ({
     id: string;
     skuId: string | null;
     bundleGroup?: {
@@ -122,12 +160,20 @@ export interface OrderSourceFacts extends OrderSource {
     unit: string;
     fulfilledQuantity: string;
     remainingQuantity: string | null;
-  }[];
+  } & OrderLineCommercialData)[];
 }
 
-/** Order detail sections that need another area's read permission. */
+/**
+ * Order detail sections that need another area's read permission. Order addresses need
+ * permission to read customers.
+ */
 export type OrderDetailSection =
-  'fulfillments' | 'returns' | 'issues' | 'workflows' | 'activity';
+  | 'fulfillments'
+  | 'returns'
+  | 'issues'
+  | 'workflows'
+  | 'activity'
+  | 'addresses';
 
 export interface OrderDetail {
   /** Live source authority and resolved facts; null means no authoritative source report. */
@@ -273,6 +319,19 @@ export interface OrderActivityReader {
 }
 
 /**
+ * Plans for one order: the proposed change, or every change the source comparison found.
+ * `hidden` lists `fulfillments` when the reader can't see fulfilment, which makes every plan's
+ * safety unknown.
+ */
+export interface OrderChangePlans {
+  orderId: string;
+  comparisonState: ComparisonState;
+  plans: OrderChangePlan[];
+  hidden: 'fulfillments'[];
+  asOf: string;
+}
+
+/**
  * Reads current orders for one tenant from canonical projections and linked Luma records.
  * Requires `orders.read`. Issue links need `issues.read`; detail sections of other areas need
  * their read permission and are listed in `hidden` otherwise.
@@ -281,4 +340,13 @@ export interface OrderWorkspace {
   /** Rejects a cursor produced by different filters or sorting with a 400 error. */
   list(context: TenantContext, query: OrderListQuery): Promise<OrderList>;
   get(context: TenantContext, orderId: string): Promise<OrderDetail | null>;
+  /**
+   * Plans a proposed change, or the detected ones, from the same snapshot rules as `get`.
+   * Rejects a line that is not on the order with a 422 error.
+   */
+  changePlan(
+    context: TenantContext,
+    orderId: string,
+    request: OrderChangeRequest | null,
+  ): Promise<OrderChangePlans | null>;
 }

@@ -5,7 +5,12 @@ import { type ReactNode, useContext } from 'react';
 
 import { Button } from '../primitives/button';
 import { Disclosure } from '../primitives/disclosure';
-import { quantityLabel, sourceLabel, unitLabel } from './case-presentation';
+import {
+  caseSummaryText,
+  quantityLabel,
+  sourceLabel,
+  unitLabel,
+} from './case-presentation';
 import { IssuePageNavigation } from './issue-section';
 
 /** Rewrites known inventory steps in plain language; other steps keep the investigation’s text. */
@@ -61,14 +66,7 @@ export function IssueOverview({
     quantity != null && diagnosis?.impact.unit
       ? unitLabel(diagnosis.impact.unit, quantity)
       : null;
-  const summary = (diagnosis?.summary ?? item.summary).replace(
-    /^Selling availability exceeds the configured authority by (-?\d+(?:\.\d+)?) (.+)\.$/,
-    (_, amount: string, measure: string) =>
-      m.issues_overview_summary_excess({
-        quantity: quantityLabel(amount),
-        unit: unitLabel(measure, amount),
-      }),
-  );
+  const summary = caseSummaryText(diagnosis?.summary ?? item.summary);
   const limitations = [
     ...new Set(
       steps

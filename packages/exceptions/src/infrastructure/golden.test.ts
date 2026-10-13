@@ -12,6 +12,7 @@ const className = z.enum([
   'sync_failure',
   'stuck_fulfillment',
   'inventory_mismatch',
+  'order_quantity_mismatch',
   'workflow_failure',
 ]);
 
