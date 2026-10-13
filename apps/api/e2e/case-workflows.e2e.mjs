@@ -465,13 +465,13 @@ test('the simulator demo turns workflows on and shows a scenario’s run on the 
     async () => {
       const done = await f.pilot.demo();
 
-      return done.workflows === 6 && done.suppliers === 1 && done.rules === 1;
+      return done.workflows === 7 && done.suppliers === 1 && done.rules === 1;
     },
     'demo setup completes',
     15_000,
   );
   expect(await f.pilot.demo()).toEqual({
-    workflows: 6,
+    workflows: 7,
     suppliers: 1,
     rules: 1,
   });

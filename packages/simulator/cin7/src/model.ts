@@ -102,7 +102,8 @@ export interface ErpNote {
   warehouse: string;
   packages: {
     id: string;
-    shippingDate: string;
+    /** Null while the parcel is still being packed. */
+    shippingDate: string | null;
     trackingNumber: string;
     trackingUrl: string;
   }[];

@@ -6,8 +6,88 @@ export type { RefundData, ReturnData } from '../domain/returns.js';
 
 type EntityKind = 'order' | 'order_line' | 'fulfillment' | 'return' | 'refund';
 
+type Money = { amount: string; currency: string };
+
+/** An amount in the shop currency and in the currency the customer was charged in. */
+export type MoneyPair = { shop: Money; presentment: Money };
+
+/** An amount as originally placed and as it stands after edits, refunds and returns. */
+type OrderAmount = { original: MoneyPair | null; current: MoneyPair | null };
+
+/**
+ * Commercial facts of order schema version 6, as the source reported them. Absent groups were
+ * not read; null values were read but not reported. Amounts are never recomputed.
+ */
+export interface OrderCommercialData {
+  currencies?: { shop: string | null; presentment: string | null };
+  amounts?: Record<
+    'subtotal' | 'shipping' | 'discounts' | 'tax' | 'duties' | 'total',
+    OrderAmount
+  >;
+  taxesIncluded?: boolean | null;
+  dutiesIncluded?: boolean | null;
+  taxLines?: {
+    title: string | null;
+    rate: string | null;
+    amount: MoneyPair | null;
+  }[];
+  shippingLines?: {
+    /** Source shipping line ID; descriptive, not a canonical identity. */
+    id: string | null;
+    title: string | null;
+    code: string | null;
+    source: string | null;
+    carrier: string | null;
+    removed: boolean | null;
+    original: MoneyPair | null;
+    discounted: MoneyPair | null;
+    current: MoneyPair | null;
+  }[];
+  discounts?: {
+    index: number | null;
+    kind: 'code' | 'automatic' | 'manual' | 'script' | 'unknown';
+    label: string | null;
+    target: 'line_item' | 'shipping_line' | 'unknown';
+    allocation: 'across' | 'each' | 'unknown';
+    value:
+      | { type: 'percentage'; percentage: string }
+      | { type: 'fixed'; amount: Money }
+      | null;
+  }[];
+  tags?: string[];
+  attributes?: {
+    edited: boolean | null;
+    requiresShipping: boolean | null;
+    test: boolean | null;
+    cancelReason: string | null;
+    cancelledAt: string | null;
+    closedAt: string | null;
+    processedAt: string | null;
+    channel: string | null;
+    /** The source's own fulfillment status label, not Luma's fulfillment state. */
+    fulfillmentStatus: string | null;
+  };
+}
+
+/** Line facts of order schema version 6; absent when the source does not report them. */
+export interface OrderLineCommercialData {
+  variantTitle?: string | null;
+  prices?: {
+    originalUnit: MoneyPair | null;
+    /** Unit price after line and order discounts. */
+    discountedUnit: MoneyPair | null;
+    totalDiscount: MoneyPair | null;
+  };
+  requiresShipping?: boolean | null;
+  /**
+   * Whether the line's variant still exists at the source: `variant_removed` when only its
+   * product remains, `no_product` for a custom item or a deleted product.
+   */
+  catalog?: 'variant' | 'variant_removed' | 'no_product';
+}
+
 export type CommerceData =
-  | {
+  | ({
       type: 'order';
       displayNumber: string | null;
       /** Source-provided fulfillment deadline; absent means unknown. */
@@ -18,7 +98,7 @@ export type CommerceData =
       total?: { amount: string; currency: string } | null;
       status: string;
       paymentStatus: string;
-      lines: {
+      lines: ({
         id: string;
         skuId: string | null;
         /** Originally ordered units, retained after reductions. */
@@ -44,8 +124,8 @@ export type CommerceData =
           variant: { externalId: string; scopeKey: string } | null;
           skuCode: string | null;
         } | null;
-      }[];
-    }
+      } & OrderLineCommercialData)[];
+    } & OrderCommercialData)
   | {
       type: 'fulfillment';
       orderId: string;
@@ -87,14 +167,14 @@ export type CommerceData =
 
 export interface CanonicalSnapshot {
   /**
-   * Order snapshots use version 6 for sold bundle groups, version 5 for whether unit prices
-   * include tax, and version 4 for
-   * optional unit prices and fractional tax rates.
+   * Order snapshots use version 7 for sold bundle groups, version 6 for commercial facts,
+   * version 5 for whether unit prices include tax, and version 4 for optional unit prices
+   * and fractional tax rates.
    * Fulfillment version 4 adds explicit milestone times.
    * Order and fulfillment snapshots use version 3 for current and remaining line quantities.
    * Stored versions 1 and 2 remain readable. Return and refund snapshots use version 1.
    */
-  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6;
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7;
   entityId: string;
   kind: EntityKind;
   connectionId: string;

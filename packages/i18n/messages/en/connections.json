@@ -15,6 +15,7 @@
   "connections_capability_fulfillment_hold_release": "Release a fulfillment hold",
   "connections_capability_fulfillment_open": "Reopen fulfillment",
   "connections_capability_fulfillment_move": "Move fulfillment to another location",
+  "connections_capability_orders_quantity_edit": "Change order line quantities in Shopify",
   "connections_capability_customers_read": "Read customers",
   "connections_capability_returns_read": "Read returns and refunds",
   "connections_capability_shipping_method_read": "Read shipping methods",

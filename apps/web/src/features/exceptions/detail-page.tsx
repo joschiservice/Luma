@@ -13,6 +13,7 @@ import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { z } from 'zod';
 
 import { connectionsOptions } from '../../kit/connections/data';
+import { CaseOrderChangePlan } from '../orders/change-plan';
 import { IssueActions } from './actions';
 import { useCaseObservation } from './observation';
 import { LiveCaseDetail } from './progress';
@@ -178,6 +179,13 @@ function IssueWorkspace({
       }
     >
       <LiveCaseDetail observation={observation} expanded />
+      {item ? (
+        <CaseOrderChangePlan
+          organizationId={organizationId}
+          subject={item.subject}
+          from={`${location.pathname}${location.searchStr}`}
+        />
+      ) : null}
     </IssuePageLayout>
   );
 }

@@ -14,6 +14,8 @@ try {
       'execution',
       'policies',
       'resolution',
+      'exceptions',
+      'app-shopify',
       'procurement',
       'application-runtime',
       'api-contract',

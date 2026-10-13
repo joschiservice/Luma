@@ -22,6 +22,11 @@ export interface CaseOwnerStore {
     id: string,
     input: { userId: string | null; revision: number },
   ): Promise<CaseOwner>;
+  /**
+   * Makes `userId` the owner of a case nobody owns, with the same revision and audit as an
+   * assignment. Returns the current owner, unchanged, when someone owns the case.
+   */
+  claim(context: TenantContext, id: string, userId: string): Promise<CaseOwner>;
 }
 
 /** Assigns, reassigns or clears case responsibility using refreshed membership and current people. */
@@ -36,34 +41,49 @@ export function createCaseOwners(deps: {
     }[]
   >;
 }) {
+  async function authorize(context: TenantContext, userId: string | null) {
+    const fresh = await deps.refreshContext(context);
+    requireTenant(fresh, context.tenantId);
+    requirePermission(fresh, 'decisions.assign');
+    requireChangesAllowed(fresh);
+    if (fresh.actor.id !== context.actor.id)
+      throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+    if (
+      userId &&
+      !(await deps.members(fresh)).some(
+        (member) =>
+          member.userId === userId &&
+          member.status !== 'suspended' &&
+          !member.accountDisabled,
+      )
+    )
+      throw new IdentityError(
+        422,
+        'VALIDATION_ERROR',
+        'Choose an active workspace member.',
+      );
+
+    return fresh;
+  }
+
   return {
     async assign(
       context: TenantContext,
       id: string,
       input: { userId: string | null; revision: number },
     ) {
-      const fresh = await deps.refreshContext(context);
-      requireTenant(fresh, context.tenantId);
-      requirePermission(fresh, 'decisions.assign');
-      requireChangesAllowed(fresh);
-      if (fresh.actor.id !== context.actor.id)
-        throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
-      if (
-        input.userId &&
-        !(await deps.members(fresh)).some(
-          (member) =>
-            member.userId === input.userId &&
-            member.status !== 'suspended' &&
-            !member.accountDisabled,
-        )
-      )
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
-          'Choose an active workspace member.',
-        );
-
-      return deps.store.assign(fresh, id, input);
+      return deps.store.assign(
+        await authorize(context, input.userId),
+        id,
+        input,
+      );
+    },
+    /**
+     * Gives a case nobody owns to an active member, so it stays with a responsible person; an
+     * existing owner is kept. Needs `decisions.assign`, like an assignment.
+     */
+    async claim(context: TenantContext, id: string, userId: string) {
+      return deps.store.claim(await authorize(context, userId), id, userId);
     },
   };
 }

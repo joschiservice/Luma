@@ -121,11 +121,19 @@ stores it as an order link in `@luma/customers`, keyed by source order: a later 
 the order to another customer, and a read without a customer removes the link. Orders
 imported before a connection reported customers get links on their next full reread.
 
+Order delivery and billing addresses follow the same path. Shopify reports them only with
+address approval and otherwise reports them as not shared. Sync removes them from the order
+observation and stores the latest report per source order in `@luma/customers`; an older read
+never replaces a newer one. Order detail shows them only to people who can read customers.
+
 A `customers/redact` or `shop/redact` request erases the affected imported profiles, their
-order links and ledger rows in its intake transaction and remembers erased customer IDs by
-digest, so later reads skip them and their orders get no new links. Erasure and customer
-imports of one connection take the same lock, so a read that started earlier cannot
-restore erased data. Other retained data still follows the
+order links, order addresses and ledger rows in its intake transaction. A customer redaction
+erases the addresses of the customer's linked orders and of the orders it lists, even when it
+names no Shopify customer ID; a shop redaction erases every address of the shop. Erased
+customer and order IDs are remembered by digest, so later reads skip them, their orders get
+no new links and those orders' addresses are not stored again. Erasing customers through
+`@luma/customers` does the same for their linked orders. Erasure and customer imports of one
+connection take the same lock, so a read that started earlier cannot restore erased data. Other retained data still follows the
 [privacy operations](shopify-production.md#privacy-operations) procedure.
 
 Sources do not always ask for erasure; JTL never does, so a customer deleted at the source
@@ -133,7 +141,8 @@ is only seen as absent from full reads. One absent read is not proof, because a 
 or permission change can hide records too. So the profile stays, marked as missing, until it
 has been missing for 30 days (`missingCustomerRetentionMs`). The final page of the next
 complete full read then removes the profile and its order links and forgets the ledger rows,
-in batches of up to 1000 per read. Customers on that page, or already seen earlier in that
+in batches of up to 1000 per read. Order addresses stay, because they belong to orders the
+source still reports. Customers on that page, or already seen earlier in that
 read, are never removed. Removal is not an erasure: no digest is kept, so a customer the
 source reports again is imported as new. Order links follow the source's reassignment, so
 orders of a customer merged into another one move to the remaining customer on the next

@@ -1,3 +1,4 @@
+import type { FulfillmentSnapshot, Observation } from '@luma/connections';
 import type { TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
 
@@ -6,6 +7,7 @@ import type {
   PositionSource,
   StockSource,
 } from '../../application/detection-monitor.js';
+import type { OrderSourceReader } from '../../application/order-refresh.js';
 
 // Cross-domain reads for scheduled detection. Sync streams, installations, source mappings,
 // stock projections and fulfillment projections are read here and never written.
@@ -77,8 +79,21 @@ const readable = (capability: string) => `c.document->>'status'='active'
  AND EXISTS(SELECT 1 FROM workspace_apps a WHERE a.tenant_id=c.tenant_id AND a.app_id=c.document->>'appId'
   AND a.status='installed' AND a.version=(c.document->>'appInstallationVersion')::int)`;
 
+const orderSourceRow = z.object({
+  connectionId: z.string().uuid(),
+  provider: z.string(),
+  externalId: z.string(),
+  scopeKey: z.string(),
+  observedAt: time,
+  fulfillments: z.boolean(),
+  // Stored observations passed validation when they were imported.
+  stored: z.array(z.custom<Observation<FulfillmentSnapshot>>()),
+});
+
 /** Creates tenant-scoped reads of the stored state that scheduled detection starts from. */
-export function createDetectionSources(db: TenantDatabase): DetectionSources {
+export function createDetectionSources(
+  db: TenantDatabase,
+): DetectionSources & OrderSourceReader {
   /** Keeps a source only when it has exactly one SKU and one location mapping. */
   function exactSource(row: z.infer<typeof positionRow>): StockSource | null {
     const sku = row.mappings.filter((m) => m.resource === 'sku');
@@ -266,6 +281,47 @@ export function createDetectionSources(db: TenantDatabase): DetectionSources {
           ? [row.snapshotId, row.otherId]
           : [row.otherId, row.snapshotId],
       };
+    },
+    async orderSources(context, orderId) {
+      const rows = await db.transaction(context.tenantId, async (tx) => {
+        // Internal sources such as Luma ERP have no app, so only the grant is checked here.
+        const result = await tx.query(
+          `SELECT p.connection_id AS "connectionId",c.document->>'provider' AS provider,
+            m.external_id AS "externalId",m.scope_key AS "scopeKey",
+            LEAST(s.observed_at,(SELECT min(fs.observed_at) FROM orders_snapshots fs
+              JOIN orders_projections fp ON fp.tenant_id=fs.tenant_id AND fp.snapshot_id=fs.id
+              WHERE fs.tenant_id=$1 AND fs.connection_id=p.connection_id AND fs.kind='fulfillment'
+               AND fs.order_id=p.entity_id)) AS "observedAt",
+            COALESCE(c.document->'permissions' ? 'fulfillment.read' AND c.document->'granted' ? 'fulfillment.read',false) AS fulfillments,
+            COALESCE((SELECT jsonb_agg(o.document->'observation' ORDER BY fs.entity_id) FROM orders_snapshots fs
+              JOIN orders_projections fp ON fp.tenant_id=fs.tenant_id AND fp.snapshot_id=fs.id
+              JOIN connector_observations o ON o.tenant_id=fs.tenant_id AND o.connection_id=fs.connection_id AND o.id=fs.observation_id
+              WHERE fs.tenant_id=$1 AND fs.connection_id=p.connection_id AND fs.kind='fulfillment'
+               AND fs.order_id=p.entity_id AND fs.document->>'deleted' IS DISTINCT FROM 'true'),'[]'::jsonb) AS stored
+          FROM orders_projections p
+          JOIN orders_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id AND s.kind='order'
+          JOIN connector_installations c ON c.tenant_id=p.tenant_id AND c.id=p.connection_id
+          JOIN LATERAL (SELECT external_id,scope_key FROM connector_source_mappings
+            WHERE tenant_id=$1 AND connection_id=p.connection_id AND resource='order' AND canonical_id=p.entity_id
+            ORDER BY created_at,id LIMIT 1) m ON true
+          WHERE p.tenant_id=$1 AND p.entity_id=$2 AND c.document->>'status'='active'
+           AND c.document->'permissions' ? 'orders.read' AND c.document->'granted' ? 'orders.read'
+           AND s.document->>'deleted' IS DISTINCT FROM 'true'
+          ORDER BY p.connection_id`,
+          [context.tenantId, orderId],
+        );
+
+        return z.array(orderSourceRow).parse(result.rows);
+      });
+
+      return rows.map((row) => ({
+        connectionId: row.connectionId,
+        provider: row.provider,
+        order: { externalId: row.externalId, scopeKey: row.scopeKey },
+        observedAt: row.observedAt,
+        fulfillments: row.fulfillments,
+        stored: row.stored,
+      }));
     },
     async fulfillments(context, { before, include, limit }) {
       const named = include.map(

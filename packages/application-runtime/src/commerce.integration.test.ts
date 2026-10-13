@@ -403,6 +403,38 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
     expect(validated.items).toHaveLength(1);
     expect(validated.items[0]?.sourceRevision).toBe('2');
     expect(JSON.stringify(validated)).not.toContain('Private');
+    const salesOrderId = validated.items[0]!.source.externalId;
+    const invocation = {
+      tenant: context(),
+      connectionId: record.connectionId,
+      provider: 'luma-erp',
+    };
+    const single = reader.parseOutput(
+      await reader.run(
+        invocation,
+        reader.parseInput({
+          limit: 1,
+          order: { externalId: salesOrderId, scopeKey: '' },
+        }),
+      ),
+    );
+    expect(single).toMatchObject({
+      nextCursor: null,
+      items: [{ source: { externalId: salesOrderId }, sourceRevision: '2' }],
+    });
+    expect(
+      await reader.run(invocation, {
+        limit: 1,
+        order: { externalId: randomUUID(), scopeKey: '' },
+      }),
+    ).toMatchObject({ items: [], nextCursor: null, completeness: 'complete' });
+    expect(() =>
+      reader.parseInput({
+        limit: 1,
+        cursor: salesOrderId,
+        order: { externalId: salesOrderId, scopeKey: '' },
+      }),
+    ).toThrow();
     expect(
       await createSalesSource(
         db,
@@ -1890,8 +1922,8 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
         version: 2,
         snapshot: {
           observationId: completed.observation.id,
-          schemaVersion: 6,
-          normalizerVersion: 'commerce/6',
+          schemaVersion: 7,
+          normalizerVersion: 'commerce/7',
           sourceUpdatedAt: null,
           data: {
             status: 'completed',
@@ -2020,18 +2052,18 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       ).toEqual([
         [1, 'commerce/1'],
         [2, 'commerce/2'],
-        [6, 'commerce/6'],
+        [7, 'commerce/7'],
       ]);
       expect(
         (await services.orders.current(context(), id))[0]?.snapshot,
       ).toMatchObject({
-        schemaVersion: 6,
+        schemaVersion: 7,
         data: { total: { amount: '48', currency: 'EUR' } },
       });
       await expect(
         services.orders.project(context(), {
           ...legacy,
-          schemaVersion: 5 as never,
+          schemaVersion: 8 as never,
         }),
       ).rejects.toThrow();
     });

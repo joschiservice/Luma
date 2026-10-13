@@ -147,6 +147,37 @@ describe('deterministic evidence-grounded diagnoses', () => {
       );
     },
   );
+  it('names what each system shows for a differing order line, and which systems do not report it', () => {
+    const value = snapshot('order_quantity_mismatch');
+    const systems = ['luma-erp', 'jtl', 'shopify'];
+    value.evidence = value.evidence.map((item, index) => ({
+      ...item,
+      connectionId: ['erp-a', 'jtl-a', 'shopify-a'][index]!,
+      source: {
+        provider: systems[index]!,
+        resource: 'order',
+        externalId: `order-${index}`,
+        scopeKey: '',
+      },
+    }));
+    const result = diagnose(value, corpus.now);
+
+    expect(result.summary).toBe(
+      'Luma ERP sets this quantity to 2; Shopify still shows 3; JTL doesn’t report it.',
+    );
+    expect(result.facts).toContainEqual(
+      expect.objectContaining({
+        code: 'line_quantities',
+        text: 'Luma ERP reports 2 each; JTL reports no current quantity; Shopify reports 3 each.',
+      }),
+    );
+    expect(result.attention.suggested).toBe(true);
+    expect(result.nextSteps.map((step) => step.code)).toEqual([
+      'reread_order_sources',
+      'carry_quantity_change',
+    ]);
+    expect(result.provenance.validUntil).toBe('2026-09-17T12:03:00.000Z');
+  });
   it('adds no sync backstory to legacy stock evidence', () => {
     const result = diagnose(snapshot('inventory_mismatch'), corpus.now);
 

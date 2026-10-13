@@ -24,9 +24,14 @@ const kinds: Record<string, { label: Label; domain: Domain }> = {
     label: m.issues_kind_workflow_failure,
     domain: 'workflows',
   },
+  order_quantity_mismatch: {
+    label: m.issues_kind_order_quantity_mismatch,
+    domain: 'orders',
+  },
 };
 
 const sources: Record<string, string> = {
+  'luma-erp': 'Luma ERP',
   shopify: 'Shopify',
   jtl: 'JTL',
   'jtl-onprem': 'JTL-Wawi',
@@ -45,6 +50,49 @@ export function issueKind(item: Pick<CaseSummary, 'class'>): IssueKind {
   return kind
     ? { label: kind.label(), domain: kind.domain }
     : { label: m.issues_kind_other(), domain: 'issues' };
+}
+
+/**
+ * Reads a case summary in the reader's language where Luma knows its wording: the stock excess
+ * and order quantity summaries. Other summaries keep the investigation's text.
+ */
+export function caseSummaryText(summary: string) {
+  if (summary === 'Order line quantities differ between systems.')
+    return m.issues_summary_quantity_generic();
+  const excess =
+    /^Selling availability exceeds the configured authority by (-?\d+(?:\.\d+)?) (.+)\.$/.exec(
+      summary,
+    );
+  if (excess)
+    return m.issues_overview_summary_excess({
+      quantity: quantityLabel(excess[1]!),
+      unit: unitLabel(excess[2]!, excess[1]!),
+    });
+  // “Luma ERP sets this quantity to 1; Shopify still shows 2; JTL doesn’t report it.”
+  const parts = summary.replace(/\.$/, '').split('; ');
+  const quantity = parts.map((part) => {
+    const match =
+      /^(.+) sets this quantity to (\d+(?:\.\d+)?)$/.exec(part) ??
+      /^(.+) still shows (\d+(?:\.\d+)?)$/.exec(part) ??
+      /^(.+) doesn’t report it$/.exec(part);
+    if (!match) return null;
+    const system = match[1]!;
+    const value = match[2] ? quantityLabel(match[2]) : '';
+
+    return part.includes(' sets this quantity to ')
+      ? m.issues_summary_quantity_authority({ system, quantity: value })
+      : part.includes(' still shows ')
+        ? m.issues_summary_quantity_differs({ system, quantity: value })
+        : m.issues_summary_quantity_not_reported({ system });
+  });
+  if (
+    parts.length > 1 &&
+    parts[0]!.includes(' sets this quantity to ') &&
+    quantity.every((part) => part !== null)
+  )
+    return `${quantity.join('; ')}.`;
+
+  return summary;
 }
 
 /** Names a source system as people know it, such as `jtl-cloud` → JTL Cloud. */

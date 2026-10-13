@@ -67,6 +67,39 @@
       "sellingSource": "right",
       "tolerance": "0"
     },
+    "order_quantity_mismatch": {
+      "tenantId": "tenant-a",
+      "evidenceTenantId": "tenant-a",
+      "subjectId": "order-1",
+      "evidenceRefs": [
+        "erp-order-observation-1",
+        "jtl-order-observation-1",
+        "shopify-order-observation-1"
+      ],
+      "lineKey": "line-1",
+      "connectionIds": ["erp-a", "jtl-a", "shopify-a"],
+      "authorityState": "resolved",
+      "authorityConnectionId": "erp-a",
+      "quantities": [
+        {
+          "connectionId": "erp-a",
+          "quantity": "2"
+        },
+        {
+          "connectionId": "jtl-a",
+          "quantity": null
+        },
+        {
+          "connectionId": "shopify-a",
+          "quantity": "3"
+        }
+      ],
+      "unit": "each",
+      "complete": true,
+      "changedAt": "2026-09-17T11:15:00Z",
+      "oldestReadAt": "2026-09-17T11:58:00Z",
+      "latestReadAt": "2026-09-17T12:00:00Z"
+    },
     "workflow_failure": {
       "tenantId": "tenant-a",
       "evidenceTenantId": "tenant-a",
@@ -982,6 +1015,202 @@
         "decision": "detect",
         "severity": "high",
         "reason": "reconciliation_required"
+      }
+    },
+    {
+      "id": "order-quantity-mismatch",
+      "exceptionClass": "order_quantity_mismatch",
+      "input": {},
+      "expected": {
+        "decision": "detect",
+        "severity": "medium",
+        "reason": "quantity_mismatch"
+      }
+    },
+    {
+      "id": "order-quantity-tenant-mismatch",
+      "exceptionClass": "order_quantity_mismatch",
+      "input": {
+        "evidenceTenantId": "tenant-b"
+      },
+      "expected": {
+        "decision": "reject",
+        "severity": null,
+        "reason": "tenant_mismatch"
+      }
+    },
+    {
+      "id": "order-quantity-agree",
+      "exceptionClass": "order_quantity_mismatch",
+      "input": {
+        "quantities": [
+          {
+            "connectionId": "erp-a",
+            "quantity": "2"
+          },
+          {
+            "connectionId": "jtl-a",
+            "quantity": null
+          },
+          {
+            "connectionId": "shopify-a",
+            "quantity": "2"
+          }
+        ]
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "quantities_agree"
+      }
+    },
+    {
+      "id": "order-quantity-equal-decimals",
+      "exceptionClass": "order_quantity_mismatch",
+      "input": {
+        "quantities": [
+          {
+            "connectionId": "erp-a",
+            "quantity": "2.0"
+          },
+          {
+            "connectionId": "jtl-a",
+            "quantity": null
+          },
+          {
+            "connectionId": "shopify-a",
+            "quantity": "2"
+          }
+        ]
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "quantities_agree"
+      }
+    },
+    {
+      "id": "order-quantity-one-reporting-source",
+      "exceptionClass": "order_quantity_mismatch",
+      "input": {
+        "quantities": [
+          {
+            "connectionId": "erp-a",
+            "quantity": "2"
+          },
+          {
+            "connectionId": "jtl-a",
+            "quantity": null
+          },
+          {
+            "connectionId": "shopify-a",
+            "quantity": null
+          }
+        ]
+      },
+      "expected": {
+        "decision": "clear",
+        "severity": null,
+        "reason": "quantities_agree"
+      }
+    },
+    {
+      "id": "order-quantity-incomplete",
+      "exceptionClass": "order_quantity_mismatch",
+      "input": {
+        "complete": false
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "incomplete_evidence"
+      }
+    },
+    {
+      "id": "order-quantity-stale",
+      "exceptionClass": "order_quantity_mismatch",
+      "input": {
+        "oldestReadAt": "2026-09-17T11:50:00Z"
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "stale_evidence"
+      }
+    },
+    {
+      "id": "order-quantity-future-read",
+      "exceptionClass": "order_quantity_mismatch",
+      "input": {
+        "latestReadAt": "2026-09-17T12:01:00Z"
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "future_evidence"
+      }
+    },
+    {
+      "id": "order-quantity-authority-unknown",
+      "exceptionClass": "order_quantity_mismatch",
+      "input": {
+        "authorityState": "unknown",
+        "authorityConnectionId": null
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "inconclusive_authority"
+      }
+    },
+    {
+      "id": "order-quantity-authority-conflicting",
+      "exceptionClass": "order_quantity_mismatch",
+      "input": {
+        "authorityState": "conflicting",
+        "authorityConnectionId": null
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "inconclusive_authority"
+      }
+    },
+    {
+      "id": "order-quantity-authority-not-reporting",
+      "exceptionClass": "order_quantity_mismatch",
+      "input": {
+        "authorityConnectionId": "jtl-a"
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "unknown_value"
+      }
+    },
+    {
+      "id": "order-quantity-propagation-pending",
+      "exceptionClass": "order_quantity_mismatch",
+      "input": {
+        "changedAt": "2026-09-17T11:45:00Z"
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "propagation_pending"
+      }
+    },
+    {
+      "id": "order-quantity-read-before-window",
+      "exceptionClass": "order_quantity_mismatch",
+      "input": {
+        "changedAt": "2026-09-17T11:40:00Z",
+        "oldestReadAt": "2026-09-17T11:58:00Z"
+      },
+      "expected": {
+        "decision": "defer",
+        "severity": null,
+        "reason": "propagation_pending"
       }
     }
   ]

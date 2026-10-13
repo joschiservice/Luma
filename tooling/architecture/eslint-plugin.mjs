@@ -169,6 +169,7 @@ export function violation(from, to) {
         'apps/api/src/support-view.integration.test.ts',
         'apps/api/src/support-view.test.ts',
         'apps/api/src/shopify-oauth.integration.test.ts',
+        'apps/api/src/shopify-order-edits.integration.test.ts',
         'apps/api/src/connections.test.ts',
         'apps/api/src/installation-verifier.test.ts',
         'apps/api/src/apps.integration.test.ts',

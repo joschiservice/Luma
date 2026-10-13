@@ -24,7 +24,10 @@ export {
   createExceptionWorkflowRuntime,
 } from './composition/workflow-runtime.js';
 
-export { createApplicationServices } from './composition/application.js';
+export {
+  createApplicationServices,
+  createOrderLineReader,
+} from './composition/application.js';
 
 export { createResourceScope } from './composition/resources.js';
 

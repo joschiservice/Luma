@@ -11,6 +11,7 @@ import { erpOf } from './erp.mjs';
 const demoCaseWorkflows = [
   'shopify-stock-correction',
   'shopify-hold-release',
+  'order-quantity-change',
   'connection-sync-check',
   'supplier-follow-up',
   'refund-follow-up',

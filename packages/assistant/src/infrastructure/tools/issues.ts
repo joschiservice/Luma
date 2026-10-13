@@ -25,6 +25,7 @@ const classes = members<NonNullable<IssueQuery['class']>>({
   sync_failure: true,
   stuck_fulfillment: true,
   inventory_mismatch: true,
+  order_quantity_mismatch: true,
   workflow_failure: true,
 });
 const severities = members<NonNullable<IssueQuery['severity']>>({

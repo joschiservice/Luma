@@ -7,6 +7,12 @@ export { createDetectionMonitor } from './application/detection-monitor.js';
 /** @public Declaration emit names it in the inferred type of `createScheduledDetection` in application-runtime. */
 export type { DetectionSources } from './application/detection-monitor.js';
 
+export type {
+  OrderLineSource,
+  OrderQuantities,
+  OrderQuantitySources,
+} from './application/detection-monitor.js';
+
 export { createDiagnosisRereader } from './application/diagnosis.js';
 
 export type {
@@ -83,6 +89,11 @@ export {
 } from './application/follow-ups.js';
 
 export { createStockRefresh } from './application/stock-refresh.js';
+
+export { createOrderRefresh } from './application/order-refresh.js';
+
+/** @public Declaration emit names it in the inferred type of `createScheduledDetection` in application-runtime. */
+export type { OrderSourceReader } from './application/order-refresh.js';
 
 export { returnStepFollowUpSource } from './domain/follow-ups.js';
 

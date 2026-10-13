@@ -1,6 +1,6 @@
 # Exception detection
 
-Detection evaluates the four [V0 taxonomy](exception-taxonomy.md) classes against
+Detection evaluates the five [V0 taxonomy](exception-taxonomy.md) classes against
 normalized evidence and persists the result as tenant-scoped incidents. It records every
 accepted evaluation with its rule and configuration versions, decision, evidence
 references and delivery correlation ID (inventory also keeps the exact signed difference,
@@ -57,10 +57,18 @@ reads decide:
   eligibility evidence records `holdOverdue`. Work from an adapter that does not read
   holds stays `unknown`.
 
+- **Order quantity:** orders whose maintained source comparison shows a current-units
+  difference that changed at least the propagation window ago are checked, at most 25 per
+  pass, least recently read first. Every source read before the window ended is reread
+  first: the order through the `orders.read` point read and its fulfilment records through
+  an order-scoped `fulfillment.read` (see [Orders refresh](orders-workspace.md#refreshing-an-orders-sources)).
+  The rule then runs on each line of the refreshed comparison, with order-line authority.
+
 Open cases of these classes are always included. When the fresh evaluation is clear, the
 monitor requests verification: stock and fulfillment reread the case's exact subject; a
 sync failure passes once its stream completes a scan after the latest detection without
-new failures. A newly detected subject gets a diagnosis. Rules run independently, so an
+new failures; an order quantity case rereads every source that was read before its latest
+detection and passes when the rule clears on those reads across the same sources. A newly detected subject gets a diagnosis. Rules run independently, so an
 unavailable source does not stop the others; failures retry on the next pass.
 [Case workflows](workflows.md#case-workflows) may start runs for these cases, but closure
 still needs this verification.
@@ -116,7 +124,8 @@ There are two ways to resolve an incident:
 Each evaluator evidence item must bind to the incident's class, canonical subject, rule
 identity and ordered scope, and its connection must match that scope. The required
 postconditions are `complete_scan_checkpoint_advanced`, `fulfillment_disposition_verified`,
-`equivalent_inventory_agrees` and `workflow_business_postcondition_verified`. They must be
+`equivalent_inventory_agrees` and `workflow_business_postcondition_verified`; order quantity
+cases use the last, because their business outcome is every reporting source agreeing. They must be
 established from source data; an accepted write receipt is insufficient.
 
 Passing evidence must be complete, authoritative, independent of the detection evidence,

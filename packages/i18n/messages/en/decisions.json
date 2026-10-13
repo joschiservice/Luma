@@ -18,6 +18,7 @@
   "decisions_kind_replenishment": "Replenishment",
   "decisions_kind_fulfillment_recovery": "Fulfillment recovery",
   "decisions_kind_inventory_correction": "Stock correction",
+  "decisions_kind_order_edit": "Order quantity change",
   "decisions_kind_supplier_commitment": "Purchase order",
   "decisions_kind_message_reply": "Reply due",
   "decisions_kind_workflow_handover": "Workflow follow-up",
