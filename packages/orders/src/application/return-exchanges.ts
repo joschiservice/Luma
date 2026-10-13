@@ -1,4 +1,5 @@
 import type { AuditEntry } from '@luma/audit';
+import type { ActionDiff } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
@@ -144,6 +145,13 @@ interface Dependencies extends Pick<
   cases: ReturnCaseStore;
   system: ReturnExchangeSystem | null;
   admission: ReturnExchangeAdmission | null;
+  /** Optional shared review supplied by runtime composition for the immutable owner plan. */
+  describeDiff?: (
+    context: TenantContext,
+    action: ProposedAction,
+    observedAt: string,
+    plan: ExchangeStepPlan,
+  ) => Promise<ActionDiff | null>;
 }
 
 const facts = (value: ReturnCase) => [
@@ -318,8 +326,27 @@ export function createReturnExchanges(deps: Dependencies) {
         (await deps.admission.writeMode(context, value.connectionId)) ===
           'observe_only';
 
+    const diff =
+      (await deps.describeDiff?.(
+        context,
+        action(value, deps.digest),
+        value.quote.observedAt,
+        value.plan,
+      )) ?? null;
+    if (diff)
+      diff.policy = decision
+        ? {
+            outcome: decision.outcome,
+            reason: decision.reason,
+            evaluatedAt: decision.evaluatedAt,
+            validUntil: decision.validUntil,
+            current: false,
+          }
+        : null;
+
     return {
       ...value,
+      ...(diff ? { diff } : {}),
       observeOnly,
       canApprove:
         manage &&

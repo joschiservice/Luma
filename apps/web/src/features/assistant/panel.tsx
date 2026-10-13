@@ -1,6 +1,6 @@
 import './assistant.css';
 
-import type { AssistantAnswer } from '@luma/api-contract';
+import type { AssistantAnswer, AssistantContext } from '@luma/api-contract';
 import { formatTime } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { rich } from '@luma/i18n/rich';
@@ -209,6 +209,10 @@ export function AssistantPanel({
   });
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [draft, setDraft] = useState('');
+  const [contextual, setContextual] = useState<{
+    context: AssistantContext;
+    label: string;
+  }>();
   const [announcement, setAnnouncement] = useState('');
   const pending = exchanges.some(
     (exchange) => exchange.state.status === 'pending',
@@ -231,7 +235,10 @@ export function AssistantPanel({
 
   useEffect(
     () =>
-      subscribeAssistantDraft((question) => {
+      subscribeAssistantDraft((question, nextContext) => {
+        abort.current?.abort();
+        setExchanges([]);
+        setContextual(nextContext);
         setDraft(question.slice(0, maxQuestion));
         requestAnimationFrame(() => input.current?.focus());
       }),
@@ -272,7 +279,12 @@ export function AssistantPanel({
     try {
       const answer = await askAssistant(
         organizationId,
-        { question: text, history: historyFor(before), timeZone },
+        {
+          question: text,
+          history: historyFor(before),
+          timeZone,
+          context: contextual?.context,
+        },
         controller.signal,
       );
       update(id, { status: 'answered', answer });
@@ -318,6 +330,7 @@ export function AssistantPanel({
     abort.current?.abort();
     setExchanges([]);
     setDraft('');
+    setContextual(undefined);
     setAnnouncement(m.assistant_announce_new_conversation());
     input.current?.focus();
   }
@@ -365,6 +378,14 @@ export function AssistantPanel({
         </div>
       </header>
 
+      {contextual ? (
+        <Alert tone="neutral" role="status" className="assistant-notice">
+          <strong>
+            {m.assistant_context_record({ label: contextual.label })}
+          </strong>
+          <p>{m.assistant_context_boundary()}</p>
+        </Alert>
+      ) : null}
       <div className="assistant-log" ref={log} aria-live="off">
         {availability.isPending && open ? (
           <div className="assistant-state" role="status">

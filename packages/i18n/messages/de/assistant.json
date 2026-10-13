@@ -53,5 +53,12 @@
   "assistant_error_access_changed": "Dein Zugriff auf diesen Workspace hat sich geändert. Lade die Seite neu, um deine Berechtigungen zu prüfen.",
   "assistant_error_unreadable_question": "Luma konnte diese Frage nicht verarbeiten. Kürze sie und versuch es erneut.",
   "assistant_error_unreachable": "Luma ist nicht erreichbar. Prüfe deine Verbindung und versuch es erneut.",
-  "assistant_key_control": "Strg"
+  "assistant_key_control": "Strg",
+  "assistant_context_explain": "Mit Luma erklären",
+  "assistant_context_question": "Was ist hier passiert, was ist betroffen und was kann ich als Nächstes prüfen? Trenne Quellenfakten, Unsicherheit, Fortschritt und verifizierte Ergebnisse.",
+  "assistant_context_record": "Untersuchung: {label}",
+  "assistant_context_boundary": "Luma liest aktuelle Belege mit deinen Berechtigungen. Prüfe nächste Schritte im verlinkten Datensatz; Änderungen benötigen weiterhin Richtlinienprüfungen und Freigaben.",
+  "assistant_source_unknown": "Quelle nicht gemeldet",
+  "assistant_source_time_unknown": "Beobachtungszeitpunkt unbekannt",
+  "assistant_source_time_unknown_short": "Unbekannt"
 }

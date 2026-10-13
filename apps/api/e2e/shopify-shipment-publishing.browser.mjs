@@ -6,6 +6,8 @@ import { shipmentPublishingFixture } from './shopify-shipment-publishing-fixture
 test('publishes an exact downstream parcel from the shared fulfillment view with independent approval, then reviews a tracking correction and customer notification choice', async ({
   resources: t,
 }) => {
+  // Two independent approval/publication cycles include provider rereads under parallel journeys.
+  test.setTimeout(180_000);
   const port = await availablePort(),
     origin = `http://127.0.0.1:${port}`;
   const f = await shipmentPublishingFixture(t, { origin });

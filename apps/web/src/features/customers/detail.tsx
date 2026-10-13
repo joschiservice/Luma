@@ -24,6 +24,7 @@ import { type ReactNode, useSyncExternalStore } from 'react';
 
 import { SignInRedirect } from '../../kit/identity/common';
 import { IdentityError } from '../../kit/identity/data';
+import { RecordAssistance } from '../../kit/record-assistance';
 import { RecordMessages } from '../../kit/record-messages';
 import { formatMoney } from '../../shared/orders/presentation';
 import { systemName } from '../products/presentation';
@@ -61,6 +62,7 @@ export function CustomerPage() {
 
   return (
     <CustomerDetailView
+      contextualAssistance
       organizationId={organizationId}
       detail={detail}
       loading={query.isPending}
@@ -153,6 +155,7 @@ function Missing() {
 
 /** Shows one customer: imported profile facts beside the orders Luma imported for them. */
 export function CustomerDetailView({
+  contextualAssistance = false,
   organizationId,
   detail,
   error,
@@ -164,6 +167,8 @@ export function CustomerDetailView({
   messages,
 }: {
   organizationId: string;
+  /** The connected page supplies the authorized assistant control. */
+  contextualAssistance?: boolean;
   detail?: CustomerDetail | undefined;
   error?: CustomerError | undefined;
   loading?: boolean;
@@ -203,11 +208,22 @@ export function CustomerDetailView({
             : undefined
         }
         actions={
-          <RefreshButton
-            refreshing={refreshing}
-            onClick={refresh}
-            label={m.customers_detail_refresh()}
-          />
+          <>
+            {item ? (
+              contextualAssistance ? (
+                <RecordAssistance
+                  organizationId={organizationId}
+                  context={{ record: { kind: 'customer', id: item.id } }}
+                  label={customerName(item)}
+                />
+              ) : null
+            ) : null}
+            <RefreshButton
+              refreshing={refreshing}
+              onClick={refresh}
+              label={m.customers_detail_refresh()}
+            />
+          </>
         }
       />
       {offline ? (

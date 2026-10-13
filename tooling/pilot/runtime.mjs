@@ -503,6 +503,8 @@ export async function createPilot(
       : undefined;
     const application = createApplicationServices({
       observability,
+      connectionEnvironment: installations.connectionEnvironment,
+
       ...(modelGateway ? { modelGateway } : {}),
       ...(supplierExtraction ? { supplierExtraction } : {}),
       ...(processClient ? { replenishmentTransport: processClient } : {}),
@@ -522,6 +524,7 @@ export async function createPilot(
         ? {
             purchasing: {
               runtime: createInstalledPurchaseOrderRuntime(installedOptions),
+
               installations,
             },
             returns: {
@@ -620,6 +623,7 @@ export async function createPilot(
               desk,
               playbooks: library,
               connections,
+              sourceEnvironments: installations.sourceEnvironments,
               sync: createCommerceSyncService(
                 db,
                 identity.service,

@@ -13,7 +13,7 @@ import {
   RouterProvider,
 } from '@tanstack/react-router';
 import { useState } from 'react';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 
 import appStyles from '../../styles.css?inline';
 import { IdentityLinksView } from '../sync/identity-links';
@@ -562,11 +562,20 @@ export const Filter: Story = {
     ).toBeVisible();
     const search = canvas.getByRole('searchbox', { name: 'Search products' });
     await userEvent.type(search, 'apron{Enter}');
+    await waitFor(() =>
+      expect(
+        canvas.getByRole('searchbox', { name: 'Search products' }),
+      ).toHaveValue('apron'),
+    );
     await userEvent.click(canvas.getByRole('button', { name: 'Clear' }));
     await expect(
       canvas.queryByRole('button', { name: /^Edit Missing from filter/ }),
     ).toBeNull();
-    await expect(search).toHaveValue('');
+    await waitFor(() =>
+      expect(
+        canvas.getByRole('searchbox', { name: 'Search products' }),
+      ).toHaveValue(''),
+    );
   },
 };
 

@@ -15,7 +15,7 @@ conventions only; it does not list files.
 | Action policy and approval requirements                                                         | `@luma/policies`                                                                         |
 | Action admission, effects, idempotency                                                          | `@luma/execution`                                                                        |
 | Append-only audit log                                                                           | `@luma/audit`                                                                            |
-| Installed connections, credentials, capabilities, observations                                  | `@luma/connections`                                                                      |
+| Installed connections, credentials, capabilities, observations and reviewed source environments | `@luma/connections`                                                                      |
 | Provider apps (setup, adapters, OAuth, webhooks, app UI)                                        | `packages/apps/<id>`, contracts in `@luma/app-host`, registration in `@luma/app-catalog` |
 | Provider protocol clients                                                                       | `packages/connectors/*`                                                                  |
 | Editable Luma order records                                                                     | `@luma/sales`                                                                            |

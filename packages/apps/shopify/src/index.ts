@@ -4,7 +4,10 @@ import { randomUUID } from 'node:crypto';
 
 import type { AppDefinition, AppFactoryContext } from '@luma/app-host';
 import type { ConnectionProvider } from '@luma/connections';
-import { simulationTransport } from '@luma/connections/adapters';
+import {
+  boundedReadTransport,
+  simulationTransport,
+} from '@luma/connections/adapters';
 import {
   createInstallationRepository,
   createInstallationService,
@@ -97,12 +100,24 @@ export function createShopifyProvider(
         capability,
       );
       const target = installationTarget.parse(current.connection.target);
-      const fetch =
+      let fetch =
         simulationTransport(
           current.connection,
           runtime.simulation ?? options.simulation,
         ) ?? runtime.fetch;
 
+      if (runtime.readBounds) {
+        if (!capability.endsWith('.read'))
+          throw new IdentityError(
+            422,
+            'VALIDATION_ERROR',
+            'Read bounds cannot authorize writes',
+          );
+        fetch = boundedReadTransport(
+          fetch ?? globalThis.fetch,
+          runtime.readBounds,
+        );
+      }
       const budgetKey = `${context.tenantId}:${id}`;
       let budget = budgets.get(budgetKey);
       if (!budget) {

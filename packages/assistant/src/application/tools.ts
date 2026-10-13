@@ -35,6 +35,8 @@ export interface AssistantTool<Input = unknown> {
   readonly reads: RecordKind;
   /** The read permission a person needs before the model is offered this tool. */
   readonly permission: Permission;
+  /** Additional read grants needed by cross-area views. */
+  readonly additionalPermissions?: readonly Permission[];
   readonly jsonSchema: Readonly<Record<string, JsonValue>>;
   /** Validates arguments, returning field problems the model can correct. */
   parse(value: unknown): { input: Input } | { problems: string[] };
@@ -100,8 +102,13 @@ export function createToolRegistry(
       },
     },
   });
+  const allowed = (context: TenantContext, tool: AssistantTool) =>
+    hasPermission(context, tool.permission) &&
+    (tool.additionalPermissions ?? []).every((permission) =>
+      hasPermission(context, permission),
+    );
   const permitted = (context: TenantContext) =>
-    tools.filter((tool) => hasPermission(context, tool.permission));
+    tools.filter((tool) => allowed(context, tool));
 
   const result = (
     tool: string,
@@ -141,7 +148,7 @@ export function createToolRegistry(
           error: 'unknown_tool',
           message: 'This tool does not exist.',
         });
-      if (!hasPermission(context, tool.permission))
+      if (!allowed(context, tool))
         return result(tool.name, tool.label, 'failed', {
           error: 'not_permitted',
           message:

@@ -104,6 +104,7 @@ function setup(
   replies: Reply[],
   options: {
     available?: boolean;
+    contextual?: boolean;
     refreshContext?: (
       context: ReturnType<typeof makeTenantContext>,
     ) => Promise<ReturnType<typeof makeTenantContext>>;
@@ -173,6 +174,7 @@ function setup(
   const spans: Operation[] = [];
   const assistant = createWorkspaceAssistant({
     gateway,
+    contextualEnabled: async () => options.contextual ?? false,
     availability:
       options.available === false
         ? { available: false, reason: 'Configure the assistant route.' }
@@ -330,6 +332,7 @@ describe('workspace assistant', () => {
     await expect(assistant.availability(context())).resolves.toEqual({
       available: false,
       reason: 'Configure the assistant route.',
+      contextual: false,
       reads: ['order', 'issue', 'stock_position', 'fulfillment', 'return'],
     });
     await expect(assistant.ask(context(), question)).rejects.toMatchObject({
@@ -509,4 +512,126 @@ describe('workspace assistant', () => {
     ]);
     expect(requests[0]!.messages[0]!.content).toContain('Europe/Berlin');
   });
+});
+
+describe('contextual workspace assistance', () => {
+  it('fails closed before any model or record read when the tenant release is off', async () => {
+    const { assistant, requests, orders } = setup(['Unexpected answer']);
+    await expect(
+      assistant.ask(context(), {
+        ...question,
+        context: { record: { kind: 'order', id: firstOrder } },
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    expect(requests).toEqual([]);
+    expect(orders.get).not.toHaveBeenCalled();
+  });
+
+  it('reads the exact selected filters before the model and resolves only those citations', async () => {
+    const { assistant, requests, orders } = setup(
+      [`Source facts [[order:${firstOrder}]].`],
+      { contextual: true },
+    );
+    const filters = {
+      view: 'outstanding',
+      placedFrom: '2026-09-28T00:00:00Z',
+      placedBefore: '2026-10-05T00:00:00Z',
+      limit: 10,
+    };
+    const answer = await assistant.ask(context(), {
+      ...question,
+      context: { collection: { tool: 'search_orders', filters } },
+    });
+    expect(orders.list).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantId }),
+      expect.objectContaining({
+        ...filters,
+        placedFrom: '2026-09-28T00:00:00.000Z',
+        placedBefore: '2026-10-05T00:00:00.000Z',
+        count: 'exact',
+      }),
+    );
+    expect(requests[0]!.messages.at(-1)?.content).toContain(
+      'Current contextual read',
+    );
+    expect(answer.citations.map((citation) => citation.id)).toEqual([
+      firstOrder,
+    ]);
+    expect(answer.content).not.toContain(unreadOrder);
+    expect(answer.usage.toolCalls).toBe(1);
+  });
+
+  it('reports a missing contextual record without turning its ID into evidence', async () => {
+    const { assistant, orders } = setup(
+      [`Could not find it [[order:${firstOrder}]].`],
+      { contextual: true },
+    );
+    const answer = await assistant.ask(context(), {
+      ...question,
+      context: { record: { kind: 'order', id: firstOrder } },
+    });
+    expect(orders.get).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantId }),
+      firstOrder,
+    );
+    expect(answer.steps[0]?.outcome).toBe('not_found');
+    expect(answer.citations).toEqual([]);
+  });
+
+  it('reports invalid collection filters rather than silently widening the selection', async () => {
+    const { assistant, orders } = setup(['The filter could not be read.'], {
+      contextual: true,
+    });
+    const answer = await assistant.ask(context(), {
+      ...question,
+      context: {
+        collection: {
+          tool: 'search_orders',
+          filters: { connectionId: tenantId },
+        },
+      },
+    });
+    expect(orders.list).not.toHaveBeenCalled();
+    expect(answer.steps[0]?.outcome).toBe('invalid_arguments');
+  });
+});
+
+it('withholds contextual factual paragraphs with missing or unread citations', async () => {
+  for (const reply of [
+    `Source fact [[order:${firstOrder}]].\n\nA second unsupported material claim.`,
+    `Invented record fact [[order:${unreadOrder}]].`,
+    `Read fact [[order:${firstOrder}]]. Malformed [[order:broken`,
+  ]) {
+    const { assistant } = setup([reply], { contextual: true });
+    const answer = await assistant.ask(context(), {
+      ...question,
+      context: { collection: { tool: 'search_orders', filters: {} } },
+    });
+    expect(answer.outcome).toBe('incomplete');
+    expect(answer.content).not.toContain('material claim');
+    expect(answer.content).not.toContain('Invented record fact');
+    expect(answer.citations).toEqual([]);
+  }
+});
+
+it('counts forced contextual lookups against the configured read budget', async () => {
+  const { assistant, orders } = setup(['I could not establish facts.'], {
+    contextual: true,
+    limits: { toolCalls: 1 },
+  });
+  const answer = await assistant.ask(context(), {
+    ...question,
+    context: {
+      record: { kind: 'order', id: firstOrder },
+      collection: { tool: 'search_orders', filters: {} },
+    },
+  });
+  expect(orders.get).toHaveBeenCalledTimes(1);
+  expect(orders.list).not.toHaveBeenCalled();
+  expect(answer.usage.toolCalls).toBe(1);
+  expect(answer.steps.map((step) => step.outcome)).toEqual([
+    'not_found',
+    'skipped',
+  ]);
+  expect(answer.outcome).toBe('incomplete');
 });

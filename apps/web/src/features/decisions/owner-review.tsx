@@ -16,6 +16,7 @@ import { PurchasingPlanReview } from '../procurement/purchasing-workbench';
 import { workflowRunsOptions } from '../workflows/data';
 import { HumanTaskReview } from '../workflows/human-task';
 import { ReplenishmentRunReview } from '../workflows/replenishment';
+import { FollowUpReview } from './follow-up-review';
 
 /**
  * Mounts the review that owns this decision. Every surface uses these same controls, so a
@@ -71,6 +72,16 @@ export function OwnerReview({
         />
       );
     case 'workflow_run':
+      if (owner.followUpProposalId)
+        return (
+          <FollowUpReview
+            organizationId={organizationId}
+            proposalId={owner.followUpProposalId}
+            definitionId={owner.definitionId}
+            onChange={onChange}
+          />
+        );
+
       return handover ? (
         <p className="decision-note">
           {rich(m.decisions_handover_text, {

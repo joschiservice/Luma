@@ -1,3 +1,4 @@
+import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 
 import type {
@@ -61,6 +62,58 @@ function present(row: Row): GenerationRecord {
 /** Stores generation provenance under tenant RLS. Records never hold prompts or model text. */
 export function createGenerationStore(db: TenantDatabase): GenerationStore {
   return {
+    apply: (context, id, decision, save) =>
+      db.transaction(context.tenantId, async (tx) => {
+        const row = (
+          await tx.query<Row>(
+            `SELECT ${columns} FROM workflow_generations WHERE tenant_id=$1 AND id=$2 FOR UPDATE`,
+            [context.tenantId, id],
+          )
+        ).rows[0];
+        if (
+          !row?.proposal_state ||
+          row.proposal_state === 'rejected' ||
+          (row.proposal_state === 'accepted' &&
+            row.accept_save_id !== decision.saveId)
+        )
+          throw new IdentityError(
+            409,
+            'CONFLICT',
+            'Someone else decided on this change first.',
+          );
+        if (row.proposal_state === 'accepted') return present(row);
+        const revision = await save();
+        const updated = (
+          await tx.query<Row>(
+            `UPDATE workflow_generations SET proposal_state='accepted',decided_by=$3,decided_at=$4,accept_save_id=$5,resulting_revision=$6 WHERE tenant_id=$1 AND id=$2 RETURNING ${columns}`,
+            [
+              context.tenantId,
+              id,
+              decision.decidedBy,
+              decision.decidedAt,
+              decision.saveId,
+              revision,
+            ],
+          )
+        ).rows[0];
+        if (!updated)
+          throw new IdentityError(
+            409,
+            'CONFLICT',
+            'The proposal was removed during review.',
+          );
+
+        return present(updated);
+      }),
+    hasUnreleasedImprovement: (context, draftId) =>
+      db.transaction(context.tenantId, async (tx) => {
+        const result = await tx.query<{ found: boolean }>(
+          "SELECT EXISTS(SELECT 1 FROM workflow_generations WHERE tenant_id=$1 AND draft_id=$2 AND proposal_state IN ('open','accepted') AND result->'improvement' IS NOT NULL AND result->'improvement' <> 'null'::jsonb) AS found",
+          [context.tenantId, draftId],
+        );
+
+        return result.rows[0]?.found === true;
+      }),
     get: (context, id) =>
       db.transaction(context.tenantId, async (tx) => {
         const row = (

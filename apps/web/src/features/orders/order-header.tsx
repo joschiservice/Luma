@@ -18,6 +18,7 @@ import {
   Truck,
 } from 'lucide-react';
 
+import { RecordAssistance } from '../../kit/record-assistance';
 import {
   formatMoney,
   fulfillmentLabel,
@@ -105,12 +106,14 @@ function orderFacts(order: OrderListItem): RecordFact[] {
  * `detail`, only the breadcrumb is shown. `returnPath` is the record the reader came from.
  */
 export function OrderHeader({
+  contextualAssistance = false,
   organizationId,
   search,
   returnPath,
   detail,
 }: {
   organizationId: string;
+  contextualAssistance?: boolean;
   search: OrdersSearch;
   returnPath: string | null;
   detail?: OrderDetail | undefined;
@@ -134,17 +137,26 @@ export function OrderHeader({
       title={order ? orderLabel(order) : m.orders_detail_title_fallback()}
       back={returnPath ? <a href={returnPath} /> : undefined}
       actions={
-        needsYou ? (
-          <Link
-            className={buttonVariants({ size: 'sm' })}
-            to="/app/$organizationId/exceptions/$exceptionId"
-            params={{ organizationId, exceptionId: needsYou.id }}
-            search={{ view: 'needs_you' }}
-          >
-            {m.orders_inspector_review_issue()}
-            <ArrowRight aria-hidden="true" />
-          </Link>
-        ) : null
+        <>
+          {order && contextualAssistance ? (
+            <RecordAssistance
+              organizationId={organizationId}
+              context={{ record: { kind: 'order', id: order.id } }}
+              label={orderLabel(order)}
+            />
+          ) : null}
+          {needsYou ? (
+            <Link
+              className={buttonVariants({ size: 'sm' })}
+              to="/app/$organizationId/exceptions/$exceptionId"
+              params={{ organizationId, exceptionId: needsYou.id }}
+              search={{ view: 'needs_you' }}
+            >
+              {m.orders_inspector_review_issue()}
+              <ArrowRight aria-hidden="true" />
+            </Link>
+          ) : null}
+        </>
       }
       facts={order ? orderFacts(order) : []}
     />

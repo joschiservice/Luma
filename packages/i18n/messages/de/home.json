@@ -116,5 +116,7 @@
   "home_returns_empty_description": "Retouren erscheinen hier, sobald ein verbundener Shop eine meldet.",
   "home_returns_not_shared_title": "Retouren werden noch nicht geteilt",
   "home_returns_not_shared_description": "Retouren erscheinen, sobald ein verbundener Shop Retouren und Erstattungen mit Luma teilt.",
-  "home_returns_review_connections": "Verbindungen prüfen"
+  "home_returns_review_connections": "Verbindungen prüfen",
+  "home_window_brief": "Morgenüberblick",
+  "home_brief_window": "Verifizierte Ergebnisse von {start} bis {end}. Entscheidungen und laufende Arbeit zeigen den aktuellen Stand."
 }

@@ -7,6 +7,8 @@ export type {
   PlaybookVersion,
 } from './domain/playbook.js';
 
+export type { WorkflowControlComparison } from './domain/workflow-improvement.js';
+
 export { playbookEligible } from './domain/playbook.js';
 
 export type {
@@ -129,3 +131,10 @@ export type {
 } from './application/case-workflows.js';
 
 export type { CodeProcessBusinessAdapter } from './application/process-business.js';
+
+export type {
+  ImprovementEvidence,
+  ImprovementDiscoveryGroup,
+} from './domain/workflow-improvement.js';
+
+export type { WorkflowImprovementControls } from './application/improvement-controls.js';

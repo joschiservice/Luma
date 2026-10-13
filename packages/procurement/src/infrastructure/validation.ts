@@ -206,6 +206,8 @@ export const followUpInputSchema = z
     response: z.enum(['accepted', 'following_up', 'credited', 'written_off']),
     note: z.string().trim().min(1).max(1000),
     nextCheckAt: z.string().datetime({ offset: true }).nullable().default(null),
+    expectedOrderRevision: z.number().int().nonnegative().optional(),
+    expectedScopeFingerprint: z.string().min(1).max(1_000_000).optional(),
   })
   .strict();
 

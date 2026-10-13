@@ -34,8 +34,11 @@ import { returnCasesContract } from './contracts/return-cases.js';
 import { returnsContract } from './contracts/returns.js';
 import { rolesContract } from './contracts/roles.js';
 import { salesContract } from './contracts/sales.js';
+import { scopedAutonomyContract } from './contracts/scoped-autonomy.js';
+import { scopedFollowUpsContract } from './contracts/scoped-follow-ups.js';
 import { settingsContract } from './contracts/settings.js';
 import { shadowContract } from './contracts/shadow.js';
+import { sourceEnvironmentsContract } from './contracts/source-environments.js';
 import { supplierEmailContract } from './contracts/supplier-email.js';
 import { syncContract } from './contracts/sync.js';
 import { systemContract } from './contracts/system.js';
@@ -91,6 +94,9 @@ type ApiContract = {
   decisions: typeof decisionsContract;
   insights: typeof insightsContract;
   assistant: typeof assistantContract;
+  scopedAutonomy: typeof scopedAutonomyContract;
+  scopedFollowUps: typeof scopedFollowUpsContract;
+  sourceEnvironments: typeof sourceEnvironmentsContract;
   sourceAuthority: typeof sourceAuthorityContract;
 };
 
@@ -142,6 +148,9 @@ export const apiContract: ApiContract = {
   decisions: decisionsContract,
   insights: insightsContract,
   assistant: assistantContract,
+  scopedAutonomy: scopedAutonomyContract,
+  scopedFollowUps: scopedFollowUpsContract,
+  sourceEnvironments: sourceEnvironmentsContract,
   sourceAuthority: sourceAuthorityContract,
 };
 
@@ -295,3 +304,7 @@ export * from './adaptive-views.js';
 export * from './adaptive-actions.js';
 
 export * from './adaptive-packages.js';
+
+export * from './action-diff.js';
+
+export * from './scoped-autonomy.js';

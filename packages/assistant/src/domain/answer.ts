@@ -1,5 +1,11 @@
 export type RecordKind =
-  'order' | 'issue' | 'stock_position' | 'fulfillment' | 'return';
+  | 'order'
+  | 'issue'
+  | 'stock_position'
+  | 'fulfillment'
+  | 'return'
+  | 'customer'
+  | 'purchase_order';
 
 /** A record a read returned, with the source and observation time of that read. */
 export interface RecordReference {
@@ -12,7 +18,8 @@ export interface RecordReference {
   sourceUpdatedAt: string | null;
 }
 
-const kinds = 'order|issue|stock_position|fulfillment|return';
+const kinds =
+  'order|issue|stock_position|fulfillment|return|customer|purchase_order';
 const uuid = '[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}';
 const markers = new RegExp(`\\[\\[(${kinds}):(${uuid})\\]\\]`, 'g');
 
@@ -109,4 +116,33 @@ function clipStrings(value: unknown): Json {
   if (typeof value === 'boolean') return value;
 
   return null;
+}
+
+/** Contextual narratives must cite every paragraph/list item and may reference only current-question reads. */
+export function groundedContextualAnswer(
+  text: string,
+  read: ReadonlyMap<string, RecordReference>,
+): boolean {
+  const withoutValidMarkers = text.replace(markers, '');
+  if (withoutValidMarkers.includes('[[') || withoutValidMarkers.includes(']]'))
+    return false;
+  const references = text.match(/\[\[[^\]\n]+\]\]/g) ?? [];
+  if (references.some((marker) => !read.has(marker))) return false;
+  const paragraphs = text
+    .split(/\n\s*\n/)
+    .flatMap((paragraph) => {
+      const lines = paragraph.split('\n').filter((line) => line.trim());
+
+      return lines.some((line) => /^\s*(?:[-*•]|\d+[.)])\s/.test(line))
+        ? lines
+        : [paragraph];
+    })
+    .filter((paragraph) => paragraph.trim());
+
+  return (
+    paragraphs.length > 0 &&
+    paragraphs.every((paragraph) =>
+      [...read.keys()].some((marker) => paragraph.includes(marker)),
+    )
+  );
 }

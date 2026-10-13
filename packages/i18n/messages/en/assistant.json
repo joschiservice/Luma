@@ -53,5 +53,12 @@
   "assistant_error_access_changed": "Your access to this workspace changed. Refresh to check your permissions.",
   "assistant_error_unreadable_question": "Luma couldn’t read this question. Shorten it and try again.",
   "assistant_error_unreachable": "Luma couldn’t be reached. Check your connection and try again.",
-  "assistant_key_control": "Ctrl"
+  "assistant_key_control": "Ctrl",
+  "assistant_context_explain": "Explain with Luma",
+  "assistant_context_question": "What happened here, what is affected, and what can I review next? Separate source facts, uncertainty, progress and verified outcomes.",
+  "assistant_context_record": "Investigating: {label}",
+  "assistant_context_boundary": "Luma reads current evidence with your permissions. Review suggested next steps on the linked record; changes still require policy checks and approvals.",
+  "assistant_source_unknown": "Source not reported",
+  "assistant_source_time_unknown": "Observation time unknown",
+  "assistant_source_time_unknown_short": "Unknown"
 }

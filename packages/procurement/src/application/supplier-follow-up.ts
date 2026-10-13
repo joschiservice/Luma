@@ -2,12 +2,15 @@ import type { TenantContext } from '@luma/identity';
 import type {
   CaseRun,
   CaseWorkflowAdapter,
+  ProcessActionResult,
   ProcessWorkflowVersion,
   WorkflowSignal,
 } from '@luma/workflows';
 
 import type { Attention } from '../domain/commitments.js';
+import { followUpScopeFingerprint } from '../domain/follow-up-snapshot.js';
 import type { SupplierCommitments } from './commitments.js';
+import type { FollowUpRequest } from './governed-follow-up.js';
 
 type OrderView = Awaited<ReturnType<SupplierCommitments['order']>>;
 
@@ -53,6 +56,18 @@ export function createSupplierFollowUp(deps: {
   /** Derives a stable UUID from a value. */
   id(value: string): string;
   now?: () => Date;
+  /** Persisted enrollment remains governed after a release rollback. */
+  managed?(tenantId: string): Promise<boolean>;
+  /** Independently verifies a managed note; null retains the never-enrolled path. */
+  verified?(
+    context: TenantContext,
+    workflowRunId: string,
+  ): Promise<boolean | null>;
+  /** Governed runtime path; null means this run has never enrolled in scoped delegation. */
+  record?(
+    context: TenantContext,
+    request: FollowUpRequest,
+  ): Promise<ProcessActionResult | null>;
 }): CaseWorkflowAdapter {
   const now = deps.now ?? (() => new Date());
   const wait = deps.version.steps.find((step) => step.kind === 'wait');
@@ -132,7 +147,13 @@ export function createSupplierFollowUp(deps: {
     const observedAt = now().toISOString();
     if (!found)
       return {
-        values: { ready: false, waiting: false, key: '' },
+        values: {
+          ready: false,
+          waiting: false,
+          key: '',
+          orderRevision: 0,
+          scopeFingerprint: '',
+        },
         evidenceRefs: [run.signal.id],
         observedAt,
       };
@@ -140,6 +161,8 @@ export function createSupplierFollowUp(deps: {
     return {
       values: {
         ready: true,
+        orderRevision: found.view.order.revision,
+        scopeFingerprint: followUpScopeFingerprint(found.view.order),
         waiting: waiting(found.view, found.target),
         key: current(found.view, found.target)?.key ?? '',
       },
@@ -206,13 +229,18 @@ export function createSupplierFollowUp(deps: {
         description: 'Records that the supplier answered while Luma waited.',
       },
     },
-    approval: {
-      mode: 'no_actions',
-      summary:
-        'This workflow only notes follow-ups on Luma’s own orders. It sends nothing to suppliers or connected systems, so nothing needs approval.',
-      details: [
-        'The note is recorded as the person who turned the workflow on and appears in the order’s history.',
-      ],
+    approval: async (context) => {
+      const governed = (await deps.managed?.(context.tenantId)) ?? false;
+
+      return {
+        mode: governed ? 'risk_based' : 'no_actions',
+        summary: deps.record
+          ? 'Scoped policies decide whether Luma may record this internal note or needs review. It sends nothing to suppliers or connected systems.'
+          : 'This workflow only notes follow-ups on Luma’s own orders. It sends nothing to suppliers or connected systems, so nothing needs approval.',
+        details: [
+          'The note is recorded as the person who turned the workflow on and appears in the order’s history.',
+        ],
+      };
     },
     async requirements(context) {
       const linked = await deps.suppliersLinked(context);
@@ -284,19 +312,31 @@ export function createSupplierFollowUp(deps: {
       const found = await read(context, run.signal.id);
       if (!found)
         return { state: 'denied', proposalId: id, reason: 'order_not_found' };
+      const observed = outputs.find((output) => output.stepId === 'order');
+      const key = String(observed?.values.key ?? '');
+      const nextCheckAt = new Date(now().getTime() + waitMs).toISOString();
+      const governed = await deps.record?.(context, {
+        runId: run.run.id,
+        stepId: step.id,
+        actionId: id,
+        orderId: found.view.order.id,
+        key,
+        nextCheckAt,
+        orderRevision: Number(observed?.values.orderRevision ?? 0),
+        orderScopeFingerprint: String(observed?.values.scopeFingerprint ?? ''),
+        observedAt: observed?.observedAt ?? now().toISOString(),
+      });
+      if (governed) return governed;
       if (found.view.followUps.some((f) => f.id === id))
         return { state: 'accepted', proposalId: id, receiptId: id };
       if (run.stop)
         return { state: 'denied', proposalId: id, reason: run.stop };
-      const observed = outputs.find((output) => output.stepId === 'order');
-      const key = String(observed?.values.key ?? '');
       if (!key || current(found.view, found.target)?.key !== key)
         return {
           state: 'denied',
           proposalId: id,
           reason: 'The order changed before Luma could note the follow-up',
         };
-      const nextCheckAt = new Date(now().getTime() + waitMs).toISOString();
       await deps.commitments.respond(context, found.view.order.id, {
         id,
         key,
@@ -310,7 +350,9 @@ export function createSupplierFollowUp(deps: {
     async verify(context, run) {
       const id = followUpId(run);
       const found = await read(context, run.signal.id);
-      const recorded = !!found?.view.followUps.some((f) => f.id === id);
+      const governed = await deps.verified?.(context, run.run.id);
+      const recorded =
+        governed ?? !!found?.view.followUps.some((f) => f.id === id);
 
       return {
         state: recorded ? 'verified' : 'failed',

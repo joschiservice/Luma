@@ -26,6 +26,14 @@ export function procurementActionDecisionProvider(
     pending: async (context) =>
       (await pending(context)).map((item) => ({
         id: `purchasing:${item.kind}:${item.id}`,
+        ...(item.kind !== 'native_receipt'
+          ? {
+              actionReference: {
+                runId: item.id,
+                stepId: item.kind === 'plan' ? 'create-order' : 'revise-order',
+              },
+            }
+          : {}),
         kind: 'supplier_commitment',
         domain: item.kind === 'native_receipt' ? 'inventory' : 'procurement',
         reason:

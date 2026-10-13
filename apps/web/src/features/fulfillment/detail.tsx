@@ -23,6 +23,7 @@ import { type ReactNode, useSyncExternalStore } from 'react';
 import { appsOptions } from '../../kit/apps/data';
 import { SignInRedirect } from '../../kit/identity/common';
 import { IdentityError } from '../../kit/identity/data';
+import { RecordAssistance } from '../../kit/record-assistance';
 import {
   fulfillmentLabels as orderFulfillmentLabels,
   paymentLabels,
@@ -101,6 +102,7 @@ export function FulfillmentDetailPage() {
 
   return (
     <FulfillmentDetailView
+      contextualAssistance
       organizationId={organizationId}
       search={search}
       detail={detail}
@@ -475,6 +477,7 @@ function Timeline({ detail }: { detail: FulfillmentDetail }) {
 
 /** Shows one fulfillment's diagnosis, next safe step, evidence and linked records. */
 export function FulfillmentDetailView({
+  contextualAssistance = false,
   organizationId,
   search = {},
   detail,
@@ -486,6 +489,8 @@ export function FulfillmentDetailView({
   actions,
 }: {
   organizationId: string;
+  /** The connected page supplies the authorized assistant control. */
+  contextualAssistance?: boolean;
   search?: FulfillmentSearch;
   detail?: FulfillmentDetail | undefined;
   loading?: boolean;
@@ -523,11 +528,22 @@ export function FulfillmentDetailView({
         title={item ? orderLabel(item) : m.fulfillment_detail_title_fallback()}
         back={from ? <Link to={from} /> : undefined}
         actions={
-          <RefreshButton
-            refreshing={refreshing}
-            onClick={refresh}
-            label={m.fulfillment_detail_refresh()}
-          />
+          <>
+            {item ? (
+              contextualAssistance ? (
+                <RecordAssistance
+                  organizationId={organizationId}
+                  context={{ record: { kind: 'fulfillment', id: item.id } }}
+                  label={orderLabel(item)}
+                />
+              ) : null
+            ) : null}
+            <RefreshButton
+              refreshing={refreshing}
+              onClick={refresh}
+              label={m.fulfillment_detail_refresh()}
+            />
+          </>
         }
         status={
           <>

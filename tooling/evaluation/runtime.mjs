@@ -12,6 +12,7 @@ import {
   parseEvidence,
   parseVerification,
 } from '@luma/execution/composition';
+import { PermissionSet } from '@luma/identity';
 import {
   builtInMembership,
   makeTenantContext,
@@ -61,7 +62,10 @@ export function createWorker(
       'evaluation',
     );
   const actor = context();
-  const refreshContext = async (c) => c;
+  const refreshContext = async (c) =>
+    checkpoint.revoked && c.actor.id === actor.actor.id
+      ? { ...c, permissions: new PermissionSet([]) }
+      : c;
   const recordObservations = async (batch) => {
     observations.push(structuredClone(batch));
   };
@@ -93,7 +97,24 @@ export function createWorker(
         }
       }
 
-      return dispatch(provider, instance, request);
+      const response = await dispatch(provider, instance, request);
+      if (
+        fixture.controls.unexpectedVerificationResponse &&
+        checkpoint.writeRequests > 0 &&
+        instance === 'jtl' &&
+        request.method === 'GET' &&
+        new URL(request.url).pathname.endsWith(
+          `/sales-orders/${incident.mapping.order.externalId}`,
+        ) &&
+        response.status === 200
+      ) {
+        const body = structuredClone(response.body);
+        body.shippingMethodId = '9';
+
+        return { ...response, body };
+      }
+
+      return response;
     });
   const jtl = createJtlConnector({
     tenantId: action.tenantId,

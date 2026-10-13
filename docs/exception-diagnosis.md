@@ -62,19 +62,34 @@ failures keep the deterministic result and are not retried on completed revision
 
 ## Scoped rereads
 
-The engine requests rereads for insufficient evidence and detected inventory mismatches
+The engine requests rereads for insufficient evidence and supported detected inventory, sync and fulfillment issues
 when a rereader is configured; without one, the result records rereads as unavailable and
 asks for manual investigation. The rereader in `@luma/resolution` uses only the existing
 `CapabilityReader`, with trusted bindings that plan reads from canonical mappings and
 publish through the detection pipeline.
 
+The default-off `active-diagnosis` release installs those bindings in the application and
+scheduled detection worker. Investigations require current `issues.manage` access and the
+installed connection owner's read authorization; support views cannot investigate. Permission,
+tenant, release and source authority are rechecked before publication. Superseded or resolved
+investigations cannot publish over the current diagnosis.
+
 - A plan holds at most two reads and is validated in full before the first request.
+- Each incident has one database-backed investigation lease and a retained 15-minute cooldown.
+  Provider retry-after can extend the cooldown. Point reads request ten records; a sync experiment
+  requests one hundred. The normalized response budget is 256 KiB. These are capability-call
+  limits; connector retry policies may make several transport attempts within a call.
 - Sync rereads use the incident's connection and capability and never narrow the complete
   scan to resource selectors. Inventory needs the mapped source SKU and stock pool;
   fulfillment needs the mapped source order. Missing or ambiguous mappings fail closed.
 - Workflow effects use execution reconciliation, not connector rereads.
 - The publisher receives normalized pages with completeness and cursors. A partial page
   cannot establish a complete scan or absence.
+- Normalized observations, their owner projections and detection ingestion share one transaction.
+  Inventory freshness is claimed only when both reads project to the same current mapped position.
+  Native-owned allocations cannot be treated as equivalent provider stock pools. Fulfillment
+  rereads leave hold/schedule eligibility unknown rather than reusing an expired eligibility claim.
+  A sync experiment does not advance the sync owner's checkpoint.
 - Retained and provider backoff are honored, with no retry loop. Cancellation is checked
   before each read and publication, and the publisher must honor the abort signal at the
   persistence boundary, so an expired investigation cannot commit. A five-second deadline
@@ -82,6 +97,13 @@ publish through the detection pipeline.
   is not published.
 
 A newly published revision reaches the worker as pending and is evaluated in turn.
+The retained experiment prevents that revision from immediately rereading itself. Complete
+passive findings stay usable while optional rereads are on cooldown; insufficient evidence stays
+failed with backoff. Successful experiments retain source timestamps, supporting observations,
+contradictions to persistent-read or snapshot-only explanations, remaining causal checks, actor,
+call budget and unknown read cost. They establish neither historical cause nor resolution, and
+grant no consequential write authority. Real incident volume and measured diagnosis benefit are
+required before production release.
 
 ## Optional model reasoning
 

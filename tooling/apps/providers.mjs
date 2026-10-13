@@ -89,6 +89,8 @@ export function createInstalledConnections(db, options) {
     registry: host.registry,
     decisionSources: host.decisionSources,
     providerCatalog: host.providerCatalog,
+    connectionEnvironment: host.connectionEnvironment,
+    sourceEnvironments: host.sourceEnvironments,
   };
 }
 

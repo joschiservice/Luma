@@ -62,6 +62,52 @@ function snapshot(
 }
 
 describe('deterministic evidence-grounded diagnoses', () => {
+  it('records independently tested hypothesis contradictions while preserving missing causal checks', () => {
+    const value = snapshot('inventory_mismatch', {
+      leftAvailable: '4',
+      rightAvailable: '12',
+      authority: 'left',
+      sellingSource: 'right',
+    });
+    const refs = [...value.input.facts.evidenceRefs];
+    const marker = {
+      ...value.evidence[0]!,
+      key: 'investigation:trusted',
+      adapterVersion: 'diagnosis-investigation-v1',
+      facts: {
+        incidentId: value.exceptionId,
+        complete: true,
+        calls: 2,
+        supportingEvidenceRefs: refs,
+      },
+    };
+    value.evidence.push(marker);
+    value.input.facts.evidenceRefs.push(marker.key);
+    const result = diagnose(value, corpus.now);
+    expect(result.facts.map((finding) => finding.code)).toContain(
+      'transient_snapshots_hypothesis_contradicted',
+    );
+    expect(
+      result.facts.find(
+        (finding) =>
+          finding.code === 'transient_snapshots_hypothesis_contradicted',
+      )?.evidenceRefs,
+    ).toEqual(refs);
+    expect(
+      result.hypotheses.every(
+        (hypothesis) =>
+          hypothesis.uncertainty === 'unsubstantiated' &&
+          hypothesis.missingChecks.length > 0,
+      ),
+    ).toBe(true);
+    expect(
+      result.nextSteps.some((step) => step.kind === 'manual_intervention'),
+    ).toBe(true);
+    marker.connectionId = value.input.facts.tenantId;
+    expect(
+      diagnose(value, corpus.now).facts.map((finding) => finding.code),
+    ).not.toContain('scoped_investigation_complete');
+  });
   for (const test of corpus.cases as {
     id: string;
     exceptionClass: ExceptionClass;

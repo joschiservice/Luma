@@ -1395,6 +1395,7 @@ export function createReplies(deps: ReplyDependencies) {
         return [
           {
             outboundId: outbound.id,
+            actionId: outbound.actionId,
             threadId: outbound.threadId,
             subject: outbound.document.subject,
             to: outbound.document.to.map((a) => a.address).join(', '),

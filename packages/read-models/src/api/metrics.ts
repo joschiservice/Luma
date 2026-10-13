@@ -24,6 +24,7 @@ import {
 export function metricRoutes(
   service?: OperationalMetrics,
   summary?: OperationalSummary,
+  reportingEnabled?: (tenantId: string) => Promise<boolean>,
 ) {
   const os = implement(apiContract.metrics).$context<HttpContext>();
 
@@ -36,6 +37,8 @@ export function metricRoutes(
             'UNAUTHENTICATED',
             'Sign in to continue',
           );
+        const reporting =
+          (await reportingEnabled?.(request.tenantContext.tenantId)) ?? false;
 
         return [
           ...orderMetricDefinitions.map((d) => ({
@@ -43,9 +46,17 @@ export function metricRoutes(
             dimensions: [...d.dimensions],
             filters: [...d.filters],
           })),
-          ...operationalMetricDefinitions.map((d) =>
-            operationalMetricDefinitionSchema.parse(d),
-          ),
+          ...operationalMetricDefinitions
+            .filter(
+              (d) =>
+                reporting ||
+                ![
+                  'resolution.detected',
+                  'resolution.completed',
+                  'resolution.completion_time',
+                ].includes(d.id),
+            )
+            .map((d) => operationalMetricDefinitionSchema.parse(d)),
         ];
       },
     ),

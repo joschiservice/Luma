@@ -17,11 +17,13 @@ import type {
 import { workspacePolicyVersion } from '../domain/action.js';
 import type { PolicyCapability } from '../domain/evaluate.js';
 import { approvalRequirement, evaluatePolicy } from '../domain/evaluate.js';
+import type { ScopedAutonomy } from './scoped-autonomy.js';
 
 export interface PolicyRepository {
   /** Reads the current workspace approval requirement and its revision. */
   workspacePolicy(tenantId: string): Promise<{
     revision: number;
+    autonomyRevision?: number;
     required: boolean;
     requireIndependentApproval: boolean;
   }>;
@@ -40,6 +42,7 @@ export interface PolicyRepository {
 }
 
 export interface PolicyDependencies {
+  autonomy?: Pick<ScopedAutonomy, 'evaluate'> | undefined;
   repository: PolicyRepository;
   appendEvidence(event: PolicyEvidence): Promise<void>;
   refreshContext(context: TenantContext): Promise<TenantContext>;
@@ -58,6 +61,7 @@ export function createPolicyService(deps: PolicyDependencies) {
     return workspacePolicyVersion(
       workspace.revision,
       workspace.requireIndependentApproval,
+      workspace.autonomyRevision,
     );
   };
 
@@ -141,6 +145,7 @@ export function createPolicyService(deps: PolicyDependencies) {
         const policyVersion = workspacePolicyVersion(
           workspace.revision,
           workspace.requireIndependentApproval,
+          workspace.autonomyRevision,
         );
         const now = deps.now();
         const approval = await deps.repository.findApproval(
@@ -149,16 +154,25 @@ export function createPolicyService(deps: PolicyDependencies) {
           actionHash,
           policyVersion,
         );
-        const { outcome, reason } = evaluatePolicy(
+        const scoped = await deps.autonomy?.evaluate(
+          fresh,
+          action,
+          capability.minimumRisk,
+        );
+        const baseline = evaluatePolicy(
           action,
           capability,
           fresh.permissions,
           fresh.actor.id,
           now.getTime(),
           approval,
-          workspace.required,
+          workspace.required || scoped?.outcome === 'approval_required',
           workspace.requireIndependentApproval,
         );
+        const { outcome, reason } =
+          baseline.outcome !== 'denied' && scoped?.outcome === 'denied'
+            ? { outcome: 'denied' as const, reason: 'scoped_autonomy' as const }
+            : baseline;
         const decision: PolicyDecision = {
           id: deps.id(),
           correlationId: context.requestId,
@@ -170,6 +184,8 @@ export function createPolicyService(deps: PolicyDependencies) {
           policyVersion,
           outcome,
           reason,
+          ...(scoped?.admission ? { autonomy: scoped.admission } : {}),
+          ...(scoped?.reason ? { autonomyBlock: scoped.reason } : {}),
           permission: capability.permission,
           ...(approval && reason === 'authorized'
             ? { approvalId: approval.id }
@@ -205,6 +221,7 @@ export function createPolicyService(deps: PolicyDependencies) {
       const policyVersion = workspacePolicyVersion(
         workspace.revision,
         workspace.requireIndependentApproval,
+        workspace.autonomyRevision,
       );
       const decision = await deps.repository.findDecision(
         context.tenantId,

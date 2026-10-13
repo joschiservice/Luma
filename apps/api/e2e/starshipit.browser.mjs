@@ -122,7 +122,14 @@ test('confirms source order and line identities, reviews the exact shipping corr
   await correction
     .getByRole('button', { name: 'Review correction', exact: true })
     .focus();
+  const previewResponse = page.waitForResponse(
+    (response) =>
+      response.url().endsWith('/order-update-preview') &&
+      response.request().method() === 'POST',
+    { timeout: 45_000 },
+  );
   await page.keyboard.press('Enter');
+  expect((await previewResponse).ok()).toBe(true);
   await expect(
     correction.getByText(
       'This correction needs approval under your workspace policy.',

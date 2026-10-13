@@ -174,14 +174,23 @@ export function createResolutionMetricReader(
   return (tenantId, asOf, scope: MeasurementScope = {}) =>
     db.transaction(tenantId, async (tx) => {
       await tx.query("SET LOCAL statement_timeout = '3000ms'");
-      const start = new Date(
-        Date.parse(asOf) - (scope.window === '24h' ? 1 : 7) * 86400000,
-      ).toISOString();
+      const end = new Date(scope.end ?? asOf).toISOString();
+      const start = scope.start
+        ? new Date(scope.start).toISOString()
+        : new Date(
+            Date.parse(end) -
+              (scope.window === '24h' ? 1 : scope.window === '30d' ? 30 : 7) *
+                86400000,
+          ).toISOString();
       const rows = (
         await tx.query<MeasurementSource & Record<string, unknown>>(
           `
       WITH cohort AS (
-        SELECT * FROM exceptions WHERE tenant_id=$1 AND document->>'firstDetectedAt'>=$2 AND document->>'firstDetectedAt'<$3 ORDER BY document->>'firstDetectedAt',id LIMIT 10001
+        SELECT * FROM exceptions WHERE tenant_id=$1 AND
+          ((document->>'firstDetectedAt'>=$2 AND document->>'firstDetectedAt'<$3) OR
+           (document->'resolution'->>'at'>=$2 AND document->'resolution'->>'at'<$3))
+          AND ($4::text IS NULL OR document->>'exceptionClass'=$4)
+          ORDER BY document->>'firstDetectedAt',id LIMIT 10001
       ), source_evidence AS (
         SELECT c.id AS incident_id,s.document FROM cohort c
         JOIN exception_evidence e ON e.tenant_id=c.tenant_id AND e.exception_id=c.id
@@ -202,6 +211,8 @@ export function createResolutionMetricReader(
         UNION SELECT c.id,'learning:' || e.id::text FROM cohort c JOIN resolution_runs r ON r.tenant_id=c.tenant_id AND r.incident_id=c.id JOIN resolution_learning_events e ON e.tenant_id=r.tenant_id AND e.run_id=r.id WHERE e.kind IN ('repair_step','intervention','human_edit') OR (e.kind='cause' AND e.document->'fact'->>'basis'='operator_investigation')
       ) SELECT c.id,c.document->>'exceptionClass' AS title,c.state,c.document->>'firstDetectedAt' AS "detectedAt",c.previous_exception_id AS "previousIncidentId",
         c.document->'resolution' AS resolution,
+        COALESCE((SELECT jsonb_agg(DISTINCT s.document->>'connectionId') FROM source_evidence s WHERE s.incident_id=c.id AND s.document->>'connectionId' IS NOT NULL),'[]') AS "connectionIds",
+        COALESCE((SELECT jsonb_agg(DISTINCT jsonb_build_object('id',r.document->'resolution'->>'id','version',r.document->'resolution'->>'version')) FROM resolution_runs r WHERE r.tenant_id=c.tenant_id AND r.incident_id=c.id AND r.document->'resolution'->>'id' IS NOT NULL AND r.document->'resolution'->>'version' IS NOT NULL),'[]') AS artifacts,
         COALESCE((SELECT jsonb_agg(document ORDER BY revision) FROM resolution_measurement_facts f WHERE f.tenant_id=$1 AND f.incident_id=c.id),'[]') AS events,
         COALESCE((SELECT jsonb_agg(ref ORDER BY ref) FROM humans h WHERE h.incident_id=c.id),'[]') AS "humanEvidence",
         EXISTS(SELECT 1 FROM source_evidence s LEFT JOIN connector_installations installation ON installation.tenant_id=$1 AND installation.id::text=s.document->>'connectionId'
@@ -213,7 +224,7 @@ export function createResolutionMetricReader(
           )) AS synthetic,
         EXISTS(SELECT FROM proposals p JOIN execution_observe_only o ON o.tenant_id=p.tenant_id AND o.proposal_id=p.id WHERE p.exception_id=c.id) AS "observeOnly"
       FROM cohort c ORDER BY c.document->>'firstDetectedAt',c.id`,
-          [tenantId, start, asOf],
+          [tenantId, start, end, scope.issueClass ?? null],
         )
       ).rows;
       if (rows.length > 10000)

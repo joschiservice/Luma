@@ -35,6 +35,7 @@ import {
   orderStage,
   reviewReasons,
 } from '../domain/commitments.js';
+import { followUpScopeFingerprint } from '../domain/follow-up-snapshot.js';
 import type {
   PurchaseOrder,
   Supplier,
@@ -321,6 +322,8 @@ export interface CommitmentDependencies {
       response: FollowUp['response'];
       note: string;
       nextCheckAt: string | null;
+      expectedOrderRevision?: number | undefined;
+      expectedScopeFingerprint?: string | undefined;
     };
   };
 }
@@ -2458,6 +2461,16 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
           async (tx) => {
             const order = await tx.order(orderId);
             if (!order) notFound('Purchase order not found');
+            if (
+              (request.expectedOrderRevision !== undefined ||
+                request.expectedScopeFingerprint !== undefined) &&
+              (request.expectedOrderRevision !== order!.revision ||
+                request.expectedScopeFingerprint !==
+                  followUpScopeFingerprint(order!))
+            )
+              conflict(
+                'The owned order changed after review. Refresh the proposal; the previous approval cannot authorize changed inputs.',
+              );
             const current = {
               followUps: await tx.followUps([orderId]),
               progress: progressFor(order!, {

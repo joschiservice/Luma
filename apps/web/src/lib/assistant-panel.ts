@@ -1,3 +1,4 @@
+import type { AssistantContext } from '@luma/api-contract';
 import { useSyncExternalStore } from 'react';
 
 const storageKey = 'luma-assistant';
@@ -44,17 +45,26 @@ export function useAssistantOpen() {
 const draftEvent = 'luma-assistant-draft';
 
 /** Opens the panel with `question` in the composer, ready to send. */
-export function askLuma(question = '') {
+export function askLuma(
+  question = '',
+  contextual?: { context: AssistantContext; label: string },
+) {
   setAssistantOpen(true);
-  if (question)
-    window.dispatchEvent(new CustomEvent(draftEvent, { detail: question }));
+  window.dispatchEvent(
+    new CustomEvent(draftEvent, { detail: { question, contextual } }),
+  );
 }
 
 /** Calls `onDraft` with questions handed to the panel from elsewhere, such as the command menu. */
-export function subscribeAssistantDraft(onDraft: (question: string) => void) {
+export function subscribeAssistantDraft(
+  onDraft: (
+    question: string,
+    contextual?: { context: AssistantContext; label: string },
+  ) => void,
+) {
   const listener = (event: Event) => {
-    if (event instanceof CustomEvent && typeof event.detail === 'string')
-      onDraft(event.detail);
+    if (event instanceof CustomEvent)
+      onDraft(event.detail.question, event.detail.contextual);
   };
   window.addEventListener(draftEvent, listener);
 

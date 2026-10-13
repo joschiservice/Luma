@@ -14,6 +14,12 @@ Kann Luma ein Problem über ein verbundenes System beheben, schlägt Luma eine �
 
 Ohne diese Berechtigungen kannst du das ganze Problem lesen, und die Prüfung zeigt **Du kannst zu diesem Problem derzeit keine Entscheidung treffen.**
 
+Wenn die gemeinsame Änderungsprüfung verfügbar ist, vergleiche **Vorher**, **Nachher** und **Erwartet vor der Ausführung**. Luma prüft den erwarteten Ausgangswert erneut vor dem Senden. Ein geänderter Wert stoppt die Aktion; prüfe dann einen neuen Vorschlag.
+
+Die Prüfung unterscheidet den Datensatz beim Anbieter vom Luma-Datensatz und zeigt betroffene Standorte, Aufträge und Positionen. **Unbekannt** bedeutet, dass der Vorschlag den Wert oder die vollständige Anzahl nicht belegt. Es bedeutet niemals null betroffene Datensätze. Ein neu angelegter Anbieter-Datensatz erhält seine ID erst beim Schreiben. Belege zeigen Beobachtungszeit und Alter; ein erfasstes Regelergebnis ersetzt keine aktuelle Freigabe.
+
+Eine mögliche Ausgleichsaktion braucht eine eigene Prüfung und ist kein automatisches Rückgängigmachen. Gesendete Nachrichten und Lieferantenverpflichtungen sind nicht rückgängig zu machen. Wird der Vorschlag während der Prüfung ersetzt, öffne **Vorheriger Vorschlag · ersetzt, keine Freigabe möglich**, um alte und neue Werte zu vergleichen.
+
 ## Vorgeschlagene Änderung prüfen [#review-the-proposed-change]
 
 **Vorgeschlagene Änderung prüfen** zeigt:

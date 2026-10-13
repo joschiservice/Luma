@@ -10,6 +10,7 @@ import {
   createResolutionPlaybooks,
   createSafetyServices as createAdmittedSafety,
 } from '@luma/application-runtime';
+import type { CapabilityReader } from '@luma/connections';
 import { createConnectionCoverage } from '@luma/connections/composition';
 import type {
   DetectionRequest,
@@ -31,6 +32,7 @@ import { createTenantDatabase } from '@luma/platform/composition';
 import { shippingMethodPlaybook } from '@luma/resolution';
 import {
   createOperationsOverview,
+  createResolutionImprovementDiscovery,
   createResolutionLearning,
   createShadowEvaluations,
 } from '@luma/resolution/composition';
@@ -46,6 +48,7 @@ import {
 } from 'vitest';
 
 import corpus from '../../exceptions/fixtures/exceptions-v0.json' with { type: 'json' };
+import { createActiveDiagnosisRereader } from './composition/active-diagnosis.js';
 import { detectionFixtures } from './test-support/detection-fixtures.js';
 import { createSafetyFixture as createSafetyServices } from './test-support/safety-fixtures.js';
 
@@ -188,6 +191,88 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
     await admin.query(`DROP DATABASE IF EXISTS "${name}"`);
     await admin.query(`DROP ROLE IF EXISTS "${name}"`);
     await admin.end();
+  });
+
+  it('publishes a scoped investigation as a new retained revision without closing a case or repeating the experiment', async () => {
+    const initial = request('active-investigation');
+    if (initial.input.exceptionClass !== 'sync_failure')
+      throw new Error('Invalid fixture');
+    initial.input.facts.errorCode = 'transient';
+    initial.input.facts.retryExhausted = true;
+    initial.input.facts.active = true;
+    initial.input.facts.scanComplete = false;
+    const incident = (await services.exceptions.ingest(context(), initial))
+      .incident;
+    if (!incident) throw new Error('Fixture did not open an incident');
+    const db = createTenantDatabase(runtime);
+    const read = vi.fn<CapabilityReader['read']>().mockResolvedValue({
+      ok: true,
+      value: { items: [], nextCursor: null, completeness: 'complete' },
+    });
+    const rereader = createActiveDiagnosisRereader({
+      database: db,
+      reader: {
+        read,
+        discover: async () => [
+          {
+            capability: 'inventory.read',
+            version: '0',
+            minimumRisk: 'low',
+            idempotency: 'none',
+            retry: { maxAttempts: 1, initialDelayMs: 0 },
+          },
+        ],
+      },
+      identity: { refreshContext: async (acting) => acting },
+      enabled: async () => true,
+      now: () => now,
+    });
+    if (!rereader) throw new Error('Missing active adapter');
+    const active = createDetectionServices(db, () => now, undefined, {
+      rereader,
+    });
+    const investigated = await active.diagnoses.run(context(), incident.id);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(investigated?.provenance.reread.status).toBe('completed');
+    expect(investigated?.revision).toBe(2);
+    expect(read).toHaveBeenCalledTimes(1);
+    const diagnosis = await active.diagnoses.run(context(), incident.id);
+    expect(diagnosis?.status).toBe('ready');
+    expect(diagnosis?.provenance.reread.status).toBe('completed');
+    expect(
+      diagnosis?.facts.some(
+        (finding) =>
+          finding.code === 'persistent_read_failure_hypothesis_contradicted',
+      ),
+    ).toBe(true);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(
+      (await active.exceptions.get(context(), incident.id))?.state,
+    ).not.toBe('resolved');
+    expect(
+      (await active.diagnoses.investigationBudget(context(), incident.id))
+        ?.completedAt,
+    ).toBe(now.toISOString());
+    expect(
+      await active.diagnoses.investigationBudget(
+        context(otherTenant),
+        incident.id,
+      ),
+    ).toBeNull();
+    const changed = request('active-investigation-again');
+    if (changed.input.exceptionClass !== 'sync_failure')
+      throw new Error('Invalid fixture');
+    changed.input.facts.errorCode = 'transient';
+    changed.input.facts.retryExhausted = true;
+    changed.input.facts.active = true;
+    now = new Date(now.getTime() + 1000);
+    changed.evidence[0]!.observedAt = now.toISOString();
+    await active.exceptions.ingest(context(), changed);
+    expect(
+      (await active.diagnoses.run(context(), incident.id))?.provenance.reread
+        .status,
+    ).toBe('rate_limited');
+    expect(read).toHaveBeenCalledTimes(1);
   });
   it('retains Shadow predictions and evidence-backed comparisons without execution', async () => {
     now = new Date();
@@ -784,6 +869,27 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
         complete: true,
         evidenceRefs: ['verification-1'],
       });
+      const discovery = createResolutionImprovementDiscovery(
+        db,
+        refreshContext,
+        async () => true,
+        () => new Date(now.getTime() + 1),
+      );
+      const discovered = await discovery.discover(context());
+      expect(discovered.items).toHaveLength(1);
+      expect(discovered.items[0]).toMatchObject({
+        pattern: 'sync_failure',
+        environment: 'unknown',
+        verifiedIncidents: 1,
+        humanInterventions: 1,
+        humanEdits: 1,
+        eligibleForProposal: false,
+        productionPromotion: 'blocked',
+        sources: [{ incidentId: incident.id, runId: run.id }],
+      });
+      expect((await discovery.discover(context(otherTenant))).items).toEqual(
+        [],
+      );
       const recurrenceSource = request(randomUUID());
       recurrenceSource.evidence[0]!.observedAt = now.toISOString();
       const recurrence = (

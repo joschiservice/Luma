@@ -1,3 +1,4 @@
+import type { ActionDiff } from '@luma/connections';
 import type { Permission, TenantContext } from '@luma/identity';
 import {
   hasPermission,
@@ -105,6 +106,11 @@ export type WorkflowPeople = (
 
 /** Combines native definitions and existing resolution definitions under one authorized catalog. */
 export function createWorkflowCatalog(deps: {
+  /** Reads the current waiting immutable action reviews; omitted while the release is off. */
+  actionReviews?: (
+    context: TenantContext,
+    requests: { id: string; proposalId: string }[],
+  ) => Promise<Map<string, ActionDiff | null>>;
   coordination?: ReturnType<typeof createWorkflowCoordination>;
   codeProcesses?: {
     supported(version: PublishedWorkflowVersion): boolean;
@@ -423,9 +429,40 @@ export function createWorkflowCatalog(deps: {
       context,
       starts.map((run) => run.id),
     );
-    const triggered = starts.map((run) =>
-      presentTriggerRun(run, evidence.get(run.id)),
-    );
+    const pending = starts.flatMap((run) => {
+      const step = [...(evidence.get(run.id) ?? [])]
+        .reverse()
+        .find(
+          (output) =>
+            output.kind === 'capability' &&
+            output.state === 'waiting' &&
+            typeof output.values.proposalId === 'string',
+        );
+
+      return step && typeof step.values.proposalId === 'string'
+        ? [
+            {
+              id: run.id,
+              stepId: step.stepId,
+              proposalId: step.values.proposalId,
+            },
+          ]
+        : [];
+    });
+    const reviews = await deps.actionReviews?.(context, pending);
+    const triggered = starts.map((run) => ({
+      ...presentTriggerRun(run, evidence.get(run.id)),
+      ...(reviews?.get(run.id)
+        ? {
+            actionReviews: [
+              {
+                stepId: pending.find((item) => item.id === run.id)!.stepId,
+                diff: reviews.get(run.id)!,
+              },
+            ],
+          }
+        : {}),
+    }));
     if (
       id === deps.replenishment?.definitionId ||
       deps.caseWorkflows?.owns(id) ||

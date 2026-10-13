@@ -124,6 +124,10 @@ export const measurementHistorySchema = z.object({
 });
 
 export const resolutionMetricItemSchema = z.object({
+  connectionIds: z.array(z.string().uuid()).optional(),
+  artifacts: z
+    .array(z.object({ id: z.string(), version: z.string() }))
+    .optional(),
   kind: z.literal('resolution'),
   id: z.string().uuid(),
   title: z.string(),

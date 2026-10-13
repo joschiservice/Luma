@@ -4,7 +4,10 @@ import {
   ConnectorError,
   type InstallationCapability,
 } from '@luma/connections';
-import { simulationTransport } from '@luma/connections/adapters';
+import {
+  boundedReadTransport,
+  simulationTransport,
+} from '@luma/connections/adapters';
 import { hasPermission } from '@luma/identity';
 import { z } from 'zod';
 
@@ -135,6 +138,19 @@ export function createJtlProvider(options: {
 
           return approvedJtlFetch(endpoint, writeMethods[capability])(...args);
         };
+      }
+
+      if (runtime.readBounds) {
+        if (!capability.endsWith('.read'))
+          throw new ConnectorError({
+            code: 'invalid_input',
+            effect: 'none',
+            retry: 'never',
+          });
+        fetch = boundedReadTransport(
+          fetch ?? globalThis.fetch,
+          runtime.readBounds,
+        );
       }
 
       return createJtlConnector({

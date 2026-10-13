@@ -100,6 +100,52 @@ async function evaluateScenario(version, fixture) {
       snapshot: incident.snapshot,
     });
     for (const command of controls.commands) {
+      if (command.kind === 'revoke' || command.kind === 'restore') {
+        checkpoint.revoked = command.kind === 'revoke';
+        continue;
+      }
+      if (command.kind === 'denied-execute') {
+        const writes = checkpoint.writeRequests;
+        await assert.rejects(
+          worker.playbooks.execute(worker.actor, incident.action.id),
+          (error) => error.code === 'FORBIDDEN',
+        );
+        assert.equal(
+          checkpoint.writeRequests,
+          writes,
+          'Revoked principal caused a provider write',
+        );
+        continue;
+      }
+      if (
+        command.kind === 'repeat-binding' ||
+        command.kind === 'stale-binding'
+      ) {
+        const binding = {
+          activationId: incident.activationId,
+          incidentId: incident.id,
+          diagnosisRevision: incident.diagnosis.revision,
+          action: incident.action,
+          snapshot: incident.snapshot,
+        };
+        if (command.kind === 'repeat-binding') {
+          const first = await worker.playbooks.bind(worker.actor, binding);
+          assert.deepEqual(
+            await worker.playbooks.bind(worker.actor, binding),
+            first,
+            'Duplicate delivery changed immutable run',
+          );
+        } else {
+          await assert.rejects(
+            worker.playbooks.bind(worker.actor, {
+              ...binding,
+              diagnosisRevision: binding.diagnosisRevision - 1,
+            }),
+            /Conflicting|revision|diagnosis/,
+          );
+        }
+        continue;
+      }
       if (command.kind === 'advance') {
         advance(checkpoint.provider, command.ms);
         continue;

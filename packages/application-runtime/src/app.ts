@@ -10,6 +10,8 @@ export { buildApp } from './composition/http-app.js';
 
 export { buildRuntimeApp } from './composition/runtime-app.js';
 
+export { createWorkflowImprovementControlHarness } from './composition/workflow-control-harness.js';
+
 export {
   createCommerceServices,
   createDeskServices,

@@ -34,7 +34,13 @@ const data: SettingsSnapshot = {
     policyRevision: 0,
     writeMode: 'writes_enabled',
   },
-  preferences: { issues: false, connections: false, revision: 0 },
+  preferences: {
+    issues: false,
+    connections: false,
+    morningBrief: false,
+    morningBriefTime: '08:00',
+    revision: 0,
+  },
   deliveryAvailable: true,
   emailPaused: null,
   lastTest: null,
@@ -73,6 +79,8 @@ function mockTeam({
     members: { items: team === 'large' ? largeTeam : membersFixture },
     invitations: { items: [] },
     roles: rolesFixture,
+    autonomy: { available: false, policies: [] },
+    'source-environments': { available: false, items: [] },
   };
   globalThis.fetch = async (input, init) => {
     const url = new URL(
@@ -103,6 +111,7 @@ function Preview({
   roleId,
   team = 'small',
   solo = false,
+  morningBrief = false,
 }: {
   section?: SettingsSection;
   state?: 'ready' | 'loading' | 'error' | 'mail-unavailable' | 'mail-paused';
@@ -110,6 +119,7 @@ function Preview({
   roleId?: string;
   team?: 'small' | 'large';
   solo?: boolean;
+  morningBrief?: boolean;
 }) {
   const [client] = useState(() => {
     const value = new QueryClient({
@@ -149,6 +159,7 @@ function Preview({
                   ? undefined
                   : {
                       ...data,
+                      morningBriefAvailable: morningBrief,
                       workspace: {
                         ...data.workspace,
                         activeMemberCount: solo ? 1 : 2,
@@ -301,6 +312,30 @@ export const LargeTeam: Story = {
     await waitFor(() => expect(pages).toHaveTextContent('1–8 of 8 people'));
     await expect(
       within(pages).getByRole('button', { name: 'Next' }),
+    ).toBeDisabled();
+  },
+};
+
+export const MorningBrief: Story = {
+  args: { section: 'notifications', member: true, morningBrief: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const time = canvas.getByLabelText('Delivery time (Europe/Berlin)');
+    await expect(time).toBeDisabled();
+    await userEvent.click(
+      canvas.getByRole('switch', { name: 'Daily morning brief' }),
+    );
+    await expect(time).toBeEnabled();
+    await expect(time).toHaveValue('08:00');
+    await expect(
+      canvas.getByRole('button', { name: 'Save changes' }),
+    ).toBeEnabled();
+    await userEvent.click(
+      canvas.getByRole('switch', { name: 'Daily morning brief' }),
+    );
+    await expect(time).toBeDisabled();
+    await expect(
+      canvas.getByRole('button', { name: 'Save changes' }),
     ).toBeDisabled();
   },
 };

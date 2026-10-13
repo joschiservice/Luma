@@ -76,6 +76,56 @@ const metric = (sources: MeasurementSource[], id: string) =>
     (m) => m.definition.id === `resolution.${id}`,
   )!;
 
+it('keeps late verification in its completion interval and outside the new detection denominator', () => {
+  const input = source({ detectedAt: '2026-09-01T10:00:00.000Z' });
+  const results = summarizeResolutionMetrics([input], asOf, {
+    start: '2026-09-29T12:00:00.000Z',
+    end: asOf,
+  });
+  expect(
+    results.find((m) => m.definition.id === 'resolution.completed')?.value,
+  ).toBe(1);
+  expect(
+    results.find((m) => m.definition.id === 'resolution.detected')?.value,
+  ).toBe(0);
+  expect(
+    results.find((m) => m.definition.id === 'resolution.eligible')?.value,
+  ).toBe(0);
+  expect(
+    results
+      .find((m) => m.definition.id === 'resolution.completion_time')
+      ?.items.map((i) => i.id),
+  ).toEqual(['incident']);
+});
+
+it('uses half-open reporting bounds, exact source/class filters and explicit recurrence links', () => {
+  const sources = [
+    source({ id: 'before', detectedAt: '2026-09-29T11:59:59.999Z' }),
+    source({
+      id: 'inside',
+      detectedAt: '2026-09-29T12:00:00.000Z',
+      connectionIds: ['connection'],
+      previousIncidentId: 'earlier',
+    }),
+    source({ id: 'outside', detectedAt: asOf }),
+    source({ id: 'other-source', connectionIds: ['other'] }),
+  ];
+  const results = summarizeResolutionMetrics(sources, asOf, {
+    start: '2026-09-29T12:00:00.000Z',
+    end: asOf,
+    connectionId: 'connection',
+    issueClass: 'inventory_mismatch',
+  });
+  expect(
+    results
+      .find((m) => m.definition.id === 'resolution.detected')
+      ?.items.map((i) => i.id),
+  ).toEqual(['inside']);
+  expect(
+    results.find((m) => m.definition.id === 'resolution.recurrent')?.breakdown,
+  ).toContainEqual({ reason: 'class:inventory_mismatch', count: 1 });
+});
+
 it('counts incident IDs independently of attempts and reconciles every count with its cohort', () => {
   const input = source({
     humanEvidence: ['approval:a', 'approval:b', 'repair:a'],

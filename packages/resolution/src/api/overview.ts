@@ -84,7 +84,12 @@ export function operationsRoutes(
           );
 
         return operationsOverviewSchema.parse(
-          await service(request.tenantContext, query.window),
+          await service(
+            request.tenantContext,
+            query.window,
+            query.end ? new Date(query.end) : undefined,
+            query.start ? new Date(query.start) : undefined,
+          ),
         );
       },
     ),

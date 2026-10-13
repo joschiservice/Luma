@@ -46,6 +46,11 @@ export function workflowGenerationRoutes(service?: DraftGeneration) {
   const os = implement(apiContract.workflowGeneration).$context<HttpContext>();
 
   return os.router({
+    discover: os.discover.handler(async ({ context: { request } }) => {
+      const s = use(request);
+
+      return await s.service.discover(s.context);
+    }),
     availability: os.availability.handler(async ({ context: { request } }) => {
       const s = use(request);
 

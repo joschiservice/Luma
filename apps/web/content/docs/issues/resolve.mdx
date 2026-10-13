@@ -24,6 +24,12 @@ Without these permissions you can still read the whole issue, and the review say
 - **Expected outcome**: what Luma checks afterward to confirm the fix.
 - **Evidence for this change**: the data the proposal relies on. Luma either keeps it current while you review, or shows until when it’s valid and when the proposal expires.
 
+When the shared change review is available, compare **Before**, **After** and **Expected before dispatch**. The expected value is the baseline Luma will check again before sending the change. A changed baseline stops the action; review a fresh proposal before continuing.
+
+The review identifies the provider record separately from the Luma record and lists the affected locations, orders and lines. **Unknown** means the proposal did not establish that value or the full affected count. It never means zero. A record created by the action has an unknown provider ID until the provider assigns one. Evidence shows its observation time and age; a recorded approval-rule result does not replace the current approval controls.
+
+**A separate compensating action may be possible** means another reviewed action may correct the result. It is not an automatic undo. **Irreversible** changes, such as a sent message or supplier commitment, need particular care. When a proposal is replaced while you check it, expand **Previous proposal · replaced, cannot be approved** to compare the old review with the fresh one.
+
 **Can’t be undone automatically** means the proposal has no way to reverse the change. Don’t assume you can undo it.
 
 ## Check what the approval rules require

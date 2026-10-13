@@ -103,6 +103,7 @@ export interface CaseDecisionFacts {
   requester_id: string | null;
   decision_id: string | null;
   proposal: {
+    id?: string;
     capability: string;
     target: { kind: string; id: string };
     parameters: Record<string, string | number | boolean | null>;
@@ -259,6 +260,7 @@ export function presentCase(
             { label: 'Risk', value: humanize(proposal.risk) },
           ]
         : [{ label: 'Issue', value: label }],
+      ...(proposal?.id ? { actionReference: { proposalId: proposal.id } } : {}),
       group: {
         key: `case:${facts.class}:approval`,
         label: `${label} fixes awaiting approval`,
@@ -424,6 +426,7 @@ export function presentReplenishment(
 
 /** Something about a sent or sending purchase order that needs a person, from the procurement owner. */
 export interface SupplierCommitmentDecision {
+  submissionId?: string | undefined;
   observeOnly?: boolean;
   key: string;
   kind:
@@ -488,6 +491,9 @@ export function presentSupplierCommitment(
     .map((l) => `${l.quantity} ${l.unit} ${l.sku}`)
     .join(', ');
   const base = {
+    ...(item.submissionId
+      ? { actionReference: { runId: item.submissionId, stepId: 'submit' } }
+      : {}),
     id: `supplier:${item.key}`,
     kind: 'supplier_commitment' as const,
     domain: 'procurement' as const,

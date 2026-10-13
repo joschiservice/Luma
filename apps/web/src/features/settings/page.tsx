@@ -43,9 +43,11 @@ import {
 } from './command';
 import { AppearanceSettings, HomeSidebarSettings } from './personal';
 import { RolesSettings } from './roles';
+import { ScopedAutonomySettings } from './scoped-autonomy';
 import { SectionHeading } from './section-heading';
 import { SecuritySettings } from './security';
 import { SourceAuthoritySettings } from './source-authority';
+import { SourceEnvironmentSettings } from './source-environments';
 import { SupportAccessSettings } from './support-access';
 import { TeamSettings } from './team';
 
@@ -283,12 +285,28 @@ export function SettingsView({
                 />
               ) : null}
               {section === 'approvals' ? (
-                <ApprovalsForm
-                  key={`${organizationId}:approvals`}
-                  data={data}
-                  organizationId={organizationId}
-                  disabled={!can('workspace.approval_policy.manage') || !online}
-                />
+                <>
+                  <ApprovalsForm
+                    key={`${organizationId}:approvals`}
+                    data={data}
+                    organizationId={organizationId}
+                    disabled={
+                      !can('workspace.approval_policy.manage') || !online
+                    }
+                  />
+                  <ScopedAutonomySettings
+                    organizationId={organizationId}
+                    disabled={
+                      !can('workspace.approval_policy.manage') ||
+                      !online ||
+                      supportView
+                    }
+                  />
+                  <SourceEnvironmentSettings
+                    organizationId={organizationId}
+                    disabled={!online || supportView}
+                  />
+                </>
               ) : null}
               {section === 'security' && supportView ? (
                 <Alert tone="neutral">
@@ -516,6 +534,34 @@ function NotificationsForm({
             disabled={disabled || command.locked}
             change={(connections) => setDraft({ ...value, connections })}
           />
+          {data.morningBriefAvailable ? (
+            <>
+              <PreferenceRow
+                title={m.settings_notifications_brief_title()}
+                description={m.settings_notifications_brief_description()}
+                checked={value.morningBrief}
+                disabled={disabled || command.locked}
+                change={(morningBrief) => setDraft({ ...value, morningBrief })}
+              />
+              <div className="settings-field">
+                <label htmlFor="morning-brief-time">
+                  {m.settings_notifications_brief_time({
+                    timezone: data.workspace.timezone,
+                  })}
+                </label>
+                <Input
+                  id="morning-brief-time"
+                  type="time"
+                  value={value.morningBriefTime}
+                  required
+                  disabled={disabled || command.locked || !value.morningBrief}
+                  onChange={(event) =>
+                    setDraft({ ...value, morningBriefTime: event.target.value })
+                  }
+                />
+              </div>
+            </>
+          ) : null}
         </div>
         <p className="settings-note">
           <Check size={14} aria-hidden="true" />{' '}
@@ -528,7 +574,9 @@ function NotificationsForm({
             disabled ||
             command.locked ||
             (value.issues === data.preferences.issues &&
-              value.connections === data.preferences.connections)
+              value.connections === data.preferences.connections &&
+              value.morningBrief === data.preferences.morningBrief &&
+              value.morningBriefTime === data.preferences.morningBriefTime)
           }
         />
         <CommandFeedback command={command} />
@@ -713,9 +761,14 @@ function ReadOnlyNotice({
   return (
     <Alert tone="neutral">
       <LockKeyhole size={14} aria-hidden="true" />{' '}
-      {rich(m.settings_read_only_notice, {
-        permission: <strong>{label}</strong>,
-      })}
+      {rich(
+        permission === 'workspace.approval_policy.manage'
+          ? m.settings_approvals_read_only_notice
+          : m.settings_read_only_notice,
+        {
+          permission: <strong>{label}</strong>,
+        },
+      )}
     </Alert>
   );
 }

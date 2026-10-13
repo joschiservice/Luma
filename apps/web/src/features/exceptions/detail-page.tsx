@@ -13,6 +13,7 @@ import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { z } from 'zod';
 
 import { connectionsOptions } from '../../kit/connections/data';
+import { RecordAssistance } from '../../kit/record-assistance';
 import { CaseOrderChangePlan } from '../orders/change-plan';
 import { IssueActions } from './actions';
 import { useCaseObservation } from './observation';
@@ -59,6 +60,13 @@ function IssueWorkspace({
       item={item}
       back={
         <>
+          {item ? (
+            <RecordAssistance
+              organizationId={organizationId}
+              context={{ record: { kind: 'issue', id: item.id } }}
+              label={caseLabel(item.class)}
+            />
+          ) : null}
           <Link
             to="/app/$organizationId/exceptions/$exceptionId"
             params={{ organizationId, exceptionId }}

@@ -68,6 +68,30 @@ Requiring another person is off while only one active member has workspace acces
 
 Permissions, required reviews and a fresh check of the outcome still apply. Changing either setting, or gaining or losing the second active member, means open reviews must be refreshed before their changes can run.
 
+### Delegate internal follow-ups
+
+If **Delegated follow-ups** is available under **Approvals**, create a policy for the suppliers, receiving locations or purchase orders Luma may follow up. An empty selection covers every eligible record in that dimension. Set a daily note limit and give a review reason. New policies start in **Manual** mode.
+
+- **Manual** lets you handle the responsibility yourself.
+- **Assisted** asks for a decision before Luma records an internal follow-up. Open **Needs you** to review the exact note and order.
+- **Autonomous** permits eligible internal notes within reviewed limits. It requires explicit promotion after enough live reviews and independent verification. Synthetic and unknown evidence do not earn this authority. Other approval rules still apply.
+
+These notes are recorded in Luma; they do not send a supplier message or place an order. Daily limits use UTC and include reserved attempts. Optional money limits block work when the amount or currency is unknown.
+
+Choose **Preview recorded work** to see how the current policy treats retained samples, with live, synthetic and unknown results labelled separately. A preview does not execute anything or prove production reliability. Pause the scope or internal connection to prevent new work. Failed or uncertain verification also pauses the policy and lowers its mode; review the evidence before resuming.
+
+When order inputs or policy change, refresh the proposal in **Needs you** and review a new decision. Earlier approval does not transfer. Verify an uncertain existing attempt before retrying; verification does not send another note.
+
+### Review operational source use
+
+In **Settings → Approvals**, connection managers can review **Source operational use**. Select **Read source evidence** for the connection you use for real operations. Review the authenticated source, its revisions and the read time. The review expires after five minutes.
+
+Confirm that you reviewed the source and that it contains real operational commerce data. Add a reason, then select **Save reviewed live declaration**. This is a reviewed workspace declaration, not provider certification. It does not grant write permission or enable Autonomous mode. Synthetic sources cannot be declared live, and unknown or synthetic history cannot earn autonomous authority.
+
+If a save response is lost, select **Check saved declaration** before preparing another change. Luma retries the same reviewed command. If the connection or credentials change, source use becomes unknown until a fresh review and declaration. Earlier history keeps its original classification.
+
+To stop using a declaration, add a reason and select **Revoke live declaration**. Revocation prevents the declaration from establishing live source use for new work; it does not rewrite earlier history or undo dispatched actions.
+
 ## Luma support
 
 **Luma support** decides whether Luma support can look into a problem by seeing this workspace as one of your members. Changing it needs **Manage Luma support access**.

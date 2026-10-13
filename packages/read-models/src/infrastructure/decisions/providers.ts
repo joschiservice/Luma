@@ -43,9 +43,10 @@ export function replenishmentDecisionProvider(
     label: 'Replenishment',
     permission: 'procurement.read',
     pending: async (context) =>
-      (await pending(context)).map((item) =>
-        presentReplenishment(item, context.actor.id),
-      ),
+      (await pending(context)).map((item) => ({
+        ...presentReplenishment(item, context.actor.id),
+        actionReference: { runId: item.runId, stepId: 'create-order' },
+      })),
   };
 }
 

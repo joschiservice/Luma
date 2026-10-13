@@ -287,12 +287,18 @@ function ModuleFrame({
  */
 export function HomePage() {
   const { organizationId } = useParams({ from: '/app/$organizationId/home' });
-  const { window } = useSearch({ from: '/app/$organizationId/home' });
+  const { window, start, end } = useSearch({
+    from: '/app/$organizationId/home',
+  });
   const navigate = useNavigate({ from: '/app/$organizationId/home' });
   const timeZone = useContext(WorkspaceTimezone);
   const client = useQueryClient();
   const session = client.getQueryData(sessionOptions().queryKey);
-  const overview = useQuery(overviewOptions(organizationId, window));
+  const bounds =
+    start && end && Date.parse(start) < Date.parse(end)
+      ? { start, end }
+      : undefined;
+  const overview = useQuery(overviewOptions(organizationId, window, bounds));
   const slowOverview = useSlowRequest(overview.isFetching);
   const workspace = useWorkspaceLayout(organizationId);
   const adaptive = useQuery(adaptiveAvailabilityOptions(organizationId));
@@ -383,17 +389,29 @@ export function HomePage() {
       <header className="home-header">
         <div className="home-header-copy">
           <p className="home-date">{today}</p>
+          {bounds ? (
+            <p className="home-note">
+              {m.home_brief_window({
+                start: formatWorkspaceDateTime(bounds.start, timeZone),
+                end: formatWorkspaceDateTime(bounds.end, timeZone),
+              })}
+            </p>
+          ) : null}
           <h1>{greeting(timeZone, session?.user.name)}</h1>
         </div>
         <div className="home-header-actions">
-          <Select<HomeWindow>
+          <Select<HomeWindow | 'brief'>
             aria-label={m.home_window_label()}
             className="home-window"
-            value={window}
+            value={bounds ? 'brief' : window}
             onValueChange={(value) => {
-              if (value) void navigate({ search: { window: value } });
+              if (value && value !== 'brief')
+                void navigate({ search: { window: value } });
             }}
             options={[
+              ...(bounds
+                ? [{ value: 'brief' as const, label: m.home_window_brief() }]
+                : []),
               { value: '24h', label: m.home_window_24h() },
               { value: '7d', label: m.home_window_7d() },
             ]}

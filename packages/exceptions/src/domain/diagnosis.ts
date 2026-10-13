@@ -639,6 +639,75 @@ export function diagnose(snapshot: DiagnosisInput, now: string): Diagnosis {
       'Independent authoritative verification proves the class postcondition.',
     );
   }
+  const investigation = evidence.find(
+    (entry) =>
+      entry.adapterVersion === 'diagnosis-investigation-v1' &&
+      entry.connectionId === null &&
+      entry.source === null &&
+      entry.facts.incidentId === snapshot.exceptionId &&
+      entry.facts.complete === true &&
+      typeof entry.facts.calls === 'number' &&
+      entry.facts.calls > 0 &&
+      entry.facts.calls <= 2,
+  );
+  if (investigation) {
+    const advice = investigation.facts.retryAfterMs;
+    const retryAt =
+      typeof advice === 'number' && Number.isFinite(advice) && advice > 0
+        ? Date.parse(investigation.observedAt) + advice
+        : null;
+    result.provenance.reread = {
+      status: 'completed',
+      retryAfter:
+        retryAt !== null && Number.isFinite(retryAt)
+          ? new Date(retryAt).toISOString()
+          : null,
+    };
+    const observed = Array.isArray(investigation.facts.supportingEvidenceRefs)
+      ? investigation.facts.supportingEvidenceRefs.filter(
+          (ref): ref is string =>
+            typeof ref === 'string' &&
+            refs.includes(ref) &&
+            ref !== investigation.key,
+        )
+      : [];
+    result.facts.push({
+      code: 'scoped_investigation_complete',
+      text: 'A bounded read-only investigation retained fresh source observations. It granted no action authority.',
+      evidenceRefs: [investigation.key, ...observed],
+    });
+    if (input.exceptionClass === 'inventory_mismatch') {
+      const left = evidence.find(
+        (entry) => entry.connectionId === input.facts.connectionIds[0],
+      );
+      const right = evidence.find(
+        (entry) => entry.connectionId === input.facts.connectionIds[1],
+      );
+      result.facts.push({
+        code: 'investigated_source_timestamps',
+        text: `Luma observed the left source at ${input.facts.leftObservedAt} and the right source at ${input.facts.rightObservedAt}. Source modification times are ${left?.sourceUpdatedAt ?? 'unknown'} and ${right?.sourceUpdatedAt ?? 'unknown'}; differing source clocks do not establish a cause.`,
+        evidenceRefs: observed,
+      });
+      if (decision.decision === 'detect')
+        result.facts.push({
+          code: 'transient_snapshots_hypothesis_contradicted',
+          text: 'Fresh complete rereads still disagree. The previous snapshots alone cannot explain away this difference; allocation semantics and source update history remain unchecked.',
+          evidenceRefs: observed,
+        });
+    }
+    if (
+      input.exceptionClass === 'sync_failure' &&
+      decision.decision === 'clear'
+    )
+      result.facts.push({
+        code: 'persistent_read_failure_hypothesis_contradicted',
+        text: 'The same scoped capability now returned a complete read. This contradicts a continuing read failure but does not establish its original cause or advance the sync checkpoint.',
+        evidenceRefs: observed,
+      });
+    result.constraints.push(
+      'Read-only experiments test current observations. They do not prove historical cause, exclusive action attribution or incident resolution.',
+    );
+  }
   const dueAt = new Date(
     Date.parse(snapshot.firstDetectedAt) + delay * 1000,
   ).toISOString();

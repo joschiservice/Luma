@@ -18,7 +18,8 @@ export type Block =
   | { type: 'paragraph'; lines: Inline[][] }
   | { type: 'list'; ordered: boolean; items: Inline[][] };
 
-const kinds = 'order|issue|stock_position|fulfillment|return';
+const kinds =
+  'order|issue|stock_position|fulfillment|return|customer|purchase_order';
 const inlinePattern = new RegExp(
   `(\\[\\[(?:${kinds}):[0-9a-f-]{36}\\]\\]|\\*\\*[^*\\n]+\\*\\*|\`[^\`\\n]+\`)`,
   'g',
@@ -111,6 +112,8 @@ export const recordDomain: Record<AssistantRecordKind, Domain> = {
   stock_position: 'inventory',
   fulfillment: 'fulfillment',
   return: 'returns',
+  customer: 'customers',
+  purchase_order: 'procurement',
 };
 
 /** "Issue · Stuck fulfillment"; other labels already name their kind. */

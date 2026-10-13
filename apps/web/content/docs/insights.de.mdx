@@ -70,6 +70,31 @@ So werden Probleme gezählt:
 
 Ein Problem wurde automatisch gelöst, wenn es für Automatisierung geeignet war, bestätigt wurde und ein vollständiger Nachweis zeigt, dass keine Person geholfen hat. Diese Probleme zählen unter **Ohne Hilfe gelöst**. Das Modul **Lösungsergebnisse** unter **Start** zeigt dieselben Live-Ergebnisse als **Automatisch gelöst** und als **Automatische Lösungsquote**. [Workflow-Tests](/docs/shadow-mode) zählen nie als Live-Ergebnisse.
 
+## Lösungsleistung prüfen [#review-resolution-performance]
+
+Wenn der Bereich in deinem Workspace verfügbar ist, wähle unter **Lösungsleistung** sieben
+Tage, 30 Tage oder einen eigenen Zeitraum. Eigene Grenzen sind ausdrückliche UTC-Zeitpunkte;
+der Bericht zeigt sie in deiner Workspace-Zeitzone. Filtere nach Verbindung, Problemklasse
+und Umgebung. Live-Betrieb ist die Vorgabe; simulierte Arbeit und Piloten bleiben getrennt.
+
+**Erkannte Probleme** zählt die erste Erkennung im Zeitraum. **Im Zeitraum verifiziert**
+zählt unabhängige Prüfungen darin, auch für früher erkannte Probleme. Eignung und menschliche
+Beteiligung verwenden weiterhin die Erkennungsgruppe einschließlich noch offener geeigneter
+Arbeit. Angenommene Änderungen, fehlgeschlagene Prüfungen und manuelles Schließen zählen
+nicht als verifiziert.
+
+Öffne eine Zahl für genau ihre Probleme und Nachweise. Die Tagestabelle verwendet UTC-Tage;
+ein Tag oder eine wiederkehrende Klasse grenzt den Bericht ein. Verbindungs- und erfasste
+Workflow-Versionszeilen bieten dieselben genauen Filter. Mit Zurück im Browser stellst du
+den vorherigen Zeitraum wieder her. Ändert sich die Gruppe beim Blättern, aktualisiere sie.
+
+Der Bericht kennzeichnet kleine Dauerstichproben und unvollständige Beteiligungsnachweise.
+Eine Autonomiequote erscheint nur bei einer nicht leeren, vollständig klassifizierten
+geeigneten Gruppe. Vergleiche verwenden gleich lange Zeiträume mit ausreichend erfassten
+Fällen und erklären keine Ursachen. **Der Datenstand ist unbekannt** bedeutet, dass die
+Zahlen erfasste Probleme und keine vollständige Anbieterabdeckung zeigen. Versionsgruppen
+können sich über mehrere Versuche überschneiden; addiere sie nicht zur Gesamtzahl.
+
 ## Bestellungen mit offener Arbeit [#orders-that-need-work]
 
 **Bestellungen mit offener Arbeit** zählt Bestellungen, die Aufmerksamkeit brauchen, etwa überfällige Bestellungen und Bestellungen, die auf dich warten. Jede Bestellung zählt einmal, auch wenn sie in mehreren verbundenen Systemen vorkommt. Wähle **Passende Bestellungen anzeigen**, um sie zu sehen, oder öffne sie in Bestellungen. Der Bereich zeigt, ob die Daten aktuell sind, **Daten veraltet** oder **Noch keine Bestelldaten**. Die Zahlen umfassen nur Bestellungen, die Luma gelesen hat; eine Null beweist also nicht, dass es keine gibt.

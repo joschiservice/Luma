@@ -79,5 +79,17 @@
   "email_account_erased_preview": "Dein Konto und die damit verknüpften personenbezogenen Daten werden gelöscht.",
   "email_account_erased_heading": "Dein Konto wurde gelöscht",
   "email_account_erased_body": "Luma löscht jetzt dein Konto und die damit verknüpften personenbezogenen Daten. Du kannst dich nicht mehr anmelden, und das Konto kann nicht wiederhergestellt werden.",
-  "email_account_erased_records": "Workspaces, in denen du Mitglied warst, behalten die Aufzeichnungen deiner Arbeit und zeigen dich als ehemaliges Mitglied."
+  "email_account_erased_records": "Workspaces, in denen du Mitglied warst, behalten die Aufzeichnungen deiner Arbeit und zeigen dich als ehemaliges Mitglied.",
+  "email_morning_brief_subject": "Morgenüberblick · {workspace}",
+  "email_morning_brief_preview": "Deine Entscheidungen, laufende Arbeit und unabhängig verifizierte Ergebnisse.",
+  "email_morning_brief_window": "Verifizierte Ergebnisse: {start} bis {end}. Offene Entscheidungen und Fälle zeigen den aktuellen Stand.",
+  "email_morning_brief_attention": "Braucht dich",
+  "email_morning_brief_active": "Ungelöste Fälle",
+  "email_morning_brief_verified": "Unabhängig verifizierte Fälle",
+  "email_morning_brief_honesty": "Die Ergebnisse zählen verifizierte Fälle, keine Aktionen oder SKUs. Ausgeführte Änderungen ohne Verifizierung bleiben ungelöst. Erfasste Fälle belegen keine vollständige Abdeckung der Anbieter.",
+  "email_morning_brief_partial": "Einige Entscheidungsquellen oder Messklassifizierungen sind unvollständig. Bekannte Zahlen beschreiben verfügbare Datensätze; automatische Ergebnisse werden nicht abgeleitet.",
+  "email_morning_brief_case_verified": "Verifiziert: {label}",
+  "email_morning_brief_case_ongoing": "Laufend: {label}",
+  "email_morning_brief_open": "Home öffnen",
+  "email_morning_brief_unavailable": "Für deinen Zugriff nicht verfügbar"
 }

@@ -1,4 +1,5 @@
 import type { AssistantAnswer } from '@luma/api-contract';
+import { Button } from '@luma/ui/components/primitives/button';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -10,6 +11,7 @@ import {
 import { useState } from 'react';
 import { expect, userEvent, within } from 'storybook/test';
 
+import { askLuma } from '../../lib/assistant-panel';
 import { StoryShell } from '../../shell/storybook-shell';
 import { AssistantPanel } from './panel';
 
@@ -123,7 +125,13 @@ function mockAssistant(state: State) {
 }
 
 /** The shell with the panel open; `state` selects the mocked server responses. */
-function Preview({ state }: { state: State }) {
+function Preview({
+  state,
+  contextual = false,
+}: {
+  state: State;
+  contextual?: boolean;
+}) {
   const [client] = useState(
     () => new QueryClient({ defaultOptions: { queries: { retry: false } } }),
   );
@@ -136,6 +144,24 @@ function Preview({ state }: { state: State }) {
             <StoryShell
               key={state}
               page="Orders"
+              children={
+                contextual ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      askLuma('What happened and what can I review next?', {
+                        context: {
+                          record: { kind: 'order', id: orders[1][0] },
+                        },
+                        label: 'Order #1047',
+                      })
+                    }
+                  >
+                    Explain with Luma
+                  </Button>
+                ) : undefined
+              }
               assistant={
                 <AssistantPanel organizationId={organizationId} open />
               }
@@ -232,4 +258,19 @@ export const Dark: Story = {
 export const Mobile: Story = {
   ...Answered,
   globals: { viewport: { value: 'mobile1', isRotated: false } },
+};
+
+export const ContextualRecord: Story = {
+  args: { contextual: true },
+  play: async ({ canvasElement }) => {
+    const panel = within(canvasElement);
+    await userEvent.click(
+      panel.getByRole('button', { name: 'Explain with Luma' }),
+    );
+    await expect(panel.getByText('Investigating: Order #1047')).toBeVisible();
+    await userEvent.click(panel.getByRole('button', { name: 'Ask' }));
+    await expect(
+      await panel.findByRole('heading', { name: 'Sources' }),
+    ).toBeVisible();
+  },
 };

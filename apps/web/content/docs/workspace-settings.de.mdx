@@ -68,6 +68,30 @@ Die Genehmigung durch eine andere Person ist ausgeschaltet, solange nur ein akti
 
 Berechtigungen, erforderliche Prüfungen und eine erneute Prüfung des Ergebnisses gelten weiterhin. Wenn du eine Einstellung änderst oder das zweite aktive Mitglied hinzukommt oder seinen Zugriff verliert, müssen offene Prüfungen aktualisiert werden, bevor ihre Änderungen ausgeführt werden können.
 
+### Interne Nachverfolgungen delegieren
+
+Wenn **Delegierte Nachverfolgungen** unter **Genehmigungen** verfügbar ist, erstelle eine Richtlinie für Lieferanten, Empfangsorte oder Bestellungen, die Luma nachverfolgen darf. Eine leere Auswahl umfasst alle berechtigten Datensätze dieser Dimension. Lege eine tägliche Notizgrenze fest und gib einen Prüfgrund an. Neue Richtlinien beginnen im Modus **Manuell**.
+
+- **Manuell** überlässt dir die Aufgabe.
+- **Assistiert** verlangt eine Entscheidung, bevor Luma eine interne Nachverfolgung erfasst. Prüfe die genaue Notiz und Bestellung unter **Braucht dich**.
+- **Autonom** erlaubt berechtigte interne Notizen innerhalb geprüfter Grenzen. Eine ausdrückliche Hochstufung braucht ausreichend Prüfungen und unabhängige Verifikationen aus dem Live-Betrieb. Synthetische und unbekannte Nachweise verleihen diese Befugnis nicht. Andere Genehmigungsregeln gelten weiterhin.
+
+Diese Notizen werden in Luma erfasst. Sie senden keine Lieferantennachricht und lösen keine Bestellung aus. Tagesgrenzen gelten nach UTC und zählen reservierte Versuche mit. Optionale Geldgrenzen blockieren die Arbeit, wenn Betrag oder Währung unbekannt sind.
+
+Prüfe gespeicherte Arbeit in der Vorschau, um die Wirkung der aktuellen Richtlinie zu sehen. Live-, synthetische und unbekannte Ergebnisse sind getrennt gekennzeichnet. Die Vorschau führt nichts aus und belegt keine Zuverlässigkeit im Produktivbetrieb. Pausiere die Richtlinie oder interne Verbindung, um neue Arbeit zu verhindern. Fehlgeschlagene oder unsichere Verifikation pausiert ebenfalls und senkt den Modus. Prüfe die Nachweise vor dem Fortsetzen.
+
+Wenn sich Bestelldaten oder Richtlinie ändern, aktualisiere den Vorschlag unter **Braucht dich** und prüfe eine neue Entscheidung. Eine frühere Genehmigung wird nicht übernommen. Verifiziere einen unsicheren bestehenden Versuch vor einer Wiederholung. Die Verifikation sendet keine weitere Notiz.
+
+### Betriebliche Quellennutzung prüfen
+
+Unter **Einstellungen → Freigaben** können Verbindungsverwalter die **Betriebliche Nutzung der Quelle** prüfen. Wähle **Quellnachweise lesen** für die Verbindung, die du tatsächlich im Betrieb nutzt. Prüfe die authentifizierte Quelle, ihre Versionen und den Lesezeitpunkt. Die Prüfung ist fünf Minuten gültig.
+
+Bestätige, dass du die Quelle geprüft hast und sie echte betriebliche Handelsdaten enthält. Ergänze eine Begründung und wähle **Geprüfte Live-Erklärung speichern**. Dies ist eine geprüfte Erklärung des Arbeitsbereichs, keine Anbieterzertifizierung. Sie erteilt keine Schreibrechte und aktiviert keinen autonomen Modus. Synthetische Quellen können nicht als live erklärt werden. Unbekannter und synthetischer Verlauf begründet keine autonome Berechtigung.
+
+Falls die Antwort auf das Speichern verloren geht, wähle **Gespeicherte Erklärung prüfen**, bevor du eine weitere Änderung vorbereitest. Luma wiederholt denselben geprüften Befehl. Ändern sich Verbindung oder Zugangsdaten, wird die Quellennutzung bis zu einer neuen Prüfung und Erklärung unbekannt. Der bisherige Verlauf behält seine ursprüngliche Einstufung.
+
+Um eine Erklärung nicht länger zu verwenden, ergänze eine Begründung und wähle **Live-Erklärung widerrufen**. Der Widerruf verhindert, dass die Erklärung für neue Arbeit eine Live-Quellennutzung begründet. Er verändert keinen früheren Verlauf und macht bereits ausgeführte Aktionen nicht rückgängig.
+
 ## Luma-Support [#luma-support]
 
 Unter **Luma-Support** legst du fest, ob der Luma-Support ein Problem untersuchen darf, indem er diesen Workspace so sieht wie eines deiner Mitglieder. Dafür brauchst du **Luma-Support-Zugriff verwalten**.

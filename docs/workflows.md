@@ -338,6 +338,62 @@ are `sensitive`, EU, zero-retention. Request text and answers are never logged o
 and errors never include model text. Request text is stored only as a hash; generated
 content is workspace content. Generation records show authorship and approve nothing.
 
+### Review an evidence-based improvement
+
+The default-off `workflow-improvements` release lets an author refine a saved draft using a
+retained inventory disagreement or connection-sync resolution. The server rereads the learning
+history through Resolution with current issue-management permission. It requires a complete,
+authoritative canonical verification and a recorded run outcome referring to that verification.
+Operator success claims and provider write acceptance do not qualify. Only structured source
+references and repair codes enter generation; raw provider payloads and notes stay with their owner.
+
+The proposal pins its baseline and candidate fingerprints, source and evaluator provenance,
+required capabilities, selected subject scope and human steps. Improvements cannot expand the
+trigger, subject, reads or actions, weaken risk or freshness, remove human review or verification,
+or introduce executable source. Every proposal automatically compiles and compares its exact
+versions with the production interpreter under trusted synthetic replies and fixed fault cases.
+The report retains both traces, counterexamples, deterministic replay markers and missing coverage.
+The model supplies neither assertions nor expected outcomes.
+
+For supported stock and sync cases, historical comparison reads native process runs linked to the
+same incident and exact baseline semantics. It checks the retained version and context fingerprints,
+then replays captured reads with their original observation times, decisions, action receipts and
+verification outputs through the same interpreter. Candidate changes cannot invent missing provider
+responses. The report retains capture fingerprints, both traces, divergent effects or outcomes and
+specific missing inputs. Resolution learning alone does not reconstruct a native process: without
+the linked native run and complete step evidence, historical coverage remains incomplete. Code and
+coordination histories are unsupported by this reconstruction and remain explicit missing inputs.
+
+Acceptance saves a new draft revision; rejection leaves it unchanged. Human edits use the same
+revision and audit path. Publication remains fenced for open or accepted evidence-based candidates
+until trusted historical reconstruction and two real recurring patterns establish release evidence.
+The default synthetic interpreter checks do not exercise production admission or persisted worker
+recovery. A configured trusted `workflowImprovementControls` composition port supplies those checks;
+without it, both remain explicitly missing and publication stays blocked. The reusable control
+harness requires a fresh disposable database and private Temporal queue for each pinned version.
+Its provisioner seeds isolated tenant and member fixtures, supplies a controlled clock, and owns
+cleanup of the database and Temporal environment. It needs disposable-cluster provisioning access,
+never production provider credentials. Do not pass an application or development database.
+The initial harness supports at most 24 native steps, four actions and 60 seconds of waits. Code,
+human-task and event-wait steps require another trusted harness and fail closed. Both versions
+share a three-minute work deadline; allocators and clock transports must honor cancellation and
+clean partial resources. Cleanup has a separate bounded allowance. SQL lock and statement
+timeouts and cancellable Temporal RPC deadlines prevent abandoned queries from surviving cleanup.
+
+The harness uses the real admission, policy and execution services with an owner-controlled
+simulator that persists only synthetic observations. It tests required approval, rejection, lost
+permission, foreign tenant, revoked artifact, changed principal and effect deduplication. Recovery
+recreates execution services over committed SQL records. For action versions, a graceful worker
+restart occurs after the first action output, effect and receipt have committed; read-only versions
+restart after their first committed read. It stops and replaces an actual Temporal worker before
+verification and completion. The separate uncertain-write test reconciles a committed effect after
+a simulated verification outage. It checks the committed outcome
+and effect count after restart. Read-only versions mark action checks inapplicable instead of
+claiming an admission dispatch. Only complete, correctly bound reports clear control and recovery
+coverage; a recreated service over uncommitted rows cannot do so. These simulations do not replace
+missing captured historical inputs or the real-pattern and partner release evidence. Existing
+versions and runs remain immutable; activation is always separate.
+
 ### Authoring evaluation
 
 `tooling/evaluation/fixtures/authoring-corpus.json` holds described workflows with

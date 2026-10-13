@@ -13,8 +13,8 @@ repeatable-read query. There is no aggregate store.
   Retries, duplicate deliveries and multiple approvals add nothing.
 - **Cohort:** incidents first detected in `[asOf - 24h|7d, asOf)`, seven days by default.
   Late verification updates the incident in its detection cohort; it never moves it to a
-  completion-time cohort or creates another outcome. Only 24-hour and seven-day windows
-  exist.
+  completion-time cohort or creates another outcome. Resolution reporting also offers
+  30-day and explicit half-open intervals, independently from the detection-cohort metrics.
 - **Recurrence:** resolved incidents are immutable. A repeat creates a new incident linked
   by `previousExceptionId` with its own cohort; it adds pending work and recurrence, and the
   earlier verification stays retained. Recurrence counts linked incidents, not repeated
@@ -97,17 +97,51 @@ cohort classified as only ineligible has a known zero denominator and no percent
 
 The family covers eligible, unknown eligibility, verified, autonomous, human involvement,
 unknown attribution, pending, recurrence, incorrect actions, median time to outcome and
-oldest pending outcome. Its only filters are `environment` and `window` (default live,
-seven days); other filters return 400. Every known count equals its full cohort length.
+oldest pending outcome. The default filters are `environment` and `window` (live, seven
+days). Released resolution reporting adds first-detection volume, verification-period
+volume and verification-period duration, plus exact start/end, issue-class, connection and
+recorded workflow-version filters. Every known count equals its full cohort length.
 `unknownCount` is unresolved classification, while the unknown-specific metrics count
 known-unknown cohorts. Breakdowns describe the same population; unknown environment
 describes the excluded population. Live, synthetic, pilot, shadow and observe-only are never combined.
 Offline, unavailable and access-loss states hide previous counts.
 
 Workload bounds, not latency guarantees: a three-second statement timeout; failure above
-10,000 detected incidents rather than truncated totals; pages of at most 100 with offsets
+10,000 incidents in the union of detection and verification intervals rather than truncated
+totals; reporting intervals of at most 366 days; pages of at most 100 with offsets
 up to 10,000; at most 50 evidence or fact identities per incident in transport, with full
 counts (the ledger and issue detail have the rest); at most 1,000 facts per ledger.
+
+## Resolution reporting
+
+`resolution-insights` is a tenant-scoped PostHog release that defaults off. It exposes the
+reporting definitions and permits their queries through the existing metric registry.
+It never changes measurement facts or their permissions. Workflow-version attribution and
+filters additionally require `workflows.read`.
+
+Detection volume and the eligible, autonomous, human-work and pending denominators use
+first detection within `[start,end)`. Verification volume and its duration distribution
+use authoritative, complete independent verification within that interval, including
+incidents detected earlier. Unknown environment remains excluded and disclosed separately
+for each counting basis; manual closure and failed verification never enter verification
+volume. Current retained facts are evaluated at `asOf`; this is not historical time travel.
+
+The UI renders interval bounds in the workspace timezone. Daily reporting buckets are
+explicit UTC days. Duration bins are under five minutes, five minutes to under one hour,
+one hour to under one day, and one day or longer. Fewer than five verified incidents carry
+a small-sample label. Equal-duration prior-period comparisons require complete recorded
+cohorts with at least five detections each and make no causal claim. Missing provider
+watermarks remain null, rather than being inferred from the latest verification.
+
+Class and connection breakdowns count unique incidents. A recorded workflow-version cohort
+can overlap another across attempts; adding version rows does not produce total incidents.
+Missing or retired connection labels retain the source identity. No version is inferred
+when attribution was not recorded.
+
+Reporting cursors bind the authorized actor, tenant, exact filters, metric set, page size,
+evaluation time and complete incident cohort. Changed filters reject the cursor with 422;
+late events or attribution changes reject a changed cohort with 409 so the reader refreshes.
+Opening a report record retains its URL filters and interval for return navigation.
 
 Committed changes to measurement, learning, admission binding, incident inputs, evidence
 and sources, disposition outbox, exception, approval and case-command rows notify the

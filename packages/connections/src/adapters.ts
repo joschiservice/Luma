@@ -18,3 +18,5 @@ export {
   exchangeReservationInputSchema,
   exchangeReservationSchema,
 } from './infrastructure/return-exchange-contracts.js';
+
+export { boundedReadTransport } from './infrastructure/bounded-read.js';

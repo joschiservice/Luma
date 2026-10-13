@@ -37,6 +37,9 @@ import {
   type VocabularySource,
   type WorkflowAuditEntry,
 } from './application/drafts.js';
+import { compareHistoricalImprovement } from './application/historical-improvement.js';
+import { applyControlComparison } from './application/improvement-controls.js';
+import { evaluateWorkflowImprovement } from './application/improvement-evaluation.js';
 import type { PlaybookDependencies } from './application/playbook.js';
 import { createPlaybookService } from './application/playbook.js';
 import type { PlaybookLibrary } from './application/playbook-library.js';
@@ -70,6 +73,7 @@ import {
   draftOutput,
 } from './infrastructure/generation-output.js';
 import { createGenerationStore } from './infrastructure/generations.js';
+import { createImprovementHistoryReader } from './infrastructure/improvement-history.js';
 import {
   activationRequestSchema,
   compilePlaybook,
@@ -154,8 +158,10 @@ export function createWorkflows(
   caseWorkflows?: CaseWorkflows,
   people?: WorkflowPeople,
   coordination?: ReturnType<typeof createWorkflowCoordination>,
+  actionReviews?: Parameters<typeof createWorkflowCatalog>[0]['actionReviews'],
 ) {
   return createWorkflowCatalog({
+    ...(actionReviews ? { actionReviews } : {}),
     ...(coordination ? { coordination } : {}),
     ...(people ? { people } : {}),
     ...(explain ? { explain } : {}),
@@ -326,6 +332,19 @@ export function createDrafts(
   const reserved = createReservedDefinitions(db);
 
   return createWorkflowDrafts({
+    publicationGuard: async (context, draft) => {
+      if (
+        !(await createGenerationStore(db).hasUnreleasedImprovement(
+          context,
+          draft.id,
+        ))
+      )
+        return null;
+
+      // Captured-run replay can cover complete retained histories. It cannot establish the
+      // required real-pattern release evidence or validate production admission by itself.
+      return 'This evidence-based improvement needs trusted historical replay and two real recurring patterns before publication. Synthetic tests do not satisfy that release gate.';
+    },
     store: createWorkflowDraftStore(db, deps.audit),
     versions: (context, id) => catalog.versions(context, id),
     reserved: async (context) =>
@@ -434,6 +453,7 @@ export function createDraftGenerations(
     gateway: ModelGateway | null;
     availability: GenerationAvailability;
     refreshContext(context: TenantContext): Promise<TenantContext>;
+    improvements?: Parameters<typeof createDraftGeneration>[0]['improvements'];
   },
 ) {
   return createDraftGeneration({
@@ -448,6 +468,96 @@ export function createDraftGenerations(
     id: randomUUID,
     now: () => new Date(),
     trace: generationTrace,
+    ...(deps.improvements
+      ? {
+          improvements: {
+            ...deps.improvements,
+            evaluate: async (context, baseline, candidate, evidence) => {
+              const report = await evaluateWorkflowImprovement({
+                context,
+                baseline,
+                candidate,
+                hash: playbookHash,
+                compile: (content) => {
+                  const checked = checkDraftContent(content, {
+                    kind: 'native',
+                    reference: 'trusted-improvement-safety',
+                    authoredBy: context.actor.id,
+                    evidenceRefs: ['trusted-synthetic-fixture'],
+                  });
+                  if (!checked.version)
+                    throw new IdentityError(
+                      409,
+                      'CONFLICT',
+                      'The improvement cannot compile for trusted evaluation.',
+                    );
+
+                  return checked.version;
+                },
+              });
+              const compiled = checkDraftContent(candidate, {
+                kind: 'native',
+                reference: 'trusted-historical-comparison',
+                authoredBy: context.actor.id,
+                evidenceRefs: evidence.evidenceRefs,
+              }).version;
+              if (!compiled)
+                throw new IdentityError(
+                  409,
+                  'CONFLICT',
+                  'The candidate cannot compile for historical comparison.',
+                );
+              if (deps.improvements?.controls) {
+                const original = checkDraftContent(baseline, {
+                  kind: 'native',
+                  reference: 'trusted-historical-comparison',
+                  authoredBy: context.actor.id,
+                  evidenceRefs: evidence.evidenceRefs,
+                }).version;
+                if (!original)
+                  throw new IdentityError(
+                    409,
+                    'CONFLICT',
+                    'The baseline cannot compile for control evaluation.',
+                  );
+                report.controls = await deps.improvements.controls.evaluate(
+                  context,
+                  original,
+                  compiled,
+                );
+                applyControlComparison(report, context, original, compiled);
+              }
+              report.historical = await compareHistoricalImprovement({
+                context,
+                baseline,
+                candidate: compiled,
+                captures: await createImprovementHistoryReader(
+                  db,
+                  playbookHash,
+                )(context, evidence, baseline),
+                hash: playbookHash,
+              });
+              if (report.historical.passed)
+                report.missingCoverage = report.missingCoverage.filter(
+                  (item) => item !== 'historical_provider_reconstruction',
+                );
+              else if (
+                report.historical.captures.length &&
+                !report.historical.missingInputs.length
+              ) {
+                report.passed = false;
+                report.counterexamples.push(
+                  ...report.historical.counterexamples.map(
+                    (id) => `historical:${id}`,
+                  ),
+                );
+              }
+
+              return report;
+            },
+          },
+        }
+      : {}),
   });
 }
 

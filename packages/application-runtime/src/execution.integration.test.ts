@@ -221,6 +221,30 @@ describe.skipIf(!databaseUrl)(
       };
     }
 
+    it('withholds dispatch when an expected provider value changes after policy evaluation', async () => {
+      const f = await admitted();
+      try {
+        checkPreconditions
+          .mockResolvedValueOnce(true)
+          .mockResolvedValueOnce(false);
+        const result = await f.service.execution.execute(alice, {
+          runId: f.step.runId,
+          stepId: f.step.stepId,
+        });
+        expect(result.state).toBe('failed');
+        if ('record' in result)
+          expect(result.record.attempt.dispatch).toBe('not_dispatched');
+        expect(execute).not.toHaveBeenCalled();
+        expect(
+          (await audit(f.step.action.id)).find(
+            (entry: AuditEntry) => entry.eventType === 'execution.withheld',
+          )?.details.reason,
+        ).toBe('stale_precondition');
+      } finally {
+        await f.service.close();
+      }
+    });
+
     it('admits concurrent logical requests once and retains provider, artifact and audit identity', async () => {
       const f = await admitted();
       execute.mockResolvedValue({

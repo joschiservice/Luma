@@ -20,7 +20,8 @@ export const dependencies = {
   federation: [],
   staff: ['platform', 'identity', 'federation'],
   audit: ['platform'],
-  orders: ['platform', 'identity', 'audit', 'policies'],
+  // Shared capability review contract only; provider reads and diff composition remain injected.
+  orders: ['platform', 'identity', 'audit', 'policies', 'connectors'],
   sales: ['platform', 'identity', 'audit', 'orders', 'connectors'],
   procurement: [
     'platform',

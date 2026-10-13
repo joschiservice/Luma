@@ -79,7 +79,7 @@ const content = {
   ],
 };
 
-function setup() {
+function setup(publicationGuard?: () => Promise<string | null>) {
   const drafts = new Map<string, StoredWorkflowDraft>();
   const published: ProcessWorkflowVersion[] = [];
   const audit: WorkflowAuditEntry[] = [];
@@ -125,6 +125,7 @@ function setup() {
     },
   };
   const service = createWorkflowDrafts({
+    ...(publicationGuard ? { publicationGuard } : {}),
     store,
     versions: async (_context, id) =>
       published.filter((item) => item.definition.id === id),
@@ -152,6 +153,34 @@ function setup() {
 }
 
 describe('workflow drafts', () => {
+  it('fences a valid exact revision until independent release evidence exists, without publication side effects', async () => {
+    let blocked = true;
+    const env = setup(async () =>
+      blocked ? 'Trusted historical replay is missing.' : null,
+    );
+    const admin = context('admin');
+    const id = randomUUID();
+    await env.service.create(admin, {
+      id,
+      mode: 'visual',
+      start: { kind: 'content', content },
+    });
+    await expect(
+      env.service.publish(admin, id, { revision: 1 }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      message: 'Trusted historical replay is missing.',
+    });
+    expect(env.published).toEqual([]);
+    expect(env.drafts.get(id)?.state).toBe('draft');
+    expect(
+      env.audit.some((entry) => entry.eventType === 'workflow.published'),
+    ).toBe(false);
+    blocked = false;
+    expect(
+      (await env.service.publish(admin, id, { revision: 1 })).draft.state,
+    ).toBe('published');
+  });
   it('creates, saves, validates and publishes a native version without activating it', async () => {
     const { service, published, audit } = setup();
     const admin = context('admin');

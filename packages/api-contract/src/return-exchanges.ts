@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { actionDiffSchema } from './action-diff.js';
+
 const ref = z
   .object({
     externalId: z.string().min(1).max(200),
@@ -144,6 +146,7 @@ const exchangeProofSchema = z
 
 /** One exact approved provider step and its independent source proof. */
 export const exchangeStepSchema = z.object({
+  diff: actionDiffSchema.nullable().optional(),
   id: z.string().uuid(),
   actionId: z.string().uuid(),
   operationId: z.string().uuid(),

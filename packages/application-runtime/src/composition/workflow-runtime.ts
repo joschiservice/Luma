@@ -48,10 +48,13 @@ import { createDetectionServices, createSafetyServices } from './services.js';
 export function createExceptionWorkflowRuntime(
   settings: TemporalSettings,
   identity: Pick<IdentityService, 'refreshContext' | 'resolveWorkflowContext'>,
-  detection: Pick<
-    ReturnType<typeof createDetectionServices>,
-    'exceptions' | 'diagnoses'
-  >,
+  detection: {
+    exceptions: ReturnType<typeof createDetectionServices>['exceptions'];
+    diagnoses: Pick<
+      ReturnType<typeof createDetectionServices>['diagnoses'],
+      'get' | 'run' | 'history'
+    >;
+  },
   safety: Pick<
     ReturnType<typeof createSafetyServices>,
     'execution' | 'provisioning'
@@ -295,6 +298,7 @@ export async function createDefaultExceptionWorker(
         ? {
             workflowSources: host.registry.workflowSources(),
             providerCatalog: host.providerCatalog,
+            connectionEnvironment: host.connectionEnvironment,
             actionPermission: host.registry.actionPermission,
             refreshStock,
           }

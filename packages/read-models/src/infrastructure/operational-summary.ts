@@ -1,9 +1,12 @@
+import { createHash } from 'node:crypto';
+
 import type { ConnectionMetricItem, CoverageReader } from '@luma/connections';
 import { summarizeConnectionMetrics } from '@luma/connections';
 import type { CaseMetricItem } from '@luma/exceptions';
 import type { TenantContext } from '@luma/identity';
 import { hasPermission, IdentityError, requireTenant } from '@luma/identity';
 import type { OperationalMetricRead, TenantDatabase } from '@luma/platform';
+import { canonicalJson } from '@luma/platform';
 import type {
   PurchaseOrderMetricItem,
   StockMetricItem,
@@ -21,6 +24,8 @@ import {
 import { operationalMetricRequestSchema } from './operational-metric-validation.js';
 
 interface Readers {
+  /** Availability only; metric read permissions and tenant row security remain mandatory. */
+  resolutionInsightsEnabled?(tenantId: string): Promise<boolean>;
   resolution?(db: TenantDatabase): ResolutionMetricReader;
   cases(
     db: TenantDatabase,
@@ -92,8 +97,94 @@ export function createOperationalSummary(
   return async (context, input) => {
     requireTenant(context, context.tenantId);
     const request = operationalMetricRequestSchema.parse(input);
-    const cursor = readMetricCursor(request.cursor, request.metrics);
-    const asOf = now().toISOString();
+    const readAt = now().toISOString();
+    const reporting =
+      request.metrics.some((id) =>
+        [
+          'resolution.detected',
+          'resolution.completed',
+          'resolution.completion_time',
+        ].includes(id),
+      ) ||
+      request.scope.start !== undefined ||
+      request.scope.end !== undefined ||
+      request.scope.issueClass !== undefined ||
+      request.scope.artifactId !== undefined ||
+      request.scope.window === '30d' ||
+      (request.scope.connectionId !== undefined &&
+        request.metrics.some((id) => id.startsWith('resolution.')));
+    if (
+      reporting &&
+      !(await readers.resolutionInsightsEnabled?.(context.tenantId))
+    )
+      throw new IdentityError(
+        503,
+        'SERVICE_UNAVAILABLE',
+        'Resolution reporting is not enabled in this workspace.',
+      );
+    if (request.scope.end && Date.parse(request.scope.end) > Date.parse(readAt))
+      throw new IdentityError(
+        422,
+        'VALIDATION_ERROR',
+        'The reporting interval cannot end in the future.',
+      );
+    if (request.scope.artifactId && !hasPermission(context, 'workflows.read'))
+      throw new IdentityError(
+        403,
+        'FORBIDDEN',
+        'Your role does not allow reading workflow versions.',
+      );
+    const hash = (value: unknown) =>
+      createHash('sha256').update(canonicalJson(value)).digest('hex');
+    const queryHash = hash([
+      context.tenantId,
+      context.actor.id,
+      request.metrics,
+      request.scope,
+      request.limit,
+    ]);
+    let reportCursor:
+      | { queryHash: string; cohortHash: string; asOf: string; token: string }
+      | undefined;
+    if (reporting && request.cursor) {
+      try {
+        const value: unknown = JSON.parse(
+          Buffer.from(request.cursor, 'base64url').toString(),
+        );
+        if (
+          !value ||
+          typeof value !== 'object' ||
+          !('queryHash' in value) ||
+          value.queryHash !== queryHash ||
+          !('cohortHash' in value) ||
+          typeof value.cohortHash !== 'string' ||
+          !('asOf' in value) ||
+          typeof value.asOf !== 'string' ||
+          !Number.isFinite(Date.parse(value.asOf)) ||
+          Date.parse(value.asOf) > Date.parse(readAt) ||
+          !('token' in value) ||
+          typeof value.token !== 'string'
+        )
+          throw new Error('Invalid reporting cursor');
+        reportCursor = {
+          queryHash,
+          cohortHash: value.cohortHash,
+          asOf: value.asOf,
+          token: value.token,
+        };
+      } catch {
+        throw new IdentityError(
+          422,
+          'VALIDATION_ERROR',
+          'This page no longer matches the reporting filters. Start from the first page.',
+        );
+      }
+    }
+    const cursor = readMetricCursor(
+      reportCursor?.token ?? request.cursor,
+      request.metrics,
+    );
+    const asOf = reportCursor?.asOf ?? readAt;
 
     return db.transaction(
       context.tenantId,
@@ -179,12 +270,23 @@ export function createOperationalSummary(
           definitionVersion: 2,
           scope: request.scope,
           asOf,
-          readAt: asOf,
+          readAt,
           timezone: 'UTC',
           nextRefreshAt: boundaries[0] ?? null,
           limit: request.limit,
           hidden,
           metrics: metrics.map((metric) => {
+            const cohortHash = hash(metric.items);
+            if (
+              reportCursor &&
+              cursor?.metric === metric.definition.id &&
+              reportCursor.cohortHash !== cohortHash
+            )
+              throw new IdentityError(
+                409,
+                'CONFLICT',
+                'The incident cohort changed. Refresh the report before continuing.',
+              );
             const page = pageCohort(
               metric.items,
               cohortKey,
@@ -195,12 +297,30 @@ export function createOperationalSummary(
 
             return {
               ...metric,
+              breakdown: hasPermission(context, 'workflows.read')
+                ? metric.breakdown
+                : metric.breakdown.filter(
+                    (row) => !row.reason.startsWith('version:'),
+                  ),
               offset: page.offset,
-              nextCursor: page.nextCursor,
+              nextCursor:
+                reporting && page.nextCursor
+                  ? Buffer.from(
+                      JSON.stringify({
+                        queryHash,
+                        cohortHash,
+                        asOf,
+                        token: page.nextCursor,
+                      }),
+                    ).toString('base64url')
+                  : page.nextCursor,
               items: page.items.map((item) =>
                 item.kind === 'resolution'
                   ? {
                       ...item,
+                      artifacts: hasPermission(context, 'workflows.read')
+                        ? (item.artifacts ?? [])
+                        : [],
                       evidenceRefCount: item.evidenceRefs.length,
                       factCount: item.factIds.length,
                       evidenceRefs: item.evidenceRefs.slice(0, 50),

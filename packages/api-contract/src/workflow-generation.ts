@@ -16,10 +16,71 @@ const scalar = z.union([
 const values = z.record(z.string(), scalar);
 const request = z.string().min(1).max(4000).regex(/\S/);
 
+const evaluationTraceSchema = z.object({
+  outcome: z.string(),
+  effects: z.array(
+    z.object({
+      key: z.string(),
+      capability: z.string(),
+      parameters: values,
+    }),
+  ),
+  outputs: z.array(
+    z.object({
+      stepId: z.string(),
+      kind: z.string(),
+      state: z.string(),
+      values,
+      evidenceRefs: z.array(z.string()),
+      recordedAt: z.string(),
+      observedAt: z.string().optional(),
+      reason: z.string().optional(),
+      code: z.unknown().optional(),
+    }),
+  ),
+  violations: z.array(z.string()),
+});
+
 /** Whether describing workflows is available here, with the reason when it isn't. */
 export const generationAvailabilitySchema = z.object({
   available: z.boolean(),
   reason: z.string().nullable(),
+  improvements: z.boolean().default(false),
+  improvementDiscovery: z.boolean().default(false),
+});
+
+/** A bounded review queue of independently verified recurring work; discovery changes nothing. */
+export const improvementDiscoverySchema = z.object({
+  asOf: z.string().datetime(),
+  windowDays: z.number().int().positive(),
+  minimumIncidents: z.number().int().positive(),
+  items: z.array(
+    z.object({
+      id: z.string(),
+      pattern: z.enum(['inventory_mismatch', 'sync_failure']),
+      artifact: z.object({
+        id: z.string(),
+        version: z.string(),
+        digest: z.string(),
+      }),
+      environment: z.enum(['live', 'synthetic', 'unknown']),
+      verifiedIncidents: z.number().int().nonnegative(),
+      humanInterventions: z.number().int().nonnegative(),
+      humanEdits: z.number().int().nonnegative(),
+      recordedEffortSeconds: z.number().nonnegative().nullable(),
+      recurrences: z.number().int().nonnegative(),
+      eligibleForProposal: z.boolean(),
+      productionPromotion: z.literal('blocked'),
+      missingEvidence: z.array(z.string()),
+      sources: z.array(
+        z.object({
+          incidentId: z.string().uuid(),
+          runId: z.string().uuid(),
+          subjectId: z.string(),
+        }),
+      ),
+    }),
+  ),
 });
 
 /** A question the model couldn't answer. It highlights one field in the builder. */
@@ -81,6 +142,10 @@ export const refineWorkflowDraftSchema = z
     id: z.string().uuid(),
     revision: z.number().int().positive(),
     instruction: request,
+    improvement: z
+      .object({ incidentId: z.string().uuid(), runId: z.string().uuid() })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -105,6 +170,101 @@ export const draftProposalSchema = z.object({
   decidedAt: z.string().datetime().nullable(),
   content: workflowDraftContentSchema,
   changes: z.array(draftChangeSchema),
+  improvement: z
+    .object({
+      evidence: z.object({
+        incidentId: z.string(),
+        runId: z.string(),
+        pattern: z.enum(['inventory_mismatch', 'sync_failure']),
+        subjectId: z.string(),
+        evidenceRefs: z.array(z.string()),
+        evaluatorVersion: z.string(),
+        verifiedAt: z.string().datetime(),
+        artifactDigest: z.string(),
+        repairCodes: z.array(z.string()),
+        humanInterventions: z.number().int().nonnegative(),
+      }),
+      baselineDigest: z.string(),
+      candidateDigest: z.string(),
+      schemaVersion: z.literal('workflow/2'),
+      requiredCapabilities: z.array(z.string()),
+      rollout: z.object({
+        kind: z.literal('selected_subjects'),
+        subjectIds: z.array(z.string()),
+      }),
+      humanSteps: z.array(z.string()),
+      coverage: z.enum(['not_evaluated', 'synthetic_passed', 'failed']),
+      missingCoverage: z.array(z.string()),
+      evaluation: z
+        .object({
+          suiteVersion: z.literal('workflow-improvement-safety/1'),
+          assertionVersion: z.literal('workflow-improvement-invariants/1'),
+          fixtureHash: z.string(),
+          source: z.literal('synthetic'),
+          passed: z.boolean(),
+          controls: z
+            .object({
+              suiteVersion: z.literal('workflow-control-simulator/1'),
+              source: z.literal('disposable_committed_fixture'),
+              tenantId: z.string(),
+              actorId: z.string(),
+              baselineDigest: z.string(),
+              candidateDigest: z.string(),
+              passed: z.boolean(),
+              versions: z.array(
+                z.object({
+                  digest: z.string(),
+                  checks: z.array(
+                    z.object({
+                      id: z.string(),
+                      passed: z.boolean(),
+                      applicable: z.boolean(),
+                    }),
+                  ),
+                  actions: z.number().int().nonnegative(),
+                  effects: z.number().int().nonnegative(),
+                  recovery: z.literal('committed_postgres_temporal'),
+                }),
+              ),
+            })
+            .optional(),
+          historical: z
+            .object({
+              source: z.literal('retained_workflow_runs'),
+              assertionVersion: z.literal('workflow-historical-invariants/1'),
+              passed: z.boolean(),
+              captures: z.array(
+                z.object({
+                  runId: z.string(),
+                  versionDigest: z.string(),
+                  contextDigest: z.string(),
+                  captureDigest: z.string(),
+                  baseline: evaluationTraceSchema,
+                  candidate: evaluationTraceSchema,
+                  passed: z.boolean(),
+                  missingInputs: z.array(z.string()),
+                }),
+              ),
+              counterexamples: z.array(z.string()),
+              missingInputs: z.array(z.string()),
+            })
+            .optional(),
+          scenarios: z.array(
+            z.object({
+              id: z.string(),
+              seed: z.number().int(),
+              passed: z.boolean(),
+              baseline: evaluationTraceSchema,
+              candidate: evaluationTraceSchema,
+            }),
+          ),
+          counterexamples: z.array(z.string()),
+          missingCoverage: z.array(z.string()),
+        })
+        .optional(),
+    })
+    .nullable()
+    .default(null),
   createdBy: z.string(),
   createdAt: z.string().datetime(),
 });

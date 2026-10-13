@@ -70,6 +70,29 @@ How issues are counted:
 
 An issue was resolved automatically when it was eligible for automation, verified, and has a complete record showing no person helped. Those issues count as **Resolved without help**. Home’s **Resolution outcomes** module shows the same live results as **Resolved automatically** and an **Automatic resolution rate**. [Workflow tests](/docs/shadow-mode) never count as live outcomes.
 
+## Review resolution performance
+
+When available in your workspace, **Resolution performance** lets you choose seven days,
+30 days or a custom interval. Custom bounds are explicit UTC instants; the report shows
+them in your workspace timezone. Filter by connection, issue class and environment. Live
+operations are the default; simulated and pilot work remain separate.
+
+**Detected issues** counts first detection during the interval. **Verified in the period**
+counts independent verification during it, including problems detected earlier. Eligible
+work and human involvement still use the detection cohort, including pending eligible
+work. An accepted write, failed check or manual closure never counts as verified.
+
+Open any number to inspect its exact issues and retained evidence. The daily table uses
+UTC days; selecting a day or recurring class narrows the report. Recorded connection and
+workflow-version rows offer the same exact filters. Use the browser's Back button to
+restore the prior interval and cohort. If the cohort changes while paging, refresh it.
+
+The report labels small duration samples and incomplete attribution. An autonomous rate
+appears only for a nonzero, fully classified eligible cohort. Comparisons use equal-length
+periods with sufficient recorded samples and do not explain causes. **Data-through is
+unknown** means the numbers cover recorded incidents, not complete provider coverage.
+Workflow-version rows can overlap across attempts; do not add them to get total incidents.
+
 ## Orders that need work
 
 **Orders that need work** counts orders that need attention, such as overdue orders and orders waiting for you. Each order counts once, even when it appears in several connected systems. Choose **Show matching orders** to see them, or open them in Orders. The section says whether the data is current, **Data out of date** or **No order data yet**. Counts include only orders Luma has read, so a zero doesn’t prove there are none.

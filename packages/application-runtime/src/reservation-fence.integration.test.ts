@@ -143,4 +143,45 @@ describe.skipIf(!databaseUrl)('execution reservation fence', () => {
       inContext(other, (client) => reserve(client, solo, 'v0.1:self-approval')),
     ).rejects.toThrow('Reservation requires its workspace context');
   });
+  it('includes persisted enrollment epochs and retains the solo self-response preference', async () => {
+    const solo = await workspace(1);
+    await owner.query(
+      'INSERT INTO autonomy_epochs(tenant_id,revision) VALUES($1,2)',
+      [solo],
+    );
+    await expect(
+      inContext(solo, (client) =>
+        reserve(client, solo, 'v0.1:self-approval:autonomy:2'),
+      ),
+    ).resolves.toBeUndefined();
+    await expect(
+      inContext(solo, (client) => reserve(client, solo, 'v0.1:self-approval')),
+    ).rejects.toThrow('Workspace policy changed before reservation');
+    await expect(
+      inContext(solo, (client) =>
+        reserve(client, solo, 'v0.1:self-approval:autonomy:1'),
+      ),
+    ).rejects.toThrow('Workspace policy changed before reservation');
+    const id = randomUUID(),
+      actorId = randomUUID();
+    await inContext(solo, (client) =>
+      client.query(
+        'INSERT INTO policy_approvals(id,tenant_id,proposal_id,action_hash,policy_version,document) VALUES($1,$2,$3,$4,$5,$6)',
+        [
+          id,
+          solo,
+          randomUUID(),
+          'a'.repeat(64),
+          'v0.1:self-approval:autonomy:2',
+          {
+            id,
+            tenantId: solo,
+            outcome: 'approved',
+            approverId: actorId,
+            requesterId: actorId,
+          },
+        ],
+      ),
+    );
+  });
 });

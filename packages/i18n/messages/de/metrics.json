@@ -64,5 +64,14 @@
   "metrics_resolution_time_to_outcome_time_semantics": "Probleme, die im gewählten Zeitraum vor dem angezeigten Zeitpunkt erstmals erkannt wurden, mit ihrem Ergebnis zu diesem Zeitpunkt. Zeigt Live-Probleme der letzten 7 Tage, sofern du nichts anderes wählst. Wiederholungen fügen keine Probleme hinzu.",
   "metrics_resolution_unresolved_age_title": "Ältestes ausstehendes Ergebnis",
   "metrics_resolution_unresolved_age_description": "Längste Zeit seit der ersten Erkennung unter den Problemen, die noch auf eine unabhängige Prüfung warten.",
-  "metrics_resolution_unresolved_age_time_semantics": "Probleme, die im gewählten Zeitraum vor dem angezeigten Zeitpunkt erstmals erkannt wurden, mit ihrem Ergebnis zu diesem Zeitpunkt. Zeigt Live-Probleme der letzten 7 Tage, sofern du nichts anderes wählst. Wiederholungen fügen keine Probleme hinzu."
+  "metrics_resolution_unresolved_age_time_semantics": "Probleme, die im gewählten Zeitraum vor dem angezeigten Zeitpunkt erstmals erkannt wurden, mit ihrem Ergebnis zu diesem Zeitpunkt. Zeigt Live-Probleme der letzten 7 Tage, sofern du nichts anderes wählst. Wiederholungen fügen keine Probleme hinzu.",
+  "metrics_resolution_detected_title": "Erkannte Probleme",
+  "metrics_resolution_detected_description": "Erstmals im gewählten halboffenen Zeitraum erkannte Probleme. Wiederholte Beobachtungen zählen nicht mehrfach.",
+  "metrics_resolution_detected_time_semantics": "Probleme, die erstmals im gewählten Zeitraum erkannt wurden, mit ihrem aktuellen Ergebnis zum angezeigten Prüfzeitpunkt. Wiederholungen zählen nicht mehrfach.",
+  "metrics_resolution_completed_title": "Im Zeitraum verifiziert",
+  "metrics_resolution_completed_description": "Probleme mit einer maßgeblichen, vollständigen und unabhängigen Prüfung im gewählten Zeitraum. Früher erkannte Probleme sind enthalten.",
+  "metrics_resolution_completed_time_semantics": "Unabhängig im halboffenen Berichtszeitraum verifizierte Probleme, ausgewertet anhand aktueller Nachweise. Die Erkennung kann vor dem Zeitraum liegen. Wiederholungen und manuelles Schließen zählen nicht als verifizierte Ergebnisse.",
+  "metrics_resolution_completion_time_title": "Median bis zur verifizierten Lösung",
+  "metrics_resolution_completion_time_description": "Zeit von der ersten Erkennung bis zur unabhängigen Prüfung für im gewählten Zeitraum verifizierte Probleme. Alle Versuche sind enthalten.",
+  "metrics_resolution_completion_time_time_semantics": "Unabhängig im halboffenen Berichtszeitraum verifizierte Probleme, ausgewertet anhand aktueller Nachweise. Die Erkennung kann vor dem Zeitraum liegen. Wiederholungen und manuelles Schließen zählen nicht als verifizierte Ergebnisse."
 }

@@ -2483,3 +2483,23 @@
 .ui-disclosure[data-slot='disclosure'].issue-overview-checks > summary {
   color: inherit;
 }
+.action-diff {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.action-diff-facts div,
+.action-diff-facts dd {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.action-diff-facts dt {
+  color: var(--foreground-subtle);
+}
+
+.action-diff [data-slot='data-table'] {
+  max-width: 100%;
+}

@@ -9,7 +9,11 @@ public readers. The summary fails as a whole if either required reader fails.
 
 `window` is `24h` (default) or `7d`. The server returns its exact UTC start, end and snapshot
 time. Verified resolutions use `[start, end)` by completion time. Active cases, attention and
-connection health describe the current state, including older unresolved cases.
+connection health describe the current state, including older unresolved cases. Optional
+explicit `start` and `end` bounds select a morning brief verification interval. These bounds
+do not turn current-state reads into historical snapshots. Fixed-window detection-cohort
+measurement is omitted for explicit intervals, so a variable interval is never labelled 24h
+or 7d automation.
 
 The nested `measurement` summary comes from the versioned
 [resolution measurement](resolution-measurement.md) reader and uses live incidents first

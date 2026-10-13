@@ -152,6 +152,7 @@ export function OperationalMetrics({
   live,
   initialRequest,
   heading = m.overview_pulse_title(),
+  eyebrow,
   description = m.overview_pulse_description(),
   metricGroups = groups,
 }: {
@@ -159,6 +160,7 @@ export function OperationalMetrics({
   live: LiveMetricView<OperationalMetricResponse>;
   initialRequest?: OperationalMetricRequest;
   heading?: string;
+  eyebrow?: string;
   description?: string;
   metricGroups?: MetricGroup[];
 }) {
@@ -194,9 +196,10 @@ export function OperationalMetrics({
       <header className="operational-heading">
         <div>
           <p className="order-metrics-eyebrow">
-            {initialRequest
-              ? m.overview_cohort_eyebrow()
-              : m.overview_pulse_eyebrow()}
+            {eyebrow ??
+              (initialRequest
+                ? m.overview_cohort_eyebrow()
+                : m.overview_pulse_eyebrow())}
           </p>
           <h2>{heading}</h2>
           <p>{description}</p>

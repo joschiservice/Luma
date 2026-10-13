@@ -1,6 +1,7 @@
 import type { DecisionItem } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import { rich } from '@luma/i18n/rich';
+import { ActionDiff } from '@luma/ui/components/issues/action-diff';
 import { CaseNotice } from '@luma/ui/components/issues/case-investigation';
 import { IssuePanelClose } from '@luma/ui/components/issues/issue-panel-close';
 import { Badge } from '@luma/ui/components/primitives/badge';
@@ -308,6 +309,7 @@ export function DecisionInspector({
         </CaseNotice>
       ) : null}
       <div className="decision-brief">
+        {item.diff ? <ActionDiff diff={item.diff} /> : null}
         <section className="decision-section" aria-labelledby={`${id}-why`}>
           <h3 id={`${id}-why`}>{m.decisions_why_title()}</h3>
           <p>

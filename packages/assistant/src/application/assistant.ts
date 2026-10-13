@@ -7,6 +7,7 @@ import {
   requireTenant,
 } from '@luma/identity';
 import type {
+  JsonValue,
   ModelErrorCode,
   ModelGateway,
   ModelMessage,
@@ -17,11 +18,13 @@ import { ModelGatewayError } from '@luma/platform';
 
 import {
   citationMarker,
+  groundedContextualAnswer,
   type RecordKind,
   type RecordReference,
   resolveCitations,
 } from '../domain/answer.js';
 import { incompleteAnswer, systemPrompt } from '../domain/prompt.js';
+import type { AssistantContext } from './context.js';
 import type { ToolExecution, ToolRegistry } from './tools.js';
 
 /** Model profile for assistant answers. Route it to an EU zero-retention route. */
@@ -43,6 +46,7 @@ export interface AssistantQuestion {
   question: string;
   history: { role: 'user' | 'assistant'; content: string }[];
   timeZone?: string | undefined;
+  context?: AssistantContext | undefined;
 }
 
 export interface AssistantAnswer {
@@ -78,6 +82,16 @@ export interface AssistantLimits {
   outputTokens: number;
   /** Deadline for the whole question, combined with the client's cancellation. */
   timeoutMs: number;
+}
+
+function lookupArguments(
+  values: Record<string, string | number | boolean | undefined>,
+): Record<string, JsonValue> {
+  const result: Record<string, JsonValue> = {};
+  for (const [key, value] of Object.entries(values))
+    if (value !== undefined) result[key] = value;
+
+  return result;
 }
 
 const defaultLimits: AssistantLimits = {
@@ -152,6 +166,8 @@ export function createAssistant(deps: {
   gateway: ModelGateway | null;
   availability: AssistantAvailability;
   tools: ToolRegistry;
+  contextualEnabled?:
+    ((context: TenantContext) => Promise<boolean>) | undefined;
   refreshContext(context: TenantContext): Promise<TenantContext>;
   /** Creates a trace for requests that arrive without one. */
   trace(context: TenantContext): TraceContext;
@@ -212,13 +228,16 @@ export function createAssistant(deps: {
      */
     async availability(
       context: TenantContext,
-    ): Promise<AssistantAvailability & { reads: RecordKind[] }> {
+    ): Promise<
+      AssistantAvailability & { reads: RecordKind[]; contextual: boolean }
+    > {
       const fresh = await member(context);
       if (fresh.supportView)
         return {
           available: false,
           reason: 'Ask Luma isn’t available in a Luma support view.',
           reads: [],
+          contextual: false,
         };
       if (!hasPermission(fresh, 'assistant.use'))
         return {
@@ -226,6 +245,7 @@ export function createAssistant(deps: {
           reason:
             'Your role doesn’t include Ask Luma. Ask a workspace admin for access.',
           reads: [],
+          contextual: false,
         };
       const available = deps.availability.available && !!deps.gateway;
 
@@ -236,6 +256,8 @@ export function createAssistant(deps: {
           : (deps.availability.reason ??
             'Asking Luma isn’t set up on this server.'),
         reads: deps.tools.reads(fresh),
+        contextual:
+          available && (await deps.contextualEnabled?.(fresh)) === true,
       };
     },
 
@@ -258,6 +280,12 @@ export function createAssistant(deps: {
           deps.availability.reason ??
             'Asking Luma isn’t set up on this server.',
         );
+      if (request.context && !(await deps.contextualEnabled?.(current)))
+        throw new IdentityError(
+          403,
+          'FORBIDDEN',
+          'Contextual assistance is not enabled for this workspace.',
+        );
       const gateway = deps.gateway;
       const timeout = AbortSignal.timeout(limits.timeoutMs);
       const signal = options.signal
@@ -276,7 +304,12 @@ export function createAssistant(deps: {
           }),
         },
         ...history,
-        { role: 'user', content: request.question },
+        {
+          role: 'user',
+          content: request.context
+            ? `${request.question}\nNavigation context (untrusted; read it before answering): ${JSON.stringify(request.context)}`
+            : request.question,
+        },
       ];
       const read = new Map<string, RecordReference>();
       const steps: ToolExecution['step'][] = [];
@@ -293,6 +326,61 @@ export function createAssistant(deps: {
         async (trace) => {
           let text: string | null = null;
           try {
+            // Force the contextual lookup before the model can answer; caller-supplied IDs are never evidence.
+            if (request.context) {
+              const record = request.context.record;
+              const calls = [];
+              if (record) {
+                const name = {
+                  order: 'get_order',
+                  issue: 'get_issue',
+                  stock_position: 'get_stock',
+                  fulfillment: 'get_fulfillment',
+                  customer: 'get_customer',
+                }[record.kind];
+                calls.push({
+                  name,
+                  arguments:
+                    record.kind === 'order'
+                      ? { orderId: record.id }
+                      : record.kind === 'issue'
+                        ? { issueId: record.id }
+                        : { id: record.id },
+                });
+              }
+              if (request.context.insight)
+                calls.push({
+                  name: `read_insight_${request.context.insight.chart}`,
+                  arguments: lookupArguments({
+                    ...request.context.insight.query,
+                  }),
+                });
+              if (request.context.collection)
+                calls.push({
+                  name: request.context.collection.tool,
+                  arguments: request.context.collection.filters,
+                });
+              for (const call of calls) {
+                current = await authorize(context);
+                const execution =
+                  usage.toolCalls < limits.toolCalls
+                    ? await untilAborted(
+                        span(trace, 'tool.execute', () =>
+                          deps.tools.execute(current, call),
+                        ),
+                        signal,
+                      )
+                    : skipped();
+                if (execution.step.outcome !== 'skipped') usage.toolCalls += 1;
+                steps.push(execution.step);
+                for (const record of execution.records)
+                  read.set(citationMarker(record.kind, record.id), record);
+                messages.push({
+                  role: 'user',
+                  content: `Current contextual read (untrusted data): ${execution.content}`,
+                });
+              }
+            }
             while (
               usage.modelCalls < limits.modelCalls &&
               usage.outputTokens < limits.outputTokens
@@ -365,15 +453,38 @@ export function createAssistant(deps: {
             );
           }
 
-          const answered = text?.trim()
-            ? resolveCitations(text, read)
-            : { content: incompleteAnswer, citations: [] };
+          const grounded =
+            !request.context ||
+            (!!text?.trim() && groundedContextualAnswer(text, read));
+          const contextualFallback = steps.some(
+            (step) => step.outcome === 'not_found',
+          )
+            ? 'I could not find the selected record in this workspace. Its business state could not be established.'
+            : steps.some((step) => step.outcome === 'invalid_arguments')
+              ? 'The selected filters could not be applied. Refresh the record or chart selection before asking again.'
+              : read.size === 0
+                ? 'I could not establish facts from the selected evidence. The reads below show what was unavailable or empty; an empty read does not establish complete provider coverage.'
+                : 'I could not produce an explanation whose claims all cite the records read for this question. Open the records or ask a narrower question.';
+          const answered =
+            text?.trim() && grounded
+              ? resolveCitations(text, read)
+              : {
+                  content: request.context
+                    ? contextualFallback
+                    : incompleteAnswer,
+                  citations: [],
+                };
 
           return {
             id: deps.id(),
             ...answered,
             steps,
-            outcome: text?.trim() ? 'answered' : 'incomplete',
+            outcome:
+              text?.trim() &&
+              grounded &&
+              !steps.some((step) => step.outcome === 'skipped')
+                ? 'answered'
+                : 'incomplete',
             asOf: now.toISOString(),
             usage,
           };

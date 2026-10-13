@@ -14,6 +14,8 @@ it('persists settings, reconciles commands, enforces tenant roles and serializes
   expect(original.preferences).toEqual({
     issues: false,
     connections: false,
+    morningBrief: false,
+    morningBriefTime: '08:00',
     revision: 0,
   });
   const write = command({

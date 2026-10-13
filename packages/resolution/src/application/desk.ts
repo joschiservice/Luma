@@ -1,3 +1,4 @@
+import { describeActionDiff } from '@luma/connections';
 import type { Diagnosis, Incident } from '@luma/exceptions';
 import type { ExecutionRecord } from '@luma/execution';
 import type { Permission, TenantContext } from '@luma/identity';
@@ -133,6 +134,8 @@ export interface DeskStore {
 }
 
 export interface DeskDependencies {
+  /** Release availability only; authorization and approval remain independent. */
+  diffEnabled?(tenantId: string): Promise<boolean>;
   store: DeskStore;
   refreshContext(context: TenantContext): Promise<TenantContext>;
   capability(action: ProposedAction): boolean;
@@ -287,6 +290,7 @@ export function createDeskService(deps: DeskDependencies) {
     async review(context: TenantContext, id: string) {
       context = await fresh(context);
       requirePermission(context, 'issues.read');
+      const diffEnabled = (await deps.diffEnabled?.(context.tenantId)) ?? false;
 
       return deps.store.withCase(
         context,
@@ -323,6 +327,59 @@ export function createDeskService(deps: DeskDependencies) {
                 target: s.proposal.action.target,
                 parameters: s.proposal.action.parameters,
                 expectedPostcondition: s.proposal.action.expectedPostcondition,
+                ...(diffEnabled
+                  ? {
+                      diff: (() => {
+                        const observations =
+                          s.diagnosis?.provenance.evidence
+                            .filter((e) =>
+                              s.proposal!.action.preconditions.evidenceRefs.includes(
+                                e.id,
+                              ),
+                            )
+                            .map((e) => e.observedAt) ?? [];
+                        const observedAt = observations.length
+                          ? observations.reduce((oldest, value) =>
+                              Date.parse(value) < Date.parse(oldest)
+                                ? value
+                                : oldest,
+                            )
+                          : null;
+                        const diff = describeActionDiff(
+                          s.proposal.action,
+                          observedAt,
+                        );
+                        if (diff)
+                          diff.evidence.ageSeconds =
+                            observedAt &&
+                            Date.parse(observedAt) <= deps.now().getTime()
+                              ? Math.floor(
+                                  (deps.now().getTime() -
+                                    Date.parse(observedAt)) /
+                                    1000,
+                                )
+                              : null;
+
+                        return diff
+                          ? {
+                              ...diff,
+                              policy: s.decision
+                                ? {
+                                    outcome: s.decision.outcome,
+                                    reason: s.decision.reason,
+                                    evaluatedAt: s.decision.evaluatedAt,
+                                    validUntil: s.decision.validUntil,
+                                    current:
+                                      !s.policyStale &&
+                                      Date.parse(s.decision.validUntil) >
+                                        deps.now().getTime(),
+                                  }
+                                : null,
+                            }
+                          : null;
+                      })(),
+                    }
+                  : {}),
                 preconditions: s.proposal.action.preconditions,
                 risk: s.proposal.action.risk,
                 expiresAt: s.proposal.action.expiresAt,

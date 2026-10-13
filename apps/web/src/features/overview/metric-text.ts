@@ -72,6 +72,21 @@ const metricText: Record<
     m.metrics_resolution_unknown_eligibility_description,
     m.metrics_resolution_unknown_eligibility_time_semantics,
   ],
+  'resolution.detected': [
+    m.metrics_resolution_detected_title,
+    m.metrics_resolution_detected_description,
+    m.metrics_resolution_detected_time_semantics,
+  ],
+  'resolution.completed': [
+    m.metrics_resolution_completed_title,
+    m.metrics_resolution_completed_description,
+    m.metrics_resolution_completed_time_semantics,
+  ],
+  'resolution.completion_time': [
+    m.metrics_resolution_completion_time_title,
+    m.metrics_resolution_completion_time_description,
+    m.metrics_resolution_completion_time_time_semantics,
+  ],
   'resolution.eligible': [
     m.metrics_resolution_eligible_title,
     m.metrics_resolution_eligible_description,

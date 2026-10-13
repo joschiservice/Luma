@@ -1,6 +1,7 @@
 /* global document, innerWidth */
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
+import { returnBrowserCommand } from './return-browser-commands.mjs';
 import { settlementFixture } from './return-settlement-fixture.mjs';
 
 test('independently approves a refund, distinguishes pending payment, and checks actual settlement on a narrow case', async ({
@@ -83,7 +84,9 @@ test('independently approves a refund, distinguishes pending payment, and checks
   });
   const approver = await pageFor(f.approver),
     section = approver.getByRole('region', { name: 'Stock and refund' });
-  await section.getByRole('button', { name: 'Approve and send' }).click();
+  await returnBrowserCommand(approver, f.path, 'decision', () =>
+    section.getByRole('button', { name: 'Approve and send' }).click(),
+  );
   await expect(
     section.getByText('Refund processing', { exact: true }),
   ).toBeVisible();
@@ -113,7 +116,9 @@ test('independently approves a refund, distinguishes pending payment, and checks
     ),
   ).toBe(true);
   await f.command({ kind: 'refund-settle', order: f.providerOrderId });
-  await section.getByRole('button', { name: 'Check source' }).click();
+  await returnBrowserCommand(approver, f.path, 'check', () =>
+    section.getByRole('button', { name: 'Check source' }).click(),
+  );
   await expect(
     section.getByText('Independently verified', { exact: true }),
   ).toBeVisible();

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { actionDiffSchema } from './action-diff.js';
 import { activityActorSchema } from './activity.js';
 import { caseStates } from './cases.js';
 
@@ -99,6 +100,7 @@ export const caseReviewSchema = z.object({
       target: z.object({ kind: ref, id }),
       parameters: fields,
       expectedPostcondition: fields,
+      diff: actionDiffSchema.nullable().optional(),
       preconditions: z.object({
         evidenceRefs: z.array(ref).max(100),
         validUntil: at,

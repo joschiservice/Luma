@@ -4,6 +4,7 @@ import { compilePlaybook, playbookHash } from '@luma/workflows/composition';
 
 import { createActivityService } from './application/activity.js';
 import { createDecisionAssignmentService } from './application/decision-assignments.js';
+import { createImprovementDiscovery } from './application/improvement-discovery.js';
 import type { LearningService, LearningStore } from './application/learning.js';
 import { createLearningService } from './application/learning.js';
 import { createMeasurementService } from './application/measurement.js';
@@ -13,6 +14,7 @@ import { measurementCommandSchema } from './infrastructure/measurement-validatio
 import { createActivityStore } from './infrastructure/persistence/activity.js';
 import { readPeople } from './infrastructure/persistence/actors.js';
 import { createDecisionAssignmentStore } from './infrastructure/persistence/decision-assignments.js';
+import { createImprovementDiscoveryReader } from './infrastructure/persistence/improvement-discovery.js';
 import { createLearningStore } from './infrastructure/persistence/learning.js';
 import { createMeasurementStore } from './infrastructure/persistence/measurement.js';
 import { createShadowStore } from './infrastructure/persistence/shadow.js';
@@ -27,6 +29,27 @@ export { createOperationsOverview } from './application/overview.js';
 export { createDeskStore } from './infrastructure/persistence/desk.js';
 
 export { createDetectionSources } from './infrastructure/persistence/detection-sources.js';
+
+/** Composes explicit review-only discovery from authoritative retained learning and environment facts. */
+export function createResolutionImprovementDiscovery(
+  db: TenantDatabase,
+  refreshContext: (context: TenantContext) => Promise<TenantContext>,
+  enabled: (tenantId: string) => Promise<boolean>,
+  now: () => Date = () => new Date(),
+) {
+  return createImprovementDiscovery({
+    read: createImprovementDiscoveryReader(db),
+    refreshContext,
+    enabled,
+    now,
+    hash: playbookHash,
+  });
+}
+
+export {
+  planActiveDiagnosis,
+  activeDiagnosisPublication,
+} from './infrastructure/active-diagnosis.js';
 
 export { createDeskService } from './application/desk.js';
 

@@ -15,6 +15,7 @@ import type {
   EffectRegistry,
   ProviderCatalog,
 } from '@luma/connections';
+import { describeActionDiff } from '@luma/connections';
 import {
   createConnectionCoverage,
   createOrderSourceVisibility,
@@ -59,7 +60,10 @@ import type {
   TenantDatabase,
 } from '@luma/platform';
 import { canonicalJson } from '@luma/platform';
-import { createReplenishmentScenarios } from '@luma/procurement';
+import {
+  createFollowUpEnvironmentReader,
+  createReplenishmentScenarios,
+} from '@luma/procurement';
 import {
   createIncomingStock,
   createIncomingStockReader,
@@ -80,6 +84,7 @@ import {
 } from '@luma/procurement/composition';
 import {
   appDecisionProvider,
+  createActionDiffReader,
   createCustomerWorkspace,
   createDecisionQueue,
   createFulfillmentWorkspace,
@@ -93,6 +98,7 @@ import {
   createRecordExplorer,
   createReturnWorkspace,
   createSourceOrderLines,
+  governedFollowUpDecisionProvider,
   messageReplyDecisionProvider,
   procurementActionDecisionProvider,
   replenishmentDecisionProvider,
@@ -113,6 +119,7 @@ import {
   createDecisionAssignments,
   createOperationsOverview,
   createRefundFollowUpCursor,
+  createResolutionImprovementDiscovery,
   createResolutionLearning,
   createResolutionMeasurements,
   createResolutionMetricReader,
@@ -120,7 +127,10 @@ import {
   createWorkspaceActivity,
   createWorkspacePeople,
 } from '@luma/resolution/composition';
-import type { CaseWorkflowAdapter } from '@luma/workflows';
+import type {
+  CaseWorkflowAdapter,
+  WorkflowImprovementControls,
+} from '@luma/workflows';
 import {
   compilePlaybook,
   compileProcessWorkflow,
@@ -136,6 +146,7 @@ import {
   createWorkflowTriggerStore,
 } from '@luma/workflows/composition';
 
+import { createActiveDiagnosisRereader } from './active-diagnosis.js';
 import { createAdaptiveWorkspaceRuntime } from './adaptive.js';
 import { createAdmissionEligibility } from './admission.js';
 import {
@@ -196,12 +207,14 @@ import {
   createReturnSettlementSystem,
 } from './return-settlement.js';
 import { createSalesRuntime } from './sales.js';
+import { createScopedSupplierFollowUp } from './scoped-follow-up.js';
 import {
   createDeskServices,
   createDetectionServices,
   createResolutionPlaybooks,
   createSafetyServices,
 } from './services.js';
+import { createWorkflowImprovementSource } from './workflow-improvements.js';
 
 /** Correlates supplier-message model calls with the request that made them. */
 function supplierTrace(requestId: string) {
@@ -254,6 +267,10 @@ export interface ApplicationServices {
     purchasing: ReturnType<typeof createPurchasing>;
     purchasingOutcomes: ReturnType<typeof createPurchasingOutcomesService>;
     commitments: SupplierCommitments;
+    scopedAutonomy: ReturnType<typeof createSafetyServices>['autonomy'];
+    governedFollowUps: ReturnType<
+      typeof createScopedSupplierFollowUp
+    >['service'];
     orderChanges: ReturnType<typeof createPurchaseOrderChanges>;
     supplierEmail: ReturnType<typeof createSupplierEmailService>;
     messaging: ReturnType<typeof createMessaging>['service'];
@@ -302,6 +319,8 @@ export interface ApplicationOptions {
   modelGateway?: ModelGateway;
   /** Whether the gateway has an EU zero-retention route for authoring, and why not. */
   authoring?: { available: boolean; reason: string | null };
+  /** Trusted isolated admission and committed recovery evaluation; absent means unavailable. */
+  workflowImprovementControls?: WorkflowImprovementControls;
   /** Installed-app decision sources, such as `registry.decisionSources()`, for Needs you. */
   decisionSources?: Parameters<typeof appDecisionProvider>[0][];
   /**
@@ -319,6 +338,11 @@ export interface ApplicationOptions {
   refreshStock?: (context: TenantContext, positionId: string) => Promise<void>;
   /** How long the follow-up workflows wait; the simulator demo shortens them. */
   followUps?: FollowUpTiming;
+  /** Positive transport-manifest proof only; absence is never interpreted as live. */
+  connectionEnvironment?(
+    context: TenantContext,
+    connectionId: string,
+  ): Promise<import('@luma/connections').SourceEnvironmentProof>;
   /** Installed purchasing-system connections. Without them, orders cannot be sent from Luma. */
   purchasing?: {
     runtime: InstalledPurchaseOrderRuntime;
@@ -409,11 +433,22 @@ export function createApplicationServices(
       identity.refreshContext,
       erpEnabledForTenant,
     );
+  const diagnosisRereader = createActiveDiagnosisRereader({
+    database,
+    authority: authority(database),
+    reader: options.nativeStockReader,
+    identity,
+    enabled: (tenantId) =>
+      createTenantFeatureRelease(options.observability)(
+        tenantId,
+        'active-diagnosis',
+      ),
+  });
   const detection = createDetectionServices(
     database,
     undefined,
     options.verifier,
-    {},
+    { ...(diagnosisRereader ? { rereader: diagnosisRereader } : {}) },
     authority(database),
     identity,
   );
@@ -527,10 +562,22 @@ export function createApplicationServices(
       (await returnCreationEffects.resolve(context, intent)) ??
       (await settlementEffects.resolve(context, intent)) ??
       (await exchangeEffects.resolve(context, intent)) ??
+      (options.execution.kind === 'enabled'
+        ? await scopedFollowUp?.effects.resolve(context, intent)
+        : null) ??
       effects.resolve(context, intent),
   };
   const resolutionEligible = createAdmissionEligibility(detection.diagnoses);
   const safety = createSafetyServices(database, identity, combinedEffects, {
+    diffRequired: (tenantId) =>
+      purchasingRelease(tenantId, 'action-review-diffs'),
+    autonomyEnabled: (tenantId) =>
+      purchasingRelease(tenantId, 'scoped-autonomy'),
+    ...(options.connectionEnvironment
+      ? { environment: options.connectionEnvironment }
+      : {}),
+    responsibilityFacts: async (context, action) =>
+      (await scopedFollowUp?.facts(context, action)) ?? null,
     eligible: (context, step) =>
       isFieldWriteCapability(step.action.capability)
         ? adaptiveFieldEligibility(context, step)
@@ -548,9 +595,12 @@ export function createApplicationServices(
                     ? returnActions.eligible(context, step)
                     : step.subject?.kind === 'return_case_exchange'
                       ? returnExchanges.eligible(context, step)
-                      : step.subject
-                        ? replenishment.eligible(context, step)
-                        : resolutionEligible(context, step),
+                      : step.subject?.kind === 'supplier_follow_up'
+                        ? (scopedFollowUp?.eligible(context, step) ??
+                          Promise.resolve(false))
+                        : step.subject
+                          ? replenishment.eligible(context, step)
+                          : resolutionEligible(context, step),
   });
   const purchasing = createPurchasing({
     store: createPurchasingStore(database, createAuditLog),
@@ -780,6 +830,10 @@ export function createApplicationServices(
       options.execution.kind === 'enabled' && options.returns
         ? createReturnSettlementAdmission(safety, combinedEffects)
         : null,
+    describeDiff: async (context, action, observedAt, plan) =>
+      (await purchasingRelease(context.tenantId, 'action-review-diffs'))
+        ? describeActionDiff(action, observedAt, { plan })
+        : null,
     refreshContext: identity.refreshContext,
     principal: identity.resolveWorkflowContext,
   });
@@ -793,6 +847,10 @@ export function createApplicationServices(
       admission:
         options.execution.kind === 'enabled' && options.returns
           ? createReturnExchangeAdmission(safety, combinedEffects)
+          : null,
+      describeDiff: async (context, action, observedAt, plan) =>
+        (await purchasingRelease(context.tenantId, 'action-review-diffs'))
+          ? describeActionDiff(action, observedAt, { plan })
           : null,
       refreshContext: identity.refreshContext,
       principal: identity.resolveWorkflowContext,
@@ -840,12 +898,11 @@ export function createApplicationServices(
       },
     },
   );
-  const desk = createDeskServices(
-    database,
-    identity,
-    combinedEffects,
-    options.desk,
-  );
+  const desk = createDeskServices(database, identity, combinedEffects, {
+    ...options.desk,
+    diffEnabled: (tenantId) =>
+      purchasingRelease(tenantId, 'action-review-diffs'),
+  });
   const library = createPersistentPlaybookLibrary(
     database,
     identity,
@@ -897,6 +954,26 @@ export function createApplicationServices(
     options.replenishmentTransport,
     adaptiveFieldWorkflows,
   );
+  const scopedFollowUp: ReturnType<typeof createScopedSupplierFollowUp> =
+    createScopedSupplierFollowUp({
+      database,
+      identity,
+      commitments,
+      safety,
+      runCurrent: (context, runId) => caseWorkflows.runCurrent(context, runId),
+      notifyDecision: (context, runId) =>
+        caseWorkflows.notifyDecision(context, runId),
+      // Only positive source proof classifies a submitted order. Missing live proof blocks promotion.
+      environment: createFollowUpEnvironmentReader({
+        commitments,
+        connectionEnvironment:
+          options.connectionEnvironment ??
+          (async () => ({ environment: 'unknown' as const, provenance: null })),
+      }),
+      ...(options.followUps?.supplierWaitSeconds !== undefined
+        ? { waitMs: options.followUps.supplierWaitSeconds * 1000 }
+        : {}),
+    });
   const caseWorkflows = createCaseWorkflowServices({
     database,
     identity,
@@ -917,6 +994,9 @@ export function createApplicationServices(
       ...createFollowUpWorkflows({
         refundCursor: createRefundFollowUpCursor(database),
         commitments,
+        recordSupplierFollowUp: scopedFollowUp.service.record,
+        managedSupplierFollowUp: safety.autonomy.managed,
+        verifySupplierFollowUp: scopedFollowUp.service.verified,
         suppliers: async (context) =>
           (await procurement.suppliers(context)).items,
         returns: () => returns,
@@ -969,6 +1049,17 @@ export function createApplicationServices(
   });
   const generation = createDraftGenerations(database, {
     drafts,
+    improvements: createWorkflowImprovementSource(
+      createResolutionLearning(database, identity.refreshContext),
+      createTenantFeatureRelease(options.observability),
+      createResolutionImprovementDiscovery(
+        database,
+        identity.refreshContext,
+        (tenantId) =>
+          purchasingRelease(tenantId, 'workflow-improvement-discovery'),
+      ),
+      options.workflowImprovementControls,
+    ),
     gateway: options.modelGateway ?? null,
     availability: options.authoring ?? {
       available: false,
@@ -987,6 +1078,19 @@ export function createApplicationServices(
     caseWorkflows,
     createWorkspacePeople(database),
     coordination,
+    async (context, requests) => {
+      if (!(await purchasingRelease(context.tenantId, 'action-review-diffs')))
+        return new Map();
+
+      return createActionDiffReader(database)(
+        context,
+        requests.map((request) => ({
+          id: request.id,
+          reference: { proposalId: request.proposalId },
+          observedAt: null,
+        })),
+      );
+    },
   );
   const nativeStock = createNativeStockRuntime(
     database,
@@ -998,8 +1102,14 @@ export function createApplicationServices(
       purchasingRelease(context.tenantId, 'purchasing-stock-booking'),
   );
   const decisions = createDecisionQueue(database, {
+    diffEnabled: (tenantId) =>
+      purchasingRelease(tenantId, 'action-review-diffs'),
     cases: caseDecisionQuery,
     providers: [
+      governedFollowUpDecisionProvider(
+        database,
+        scopedFollowUp.service.pending,
+      ),
       {
         id: 'custom-field-workflows',
         label: 'Custom field changes',
@@ -1007,6 +1117,7 @@ export function createApplicationServices(
         pending: async (context) =>
           (await adaptiveFieldWorkflows.pending(context)).map((item) => ({
             id: `custom-field:${item.runId}:${item.stepId}`,
+            actionReference: { runId: item.runId, stepId: item.stepId },
             kind: 'custom_field' as const,
             reason: 'approval' as const,
             domain:
@@ -1176,6 +1287,7 @@ export function createApplicationServices(
       supplierCommitmentDecisionProvider(async (context) =>
         (await commitments.pending(context)).map((item) => ({
           key: item.attention.key,
+          submissionId: item.submission?.id,
           kind: item.attention.kind,
           purchaseOrderId: item.order.id,
           reference: item.order.reference,
@@ -1280,7 +1392,44 @@ export function createApplicationServices(
   );
   const inventory = createInventoryWorkspace(database);
   const returns = createReturnWorkspace(database);
+  const insights = createInsights(database, {
+    orders: orderQueries,
+    cases: caseTimelineQuery,
+    stock: createStockRiskReader,
+    procurement: async (context) => {
+      const [summaries, { items }] = await Promise.all([
+        commitments.summaries(context),
+        procurement.orders(context),
+      ]);
+      const orders = new Map(items.map((order) => [order.id, order]));
+
+      // Orders created between the two reads are left for the next refresh.
+      return summaries.flatMap((summary) => {
+        const order = orders.get(summary.id);
+
+        return order
+          ? [
+              {
+                id: summary.id,
+                reference: order.reference,
+                supplierName: order.supplierName,
+                stage: summary.stage,
+                expectedDate: summary.expectedDate,
+                overdue: summary.overdue,
+                attention: summary.attention,
+                nextOwner: summary.nextOwner,
+                createdAt: order.createdAt,
+              },
+            ]
+          : [];
+      });
+    },
+    refreshContext: identity.refreshContext,
+  });
+  const customers = createCustomerWorkspace(database);
   const assistant = createWorkspaceAssistant({
+    contextualEnabled: (context) =>
+      purchasingRelease(context.tenantId, 'contextual-record-assistance'),
     gateway: options.modelGateway ?? null,
     availability: options.assistant ?? {
       available: false,
@@ -1289,6 +1438,9 @@ export function createApplicationServices(
     reads: {
       orders,
       issues: detection.cases,
+      customers,
+      insights,
+      reviewIssue: desk.review,
       inventory,
       fulfillment,
       returns,
@@ -1298,7 +1450,6 @@ export function createApplicationServices(
   });
 
   const products = createProductWorkspace(database);
-  const customers = createCustomerWorkspace(database);
   const adaptive = createAdaptiveWorkspaceRuntime({
     database,
     identity,
@@ -1360,6 +1511,8 @@ export function createApplicationServices(
       purchasing,
       purchasingOutcomes,
       commitments,
+      scopedAutonomy: safety.autonomy,
+      governedFollowUps: scopedFollowUp.service,
       orderChanges,
       shadow: createShadowEvaluations(database, identity.refreshContext),
       cases: detection.cases,
@@ -1372,6 +1525,8 @@ export function createApplicationServices(
       ),
       learning: createResolutionLearning(database, identity.refreshContext),
       operationalSummary: createOperationalSummary(database, {
+        resolutionInsightsEnabled: (tenantId) =>
+          purchasingRelease(tenantId, 'resolution-insights'),
         cases: createCaseMetricReader,
         resolution: createResolutionMetricReader,
         procurement: createProcurementMetricReader,
@@ -1412,40 +1567,7 @@ export function createApplicationServices(
       fulfillment,
       decisions,
       decisionAssignments,
-      insights: createInsights(database, {
-        orders: orderQueries,
-        cases: caseTimelineQuery,
-        stock: createStockRiskReader,
-        procurement: async (context) => {
-          const [summaries, { items }] = await Promise.all([
-            commitments.summaries(context),
-            procurement.orders(context),
-          ]);
-          const orders = new Map(items.map((order) => [order.id, order]));
-
-          // Orders created between the two reads are left for the next refresh.
-          return summaries.flatMap((summary) => {
-            const order = orders.get(summary.id);
-
-            return order
-              ? [
-                  {
-                    id: summary.id,
-                    reference: order.reference,
-                    supplierName: order.supplierName,
-                    stage: summary.stage,
-                    expectedDate: summary.expectedDate,
-                    overdue: summary.overdue,
-                    attention: summary.attention,
-                    nextOwner: summary.nextOwner,
-                    createdAt: order.createdAt,
-                  },
-                ]
-              : [];
-          });
-        },
-        refreshContext: identity.refreshContext,
-      }),
+      insights,
       assistant,
     },
   };

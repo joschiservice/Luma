@@ -13,6 +13,11 @@
       "luma-source": "./src/composition.ts",
       "types": "./dist/composition.d.ts",
       "default": "./dist/composition.js"
+    },
+    "./http": {
+      "luma-source": "./src/http.ts",
+      "types": "./dist/http.d.ts",
+      "default": "./dist/http.js"
     }
   },
   "scripts": {
@@ -22,7 +27,10 @@
   },
   "dependencies": {
     "@luma/identity": "workspace:*",
-    "@luma/platform": "workspace:*"
+    "@luma/platform": "workspace:*",
+    "@luma/api-contract": "workspace:*",
+    "@orpc/server": "catalog:",
+    "fastify": "catalog:"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

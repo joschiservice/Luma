@@ -5,8 +5,26 @@ import { caseSummarySchema } from './cases.js';
 export const overviewQuerySchema = z
   .object({
     window: z.enum(['24h', '7d']).default('24h'),
+    /** Exact verification interval from a morning brief; current case state is still current. */
+    start: z.string().datetime().optional(),
+    end: z.string().datetime().optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (value) => (value.start === undefined) === (value.end === undefined),
+    { message: 'Provide both start and end.' },
+  )
+  .refine(
+    (value) =>
+      !value.start ||
+      !value.end ||
+      (Date.parse(value.start) < Date.parse(value.end) &&
+        Date.parse(value.end) <= Date.now()),
+    {
+      message:
+        'The verification interval must end in the past and start before its end.',
+    },
+  );
 
 const count = z.number().int().nonnegative();
 
@@ -52,6 +70,7 @@ export const operationsOverviewSchema = z.object({
   attentionCount: count,
   activeCount: count,
   verifiedResolutions: count,
+  verifiedCases: z.array(caseSummarySchema).max(5).optional(),
   automaticallyResolved: count.nullable(),
   automation: z
     .object({ numerator: count, denominator: count })

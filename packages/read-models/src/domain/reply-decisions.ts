@@ -3,6 +3,7 @@ import type { DecisionCandidate } from './decision-item.js';
 /** A reply in flight that needs a person, as the messaging owner reports it. */
 export interface ReplySendDecision {
   outboundId: string;
+  actionId?: string | null;
   threadId: string;
   subject: string;
   /** Recipients as written, comma separated. */
@@ -31,6 +32,9 @@ export function presentReplySend(item: ReplySendDecision): DecisionCandidate {
   const subject = item.subject || '(no subject)';
   const base = {
     id: `message-send:${item.outboundId}`,
+    ...(item.actionId
+      ? { actionReference: { proposalId: item.actionId } }
+      : {}),
     kind: 'message_reply' as const,
     domain: 'operations' as const,
     requestedAt: item.requestedAt,

@@ -79,5 +79,17 @@
   "email_account_erased_preview": "Your account and the personal data linked to it are being erased.",
   "email_account_erased_heading": "Your account has been deleted",
   "email_account_erased_body": "Luma is erasing your account and the personal data linked to it now. You can’t sign in again, and the account can’t be restored.",
-  "email_account_erased_records": "Workspaces you belonged to keep their records of your work, shown as a former member."
+  "email_account_erased_records": "Workspaces you belonged to keep their records of your work, shown as a former member.",
+  "email_morning_brief_subject": "Morning brief · {workspace}",
+  "email_morning_brief_preview": "Your decisions, ongoing work and independently verified results.",
+  "email_morning_brief_window": "Verified results: {start} to {end}. Attention and unresolved cases describe the current snapshot.",
+  "email_morning_brief_attention": "Needs you",
+  "email_morning_brief_active": "Unresolved cases",
+  "email_morning_brief_verified": "Cases independently verified",
+  "email_morning_brief_honesty": "Results count verified cases, not actions or SKUs. Executed changes awaiting verification remain unresolved. Recorded cases do not establish complete provider coverage.",
+  "email_morning_brief_partial": "Some decision sources or measurement classifications are incomplete. Known figures describe the available records; automatic outcomes are not inferred.",
+  "email_morning_brief_case_verified": "Verified: {label}",
+  "email_morning_brief_case_ongoing": "Ongoing: {label}",
+  "email_morning_brief_open": "Open Home",
+  "email_morning_brief_unavailable": "Unavailable for your access"
 }

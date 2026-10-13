@@ -26,6 +26,7 @@ import {
 import { createDetectionSources } from '@luma/resolution/composition';
 import type { Pool } from 'pg';
 
+import { createActiveDiagnosisRereader } from './active-diagnosis.js';
 import { createTenantFeatureRelease } from './feature-release.js';
 import { createSalesReadSource, createSalesTenantRelease } from './sales.js';
 import { createCommerceServices, createDetectionServices } from './services.js';
@@ -212,19 +213,20 @@ export function createDetectionWorker(options: {
     ...(options.env ? { env: options.env } : {}),
   });
   const log = options.log ?? createFailureLog();
+  const capabilities = createInstalledRuntime({
+    internalSource: createSalesReadSource(
+      options.database,
+      options.observability,
+    ),
+    installations: host.connections,
+    providers: host.registry.providers(),
+    record: async () => undefined,
+    recordObservations: async () => undefined,
+  });
   const monitor = createScheduledDetection({
     internalOrdersEnabled: createSalesTenantRelease(options.observability),
     database: options.database,
-    capabilities: createInstalledRuntime({
-      internalSource: createSalesReadSource(
-        options.database,
-        options.observability,
-      ),
-      installations: host.connections,
-      providers: host.registry.providers(),
-      record: async () => undefined,
-      recordObservations: async () => undefined,
-    }),
+    capabilities,
     category: (provider) =>
       provider === 'luma-erp'
         ? 'erp'
@@ -233,11 +235,22 @@ export function createDetectionWorker(options: {
     detection: () => detection,
     log,
   });
+  const rereader = createActiveDiagnosisRereader({
+    database: options.database,
+    reader: capabilities,
+    identity: options.identity,
+    authority: monitor.authority,
+    enabled: (tenantId) =>
+      createTenantFeatureRelease(options.observability)(
+        tenantId,
+        'active-diagnosis',
+      ),
+  });
   const detection = createDetectionServices(
     options.database,
     undefined,
     monitor.verifier,
-    {},
+    { ...(rereader ? { rereader } : {}) },
     monitor.authority,
   );
   const stop = new AbortController();

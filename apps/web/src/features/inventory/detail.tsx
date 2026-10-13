@@ -20,6 +20,7 @@ import type { ReactNode } from 'react';
 import { appsOptions } from '../../kit/apps/data';
 import { SignInRedirect } from '../../kit/identity/common';
 import { IdentityError } from '../../kit/identity/data';
+import { RecordAssistance } from '../../kit/record-assistance';
 import {
   connectionStatusLabel,
   formatSourceNumber,
@@ -60,6 +61,7 @@ export function StockPage() {
 
   return (
     <StockDetailView
+      contextualAssistance
       organizationId={organizationId}
       search={search}
       detail={query.isError ? undefined : query.data}
@@ -125,6 +127,7 @@ export function StockPage() {
 
 /** Shows a source comparison followed by the evidence and work needed to investigate a mismatch. */
 export function StockDetailView({
+  contextualAssistance = false,
   organizationId,
   search = {},
   detail,
@@ -140,6 +143,8 @@ export function StockDetailView({
   replenishment,
 }: {
   organizationId: string;
+  /** The connected page supplies the authorized assistant control. */
+  contextualAssistance?: boolean;
   search?: InventorySearch;
   detail?: InventoryDetail | undefined;
   error?: string | undefined;
@@ -177,11 +182,24 @@ export function StockDetailView({
         title={position?.sku ?? m.inventory_detail_title_fallback()}
         back={back ? <Link to={back} /> : undefined}
         actions={
-          <RefreshButton
-            refreshing={refreshing}
-            onClick={refresh}
-            label={m.inventory_detail_refresh()}
-          />
+          <>
+            {position ? (
+              contextualAssistance ? (
+                <RecordAssistance
+                  organizationId={organizationId}
+                  context={{
+                    record: { kind: 'stock_position', id: position.id },
+                  }}
+                  label={position.sku}
+                />
+              ) : null
+            ) : null}
+            <RefreshButton
+              refreshing={refreshing}
+              onClick={refresh}
+              label={m.inventory_detail_refresh()}
+            />
+          </>
         }
         status={position ? <StockState position={position} /> : null}
         description={

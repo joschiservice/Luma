@@ -21,6 +21,12 @@ Timelines never reconstruct past states: statuses are current, and breakdowns de
 the evaluation time. Resolution performance stays in
 [resolution measurement](resolution-measurement.md).
 
+When the tenant's resolution-reporting release is enabled, Insights uses the same metric
+registry and attribution ledger for explicit reporting intervals, recurrence tables,
+verification durations and recorded workflow versions. These reporting cohorts remain
+separate from the commerce charts; their rules and release boundaries are documented in
+[resolution measurement](resolution-measurement.md#resolution-reporting).
+
 Buckets are calendar days or Monday-based weeks in the requested IANA time zone, computed in
 PostgreSQL. The last bucket ends at the start of the next local day. The orders chart
 reconciles with the Orders list: a point's `start`/`end` days are the list's

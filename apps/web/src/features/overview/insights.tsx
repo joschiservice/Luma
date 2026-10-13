@@ -20,6 +20,7 @@ import {
   resolutionMetricRequest,
   ResolutionOutcomes,
 } from './resolution-outcomes';
+import { ResolutionReport, useResolutionReporting } from './resolution-report';
 
 /**
  * Shows live operational metrics, trends over time and order flow, with drill-downs into the
@@ -34,13 +35,14 @@ export function InsightsPage() {
   const location = useLocation();
   const [environment, setEnvironment] = useState<OutcomeEnvironment>('live');
   const [window, setWindow] = useState<OutcomeWindow>('7d');
+  const reporting = useResolutionReporting(organizationId);
   const resolution = useMemo(
     () => resolutionMetricRequest(environment, window),
     [environment, window],
   );
   const live = useLiveMetricSummary(organizationId, {
     operational: operationalMetricRequest,
-    resolution,
+    resolution: reporting ? undefined : resolution,
     orders: orderMetricRequest,
   });
 
@@ -64,15 +66,29 @@ export function InsightsPage() {
           })
         }
       />
-      <ResolutionOutcomes
-        key={`resolution-${organizationId}`}
-        organizationId={organizationId}
-        live={live.resolution}
-        environment={environment}
-        window={window}
-        onEnvironmentChange={setEnvironment}
-        onWindowChange={setWindow}
-      />
+      {reporting ? (
+        <ResolutionReport
+          key={`report-${organizationId}`}
+          organizationId={organizationId}
+          search={search}
+          onSearch={(patch) =>
+            void navigate({
+              search: (previous) => ({ ...previous, ...patch }),
+              resetScroll: false,
+            })
+          }
+        />
+      ) : (
+        <ResolutionOutcomes
+          key={`resolution-${organizationId}`}
+          organizationId={organizationId}
+          live={live.resolution}
+          environment={environment}
+          window={window}
+          onEnvironmentChange={setEnvironment}
+          onWindowChange={setWindow}
+        />
+      )}
       <OrderMetrics
         key={organizationId}
         organizationId={organizationId}

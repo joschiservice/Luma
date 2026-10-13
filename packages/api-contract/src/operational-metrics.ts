@@ -25,6 +25,9 @@ const operationalMetricIdSchema = z.enum([
   'resolution.incorrect_actions',
   'resolution.time_to_outcome',
   'resolution.unresolved_age',
+  'resolution.detected',
+  'resolution.completed',
+  'resolution.completion_time',
 ]);
 const timestamp = z.string().datetime({ offset: true });
 
@@ -54,6 +57,11 @@ export const operationalMetricDefinitionSchema = z.object({
       'authority',
       'environment',
       'window',
+      'start',
+      'end',
+      'issueClass',
+      'artifactId',
+      'artifactVersion',
     ]),
   ),
   timeSemantics: z.string(),
@@ -66,9 +74,32 @@ const operationalMetricScopeSchema = z
     supplierId: z.string().uuid().optional(),
     authority: z.enum(['luma', 'external']).optional(),
     environment: measurementEnvironmentSchema.optional(),
-    window: z.enum(['24h', '7d']).optional(),
+    window: z.enum(['24h', '7d', '30d']).optional(),
+    start: z.string().datetime({ offset: true }).optional(),
+    end: z.string().datetime({ offset: true }).optional(),
+    issueClass: z.string().min(1).max(100).optional(),
+    artifactId: z.string().min(1).max(200).optional(),
+    artifactVersion: z.string().min(1).max(200).optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (scope) =>
+      (scope.artifactId === undefined) ===
+      (scope.artifactVersion === undefined),
+    'Provide both workflow identity and version.',
+  )
+  .refine(
+    (scope) => (scope.start === undefined) === (scope.end === undefined),
+    'Provide both reporting bounds.',
+  )
+  .refine(
+    (scope) =>
+      !scope.start ||
+      !scope.end ||
+      (Date.parse(scope.end) > Date.parse(scope.start) &&
+        Date.parse(scope.end) - Date.parse(scope.start) <= 366 * 86400000),
+    'Use a reporting interval of up to 366 days.',
+  );
 
 export const operationalMetricRequestSchema = z
   .object({
@@ -94,10 +125,20 @@ export const operationalMetricRequestSchema = z
     (v) =>
       Object.keys(v.scope).every((key) =>
         v.metrics.every((id) =>
-          key === 'environment' || key === 'window'
+          [
+            'environment',
+            'window',
+            'start',
+            'end',
+            'issueClass',
+            'artifactId',
+            'artifactVersion',
+          ].includes(key)
             ? id.startsWith('resolution.')
             : key === 'connectionId'
-              ? id.startsWith('inventory.') || id.startsWith('connections.')
+              ? id.startsWith('inventory.') ||
+                id.startsWith('connections.') ||
+                id.startsWith('resolution.')
               : id.startsWith('procurement.'),
         ),
       ),

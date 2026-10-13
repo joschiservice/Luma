@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { actionDiffSchema } from './action-diff.js';
 import { recordKindSchema } from './records.js';
 
 const timestamp = z.string().datetime({ offset: true });
@@ -76,6 +77,7 @@ const decisionOwnerSchema = z.discriminatedUnion('kind', [
     kind: z.literal('workflow_run'),
     definitionId: z.string().min(1),
     runId: z.string().uuid(),
+    followUpProposalId: z.string().uuid().optional(),
   }),
   z.object({
     kind: z.literal('app_fulfillment'),
@@ -112,6 +114,7 @@ const decisionAssignmentSchema = z.object({
 });
 
 const decisionItemSchema = z.object({
+  diff: actionDiffSchema.nullable().optional(),
   observeOnly: z.boolean().optional(),
   /** Stable queue ID, such as `case:<uuid>`. Assignments and links use it. */
   id: z.string().min(1).max(200),

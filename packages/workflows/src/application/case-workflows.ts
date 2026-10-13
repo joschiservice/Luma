@@ -6,6 +6,7 @@ import type {
 import {
   hasPermission,
   IdentityError,
+  requireChangesAllowed,
   requirePermission,
   requireTenant,
 } from '@luma/identity';
@@ -99,7 +100,8 @@ export interface CaseWorkflowAdapter {
    * How approval works, when the workflow's actions only change Luma's own records. Without it,
    * readiness describes the workspace's approval policy for changes in connected systems.
    */
-  approval?: ApprovalBehavior;
+  approval?:
+    ApprovalBehavior | ((context: TenantContext) => Promise<ApprovalBehavior>);
   /** The owner's open follow-ups. Without it, the workflow starts from detection cases. */
   signals?: SignalReader;
   /**
@@ -197,6 +199,8 @@ export interface CaseRunTransport {
     run: ProcessRun,
     version: ProcessWorkflowVersion,
   ): Promise<unknown>;
+  /** Idempotent wake only; the process rereads its immutable intent and all current admission controls. */
+  notifyDecision?(context: TenantContext, run: ProcessRun): Promise<void>;
 }
 
 const openStates = new Set(['running', 'awaiting_decision', 'waiting']);
@@ -405,7 +409,10 @@ export function createCaseWorkflows(deps: {
     context: TenantContext,
     found: CaseWorkflowAdapter,
   ): Promise<ApprovalBehavior> {
-    if (found.approval) return found.approval;
+    if (found.approval)
+      return typeof found.approval === 'function'
+        ? found.approval(context)
+        : found.approval;
     const { version } = found;
     const actions = version.steps.filter((step) => step.kind === 'capability');
     if (!actions.length)
@@ -596,7 +603,7 @@ export function createCaseWorkflows(deps: {
           inputs: version.inputs,
           context: version.context,
           approval:
-            found.approval?.summary ??
+            (await approval(context, found)).summary ??
             'Each change waits for policy approval by someone else who can approve changes before it is sent.',
         },
       ],
@@ -852,6 +859,52 @@ export function createCaseWorkflows(deps: {
   }));
 
   return {
+    /** Rechecks the original native activation, principal, immutable run binding and nonterminal state. */
+    async runCurrent(context: TenantContext, runId: string): Promise<boolean> {
+      context = await authorize(context);
+      const run = await deps.runs.run(context, runId);
+      if (!run) return false;
+      const loaded = await bound(run).catch(() => null);
+      if (!loaded || loaded.caseRun.stop) return false;
+      const activation = loaded.caseRun.activation;
+      if (
+        activation.principalId !== run.actor.id ||
+        activation.versionDigest !== run.versionDigest ||
+        activation.version !== run.version ||
+        activation.artifactDigest !==
+          deps.hash({
+            definitionId: activation.definitionId,
+            versionDigest: activation.versionDigest,
+            principalId: activation.principalId,
+            policyVersion: activation.policyVersion,
+            scope: 'workspace',
+          })
+      )
+        return false;
+      const outputs = (await deps.steps.list(context, [runId])).get(runId);
+      const state = presentTriggerRun(run, outputs).processState;
+
+      return !state || openStates.has(state);
+    },
+    /** Wakes a reviewed native run as its original principal; it never authorizes or dispatches an action. */
+    async notifyDecision(
+      context: TenantContext,
+      runId: string,
+    ): Promise<boolean> {
+      context = await authorize(context, 'decisions.respond');
+      requireChangesAllowed(context);
+      if (
+        !deps.transport?.notifyDecision ||
+        !(await this.runCurrent(context, runId))
+      )
+        return false;
+      const run = await deps.runs.run(context, runId);
+      if (!run) return false;
+      const loaded = await bound(run);
+      await deps.transport.notifyDecision(loaded.context, run);
+
+      return true;
+    },
     activities,
     templates,
     /** Whether a definition ID belongs to a case workflow. */

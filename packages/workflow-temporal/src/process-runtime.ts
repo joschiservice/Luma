@@ -49,6 +49,7 @@ function createProcessCommands(
       context: TenantContext,
       run: ProcessRun,
       source: ProcessWorkflowVersion,
+      timeoutMs?: number,
     ) {
       const id = await scope(context, run);
       const version = source;
@@ -59,12 +60,21 @@ function createProcessCommands(
       )
         throw new Error('Workflow run version binding changed');
       try {
-        await client.workflow.start('processWorkflow', {
-          workflowId: id,
-          taskQueue,
-          args: [run, version],
-          workflowIdReusePolicy: WorkflowIdReusePolicy.REJECT_DUPLICATE,
-        });
+        if (
+          timeoutMs !== undefined &&
+          (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 60000)
+        )
+          throw new Error('Invalid start request deadline');
+        const start = () =>
+          client.workflow.start('processWorkflow', {
+            workflowId: id,
+            taskQueue,
+            args: [run, version],
+            workflowIdReusePolicy: WorkflowIdReusePolicy.REJECT_DUPLICATE,
+          });
+        await (timeoutMs === undefined
+          ? start()
+          : client.connection.withDeadline(Date.now() + timeoutMs, start));
       } catch (error) {
         if (!(error instanceof WorkflowExecutionAlreadyStartedError))
           throw error;
@@ -75,16 +85,32 @@ function createProcessCommands(
     async progress(
       context: TenantContext,
       run: ProcessRun,
+      timeoutMs?: number,
     ): Promise<ProcessProgress> {
       const id = await scope(context, run);
 
-      return client.workflow
-        .getHandle(id)
-        .query<ProcessProgress>('processProgress');
+      const query = () =>
+        client.workflow.getHandle(id).query<ProcessProgress>('processProgress');
+      if (timeoutMs !== undefined) {
+        if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 60000)
+          throw new Error('Invalid progress query deadline');
+
+        return client.connection.withDeadline(Date.now() + timeoutMs, query);
+      }
+
+      return query();
     },
-    async notifyDecision(context: TenantContext, run: ProcessRun) {
+    async notifyDecision(
+      context: TenantContext,
+      run: ProcessRun,
+      timeoutMs = 5000,
+    ) {
       const id = await scope(context, run);
-      await client.workflow.getHandle(id).signal('processDecisionChanged');
+      if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 60000)
+        throw new Error('Invalid decision notification deadline');
+      await client.connection.withDeadline(Date.now() + timeoutMs, () =>
+        client.workflow.getHandle(id).signal('processDecisionChanged'),
+      );
     },
   };
 }

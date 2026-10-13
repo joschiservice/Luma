@@ -46,10 +46,14 @@ async function load(tx: SqlTransaction, tenantId: string, id: string) {
   if (!row) throw new IdentityError(404, 'NOT_FOUND', 'Case not found');
   if (!row.proposal?.action) row.proposal = null;
   const policy = (
-    await tx.query<{ revision: number; requireIndependentApproval: boolean }>(
-      `SELECT COALESCE(s.policy_revision,0) AS revision,
+    await tx.query<{
+      revision: number;
+      autonomyRevision: number;
+      requireIndependentApproval: boolean;
+    }>(
+      `SELECT COALESCE(a.revision,0) AS "autonomyRevision",COALESCE(s.policy_revision,0) AS revision,
       workspace_requires_independent_approval() AS "requireIndependentApproval"
-      FROM (SELECT $1::uuid AS tenant_id) t LEFT JOIN workspace_settings s ON s.tenant_id=t.tenant_id`,
+      FROM (SELECT $1::uuid AS tenant_id) t LEFT JOIN workspace_settings s ON s.tenant_id=t.tenant_id LEFT JOIN autonomy_epochs a ON a.tenant_id=t.tenant_id`,
       [tenantId],
     )
   ).rows[0]!;
@@ -57,6 +61,7 @@ async function load(tx: SqlTransaction, tenantId: string, id: string) {
   row.effectivePolicyVersion = workspacePolicyVersion(
     policy.revision,
     policy.requireIndependentApproval,
+    policy.autonomyRevision,
   );
   row.policyStale =
     !!row.decision && row.decision.policyVersion !== row.effectivePolicyVersion;

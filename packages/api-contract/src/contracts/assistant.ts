@@ -21,7 +21,7 @@ export const assistantContract = {
       path,
       summary: 'Check whether you can ask Luma here',
       description:
-        'Any member can check this. Asking Luma needs the Use Ask Luma permission and an EU model route with zero data retention. Without either, `available` is false and `reason` explains what is missing. `reads` lists the records the assistant can look up for you, based on your role.',
+        'Any member can check this. Asking Luma needs the Use Ask Luma permission and an EU model route with zero data retention. Without either, `available` is false and `reason` explains what is missing. `reads` lists the records the assistant can look up for you, based on your role. `contextual` reports whether record and chart assistance is available in this workspace.',
     })
     .meta({ access: anyMember, errors: [401, 403, 404, 503] })
     .input(z.object({ params: organizationParamsSchema }))
@@ -32,7 +32,7 @@ export const assistantContract = {
       path: `${path}/answers`,
       summary: 'Ask a question about your workspace',
       description:
-        'Answers a question from the orders, issues, stock, fulfillment and returns you can see in this workspace. Luma reads current records for every question, with your access, and never changes anything. Citation markers in `content` link to the records the answer used, with their source and observation time. Send earlier turns in `history` for follow-up questions; Luma does not store conversations. Each answer is limited in reads, length and time; when a limit is reached, `outcome` is `incomplete`. Returns 503 with a reason when the assistant is unavailable here or the model fails, times out or returns nothing usable.',
+        'Answers a question from the orders, issues, stock, fulfillment, customer profiles and returns you can see in this workspace. Luma reads current records for every question, with your access, and never changes anything. Citation markers in `content` link to the records the answer used, with their source and observation time. Send earlier turns in `history` for follow-up questions; Luma does not store conversations. Optional context rereads a selected record or exact chart filters before answering; it requires contextual assistance to be enabled for this workspace. Each answer is limited in reads, length and time; when a limit is reached, `outcome` is `incomplete`. Returns 503 with a reason when the assistant is unavailable here or the model fails, times out or returns nothing usable.',
     })
     .meta({
       access: requires('assistant.use'),

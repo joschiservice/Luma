@@ -22,11 +22,13 @@ import type {
   AuthoritySettings,
   ConnectionManagement,
   ProviderCatalog,
+  SourceEnvironments,
 } from '@luma/connections';
 import {
   connectionRoutes,
   createConnectors,
   sourceAuthorityRoutes,
+  sourceEnvironmentRoutes,
 } from '@luma/connections/http';
 import type { CaseService } from '@luma/exceptions';
 import { caseRoutes } from '@luma/exceptions/http';
@@ -61,7 +63,9 @@ import type {
 import { returnCaseRoutes } from '@luma/orders/http';
 import type { ModelGateway, Observability, Observation } from '@luma/platform';
 import { describeError } from '@luma/platform';
-import type { ProcurementService } from '@luma/procurement';
+import type { ScopedAutonomy } from '@luma/policies';
+import { scopedAutonomyRoutes } from '@luma/policies/http';
+import type { GovernedFollowUps, ProcurementService } from '@luma/procurement';
 import type {
   createIncomingStock,
   PurchaseOrderChanges,
@@ -74,6 +78,7 @@ import type {
 import {
   procurementRoutes,
   purchaseOrderChangeRoutes,
+  scopedFollowUpRoutes,
   supplierEmailRoutes,
 } from '@luma/procurement/http';
 import type {
@@ -143,6 +148,8 @@ import { implement } from '@orpc/server';
 import type { FastifyServerOptions } from 'fastify';
 import Fastify, { LogController } from 'fastify';
 
+import { createTenantFeatureRelease } from './feature-release.js';
+
 declare module 'fastify' {
   interface FastifyInstance {
     modelGateway: ModelGateway | null;
@@ -202,6 +209,8 @@ export interface AppDependencies {
   decisionAssignments?: DecisionAssignments;
   insights?: Insights;
   assistant?: Assistant;
+  scopedAutonomy?: ScopedAutonomy;
+  governedFollowUps?: GovernedFollowUps;
   sync?: SyncService;
   metricEvents?: MetricEvents;
   apps?: AppService;
@@ -209,6 +218,7 @@ export interface AppDependencies {
   cases?: CaseService;
   connections?: ConnectionManagement;
   sourceAuthority?: AuthoritySettings;
+  sourceEnvironments?: SourceEnvironments;
   modelGateway?: ModelGateway;
   identity?: IdentityService;
   settings?: SettingsService;
@@ -459,6 +469,11 @@ export function buildApp(
       metrics: metricRoutes(
         dependencies.metrics,
         dependencies.operationalSummary,
+        (tenantId) =>
+          createTenantFeatureRelease(dependencies.observability)(
+            tenantId,
+            'resolution-insights',
+          ),
       ),
       identity: identityRoutes(dependencies.identity),
       settings: settingsRoutes(dependencies.settings),
@@ -467,6 +482,9 @@ export function buildApp(
       connections: connectionRoutes(
         dependencies.connections,
         dependencies.sales?.enabled,
+      ),
+      sourceEnvironments: sourceEnvironmentRoutes(
+        dependencies.sourceEnvironments,
       ),
       sourceAuthority: sourceAuthorityRoutes(dependencies.sourceAuthority),
       system: {
@@ -531,6 +549,8 @@ export function buildApp(
       ),
       insights: insightRoutes(dependencies.insights),
       assistant: assistantRoutes(dependencies.assistant),
+      scopedAutonomy: scopedAutonomyRoutes(dependencies.scopedAutonomy),
+      scopedFollowUps: scopedFollowUpRoutes(dependencies.governedFollowUps),
     }),
   );
   const apps = dependencies.apps;

@@ -44,3 +44,7 @@ export {
 } from './infrastructure/fulfillment/dispatch-evidence.js';
 
 export { createAdaptiveViewIdentities } from './infrastructure/adaptive-identities.js';
+
+export { createActionDiffReader } from './infrastructure/action-diffs.js';
+
+export { governedFollowUpDecisionProvider } from './infrastructure/decisions/governed-follow-ups.js';

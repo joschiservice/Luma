@@ -13,6 +13,8 @@ import type {
   InstallationService,
   InstallationTarget,
   ProviderCatalog,
+  SourceEnvironmentProof,
+  SourceEnvironments,
 } from '@luma/connections';
 import { ConnectorError } from '@luma/connections';
 import {
@@ -21,8 +23,9 @@ import {
   createProviderCatalog,
   createSecretCipher,
   createSourceAuthority,
+  createSourceEnvironmentService,
 } from '@luma/connections/composition';
-import { IdentityError } from '@luma/identity';
+import { IdentityError, type TenantContext } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 
 import { factories } from './generated.js';
@@ -55,6 +58,12 @@ export function createAppHost(
   apps: AppService;
   connections: InstallationService;
   providerCatalog: ProviderCatalog;
+  sourceEnvironments: SourceEnvironments;
+  /** Trusted reviewed declaration or positive manifest proof; missing and changed bindings stay unknown. */
+  connectionEnvironment(
+    context: TenantContext,
+    id: string,
+  ): Promise<SourceEnvironmentProof>;
   /** Lists installed apps' decisions, filtered by each decision kind's declared permissions. */
   decisionSources(): ReturnType<AppRegistry['decisionSources']>;
 } {
@@ -177,7 +186,91 @@ export function createAppHost(
     options.internalOrdersEnabled,
   );
 
+  const sourceEnvironments = createSourceEnvironmentService(database, {
+    refreshContext: options.refreshContext,
+    connections: service,
+    enabled: (tenantId) =>
+      options.featureEnabled?.(tenantId, 'scoped-autonomy') ??
+      Promise.resolve(false),
+    synthetic: (connection) => options.simulation?.(connection) !== undefined,
+    async installed(context, connection) {
+      if (!connection.appId) return false;
+      try {
+        return (
+          (await apps.requireInstalled(context, connection.appId)) ===
+          connection.appInstallationVersion
+        );
+      } catch (error) {
+        if (
+          error instanceof IdentityError &&
+          [403, 404, 409].includes(error.statusCode)
+        )
+          return false;
+        throw error;
+      }
+    },
+    async readEvidence(context, connection, signal) {
+      const adapter = await provider(connection.target).build(
+        context,
+        connection.id,
+        'purchase-orders.read',
+        {
+          installations: service,
+          recordObservations: async () => undefined,
+          readBounds: {
+            signal,
+            maxRequests: 4,
+            maxResponseBytes: 1_048_576,
+            maxTotalBytes: 2_097_152,
+          },
+          ...(options.simulation ? { simulation: options.simulation } : {}),
+        },
+      );
+      const handler = adapter.capabilities['purchase-orders.read'];
+      if (!handler)
+        throw new IdentityError(
+          409,
+          'CONFLICT',
+          'Purchase-order evidence is unavailable',
+        );
+      const output = handler.parseOutput(
+        await handler.run(
+          {
+            tenant: context,
+            connectionId: connection.id,
+            provider: adapter.provider,
+          },
+          handler.parseInput({ limit: 1 }),
+        ),
+      );
+      if (
+        output.completeness !== 'complete' ||
+        output.items.some(
+          ({ source }) =>
+            source.tenantId !== context.tenantId ||
+            source.connectionId !== connection.id ||
+            source.provider !== adapter.provider,
+        )
+      )
+        throw new IdentityError(
+          409,
+          'CONFLICT',
+          'Source evidence is incomplete',
+        );
+
+      return output.items.map((o) => ({
+        id: o.id,
+        provider: o.source.provider,
+        resource: o.source.resource,
+        sourceRevision: o.sourceRevision,
+        observedAt: o.observedAt,
+      }));
+    },
+  });
+
   return {
+    sourceEnvironments,
+    connectionEnvironment: sourceEnvironments.classify,
     registry,
     apps,
     decisionSources: () =>

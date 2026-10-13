@@ -14,16 +14,27 @@ const api = createWebApiClient();
  * Loads the selected operations window and refreshes it every 30 seconds and when
  * connectivity or focus returns.
  */
-export function overviewOptions(organizationId: string, window: '24h' | '7d') {
+export function overviewOptions(
+  organizationId: string,
+  window: '24h' | '7d',
+  bounds?: { start: string; end: string },
+) {
   return queryOptions({
-    queryKey: ['private', 'organization', organizationId, 'overview', window],
+    queryKey: [
+      'private',
+      'organization',
+      organizationId,
+      'overview',
+      window,
+      ...(bounds ? [bounds] : []),
+    ],
     ...privateQueryDefaults,
     refetchInterval: 30_000,
     refetchOnWindowFocus: 'always',
     refetchOnReconnect: 'always',
     queryFn: ({ signal }) =>
       api.operations.overview(
-        { params: { organizationId }, query: { window } },
+        { params: { organizationId }, query: { window, ...bounds } },
         { signal },
       ),
   });

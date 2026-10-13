@@ -64,5 +64,14 @@
   "metrics_resolution_time_to_outcome_time_semantics": "Issues first detected in the selected period before the time shown, with their outcome at that time. Shows live issues from the last 7 days unless you choose otherwise. Retries don’t add issues.",
   "metrics_resolution_unresolved_age_title": "Oldest pending outcome",
   "metrics_resolution_unresolved_age_description": "Longest time since first detection among issues still waiting for an independent check.",
-  "metrics_resolution_unresolved_age_time_semantics": "Issues first detected in the selected period before the time shown, with their outcome at that time. Shows live issues from the last 7 days unless you choose otherwise. Retries don’t add issues."
+  "metrics_resolution_unresolved_age_time_semantics": "Issues first detected in the selected period before the time shown, with their outcome at that time. Shows live issues from the last 7 days unless you choose otherwise. Retries don’t add issues.",
+  "metrics_resolution_detected_title": "Detected issues",
+  "metrics_resolution_detected_description": "Incidents first detected in the selected half-open interval. Repeated observations do not add incidents.",
+  "metrics_resolution_detected_time_semantics": "Issues first detected in the selected period before the time shown, with their outcome at that time. Shows live issues from the last 7 days unless you choose otherwise. Retries don’t add issues.",
+  "metrics_resolution_completed_title": "Verified in the period",
+  "metrics_resolution_completed_description": "Incidents with an authoritative, complete independent verification in the selected period. Includes incidents detected earlier.",
+  "metrics_resolution_completed_time_semantics": "Issues independently verified within the half-open reporting interval, evaluated from current retained facts. First detection may precede the interval. Retries and manual closure never add verified outcomes.",
+  "metrics_resolution_completion_time_title": "Median time to verified resolution",
+  "metrics_resolution_completion_time_description": "Time from first detection to independent verification for incidents verified in the selected period. Includes every attempt.",
+  "metrics_resolution_completion_time_time_semantics": "Issues independently verified within the half-open reporting interval, evaluated from current retained facts. First detection may precede the interval. Retries and manual closure never add verified outcomes."
 }

@@ -3,6 +3,8 @@ import type { Locale } from '@luma/i18n/locales';
 import type { Pool, PoolClient } from 'pg';
 
 import type { MailProvider } from '../application/mail.js';
+import type { MorningBriefContent } from '../application/morning-brief.js';
+import { morningBriefClock } from '../application/morning-brief.js';
 import { isBuiltInRole } from '../domain/roles.js';
 import type { MembershipRow } from './access.js';
 import { membershipFromRow, membershipSelect } from './access.js';
@@ -12,6 +14,7 @@ import {
   maxAttempts,
   retryDelaySeconds,
 } from './mail-dispatch.js';
+import { briefAuthority } from './morning-brief.js';
 import { drainPasswordMail } from './password-mail.js';
 import { workspaceTransaction } from './settings.js';
 
@@ -19,6 +22,7 @@ interface Delivery {
   id: string;
   kind:
     | 'invitation'
+    | 'morning_brief'
     | 'test'
     | 'issues'
     | 'connections'
@@ -31,6 +35,11 @@ interface Delivery {
   target_id: string | null;
   attempts: number;
   first_attempt_at: Date | null;
+  brief_document: {
+    content: MorningBriefContent;
+    authority: string;
+    day: string;
+  } | null;
 }
 
 interface Workspace {
@@ -219,9 +228,10 @@ async function memberMail(
       locale: string | null;
       issues: boolean;
       connections: boolean;
+      morning_brief: boolean;
       suppressed: boolean;
     }>(
-      `SELECT u.email,u.locale,COALESCE(p.issues,false) AS issues,COALESCE(p.connections,false) AS connections,
+      `SELECT u.email,u.locale,COALESCE(p.issues,false) AS issues,COALESCE(p.connections,false) AS connections,COALESCE(p.morning_brief,false) AS morning_brief,
         EXISTS(SELECT FROM mail_suppressions s WHERE s.user_id=u.id AND lower(s.email)=lower(u.email)) AS suppressed
       FROM memberships m JOIN users u ON u.id=m.user_id
       LEFT JOIN notification_preferences p ON p.tenant_id=m.tenant_id AND p.user_id=m.user_id WHERE m.tenant_id=$1 AND m.user_id=$2 AND m.status='active'
@@ -237,6 +247,36 @@ async function memberMail(
       ...address,
       email: { kind: 'test', workspace: workspace.name, preferencesLink },
     };
+  if (message.kind === 'morning_brief') {
+    if (
+      !recipient.morning_brief ||
+      recipient.suppressed ||
+      !message.brief_document ||
+      morningBriefClock(new Date(), workspace.timeZone).day !==
+        message.brief_document.day
+    )
+      return null;
+    const member = (
+      await tx.query<MembershipRow>(
+        `${membershipSelect} WHERE m.tenant_id=$1 AND m.user_id=$2`,
+        [tenantId, message.user_id],
+      )
+    ).rows[0];
+    if (!member || briefAuthority(member) !== message.brief_document.authority)
+      return null;
+
+    return {
+      ...address,
+      email: {
+        ...message.brief_document.content,
+        kind: 'morning_brief',
+        workspace: workspace.name,
+        timeZone: workspace.timeZone,
+        link: `${origin}/app/${tenantId}/home?start=${encodeURIComponent(message.brief_document.content.start)}&end=${encodeURIComponent(message.brief_document.content.end)}`,
+        preferencesLink,
+      },
+    };
+  }
   if (
     (message.kind !== 'issues' && message.kind !== 'connections') ||
     !recipient[message.kind] ||
@@ -262,6 +302,8 @@ export function createMailDelivery(
   origin: string,
   secret: string,
   token: (tenantId: string, id: string, generation: number) => string,
+  morningBriefEnabled: (tenantId: string) => Promise<boolean> = async () =>
+    false,
 ) {
   let running: Promise<void> | undefined;
 
@@ -312,6 +354,9 @@ export function createMailDelivery(
         );
         if (!reserved) break;
         if (reserved.attempts === -1) continue;
+        const briefEnabled =
+          reserved.kind !== 'morning_brief' ||
+          (await morningBriefEnabled(tenantId));
         const delivery = await workspaceTransaction(
           pool,
           tenantId,
@@ -342,8 +387,9 @@ export function createMailDelivery(
                 [tenantId],
               )
             ).rows[0]!;
-            const addressed =
-              message.kind === 'invitation'
+            const addressed = !briefEnabled
+              ? null
+              : message.kind === 'invitation'
                 ? await invitationMail(
                     tx,
                     tenantId,

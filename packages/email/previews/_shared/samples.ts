@@ -8,6 +8,32 @@ const preferencesLink = `${origin}/app/${tenant}/settings/notifications`;
 
 /** Realistic sample data for every email, used by the preview server and the render tests. */
 export const samples = {
+  morning_brief: {
+    kind: 'morning_brief',
+    workspace,
+    timeZone,
+    preferencesLink,
+    start: '2026-10-11T06:00:00Z',
+    end: '2026-10-12T06:00:00Z',
+    attention: 2,
+    active: 3,
+    verified: 14,
+    partial: true,
+    decisions: [
+      {
+        label: 'Review stock correction',
+        link: `${origin}/app/${tenant}/needs-you?item=case%3A123`,
+      },
+    ],
+    cases: [
+      {
+        label: 'SKU 482',
+        verified: true,
+        link: `${origin}/app/${tenant}/exceptions/9a7c5e3b-2d1f-4b8e-8c6a-4e2d0b9f7a5c/detail`,
+      },
+    ],
+    link: `${origin}/app/${tenant}/home?start=2026-10-11T06%3A00%3A00Z&end=2026-10-12T06%3A00%3A00Z`,
+  },
   invitation: {
     kind: 'invitation',
     workspace,

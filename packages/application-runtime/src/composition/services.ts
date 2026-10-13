@@ -28,8 +28,18 @@ import { createCommerceProjections as createInventoryProjections } from '@luma/i
 import { createCommerceProjections as createOrderProjections } from '@luma/orders/composition';
 import type { TenantDatabase } from '@luma/platform';
 import { createTenantDatabase } from '@luma/platform/composition';
-import type { PolicyEvidence, ProposedAction } from '@luma/policies';
-import { createPolicies } from '@luma/policies/composition';
+import type {
+  PolicyEvidence,
+  ProposedAction,
+  ScopedAutonomy,
+  ScopedResponsibilityFacts,
+} from '@luma/policies';
+import {
+  completeAutonomy,
+  createPersistentScopedAutonomy,
+  createPolicies,
+  reserveAutonomy,
+} from '@luma/policies/composition';
 import type { DeskDependencies } from '@luma/resolution';
 import { createDetectionPipeline } from '@luma/resolution';
 import {
@@ -46,14 +56,65 @@ export function createSafetyServices(
   registry: EffectRegistry,
   admissionOptions: {
     eligible(context: TenantContext, step: BoundActionStep): Promise<boolean>;
+    diffRequired?(tenantId: string): Promise<boolean>;
+    autonomyEnabled?(tenantId: string): Promise<boolean>;
+    environment?: Parameters<
+      typeof createPersistentScopedAutonomy
+    >[1]['environment'];
+    responsibilityFacts?(
+      context: TenantContext,
+      action: ProposedAction,
+    ): Promise<ScopedResponsibilityFacts | null>;
   } = { eligible: async () => false },
-) {
+): {
+  autonomy: ScopedAutonomy;
+  policies: ReturnType<typeof createPolicies>;
+  provisioning: ReturnType<typeof createAdmissionStore>;
+  execution: ReturnType<typeof createAdmission>;
+  close: () => Promise<void>;
+} {
   const { db, close } = serviceDatabase(database, 10);
   const audit = createAuditLog(db);
+  const autonomy = createPersistentScopedAutonomy(db, {
+    refreshContext: identity.refreshContext,
+    enabled: admissionOptions.autonomyEnabled ?? (async () => false),
+    ...(admissionOptions.environment
+      ? { environment: admissionOptions.environment }
+      : {}),
+    facts: admissionOptions.responsibilityFacts ?? (async () => null),
+    appendAudit: async (event) =>
+      audit.append({
+        id: event.id,
+        tenantId: event.tenantId,
+        eventKey: event.id,
+        eventType: 'autonomy.changed',
+        schemaVersion: 1,
+        occurredAt: event.at,
+        actor: {
+          kind:
+            event.actorId === 'scoped-autonomy-circuit' ? 'service' : 'user',
+          id: event.actorId,
+        },
+        correlationId: event.correlationId,
+        proposalId: event.policyId,
+        actionHash: createHash('sha256')
+          .update(JSON.stringify(event))
+          .digest('hex'),
+        evidenceRefs: [],
+        details: {
+          policyId: event.policyId,
+          revision: String(event.revision),
+          mode: event.mode,
+          previousMode: event.previousMode ?? 'none',
+          reason: event.reason,
+        },
+      }),
+  });
   const policies = createPolicies(
     db,
     identity.refreshContext,
     policyAudit(audit),
+    autonomy,
   );
   const provisioning = createAdmissionStore(db);
   const engine = createExecution(
@@ -62,9 +123,44 @@ export function createSafetyServices(
     audit,
     registry,
     identity.refreshContext,
+    admissionOptions.diffRequired,
+    {
+      prepare: async (tx, record) => {
+        if (record.attempt.autonomy)
+          await reserveAutonomy(
+            tx,
+            record.tenantId,
+            record.proposalId,
+            record.attempt.autonomy,
+            new Date(),
+          );
+      },
+      finish: async (tx, record) => {
+        if (record.attempt.autonomy)
+          await completeAutonomy(
+            tx,
+            record.tenantId,
+            record.proposalId,
+            record.attempt.autonomy,
+            {
+              dispatch: record.attempt.dispatch ?? 'uncertain',
+              verification:
+                record.attempt.verification?.outcome === 'passed'
+                  ? 'passed'
+                  : record.attempt.verification?.outcome === 'failed'
+                    ? 'failed'
+                    : record.attempt.dispatch === 'not_dispatched'
+                      ? 'not_checked'
+                      : 'unknown',
+            },
+            new Date(),
+          );
+      },
+    },
   );
 
   return {
+    autonomy,
     policies,
     provisioning,
     execution: createAdmission({
@@ -248,6 +344,7 @@ export function createDeskServices(
   identity: Pick<IdentityService, 'refreshContext'>,
   effects: EffectRegistry = { resolve: async () => null },
   options: {
+    diffEnabled?: DeskDependencies['diffEnabled'];
     capability?: (action: ProposedAction) => boolean;
     workflow?: DeskDependencies['workflow'];
     refreshProposal?: DeskDependencies['refreshProposal'];
@@ -274,6 +371,7 @@ export function createDeskServices(
   });
 
   return createDeskService({
+    ...(options.diffEnabled ? { diffEnabled: options.diffEnabled } : {}),
     store,
     refreshContext: identity.refreshContext,
     capability: options.capability ?? (() => false),

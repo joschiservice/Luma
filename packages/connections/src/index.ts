@@ -1,5 +1,9 @@
 export type { ProviderCatalog } from './application/providers.js';
 
+export { describeActionDiff } from './domain/action-diff.js';
+
+export type { ActionDiff } from './domain/action-diff.js';
+
 export { authorityGroups, resolveAuthority } from './domain/authority.js';
 
 export type {
@@ -128,3 +132,7 @@ export type {
 export type { ProductBundle } from './domain/bundles.js';
 
 export type { PurchaseOrderRevisionInput } from './domain/purchase-order-revisions.js';
+
+export type { SourceEnvironments } from './application/source-environment.js';
+
+export type { SourceEnvironmentProof } from './domain/source-environment.js';

@@ -1,6 +1,9 @@
 import type { AppDefinition, AppFactoryContext } from '@luma/app-host';
 import { type ConnectionProvider, ConnectorError } from '@luma/connections';
-import { simulationTransport } from '@luma/connections/adapters';
+import {
+  boundedReadTransport,
+  simulationTransport,
+} from '@luma/connections/adapters';
 import type { SimulationTransport } from '@luma/connections/composition';
 import { createRequestPacer, type RequestPacer } from '@luma/connector-cin7';
 import { hasPermission } from '@luma/identity';
@@ -71,11 +74,23 @@ export function createCin7Provider(
         capability,
       );
       const target = installationTarget.parse(current.connection.target);
-      const fetch =
+      let fetch =
         simulationTransport(
           current.connection,
           runtime.simulation ?? options.simulation,
         ) ?? runtime.fetch;
+      if (runtime.readBounds) {
+        if (!capability.endsWith('.read'))
+          throw new ConnectorError({
+            code: 'invalid_input',
+            effect: 'none',
+            retry: 'never',
+          });
+        fetch = boundedReadTransport(
+          fetch ?? globalThis.fetch,
+          runtime.readBounds,
+        );
+      }
       const state = stateOf(context.tenantId, id);
 
       return createCin7Connector({

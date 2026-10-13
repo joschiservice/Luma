@@ -1,6 +1,7 @@
 import type { ReturnCaseDetail, ReturnExchangesView } from '@luma/api-contract';
 import { formatNumber } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
+import { ActionDiff } from '@luma/ui/components/issues/action-diff';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import {
@@ -19,8 +20,19 @@ import { useState } from 'react';
 
 import { useNow } from '../../kit/live/now';
 import { formatMoney } from '../../shared/orders/presentation';
-import { exchangeCommands, returnCaseError, returnCaseKey } from './case-data';
+import {
+  exchangeCommands,
+  returnCaseError,
+  returnCaseKey,
+  returnExchangeOptions,
+} from './case-data';
 import { retryableReturnRequestId } from './case-requests';
+
+type ExchangeCommand = ReturnType<typeof exchangeCommands>;
+
+type ExchangeResult = Awaited<
+  ReturnType<ExchangeCommand[keyof ExchangeCommand]>
+>;
 
 const consistencyLabels = {
   receipt: () => m.returns_exchange_check_receipt(),
@@ -97,11 +109,40 @@ export function ReturnExchange({
     [requests, setRequests] = useState<Record<string, string>>({});
   const command = exchangeCommands(organizationId, detail.case.id),
     mutation = useMutation({
-      mutationFn: (fn: () => Promise<unknown>) => fn(),
+      mutationFn: (fn: () => Promise<ExchangeResult>) => fn(),
+      onSuccess: (result) => {
+        // Only owner-returned steps and fresh consistency checks change their matching panel.
+        client.setQueryData<ReturnExchangesView>(
+          returnExchangeOptions(organizationId, detail.case.id).queryKey,
+          (current) => {
+            if (!current) return current;
+            if ('plan' in result)
+              return {
+                ...current,
+                steps: current.steps.some((step) => step.id === result.id)
+                  ? current.steps.map((step) =>
+                      step.id === result.id ? result : step,
+                    )
+                  : [...current.steps, result],
+              };
+            if ('checks' in result)
+              return {
+                ...current,
+                operation: current.operation
+                  ? { ...current.operation, completion: result }
+                  : null,
+              };
+            if ('currentAttemptId' in result)
+              return { ...current, operation: result };
+
+            return current;
+          },
+        );
+      },
       onSettled: () =>
         client.invalidateQueries({ queryKey: returnCaseKey(organizationId) }),
     });
-  const run = (fn: () => Promise<unknown>) => mutation.mutate(fn),
+  const run = (fn: () => Promise<ExchangeResult>) => mutation.mutate(fn),
     root = data?.operation;
   const requested = data?.steps.find((s) => s.id === root?.currentAttemptId),
     processed = data?.steps.find((s) => s.plan.kind === 'process' && s.sent),
@@ -305,6 +346,7 @@ export function ReturnExchange({
                             ? m.returns_service_stale()
                             : stateLabels[step.state]()}
                         </StatePill>
+                        {step.diff ? <ActionDiff diff={step.diff} /> : null}
                         {financial ? (
                           <span>
                             {financial.kind === 'even'

@@ -100,6 +100,7 @@ export interface SettingsDependencies {
   repository: SettingsRepository;
   identity: Pick<IdentityService, 'authenticate'>;
   deliveryAvailable: boolean;
+  morningBriefEnabled?: (tenantId: string) => Promise<boolean>;
   id(): string;
   now(): Date;
   token(tenantId: string, invitationId: string, generation: number): string;
@@ -257,7 +258,13 @@ export function createSettingsService(deps: SettingsDependencies) {
       }),
     /** Reads workspace controls and the caller's preferences. */
     get: (context: TenantContext) =>
-      authorized(context, null, (tx) => tx.snapshot(context.actor.id)),
+      authorized(context, null, (tx) => tx.snapshot(context.actor.id)).then(
+        async (snapshot) => ({
+          ...snapshot,
+          morningBriefAvailable:
+            (await deps.morningBriefEnabled?.(context.tenantId)) ?? false,
+        }),
+      ),
     /** Saves name and timezone only if the reviewed revision is still current. */
     updateWorkspace(
       context: TenantContext,
@@ -398,6 +405,8 @@ export function createSettingsService(deps: SettingsDependencies) {
         revision: number;
         issues: boolean;
         connections: boolean;
+        morningBrief?: boolean | undefined;
+        morningBriefTime?: string | undefined;
       },
     ) {
       return command(context, null, input, 'notifications', async (tx) => {
@@ -407,6 +416,8 @@ export function createSettingsService(deps: SettingsDependencies) {
         await tx.savePreferences(context.actor.id, {
           issues: input.issues,
           connections: input.connections,
+          morningBrief: input.morningBrief ?? before.morningBrief,
+          morningBriefTime: input.morningBriefTime ?? before.morningBriefTime,
           revision: before.revision + 1,
         });
 

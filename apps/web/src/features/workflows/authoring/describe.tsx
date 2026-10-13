@@ -17,6 +17,8 @@ import {
   DialogTitle,
 } from '@luma/ui/components/primitives/dialog';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
+import { Input } from '@luma/ui/components/primitives/input';
+import { Select } from '@luma/ui/components/primitives/select';
 import { Textarea } from '@luma/ui/components/primitives/textarea';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
@@ -29,6 +31,8 @@ import {
   describeWorkflow,
   draftsKey,
   generationAvailabilityOptions,
+  improvementDiscoveryOptions,
+  improvementRunsOptions,
   refineDraft,
   rejectProposal,
   suggestCodeStep,
@@ -36,6 +40,29 @@ import {
 import { humanize } from './draft-model';
 
 type Generation = GeneratedDraft['generation'];
+
+const improvementScenarios: Record<string, () => string> = {
+  ordinary: m.authoring_improvement_scenario_ordinary,
+  'approval-denied': m.authoring_improvement_scenario_approval_denied,
+  'policy-denied': m.authoring_improvement_scenario_policy_denied,
+  'verification-ambiguous':
+    m.authoring_improvement_scenario_verification_ambiguous,
+  'stale-observation': m.authoring_improvement_scenario_stale_observation,
+  'provider-outage': m.authoring_improvement_scenario_provider_outage,
+  'source-injection': m.authoring_improvement_scenario_source_injection,
+  'restart-replay': m.authoring_improvement_scenario_restart_replay,
+};
+
+const improvementOutcomes: Record<string, () => string> = {
+  verified: m.authoring_test_outcome_verified,
+  ended: m.authoring_test_outcome_ended,
+  denied: m.authoring_test_outcome_denied,
+  failed: m.authoring_improvement_failed,
+  failed_verification: m.authoring_test_outcome_failed_verification,
+  inconclusive_verification: m.authoring_test_outcome_inconclusive,
+  escalated: m.authoring_test_outcome_escalated,
+  awaiting_decision: m.authoring_test_outcome_awaiting_decision,
+};
 
 // Explanations stay in this browser tab only; the server keeps provenance, not the model's text.
 const recent = new Map<string, Generation>();
@@ -201,6 +228,25 @@ export function GenerationAssistant({
   const availability = useQuery(generationAvailabilityOptions(organizationId));
   const generation = recent.get(draft.id);
   const [instruction, setInstruction] = useState('');
+  const [sourceLink, setSourceLink] = useState('');
+  const [selectedRun, setSelectedRun] = useState('');
+  const [discoveredSource, setDiscoveredSource] = useState<{
+    incidentId: string;
+    runId: string;
+  } | null>(null);
+  const discovery = useQuery(improvementDiscoveryOptions(organizationId));
+  const sourceId = availability.data?.improvements
+    ? (sourceLink
+        .match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi)
+        ?.at(-1) ?? null)
+    : null;
+  const sourceRuns = useQuery(improvementRunsOptions(organizationId, sourceId));
+  const runId =
+    discoveredSource?.incidentId === sourceId
+      ? discoveredSource.runId
+      : sourceRuns.data?.some((run) => run.id === selectedRun)
+        ? selectedRun
+        : sourceRuns.data?.[0]?.id;
   const [proposal, setProposal] = useState<DraftProposal | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
@@ -220,6 +266,9 @@ export function GenerationAssistant({
         id: crypto.randomUUID(),
         revision: draft.revision,
         instruction: instruction.trim(),
+        ...(sourceId && runId
+          ? { improvement: { incidentId: sourceId, runId } }
+          : {}),
       });
       setProposal(next);
     } catch (failure) {
@@ -329,6 +378,154 @@ export function GenerationAssistant({
             aria-label={m.authoring_proposal_title()}
           >
             <h3>{m.authoring_proposal_title()}</h3>
+            {proposal.improvement ? (
+              <Disclosure>
+                <summary>{m.authoring_improvement_review()}</summary>
+                <p>
+                  {m.authoring_improvement_scope({
+                    subject: proposal.improvement.rollout.subjectIds.join(', '),
+                  })}
+                </p>
+                <p>
+                  {m.authoring_improvement_capabilities({
+                    capabilities:
+                      proposal.improvement.requiredCapabilities.join(', ') ||
+                      m.authoring_improvement_none(),
+                  })}
+                </p>
+                <p>
+                  {m.authoring_improvement_human({
+                    steps:
+                      proposal.improvement.humanSteps.join(', ') ||
+                      m.authoring_improvement_none(),
+                  })}
+                </p>
+                <p className="authoring-hint">
+                  {m.authoring_improvement_coverage()}
+                </p>
+                {proposal.improvement.evaluation ? (
+                  <>
+                    <p>
+                      {proposal.improvement.evaluation.passed
+                        ? m.authoring_improvement_tests_passed({
+                            count:
+                              proposal.improvement.evaluation.scenarios.length,
+                          })
+                        : m.authoring_improvement_tests_failed({
+                            count:
+                              proposal.improvement.evaluation.counterexamples
+                                .length,
+                          })}
+                    </p>
+                    <ul>
+                      {proposal.improvement.evaluation.scenarios.map(
+                        (scenario) => (
+                          <li key={scenario.id}>
+                            <Badge
+                              tone={scenario.passed ? 'success' : 'danger'}
+                            >
+                              {scenario.passed
+                                ? m.authoring_improvement_passed()
+                                : m.authoring_improvement_failed()}
+                            </Badge>{' '}
+                            {(
+                              improvementScenarios[scenario.id] ??
+                              m.authoring_improvement_review
+                            )()}
+                            :{' '}
+                            {(
+                              improvementOutcomes[scenario.baseline.outcome] ??
+                              m.authoring_improvement_failed
+                            )()}{' '}
+                            →{' '}
+                            {(
+                              improvementOutcomes[scenario.candidate.outcome] ??
+                              m.authoring_improvement_failed
+                            )()}
+                          </li>
+                        ),
+                      )}
+                    </ul>
+                    {proposal.improvement.evaluation.controls ? (
+                      <p>
+                        {m.authoring_improvement_controls()}:{' '}
+                        <Badge
+                          tone={
+                            proposal.improvement.evaluation.controls.passed
+                              ? 'success'
+                              : 'danger'
+                          }
+                        >
+                          {proposal.improvement.evaluation.controls.passed
+                            ? m.authoring_improvement_passed()
+                            : m.authoring_improvement_failed()}
+                        </Badge>
+                      </p>
+                    ) : null}
+                    {proposal.improvement.evaluation.historical ? (
+                      <div>
+                        <p>
+                          {m.authoring_improvement_historical({
+                            count:
+                              proposal.improvement.evaluation.historical
+                                .captures.length,
+                          })}
+                        </p>
+                        {proposal.improvement.evaluation.historical
+                          .missingInputs.length ? (
+                          <Alert tone="warning">
+                            {m.authoring_improvement_historical_missing()}
+                          </Alert>
+                        ) : null}
+                        <ul>
+                          {proposal.improvement.evaluation.historical.captures.map(
+                            (capture) => (
+                              <li key={capture.runId}>
+                                <Badge
+                                  tone={capture.passed ? 'success' : 'warning'}
+                                >
+                                  {capture.passed
+                                    ? m.authoring_improvement_passed()
+                                    : m.authoring_improvement_failed()}
+                                </Badge>{' '}
+                                {capture.runId}
+                                <dl className="authoring-code-summary">
+                                  <div>
+                                    <dt>
+                                      {m.authoring_improvement_baseline()}
+                                    </dt>
+                                    <dd>
+                                      {m.authoring_improvement_hashes({
+                                        baseline: capture.versionDigest,
+                                        candidate: capture.captureDigest,
+                                      })}
+                                    </dd>
+                                  </div>
+                                </dl>
+                              </li>
+                            ),
+                          )}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
+                <dl className="authoring-step-explanations">
+                  <div>
+                    <dt>{m.authoring_improvement_baseline()}</dt>
+                    <dd style={{ overflowWrap: 'anywhere' }}>
+                      {proposal.improvement.baselineDigest}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{m.authoring_improvement_candidate()}</dt>
+                    <dd style={{ overflowWrap: 'anywhere' }}>
+                      {proposal.improvement.candidateDigest}
+                    </dd>
+                  </div>
+                </dl>
+              </Disclosure>
+            ) : null}
             {proposal.changes.length ? (
               <ul>
                 {proposal.changes.map((item, index) => (
@@ -379,7 +576,13 @@ export function GenerationAssistant({
               </Button>
               <Button
                 disabled={
-                  pending || !saved || proposal.baseRevision !== draft.revision
+                  pending ||
+                  !saved ||
+                  proposal.baseRevision !== draft.revision ||
+                  (!!proposal.improvement &&
+                    proposal.diagnostics.some(
+                      (item) => item.severity === 'error',
+                    ))
                 }
                 onClick={() => void decide(true)}
               >
@@ -398,6 +601,143 @@ export function GenerationAssistant({
               void propose();
             }}
           >
+            {availability.data?.improvements ? (
+              <Disclosure>
+                <summary>{m.authoring_improvement_source()}</summary>
+                {availability.data.improvementDiscovery ? (
+                  <div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={pending || discovery.isFetching}
+                      onClick={() => void discovery.refetch()}
+                    >
+                      {m.authoring_discovery_action()}
+                    </Button>
+                    <p className="authoring-hint">
+                      {m.authoring_discovery_hint()}
+                    </p>
+                    {discovery.isFetching ? (
+                      <p role="status">{m.authoring_improvement_loading()}</p>
+                    ) : null}
+                    {discovery.isError ? (
+                      <Alert tone="warning">
+                        {workflowError(discovery.error)}
+                      </Alert>
+                    ) : null}
+                    {discovery.data?.items.length === 0 ? (
+                      <p>{m.authoring_discovery_empty()}</p>
+                    ) : null}
+                    {discovery.data ? (
+                      <ul>
+                        {discovery.data.items.map((group) => (
+                          <li key={group.id}>
+                            <strong>
+                              {group.artifact.id} · {group.artifact.version}
+                            </strong>
+                            <p>
+                              {m.authoring_discovery_counts({
+                                issues: group.verifiedIncidents,
+                                human:
+                                  group.humanInterventions + group.humanEdits,
+                                recurrences: group.recurrences,
+                              })}
+                            </p>
+                            <Badge
+                              tone={
+                                group.environment === 'live'
+                                  ? 'neutral'
+                                  : 'warning'
+                              }
+                            >
+                              {group.environment === 'live'
+                                ? m.authoring_discovery_live()
+                                : group.environment === 'synthetic'
+                                  ? m.authoring_discovery_synthetic()
+                                  : m.authoring_discovery_unknown()}
+                            </Badge>
+                            <p className="authoring-hint">
+                              {group.eligibleForProposal
+                                ? m.authoring_discovery_review()
+                                : m.authoring_discovery_volume({
+                                    minimum: discovery.data.minimumIncidents,
+                                  })}
+                            </p>
+                            {group.sources.map((source) => (
+                              <Button
+                                key={source.runId}
+                                type="button"
+                                variant="outline"
+                                disabled={!group.eligibleForProposal || pending}
+                                onClick={() => {
+                                  setSourceLink(source.incidentId);
+                                  setSelectedRun(source.runId);
+                                  setDiscoveredSource(source);
+                                }}
+                              >
+                                {m.authoring_discovery_choose({
+                                  subject: source.subjectId,
+                                })}
+                              </Button>
+                            ))}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                ) : null}
+                <label className="authoring-field">
+                  {m.authoring_improvement_issue()}
+                  <Input
+                    value={sourceLink}
+                    disabled={pending}
+                    placeholder={m.authoring_improvement_issue_placeholder()}
+                    onChange={(event) => {
+                      setSourceLink(event.target.value);
+                      setSelectedRun('');
+                      setDiscoveredSource(null);
+                    }}
+                  />
+                </label>
+                {sourceLink && !sourceId ? (
+                  <p className="authoring-hint">
+                    {m.authoring_improvement_issue_invalid()}
+                  </p>
+                ) : null}
+                {sourceRuns.isFetching ? (
+                  <p role="status">{m.authoring_improvement_loading()}</p>
+                ) : null}
+                {sourceRuns.isError ? (
+                  <Alert tone="warning">
+                    {workflowError(sourceRuns.error)}
+                  </Alert>
+                ) : null}
+                {sourceId && sourceRuns.data?.length === 0 ? (
+                  <p>{m.authoring_improvement_empty()}</p>
+                ) : null}
+                {sourceRuns.data?.length ? (
+                  <label className="authoring-field">
+                    {m.authoring_improvement_resolution()}
+                    <Select
+                      aria-label={m.authoring_improvement_resolution()}
+                      value={runId ?? null}
+                      disabled={pending}
+                      onValueChange={(value) => {
+                        setSelectedRun(value ?? '');
+                        setDiscoveredSource(null);
+                      }}
+                      options={sourceRuns.data.map((run) => ({
+                        value: run.id,
+                        label: `${run.resolution.id} · ${run.resolution.version}`,
+                      }))}
+                    />
+                  </label>
+                ) : null}
+                <p className="authoring-hint">
+                  {m.authoring_improvement_source_hint()}
+                </p>
+              </Disclosure>
+            ) : null}
             <label className="authoring-field">
               {m.authoring_refine_label()}
               <Textarea
@@ -416,7 +756,12 @@ export function GenerationAssistant({
                 pending ||
                 !saved ||
                 !instruction.trim() ||
-                !availability.data?.available
+                !availability.data?.available ||
+                (!!sourceLink &&
+                  (!sourceId ||
+                    !runId ||
+                    sourceRuns.isFetching ||
+                    sourceRuns.isError))
               }
             >
               {pending

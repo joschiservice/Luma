@@ -25,6 +25,27 @@ they never evaluate models or connector preconditions.
   [Activity](workspace-activity.md#attribution); review and progress keep user IDs and list
   the people they reference in `people`.
 
+## Shared action review
+
+The `action-review-diffs` release adds one review contract to case detail, Needs you and
+waiting workflow actions. It reads immutable proposals and frozen owner snapshots without
+calling providers, policy evaluation or models. Provider record identity stays distinct from
+Luma's operation identity; IDs assigned by a future provider write remain unknown.
+
+The review shows before, planned after and expected baseline separately, together with affected
+scope, compensation limits, retained evidence and its age. Known null stays distinct from a
+missing value. Line encodings are interpreted by their registered capability; revisions are
+explicit guards and never stand in for unknown business values. Unpinned canonical projection
+values remain unknown until their owning read model confirms them. A recorded policy decision
+is history; only the owner’s current controls can authorize approval or dispatch.
+
+Registered effects need a reviewed diff when the release is enabled. An unregistered capability
+cannot proceed just because its name resembles an existing one. Compensation means a separately
+reviewed correction may be possible, never an automatic undo or permission to retry an uncertain
+write. Dispatch rereads preconditions after audit persistence; changed expected values withhold
+the call. Fresh proposals use new immutable identities and require another review. The client
+retains the replaced diff during renewal so the person can compare it with the fresh proposal.
+
 ## Decisions
 
 Escalation and manual closure need `issues.manage` (**Work on issues**). Approval and rejection need `decisions.respond` and an

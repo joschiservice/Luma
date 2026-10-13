@@ -10,6 +10,7 @@ import {
   draftProposalSchema,
   generatedDraftSchema,
   generationAvailabilitySchema,
+  improvementDiscoverySchema,
   refineWorkflowDraftSchema,
   workflowGenerationSchema,
 } from '../workflow-generation.js';
@@ -22,6 +23,20 @@ const draftParams = organizationParamsSchema.extend({
 const proposalParams = draftParams.extend({ proposalId: z.string().uuid() });
 
 export const workflowGenerationContract = {
+  discover: endpoint
+    .route({
+      method: 'GET',
+      path: `${authoring}/improvement-sources`,
+      summary: 'Discover recurring verified work for review',
+      description:
+        'Requires `workflows.author` and `issues.manage`. On an explicit request, groups at most 500 verified issues from the last 30 days by pattern, immutable resolution artifact and recorded environment. Counts describe retained human involvement and recurrence. Select evidence to request a separate proposal; discovery never invokes a model, changes a workflow or grants publication or activation authority. Returns 404 when discovery is unavailable, or 503 when the bounded cohort is too large.',
+    })
+    .meta({
+      access: requires('workflows.author'),
+      errors: [401, 403, 404, 409, 503],
+    })
+    .input(z.object({ params: organizationParamsSchema }))
+    .output(improvementDiscoverySchema),
   availability: endpoint
     .route({
       method: 'GET',

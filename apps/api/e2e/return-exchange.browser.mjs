@@ -1,6 +1,7 @@
 /* global document, innerWidth */
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
+import { returnBrowserCommand } from './return-browser-commands.mjs';
 import { settlementFixture } from './return-settlement-fixture.mjs';
 
 test('requests a replacement by keyboard and verifies charge payment before approving hold release on a narrow case', async ({
@@ -74,7 +75,9 @@ test('requests a replacement by keyboard and verifies charge payment before appr
   ).toBe(0);
   const approver = await pageFor(f.approver),
     review = approver.getByRole('region', { name: 'Exchange' });
-  await review.getByRole('button', { name: 'Approve and send' }).click();
+  await returnBrowserCommand(approver, f.path, 'decision', () =>
+    review.getByRole('button', { name: 'Approve and send' }).click(),
+  );
   await expect(
     review.getByText('Independently verified', { exact: true }),
   ).toBeVisible();
@@ -112,7 +115,9 @@ test('requests a replacement by keyboard and verifies charge payment before appr
     )
     .toBe(1);
   await approver.reload();
-  await review.getByRole('button', { name: 'Approve and send' }).click();
+  await returnBrowserCommand(approver, f.path, 'decision', () =>
+    review.getByRole('button', { name: 'Approve and send' }).click(),
+  );
   await expect(
     review.getByText('Price difference payment pending', { exact: true }),
   ).toBeVisible();
@@ -139,7 +144,9 @@ test('requests a replacement by keyboard and verifies charge payment before appr
     fullPage: true,
   });
   await f.command({ kind: 'exchange-pay', order: f.providerOrderId });
-  await review.getByRole('button', { name: 'Check source' }).last().click();
+  await returnBrowserCommand(approver, f.path, 'check', () =>
+    review.getByRole('button', { name: 'Check source' }).last().click(),
+  );
   await expect(
     review.getByText('Price difference payment verified', { exact: true }),
   ).toBeVisible();
@@ -150,7 +157,9 @@ test('requests a replacement by keyboard and verifies charge payment before appr
     review.getByText('Waiting for approval', { exact: true }),
   ).toBeVisible();
   await requester.reload();
-  await section.getByRole('button', { name: 'Approve and send' }).click();
+  await returnBrowserCommand(requester, f.path, 'decision', () =>
+    section.getByRole('button', { name: 'Approve and send' }).click(),
+  );
   await expect(
     section.getByText('Replacement fulfillment ready', { exact: true }).last(),
   ).toBeVisible();

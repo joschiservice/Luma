@@ -1,6 +1,7 @@
 /* global document, innerWidth */
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
+import { returnBrowserCommand } from './return-browser-commands.mjs';
 import { completionFixture } from './return-completion-fixture.mjs';
 
 test('records receipt and inspection, approves stock and exchange separately, then completes only after both systems agree', async ({
@@ -122,7 +123,9 @@ test('records receipt and inspection, approves stock and exchange separately, th
   expect(replacementRequest.replacement.skuId).toBe(replacement.skuId);
   const approver = await pageFor(f.approver),
     review = approver.getByRole('region', { name: 'Exchange', exact: true });
-  await review.getByRole('button', { name: 'Approve and send' }).click();
+  await returnBrowserCommand(approver, f.path, 'decision', () =>
+    review.getByRole('button', { name: 'Approve and send' }).click(),
+  );
   await expect(
     review.getByText('Independently verified', { exact: true }),
   ).toBeVisible();
@@ -137,10 +140,12 @@ test('records receipt and inspection, approves stock and exchange separately, th
     stock.getByText('Waiting for approval', { exact: true }),
   ).toBeVisible();
   await approver.reload();
-  await approver
-    .getByRole('region', { name: 'Stock and refund' })
-    .getByRole('button', { name: 'Approve and send' })
-    .click();
+  await returnBrowserCommand(approver, f.path, 'decision', () =>
+    approver
+      .getByRole('region', { name: 'Stock and refund' })
+      .getByRole('button', { name: 'Approve and send' })
+      .click(),
+  );
   await expect(
     approver
       .getByRole('region', { name: 'Stock and refund' })
@@ -154,11 +159,15 @@ test('records receipt and inspection, approves stock and exchange separately, th
     section.getByText('Waiting for approval', { exact: true }),
   ).toBeVisible();
   await approver.reload();
-  await review.getByRole('button', { name: 'Approve and send' }).click();
+  await returnBrowserCommand(approver, f.path, 'decision', () =>
+    review.getByRole('button', { name: 'Approve and send' }).click(),
+  );
   await expect(
     review.getByText('Price difference payment pending', { exact: true }),
   ).toBeVisible();
-  await review.getByRole('button', { name: 'Check both systems' }).click();
+  await returnBrowserCommand(approver, f.path, 'complete', () =>
+    review.getByRole('button', { name: 'Check both systems' }).click(),
+  );
   await expect(
     review.getByText('Exchange unresolved · case owner must follow up', {
       exact: true,
@@ -175,7 +184,9 @@ test('records receipt and inspection, approves stock and exchange separately, th
   );
   await f.command({ kind: 'refund-settle', order: f.providerOrderId });
   await review.getByRole('button', { name: 'Check both systems' }).focus();
-  await approver.keyboard.press('Enter');
+  await returnBrowserCommand(approver, f.path, 'complete', () =>
+    approver.keyboard.press('Enter'),
+  );
   await expect(
     review.getByText('Exchange consistency verified', { exact: true }),
   ).toBeVisible();

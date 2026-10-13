@@ -19,6 +19,44 @@ import { localizeVocabulary } from './vocabulary-text';
 export const draftsKey = (organizationId: string) =>
   [...workflowsKey(organizationId), 'drafts'] as const;
 
+/** Runs bounded review-only discovery only when the operator requests it. */
+export const improvementDiscoveryOptions = (organizationId: string) =>
+  queryOptions({
+    queryKey: [...workflowsKey(organizationId), 'improvement-discovery'],
+    ...privateQueryDefaults,
+    enabled: false,
+    queryFn: ({ signal }) =>
+      api.workflowGeneration.discover(
+        { params: { organizationId } },
+        { signal },
+      ),
+  });
+
+/** Loads retained resolution selections only after an author supplies an issue link. */
+export const improvementRunsOptions = (
+  organizationId: string,
+  exceptionId: string | null,
+) =>
+  queryOptions({
+    queryKey: [
+      ...workflowsKey(organizationId),
+      'improvement-source',
+      exceptionId,
+    ],
+    ...privateQueryDefaults,
+    enabled: exceptionId !== null,
+    queryFn: async ({ signal }) => {
+      if (!exceptionId) return [];
+
+      return (
+        await api.resolutionLearning.list(
+          { params: { organizationId, exceptionId }, query: {} },
+          { signal },
+        )
+      ).items;
+    },
+  });
+
 /** Lists templates with their requirements and readiness in this workspace. */
 export const templatesOptions = (organizationId: string) =>
   queryOptions({

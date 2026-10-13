@@ -46,3 +46,14 @@ it('rejects unauthorized and malformed summaries without caching totals', async 
     client.clear();
   }
 });
+
+it('isolates exact brief windows from rolling Home caches', () => {
+  const a = { start: '2026-10-24T06:00:00Z', end: '2026-10-25T07:00:00Z' };
+  const b = { start: '2026-10-25T07:00:00Z', end: '2026-10-26T07:00:00Z' };
+  expect(overviewOptions('a', '24h', a).queryKey).not.toEqual(
+    overviewOptions('a', '24h').queryKey,
+  );
+  expect(overviewOptions('a', '24h', a).queryKey).not.toEqual(
+    overviewOptions('a', '24h', b).queryKey,
+  );
+});

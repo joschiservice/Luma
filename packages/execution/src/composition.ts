@@ -28,10 +28,13 @@ export function createExecution(
   audit: AuditLog,
   registry: EffectRegistry,
   refreshContext: ExecutionDependencies['refreshContext'],
+  diffRequired?: ExecutionDependencies['diffRequired'],
+  controls?: Parameters<typeof createExecutionRepository>[1],
 ) {
   return createExecutionService({
+    ...(diffRequired ? { diffRequired } : {}),
     writeControl: createWriteControl(db),
-    repository: createExecutionRepository(db),
+    repository: createExecutionRepository(db, controls),
     policies,
     audit,
     registry,

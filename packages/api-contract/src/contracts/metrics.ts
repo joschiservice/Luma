@@ -38,11 +38,11 @@ export const metricsContract = {
       path: '/v2/organizations/{organizationId}/metrics/query',
       summary: 'Read selected operational metrics and matching records',
       description:
-        'Reads cases, monitored stock, purchase orders, connection health and evidence-backed resolution outcomes in one consistent, current read. Select metric IDs explicitly. Filters must be supported by every selected metric. Each metric returns its first page of records; pass a metric’s nextCursor as cursor to read the records after that page. Pages read current data, so records can join or leave between pages; deduplicate by ID. A cursor from another request returns 422. Resolution alone accepts environment and a 24-hour or seven-day first-detection window; other families describe current state. Null values, unknown classification and unavailable coverage are distinct from zero.',
+        'Reads cases, monitored stock, purchase orders, connection health and evidence-backed resolution outcomes in one consistent, current read. Select metric IDs explicitly. Filters must be supported by every selected metric. Each metric returns its first page of records; pass a metric’s nextCursor as cursor to read the records after that page. Pages read current data, so records can join or leave between pages; deduplicate by ID. A cursor from another request returns 422. Resolution uses environment and first-detection windows. When released for the workspace, reporting also accepts 30 days, paired half-open start/end bounds of up to 366 days, issue class, connection and recorded workflow version. Verification-period metrics count the independent verification time, including older detected incidents. Reporting cursors bind the exact authorized scope and evaluation time; changed filters return 422 and changed incident facts return 409. Other families describe current state. Null values, unknown classification and unavailable coverage are distinct from zero.',
     })
     .meta({
       access: requires('insights.read'),
-      errors: [400, 401, 404, 422, 503],
+      errors: [400, 401, 403, 404, 409, 422, 503],
       readOnly: true,
     })
     .input(

@@ -116,5 +116,7 @@
   "home_returns_empty_description": "Returns appear here when a connected store reports one.",
   "home_returns_not_shared_title": "Returns aren’t shared yet",
   "home_returns_not_shared_description": "Returns appear once a connected store shares returns and refunds with Luma.",
-  "home_returns_review_connections": "Review connections"
+  "home_returns_review_connections": "Review connections",
+  "home_window_brief": "Morning brief",
+  "home_brief_window": "Verified results from {start} to {end}. Decisions and ongoing work show the current state."
 }

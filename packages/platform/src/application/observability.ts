@@ -11,6 +11,15 @@ type ProductEvent =
 /** Flag keys that may be evaluated; add a key here before creating it in PostHog. */
 export const featureFlags = [
   'observability-test',
+  'contextual-record-assistance',
+  'operational-morning-brief',
+  'action-review-diffs',
+  'scoped-autonomy',
+  'resolution-insights',
+  'active-diagnosis',
+  'workflow-improvements',
+  'workflow-red-teaming',
+  'workflow-improvement-discovery',
   'adaptive-custom-fields',
   'adaptive-saved-views',
   'adaptive-view-generation',

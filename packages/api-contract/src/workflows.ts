@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { actionDiffSchema } from './action-diff.js';
 import { activityActorSchema } from './activity.js';
 import { codeStepViewSchema, codeTelemetrySchema } from './code-steps.js';
 import {
@@ -226,6 +227,10 @@ export const workflowRunViewSchema = playbookRunViewSchema
         'inconclusive_verification',
         'escalated',
       ])
+      .optional(),
+    actionReviews: z
+      .array(z.object({ stepId: text, diff: actionDiffSchema }))
+      .max(100)
       .optional(),
     processSteps: z
       .array(

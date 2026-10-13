@@ -1398,3 +1398,38 @@
   align-items: center;
   min-width: 260px;
 }
+
+/* Policy cards keep review evidence and controls readable as the workspace narrows. */
+.settings-autonomy-policy {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+
+.settings-autonomy-policy h3 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-autonomy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-source-evidence,
+.settings-source-evidence > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px 12px;
+  overflow-wrap: anywhere;
+}
+.settings-source-evidence > div {
+  grid-column: 1 / -1;
+}
+.settings-source-evidence dd {
+  margin: 0;
+}

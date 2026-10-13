@@ -230,6 +230,27 @@ export function assigneeOptions(
 
 /** Localizes owned return work without changing its authority or evidence. */
 export function localizeReturnDecision(item: DecisionItem): DecisionItem {
+  if (item.owner.kind === 'workflow_run' && item.owner.followUpProposalId)
+    return {
+      ...item,
+      title: m.decisions_follow_up_title(),
+      why:
+        item.reason === 'recovery'
+          ? m.decisions_follow_up_stale()
+          : m.decisions_follow_up_why(),
+      consequences: [
+        {
+          response: m.issues_decision_approve(),
+          text: m.decisions_follow_up_approve_text(),
+        },
+        {
+          response: m.issues_decision_reject(),
+          text: m.decisions_follow_up_reject_text(),
+        },
+      ],
+      subject: { ...item.subject, label: m.decisions_follow_up_group() },
+      group: { ...item.group, label: m.decisions_follow_up_group() },
+    };
   if (item.kind !== 'return_case') return item;
   const stage = item.change.find((fact) => fact.label === 'Stage')?.value;
 

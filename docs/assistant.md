@@ -69,3 +69,24 @@ latency.
 Route the `assistant` profile like authoring; see
 [Model gateway](model-gateway.md#assistant-profile). Synthetic local data does not need the
 [processing-path review](architecture/003-model-processing-path-review.md); tenant data does.
+
+## Record context
+
+Contextual assistance is released per tenant through the default-off
+`contextual-record-assistance` flag. Availability exposes that decision only after refreshing
+the member context; an explicit contextual question checks it again on the server.
+Navigation context contains record IDs or validated chart filters, never trusted facts or
+grants. The assistant forces the contextual lookup before its first model call. Failed,
+missing and permission-limited reads remain explicit tool results. Selecting another record
+starts a new conversation; retries and follow-ups retain its context.
+
+Chart selections use the Insights owner's records query with the original range, time zone,
+connection, point, series and evaluation time. Expired selections fail rather than widening
+silently. Evaluation time is distinct from source observation time. Chart summaries without a
+source timestamp cite that timestamp as unknown; individual detail reads can provide it.
+
+Issue reads include the desk owner's current permitted decisions, policy freshness and
+proposal/approval state. A diagnosis recommendation alone never establishes eligibility.
+Following the issue citation opens governed review, which checks permission, current evidence,
+policy and Action Admission again. Assistant tools remain read-only; proposed actions,
+accepted writes, observed progress and independently verified outcomes stay distinct.

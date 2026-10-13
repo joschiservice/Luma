@@ -5,6 +5,7 @@ import type {
 } from '@luma/api-contract';
 import { formatNumber } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
+import { ActionDiff } from '@luma/ui/components/issues/action-diff';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import {
@@ -24,6 +25,7 @@ import { formatMoney } from '../../shared/orders/presentation';
 import {
   returnCaseError,
   returnCaseKey,
+  returnSettlementOptions,
   settlementCommands,
 } from './case-data';
 import { retryableReturnRequestId } from './case-requests';
@@ -63,11 +65,29 @@ export function ReturnSettlement({
   const [requests, setRequests] = useState<Record<string, string>>({});
   const command = settlementCommands(organizationId, detail.case.id);
   const mutation = useMutation({
-    mutationFn: (fn: () => Promise<unknown>) => fn(),
+    mutationFn: (fn: () => Promise<ReturnActionView>) => fn(),
+    onSuccess: (action) => {
+      // The command response already includes the owner's independently read result.
+      // Show it without waiting for unrelated case panels; no status is inferred locally.
+      client.setQueryData<ReturnActionList>(
+        returnSettlementOptions(organizationId, detail.case.id).queryKey,
+        (current) =>
+          current
+            ? {
+                ...current,
+                items: current.items.some((item) => item.id === action.id)
+                  ? current.items.map((item) =>
+                      item.id === action.id ? action : item,
+                    )
+                  : [...current.items, action],
+              }
+            : current,
+      );
+    },
     onSettled: () =>
       client.invalidateQueries({ queryKey: returnCaseKey(organizationId) }),
   });
-  const run = (fn: () => Promise<unknown>) => mutation.mutate(fn);
+  const run = (fn: () => Promise<ReturnActionView>) => mutation.mutate(fn);
 
   function request(kind: 'refund' | 'restock', targetId?: string) {
     const key = targetId ?? kind,
@@ -164,6 +184,7 @@ export function ReturnSettlement({
                         ? m.returns_service_stale()
                         : labels[action.state]()}
                     </StatePill>
+                    {action.diff ? <ActionDiff diff={action.diff} /> : null}
                     <span>
                       {m.returns_settlement_requested()}{' '}
                       <WorkspaceDate value={action.requestedAt} />

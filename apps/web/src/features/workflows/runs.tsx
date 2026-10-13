@@ -5,6 +5,7 @@ import type {
 } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import { rich } from '@luma/i18n/rich';
+import { ActionDiff } from '@luma/ui/components/issues/action-diff';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Card, CardHeader } from '@luma/ui/components/primitives/card';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
@@ -288,6 +289,14 @@ export function WorkflowRuns({
                             <WorkspaceDate value={step.recordedAt} />
                           </div>
                           <p>{processStepDescription(step)}</p>
+                          {run.actionReviews
+                            ?.filter((review) => review.stepId === step.stepId)
+                            .map((review) => (
+                              <ActionDiff
+                                key={review.stepId}
+                                diff={review.diff}
+                              />
+                            ))}
                           {step.evidenceRefs.length ? (
                             <p>
                               {m.workflows_runs_evidence_count({

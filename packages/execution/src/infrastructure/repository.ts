@@ -19,6 +19,10 @@ async function outbox(tx: SqlTransaction, entry: AuditEntry) {
  */
 export function createExecutionRepository(
   db: TenantDatabase,
+  controls?: {
+    prepare(tx: SqlTransaction, record: ExecutionRecord): Promise<void>;
+    finish(tx: SqlTransaction, record: ExecutionRecord): Promise<void>;
+  },
 ): ExecutionRepository {
   return {
     verification: (tenantId, entry) =>
@@ -73,6 +77,7 @@ export function createExecutionRepository(
           ],
         );
         if (!result.rowCount) return false;
+        await controls?.prepare(tx, record);
         await outbox(tx, entry);
 
         return true;
@@ -90,6 +95,7 @@ export function createExecutionRepository(
           ],
         );
         if (!result.rowCount) return false;
+        await controls?.finish(tx, record);
         await outbox(tx, entry);
 
         return true;

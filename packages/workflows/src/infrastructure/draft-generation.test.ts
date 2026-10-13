@@ -19,6 +19,7 @@ import { codeRuntime } from '../domain/code-step.js';
 import type { WorkflowDraftContent } from '../domain/draft.js';
 import type { ProcessWorkflowVersion } from '../domain/process.js';
 import type { VocabularyContribution } from '../domain/vocabulary.js';
+import type { ImprovementEvidence } from '../domain/workflow-improvement.js';
 import {
   codeSourceProblem,
   codeStepOutput,
@@ -275,7 +276,12 @@ function fakeGateway(replies: Reply[]) {
 
 function setup(
   replies: Reply[],
-  options: { available?: boolean; timeoutMs?: number } = {},
+  options: {
+    available?: boolean;
+    timeoutMs?: number;
+    improvementEvidence?: ImprovementEvidence;
+    improvementsEnabled?: boolean;
+  } = {},
 ) {
   const drafts = new Map<string, StoredWorkflowDraft>();
   const published: ProcessWorkflowVersion[] = [];
@@ -320,6 +326,30 @@ function setup(
   });
   const publish = vi.spyOn(service, 'publish');
   const generationStore: GenerationStore = {
+    apply: async (_context, id, decision, save) => {
+      const record = records.get(id);
+      if (!record || record.proposal?.state !== 'open')
+        throw new Error('Proposal already decided');
+      const revision = await save();
+      const updated: GenerationRecord = {
+        ...record,
+        resultingRevision: revision,
+        proposal: { state: 'accepted', ...decision },
+      };
+      records.set(id, updated);
+
+      return updated;
+    },
+    hasUnreleasedImprovement: async (_context, draftId) =>
+      [...records.values()].some(
+        (record) =>
+          record.draftId === draftId &&
+          (record.proposal?.state === 'accepted' ||
+            record.proposal?.state === 'open') &&
+          record.result &&
+          'improvement' in record.result &&
+          !!record.result.improvement,
+      ),
     get: async (_context, id) => structuredClone(records.get(id) ?? null),
     insert: async (_context, record) => {
       if (records.has(record.id)) return false;
@@ -355,6 +385,15 @@ function setup(
     now: () => new Date('2026-09-28T10:00:00Z'),
     trace: (item) => ({ requestId: item.requestId, traceId: 't', spanId: 's' }),
     ...(options.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
+    improvements: {
+      enabled: async () => options.improvementsEnabled ?? false,
+      evidence: async () => {
+        if (!options.improvementEvidence)
+          throw new Error('Evidence unavailable');
+
+        return options.improvementEvidence;
+      },
+    },
   });
 
   return {
@@ -375,6 +414,109 @@ const describeRequest = (prompt = 'Reorder 20 units when stock is low.') => ({
 });
 
 describe('draft generation', () => {
+  it('grounds an improvement in verified facts, pins scope and rejects generated privilege expansion', async () => {
+    const evidence: ImprovementEvidence = {
+      incidentId: randomUUID(),
+      runId: randomUUID(),
+      pattern: 'inventory_mismatch',
+      subjectId: 'stock-position',
+      evidenceRefs: ['verified-read'],
+      evaluatorVersion: 'inventory/1',
+      verifiedAt: '2026-09-28T09:00:00.000Z',
+      artifactDigest: 'a'.repeat(64),
+      repairCodes: ['correct-stock'],
+      humanInterventions: 1,
+    };
+    const admin = context('admin');
+    const draftId = randomUUID();
+    const safe = structuredClone(held);
+    safe.definition.intent = 'A clearer handover after confirmed resolution.';
+    const env = setup([{ output: answer(safe) }], {
+      improvementEvidence: evidence,
+      improvementsEnabled: true,
+    });
+    await env.drafts.create(admin, {
+      id: draftId,
+      mode: 'visual',
+      start: { kind: 'content', content: held },
+    });
+    const request = {
+      id: randomUUID(),
+      revision: 1,
+      instruction: 'Improve this operation.',
+      improvement: { incidentId: evidence.incidentId, runId: evidence.runId },
+    };
+    const proposed = await env.generation.refine(admin, draftId, request);
+    expect(proposed.improvement?.evidence).toEqual(evidence);
+    expect(proposed.improvement?.rollout.subjectIds).toEqual([
+      'stock-position',
+    ]);
+    expect(proposed.improvement?.coverage).toBe('not_evaluated');
+    expect(proposed.content.definition.intent).toBe(safe.definition.intent);
+    expect(env.stored.get(draftId)?.content).toEqual(held);
+    expect(env.publish).not.toHaveBeenCalled();
+    expect(await env.generation.refine(admin, draftId, request)).toEqual(
+      proposed,
+    );
+    expect(env.requests).toHaveLength(1);
+    await env.generation.reject(admin, draftId, proposed.id);
+    await expect(
+      env.generation.accept(admin, draftId, proposed.id, {
+        revision: 1,
+        saveId: randomUUID(),
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    const unsafe = structuredClone(held);
+    unsafe.applicability.trigger = {
+      kind: 'schedule',
+      at: '2026-09-29T00:00:00.000Z',
+    };
+    const hostile = setup(
+      [
+        { output: answer(unsafe) },
+        { output: answer(unsafe) },
+        { output: answer(unsafe) },
+      ],
+      { improvementEvidence: evidence, improvementsEnabled: true },
+    );
+    await hostile.drafts.create(admin, {
+      id: draftId,
+      mode: 'visual',
+      start: { kind: 'content', content: held },
+    });
+    const rejected = await hostile.generation.refine(admin, draftId, request);
+    expect(
+      rejected.diagnostics.some(
+        (item) => item.code === 'improvement_authority',
+      ),
+    ).toBe(true);
+    await expect(
+      hostile.generation.accept(admin, draftId, rejected.id, {
+        revision: 1,
+        saveId: randomUUID(),
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it('keeps evidence authoring disabled before a model call', async () => {
+    const env = setup([]);
+    const draftId = randomUUID();
+    await env.drafts.create(context('admin'), {
+      id: draftId,
+      mode: 'visual',
+      start: { kind: 'content', content: held },
+    });
+    await expect(
+      env.generation.refine(context('admin'), draftId, {
+        id: randomUUID(),
+        revision: 1,
+        instruction: 'Improve.',
+        improvement: { incidentId: randomUUID(), runId: randomUUID() },
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(env.requests).toHaveLength(0);
+  });
   it('limits the output schema to installed vocabulary and sends tenant text as sensitive EU data', async () => {
     const env = setup([{ output: answer(replenish) }]);
     const result = await env.generation.describe(
@@ -589,6 +731,8 @@ describe('draft generation', () => {
     expect(await env.generation.availability(context('member'))).toEqual({
       available: false,
       reason: 'No EU model route is configured.',
+      improvements: false,
+      improvementDiscovery: false,
     });
     expect(env.requests).toHaveLength(0);
     expect(env.stored.size).toBe(0);

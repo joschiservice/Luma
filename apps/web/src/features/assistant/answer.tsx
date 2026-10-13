@@ -48,6 +48,26 @@ function RecordLink({
 }) {
   const shared = { className, title, onClick: onNavigate };
   switch (citation.kind) {
+    case 'purchase_order':
+      return (
+        <Link
+          {...shared}
+          to="/app/$organizationId/procurement/$purchaseOrderId"
+          params={{ organizationId, purchaseOrderId: citation.id }}
+        >
+          {children}
+        </Link>
+      );
+    case 'customer':
+      return (
+        <Link
+          {...shared}
+          to="/app/$organizationId/customers/$customerId"
+          params={{ organizationId, customerId: citation.id }}
+        >
+          {children}
+        </Link>
+      );
     case 'order':
       return (
         <Link
@@ -296,7 +316,10 @@ export function AnswerContent({
                     <span className="assistant-source-copy">
                       <strong>{citationTitle(citation)}</strong>
                       <span>
-                        {[citation.detail, sourceLine(citation)]
+                        {[
+                          citation.detail,
+                          sourceLine(citation) || m.assistant_source_unknown(),
+                        ]
                           .filter(Boolean)
                           .join(' · ')}
                       </span>
@@ -322,7 +345,15 @@ export function AnswerContent({
                               })}
                         </span>
                       </time>
-                    ) : null}
+                    ) : (
+                      <span
+                        className="assistant-source-time"
+                        title={m.assistant_source_time_unknown()}
+                        aria-label={m.assistant_source_time_unknown()}
+                      >
+                        {m.assistant_source_time_unknown_short()}
+                      </span>
+                    )}
                   </RecordLink>
                 </li>
               );

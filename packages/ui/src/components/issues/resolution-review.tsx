@@ -24,6 +24,7 @@ import { Badge } from '../primitives/badge';
 import { Button } from '../primitives/button';
 import { Card, CardHeader, CardTitle } from '../primitives/card';
 import { Disclosure } from '../primitives/disclosure';
+import { ActionDiff } from './action-diff';
 import { caseLabel, CaseNotice, CaseTime } from './case-investigation';
 import {
   caseStateLabel,
@@ -120,6 +121,12 @@ export function ResolutionReview({
         </h3>
         {proposal ? (
           <>
+            {proposal.diff ? (
+              <ActionDiff
+                diff={proposal.diff}
+                onEvidence={navigate ? () => navigate('evidence') : undefined}
+              />
+            ) : null}
             {review.observeOnly ? (
               <Alert tone="neutral" role="status">
                 <AlertTitle>{m.issues_observe_only_title()}</AlertTitle>

@@ -30,6 +30,21 @@ export type Email =
       timeZone: string;
       link: string;
     }
+  | {
+      kind: 'morning_brief';
+      workspace: string;
+      timeZone: string;
+      start: string;
+      end: string;
+      attention: number;
+      active: number | null;
+      verified: number | null;
+      partial: boolean;
+      decisions: { label: string; link: string }[];
+      cases: { label: string; link: string; verified: boolean }[];
+      link: string;
+      preferencesLink: string;
+    }
   | { kind: 'test'; workspace: string; preferencesLink: string }
   | {
       kind: 'issue' | 'connection';
@@ -76,6 +91,88 @@ export function emailContent(
 ): { subject: string; document: ReactElement } {
   const o = { locale };
   switch (email.kind) {
+    case 'morning_brief': {
+      const values = { workspace: email.workspace };
+      const number = (value: number | null) =>
+        value === null
+          ? m.email_morning_brief_unavailable({}, o)
+          : new Intl.NumberFormat(locale).format(value);
+
+      return {
+        subject: m.email_morning_brief_subject(values, o),
+        document: (
+          <EmailLayout
+            locale={locale}
+            preview={m.email_morning_brief_preview({}, o)}
+            heading={m.email_morning_brief_subject(values, o)}
+            reason={{
+              kind: 'workspace',
+              workspace: email.workspace,
+              preferencesLink: email.preferencesLink,
+            }}
+          >
+            <Paragraph>
+              {m.email_morning_brief_window(
+                {
+                  start: formatEmailDateTime(
+                    new Date(email.start),
+                    locale,
+                    email.timeZone,
+                  ),
+                  end: formatEmailDateTime(
+                    new Date(email.end),
+                    locale,
+                    email.timeZone,
+                  ),
+                },
+                o,
+              )}
+            </Paragraph>
+            <Facts
+              items={[
+                {
+                  label: m.email_morning_brief_attention({}, o),
+                  value: number(email.attention),
+                },
+                {
+                  label: m.email_morning_brief_active({}, o),
+                  value: number(email.active),
+                },
+                {
+                  label: m.email_morning_brief_verified({}, o),
+                  value: number(email.verified),
+                },
+              ]}
+            />
+            <Paragraph>{m.email_morning_brief_honesty({}, o)}</Paragraph>
+            {email.partial ? (
+              <Paragraph>{m.email_morning_brief_partial({}, o)}</Paragraph>
+            ) : null}
+            {email.decisions.map((item) => (
+              <SecondaryLink key={item.link} href={item.link}>
+                {item.label}
+              </SecondaryLink>
+            ))}
+            {email.cases.map((item) => (
+              <SecondaryLink key={item.link} href={item.link}>
+                {item.verified
+                  ? m.email_morning_brief_case_verified(
+                      { label: item.label },
+                      o,
+                    )
+                  : m.email_morning_brief_case_ongoing(
+                      { label: item.label },
+                      o,
+                    )}
+              </SecondaryLink>
+            ))}
+            <Action locale={locale} href={email.link}>
+              {m.email_morning_brief_open({}, o)}
+            </Action>
+          </EmailLayout>
+        ),
+      };
+    }
     case 'invitation': {
       const role =
         'custom' in email.role

@@ -13,6 +13,7 @@ export function presentReturnCase(item: {
     revision?: number;
   };
   creation: {
+    id?: string;
     state: string;
     expiresAt: string;
     requestedAt: string;
@@ -49,6 +50,9 @@ export function presentReturnCase(item: {
 
   return {
     id: `return-case:${value.id}`,
+    ...(creation?.id
+      ? { actionReference: { runId: creation.id, stepId: 'create' } }
+      : {}),
     kind: 'return_case',
     domain: 'orders',
     reason: approval

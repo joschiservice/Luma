@@ -7,7 +7,8 @@ import type { ResolutionMetricReader } from './measurement.js';
 
 /**
  * Combines persisted case counts and connection coverage for a rolling 24-hour or seven-day
- * window.
+ * window. Explicit bounds select a brief verification interval; fixed-window measurement
+ * is omitted because its detection cohort cannot represent a variable interval.
  */
 export function createOperationsOverview(
   cases: CaseService,
@@ -15,19 +16,27 @@ export function createOperationsOverview(
   now = () => new Date(),
   measurementReader?: ResolutionMetricReader,
 ): OperationsOverviewService {
-  return async (context: TenantContext, window: '24h' | '7d') => {
+  return async (
+    context: TenantContext,
+    window: '24h' | '7d',
+    asOf?: Date,
+    since?: Date,
+  ) => {
     requireTenant(context, context.tenantId);
-    const end = now().toISOString();
-    const start = new Date(
-      Date.parse(end) - (window === '7d' ? 7 : 1) * 86400000,
+    const end = (asOf ?? now()).toISOString();
+    const readAt = since ? now().toISOString() : end;
+    const start = (
+      since ?? new Date(Date.parse(end) - (window === '7d' ? 7 : 1) * 86400000)
     ).toISOString();
     const [summary, connections, metrics] = await Promise.all([
-      cases.overview(context, start, end),
-      coverage(context, end),
-      measurementReader?.(context.tenantId, end, {
-        environment: 'live',
-        window,
-      }),
+      cases.overview(context, start, end, readAt),
+      coverage(context, readAt),
+      since
+        ? undefined
+        : measurementReader?.(context.tenantId, end, {
+            environment: 'live',
+            window,
+          }),
     ]);
 
     const autonomous = metrics?.find(
@@ -67,7 +76,7 @@ export function createOperationsOverview(
     return {
       ...summary,
       connections,
-      generatedAt: end,
+      generatedAt: readAt,
       window: { start, end },
       freshnessThresholdHours: 24 as const,
       measurement: measured,
@@ -88,6 +97,8 @@ export function createOperationsOverview(
 export type OperationsOverviewService = (
   context: TenantContext,
   window: '24h' | '7d',
+  asOf?: Date,
+  since?: Date,
 ) => Promise<
   Awaited<ReturnType<CaseService['overview']>> & {
     connections: Awaited<ReturnType<CoverageReader>>;

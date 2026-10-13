@@ -28,6 +28,21 @@ export const insightRanges = [
  * and come back to the same records. `metric` restores the order metric dialog.
  */
 export const insightsSearch = z.object({
+  reportArtifact: z.string().max(200).optional().catch(undefined),
+  reportVersion: z.string().max(200).optional().catch(undefined),
+  reportWindow: z.enum(['7d', '30d', 'custom']).optional().catch(undefined),
+  reportStart: z
+    .string()
+    .datetime({ offset: true })
+    .optional()
+    .catch(undefined),
+  reportEnd: z.string().datetime({ offset: true }).optional().catch(undefined),
+  reportClass: z.string().min(1).max(100).optional().catch(undefined),
+  reportSource: z.uuid().optional().catch(undefined),
+  reportEnv: z
+    .enum(['live', 'pilot', 'synthetic', 'shadow', 'observe_only', 'unknown'])
+    .optional()
+    .catch(undefined),
   range: z.enum(insightRanges).optional().catch(undefined),
   source: z.uuid().optional().catch(undefined),
   chart: z.enum(insightCharts).optional().catch(undefined),

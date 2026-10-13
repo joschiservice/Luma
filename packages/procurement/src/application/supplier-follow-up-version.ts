@@ -4,6 +4,8 @@ const orderFields = {
   ready: 'boolean',
   waiting: 'boolean',
   key: 'string',
+  orderRevision: 'number',
+  scopeFingerprint: 'string',
 } as const;
 
 /**
@@ -24,7 +26,7 @@ export function supplierFollowUpSource(
         'When a supplier hasn’t confirmed a sent order in time, or a delivery is past its expected date, note the follow-up on the order, wait, check again and hand it back to a buyer if the supplier is still silent. Nothing is sent to the supplier.',
       category: 'procurement',
     },
-    version: '1.0.0',
+    version: '1.1.0',
     applicability: {
       trigger: { kind: 'event', eventType: 'supplier_order_overdue' },
       subjectKind: 'purchase_order',

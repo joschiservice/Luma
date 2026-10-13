@@ -28,6 +28,7 @@
   "dependencies": {
     "@luma/api-contract": "workspace:*",
     "@luma/audit": "workspace:*",
+    "@luma/connections": "workspace:*",
     "@luma/identity": "workspace:*",
     "@luma/platform": "workspace:*",
     "@luma/policies": "workspace:*",

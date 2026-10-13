@@ -33,7 +33,12 @@ export type DecisionOwner =
   | { kind: 'return_case'; caseId: string }
   | { kind: 'human_task'; definitionId: string; runId: string; stepId: string }
   | { kind: 'case'; exceptionId: string }
-  | { kind: 'workflow_run'; definitionId: string; runId: string }
+  | {
+      kind: 'workflow_run';
+      definitionId: string;
+      runId: string;
+      followUpProposalId?: string;
+    }
   | {
       kind: 'app_fulfillment';
       appId: string;
@@ -91,6 +96,8 @@ export type DecisionCandidate = Omit<
   DecisionItem,
   'urgency' | 'evidence' | 'assignment' | 'record'
 > & {
+  /** Owner-bound immutable proposal; used only for a shared read-only action review. */
+  actionReference?: { proposalId: string } | { runId: string; stepId: string };
   ownerAssignment?: DecisionAssignment | undefined;
   evidence: { observedAt: string | null; validUntil: string | null };
   record:

@@ -166,10 +166,16 @@ function transaction(
       ).rows[0]!;
       const preferences = (
         await tx.query<SettingsSnapshot['preferences']>(
-          'SELECT issues,connections,revision FROM notification_preferences WHERE tenant_id=$1 AND user_id=$2',
+          'SELECT issues,connections,morning_brief AS "morningBrief",morning_brief_time AS "morningBriefTime",revision FROM notification_preferences WHERE tenant_id=$1 AND user_id=$2',
           [tenantId, userId],
         )
-      ).rows[0] ?? { issues: false, connections: false, revision: 0 };
+      ).rows[0] ?? {
+        issues: false,
+        connections: false,
+        morningBrief: false,
+        morningBriefTime: '08:00',
+        revision: 0,
+      };
       const lastTest =
         (
           await tx.query<NonNullable<SettingsSnapshot['lastTest']>>(
@@ -240,13 +246,21 @@ function transaction(
     },
     async savePreferences(userId, value) {
       await tx.query(
-        `INSERT INTO notification_preferences(tenant_id,user_id,issues,connections,revision) VALUES($1,$2,$3,$4,$5)
-        ON CONFLICT(tenant_id,user_id) DO UPDATE SET issues=$3,connections=$4,revision=$5`,
-        [tenantId, userId, value.issues, value.connections, value.revision],
+        `INSERT INTO notification_preferences(tenant_id,user_id,issues,connections,revision,morning_brief,morning_brief_time) VALUES($1,$2,$3,$4,$5,$6,$7)
+        ON CONFLICT(tenant_id,user_id) DO UPDATE SET issues=$3,connections=$4,revision=$5,morning_brief=$6,morning_brief_time=$7`,
+        [
+          tenantId,
+          userId,
+          value.issues,
+          value.connections,
+          value.revision,
+          value.morningBrief,
+          value.morningBriefTime,
+        ],
       );
       await tx.query(
-        "UPDATE workspace_mail SET state='cancelled' WHERE tenant_id=$1 AND user_id=$2 AND state='queued' AND ((kind='issues' AND NOT $3) OR (kind='connections' AND NOT $4))",
-        [tenantId, userId, value.issues, value.connections],
+        "UPDATE workspace_mail SET state='cancelled' WHERE tenant_id=$1 AND user_id=$2 AND state='queued' AND ((kind='issues' AND NOT $3) OR (kind='connections' AND NOT $4) OR (kind='morning_brief' AND NOT $5))",
+        [tenantId, userId, value.issues, value.connections, value.morningBrief],
       );
     },
     async layout(userId) {

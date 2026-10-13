@@ -78,3 +78,20 @@ selection and context, ordered operator facts, automated bound inputs and hashes
 records, every action and incident verification attempt, the current canonical resolution
 and recurrence IDs. Histories before this feature are not backfilled. Exports are tenant
 data and must be de-identified before reuse as fixtures.
+
+## Review-only improvement discovery
+
+When separately released for a workspace, authors who can manage issues may explicitly
+request a review queue from the last 30 days of retained learning. Discovery reads at most
+500 independently verified incidents in one consistent snapshot. A larger cohort fails
+without returning a misleading partial ranking; authors can inspect individual issues in
+Insights and select a verified resolution directly.
+
+Groups preserve the exact resolution artifact digest, supported operational pattern and
+recorded environment. Synthetic and unknown environments never supply real-run evidence.
+Three distinct verified incidents with two recorded human interventions or edits make a
+review proposal eligible. Missing effort remains unknown, and recurrence counts describe
+explicit links rather than inferred business impact. A chosen source enters the ordinary
+immutable proposal, comparison and human review flow. Discovery makes no model calls,
+changes no workflow and grants no publication or activation authority. Production promotion
+remains blocked pending trusted historical replay and evidence for two real patterns.

@@ -1,3 +1,5 @@
+import type { AutonomyAdmission, AutonomyBlock } from './scoped-autonomy.js';
+
 export const currentPolicyVersion = 'v0.1';
 
 export interface Provenance {
@@ -46,7 +48,11 @@ export interface PolicyDecision {
     | 'capability_unavailable'
     | 'stale_intent'
     | 'approval_required'
-    | 'approval_rejected';
+    | 'approval_rejected'
+    | 'scoped_autonomy';
+  /** Trusted bounded-delegation facts; never provided by the caller or a model. */
+  autonomy?: AutonomyAdmission;
+  autonomyBlock?: AutonomyBlock;
   approvalId?: string;
   /** The permission the actor needed; approvers also need it when it belongs to an app. */
   permission?: string;
@@ -77,11 +83,18 @@ export type PolicyEvidence =
 export function workspacePolicyVersion(
   revision: number,
   requireIndependentApproval = true,
+  autonomyRevision = 0,
 ): string {
   const version =
     revision === 0
       ? currentPolicyVersion
       : `${currentPolicyVersion}:workspace:${revision}`;
 
-  return requireIndependentApproval ? version : `${version}:self-approval`;
+  const effective = requireIndependentApproval
+    ? version
+    : `${version}:self-approval`;
+
+  return autonomyRevision
+    ? `${effective}:autonomy:${autonomyRevision}`
+    : effective;
 }

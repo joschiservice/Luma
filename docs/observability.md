@@ -66,6 +66,18 @@ reporting use `purchasing-receipts`, `purchasing-shortfall-decisions`, `purchasi
 settle an uncertain dispatched effect remain available when its write release is disabled.
 Use explicit development overrides for synthetic runs.
 
+Operational intelligence releases default off: `contextual-record-assistance`,
+`operational-morning-brief`, `action-review-diffs`, `resolution-insights` and
+`active-diagnosis`. They expose contextual reads, opt-in mail, reviewed action descriptions,
+recorded-incident reporting and bounded diagnostic rereads through authorized APIs.
+
+`scoped-autonomy`, `workflow-improvements`, `workflow-red-teaming` and
+`workflow-improvement-discovery` also default off. Enabling them does not supply missing
+live track records or historical evaluation evidence, reduce risk floors, carry approval
+to a refreshed proposal, or promote a workflow. A managed responsibility remains subject
+to its persisted pause and scope controls when its release is disabled. Discovery only
+offers evidence for a person to review; it never edits an active version.
+
 ## Data policy
 
 General telemetry contains deployment metadata, correlation IDs, tenant HMACs, fixed operation names, status, timing, approved model names, token counts, model latency and reported cost. [Error reports](#error-reports) add diagnostic fields. There is no general-purpose metadata bag.

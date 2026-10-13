@@ -15,7 +15,10 @@ import {
   createInstalledRuntime,
 } from '@luma/connections/composition';
 import type { IdentityService, TenantContext } from '@luma/identity';
-import { createIdentity } from '@luma/identity/composition';
+import {
+  createIdentity,
+  createMorningBriefReader,
+} from '@luma/identity/composition';
 import { registerIdentityHttp, requestIsReadOnly } from '@luma/identity/http';
 import type { Observability } from '@luma/platform';
 import {
@@ -83,6 +86,11 @@ export async function buildRuntimeApp(
     const identity = createIdentity({
       ...settings,
       readOnly: requestIsReadOnly,
+      morningBriefEnabled: (tenantId) =>
+        createTenantFeatureRelease(observability)(
+          tenantId,
+          'operational-morning-brief',
+        ),
     });
     resources.add(identity.close);
     const casePool = new Pool({
@@ -201,6 +209,9 @@ export async function buildRuntimeApp(
       database: tenantDatabase(),
       identity: identity.service,
       providerCatalog: installedConnections.providerCatalog,
+      ...('connectionEnvironment' in installedConnections
+        ? { connectionEnvironment: installedConnections.connectionEnvironment }
+        : {}),
       execution: processClient
         ? { kind: 'enabled', effects: { resolve: async () => null } }
         : { kind: 'disabled' },
@@ -282,6 +293,9 @@ export async function buildRuntimeApp(
       ...(installedConnections
         ? {
             apps: installedConnections.apps,
+            ...('sourceEnvironments' in installedConnections
+              ? { sourceEnvironments: installedConnections.sourceEnvironments }
+              : {}),
             appRegistry: installedConnections.registry,
             providerCatalog: installedConnections.providerCatalog,
           }
@@ -302,6 +316,36 @@ export async function buildRuntimeApp(
       app.log.error('Case database connection failed'),
     );
     registerIdentityHttp(app, identity);
+    const scheduleMorningBriefs = identity.morningBriefScheduler({
+      enabled: (tenantId) =>
+        createTenantFeatureRelease(observability)(
+          tenantId,
+          'operational-morning-brief',
+        ),
+      read: createMorningBriefReader({
+        decisions: (context) =>
+          application.http.decisions.list(context, { view: 'all', limit: 5 }),
+        overview: (context, asOf, start) =>
+          application.http.operations(context, '24h', asOf, start),
+        active: (context) =>
+          application.http.cases.list(context, { view: 'active', limit: 5 }),
+        origin:
+          settings.mail?.origin ?? settings.mailOrigin ?? settings.baseURL,
+      }),
+    });
+    let briefPass: Promise<void> | undefined;
+    const briefTimer = setInterval(() => {
+      briefPass ??= scheduleMorningBriefs()
+        .catch(() => app.log.error('Morning brief schedule pass failed'))
+        .finally(() => {
+          briefPass = undefined;
+        });
+    }, 60000);
+    briefTimer.unref();
+    resources.add(async () => {
+      clearInterval(briefTimer);
+      await briefPass;
+    });
     const deliveryTimer = setInterval(() => {
       void identity.mailDelivery
         .drain()

@@ -278,3 +278,5 @@ export function createPurchaseOrderChanges(
 }
 
 export type { PurchaseOrderChanges } from './application/purchase-order-changes.js';
+
+export { createFollowUpPlanStore } from './infrastructure/governed-follow-up.js';

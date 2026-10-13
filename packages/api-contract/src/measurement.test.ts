@@ -76,5 +76,38 @@ it('accepts the shared resolution family and rejects filters unsupported by any 
       ...request,
       scope: { connectionId: command.id },
     }).success,
+  ).toBe(true);
+});
+
+it('requires paired bounded reporting intervals and exact workflow-version scope', () => {
+  const request = {
+    definitionVersion: 2,
+    metrics: ['resolution.completed'],
+    scope: { start: '2026-10-01T00:00:00Z', end: '2026-10-13T00:00:00Z' },
+  };
+  expect(operationalMetricRequestSchema.safeParse(request).success).toBe(true);
+  expect(
+    operationalMetricRequestSchema.safeParse({
+      ...request,
+      scope: { start: request.scope.start },
+    }).success,
   ).toBe(false);
+  expect(
+    operationalMetricRequestSchema.safeParse({
+      ...request,
+      scope: { ...request.scope, end: '2026-09-30T00:00:00Z' },
+    }).success,
+  ).toBe(false);
+  expect(
+    operationalMetricRequestSchema.safeParse({
+      ...request,
+      scope: { artifactId: 'workflow' },
+    }).success,
+  ).toBe(false);
+  expect(
+    operationalMetricRequestSchema.safeParse({
+      ...request,
+      scope: { ...request.scope, artifactId: 'workflow', artifactVersion: '1' },
+    }).success,
+  ).toBe(true);
 });

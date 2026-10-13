@@ -43,3 +43,19 @@ export type { FollowUp, Submission } from './domain/commitments.js';
 export type { PurchaseOrder } from './domain/procurement.js';
 
 export type { PurchasingTimelineEntry } from './domain/purchasing-timeline.js';
+
+export { createGovernedFollowUps } from './application/governed-follow-up.js';
+
+export type {
+  FollowUpPlan,
+  GovernedFollowUps,
+} from './application/governed-follow-up.js';
+
+export { followUpScopeFingerprint } from './domain/follow-up-snapshot.js';
+
+export { createFollowUpEnvironmentReader } from './application/follow-up-environment.js';
+
+export {
+  followUpReceiptMatches,
+  supplierFollowUpNote,
+} from './domain/follow-up-receipt.js';

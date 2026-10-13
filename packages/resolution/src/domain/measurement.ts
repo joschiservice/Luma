@@ -60,6 +60,8 @@ export interface MeasurementEvent {
 }
 
 export interface MeasurementSource {
+  connectionIds?: string[];
+  artifacts?: { id: string; version: string }[];
   id: string;
   title: string;
   state: string;
@@ -80,6 +82,8 @@ export interface MeasurementSource {
 }
 
 export interface ResolutionMetricItem {
+  connectionIds?: string[];
+  artifacts?: { id: string; version: string }[];
   kind: 'resolution';
   id: string;
   title: string;
@@ -101,8 +105,17 @@ export interface ResolutionMetricItem {
 
 export interface MeasurementScope {
   environment?: MeasurementEnvironment | undefined;
-  window?: '24h' | '7d' | undefined;
+  window?: '24h' | '7d' | '30d' | undefined;
+  start?: string | undefined;
+  end?: string | undefined;
+  issueClass?: string | undefined;
+  artifactId?: string | undefined;
+  artifactVersion?: string | undefined;
+  connectionId?: string | undefined;
 }
+
+const completionSemantics =
+  'Issues independently verified within the half-open reporting interval, evaluated from current retained facts. First detection may precede the interval. Retries and manual closure never add verified outcomes.';
 
 const metricSpecs: readonly (readonly [
   string,
@@ -110,6 +123,24 @@ const metricSpecs: readonly (readonly [
   string,
   'case' | 'second',
 ])[] = [
+  [
+    'detected',
+    'Detected issues',
+    'Incidents first detected in the selected half-open interval. Repeated observations do not add incidents.',
+    'case',
+  ],
+  [
+    'completed',
+    'Verified in the period',
+    'Incidents with an authoritative, complete independent verification in the selected period. Includes incidents detected earlier.',
+    'case',
+  ],
+  [
+    'completion_time',
+    'Median time to verified resolution',
+    'Time from first detection to independent verification for incidents verified in the selected period. Includes every attempt.',
+    'second',
+  ],
   [
     'unknown_eligibility',
     'Unknown eligibility',
@@ -186,10 +217,20 @@ export const resolutionMetricDefinitions: OperationalMetricDefinition[] =
     unit,
     version: 2,
     family: 'resolution',
-    filters: ['environment', 'window'],
+    filters: [
+      'environment',
+      'window',
+      'start',
+      'end',
+      'issueClass',
+      'connectionId',
+      'artifactId',
+      'artifactVersion',
+    ],
     permissions: 'workspace_member',
-    timeSemantics:
-      'Issues first detected in the selected period before the time shown, with their outcome at that time. Shows live issues from the last 7 days unless you choose otherwise. Retries don’t add issues.',
+    timeSemantics: ['completed', 'completion_time'].includes(id)
+      ? completionSemantics
+      : 'Issues first detected in the selected period before the time shown, with their outcome at that time. Shows live issues from the last 7 days unless you choose otherwise. Retries don’t add issues.',
   }));
 
 /** Classifies persisted incident facts without treating missing attribution or action acceptance as autonomy. */
@@ -241,6 +282,8 @@ export function classifyResolution(
 
   return {
     kind: 'resolution',
+    connectionIds: source.connectionIds ?? [],
+    artifacts: source.artifacts ?? [],
     id: source.id,
     title: source.title,
     state: source.state,
@@ -291,24 +334,68 @@ export function summarizeResolutionMetrics(
   asOf: string,
   scope: MeasurementScope = {},
 ): OperationalMetricRead<ResolutionMetricItem>[] {
-  const start = Date.parse(asOf) - (scope.window === '24h' ? 1 : 7) * 86400000;
+  const periodDays =
+    scope.window === '24h' ? 1 : scope.window === '30d' ? 30 : 7;
+  const end = Date.parse(scope.end ?? asOf);
+  const start = scope.start
+    ? Date.parse(scope.start)
+    : end - periodDays * 86400000;
   const classified = sources
     .filter(
       (s) =>
-        Date.parse(s.detectedAt) >= start &&
-        Date.parse(s.detectedAt) < Date.parse(asOf),
+        (!scope.issueClass || s.title === scope.issueClass) &&
+        (!scope.artifactId ||
+          s.artifacts?.some(
+            (artifact) =>
+              artifact.id === scope.artifactId &&
+              artifact.version === scope.artifactVersion,
+          )) &&
+        (!scope.connectionId ||
+          s.connectionIds?.includes(scope.connectionId)) &&
+        ((Date.parse(s.detectedAt) >= start &&
+          Date.parse(s.detectedAt) < end) ||
+          (s.resolution &&
+            Date.parse(s.resolution.at) >= start &&
+            Date.parse(s.resolution.at) < end)),
     )
     .map((s) => classifyResolution(s, asOf));
+  const completionItems = classified.filter(
+    (s) =>
+      s.environment === (scope.environment ?? 'live') &&
+      s.verifiedAt !== null &&
+      Date.parse(s.verifiedAt) >= start &&
+      Date.parse(s.verifiedAt) < end,
+  );
   const items = classified
-    .filter((s) => s.environment === (scope.environment ?? 'live'))
+    .filter(
+      (s) =>
+        s.environment === (scope.environment ?? 'live') &&
+        Date.parse(s.detectedAt) >= start &&
+        Date.parse(s.detectedAt) < end,
+    )
     .sort(
       (a, b) =>
         a.detectedAt.localeCompare(b.detectedAt) || a.id.localeCompare(b.id),
     );
-  const excludedUnknown =
+  const excludedUnknownDetected =
     scope.environment === 'unknown'
       ? 0
-      : classified.filter((s) => s.environment === 'unknown').length;
+      : classified.filter(
+          (s) =>
+            s.environment === 'unknown' &&
+            Date.parse(s.detectedAt) >= start &&
+            Date.parse(s.detectedAt) < end,
+        ).length;
+  const excludedUnknownCompletion =
+    scope.environment === 'unknown'
+      ? 0
+      : classified.filter(
+          (s) =>
+            s.environment === 'unknown' &&
+            s.verifiedAt !== null &&
+            Date.parse(s.verifiedAt) >= start &&
+            Date.parse(s.verifiedAt) < end,
+        ).length;
   const unknownEligibility = items.filter(
     (s) => s.eligibility === 'unknown',
   ).length;
@@ -317,6 +404,9 @@ export function summarizeResolutionMetrics(
   ).length;
   const eligible = items.filter((s) => s.eligibility === 'eligible');
   const predicates: Record<string, (s: ResolutionMetricItem) => boolean> = {
+    detected: () => true,
+    completed: () => true,
+    completion_time: () => true,
     unknown_eligibility: (s) => s.eligibility === 'unknown',
     eligible: (s) => s.eligibility === 'eligible',
     verified: (s) => s.outcome === 'verified',
@@ -336,7 +426,13 @@ export function summarizeResolutionMetrics(
 
   return resolutionMetricDefinitions.map((definition) => {
     const key = definition.id.slice('resolution.'.length);
-    const cohort = items.filter(predicates[key]!);
+    const excludedUnknown = ['completed', 'completion_time'].includes(key)
+      ? excludedUnknownCompletion
+      : excludedUnknownDetected;
+    const selectedItems = ['completed', 'completion_time'].includes(key)
+      ? completionItems
+      : items;
+    const cohort = selectedItems.filter(predicates[key]!);
     const unknown =
       key === 'eligible'
         ? unknownEligibility
@@ -349,7 +445,7 @@ export function summarizeResolutionMetrics(
           : 0;
     const durations = cohort
       .map((s) =>
-        key === 'time_to_outcome'
+        key === 'time_to_outcome' || key === 'completion_time'
           ? s.timeToOutcomeSeconds!
           : s.unresolvedAgeSeconds!,
       )
@@ -366,6 +462,31 @@ export function summarizeResolutionMetrics(
               ? durations[middle]!
               : (durations[middle - 1]! + durations[middle]!) / 2;
     const partial = unknown > 0 || excludedUnknown > 0;
+    const groups = new Map<string, number>();
+    const add = (key: string) => groups.set(key, (groups.get(key) ?? 0) + 1);
+    for (const item of cohort) {
+      add(`class:${item.title}`);
+      for (const connectionId of new Set(item.connectionIds ?? []))
+        add(`connection:${connectionId}`);
+      for (const artifact of new Set(
+        (item.artifacts ?? []).map((a) => JSON.stringify([a.id, a.version])),
+      ))
+        add(`version:${artifact}`);
+      if (key === 'detected' || key === 'completed')
+        add(
+          `day:${new Date(key === 'completed' ? item.verifiedAt! : item.detectedAt).toISOString().slice(0, 10)}`,
+        );
+      if (key === 'completion_time' && item.timeToOutcomeSeconds !== null)
+        add(
+          item.timeToOutcomeSeconds < 300
+            ? 'duration:under_5m'
+            : item.timeToOutcomeSeconds < 3600
+              ? 'duration:5m_1h'
+              : item.timeToOutcomeSeconds < 86400
+                ? 'duration:1h_1d'
+                : 'duration:over_1d',
+        );
+    }
 
     return {
       definition,
@@ -373,27 +494,33 @@ export function summarizeResolutionMetrics(
       total: partial ? null : value,
       observedCount: cohort.length,
       unknownCount: unknown,
-      population: items.length,
-      coverage: items.length
+      population: selectedItems.length,
+      coverage: selectedItems.length
         ? partial
           ? 'partial'
           : 'complete'
         : 'unavailable',
-      coverageExplanation: `${items.length} recorded ${scope.environment ?? 'live'} incidents in this detection cohort. ${excludedUnknown} incidents have unknown environment and are excluded. This does not establish complete provider coverage.`,
+      coverageExplanation: `${selectedItems.length} recorded ${scope.environment ?? 'live'} incidents in this ${['completed', 'completion_time'].includes(key) ? 'verification' : 'detection'} cohort. ${excludedUnknown} incidents have unknown environment and are excluded. This does not establish complete provider coverage.`,
       freshness: 'fresh',
       observedAt: asOf,
       dataThrough: null,
-      nextRefreshAt: items.length
+      nextRefreshAt: selectedItems.length
         ? new Date(
-            Math.min(
-              Date.parse(asOf) + 60000,
-              ...items.map(
-                (s) =>
-                  Date.parse(s.detectedAt) +
-                  (scope.window === '24h' ? 1 : 7) * 86400000 +
-                  1,
-              ),
-            ),
+            scope.end
+              ? Date.parse(asOf) + 60000
+              : Math.min(
+                  Date.parse(asOf) + 60000,
+                  ...selectedItems.map(
+                    (item) =>
+                      Date.parse(
+                        ['completed', 'completion_time'].includes(key)
+                          ? item.verifiedAt!
+                          : item.detectedAt,
+                      ) +
+                      periodDays * 86400000 +
+                      1,
+                  ),
+                ),
           ).toISOString()
         : null,
       breakdown: [
@@ -401,6 +528,9 @@ export function summarizeResolutionMetrics(
         { reason: 'unknown_eligibility', count: unknownEligibility },
         { reason: 'unknown_attribution', count: unknownAttribution },
         { reason: 'unknown_environment', count: excludedUnknown },
+        ...[...groups]
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([reason, count]) => ({ reason, count })),
       ],
       items: cohort,
     };

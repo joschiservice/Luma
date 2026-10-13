@@ -68,6 +68,48 @@ The harness calls production Playbook, admission, policy/approval, execution, sh
 
 A restart serializes the complete provider/persistence/ID checkpoint to JSON and constructs fresh services. This tests recovery of durable reservations and read-only reconciliation. Database transactions and Temporal event-history replay remain covered by their integration suites. The checked-in corpus is synthetic; historical cases enter through the capture command.
 
+## Adversarial proposal comparison
+
+The default-off `workflow-red-teaming` release governs model proposal generation. The proposal
+function needs a trusted tenant release decision and uses the sensitive EU zero-retention authoring
+route. Only trusted catalogue identifiers enter the model. Models select a reviewed fault template,
+a bounded mutation and a seed; they cannot supply fixture patches, commands or assertions.
+
+The proposal retains schema, prompt, model, corpus version and hash with every spec. Source-text
+variants use seeded malicious strings supplied by the trusted host. Every variant adds a denied
+foreign-tenant probe. Baseline and candidate run through the existing shipping-method harness
+against the complete mandatory corpus and all materialized proposals; a model cannot omit the
+idempotency, isolation, unexpected-write or outcome checks. Reports retain every counterexample,
+whether it regresses the baseline, and unsupported scenario classes.
+
+A deployment operator can propose variants for an explicitly selected workspace:
+
+```sh
+pnpm propose:red-team <workspace-id> corpus.json .luma/evaluations/proposals.json
+```
+
+The command uses the normal server observability configuration to evaluate the workspace's
+`workflow-red-teaming` flag through PostHog, defaulting off. Development and test use the existing
+feature flag overrides; staging and production reject overrides. Generation requires the approved
+EU zero-retention authoring route. The command loads no customer records and grants no execution
+authority. Catalogue files are bounded to 1 MiB, and proposals are saved atomically with private
+permissions. Keep deployment credentials in server configuration.
+
+Replay a saved proposal after building the normal Playbook evaluator dependencies:
+
+```sh
+pnpm evaluate:red-team baseline.json candidate.json corpus.json proposals.json .luma/evaluations/red-team.json
+```
+
+The replay command never calls a model and writes its report atomically with private permissions.
+Proposals have `schemaVersion: 1`, `corpusVersion`, `corpusHash` and `specs`; each spec has a trusted
+`templateId`, `mutation` (`reference`, `source-text`, `identity-probe`) and unsigned 32-bit `seed`.
+The model helper also records `promptVersion` and `route`. Mandatory reviewed templates cover
+duplicate and stale event bindings, contradictory independent observations, permission revocation
+after approval across restart, and unexpected valid provider responses. They run even when the
+model selects other variants. Real incident long-tail coverage remains a release prerequisite;
+synthetic passes do not establish real incident usefulness.
+
 ## Code Step replay
 
 Run `pnpm setup:code`, then `pnpm evaluate:code [corpus.json] [report.json]` to evaluate a pinned Code Step with ordered fixture replies. The default corpus is `fixtures/code-corpus.json`. Every scenario runs twice; outputs, request order and input digests must agree. Reports exclude wall-time and memory measurements. See [Code Steps](../../docs/code-steps.md) for runtime installation, capability grants and deployment limits.

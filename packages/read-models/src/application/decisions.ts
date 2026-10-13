@@ -1,21 +1,23 @@
+import type { ActionDiff } from '@luma/connections';
 import type { Permission, TenantContext } from '@luma/identity';
 import type { ReplenishmentDecision } from '@luma/procurement';
 
 import type {
   DecisionAssignment,
-  DecisionCandidate,
+  DecisionCandidate as BaseDecisionCandidate,
   DecisionDomain,
-  DecisionItem,
+  DecisionItem as BaseDecisionItem,
   DecisionOwner,
   DecisionReason,
   DecisionView,
 } from '../domain/decision-item.js';
 import type { SupplierCommitmentDecision } from '../domain/decisions.js';
 
-export type {
-  DecisionCandidate,
-  DecisionItem,
-} from '../domain/decision-item.js';
+export type DecisionItem = BaseDecisionItem & { diff?: ActionDiff | null };
+
+export type DecisionCandidate = BaseDecisionCandidate & {
+  diff?: ActionDiff | null;
+};
 
 /** An owner that lists its own decisions for the reader. It must not read providers. */
 export interface DecisionProvider {

@@ -66,6 +66,8 @@ it('explains why describing is unavailable without an EU route and keeps tenants
     .body;
   expect(availability).toEqual({
     available: false,
+    improvements: false,
+    improvementDiscovery: false,
     reason: expect.stringMatching(
       /^Describing workflows needs an EU model route with zero data retention\. Whoever runs this Luma server/,
     ),
@@ -215,6 +217,8 @@ it('describes, refines and records a draft through the EU route without logging 
   expect((await call(member, '/workflow-authoring/generation')).body).toEqual({
     available: true,
     reason: null,
+    improvements: false,
+    improvementDiscovery: false,
   });
 
   const prompt =

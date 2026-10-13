@@ -77,6 +77,33 @@ Mail goes through three PostgreSQL queues: password mail, account notices and wo
 
 The mail port accepts a destination, subject, HTML and plain-text parts, a category tag and the message ID. Messages contain authorized issue or connection links and no provider payloads. Tests inject a deterministic provider through composition; there is no public test-mailbox endpoint. Queue tenant discovery and source triggers run as the migration owner, which needs RLS bypass; runtime connections stay restricted.
 
+### Daily morning briefs
+
+Daily briefs are an optional member preference, off by default and released through the
+`operational-morning-brief` PostHog flag. Each member chooses a wall clock time in the
+workspace timezone. API replicas check due schedules every minute and use one durable mail
+receipt per member and local date; a repeated daylight-saving hour cannot duplicate a brief,
+and a skipped hour sends at the next available time. Restarts catch up on the current day.
+
+The brief composes the same authorized Needs you and operations readers as Home. Current
+decisions and unresolved cases stay separate from independently verified outcomes. The
+verification interval starts at the previous prepared brief's end, or the previous local
+midnight for the first brief. This retains continuous reporting through timezone changes,
+daylight saving and downtime. The frozen interval and content stay identical through retries;
+empty complete reads retain a cancelled receipt without sending. Failed reads retry without
+creating a receipt or inventing zeros.
+
+Figures count verified cases, not action attempts or SKU quantities. Missing decision sources
+remain labelled incomplete, and inaccessible issue figures are withheld. The Home link selects
+the same explicit verification interval while current attention remains current; fixed-window
+autonomy measurement is omitted for that variable interval. Specific decision and case links
+retain their usual authorization checks.
+
+Dispatch rechecks the release, membership, effective grants, preference and address suppression.
+Changed grants cancel the snapshot rather than delivering previously authorized data. Opt-out
+cancels queued briefs. A queued brief that reaches the next local date expires; it does not send
+alongside the new day's brief. The usual provider idempotency and bounded retry rules apply.
+
 ### Language and content
 
 Every message is rendered when it is sent, from the `@luma/email` templates and the `email` message catalog, so queued mail follows a language change. Mail uses the recipient's stored language:
@@ -140,3 +167,19 @@ replaces an earlier one; revoking clears it and ends open views on their next re
 a request allows the requested duration from now, or keeps a later end time. Each is a command
 with a receipt and a `revision`, recorded as a `support_access.*` access event. Staff can't change
 consent from a support view, because every write is refused there.
+
+## Bounded delegation
+
+Scoped delegation governs only internal supplier follow-up notes. It does not lower purchasing, financial or provider capability risk floors. Membership grants, requester independence, workspace approval preferences and fresh verification still apply. New policies start in Manual; Assisted prepares review; Autonomous requires explicit promotion. Changing scope demotes Autonomous and invalidates decisions through the workspace policy epoch.
+
+Exact quantity and optional exposure reservations share the execution transaction and tenant dispatch fence. Daily budgets use UTC and conservatively count every reserved attempt, including withheld work. A pause committed before reservation prevents new work. Existing attempts remain available for reconciliation. Failed verification, uncertain dispatch or unavailable verification pause the policy, lower its mode and persist an audit event.
+
+Preview applies the current policy to at most 100 retained owner-read samples and labels live, synthetic and unknown provenance separately. Only current-scope live reviewed and verified history earns promotion: at least 20 samples, at least 95% acceptance and verification, and no retained failure or uncertain effect. A retained bare live label is insufficient: each earned sample needs its original reviewed source declaration and the current exact declaration and source binding. Synthetic runs do not establish production reliability.
+
+The release gate defaults off and controls availability, never authority. Persisted enrollment remains governed after rollback and blocks new work while the gate is off. Never-enrolled workspaces retain ordinary internal-note behavior. Immutable native proposals pin the owner revision and exact supplier, destination, line, price and source inputs. The owner rechecks these in the note transaction. Explicit refresh binds a successor proposal and execution step, retaining original workflow and logical receipt, and requires a new decision. Previous consent never transfers. A saved human response wakes the original workflow as its original bound principal; notification only causes admission to reread the immutable current proposal. Lost wakes use the durable polling fallback. Reserved or uncertain attempts must reconcile before renewal.
+
+Connection managers can declare live operational use only after a fresh authenticated purchase-order read and explicit confirmation with a reason. Reviews expire after five minutes and bind tenant, connection, provider target, credential version, connection version and app installation version. Immutable declaration command receipts retain the reviewer, revision, reason and source identity evidence without provider record payloads. This is a reviewed workspace declaration, never provider certification or a write grant.
+
+A positive simulator manifest overrides any declaration. Missing or revoked declarations, unavailable grants or apps, and changed source or credential bindings classify new work as unknown. Declaration changes cannot rewrite an earlier proposal's facts. An existing native approval becomes stale when its original source proof changes; explicit refresh creates a successor and a new decision. Autonomous admission and promotion require earned history matching the current exact declaration, source and credential revisions. Replacing a declaration requires a new reviewed track record; old history remains auditable with its original classification.
+
+Source inspection reads one authenticated purchase-order page. The provider's approved transport remains in force. A review has a total ten-second deadline, at most four transport requests, a one MiB response limit and a two MiB total payload limit. Cancellation aborts the read; oversized, incomplete, empty, expired or interrupted evidence cannot be retained as a usable review. Retained source reviews contain normalized observation identities, revisions and timestamps, not provider record payloads or a canonical commerce projection.

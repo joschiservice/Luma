@@ -17,6 +17,8 @@ export interface WorkspaceSettings {
 export interface NotificationPreferences {
   issues: boolean;
   connections: boolean;
+  morningBrief: boolean;
+  morningBriefTime: string;
   revision: number;
 }
 
@@ -57,6 +59,8 @@ export interface SettingsSnapshot {
   workspace: WorkspaceSettings;
   preferences: NotificationPreferences;
   deliveryAvailable: boolean;
+  /** Whether the daily brief release is enabled for this workspace. */
+  morningBriefAvailable?: boolean;
   /** Why optional email to the person's address is paused, if it is. */
   emailPaused: 'bounced' | 'complained' | null;
   lastTest: { id: string; state: DeliveryState } | null;

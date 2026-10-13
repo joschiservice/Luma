@@ -171,10 +171,20 @@ test('creates workflows from templates and from scratch, then publishes without 
   await page
     .getByText(/is now at position 1 of 2/)
     .waitFor({ state: 'attached' });
-  await page.keyboard.press('ArrowDown');
-  await page
-    .getByText(/is now at position 2 of 2/)
-    .waitFor({ state: 'attached' });
+  // Pickup announces before the keyboard sensor installs its movement listener. Repeat toward
+  // the final slot only until its announcement confirms that the movement was received.
+  await expect
+    .poll(
+      async () => {
+        const moved = page.getByText(/is now at position 2 of 2/);
+        if (await moved.count()) return true;
+        await page.keyboard.press('ArrowDown');
+
+        return (await moved.count()) > 0;
+      },
+      { timeout: 15_000 },
+    )
+    .toBe(true);
   await page.keyboard.press('Space');
   await steps
     .getByText(

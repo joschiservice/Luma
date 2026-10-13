@@ -33,6 +33,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { ArrowUpRight, RefreshCw } from 'lucide-react';
 
+import { RecordAssistance } from '../../kit/record-assistance';
 import {
   formatMoney,
   fulfillmentLabels,
@@ -168,6 +169,24 @@ export function RecordsSheet({
             {scopeText} {definition.description()}
           </DialogDescription>
         </DialogHeader>
+        <RecordAssistance
+          onOpen={onClose}
+          organizationId={organizationId}
+          label={selectionTitle(data, selection, timeZone)}
+          context={{
+            insight: {
+              chart: data.chart,
+              query: {
+                ...scope,
+                point: selection.point,
+                series: selection.series,
+                asOf: data.asOf,
+                offset: 0,
+                limit: 25,
+              },
+            },
+          }}
+        />
         <div className="insights-sheet-facts">
           <Badge tone={badge.tone}>{badge.label}</Badge>
           <span>{dataThroughText(data, timeZone)}</span>

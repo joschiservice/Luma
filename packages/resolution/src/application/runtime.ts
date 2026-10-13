@@ -152,7 +152,7 @@ export class WorkflowInputError extends Error {}
 export function createExceptionActivities(deps: {
   identity: Pick<IdentityService, 'resolveWorkflowContext'>;
   exceptions: DetectionService;
-  diagnoses: DiagnosisService;
+  diagnoses: Pick<DiagnosisService, 'get' | 'run' | 'history'>;
   execution: ActionAdmission;
   bindings: WorkflowBindings;
   playbook?: PlaybookService;

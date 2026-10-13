@@ -172,6 +172,7 @@ export function OrderPage() {
 
   return (
     <OrderDetailView
+      contextualAssistance
       organizationId={organizationId}
       search={search}
       detail={status === 403 ? undefined : query.data}
@@ -313,6 +314,7 @@ export type OrderError = 'missing' | 'access' | 'unavailable';
 
 /** Presents one order's state, source facts, evidence and linked work with its unavailable states. */
 export function OrderDetailView({
+  contextualAssistance = false,
   organizationId,
   search,
   detail,
@@ -327,6 +329,8 @@ export function OrderDetailView({
   changePlan,
 }: {
   organizationId: string;
+  /** The connected page supplies the authorized assistant control. */
+  contextualAssistance?: boolean;
   search: OrdersSearch;
   detail?: OrderDetail | undefined;
   loading?: boolean;
@@ -392,6 +396,7 @@ export function OrderDetailView({
         <Alert role="status">{m.orders_detail_linked_notice()}</Alert>
       ) : null}
       <OrderHeader
+        contextualAssistance={contextualAssistance}
         organizationId={organizationId}
         search={listSearch}
         returnPath={returnPath}

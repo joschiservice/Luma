@@ -9,14 +9,17 @@ export async function seedResolutionMeasurement(
     environment = 'live',
     verified = true,
     previousIncidentId = null,
+    detectedAt = new Date(Date.now() - 3600000).toISOString(),
+    verifiedAt = new Date(Date.now() - 300000).toISOString(),
+    sourceConnectionId = null,
   } = {},
 ) {
   const id = randomUUID(),
     evidence = `measurement:${randomUUID()}`;
   const tenant = f.org.id;
   const inputKey = `measurement-input:${randomUUID()}`;
-  const connectionId = simulationConnection ? randomUUID() : null;
-  if (connectionId)
+  const connectionId = simulationConnection ? randomUUID() : sourceConnectionId;
+  if (simulationConnection)
     await f.db.owner.query(
       'INSERT INTO connector_installations(tenant_id,id,version,document,secret) VALUES($1,$2,1,$3,$4)',
       [
@@ -38,8 +41,6 @@ export async function seedResolutionMeasurement(
         'fixture',
       ],
     );
-  const detectedAt = new Date(Date.now() - 3600000).toISOString();
-  const verifiedAt = new Date(Date.now() - 300000).toISOString();
   const fingerprint = createHash('sha256').update(id).digest('hex');
   const resolution = verified
     ? {

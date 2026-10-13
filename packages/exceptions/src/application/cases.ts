@@ -55,6 +55,8 @@ export interface CaseOverview {
   attentionCount: number;
   activeCount: number;
   verifiedResolutions: number;
+  /** Up to five verified cases completed in the overview window. */
+  verifiedCases?: CaseSummary[];
   prioritizedDecisions: CaseSummary[];
 }
 
@@ -77,7 +79,12 @@ export interface CaseReader {
     id: string,
     query: CaseEvidenceQuery,
   ): Promise<CaseEvidencePage | null>;
-  overview(tenantId: string, start: string, end: string): Promise<CaseOverview>;
+  overview(
+    tenantId: string,
+    start: string,
+    end: string,
+    readAt?: string,
+  ): Promise<CaseOverview>;
   list(
     tenantId: string,
     query: CaseQuery,
@@ -137,10 +144,15 @@ export function createCaseService(
 
       return reader.evidence(context.tenantId, id, query);
     },
-    overview(context: TenantContext, start: string, end: string) {
+    overview(
+      context: TenantContext,
+      start: string,
+      end: string,
+      readAt?: string,
+    ) {
       requireTenant(context, context.tenantId);
 
-      return reader.overview(context.tenantId, start, end);
+      return reader.overview(context.tenantId, start, end, readAt);
     },
     list(context: TenantContext, query: CaseQuery) {
       requireTenant(context, context.tenantId);

@@ -155,6 +155,11 @@ function readCode(
 
 /** Authors `workflow/2` drafts and publishes them as immutable versions. Drafts never run. */
 export function createWorkflowDrafts(deps: {
+  /** Owner-provided release evidence fence, checked against the locked exact draft. */
+  publicationGuard?(
+    context: TenantContext,
+    draft: WorkflowDraft,
+  ): Promise<string | null>;
   store: WorkflowDraftStore;
   /** Reads published native versions; the same store used by the workflow catalog. */
   versions(
@@ -735,6 +740,8 @@ export function createWorkflowDrafts(deps: {
           conflict(
             `Fix ${result.validation.diagnostics.filter((item) => item.severity === 'error').length} problem(s) before publishing.`,
           );
+        const blocked = await deps.publicationGuard?.(context, view(draft));
+        if (blocked) conflict(blocked);
         await tx.publish(result.version!);
         const now = deps.now().toISOString();
         const published: StoredWorkflowDraft = {

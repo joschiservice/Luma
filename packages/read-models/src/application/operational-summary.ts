@@ -43,7 +43,12 @@ export interface OperationalSummaryRequest {
   scope?:
     | {
         environment?: MeasurementEnvironment | undefined;
-        window?: '24h' | '7d' | undefined;
+        window?: '24h' | '7d' | '30d' | undefined;
+        start?: string | undefined;
+        end?: string | undefined;
+        issueClass?: string | undefined;
+        artifactId?: string | undefined;
+        artifactVersion?: string | undefined;
         connectionId?: string | undefined;
         supplierId?: string | undefined;
         authority?: 'luma' | 'external' | undefined;

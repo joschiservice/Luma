@@ -148,6 +148,11 @@ export const settingsContract = {
             revision: z.number().int().nonnegative(),
             issues: z.boolean(),
             connections: z.boolean(),
+            morningBrief: z.boolean().optional(),
+            morningBriefTime: z
+              .string()
+              .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+              .optional(),
           })
           .strict(),
       }),

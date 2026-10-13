@@ -106,6 +106,29 @@ export function createDiagnosisRepository(
   db: TenantDatabase,
 ): DiagnosisRepository {
   return {
+    investigationBudget: (tenantId, exceptionId) =>
+      db.transaction(tenantId, async (tx) => {
+        const result = await tx.query<{
+          evidence: DiagnosisInput['evidence'][number];
+        }>(
+          `SELECT evidence FROM exception_diagnoses d CROSS JOIN LATERAL jsonb_array_elements(d.snapshot->'evidence') AS items(evidence)
+         WHERE d.tenant_id=$1 AND d.exception_id=$2 AND evidence->>'adapterVersion'='diagnosis-investigation-v1'
+         AND evidence->'connectionId'='null'::jsonb AND evidence->'source'='null'::jsonb
+         AND evidence->'facts'->>'incidentId'=$2::text ORDER BY d.revision DESC LIMIT 1`,
+          [tenantId, exceptionId],
+        );
+        const evidence = result.rows[0]?.evidence;
+        if (!evidence) return null;
+        const advice = evidence.facts.retryAfterMs;
+
+        return {
+          completedAt: evidence.observedAt,
+          retryAfterMs:
+            typeof advice === 'number' && Number.isFinite(advice) && advice >= 0
+              ? advice
+              : null,
+        };
+      }),
     current: (tenantId, exceptionId) =>
       db.transaction(tenantId, async (tx) => {
         const result = await tx.query<{

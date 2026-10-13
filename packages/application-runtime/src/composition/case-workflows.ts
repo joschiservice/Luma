@@ -150,6 +150,15 @@ export interface FollowUpTiming {
  */
 export function createFollowUpWorkflows(deps: {
   commitments: Pick<SupplierCommitments, 'pending' | 'order' | 'respond'>;
+  recordSupplierFollowUp?: Parameters<
+    typeof createSupplierFollowUp
+  >[0]['record'];
+  verifySupplierFollowUp?: Parameters<
+    typeof createSupplierFollowUp
+  >[0]['verified'];
+  managedSupplierFollowUp?: Parameters<
+    typeof createSupplierFollowUp
+  >[0]['managed'];
   suppliers(context: TenantContext): Promise<{ link?: unknown }[]>;
   returns: () => Pick<ReturnWorkspace, 'list' | 'get'>;
   orders: () => Pick<OrderWorkspace, 'list' | 'get'>;
@@ -233,6 +242,15 @@ export function createFollowUpWorkflows(deps: {
         supplierFollowUpSource(timing.supplierWaitSeconds ?? 4 * 3600),
       ),
       commitments: deps.commitments,
+      ...(deps.recordSupplierFollowUp
+        ? { record: deps.recordSupplierFollowUp }
+        : {}),
+      ...(deps.verifySupplierFollowUp
+        ? { verified: deps.verifySupplierFollowUp }
+        : {}),
+      ...(deps.managedSupplierFollowUp
+        ? { managed: deps.managedSupplierFollowUp }
+        : {}),
       suppliersLinked: async (context) =>
         (await deps.suppliers(context)).some((supplier) => !!supplier.link),
       id: stableId,

@@ -7,6 +7,11 @@ import type { Diagnosis, DiagnosisInput } from '../domain/diagnosis.js';
 import { diagnose } from '../domain/diagnosis.js';
 
 export interface DiagnosisRepository {
+  /** Reads the newest retained experiment without loading the case's complete history. */
+  investigationBudget?(
+    tenantId: string,
+    exceptionId: string,
+  ): Promise<{ completedAt: string; retryAfterMs: number | null } | null>;
   current(
     tenantId: string,
     exceptionId: string,
@@ -66,6 +71,17 @@ export function createDiagnosisService(
     Date.parse(now().toISOString()) > Date.parse(value.provenance.validUntil);
 
   return {
+    /** Worker-only budget read; it grants neither connector access nor investigation authority. */
+    async investigationBudget(context: TenantContext, exceptionId: string) {
+      requireTenant(context, context.tenantId);
+
+      return (
+        (await repository.investigationBudget?.(
+          context.tenantId,
+          boundary.id(exceptionId),
+        )) ?? null
+      );
+    },
     async get(context: TenantContext, exceptionId: string) {
       requireTenant(context, context.tenantId);
       const row = await repository.current(
@@ -136,7 +152,9 @@ export function createDiagnosisService(
       );
       if (
         value.status === 'insufficient_evidence' ||
-        (row.snapshot.input.exceptionClass === 'inventory_mismatch' &&
+        (['inventory_mismatch', 'sync_failure', 'stuck_fulfillment'].includes(
+          row.snapshot.input.exceptionClass,
+        ) &&
           value.detectorDecision.decision === 'detect')
       ) {
         if (!options.rereader) value.provenance.reread.status = 'unavailable';
@@ -149,7 +167,10 @@ export function createDiagnosisService(
                 signal,
               ),
             );
-            if (value.provenance.reread.status === 'rate_limited') {
+            if (
+              value.provenance.reread.status === 'rate_limited' &&
+              value.status === 'insufficient_evidence'
+            ) {
               value.status = 'failed';
               value.reason = 'authoritative_read_rate_limited';
             }

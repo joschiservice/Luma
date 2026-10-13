@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { actionDiffSchema } from './action-diff.js';
+
 const ref = z.object({ externalId: z.string(), scopeKey: z.string() });
 const plan = z.discriminatedUnion('kind', [
   z.object({
@@ -27,6 +29,7 @@ const plan = z.discriminatedUnion('kind', [
 
 /** Records approval, dispatch and independent proof separately for one return settlement. */
 export const returnActionSchema = z.object({
+  diff: actionDiffSchema.nullable().optional(),
   id: z.string().uuid(),
   caseId: z.string().uuid(),
   connectionId: z.string().uuid(),

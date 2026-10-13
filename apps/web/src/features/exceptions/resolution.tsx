@@ -1,11 +1,18 @@
-import type { CaseDecision, DecisionReceipt } from '@luma/api-contract';
+import type {
+  ActionDiff as Diff,
+  CaseDecision,
+  CaseReview,
+  DecisionReceipt,
+} from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
+import { ActionDiff } from '@luma/ui/components/issues/action-diff';
 import {
   CaseLoading,
   CaseNotice,
 } from '@luma/ui/components/issues/case-investigation';
 import { ResolutionReview } from '@luma/ui/components/issues/resolution-review';
 import { Button } from '@luma/ui/components/primitives/button';
+import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { useEffect, useRef, useState } from 'react';
 
 import { IdentityError } from '../../kit/identity/data';
@@ -58,6 +65,31 @@ export function CaseResolution({
   const [uncertain, setUncertain] = useState<CaseDecision>();
   const [message, setMessage] = useState('');
   const [receipt, setReceipt] = useState<DecisionReceipt>();
+  const [previousDiff, setPreviousDiff] = useState<{
+    exceptionId: string;
+    replacedBy: string;
+    diff: Diff;
+  }>();
+
+  function retainPrevious(before: CaseReview, after: CaseReview) {
+    if (
+      before.proposal?.diff &&
+      after.proposal &&
+      before.proposal.id !== after.proposal.id
+    ) {
+      setPreviousDiff({
+        exceptionId,
+        replacedBy: after.proposal.id,
+        diff: {
+          ...before.proposal.diff,
+          policy: before.proposal.diff.policy
+            ? { ...before.proposal.diff.policy, current: false }
+            : null,
+        },
+      });
+    }
+  }
+
   const refresh = () =>
     observation.refresh().catch(() => {
       /* Query state presents refresh failures. */
@@ -101,6 +133,7 @@ export function CaseResolution({
         setCheckError('');
         try {
           const current = await refreshResolution(organizationId, exceptionId);
+          retainPrevious(review, current);
           if (!sameResolution(review, current)) {
             setCheckError(
               m.exceptions_resolution_changed(),
@@ -246,7 +279,8 @@ export function CaseResolution({
     setChecking(true);
     setCheckError('');
     try {
-      await refreshResolution(organizationId, exceptionId);
+      const refreshed = await refreshResolution(organizationId, exceptionId);
+      if (data?.review) retainPrevious(data.review, refreshed);
     } catch (error) {
       if (!(error instanceof IdentityError) || error.status !== 503)
         automaticCheck.current.attempts = 3;
@@ -362,6 +396,14 @@ export function CaseResolution({
         <CaseNotice title={m.exceptions_resolution_expired_title()}>
           {m.exceptions_resolution_expired_text()}
         </CaseNotice>
+      ) : null}
+      {previousDiff?.exceptionId === exceptionId &&
+      previousDiff.replacedBy === data?.review.proposal?.id &&
+      data?.review.proposal?.diff ? (
+        <Disclosure>
+          <summary>{m.issues_diff_replaced()}</summary>
+          <ActionDiff diff={previousDiff.diff} />
+        </Disclosure>
       ) : null}
       {data ? (
         <ResolutionReview

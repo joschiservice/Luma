@@ -19,6 +19,8 @@ const workspaceSettingsSchema = z.object({
 const notificationPreferencesSchema = z.object({
   issues: z.boolean(),
   connections: z.boolean(),
+  morningBrief: z.boolean(),
+  morningBriefTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   revision: z.number().int(),
 });
 
@@ -39,6 +41,7 @@ export const settingsSnapshotSchema = z.object({
   workspace: workspaceSettingsSchema,
   preferences: notificationPreferencesSchema,
   deliveryAvailable: z.boolean(),
+  morningBriefAvailable: z.boolean().optional(),
   /**
    * Why Luma paused optional email to your address: it bounced permanently or you reported
    * Luma's email as spam. Null when email to you is not paused. A delivered test email resumes it.

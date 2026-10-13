@@ -1,6 +1,6 @@
 import type { AuditEntry, AuditLog } from '@luma/audit';
 import type { EffectRegistry, VerificationResult } from '@luma/connections';
-import { ConnectorError } from '@luma/connections';
+import { ConnectorError, describeActionDiff } from '@luma/connections';
 import type { TenantContext } from '@luma/identity';
 import {
   hasPermission,
@@ -9,6 +9,7 @@ import {
   requireTenant,
 } from '@luma/identity';
 import type {
+  AutonomyAdmission,
   PolicyDecision,
   PolicyService,
   ProposedAction,
@@ -52,6 +53,7 @@ export interface ExecutionRecord {
   state: 'prepared' | 'succeeded' | 'failed' | 'unknown';
   attempt: {
     id: string;
+    autonomy?: AutonomyAdmission;
     number: 1;
     policyDecisionId: string;
     approvalId?: string;
@@ -89,6 +91,8 @@ export interface ExecutionRepository {
 }
 
 export interface ExecutionDependencies {
+  /** Requires registered, deterministic diff semantics for new dispatches when released. */
+  diffRequired?(tenantId: string): Promise<boolean>;
   /** Trusted write controls; persistent composition supplies this for every provider effect. */
   writeControl?: {
     mode(
@@ -412,6 +416,8 @@ export function createExecutionService(deps: ExecutionDependencies) {
         return observeOnly();
       const available =
         !!adapter &&
+        (!(await deps.diffRequired?.(context.tenantId)) ||
+          describeActionDiff(action) !== null) &&
         adapter.capability === action.capability &&
         adapter.version === action.capabilityVersion &&
         (await adapter.checkPreconditions(action)) === true;
@@ -438,6 +444,7 @@ export function createExecutionService(deps: ExecutionDependencies) {
           dispatch: 'uncertain',
           businessOutcome: 'pending',
           policyDecisionId: decision.id,
+          ...(decision.autonomy ? { autonomy: decision.autonomy } : {}),
           ...(decision.approvalId ? { approvalId: decision.approvalId } : {}),
           permission,
           ...(adapter.dispatchIdentity
@@ -534,8 +541,14 @@ export function createExecutionService(deps: ExecutionDependencies) {
           .then((current) => current.permissions.has(permission))
           .catch(() => false)) &&
         (admissionGuard ? await admissionGuard().catch(() => false) : true);
+      // The audit flush and authorization refresh may outlive the first provider check.
+      // Recheck the exact expected values immediately before dispatch; adapters still enforce
+      // provider compare-and-set or an independently bound calculation at the write boundary.
+      const preconditionsCurrent =
+        admissionCurrent &&
+        (await adapter.checkPreconditions(action).catch(() => false));
       if (
-        !admissionCurrent ||
+        !preconditionsCurrent ||
         (await deps.policies.currentVersion(context.tenantId)) !==
           decision.policyVersion ||
         deps.now().getTime() >= Date.parse(decision.validUntil)
@@ -554,9 +567,12 @@ export function createExecutionService(deps: ExecutionDependencies) {
             'execution.withheld',
             deps.id(),
             {
-              reason: admissionCurrent
-                ? 'decision_expired'
-                : 'admission_changed',
+              reason:
+                !preconditionsCurrent && admissionCurrent
+                  ? 'stale_precondition'
+                  : admissionCurrent
+                    ? 'decision_expired'
+                    : 'admission_changed',
               dispatch: 'not_dispatched',
               businessOutcome: 'inconclusive',
             },

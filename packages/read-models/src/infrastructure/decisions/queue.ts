@@ -22,6 +22,7 @@ import {
   presentCase,
   urgencies,
 } from '../../domain/decisions.js';
+import { createActionDiffReader } from '../action-diffs.js';
 
 const cursorSchema = z
   .object({
@@ -166,6 +167,8 @@ export function createDecisionQueue(
     cases: string;
     providers: readonly DecisionProvider[];
     refreshContext(context: TenantContext): Promise<TenantContext>;
+    /** Release only; owner read permissions still determine every included proposal. */
+    diffEnabled?(tenantId: string): Promise<boolean>;
     now?: () => Date;
   },
 ): DecisionQueue {
@@ -273,15 +276,21 @@ export function createDecisionQueue(
     );
 
     const page = result.items.slice(0, query.limit);
+    const references = new Map<
+      string,
+      NonNullable<DecisionCandidate['actionReference']>
+    >();
     const items = page.flatMap((row): DecisionItem[] => {
       const candidate = row.facts
         ? presentCase(row.facts, reader, asOf)
         : external.get(row.id);
       if (!candidate) return [];
+      const { actionReference, ...visible } = candidate;
+      if (actionReference) references.set(row.id, actionReference);
 
       return [
         {
-          ...candidate,
+          ...visible,
           urgency: urgencies[row.rank],
           evidence: {
             ...candidate.evidence,
@@ -295,6 +304,43 @@ export function createDecisionQueue(
         },
       ];
     });
+    if (references.size && (await deps.diffEnabled?.(fresh.tenantId))) {
+      const reviews = await createActionDiffReader(db)(
+        fresh,
+        [...references].map(([id, reference]) => ({
+          id,
+          reference,
+          observedAt: (() => {
+            const item = items.find((item) => item.id === id);
+
+            return item &&
+              ((item.owner.kind === 'workflow_run' &&
+                item.owner.followUpProposalId) ||
+                [
+                  'case',
+                  'replenishment',
+                  'inventory_correction',
+                  'fulfillment_recovery',
+                  'order_edit',
+                  'shipment_publication',
+                ].includes(item.kind))
+              ? item.evidence.observedAt
+              : null;
+          })(),
+          canonical: items.find((item) => item.id === id)?.record ?? null,
+          ...(() => {
+            const item = items.find((item) => item.id === id);
+
+            return item?.owner.kind === 'case'
+              ? {
+                  evidenceLink: `/app/${fresh.tenantId}/exceptions/${item.owner.exceptionId}/detail`,
+                }
+              : {};
+          })(),
+        })),
+      );
+      for (const item of items) item.diff = reviews.get(item.id) ?? null;
+    }
     const last = page.at(-1);
 
     return {

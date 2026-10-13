@@ -57,14 +57,14 @@ it('reconciles authorized incident cohorts, excludes synthetic data and retains 
     endpoint,
     'POST',
     { ...request, scope: { connectionId: randomUUID() } },
-    400,
+    503,
   );
   await f.request(
     f.owner,
     endpoint,
     'POST',
     { ...request, scope: { environment: 'live', window: '30d' } },
-    400,
+    503,
   );
   const overview = await f.request(
     f.owner,

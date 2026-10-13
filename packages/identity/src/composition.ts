@@ -4,6 +4,7 @@ import { Pool } from 'pg';
 
 import { createIdentityService } from './application/identity.js';
 import type { MailProvider } from './application/mail.js';
+import type { MorningBriefSource } from './application/morning-brief.js';
 import type { AppPermissionSource } from './application/roles.js';
 import { createRolesService } from './application/roles.js';
 import { createSettingsService } from './application/settings.js';
@@ -12,6 +13,7 @@ import type { AuthSettings } from './infrastructure/auth.js';
 import { createResendMail } from './infrastructure/mail.js';
 import { createMailDelivery } from './infrastructure/mail-delivery.js';
 import { createMailEvents } from './infrastructure/mail-events.js';
+import { createMorningBriefScheduler } from './infrastructure/morning-brief.js';
 import { createPasswordMail } from './infrastructure/password-mail.js';
 import { createRepository } from './infrastructure/repository.js';
 import { createRolesRepository } from './infrastructure/roles.js';
@@ -33,6 +35,7 @@ export function createIdentity(
     };
     mailProvider?: MailProvider;
     mailOrigin?: string;
+    morningBriefEnabled?: (tenantId: string) => Promise<boolean>;
     /** Reports whether the current request may only read, as in a support view. */
     readOnly?: () => boolean;
   },
@@ -62,6 +65,9 @@ export function createIdentity(
     repository: createSettingsRepository(pool, !!provider, settings.readOnly),
     identity: service,
     deliveryAvailable: !!provider,
+    ...(settings.morningBriefEnabled
+      ? { morningBriefEnabled: settings.morningBriefEnabled }
+      : {}),
     now: () => new Date(),
     id: randomUUID,
     token,
@@ -75,6 +81,7 @@ export function createIdentity(
     mailOrigin,
     settings.secret,
     token,
+    settings.morningBriefEnabled,
   );
 
   return {
@@ -89,6 +96,12 @@ export function createIdentity(
         now: () => new Date(),
       }),
     mailDelivery,
+    /** Composes the daily schedule with the existing authorized operational readers. */
+    morningBriefScheduler: (source: MorningBriefSource) => {
+      const schedule = createMorningBriefScheduler(pool, source);
+
+      return (now?: Date) => (provider ? schedule(now) : Promise.resolve());
+    },
     /** Records Resend delivery events; absent without a webhook secret. */
     mailEvents: settings.mail?.webhookSecret
       ? createMailEvents(pool, {
@@ -133,3 +146,5 @@ export function createIdentity(
 export { builtInMembership, makeTenantContext } from './domain/context.js';
 
 export { createRoleIdentityReader } from './infrastructure/role-identities.js';
+
+export { createMorningBriefReader } from './application/morning-brief.js';

@@ -1,7 +1,9 @@
 import type { CaseService } from '@luma/exceptions';
+import type { TenantContext } from '@luma/identity';
 import { IdentityError } from '@luma/identity';
 import { z } from 'zod';
 
+import type { AssistantIssueReview } from '../../application/context.js';
 import { defineTool } from '../../application/tools.js';
 import { citationMarker, clip } from '../../domain/answer.js';
 import {
@@ -126,7 +128,13 @@ export function searchIssuesTool(cases: Pick<CaseService, 'list'>) {
 const getInput = z.object({ issueId: z.string().uuid() }).strict();
 
 /** Reads one issue with its diagnosis: facts, likely causes and suggested next steps. */
-export function getIssueTool(cases: Pick<CaseService, 'get'>) {
+export function getIssueTool(
+  cases: Pick<CaseService, 'get'>,
+  review?: (
+    context: TenantContext,
+    id: string,
+  ) => Promise<AssistantIssueReview>,
+) {
   return defineTool(parser(getInput), {
     name: 'get_issue',
     label: 'Read an issue',
@@ -145,10 +153,31 @@ export function getIssueTool(cases: Pick<CaseService, 'get'>) {
       const issue = await cases.get(context, input.issueId);
       if (!issue) throw new IdentityError(404, 'NOT_FOUND', 'Issue not found');
       const diagnosis = issue.diagnosis;
+      const governed = await review?.(context, issue.id);
 
       return {
         data: {
           issue: issueRow(issue),
+          governedReview: governed
+            ? {
+                permittedDecisions: governed.permittedDecisions,
+                refreshable: governed.refreshable ?? false,
+                observeOnly: governed.observeOnly ?? false,
+                policyStale: governed.policyStale ?? false,
+                proposal: governed.proposal
+                  ? {
+                      id: governed.proposal.id,
+                      capability: governed.proposal.capability,
+                      available: governed.proposal.available,
+                      expiresAt: governed.proposal.expiresAt,
+                      policy: governed.proposal.policy,
+                      approval: governed.proposal.approval,
+                    }
+                  : null,
+                instruction:
+                  'Only these permitted decisions are currently eligible. Open this cited issue for governed review; eligibility is checked again when acting.',
+              }
+            : null,
           diagnosis: diagnosis
             ? {
                 status: diagnosis.status,
@@ -162,6 +191,14 @@ export function getIssueTool(cases: Pick<CaseService, 'get'>) {
                 },
                 nextSteps: diagnosis.nextSteps.slice(0, 5),
                 generatedAt: diagnosis.provenance.generatedAt,
+                evidence: diagnosis.provenance.evidence.slice(0, 10),
+                evidenceOmitted: Math.max(
+                  0,
+                  diagnosis.provenance.evidence.length - 10,
+                ),
+                validUntil: diagnosis.provenance.validUntil,
+                reread: diagnosis.provenance.reread,
+                superseded: diagnosis.superseded,
               }
             : null,
         },

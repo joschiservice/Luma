@@ -84,6 +84,7 @@ export function createPolicyRepository(db: TenantDatabase): PolicyRepository {
           workspacePolicyVersion(
             current.revision,
             current.requireIndependentApproval,
+            current.autonomyRevision,
           ) !== approval.policyVersion
         )
           throw new IdentityError(
@@ -121,6 +122,15 @@ export function createPolicyRepository(db: TenantDatabase): PolicyRepository {
           ],
         );
 
+        await tx.query(
+          "UPDATE autonomy_history SET document=jsonb_set(document,'{review}',to_jsonb($3::text)),updated_at=now() WHERE tenant_id=$1 AND proposal_id=$2 AND document->>'review'='not_reviewed'",
+          [
+            saved.tenantId,
+            saved.proposalId,
+            saved.outcome === 'approved' ? 'accepted' : 'overridden',
+          ],
+        );
+
         return saved;
       }),
   };
@@ -130,12 +140,13 @@ export function createPolicyRepository(db: TenantDatabase): PolicyRepository {
 async function readWorkspacePolicy(tx: SqlTransaction, tenantId: string) {
   const result = await tx.query<{
     revision: number;
+    autonomyRevision: number;
     required: boolean;
     requireIndependentApproval: boolean;
   }>(
-    `SELECT COALESCE(s.policy_revision,0) AS revision,COALESCE(s.always_require_approval,false) AS required,
+    `SELECT COALESCE(a.revision,0) AS "autonomyRevision",COALESCE(s.policy_revision,0) AS revision,COALESCE(s.always_require_approval,false) AS required,
     workspace_requires_independent_approval() AS "requireIndependentApproval"
-    FROM (SELECT $1::uuid AS tenant_id) t LEFT JOIN workspace_settings s ON s.tenant_id=t.tenant_id`,
+    FROM (SELECT $1::uuid AS tenant_id) t LEFT JOIN workspace_settings s ON s.tenant_id=t.tenant_id LEFT JOIN autonomy_epochs a ON a.tenant_id=t.tenant_id`,
     [tenantId],
   );
 

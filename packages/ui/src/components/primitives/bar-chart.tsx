@@ -59,12 +59,13 @@ export interface ChartSelection {
 }
 
 /** Rounds a maximum up to a readable axis: 1, 2 or 5 times a power of ten per step. */
-function chartTicks(max: number, count = 4) {
+function chartTicks(max: number, count = 4, integerTicks = false) {
   if (max <= 0) return [0, 1];
   const rough = max / count;
   const power = 10 ** Math.floor(Math.log10(rough));
-  const step =
+  const niceStep =
     [1, 2, 5, 10].map((m) => m * power).find((s) => s >= rough) ?? power * 10;
+  const step = integerTicks ? Math.max(1, niceStep) : niceStep;
   const ticks: number[] = [];
   for (let value = 0; value < max + step; value += step) ticks.push(value);
 
@@ -171,6 +172,7 @@ export function BarChart({
   series,
   categories,
   unit = formatNumber,
+  integerTicks = false,
   selected,
   onSelect,
   busy = false,
@@ -184,6 +186,8 @@ export function BarChart({
   categories: ChartCategory[];
   /** Formats a value with its unit, such as "12 orders". */
   unit?: (value: number) => string;
+  /** Uses whole-number ticks for counting units such as incidents or orders. */
+  integerTicks?: boolean;
   selected?: ChartSelection | null | undefined;
   onSelect?: ((selection: ChartSelection) => void) | undefined;
   /** Keeps the previous values visible but dimmed while new ones load. */
@@ -195,7 +199,7 @@ export function BarChart({
   const [shown, setShown] = useState<number | null>(null);
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const max = Math.max(0, ...categories.map((c) => total(c, series)));
-  const ticks = chartTicks(max);
+  const ticks = chartTicks(max, 4, integerTicks);
   const scale = ticks.at(-1)!;
   const vertical = orientation === 'vertical';
   const [width, setWidth] = useState(640);
