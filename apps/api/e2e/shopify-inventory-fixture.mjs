@@ -296,10 +296,22 @@ export async function correctionFixture(
       recordObservations: async (evidence) => {
         const outcomes = await commerce.ingestion.importMany(
           tenant,
-          evidence.observations.map((observation) => ({
-            ingestKey: observation.id,
-            input: { capability: evidence.capability, observation },
-          })),
+          evidence.observations.map((observation) => {
+            // Retained order evidence excludes personal fields, as the sync runner does.
+            const data = { ...observation.data };
+            if (evidence.capability === 'orders.read') {
+              delete data.customer;
+              delete data.addresses;
+            }
+
+            return {
+              ingestKey: observation.id,
+              input: {
+                capability: evidence.capability,
+                observation: { ...observation, data },
+              },
+            };
+          }),
         );
         if (outcomes.some((outcome) => outcome.status === 'pending'))
           throw new Error('Imported evidence was not projected');
