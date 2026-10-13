@@ -9,3 +9,5 @@ export type {
 export { receivingSignals } from './domain/receiving.js';
 
 export type { TransferFacts, ReceivingSignal } from './domain/receiving.js';
+
+export type { LedgerService } from './application/ledger-service.js';

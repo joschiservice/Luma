@@ -46,6 +46,14 @@ const permissionText: Record<
     m.permissions_inventory_read_label,
     m.permissions_inventory_read_description,
   ],
+  'inventory.manage': [
+    m.permissions_inventory_manage_label,
+    m.permissions_inventory_manage_description,
+  ],
+  'inventory.approve': [
+    m.permissions_inventory_approve_label,
+    m.permissions_inventory_approve_description,
+  ],
   'products.read': [
     m.permissions_products_read_label,
     m.permissions_products_read_description,

@@ -22,6 +22,7 @@
     "@luma/exceptions": "workspace:*",
     "@luma/execution": "workspace:*",
     "@luma/identity": "workspace:*",
+    "@luma/inventory": "workspace:*",
     "@luma/orders": "workspace:*",
     "@luma/policies": "workspace:*",
     "@luma/procurement": "workspace:*",

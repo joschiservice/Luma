@@ -120,5 +120,9 @@
   "permissions_shopify_returns_manage_label": "Shopify-Retouren verwalten",
   "permissions_shopify_returns_manage_description": "Genehmigung für Shopify-Retouren, Erstattungen und Umtausch anfordern.",
   "permissions_jtl_returns_restock_label": "Geprüfte Retouren einlagern",
-  "permissions_jtl_returns_restock_description": "Fordere eine Freigabe an und lagere nur geprüfte, wiederverkaufbare Einheiten in einem Wawi-Lager ein."
+  "permissions_jtl_returns_restock_description": "Fordere eine Freigabe an und lagere nur geprüfte, wiederverkaufbare Einheiten in einem Wawi-Lager ein.",
+  "permissions_inventory_manage_label": "Nativen Bestand verwalten",
+  "permissions_inventory_manage_description": "Geprüfte Eröffnungsbestände und Korrekturen vorbereiten, native Bestandsbewegungen verwalten und das Schattenbuch abstimmen.",
+  "permissions_inventory_approve_label": "Native Bestandsänderungen prüfen",
+  "permissions_inventory_approve_description": "Den genauen Eröffnungsbestand oder die Korrektur eines anderen Mitglieds genehmigen oder ablehnen."
 }

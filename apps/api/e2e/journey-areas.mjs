@@ -748,6 +748,12 @@ export const journeyAreas = {
     ...webInventory,
     ...webOrders,
   ],
+  'stock-ledger.e2e.mjs': [
+    ...ordersFixture,
+    ...inventory,
+    ...appHost,
+    'packages/application-runtime/src/composition/inventory-ledger.ts',
+  ],
   'shopify-bundles.e2e.mjs': [
     ...ordersFixture,
     ...detectionFixture,

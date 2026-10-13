@@ -37,6 +37,7 @@ import {
   type InventoryWriteReceipt,
 } from './inventory-write-attribution.js';
 import {
+  inventoryCompositionSelection,
   discountApplication,
   orderLine,
   orderSelection,
@@ -499,6 +500,21 @@ export function createShopifyConnector(
         }
         const filters = input as CapabilityInput<'inventory.read'> &
           CapabilityInput<'fulfillment.read'>;
+        if (capability === 'inventory.read' && filters.includeComposition) {
+          const access = parse(
+            s.scanStart,
+            await request(
+              'query LumaScanStart { currentAppInstallation { accessScopes { handle } } }',
+              {},
+            ),
+          );
+          if (
+            !access.currentAppInstallation.accessScopes.some((scope) =>
+              ['read_products', 'write_products'].includes(scope.handle),
+            )
+          )
+            fail('permission_denied');
+        }
         const updatedSince =
           'updatedSince' in input ? (input.updatedSince ?? null) : null;
         const createdSince =
@@ -517,6 +533,7 @@ export function createShopifyConnector(
               readPageSize(capability, input.limit),
               filters.sku ?? null,
               filters.location ?? null,
+              filters.includeComposition ?? false,
               filters.order ?? null,
               updatedSince,
               createdSince,
@@ -854,6 +871,7 @@ export function createShopifyConnector(
             capability,
             orderCustomers,
             orderAddresses,
+            filters.includeComposition === true,
           );
           const data = await request(
             root === 'inventoryItems'
@@ -1051,7 +1069,7 @@ export function createShopifyConnector(
             const item = await node(
               parent.id,
               'InventoryItem',
-              'id tracked',
+              `id tracked ${filters.includeComposition ? inventoryCompositionSelection : ''}`,
               s.inventoryItem,
             );
             const levels = await children(
@@ -1061,6 +1079,24 @@ export function createShopifyConnector(
               'id updatedAt isActive location { id isActive } quantities(names: ["on_hand", "committed", "reserved", "incoming", "damaged", "quality_control", "safety_stock", "available"]) { name quantity }',
               s.level,
             );
+            let composition;
+            if (filters.includeComposition) {
+              if (item.variant === undefined) fail('invalid_response');
+              if (
+                item.variant &&
+                item.variant.productVariantComponents.nodes.length === 0 &&
+                item.variant.productVariantComponents.pageInfo.hasNextPage
+              )
+                fail('invalid_response');
+              composition = item.variant
+                ? {
+                    variant: ref(item.variant.id),
+                    requiresComponents: item.variant.requiresComponents,
+                    hasComponents:
+                      item.variant.productVariantComponents.nodes.length > 0,
+                  }
+                : null;
+            }
             for (const level of levels) {
               if (
                 filters.location &&
@@ -1079,6 +1115,7 @@ export function createShopifyConnector(
                 item.tracked ? (values.get(key) ?? null) : null;
               const available = value('available');
               emit('sku', ref(item.id, level.location.id), level.updatedAt, {
+                ...(composition === undefined ? {} : { composition }),
                 sku: ref(item.id),
                 location: ref(level.location.id),
                 unit: 'each',

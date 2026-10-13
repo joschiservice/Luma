@@ -232,7 +232,7 @@ describe('Shopify read capabilities', () => {
         items: [
           {
             source: { provider: 'shopify', externalId: commerce.order.id },
-            adapterVersion: 'shopify/11',
+            adapterVersion: 'shopify/12',
             data: {
               paymentStatus: 'paid',
               placedAt: '2026-09-14T08:30:00Z',
@@ -581,6 +581,88 @@ describe('Shopify read capabilities', () => {
     expect(
       JSON.parse(String(f.fetch.mock.calls.at(-1)?.[1]?.body)).variables.after,
     ).toBe('next-page');
+  });
+  it('reads stock-bearing composition only when requested and retains unavailable composition as unknown', async () => {
+    const f = fixture(),
+      fallback = f.fetch.getMockImplementation()!;
+    let variant: unknown = {
+      id: 'gid://shopify/ProductVariant/900',
+      requiresComponents: false,
+      productVariantComponents: page([]),
+    };
+    f.fetch.mockImplementation(async (url, init) => {
+      const { query } = JSON.parse(String(init?.body)) as { query: string };
+      if (
+        query.includes('LumaPage') &&
+        query.includes('inventoryItems') &&
+        query.includes('productVariantComponents')
+      )
+        return response({
+          page: page([
+            {
+              ...f.data.inventoryItem,
+              variant,
+              inventoryLevels: page(f.data.levels),
+            },
+          ]),
+        });
+      if (
+        query.includes('... on InventoryItem') &&
+        query.includes('productVariantComponents')
+      )
+        return response({ node: { ...f.data.inventoryItem, variant } });
+
+      return fallback(url, init);
+    });
+    const plain = await f.read('inventory.read');
+    expect(plain.ok && plain.value.items[0]?.data).not.toHaveProperty(
+      'composition',
+    );
+    expect(
+      f.fetch.mock.calls.every(
+        (call) => !String(call[1]?.body).includes('productVariantComponents'),
+      ),
+    ).toBe(true);
+    const input = { limit: 10, includeComposition: true };
+
+    async function composition() {
+      const result = await f.read('inventory.read', input);
+      if (!result.ok) throw new Error(result.error.code);
+
+      return result.value.items[0]?.data.composition;
+    }
+
+    expect(await composition()).toEqual({
+      variant: ref('gid://shopify/ProductVariant/900'),
+      requiresComponents: false,
+      hasComponents: false,
+    });
+    variant = {
+      id: 'gid://shopify/ProductVariant/900',
+      requiresComponents: true,
+      productVariantComponents: page(
+        [{ id: 'gid://shopify/ProductVariantComponent/1' }],
+        'more',
+      ),
+    };
+    expect(await composition()).toMatchObject({
+      requiresComponents: true,
+      hasComponents: true,
+    });
+    variant = null;
+    expect(await composition()).toBeNull();
+    variant = undefined;
+    expect(await f.read('inventory.read', input)).toMatchObject({
+      ok: false,
+      error: { code: 'invalid_response' },
+    });
+    f.data.scopes = f.data.scopes.filter(
+      (scope) => !['read_products', 'write_products'].includes(scope.handle),
+    );
+    expect(await f.read('inventory.read', input)).toMatchObject({
+      ok: false,
+      error: { code: 'permission_denied' },
+    });
   });
   it('uses typed identity filters without relying on SKU text or search syntax', async () => {
     const f = fixture();

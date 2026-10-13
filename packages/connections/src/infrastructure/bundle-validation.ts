@@ -41,3 +41,12 @@ export const productBundleSchema = z
       .nullable(),
   })
   .strict();
+
+/** Retains the first-edge composition proof without copying a complete product recipe into stock reads. */
+export const stockCompositionSchema = z
+  .object({
+    variant: ref,
+    requiresComponents: z.boolean(),
+    hasComponents: z.boolean(),
+  })
+  .strict();

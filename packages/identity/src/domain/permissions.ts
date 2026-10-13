@@ -174,6 +174,24 @@ export const permissionCatalog = [
     introduced,
   },
   {
+    key: 'inventory.manage',
+    group: 'records',
+    label: 'Manage native stock',
+    description:
+      'Prepare reviewed stock openings and corrections, manage native stock movements and reconcile the shadow ledger.',
+    consequential: true,
+    introduced: '2026-10-12',
+  },
+  {
+    key: 'inventory.approve',
+    group: 'records',
+    label: 'Review native stock changes',
+    description:
+      'Approve or reject another member’s exact stock opening or correction.',
+    consequential: true,
+    introduced: '2026-10-12',
+  },
+  {
     key: 'products.read',
     group: 'records',
     label: 'View products',

@@ -21,6 +21,11 @@ type CommerceData =
   | ShipmentData
   | {
       type: 'position';
+      composition?: {
+        variant: { externalId: string; scopeKey: string };
+        requiresComponents: boolean;
+        hasComponents: boolean;
+      } | null;
       skuId: string;
       locationId: string;
       unit: string;
@@ -91,7 +96,7 @@ export type Dependent = {
 
 export interface CanonicalSnapshot {
   /** Version 2 adds product/stock facts; position version 3 adds corroborated write attribution. */
-  schemaVersion: 1 | 2 | 3;
+  schemaVersion: 1 | 2 | 3 | 4;
   entityId: string;
   kind: EntityKind;
   connectionId: string;

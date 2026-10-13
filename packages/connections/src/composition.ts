@@ -105,4 +105,5 @@ export {
 export {
   orderBundleGroupSchema,
   productBundleSchema,
+  stockCompositionSchema,
 } from './infrastructure/bundle-validation.js';
