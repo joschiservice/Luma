@@ -2,6 +2,7 @@ import type { IdentityService, TenantContext } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 
 import { createProcessActivities } from '../application/process-activities.js';
+import type { CodeProcessBusinessAdapter } from '../application/process-business.js';
 import type { ProcessRun, ProcessWorkflowVersion } from '../domain/process.js';
 import type { VocabularyContribution } from '../domain/vocabulary.js';
 import type {
@@ -27,6 +28,7 @@ export function createCodeProcesses(
   db: TenantDatabase,
   identity: Pick<IdentityService, 'resolveWorkflowContext'>,
   transport?: CodeProcessTransport,
+  business?: CodeProcessBusinessAdapter,
 ) {
   const directory = process.env.LUMA_CODE_RUNTIME_DIR;
   const runs = createWorkflowTriggerStore(db);
@@ -42,11 +44,12 @@ export function createCodeProcesses(
       (step) =>
         step.kind === 'code' ||
         step.kind === 'human_task' ||
-        step.kind === 'event_wait',
+        step.kind === 'event_wait' ||
+        business?.supports(step),
     ) &&
     version.steps.every(
       (step) =>
-        [
+        ([
           'code',
           'condition',
           'wait',
@@ -54,7 +57,8 @@ export function createCodeProcesses(
           'escalation',
           'human_task',
           'event_wait',
-        ].includes(step.kind) &&
+        ].includes(step.kind) ||
+          business?.supports(step)) &&
         (step.kind !== 'code' || (!!directory && !step.grants.length)),
     );
   const unavailable = async (): Promise<never> => {
@@ -68,15 +72,15 @@ export function createCodeProcesses(
 
       return item && supported(item) ? item : null;
     },
-    admission: {
+    admission: business?.admission ?? {
       get: unavailable,
       execute: unavailable,
       reconcile: unavailable,
     },
-    bindAction: unavailable,
-    read: unavailable,
-    decision: unavailable,
-    verify: unavailable,
+    bindAction: business?.bindAction ?? unavailable,
+    read: business?.read ?? unavailable,
+    decision: business?.decision ?? unavailable,
+    verify: business?.verify ?? unavailable,
     record: steps.record,
     ...(directory
       ? {
@@ -109,10 +113,15 @@ export function createCodeProcesses(
     supported,
     start,
     /** Describes the computation steps this adapter runs in workflows that contain a Code Step. */
-    async vocabulary(): Promise<VocabularyContribution> {
+    async vocabulary(context?: TenantContext): Promise<VocabularyContribution> {
       const executable = !!transport;
+      const contribution =
+        context && business ? await business.vocabulary(context) : {};
 
       return {
+        reads: contribution.reads ?? [],
+        capabilities: contribution.capabilities ?? [],
+        evaluators: contribution.evaluators ?? [],
         triggers: [
           ...(['manual', 'event', 'condition', 'exception'] as const).map(
             (kind) => ({
@@ -126,22 +135,26 @@ export function createCodeProcesses(
             executable,
           },
         ],
-        stepKinds: (
-          [
-            'code',
-            'condition',
-            'wait',
-            'escalation',
-            'end',
-            'human_task',
-            'event_wait',
-          ] as const
-        ).map((kind) => ({
-          kind,
-          executable,
-          ...(coordinationReason ? { reason: coordinationReason } : {}),
-        })),
+        stepKinds: [
+          ...(contribution.stepKinds ?? []),
+          ...(
+            [
+              'code',
+              'condition',
+              'wait',
+              'escalation',
+              'end',
+              'human_task',
+              'event_wait',
+            ] as const
+          ).map((kind) => ({
+            kind,
+            executable,
+            ...(coordinationReason ? { reason: coordinationReason } : {}),
+          })),
+        ],
         subjects: [
+          ...(contribution.subjects ?? []),
           {
             kind: 'purchase_order',
             label: 'Purchase order',

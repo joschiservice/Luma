@@ -6,6 +6,15 @@ export const connectorPackages = {
 };
 
 export const dependencies = {
+  adaptive: [
+    'platform',
+    'identity',
+    'audit',
+    'workflows',
+    'connectors',
+    'execution',
+    'policies',
+  ],
   platform: [],
   identity: ['platform'],
   federation: [],
@@ -76,6 +85,7 @@ export const layers = {
 };
 
 export const domainPackages = {
+  adaptive: 'adaptive',
   platform: 'platform',
   identity: 'identity',
   'identity-provider': 'federation',

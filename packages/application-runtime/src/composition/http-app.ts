@@ -1,6 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import type { Socket } from 'node:net';
 
+import type { FieldWorkflowAdapter } from '@luma/adaptive';
+import {
+  adaptiveAvailabilityRoutes,
+  fieldsRoutes,
+  operationalPackageRoutes,
+  viewActionRoutes,
+  viewsRoutes,
+} from '@luma/adaptive/http';
 import type { ApiError } from '@luma/api-contract';
 import { apiContract } from '@luma/api-contract';
 import { openApiDocument } from '@luma/api-contract/openapi';
@@ -146,6 +154,10 @@ declare module 'fastify' {
 }
 
 export interface AppDependencies {
+  fieldWorkflows?: FieldWorkflowAdapter;
+  adaptive?: ReturnType<
+    typeof import('./adaptive.js').createAdaptiveWorkspaceRuntime
+  >;
   shadow?: ShadowService;
   activity?: ActivityService;
   playbooks?: PlaybookLibrary;
@@ -397,6 +409,16 @@ export function buildApp(
     app,
     apiContract,
     os.router({
+      adaptive: adaptiveAvailabilityRoutes(dependencies.adaptive?.availability),
+      adaptiveFields: fieldsRoutes(
+        dependencies.adaptive?.fields,
+        dependencies.fieldWorkflows,
+      ),
+      adaptiveViews: viewsRoutes(dependencies.adaptive?.views),
+      adaptiveActions: viewActionRoutes(dependencies.adaptive?.actions),
+      adaptivePackages: operationalPackageRoutes(
+        dependencies.adaptive?.packages,
+      ),
       shadow: shadowRoutes(dependencies.shadow),
       activity: activityRoutes(dependencies.activity),
       playbooks: playbookRoutes(dependencies.playbooks),

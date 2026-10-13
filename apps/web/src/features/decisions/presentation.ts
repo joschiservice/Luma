@@ -36,6 +36,7 @@ export const reasonLabels: Record<DecisionReason, () => string> = {
 
 export const kindLabels: Record<DecisionKind, () => string> = {
   case: m.decisions_kind_case,
+  custom_field: m.adaptive_field_change,
   return_case: m.returns_case_title_fallback,
   replenishment: m.decisions_kind_replenishment,
   fulfillment_recovery: m.decisions_kind_fulfillment_recovery,

@@ -7,6 +7,7 @@ import { Input } from '@luma/ui/components/primitives/input';
 import { Select } from '@luma/ui/components/primitives/select';
 import { Switch } from '@luma/ui/components/primitives/switch';
 import { LanguageSelect } from '@luma/ui/components/workspace/language-select';
+import { useQuery } from '@tanstack/react-query';
 import {
   ArrowDown,
   ArrowUp,
@@ -30,6 +31,7 @@ import {
   type ThemePreference,
   useThemePreference,
 } from '../../lib/theme';
+import { adaptiveAvailabilityOptions } from '../adaptive/data';
 import { SectionHeading } from './section-heading';
 
 const themes: {
@@ -144,13 +146,18 @@ export function HomeSidebarSettings({
   organizationId: string;
 }) {
   const workspace = useWorkspaceLayout(organizationId);
+  const adaptive = useQuery(adaptiveAvailabilityOptions(organizationId));
   const modules = workspace.layout?.home ?? defaultHome;
   const pinned = workspace.layout?.pinned ?? [];
   const saveHome = (home: HomeModule[]) => workspace.save({ home });
   const savePins = (next: PinnedPage[]) => workspace.save({ pinned: next });
   const ordered: HomeModuleId[] = [
     ...modules.map((module) => module.id),
-    ...homeModuleIds.filter((id) => !modules.some((item) => item.id === id)),
+    ...homeModuleIds.filter(
+      (id) =>
+        (id !== 'saved-views' || adaptive.data?.views === true) &&
+        !modules.some((item) => item.id === id),
+    ),
   ];
 
   return (

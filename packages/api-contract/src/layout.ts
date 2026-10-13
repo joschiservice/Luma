@@ -12,6 +12,7 @@ export const homeModuleIds = [
   'catalog',
   'fulfillment',
   'returns',
+  'saved-views',
 ] as const;
 
 const homeModuleSchema = z

@@ -54,7 +54,8 @@
     "fastify": "catalog:",
     "pg": "catalog:pg-8-20-0",
     "zod": "catalog:",
-    "@luma/sales": "workspace:*"
+    "@luma/sales": "workspace:*",
+    "@luma/adaptive": "workspace:*"
   },
   "devDependencies": {
     "@luma/typescript-config": "workspace:*",

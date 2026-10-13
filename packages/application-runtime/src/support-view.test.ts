@@ -119,6 +119,9 @@ it('lists every route with a request body that support views may call', () => {
       .map((route) => route.key)
       .sort(),
   ).toEqual([
+    'adaptiveActions.preview',
+    'adaptivePackages.preview',
+    'adaptiveViews.preview',
     'metrics.operationalQuery',
     'metrics.query',
     'metrics.summary',

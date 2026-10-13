@@ -71,6 +71,8 @@ for Luma's users live in `apps/web/content/docs`.
 
 **Workspaces and metrics**
 
+- [Adaptive workspaces](adaptive-workspaces.md): typed fields, saved queries, governed actions and operational packages.
+
 - [Operations overview](operations-overview.md), [Needs you](needs-you.md) and
   [Workspace Activity](workspace-activity.md).
 - [Orders](orders-workspace.md), [Products](products-workspace.md),

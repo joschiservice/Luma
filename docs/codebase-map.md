@@ -30,6 +30,7 @@ conventions only; it does not list files.
 | Suppliers, purchase orders, replenishment, commitments                                          | `@luma/procurement`                                                                      |
 | Mailboxes, message threads, links, documents and replies                                        | `@luma/messaging`                                                                        |
 | Cross-owner read-only views (workspaces, metrics, Needs you)                                    | `@luma/read-models`                                                                      |
+| Custom fields, saved operational views and operational packages                                 | `@luma/adaptive`                                                                         |
 | Ask Luma                                                                                        | `@luma/assistant`                                                                        |
 | Service composition, process runtimes, migrations                                               | `@luma/application-runtime`                                                              |
 | HTTP schemas, typed client, OpenAPI                                                             | `@luma/api-contract`                                                                     |

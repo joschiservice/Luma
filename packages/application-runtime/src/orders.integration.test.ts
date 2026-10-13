@@ -1,6 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 
+import {
+  createAdaptiveViewReadAdapter,
+  createAdaptiveViews,
+} from '@luma/adaptive/composition';
+import {
+  adaptiveViewQuerySchema,
+  orderListQuerySchema,
+} from '@luma/api-contract';
 import { buildApp, createCommerceServices } from '@luma/application-runtime';
 import {
   assistantModelProfile,
@@ -233,6 +241,8 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     kind?: 'fulfillment_order' | 'shipment';
     remaining?: string;
     observedAt?: string;
+    holds?: { reason: 'inventory_out_of_stock' }[];
+    location?: { id: { externalId: string; scopeKey: string }; name: string };
   }) {
     const observation: CommerceObservation & {
       capability: 'fulfillment.read';
@@ -257,6 +267,8 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
         data: {
           order: { externalId: options.order, scopeKey: '' },
           status: options.status,
+          ...(options.holds ? { holds: options.holds } : {}),
+          ...(options.location ? { location: options.location } : {}),
           ...(options.kind ? { kind: options.kind } : {}),
           lastProgressAt: '2026-09-19T10:00:00Z',
           failureCode: null,
@@ -286,6 +298,19 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
       observation.observation.id,
       'operator-confirmed',
     );
+    if (options.location)
+      await services.ingestion.bind(
+        context(),
+        {
+          ...observation.observation.source,
+          resource: 'location',
+          externalId: options.location.id.externalId,
+          scopeKey: options.location.id.scopeKey,
+        },
+        options.location.name,
+        observation.observation.id,
+        'operator-confirmed',
+      );
     await services.ingestion.replay(context(), options.connectionId, key);
 
     return id;
@@ -321,7 +346,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     // The writer mirrors the ingestion worker; the reader mirrors the API login.
     for (const [role, grants] of [
       [`${name}_w`, 'luma_connectors,luma_orders,luma_inventory'],
-      [`${name}_r`, 'luma_connectors,luma_case_reader,luma_desk'],
+      [`${name}_r`, 'luma_connectors,luma_case_reader,luma_desk,luma_adaptive'],
     ] as const) {
       await admin.query(
         `CREATE ROLE "${role}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
@@ -2276,5 +2301,487 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     } finally {
       await grant(grants);
     }
+  });
+  it('applies saved-view custom filters and ordering before native pagination and denies unavailable fields', async () => {
+    await owner.query(
+      "INSERT INTO organizations(id,name,slug,status,created_at) VALUES($1,'Adaptive',$2,'active',now()) ON CONFLICT DO NOTHING",
+      [tenant, `adaptive-${tenant}`],
+    );
+    const fieldId = randomUUID();
+    const field = {
+      id: fieldId,
+      recordType: 'order',
+      key: `urgency_${fieldId.replaceAll('-', '')}`,
+      type: 'number',
+      label: { en: 'Urgency', de: 'Dringlichkeit' },
+      choices: [],
+      readPermission: 'orders.read',
+      writePermission: 'sales.manage',
+      revision: 1,
+      archived: false,
+      source: 'luma',
+      createdAt: clock.toISOString(),
+      updatedAt: clock.toISOString(),
+    };
+    await owner.query(
+      'INSERT INTO adaptive_fields(tenant_id,id,record_type,field_key,field_type,archived,source,document,created_at) VALUES($1,$2,$3,$4,$5,false,$6,$7,$8)',
+      [tenant, fieldId, 'order', field.key, 'number', 'luma', field, clock],
+    );
+    const ids = [];
+    for (const [number, urgency, status] of [
+      ['A', 20, 'open'],
+      ['B', 10, 'open'],
+      ['C', 100, 'cancelled'],
+    ] as const) {
+      const id = await seedOrder({
+        connectionId: shopify,
+        external: `adaptive-${number}`,
+        key: `adaptive-${number}`,
+        updatedAt: '2026-09-19T10:00:00Z',
+        data: { displayNumber: number, status },
+        lines: [],
+      });
+      ids.push(id);
+      await owner.query(
+        'INSERT INTO adaptive_field_values(tenant_id,record_type,record_id,field_id,value,document) VALUES($1,$2,$3,$4,$5,$6)',
+        [
+          tenant,
+          'order',
+          id,
+          fieldId,
+          JSON.stringify(urgency),
+          { fieldId, value: urgency },
+        ],
+      );
+    }
+    const query = {
+      q: '',
+      count: 'exact' as const,
+      view: 'all' as const,
+      status: 'open',
+      sort: 'updated' as const,
+      direction: 'desc' as const,
+      limit: 1,
+      adaptive: {
+        filters: [{ fieldId, operator: 'gte' as const, value: 10 }],
+        sort: { fieldId, direction: 'desc' as const },
+      },
+    };
+    const first = await workspace().list(context(), query);
+    expect(first.items.map((item) => item.displayNumber)).toEqual(['A']);
+    expect(first.totalCount).toBe(2);
+    expect(first.nextCursor).not.toBeNull();
+    const second = await workspace().list(context(), {
+      ...query,
+      cursor: first.nextCursor!,
+    });
+    expect(second.items.map((item) => item.displayNumber)).toEqual(['B']);
+    expect(second.nextCursor).toBeNull();
+    await expect(
+      workspace().list(context(otherTenant), {
+        ...query,
+        cursor: first.nextCursor!,
+      }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    const selected = await workspace().list(context(), {
+      ...query,
+      adaptive: { ...query.adaptive, selectedRecordIds: [ids[2]!] },
+    });
+    expect(selected.items).toHaveLength(0);
+    await owner.query(
+      "UPDATE adaptive_fields SET archived=true,document=jsonb_set(document,'{archived}','true') WHERE tenant_id=$1 AND id=$2",
+      [tenant, fieldId],
+    );
+    await expect(workspace().list(context(), query)).rejects.toMatchObject({
+      statusCode: 422,
+    });
+  });
+
+  it('queries custom order filters and sorting over 100,000 native projections without page sampling', async () => {
+    await owner.query(
+      "INSERT INTO organizations(id,name,slug,status,created_at) VALUES($1,'Adaptive',$2,'active',now()) ON CONFLICT DO NOTHING",
+      [tenant, `adaptive-${tenant}`],
+    );
+    const original = await seedOrder({
+      connectionId: shopify,
+      external: 'adaptive-template',
+      key: 'adaptive-template',
+      updatedAt: '2026-09-19T10:00:00Z',
+      data: { displayNumber: 'template' },
+      lines: [],
+    });
+    const fieldId = randomUUID();
+    const field = {
+      id: fieldId,
+      recordType: 'order',
+      key: `urgency_${fieldId.replaceAll('-', '')}`,
+      type: 'number',
+      label: { en: 'Urgency', de: 'Dringlichkeit' },
+      choices: [],
+      readPermission: 'orders.read',
+      writePermission: 'sales.manage',
+      revision: 1,
+      archived: false,
+      source: 'luma',
+      createdAt: clock.toISOString(),
+      updatedAt: clock.toISOString(),
+    };
+    await owner.query(
+      'INSERT INTO adaptive_fields(tenant_id,id,record_type,field_key,field_type,archived,source,document,created_at) VALUES($1,$2,$3,$4,$5,false,$6,$7,$8)',
+      [tenant, fieldId, 'order', field.key, 'number', 'luma', field, clock],
+    );
+    const seed = await owner.connect();
+    try {
+      // Bulk performance fixtures already supply maintained projections; avoid replaying ingestion triggers.
+      await seed.query('SET session_replication_role=replica');
+      await seed.query(
+        'CREATE TEMP TABLE adaptive_perf_ids AS SELECT gen_random_uuid() AS entity_id,gen_random_uuid() AS snapshot_id,n FROM generate_series(1,100000) n',
+      );
+      await seed.query(
+        "INSERT INTO orders_entities(id,tenant_id,kind,reconciliation_key) SELECT entity_id,$1,'order','adaptive-perf-'||n FROM adaptive_perf_ids",
+        [tenant],
+      );
+      await seed.query(
+        `INSERT INTO orders_snapshots(id,tenant_id,entity_id,kind,connection_id,observation_id,normalizer_version,mapping_version,source_updated_at,observed_at,document)
+        SELECT i.snapshot_id,s.tenant_id,i.entity_id,s.kind,s.connection_id,s.observation_id,s.normalizer_version,s.mapping_version,s.source_updated_at,s.observed_at,jsonb_set(s.document,'{entityId}',to_jsonb(i.entity_id::text))
+        FROM adaptive_perf_ids i CROSS JOIN orders_snapshots s WHERE s.tenant_id=$1 AND s.entity_id=$2 AND s.connection_id=$3`,
+        [tenant, original, shopify],
+      );
+      await seed.query(
+        `INSERT INTO orders_projections(tenant_id,entity_id,connection_id,snapshot_id) SELECT $1,entity_id,$2,snapshot_id FROM adaptive_perf_ids`,
+        [tenant, shopify],
+      );
+      await seed.query(
+        `INSERT INTO orders_list(tenant_id,entity_id,connection_id,snapshot_id,selected,status,payment_status,display_number,observed_at,source_updated_at,placed_at,due_at,deleted,line_count,fulfillment,open,state_valid_from,differs,updated_key,placed_key,placed_rank,number_key,number_rank,due_key,due_rank,updated_rank)
+       SELECT s.tenant_id,i.entity_id,s.connection_id,i.snapshot_id,true,CASE WHEN i.n%2=0 THEN 'open' ELSE 'cancelled' END,s.payment_status,'perf-'||i.n,s.observed_at,s.source_updated_at,s.placed_at,s.due_at,false,s.line_count,s.fulfillment,s.open,s.state_valid_from,false,s.updated_key,s.placed_key,s.placed_rank,'perf-'||i.n,0,s.due_key,s.due_rank,s.updated_rank FROM adaptive_perf_ids i CROSS JOIN orders_list s WHERE s.tenant_id=$1 AND s.entity_id=$2 AND s.connection_id=$3`,
+        [tenant, original, shopify],
+      );
+      await seed.query(
+        `INSERT INTO adaptive_field_values(tenant_id,record_type,record_id,field_id,value,document) SELECT $1,'order',entity_id,$2,to_jsonb(n%100),jsonb_build_object('fieldId',$2::uuid::text,'value',n%100) FROM adaptive_perf_ids`,
+        [tenant, fieldId],
+      );
+      await seed.query('ANALYZE orders_list');
+      await seed.query('ANALYZE adaptive_field_values');
+    } finally {
+      await seed.query('SET session_replication_role=origin');
+      await seed.query('DROP TABLE adaptive_perf_ids');
+      seed.release();
+    }
+    const started = performance.now();
+    const result = await workspace().list(context(), {
+      q: '',
+      view: 'all',
+      status: 'open',
+      sort: 'updated',
+      direction: 'desc',
+      limit: 50,
+      count: 'exact',
+      adaptive: {
+        filters: [{ fieldId, operator: 'gte', value: 90 }],
+        sort: { fieldId, direction: 'desc' },
+      },
+    });
+    const elapsed = performance.now() - started;
+    expect(result.totalCount).toBe(5000);
+    expect(result.items).toHaveLength(50);
+    expect(result.nextCursor).not.toBeNull();
+    const values = await owner.query<{ value: number }>(
+      'SELECT value FROM adaptive_field_values WHERE tenant_id=$1 AND field_id=$2 AND record_id=ANY($3::uuid[])',
+      [tenant, fieldId, result.items.map((item) => item.id)],
+    );
+    expect(values.rows.every((row) => row.value === 98)).toBe(true);
+    process.stdout.write(
+      `Adaptive native order query: 100,000 records, ${elapsed.toFixed(1)} ms\n`,
+    );
+  }, 120000);
+
+  it('groups and charts the complete filtered custom-field query and refuses inaccessible fields', async () => {
+    await owner.query(
+      "INSERT INTO organizations(id,name,slug,status,created_at) VALUES($1,'Adaptive',$2,'active',now()) ON CONFLICT DO NOTHING",
+      [tenant, `adaptive-${tenant}`],
+    );
+    const fieldId = randomUUID();
+    const field = {
+      id: fieldId,
+      recordType: 'order',
+      key: `board_${fieldId.replaceAll('-', '')}`,
+      type: 'number',
+      label: { en: 'Priority', de: 'Priorität' },
+      choices: [],
+      readPermission: 'sales.manage',
+      writePermission: 'sales.manage',
+      revision: 1,
+      archived: false,
+      source: 'luma',
+      createdAt: clock.toISOString(),
+      updatedAt: clock.toISOString(),
+    };
+    await owner.query(
+      'INSERT INTO adaptive_fields(tenant_id,id,record_type,field_key,field_type,archived,source,document,created_at) VALUES($1,$2,$3,$4,$5,false,$6,$7,$8)',
+      [tenant, fieldId, 'order', field.key, 'number', 'luma', field, clock],
+    );
+    for (const [number, priority] of [
+      ['A', 1],
+      ['B', 2],
+      ['C', 2],
+    ] as const) {
+      const id = await seedOrder({
+        connectionId: shopify,
+        external: `board-${number}`,
+        key: `board-${number}`,
+        updatedAt: '2026-09-19T10:00:00Z',
+        data: { displayNumber: number },
+        lines: [],
+      });
+      await owner.query(
+        'INSERT INTO adaptive_field_values(tenant_id,record_type,record_id,field_id,value,document) VALUES($1,$2,$3,$4,$5,$6)',
+        [
+          tenant,
+          'order',
+          id,
+          fieldId,
+          JSON.stringify(priority),
+          { fieldId, value: priority },
+        ],
+      );
+    }
+    const adapter = createAdaptiveViewReadAdapter(
+      createTenantDatabase(reader),
+      {
+        read: async (c, filters) => {
+          const result = await workspace().list(
+            c,
+            orderListQuerySchema.parse(filters),
+          );
+
+          return {
+            ...result,
+            items: result.items.map((item) => ({ ...item })),
+          };
+        },
+      },
+      { recordType: 'order', columns: ['id', 'displayNumber', 'status'] },
+    );
+    const query = adaptiveViewQuerySchema.parse({
+      version: 1,
+      domain: 'orders',
+      filters: { status: 'open' },
+      columns: ['displayNumber', `custom:${fieldId}`],
+      customFilters: [{ fieldId, operator: 'gte', value: 2 }],
+      sort: { field: `custom:${fieldId}`, direction: 'desc' },
+      groupBy: `custom:${fieldId}`,
+      metrics: [{ id: 'count', operation: 'count', field: null }],
+      charts: [
+        {
+          id: 'priorities',
+          type: 'bar',
+          groupBy: `custom:${fieldId}`,
+          metricId: 'count',
+        },
+      ],
+    });
+    const result = await adapter.read(
+      context(),
+      { q: '', view: 'all', status: 'open' },
+      query,
+    );
+    expect(result.totalCount).toBe(2);
+    expect(result.items).toHaveLength(2);
+    expect(result.aggregates).toEqual([
+      { metricId: 'count', value: 2, complete: true },
+    ]);
+    expect(result.groups).toEqual([{ key: 2, count: 2 }]);
+    expect(result.chartSeries).toEqual([
+      {
+        id: 'priorities',
+        points: [{ key: 2, value: 2, count: 2 }],
+        truncated: false,
+        complete: true,
+      },
+    ]);
+    const limited = makeTenantContext(
+      { userId: 'operator', sessionId: 'session' },
+      {
+        id: tenant,
+        name: 'Fixture',
+        slug: 'fixture',
+        status: 'active',
+        dataRegion: 'EU',
+      },
+      {
+        ...builtInMembership(
+          { id: 'membership', organizationId: tenant, userId: 'operator' },
+          'member',
+        ),
+        permissions: new PermissionSet(['orders.read']),
+      },
+      randomUUID(),
+    );
+    await expect(
+      adapter.read(limited, { q: '', view: 'all', status: 'open' }, query),
+    ).rejects.toMatchObject({ statusCode: 422 });
+  });
+  it('selects warehouse stock delays only from explicit fresh source holds', async () => {
+    const orderId = await seedOrder({
+      connectionId: shopify,
+      external: 'stock-held-order',
+      key: 'stock-held-order',
+      updatedAt: clock.toISOString(),
+      data: { displayNumber: 'HELD' },
+      lines: [{ external: 'held-line', key: 'held-line', quantity: '1' }],
+    });
+    await seedShipment({
+      connectionId: shopify,
+      external: 'held-fulfillment',
+      order: 'stock-held-order',
+      line: 'held-line',
+      quantity: '1',
+      status: 'processing',
+      kind: 'fulfillment_order',
+      remaining: '1',
+      observedAt: clock.toISOString(),
+      holds: [{ reason: 'inventory_out_of_stock' }],
+      location: {
+        id: { externalId: 'de-warehouse', scopeKey: '' },
+        name: 'German warehouse',
+      },
+    });
+    const location = (
+      await owner.query<{ id: string }>(
+        "SELECT id FROM inventory_entities WHERE tenant_id=$1 AND kind='location' AND reconciliation_key='German warehouse'",
+        [tenant],
+      )
+    ).rows[0]!.id;
+    const query = {
+      q: '',
+      view: 'all' as const,
+      sort: 'updated' as const,
+      direction: 'desc' as const,
+      limit: 50,
+      count: 'exact' as const,
+      stockBlocked: true as const,
+      locationId: location,
+    };
+    const selected = await workspace().list(context(), query);
+    expect(selected.items.map((item) => item.id)).toEqual([orderId]);
+    expect(selected.totalCount).toBe(1);
+    expect(
+      (
+        await workspace().list(context(), {
+          ...query,
+          locationId: randomUUID(),
+        })
+      ).items,
+    ).toHaveLength(0);
+    clock = new Date(clock.getTime() + 6 * 60000);
+    expect((await workspace().list(context(), query)).items).toHaveLength(0);
+    const limited = makeTenantContext(
+      { userId: 'operator', sessionId: 'session' },
+      {
+        id: tenant,
+        name: 'Fixture',
+        slug: 'fixture',
+        status: 'active',
+        dataRegion: 'EU',
+      },
+      {
+        ...builtInMembership(
+          { id: 'membership', organizationId: tenant, userId: 'operator' },
+          'member',
+        ),
+        permissions: new PermissionSet(['orders.read']),
+      },
+      randomUUID(),
+    );
+    await expect(workspace().list(limited, query)).rejects.toMatchObject({
+      statusCode: 403,
+    });
+  });
+  it('persists private saved-view revisions under the restricted tenant role with replay and archive restore', async () => {
+    await owner.query(
+      "INSERT INTO organizations(id,name,slug,status,created_at) VALUES($1,'Adaptive',$2,'active',now()) ON CONFLICT DO NOTHING",
+      [tenant, `adaptive-${tenant}`],
+    );
+    const userId = randomUUID();
+    const actor = (tenantId: string, user: string = userId) =>
+      makeTenantContext(
+        { userId: user, sessionId: randomUUID() },
+        {
+          id: tenantId,
+          name: 'Fixture',
+          slug: 'fixture',
+          status: 'active',
+          dataRegion: 'EU',
+        },
+        builtInMembership(
+          { id: randomUUID(), organizationId: tenantId, userId: user },
+          'member',
+        ),
+        randomUUID(),
+      );
+    const service = createAdaptiveViews(createTenantDatabase(reader), {
+      refreshContext: async (c) => c,
+      released: async () => true,
+      readers: {
+        orders: {
+          read: async () => ({
+            items: [],
+            nextCursor: null,
+            asOf: clock.toISOString(),
+          }),
+        },
+      },
+      trace: (c) => ({
+        traceId: 'trace',
+        spanId: 'span',
+        requestId: c.requestId,
+      }),
+    });
+    const form = {
+      commandId: randomUUID(),
+      name: 'Orders requiring review',
+      description: '',
+      sharing: { scope: 'private' as const, roleIds: [] },
+      query: adaptiveViewQuerySchema.parse({
+        version: 1,
+        domain: 'orders',
+        filters: { status: 'open' },
+        columns: ['displayNumber', 'status'],
+      }),
+      reviewed: true as const,
+    };
+    const saved = await service.create(actor(tenant), form);
+    expect((await service.create(actor(tenant), form)).id).toBe(saved.id);
+    expect((await service.list(actor(tenant))).items).toHaveLength(1);
+    await expect(
+      service.get(actor(otherTenant), saved.id),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    await expect(
+      service.get(actor(tenant, randomUUID()), saved.id),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    const updated = await service.update(actor(tenant), saved.id, {
+      ...form,
+      name: 'Revised',
+      expectedRevision: 1,
+    });
+    expect(updated.revision).toBe(2);
+    await expect(
+      service.update(actor(tenant), saved.id, { ...form, expectedRevision: 1 }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+    expect(
+      (await service.history(actor(tenant), saved.id)).items.map(
+        (item) => item.revision,
+      ),
+    ).toEqual([2, 1]);
+    const archived = await service.archive(actor(tenant), saved.id, 2);
+    expect((await service.list(actor(tenant))).items).toHaveLength(0);
+    const restored = await service.restore(
+      actor(tenant),
+      saved.id,
+      archived.revision,
+    );
+    expect(restored.name).toBe('Revised');
+    expect(restored.archived).toBe(false);
+    expect(restored.revision).toBe(4);
   });
 });

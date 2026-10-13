@@ -174,6 +174,10 @@ evidence of ownership; admission resolves and authorizes the resource itself.
 - A start creates a run with immutable trigger evidence and grants no activation,
   permission or approval. It waits at `awaiting_admission` until an installed adapter
   starts it.
+- A custom workflow can be cancelled before its first admitted action, or at a supported
+  human or event wait. Cancellation and admission share a transaction fence. Once an
+  action is admitted, cancellation cannot treat missing step output as proof that no
+  work started. A cancelled run rejects later admission.
 - Scheduled starts persist in PostgreSQL. The workflow worker advances due starts in locked
   batches, so a crash leaves a start pending and downtime drops nothing.
   `advance_workflow_schedules()` returns only a count, never cross-tenant data, and cannot

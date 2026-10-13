@@ -2,6 +2,7 @@
 
 type DecisionKind =
   | 'case'
+  | 'custom_field'
   | 'return_case'
   | 'replenishment'
   | 'fulfillment_recovery'
@@ -28,6 +29,7 @@ type DecisionRecordKind =
   'order' | 'fulfillment' | 'position' | 'sku' | 'product';
 
 export type DecisionOwner =
+  | { kind: 'custom_field'; runId: string; stepId: string }
   | { kind: 'return_case'; caseId: string }
   | { kind: 'human_task'; definitionId: string; runId: string; stepId: string }
   | { kind: 'case'; exceptionId: string }

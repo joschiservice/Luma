@@ -100,6 +100,22 @@ export const orderListQuerySchema = z
     status: orderStatusSchema.optional(),
     paymentStatus: orderPaymentStatusSchema.optional(),
     connectionId: z.string().uuid().optional(),
+    locationId: z
+      .string()
+      .uuid()
+      .optional()
+      .describe(
+        'Canonical fulfillment warehouse. Requires fulfillment access.',
+      ),
+    stockBlocked: z
+      .union([
+        z.literal(true),
+        z.literal('true').transform(() => true as const),
+      ])
+      .optional()
+      .describe(
+        'Open orders with an explicit source inventory-out-of-stock hold observed within five minutes. Missing or stale holds remain unknown. Requires inventory and fulfillment access.',
+      ),
     customerId: z
       .string()
       .uuid()

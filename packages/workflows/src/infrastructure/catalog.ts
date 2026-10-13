@@ -56,7 +56,7 @@ export function createWorkflowCatalogStore(
     versions: (context, id) =>
       db.transaction(context.tenantId, async (tx) => {
         const result = await tx.query<{ document: unknown }>(
-          "SELECT document FROM playbook_versions WHERE tenant_id=$1 AND ($2::text IS NULL OR definition_id=$2) AND document->>'format' IN ('workflow/1','workflow/2')",
+          "SELECT v.document FROM playbook_versions v WHERE v.tenant_id=$1 AND ($2::text IS NULL OR v.definition_id=$2) AND v.document->>'format' IN ('workflow/1','workflow/2') AND NOT EXISTS(SELECT 1 FROM workflow_package_archives a WHERE a.tenant_id=v.tenant_id AND a.definition_id=v.definition_id AND a.archived)",
           [context.tenantId, id ?? null],
         );
 

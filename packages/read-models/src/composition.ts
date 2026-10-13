@@ -42,3 +42,5 @@ export {
   createShipmentDispatchReader,
   createShipmentDispatchOptionsReader,
 } from './infrastructure/fulfillment/dispatch-evidence.js';
+
+export { createAdaptiveViewIdentities } from './infrastructure/adaptive-identities.js';

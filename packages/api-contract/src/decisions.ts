@@ -7,6 +7,7 @@ const timestamp = z.string().datetime({ offset: true });
 /** The owner whose authoritative decision an item projects. */
 const decisionKindSchema = z.enum([
   'case',
+  'custom_field',
   'return_case',
   'replenishment',
   'shipment_publication',
@@ -58,6 +59,11 @@ const decisionViewSchema = z.enum(['all', 'mine', 'unassigned']);
 
 /** Where the authoritative decision controls live. Every surface acts on this same owner. */
 const decisionOwnerSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('custom_field'),
+    runId: z.string().uuid(),
+    stepId: z.string().min(1),
+  }),
   z.object({ kind: z.literal('return_case'), caseId: z.string().uuid() }),
   z.object({
     kind: z.literal('human_task'),

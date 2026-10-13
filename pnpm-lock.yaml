@@ -721,6 +721,52 @@ importers:
         specifier: 'catalog:'
         version: 4.23.13
 
+  packages/adaptive:
+    dependencies:
+      '@luma/api-contract':
+        specifier: workspace:*
+        version: link:../api-contract
+      '@luma/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@luma/connections':
+        specifier: workspace:*
+        version: link:../connections
+      '@luma/execution':
+        specifier: workspace:*
+        version: link:../execution
+      '@luma/identity':
+        specifier: workspace:*
+        version: link:../identity
+      '@luma/platform':
+        specifier: workspace:*
+        version: link:../platform
+      '@luma/policies':
+        specifier: workspace:*
+        version: link:../policies
+      '@luma/workflows':
+        specifier: workspace:*
+        version: link:../workflows
+      '@orpc/server':
+        specifier: 'catalog:'
+        version: 1.15.5(@opentelemetry/api@1.9.1)(fastify@5.12.5)(ws@8.21.3)
+      fastify:
+        specifier: 'catalog:'
+        version: 5.12.5
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      '@luma/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.5
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.5)(@vitest/browser-playwright@4.1.11)(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))
+
   packages/api-contract:
     dependencies:
       '@orpc/client':
@@ -822,6 +868,9 @@ importers:
 
   packages/application-runtime:
     dependencies:
+      '@luma/adaptive':
+        specifier: workspace:*
+        version: link:../adaptive
       '@luma/api-contract':
         specifier: workspace:*
         version: link:../api-contract
@@ -1636,6 +1685,9 @@ importers:
       '@luma/i18n':
         specifier: workspace:*
         version: link:../i18n
+      '@luma/platform':
+        specifier: workspace:*
+        version: link:../platform
       '@orpc/contract':
         specifier: 'catalog:'
         version: 1.15.5(@opentelemetry/api@1.9.1)

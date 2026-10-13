@@ -31,6 +31,11 @@ Span names, product event names, flag keys and model names are explicit allowlis
 
 ## Feature flags
 
+Adaptive workspace rollout uses `adaptive-custom-fields`, `adaptive-saved-views`,
+`adaptive-view-generation`, `adaptive-view-actions` and `adaptive-operational-packages`.
+Each defaults off. Saved-view generation also requires an approved EU zero-retention authoring
+route; a release flag never grants access or bypasses that processing requirement.
+
 Flags are server-side release toggles evaluated through `Observability.flag`. The browser has no flag SDK; expose a flag's effect to the web app through the API.
 
 - Add the key to `featureFlags` in `@luma/platform` before creating the flag in PostHog. Unlisted keys always return the fallback.

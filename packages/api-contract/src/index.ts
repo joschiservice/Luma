@@ -1,4 +1,9 @@
 import { activityContract } from './contracts/activity.js';
+import { adaptiveContract } from './contracts/adaptive.js';
+import { adaptiveActionsContract } from './contracts/adaptive-actions.js';
+import { adaptiveFieldsContract } from './contracts/adaptive-fields.js';
+import { adaptivePackagesContract } from './contracts/adaptive-packages.js';
+import { adaptiveViewsContract } from './contracts/adaptive-views.js';
 import { appsContract } from './contracts/apps.js';
 import { assistantContract } from './contracts/assistant.js';
 import { sourceAuthorityContract } from './contracts/authority.js';
@@ -43,6 +48,11 @@ import { workflowsContract } from './contracts/workflows.js';
  * of expanding every route schema into one type that exceeds the compiler's serialization limit.
  */
 type ApiContract = {
+  adaptivePackages: typeof adaptivePackagesContract;
+  adaptiveActions: typeof adaptiveActionsContract;
+  adaptiveViews: typeof adaptiveViewsContract;
+  adaptiveFields: typeof adaptiveFieldsContract;
+  adaptive: typeof adaptiveContract;
   shadow: typeof shadowContract;
   activity: typeof activityContract;
   playbooks: typeof playbooksContract;
@@ -89,6 +99,11 @@ type ApiContract = {
  * `orders.list`.
  */
 export const apiContract: ApiContract = {
+  adaptivePackages: adaptivePackagesContract,
+  adaptiveActions: adaptiveActionsContract,
+  adaptiveViews: adaptiveViewsContract,
+  adaptiveFields: adaptiveFieldsContract,
+  adaptive: adaptiveContract,
   shadow: shadowContract,
   activity: activityContract,
   playbooks: playbooksContract,
@@ -272,3 +287,11 @@ export * from './purchasing-outcomes.js';
 export * from './incoming-stock.js';
 
 export type { PurchaseOrderChangeInput } from './purchase-order-changes.js';
+
+export * from './adaptive-fields.js';
+
+export * from './adaptive-views.js';
+
+export * from './adaptive-actions.js';
+
+export * from './adaptive-packages.js';

@@ -11,6 +11,11 @@ type ProductEvent =
 /** Flag keys that may be evaluated; add a key here before creating it in PostHog. */
 export const featureFlags = [
   'observability-test',
+  'adaptive-custom-fields',
+  'adaptive-saved-views',
+  'adaptive-view-generation',
+  'adaptive-view-actions',
+  'adaptive-operational-packages',
   'luma-erp-orders',
   'starshipit-fulfillment',
   'starshipit-actions',

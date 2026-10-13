@@ -222,7 +222,11 @@ export function violation(from, to) {
         from.endsWith('/infrastructure/learning-validation.ts') ||
         from.endsWith('/infrastructure/measurement-validation.ts') ||
         from.endsWith('/infrastructure/shadow-validation.ts') ||
-        from.endsWith('/infrastructure/diagnosis-validation.ts')) &&
+        from.endsWith('/infrastructure/diagnosis-validation.ts') ||
+        (source.name === 'adaptive' &&
+          (from.endsWith('/infrastructure/fields-validation.ts') ||
+            from.endsWith('/infrastructure/views-validation.ts') ||
+            from.endsWith('/infrastructure/package-configuration.ts')))) &&
       (to === 'packages/api-contract/' ||
         (source.name === 'staff' && to === 'packages/api-contract/staff'))
     )

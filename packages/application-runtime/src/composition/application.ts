@@ -1,5 +1,11 @@
 import { createHash, randomBytes } from 'node:crypto';
 
+import { isFieldWriteCapability } from '@luma/adaptive';
+import {
+  createAdaptiveFieldEffects,
+  createAdaptiveFields,
+  createAdaptiveFieldWorkflows,
+} from '@luma/adaptive/composition';
 import type { AppFactoryContext } from '@luma/app-host';
 import { createWorkspaceAssistant } from '@luma/assistant/composition';
 import { createAuditLog } from '@luma/audit/composition';
@@ -27,6 +33,7 @@ import {
   orderAttentionForOrders,
   orderAttentionQuery,
 } from '@luma/exceptions/composition';
+import type { BoundActionStep } from '@luma/execution';
 import type { IdentityService, TenantContext } from '@luma/identity';
 import { hasPermission } from '@luma/identity';
 import {
@@ -122,11 +129,14 @@ import {
   createDraftGenerations,
   createDrafts,
   createDraftTestRuns,
+  createProcessStepStore,
   createWorkflowEventSink,
   createWorkflows,
   createWorkflowTemplates,
+  createWorkflowTriggerStore,
 } from '@luma/workflows/composition';
 
+import { createAdaptiveWorkspaceRuntime } from './adaptive.js';
 import { createAdmissionEligibility } from './admission.js';
 import {
   createCaseWorkflowServices,
@@ -228,6 +238,8 @@ export interface ApplicationServices {
   library: ReturnType<typeof createPersistentPlaybookLibrary>;
   messaging: ReturnType<typeof createMessaging>;
   http: {
+    adaptive: ReturnType<typeof createAdaptiveWorkspaceRuntime>;
+    fieldWorkflows: ReturnType<typeof createAdaptiveFieldWorkflows>;
     shadow: ReturnType<typeof createShadowEvaluations>;
     cases: ReturnType<typeof createDetectionServices>['cases'];
     desk: ReturnType<typeof createDeskServices>;
@@ -491,8 +503,23 @@ export function createApplicationServices(
           () => returnExchanges,
         )
       : { resolve: async () => null };
+  const adaptiveFieldService = createAdaptiveFields(database, {
+    audit: createAuditLog,
+    refreshContext: identity.refreshContext,
+    released: (context) =>
+      purchasingRelease(context.tenantId, 'adaptive-custom-fields'),
+  });
+  const adaptiveFieldEffects: EffectRegistry =
+    options.execution.kind === 'enabled'
+      ? createAdaptiveFieldEffects(adaptiveFieldService)
+      : { resolve: async () => null };
+  let adaptiveFieldEligibility: (
+    context: TenantContext,
+    step: BoundActionStep,
+  ) => Promise<boolean> = async () => false;
   const combinedEffects: EffectRegistry = {
     resolve: async (context, intent) =>
+      (await adaptiveFieldEffects.resolve(context, intent)) ??
       (await procurementEffects.resolve(context, intent)) ??
       (await submissionEffects.resolve(context, intent)) ??
       (await orderChangeEffects.resolve(context, intent)) ??
@@ -505,23 +532,25 @@ export function createApplicationServices(
   const resolutionEligible = createAdmissionEligibility(detection.diagnoses);
   const safety = createSafetyServices(database, identity, combinedEffects, {
     eligible: (context, step) =>
-      step.subject?.kind === 'purchase_order_change'
-        ? orderChanges.eligible(context, step)
-        : step.subject?.kind === 'purchasing_plan'
-          ? purchasing.eligible(context, step)
-          : step.subject?.kind === 'purchase_order_submission'
-            ? commitments.eligible(context, step)
-            : step.subject?.kind === 'message_outbound'
-              ? messaging.replies.eligible(context, step)
-              : step.subject?.kind === 'return_case_creation'
-                ? returnCases.eligible(context, step)
-                : step.subject?.kind === 'return_case_settlement'
-                  ? returnActions.eligible(context, step)
-                  : step.subject?.kind === 'return_case_exchange'
-                    ? returnExchanges.eligible(context, step)
-                    : step.subject
-                      ? replenishment.eligible(context, step)
-                      : resolutionEligible(context, step),
+      isFieldWriteCapability(step.action.capability)
+        ? adaptiveFieldEligibility(context, step)
+        : step.subject?.kind === 'purchase_order_change'
+          ? orderChanges.eligible(context, step)
+          : step.subject?.kind === 'purchasing_plan'
+            ? purchasing.eligible(context, step)
+            : step.subject?.kind === 'purchase_order_submission'
+              ? commitments.eligible(context, step)
+              : step.subject?.kind === 'message_outbound'
+                ? messaging.replies.eligible(context, step)
+                : step.subject?.kind === 'return_case_creation'
+                  ? returnCases.eligible(context, step)
+                  : step.subject?.kind === 'return_case_settlement'
+                    ? returnActions.eligible(context, step)
+                    : step.subject?.kind === 'return_case_exchange'
+                      ? returnExchanges.eligible(context, step)
+                      : step.subject
+                        ? replenishment.eligible(context, step)
+                        : resolutionEligible(context, step),
   });
   const purchasing = createPurchasing({
     store: createPurchasingStore(database, createAuditLog),
@@ -835,10 +864,38 @@ export function createApplicationServices(
     ...(options.refreshStock ? { refreshStock: options.refreshStock } : {}),
   });
   const coordination = createCoordination(database, identity, createAuditLog);
+  const adaptiveFieldWorkflows = createAdaptiveFieldWorkflows(database, {
+    fields: adaptiveFieldService,
+    policies: safety.policies,
+    refreshContext: identity.refreshContext,
+    effects: adaptiveFieldEffects,
+    admission: safety.execution,
+    provisioning: safety.provisioning,
+    resolveContext: (run) =>
+      identity.resolveWorkflowContext(run.actor.id, run.tenantId, run.id),
+    run: createWorkflowTriggerStore(database).run,
+    version: async (context, id, version) => {
+      const found = await createWorkflowTriggerStore(database).version(
+        context,
+        id,
+        version,
+      );
+
+      return found?.format === 'workflow/2' ? found : null;
+    },
+    outputs: async (context, runId) =>
+      (await createProcessStepStore(database).list(context, [runId])).get(
+        runId,
+      ) ?? [],
+    enabled:
+      options.execution.kind === 'enabled' && !!options.replenishmentTransport,
+  });
+  adaptiveFieldEligibility = adaptiveFieldWorkflows.eligible;
   const codeProcesses = createCodeProcesses(
     database,
     identity,
     options.replenishmentTransport,
+    adaptiveFieldWorkflows,
   );
   const caseWorkflows = createCaseWorkflowServices({
     database,
@@ -943,6 +1000,72 @@ export function createApplicationServices(
   const decisions = createDecisionQueue(database, {
     cases: caseDecisionQuery,
     providers: [
+      {
+        id: 'custom-field-workflows',
+        label: 'Custom field changes',
+        permission: 'adaptive.fields.read',
+        pending: async (context) =>
+          (await adaptiveFieldWorkflows.pending(context)).map((item) => ({
+            id: `custom-field:${item.runId}:${item.stepId}`,
+            kind: 'custom_field' as const,
+            reason: 'approval' as const,
+            domain:
+              item.recordType === 'order'
+                ? ('orders' as const)
+                : item.recordType === 'product'
+                  ? ('inventory' as const)
+                  : ('procurement' as const),
+            title: `Change ${item.field.label.en}`,
+            why: item.stale
+              ? 'The field or value changed after this proposal. Review the workflow again.'
+              : 'A workflow proposes a typed custom field change.',
+            consequences: [
+              {
+                response: 'Approve',
+                text: 'The workflow may execute this exact change after current permissions and policy are checked.',
+              },
+              {
+                response: 'Reject',
+                text: 'The workflow cannot execute this proposed change.',
+              },
+            ],
+            change: [
+              { label: 'Before', value: JSON.stringify(item.beforeValue) },
+              { label: 'After', value: JSON.stringify(item.proposedValue) },
+            ],
+            impact: { level: 'medium' as const, text: null },
+            requestedAt: item.requestedAt,
+            deadline: item.expiresAt,
+            requesterId: item.requesterId,
+            evidence: {
+              observedAt: item.requestedAt,
+              validUntil: item.expiresAt,
+            },
+            response:
+              item.canRespond && !item.stale
+                ? ('decide' as const)
+                : item.requireIndependentApproval &&
+                    item.requesterId === context.actor.id
+                  ? ('awaiting_other' as const)
+                  : ('view_only' as const),
+            subject: { label: item.field.label.en, detail: item.recordId },
+            record:
+              item.recordType === 'order'
+                ? { kind: 'order' as const, id: item.recordId }
+                : item.recordType === 'product'
+                  ? { kind: 'sku' as const, id: item.recordId }
+                  : null,
+            owner: {
+              kind: 'custom_field' as const,
+              runId: item.runId,
+              stepId: item.stepId,
+            },
+            group: {
+              key: `custom-field:${item.field.id}`,
+              label: item.field.label.en,
+            },
+          })),
+      },
       {
         id: 'human-tasks',
         label: 'Human tasks',
@@ -1174,6 +1297,29 @@ export function createApplicationServices(
     observability: options.observability,
   });
 
+  const products = createProductWorkspace(database);
+  const customers = createCustomerWorkspace(database);
+  const adaptive = createAdaptiveWorkspaceRuntime({
+    database,
+    identity,
+    ...(options.observability ? { observability: options.observability } : {}),
+    ...(options.modelGateway ? { model: options.modelGateway } : {}),
+    modelAvailable: options.authoring?.available ?? false,
+    owners: {
+      orders,
+      inventory,
+      fulfillment,
+      products,
+      customers,
+      decisions,
+      cases: detection.cases,
+      procurement,
+      commitments,
+      supplierEmail,
+      workflows,
+    },
+  });
+
   return {
     coordination,
     codeProcesses,
@@ -1197,6 +1343,8 @@ export function createApplicationServices(
     library,
     messaging,
     http: {
+      adaptive,
+      fieldWorkflows: adaptiveFieldWorkflows,
       supplierEmail,
       messaging: messaging.service,
       messagingReplies: messaging.replies,
@@ -1242,14 +1390,14 @@ export function createApplicationServices(
         createResolutionMetricReader(database),
       ),
       inventory,
-      products: createProductWorkspace(database),
+      products,
       procurementContext: createProcurementContext(database),
       returns,
       returnCases,
       returnActions,
       returnExchanges,
       returnDeadlines,
-      customers: createCustomerWorkspace(database),
+      customers,
       records: createRecordExplorer(database, hiddenOrderSources),
       orders,
       inventoryLedger: createInventoryLedgerRuntime(database, identity),

@@ -36,6 +36,7 @@ import {
 import { IncomingStockSection } from '../../shared/procurement/incoming-stock';
 import { PurchasingOutcomePanel } from '../../shared/procurement/purchasing-outcomes';
 import { SupplierTermsSection } from '../../shared/procurement/supplier-terms';
+import { RecordFields } from '../adaptive/record-fields';
 import { stockQuantity, StockState } from '../inventory/presentation';
 import { recordReturnPath } from '../records/data';
 import { IdentityLinks } from '../sync/identity-links';
@@ -93,6 +94,13 @@ export function ProductPage() {
       refresh={() => void query.refetch()}
       purchasing={
         <>
+          {query.data ? (
+            <RecordFields
+              organizationId={organizationId}
+              recordType="product"
+              recordId={query.data.item.skuId}
+            />
+          ) : null}
           <IncomingStockSection organizationId={organizationId} skuId={skuId} />
           <SupplierTermsSection organizationId={organizationId} skuId={skuId} />
           <PurchasingOutcomePanel

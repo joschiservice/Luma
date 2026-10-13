@@ -48,6 +48,8 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useContext, useState } from 'react';
 
+import { adaptiveAvailabilityOptions } from '../../features/adaptive/data';
+import { SavedViewsModule } from '../../features/adaptive/home-module';
 import { overviewOptions } from '../../features/overview/data';
 import { useLiveMetricSummary } from '../../features/overview/metrics-live';
 import { OperationalMetrics } from '../../features/overview/operational-metrics';
@@ -64,6 +66,7 @@ import {
   placeModule,
 } from '../../kit/home/preferences';
 import { sessionOptions } from '../../kit/identity/data';
+import { usePermissions } from '../../kit/identity/permissions';
 import { useWorkspaceLayout } from '../../kit/layout/data';
 import {
   ActivityModule,
@@ -292,11 +295,15 @@ export function HomePage() {
   const overview = useQuery(overviewOptions(organizationId, window));
   const slowOverview = useSlowRequest(overview.isFetching);
   const workspace = useWorkspaceLayout(organizationId);
+  const adaptive = useQuery(adaptiveAvailabilityOptions(organizationId));
+  const { ready } = usePermissions(organizationId);
   const [editing, setEditing] = useState(false);
   const [dragged, setDragged] = useState<HomeModuleId | null>(null);
   const modules = workspace.layout?.home ?? defaultHome;
   const hidden = homeModuleIds.filter(
-    (id) => !modules.some((module) => module.id === id),
+    (id) =>
+      (id !== 'saved-views' || (adaptive.data?.views === true && ready)) &&
+      !modules.some((module) => module.id === id),
   );
   // Visible metric modules share one live summary read.
   const live = useLiveMetricSummary(organizationId, {
@@ -336,6 +343,8 @@ export function HomePage() {
         );
       case 'activity':
         return <ActivityModule organizationId={organizationId} />;
+      case 'saved-views':
+        return <SavedViewsModule organizationId={organizationId} />;
       case 'catalog':
         return <CatalogModule organizationId={organizationId} />;
       case 'fulfillment':

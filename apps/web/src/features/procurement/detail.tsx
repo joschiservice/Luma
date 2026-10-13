@@ -43,6 +43,7 @@ import { type ReactNode, useRef, useState, useSyncExternalStore } from 'react';
 import { SignInRedirect } from '../../kit/identity/common';
 import { IdentityError } from '../../kit/identity/data';
 import { RecordMessages } from '../../kit/record-messages';
+import { RecordFields } from '../adaptive/record-fields';
 import { stockQuantity } from '../inventory/presentation';
 import { WorkflowCoverageCard } from '../workflows/coverage';
 import {
@@ -176,24 +177,31 @@ export function PurchaseOrderPage() {
         void context.refetch();
       }}
       messages={
-        <RecordMessages
-          organizationId={organizationId}
-          kind="purchase_order"
-          recordId={purchaseOrderId}
-          frame={(content) => (
-            <section
-              className="procurement-section"
-              aria-labelledby="purchase-order-inbox"
-            >
-              <div className="procurement-section-heading">
-                <h2 id="purchase-order-inbox">
-                  {m.messaging_record_section_title()}
-                </h2>
-              </div>
-              {content}
-            </section>
-          )}
-        />
+        <>
+          <RecordFields
+            organizationId={organizationId}
+            recordType="purchase_order"
+            recordId={purchaseOrderId}
+          />
+          <RecordMessages
+            organizationId={organizationId}
+            kind="purchase_order"
+            recordId={purchaseOrderId}
+            frame={(content) => (
+              <section
+                className="procurement-section"
+                aria-labelledby="purchase-order-inbox"
+              >
+                <div className="procurement-section-heading">
+                  <h2 id="purchase-order-inbox">
+                    {m.messaging_record_section_title()}
+                  </h2>
+                </div>
+                {content}
+              </section>
+            )}
+          />
+        </>
       }
     />
   );

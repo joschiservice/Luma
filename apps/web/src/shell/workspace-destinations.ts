@@ -5,6 +5,7 @@ import {
   Blocks,
   Boxes,
   ChartNoAxesColumn,
+  Columns3,
   Database,
   DatabaseZap,
   Hand,
@@ -27,6 +28,7 @@ type DestinationGroup = 'core' | 'operations' | 'workspace';
 
 /** Workspace route segments that appear in navigation. */
 type DestinationPath =
+  | 'views'
   | 'home'
   | 'needs-you'
   | 'exceptions'
@@ -132,6 +134,15 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     description: m.identity_nav_records_description,
     group: 'core',
     shortcut: 'r',
+  }),
+  destination({
+    path: 'views',
+    label: m.adaptive_title,
+    Icon: Columns3,
+    description: m.adaptive_description,
+    group: 'core',
+    shortcut: 'v',
+    area: m.adaptive_title,
   }),
   destination({
     path: 'activity',

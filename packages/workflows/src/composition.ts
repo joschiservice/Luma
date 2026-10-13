@@ -520,3 +520,5 @@ export function createCoordination(
 }
 
 export { createWorkflowEventSink } from './infrastructure/coordination.js';
+
+export { createPackageWorkflowArchive } from './infrastructure/package-definitions.js';

@@ -28,6 +28,7 @@ import { IdentityError } from '../../kit/identity/data';
 import { RecordMessages } from '../../kit/record-messages';
 import { PurchasingOutcomePanel } from '../../shared/procurement/purchasing-outcomes';
 import { SupplierTermsSection } from '../../shared/procurement/supplier-terms';
+import { RecordFields } from '../adaptive/record-fields';
 import { stockQuantity } from '../inventory/presentation';
 import {
   procurementError,
@@ -68,23 +69,30 @@ export function SupplierPage() {
         void context.refetch();
       }}
       messages={
-        <RecordMessages
-          organizationId={organizationId}
-          kind="supplier"
-          recordId={supplierId}
-          frame={(content) => (
-            <Card
-              as="section"
-              className="procurement-side"
-              aria-labelledby="supplier-inbox-threads"
-            >
-              <h2 id="supplier-inbox-threads">
-                {m.messaging_record_section_title()}
-              </h2>
-              {content}
-            </Card>
-          )}
-        />
+        <>
+          <RecordFields
+            organizationId={organizationId}
+            recordType="supplier"
+            recordId={supplierId}
+          />
+          <RecordMessages
+            organizationId={organizationId}
+            kind="supplier"
+            recordId={supplierId}
+            frame={(content) => (
+              <Card
+                as="section"
+                className="procurement-side"
+                aria-labelledby="supplier-inbox-threads"
+              >
+                <h2 id="supplier-inbox-threads">
+                  {m.messaging_record_section_title()}
+                </h2>
+                {content}
+              </Card>
+            )}
+          />
+        </>
       }
     />
   );

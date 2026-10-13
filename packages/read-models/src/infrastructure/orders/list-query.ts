@@ -39,6 +39,12 @@ export function listSql(
   connection = false,
   exactCount = false,
   customer?: number,
+  adaptive?: {
+    predicate: string;
+    sort: string | undefined;
+    offsetParameter: string;
+  },
+  fulfillmentPredicate?: string,
 ) {
   const op = direction === 'desc' ? '<' : '>';
   const rank = `${sort}_rank`,
@@ -65,6 +71,8 @@ export function listSql(
  AND ($8::timestamptz IS NULL OR o.source_updated_at >= $8) AND ($9::timestamptz IS NULL OR o.source_updated_at < $9)
  ${search === 'broad' ? `AND ${orderSearchPredicate}` : search === 'selective' ? 'AND o.entity_id=ANY($14::uuid[])' : ''}
  ${customer ? `AND o.entity_id=ANY($${customer}::uuid[])` : ''}
+ ${fulfillmentPredicate ? `AND (${fulfillmentPredicate})` : ''}
+ ${adaptive ? `AND (${adaptive.predicate}) AND ($11::int IS NULL OR $11 IS NOT NULL) AND ($12::text IS NULL OR $12 IS NOT NULL) AND ($13::uuid IS NULL OR $13 IS NOT NULL)` : ''}
  AND ${
    view === 'outstanding' || view === 'overdue'
      ? `((o.state_valid_from <= $2 AND o.open IS TRUE) OR (o.state_valid_from > $2 AND EXISTS
@@ -74,7 +82,10 @@ export function listSql(
        : viewFilters[view]
  }
 ), page AS MATERIALIZED (
- SELECT *,${rank} AS sort_rank,${key} AS sort_key FROM (
+ ${
+   adaptive
+     ? `SELECT *,${rank} AS sort_rank,${key} AS sort_key,row_number() OVER(ORDER BY ${adaptive.sort ?? order}) AS adaptive_rank FROM filtered ORDER BY ${adaptive.sort ?? order} LIMIT $10 OFFSET ${adaptive.offsetParameter}`
+     : ` SELECT *,${rank} AS sort_rank,${key} AS sort_key FROM (
   (SELECT * FROM filtered WHERE ${rank}=0 AND ($11::int IS NULL OR
     ($11=0 AND (${key},entity_id) ${op} ($12 COLLATE "C",$13::uuid)))
    ORDER BY ${key} ${direction},entity_id ${direction} LIMIT $10)
@@ -82,7 +93,8 @@ export function listSql(
   (SELECT * FROM filtered WHERE ${rank}=1 AND ($11::int IS NULL OR $11=0 OR
     ($11=1 AND (${key},entity_id) ${op} ($12 COLLATE "C",$13::uuid)))
    ORDER BY ${key} ${direction},entity_id ${direction} LIMIT $10)
- ) candidates ORDER BY ${order} LIMIT $10
+ ) candidates ORDER BY ${order} LIMIT $10`
+ }
 ), ${view !== 'needs_you' ? `${attention},` : ''} rows AS MATERIALIZED (
  SELECT p.*,${queries.state.comparisonState('p')} AS current_comparison_state,CASE WHEN p.state_valid_from>$2 THEN f.open ELSE p.open END AS current_open,
  CASE WHEN p.state_valid_from>$2 THEN f.fulfillment ELSE p.fulfillment END AS current_fulfillment
@@ -94,7 +106,7 @@ SELECT o.entity_id AS id,o.display_number AS "displayNumber",o.placed_at AS "pla
  CASE WHEN o.current_open=false THEN false WHEN o.current_open IS NULL OR o.due_at IS NULL THEN NULL ELSE o.due_at < $2 END AS overdue,o.due_at AS "dueAt",
  CASE WHEN o.deleted THEN '{}'::uuid[] ELSE COALESCE(a.issue_ids,'{}'::uuid[]) END AS "issueIds",
  o.current_comparison_state='confirmed' AS differs,o.current_comparison_state AS "comparisonState",src.sources,o.observed_at AS "observedAt",o.source_updated_at AS "sourceUpdatedAt",
- o.sort_rank AS "sortRank",o.sort_key AS "sortKey"
+ ${adaptive ? 'o.adaptive_rank AS "adaptiveRank",' : ''}o.sort_rank AS "sortRank",o.sort_key AS "sortKey"
 FROM rows o
 LEFT JOIN attention a ON a.order_id=o.entity_id
 CROSS JOIN LATERAL (
@@ -111,5 +123,5 @@ CROSS JOIN LATERAL (
   AND resource='order' AND canonical_id=c.entity_id ORDER BY created_at,id LIMIT 1) m ON true
 ) src)
 SELECT ${exactCount ? '(SELECT count(*) FROM filtered)::int' : 'NULL::int'} AS "totalCount",
- COALESCE((SELECT jsonb_agg(to_jsonb(i) ORDER BY i."sortRank",i."sortKey" ${direction},i.id ${direction}) FROM items i),'[]'::jsonb) AS items`;
+ COALESCE((SELECT jsonb_agg(to_jsonb(i) ORDER BY ${adaptive ? 'i."adaptiveRank"' : `i."sortRank",i."sortKey" ${direction},i.id ${direction}`} ) FROM items i),'[]'::jsonb) AS items`;
 }
