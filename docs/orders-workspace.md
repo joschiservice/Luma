@@ -34,6 +34,13 @@ from the Exceptions attention query, embedded in the same transaction so it has 
 limit. Keep it that way: the outstanding, overdue and needs-you views must count exactly
 the orders the metrics count.
 
+Warehouse filtering selects orders with open fulfillment work assigned to the exact canonical
+location. The stock-blocked filter requires an explicit `inventory_out_of_stock` source hold
+observed within five minutes, an active installed source and its current fulfillment grant.
+Missing, stale and unmapped evidence does not establish whether an order is stock-blocked.
+Both filters require fulfillment access; stock-blocked also requires inventory access. The
+query stops while source access is restricted or order projections are rebuilding.
+
 ### Search and paging
 
 Search matches, case-insensitively and literally: any source's order number, source
@@ -42,8 +49,10 @@ order ID. Sorting uses last update (source update time, falling back to observat
 placed date, order number (shorter numbers first, then text) or due date. Missing sort
 values come last in both directions.
 
-Pages use a keyset cursor over the sort key and order ID, so new orders do not shift the
-page a reader is on. The cursor is bound to the tenant and the exact filters and sort; any
+Native sorting uses a keyset cursor over the sort key and order ID, so new orders do not shift the
+page a reader is on. Saved views with custom predicates use indexed field joins before
+pagination and exact counting. Their cursors bind the complete tenant query, and custom
+ordering uses an offset; concurrent record or field changes can shift later pages. The cursor is bound to the tenant and the exact filters and sort; any
 other combination is rejected with 400. `totalCount` is null unless the request passes
 `count=exact`, which counts every match and costs more for broad filters. Changing only
 that option does not invalidate a cursor.

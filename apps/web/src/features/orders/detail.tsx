@@ -42,6 +42,7 @@ import {
   orderSummary,
   type SummaryKind,
 } from '../../shared/orders/presentation';
+import { RecordFields } from '../adaptive/record-fields';
 import { AppExtension } from '../apps/extension';
 import { recordReturnPath } from '../records/data';
 import { OrderReturnCases } from '../returns/case-entry';
@@ -263,6 +264,11 @@ export function OrderPage() {
       linkedSources={
         query.data ? (
           <>
+            <RecordFields
+              organizationId={organizationId}
+              recordType="order"
+              recordId={query.data.order.id}
+            />
             <SalesRecord organizationId={organizationId} detail={query.data} />
             <NativeOrderStock
               organizationId={organizationId}

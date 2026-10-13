@@ -132,7 +132,7 @@ export function createWorkflowTriggerStore(
       db.transaction(context.tenantId, async (tx) => {
         const row = (
           await tx.query<{ document: Record<string, unknown> }>(
-            'SELECT document FROM playbook_versions WHERE tenant_id=$1 AND definition_id=$2 AND version=$3',
+            'SELECT v.document FROM playbook_versions v WHERE v.tenant_id=$1 AND v.definition_id=$2 AND v.version=$3 AND NOT EXISTS(SELECT 1 FROM workflow_package_archives a WHERE a.tenant_id=v.tenant_id AND a.definition_id=v.definition_id AND a.archived)',
             [context.tenantId, id, version],
           )
         ).rows[0];
@@ -226,9 +226,14 @@ export function createWorkflowTriggerStore(
       }),
     cancel: (context, id, runId) =>
       db.transaction(context.tenantId, async (tx) => {
+        // Admission binds first steps under this fence before dispatch. A missing
+        // process output alone does not establish that no action was admitted.
+        await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+          `workflow-run:${context.tenantId}:${runId}`,
+        ]);
         const row = (
           await tx.query<Row>(
-            "UPDATE workflow_trigger_runs SET state='cancelled' WHERE tenant_id=$1 AND definition_id=$2 AND id=$3 AND (state IN ('scheduled','cancelled') OR (state='awaiting_admission' AND (SELECT waiting.state='waiting' AND waiting.document->>'kind' IN ('human_task','event_wait') FROM workflow_process_steps waiting WHERE waiting.tenant_id=workflow_trigger_runs.tenant_id AND waiting.run_id=workflow_trigger_runs.id ORDER BY waiting.sequence DESC LIMIT 1) AND NOT EXISTS(SELECT 1 FROM workflow_process_steps s WHERE s.tenant_id=workflow_trigger_runs.tenant_id AND s.run_id=workflow_trigger_runs.id AND (s.document->>'kind'='end' OR s.state IN ('denied','failed','inconclusive','ended','escalated'))))) RETURNING document,state,triggered_at",
+            "UPDATE workflow_trigger_runs SET state='cancelled' WHERE tenant_id=$1 AND definition_id=$2 AND id=$3 AND (state IN ('scheduled','cancelled') OR (state='awaiting_admission' AND ((NOT EXISTS(SELECT 1 FROM workflow_process_steps untouched WHERE untouched.tenant_id=workflow_trigger_runs.tenant_id AND untouched.run_id=workflow_trigger_runs.id) AND EXISTS(SELECT 1 FROM playbook_versions v WHERE v.tenant_id=workflow_trigger_runs.tenant_id AND v.definition_id=workflow_trigger_runs.definition_id AND v.version=workflow_trigger_runs.version AND v.document->>'format'='workflow/2') AND NOT EXISTS(SELECT 1 FROM action_admission_steps bound WHERE bound.tenant_id=workflow_trigger_runs.tenant_id AND bound.run_id=workflow_trigger_runs.id) AND NOT EXISTS(SELECT 1 FROM executed_actions execution WHERE execution.tenant_id=workflow_trigger_runs.tenant_id AND execution.document->'admission'->>'runId'=workflow_trigger_runs.id::text)) OR (SELECT waiting.state='waiting' AND waiting.document->>'kind' IN ('human_task','event_wait') FROM workflow_process_steps waiting WHERE waiting.tenant_id=workflow_trigger_runs.tenant_id AND waiting.run_id=workflow_trigger_runs.id ORDER BY waiting.sequence DESC LIMIT 1)) AND NOT EXISTS(SELECT 1 FROM workflow_process_steps s WHERE s.tenant_id=workflow_trigger_runs.tenant_id AND s.run_id=workflow_trigger_runs.id AND (s.document->>'kind'='end' OR s.state IN ('denied','failed','inconclusive','ended','escalated'))))) RETURNING document,state,triggered_at",
             [context.tenantId, id, runId],
           )
         ).rows[0];

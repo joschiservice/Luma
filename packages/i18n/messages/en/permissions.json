@@ -128,5 +128,15 @@
   "permissions_starshipit_order_update_run_label": "Correct unshipped Starshipit orders",
   "permissions_starshipit_order_update_run_description": "Propose and apply approved quantity corrections before labels are created.",
   "permissions_shopify_shipment_publishing_run_label": "Publish Shopify shipments",
-  "permissions_shopify_shipment_publishing_run_description": "Preview, approve and publish dispatched shipments and tracking to Shopify."
+  "permissions_shopify_shipment_publishing_run_description": "Preview, approve and publish dispatched shipments and tracking to Shopify.",
+  "permissions_adaptive_fields_read_label": "View custom fields",
+  "permissions_adaptive_fields_read_description": "See custom fields on records you can access.",
+  "permissions_adaptive_fields_write_label": "Edit custom field values",
+  "permissions_adaptive_fields_write_description": "Change Luma-owned custom fields on records you can access.",
+  "permissions_adaptive_fields_manage_label": "Manage custom fields",
+  "permissions_adaptive_fields_manage_description": "Define and archive typed custom fields and their access rules.",
+  "permissions_adaptive_views_manage_label": "Manage shared views",
+  "permissions_adaptive_views_manage_description": "Edit and archive views owned by other workspace members.",
+  "permissions_adaptive_packages_manage_label": "Manage operational packages",
+  "permissions_adaptive_packages_manage_description": "Review, install and remove operational package definitions."
 }

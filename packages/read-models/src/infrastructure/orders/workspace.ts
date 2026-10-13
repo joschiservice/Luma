@@ -84,6 +84,9 @@ export function createOrderWorkspace(
           requirePermission(fresh, 'inventory.read');
           requirePermission(fresh, 'fulfillment.read');
         }
+        if (query.locationId || query.stockBlocked)
+          requirePermission(fresh, 'fulfillment.read');
+        if (query.stockBlocked) requirePermission(fresh, 'inventory.read');
         if (query.customerId) requirePermission(fresh, 'customers.read');
         const list = await listOrders(
           tx,

@@ -20,6 +20,8 @@ const flags = {
   'purchasing-incoming': true,
   'procurement-email-submission': true,
   'procurement-supplier-follow-ups': true,
+  'adaptive-saved-views': true,
+  'adaptive-view-actions': true,
 };
 
 /** Runs the real purchasing services against supplier, mail and stock provider observations. */
@@ -553,10 +555,73 @@ for (const channel of ['jtl', 'email'])
       nextCheckAt: new Date(Date.now() + 86_400_000).toISOString(),
       reason: 'Supplier confirmation deadline passed',
     };
-    const follow = await f.api(
-      `/procurement/purchase-orders/${f.orderId}/email/follow-up`,
-      followRequest,
-    );
+    let follow;
+    if (channel === 'email') {
+      const actionId = randomUUID();
+      const view = await f.api('/adaptive/views', {
+        commandId: randomUUID(),
+        name: 'Purchasing follow-ups',
+        description: 'Review overdue supplier confirmations.',
+        sharing: { scope: 'private', roleIds: [] },
+        reviewed: true,
+        query: {
+          version: 1,
+          domain: 'procurement',
+          filters: { attention: 'confirmation_overdue' },
+          customFilters: [],
+          columns: ['reference', 'supplierName', 'attentionKey'],
+          sort: null,
+          groupBy: null,
+          layout: 'table',
+          metrics: [],
+          charts: [],
+          actions: [
+            {
+              id: actionId,
+              label: { en: 'Prepare follow-up', de: 'Nachfrage vorbereiten' },
+              target: { kind: 'capability', id: 'supplier.follow-up' },
+              inputs: {
+                connectionId: {
+                  source: 'literal',
+                  value: followRequest.connectionId,
+                },
+                attentionKey: { source: 'row', field: 'attentionKey' },
+                nextCheckHours: { source: 'literal', value: 24 },
+                reason: { source: 'literal', value: followRequest.reason },
+              },
+            },
+          ],
+        },
+      });
+      const actionPath = `/adaptive/views/${view.id}/actions/${actionId}`;
+      const selection = { commandId: randomUUID(), recordIds: [f.orderId] };
+      const preview = await f.api(`${actionPath}/preview`, selection);
+      expect(preview.items[0]).toMatchObject({
+        recordId: f.orderId,
+        available: true,
+      });
+      expect(preview.items[0].approval).toContain('approval');
+      const runRequest = { ...selection, reviewDigest: preview.reviewDigest };
+      const proposed = await f.api(`${actionPath}/run`, runRequest);
+      expect(proposed.items[0]).toMatchObject({
+        recordId: f.orderId,
+        state: 'proposed',
+      });
+      expect(await f.api(`${actionPath}/run`, runRequest)).toEqual(proposed);
+      const thread = await f.api(
+        `/messaging/threads/${proposed.items[0].destination.split('/')[1]}`,
+      );
+      follow = thread.outbound.find(
+        (item) => item.id === proposed.items[0].proposalId,
+      );
+      expect(follow.state).toBe('draft');
+      expect((await f.record()).followUps).toHaveLength(0);
+    } else {
+      follow = await f.api(
+        `/procurement/purchase-orders/${f.orderId}/email/follow-up`,
+        followRequest,
+      );
+    }
     const followRequested = await f.api(
       `/messaging/outbound/${follow.id}/request`,
       { id: randomUUID() },

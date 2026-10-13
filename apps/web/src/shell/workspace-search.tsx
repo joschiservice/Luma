@@ -36,6 +36,10 @@ import {
   useSyncExternalStore,
 } from 'react';
 
+import {
+  adaptiveAvailabilityOptions,
+  viewsOptions,
+} from '../features/adaptive/data';
 import { ordersOptions, suppliersOptions } from '../features/procurement/data';
 import { recordsOptions } from '../features/records/data';
 import { returnCasesOptions } from '../features/returns/case-data';
@@ -164,7 +168,19 @@ export function WorkspaceSearch({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [recordQuery, setRecordQuery] = useState('');
-  const { can } = usePermissions(organizationId);
+  const { can, ready } = usePermissions(organizationId);
+  const adaptive = useQuery(adaptiveAvailabilityOptions(organizationId));
+  const savedViews = useQuery({
+    ...viewsOptions(organizationId),
+    enabled: open && adaptive.data?.views === true && ready,
+  });
+  const matchedViews =
+    savedViews.data?.items
+      .filter(
+        (view) =>
+          !view.archived && matches(query, `${view.name} ${view.description}`),
+      )
+      .slice(0, 8) ?? [];
   const modifier = useSyncExternalStore(
     subscribePlatform,
     platformModifier,
@@ -251,6 +267,7 @@ export function WorkspaceSearch({
     : [];
   const pages = workspaceDestinations.filter(
     (item) =>
+      (item.path !== 'views' || adaptive.data?.views === true) &&
       (!item.permission || can(item.permission)) &&
       matches(query, `${item.label} ${item.description}`),
   );
@@ -346,6 +363,27 @@ export function WorkspaceSearch({
             else items[next]?.focus();
           }}
         >
+          {matchedViews.length ? (
+            <p className="command-section-label">{m.adaptive_title()}</p>
+          ) : null}
+          {matchedViews.map((view) => (
+            <Link
+              key={view.id}
+              className="command-item"
+              to="/app/$organizationId/views/$viewId"
+              params={{ organizationId, viewId: view.id }}
+              search={{}}
+              onClick={() => changeOpen(false)}
+            >
+              <span className="command-item-icon">
+                <Search size={16} aria-hidden="true" />
+              </span>
+              <span className="command-item-copy">
+                <strong>{view.name}</strong>
+                <span>{view.description}</span>
+              </span>
+            </Link>
+          ))}
           {pages.length ? (
             <p className="command-section-label">
               {m.identity_search_section_pages()}
@@ -547,7 +585,8 @@ export function WorkspaceSearch({
               </button>
             );
           })}
-          {!pages.length &&
+          {!matchedViews.length &&
+          !pages.length &&
           !actions.length &&
           !records.data?.items.length &&
           !purchaseResults.length ? (

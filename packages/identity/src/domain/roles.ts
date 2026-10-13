@@ -29,6 +29,7 @@ interface BuiltInRole {
 const allCore = permissionCatalog.map((permission) => permission.key);
 
 const memberPermissions = [
+  'adaptive.fields.read',
   'orders.read',
   'fulfillment.read',
   'inventory.read',

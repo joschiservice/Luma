@@ -95,6 +95,48 @@ const introduced = '2026-10-06';
  */
 export const permissionCatalog = [
   {
+    key: 'adaptive.fields.read',
+    group: 'records',
+    label: 'View custom fields',
+    description: 'See custom fields on records you can access.',
+    consequential: false,
+    introduced: '2026-10-13',
+  },
+  {
+    key: 'adaptive.fields.write',
+    group: 'records',
+    label: 'Edit custom field values',
+    description: 'Change Luma-owned custom fields on records you can access.',
+    consequential: true,
+    introduced: '2026-10-13',
+  },
+  {
+    key: 'adaptive.fields.manage',
+    group: 'workspace',
+    label: 'Manage custom fields',
+    description:
+      'Define and archive typed custom fields and their access rules.',
+    consequential: true,
+    introduced: '2026-10-13',
+  },
+  {
+    key: 'adaptive.views.manage',
+    group: 'workspace',
+    label: 'Manage shared views',
+    description: 'Edit and archive views owned by other workspace members.',
+    consequential: false,
+    introduced: '2026-10-13',
+  },
+  {
+    key: 'adaptive.packages.manage',
+    group: 'workspace',
+    label: 'Manage operational packages',
+    description: 'Review, install and remove operational package definitions.',
+    consequential: true,
+    introduced: '2026-10-13',
+  },
+
+  {
     key: 'sales.manage',
     group: 'records',
     label: 'Manage Luma orders',

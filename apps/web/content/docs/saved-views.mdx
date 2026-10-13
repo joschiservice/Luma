@@ -1,0 +1,51 @@
+---
+title: Build a workspace around your business
+description: Create shared live views, add business information to records and install reviewed workspace packages.
+---
+
+**Saved views** lets you bring the records your team works on into a focused workspace. Views read current Luma records. Saving a view stores its configuration, not a copy of the records.
+
+These features must be available in your workspace. Your role determines which views, fields, records and actions you can use.
+
+## Create a view
+
+1. Open **Saved views** or press **G** then **V**.
+2. Select **Create view**, or start from an integrated view under **Built-in**.
+3. Choose the record type, columns and filters. You can also sort records, group them or use a board.
+4. Select **Preview records**. Check the matching records and any evidence warnings. Empty results mean no records matched this configuration; unavailable data is shown separately.
+5. Give the view a name and choose who can see it.
+6. Confirm that you reviewed the configuration, then select **Save reviewed view**.
+
+Where **Describe a view** is available, enter what you want to see and select **Prepare draft**. The draft is a suggestion. Review its fields, filters and explanation, edit it if needed and preview the records before saving. If the request needs clarification or cannot be supported, the explanation tells you why. You can continue with the manual editor.
+
+Sharing a view does not grant access to its records. Each reader needs the corresponding record permissions. **Only me** keeps a view private; **Workspace** shares it with members who can read the records; **Selected roles** limits it to the roles you choose.
+
+## Use and maintain a view
+
+Open a record from the first table column to investigate its full details. Grouped tables and boards show the records on the current page. Metric cards and charts show the query's calculated values; incomplete or truncated results are labeled. Narrow broad filters when a query reaches a read limit.
+
+Use **Edit view** to change its configuration. You must preview and review it again before saving. **Version history** shows earlier configurations; restoring one opens it for review and saves a new version. **Duplicate** creates your own private copy. **Archive view** hides a view while retaining its history.
+
+Pin a view with the pin control in the workspace bar. Pins are personal and keep the view's address. Add the **Saved views** module in **Home → Customize** for quick access, or find a view through workspace search.
+
+## Add custom fields
+
+Open **Saved views → Custom fields** and choose orders, products, suppliers or purchase orders. People with field management permission can create fields with English and German labels, a stable key, a type and read and edit permissions. Choice fields need a stable option key and both labels for each option.
+
+Fields support text, numbers, dates, yes/no values, a single choice, multiple choices and a workspace member. Open a record to edit the fields your role allows you to change, then select **Save custom fields**. Provider-observed fields stay read-only. Luma field values do not change the provider's record.
+
+You can use supported custom fields as view columns, filters, sorting, groups and numeric metrics. A field's read permission applies wherever it appears. Retiring a field hides it from active record forms while keeping its values and history. Changing a field's type or removing an option can be refused when existing values would become invalid.
+
+Workflows may also propose field changes. A waiting change appears on the record and in **Needs you**. Review the current and proposed values before approving or rejecting it. If independent approval is required, the requester cannot approve their own change. A stale proposal needs a new review. After approval, Luma checks permissions again and independently verifies the written value.
+
+## Review actions
+
+A view may offer configured actions. Select one or more records and choose an action, then select **Review selected action**. The review shows the scope, proposed changes, approval requirements and verification behavior separately for each record.
+
+Select **Create reviewed proposals** to continue. Each record returns its own result. Open the proposal to follow its normal review and approval path. Unavailable or failed records do not prevent other eligible records from receiving a proposal. An uncertain outcome requires investigation; creating a proposal does not mean that its action ran or that the issue was resolved.
+
+## Install a workspace package
+
+Open **Workspace packages** to see reviewed configurations for supported business processes. **Review package** shows the required permissions, prerequisites and parameters. Choose the parameters and review the proposed fields, views and workflows before selecting **Install reviewed package**.
+
+Installation does not grant permissions. Included workflows stay inactive until you activate them through the normal workflow review. A later package version can add resources while preserving your configuration. Uninstalling archives the package's additions while retaining business records, field values, configuration and audit history. Reinstall with the retained parameters to restore local changes. Disable active triggers and finish or cancel pending workflow runs before uninstalling.

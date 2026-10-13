@@ -19,6 +19,7 @@ import {
   SupportViewBanner,
   useEndSupportView,
 } from '../features/account/support-view';
+import { adaptiveAvailabilityOptions } from '../features/adaptive/data';
 import { AppNavigation } from '../features/apps/navigation';
 import { AssistantPanel } from '../features/assistant/panel';
 import {
@@ -112,11 +113,14 @@ function Navigation({
     select: (list) => list.counts.views.all,
   });
   const { can } = usePermissions(organizationId);
+  const adaptive = useQuery(adaptiveAvailabilityOptions(organizationId));
   // Areas outside the person's role stay out of navigation; opening them explains why.
   const group = (name: WorkspaceDestination['group']) =>
     workspaceDestinations.filter(
       (item) =>
-        item.group === name && (!item.permission || can(item.permission)),
+        item.group === name &&
+        (item.path !== 'views' || adaptive.data?.views === true) &&
+        (!item.permission || can(item.permission)),
     );
   const link = (destination: WorkspaceDestination) => (
     <li key={destination.path}>
@@ -151,6 +155,7 @@ function Navigation({
 /** Navigates with `G` followed by a destination key, as in G then I for Issues. */
 function useGoShortcuts(organizationId: string) {
   const navigate = useNavigate();
+  const adaptive = useQuery(adaptiveAvailabilityOptions(organizationId));
 
   useEffect(() => {
     let armedAt = 0;
@@ -169,7 +174,11 @@ function useGoShortcuts(organizationId: string) {
         const destination = workspaceDestinations.find(
           (item) => item.shortcut === key,
         );
-        if (!destination) return;
+        if (
+          !destination ||
+          (destination.path === 'views' && !adaptive.data?.views)
+        )
+          return;
         event.preventDefault();
         void navigate({
           to: `/app/$organizationId/${destination.path}`,
@@ -183,7 +192,7 @@ function useGoShortcuts(organizationId: string) {
     window.addEventListener('keydown', onKey);
 
     return () => window.removeEventListener('keydown', onKey);
-  }, [navigate, organizationId]);
+  }, [navigate, organizationId, adaptive.data?.views]);
 }
 
 /** Record pages show linked inbox threads through the kit's record messages slot. */

@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 
 import { connectionsOptions } from '../../kit/connections/data';
+import { FieldWorkflowReview } from '../adaptive/field-workflow-review';
 import { AppExtension } from '../apps/extension';
 import { useCaseObservation } from '../exceptions/observation';
 import { CaseResolution } from '../exceptions/resolution';
@@ -34,6 +35,15 @@ export function OwnerReview({
   onChange: () => Promise<void>;
 }) {
   switch (owner.kind) {
+    case 'custom_field':
+      return (
+        <FieldWorkflowReview
+          organizationId={organizationId}
+          runId={owner.runId}
+          stepId={owner.stepId}
+          onChange={onChange}
+        />
+      );
     case 'return_case':
       return (
         <Link

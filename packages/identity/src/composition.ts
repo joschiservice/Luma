@@ -131,3 +131,5 @@ export function createIdentity(
 }
 
 export { builtInMembership, makeTenantContext } from './domain/context.js';
+
+export { createRoleIdentityReader } from './infrastructure/role-identities.js';

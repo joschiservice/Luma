@@ -27,8 +27,24 @@ export type OrderView =
 
 export type OrderSort = 'updated' | 'placed' | 'number' | 'due';
 
+/** Internal saved-view constraints; record owners authorize every referenced field. */
+export interface OrderAdaptiveSelection {
+  filters: {
+    fieldId: string;
+    operator:
+      'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'is_empty';
+    value: string | number | boolean | null;
+  }[];
+  sort?: { fieldId: string; direction: 'asc' | 'desc' } | undefined;
+  selectedRecordIds?: readonly string[] | undefined;
+  offset?: number | undefined;
+}
+
 export interface OrderListQuery {
+  adaptive?: OrderAdaptiveSelection | undefined;
   q: string;
+  locationId?: string | undefined;
+  stockBlocked?: true | undefined;
   /** Request an exact total; omitted counts return null and avoid counting every match. */
   count?: 'exact' | undefined;
   view: OrderView;

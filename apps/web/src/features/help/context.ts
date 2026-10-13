@@ -23,6 +23,7 @@ export const helpTopics = [
   'workflows',
   'workflows/create',
   'home',
+  'saved-views',
   'workspace-settings',
   'roles-and-permissions',
   'account-security',

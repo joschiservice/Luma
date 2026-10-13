@@ -127,3 +127,5 @@ export type {
   CaseWorkflowAdapter,
   CaseWorkflows,
 } from './application/case-workflows.js';
+
+export type { CodeProcessBusinessAdapter } from './application/process-business.js';

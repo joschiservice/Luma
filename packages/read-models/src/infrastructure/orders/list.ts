@@ -1,4 +1,5 @@
 import type { TenantContext } from '@luma/identity';
+import { IdentityError } from '@luma/identity';
 import type { SqlTransaction } from '@luma/platform';
 
 import type {
@@ -6,7 +7,14 @@ import type {
   OrderListItem,
   OrderListQuery,
 } from '../../application/orders.js';
-import { cursorContext, readCursor, writeCursor } from './cursor.js';
+import { adaptiveOrderSelection } from './adaptive-query.js';
+import {
+  cursorContext,
+  readAdaptiveCursor,
+  readCursor,
+  writeAdaptiveCursor,
+  writeCursor,
+} from './cursor.js';
 import { legacyListSql } from './legacy-list-query.js';
 import type { OrderReadQueries } from './list-query.js';
 import { listSql } from './list-query.js';
@@ -67,7 +75,8 @@ export async function listOrders(
   hiddenSources = false,
 ): Promise<OrderList> {
   const scope = cursorContext(context.tenantId, query);
-  const after = query.cursor ? readCursor(query.cursor, scope) : null;
+  const after =
+    !query.adaptive && query.cursor ? readCursor(query.cursor, scope) : null;
   const search = query.q !== '';
   const rebuilding = await tx.query(
     'SELECT 1 FROM orders_list_backfill WHERE tenant_id=$1',
@@ -114,6 +123,35 @@ export async function listOrders(
     values.push(await customerOrderIds(tx, context.tenantId, query.customerId));
     customer = values.length;
   }
+  if (
+    (query.adaptive || query.locationId || query.stockBlocked) &&
+    (rebuilding.rowCount || hiddenSources)
+  )
+    throw new IdentityError(
+      503,
+      'SERVICE_UNAVAILABLE',
+      'Warehouse and custom-field queries are unavailable while order projections rebuild or source access is restricted.',
+    );
+  const adaptiveOffset =
+    query.adaptive && query.cursor
+      ? readAdaptiveCursor(query.cursor, scope)
+      : (query.adaptive?.offset ?? 0);
+  const adaptive = query.adaptive
+    ? await adaptiveOrderSelection(
+        tx,
+        context,
+        { ...query.adaptive, offset: adaptiveOffset },
+        values,
+      )
+    : undefined;
+  let fulfillmentPredicate: string | undefined;
+  if (query.locationId || query.stockBlocked) {
+    const location = query.locationId
+      ? (values.push(query.locationId),
+        `AND f.location_id=$${values.length}::uuid`)
+      : '';
+    fulfillmentPredicate = `EXISTS(SELECT 1 FROM orders_fulfillment_list f JOIN connector_installations c ON c.tenant_id=f.tenant_id AND c.id=f.connection_id JOIN workspace_apps app ON app.tenant_id=c.tenant_id AND app.app_id=c.document->>'appId' AND app.status='installed' WHERE f.tenant_id=$1 AND f.order_id=o.entity_id AND f.open AND NOT f.deleted AND c.document->>'status'='active' AND c.document->'granted' ? 'fulfillment.read' ${location} ${query.stockBlocked ? "AND f.hold_reasons @> ARRAY['inventory_out_of_stock']::text[] AND f.observed_at<=$2 AND f.observed_at>=$2::timestamptz-interval '5 minutes'" : ''})`;
+  }
   const sql =
     rebuilding.rowCount || hiddenSources
       ? legacyListSql(
@@ -134,6 +172,8 @@ export async function listOrders(
           !!query.connectionId,
           query.count === 'exact',
           customer,
+          adaptive,
+          fulfillmentPredicate,
         );
   const result = await tx.query<{
     totalCount: number | null;
@@ -164,8 +204,11 @@ export async function listOrders(
       sourceUpdatedAt: iso(row.sourceUpdatedAt),
     })),
     totalCount,
-    nextCursor:
-      items.length > query.limit && last
+    nextCursor: query.adaptive
+      ? items.length > query.limit
+        ? writeAdaptiveCursor(scope, adaptiveOffset + query.limit)
+        : null
+      : items.length > query.limit && last
         ? writeCursor(scope, {
             rank: last.sortRank,
             key: last.sortKey,

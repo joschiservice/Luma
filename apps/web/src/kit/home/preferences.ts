@@ -34,6 +34,16 @@ export const homeModules: Record<
     Icon: LucideIcon;
   }
 > = {
+  'saved-views': {
+    get title() {
+      return m.adaptive_title();
+    },
+    get description() {
+      return m.adaptive_description();
+    },
+    size: 'half',
+    Icon: ChartNoAxesColumn,
+  },
   attention: {
     get title() {
       return m.home_module_attention_title();

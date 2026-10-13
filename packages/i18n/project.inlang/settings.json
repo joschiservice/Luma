@@ -5,6 +5,7 @@
   "modules": ["./node_modules/@inlang/plugin-icu1/dist/index.js"],
   "plugin.inlang.icu-messageformat-1": {
     "pathPattern": [
+      "./messages/{locale}/adaptive.json",
       "./messages/{locale}/activity.json",
       "./messages/{locale}/apps.json",
       "./messages/{locale}/assistant.json",

@@ -96,6 +96,12 @@ limited to the workspace's installed vocabulary, at most three calls per request
 60-second deadline. It records the route, token usage and a hash of the request text;
 prompts and answers stay out of logs and traces.
 
+Saved view drafting uses the same `authoring` route, with one structured call and a
+30-second deadline. It sends the authorized query vocabulary and bounded canonical warehouse
+identities. The result remains an unsaved draft until a person reviews it. Unknown identities,
+unsupported relationships and source evidence limits require clarification; a model cannot
+establish why an order is delayed or add an executable action to the draft.
+
 ### Supplier extraction profile
 
 `supplier-extraction` ([Supplier commitments](supplier-commitments.md#supplier-messages))

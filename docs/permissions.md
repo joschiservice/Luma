@@ -10,6 +10,9 @@ Workspace details and approval rules.
 
 | Permission | Key | Description | Sensitive | Owner | Admin | Member |
 | --- | --- | --- | --- | --- | --- | --- |
+| Manage custom fields | `adaptive.fields.manage` | Define and archive typed custom fields and their access rules. | Yes | Yes | Yes |  |
+| Manage shared views | `adaptive.views.manage` | Edit and archive views owned by other workspace members. |  | Yes | Yes |  |
+| Manage operational packages | `adaptive.packages.manage` | Review, install and remove operational package definitions. | Yes | Yes | Yes |  |
 | Edit workspace settings | `workspace.settings.manage` | Change the workspace name, display time zone and authoritative sources. |  | Yes | Yes |  |
 | Manage approval rules | `workspace.approval_policy.manage` | Choose when changes need approval and whether another person must approve. | Yes | Yes | Yes |  |
 
@@ -29,6 +32,8 @@ Imported orders, stock, products, customers, and returns.
 
 | Permission | Key | Description | Sensitive | Owner | Admin | Member |
 | --- | --- | --- | --- | --- | --- | --- |
+| View custom fields | `adaptive.fields.read` | See custom fields on records you can access. |  | Yes | Yes | Yes |
+| Edit custom field values | `adaptive.fields.write` | Change Luma-owned custom fields on records you can access. | Yes | Yes | Yes |  |
 | Manage Luma orders | `sales.manage` | Accept storefront orders and read and edit Luma order records, including addresses. | Yes | Yes | Yes |  |
 | View orders | `orders.read` | See orders, their lines, payments, and links to the source systems. |  | Yes | Yes | Yes |
 | View fulfillment | `fulfillment.read` | See shipments, carriers, and fulfillment progress. |  | Yes | Yes | Yes |

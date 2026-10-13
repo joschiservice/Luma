@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import type { TenantContext } from '@luma/identity';
-import { requireTenant } from '@luma/identity';
+import { IdentityError, requireTenant } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 import { canonicalJson as canonical } from '@luma/platform';
 import { z } from 'zod';
@@ -182,6 +182,21 @@ export function createAdmissionStore(db: TenantDatabase) {
         actionHash: hash,
       };
       await db.transaction(context.tenantId, async (tx) => {
+        // The workflow owner takes the same fence before cancellation. Binding commits
+        // before possible effects, so cancellation cannot misclassify a bound first step.
+        await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+          `workflow-run:${context.tenantId}:${input.runId}`,
+        ]);
+        const workflow = await tx.query<{ state: string }>(
+          'SELECT state FROM workflow_trigger_runs WHERE tenant_id=$1 AND id=$2',
+          [context.tenantId, input.runId],
+        );
+        if (workflow.rows[0]?.state === 'cancelled')
+          throw new IdentityError(
+            409,
+            'CONFLICT',
+            'This workflow run was cancelled before its action was bound.',
+          );
         const run = {
           tenantId: input.tenantId,
           runId: input.runId,
