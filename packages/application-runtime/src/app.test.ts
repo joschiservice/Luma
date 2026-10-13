@@ -760,3 +760,58 @@ it('closes unused TCP preconnections during shutdown', async () => {
     socket.destroy();
   }
 }, 2000);
+
+it('finishes active HTTP responses and closes their keep-alive sockets while draining', async () => {
+  const app = buildApp();
+  let entered!: () => void;
+  let finish!: () => void;
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const work = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  app.addHook('onSend', async (_request, _reply, payload) => {
+    entered();
+    await work;
+
+    return payload;
+  });
+  const address = new URL(await app.listen({ host: '127.0.0.1', port: 0 }));
+  const socket = createConnection({
+    host: address.hostname,
+    port: Number(address.port),
+  });
+  let response = '';
+  socket.setEncoding('utf8');
+  socket.on('data', (chunk: string) => {
+    response += chunk;
+  });
+  await new Promise<void>((resolve, reject) => {
+    socket.once('connect', resolve);
+    socket.once('error', reject);
+  });
+  socket.write(
+    'GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: keep-alive\r\n\r\n',
+  );
+  await started;
+  let closed = false;
+  const closing = app.close().then(() => {
+    closed = true;
+  });
+  try {
+    await expect
+      .poll(() => app.server.listening, { timeout: 1000 })
+      .toBe(false);
+    expect(closed).toBe(false);
+    finish();
+    await expect
+      .poll(() => response, { timeout: 1000 })
+      .toContain('"status":"ok"');
+    await expect.poll(() => closed, { timeout: 1000 }).toBe(true);
+  } finally {
+    finish();
+    socket.destroy();
+    await closing;
+  }
+});

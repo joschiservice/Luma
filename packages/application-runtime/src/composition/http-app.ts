@@ -205,14 +205,28 @@ export function buildApp(
     genReqId: () => randomUUID(),
     logController: new LogController({ disableRequestLogging: true }),
   });
-  // Node's idle-connection cleanup excludes TCP preconnections that never sent HTTP.
+  let draining = false;
   const preconnections = new Set<Socket>();
   app.server.on('connection', (socket) => {
+    if (draining) {
+      socket.destroy();
+
+      return;
+    }
     preconnections.add(socket);
     socket.once('close', () => preconnections.delete(socket));
   });
-  app.server.on('request', (request) => preconnections.delete(request.socket));
+  app.server.on('request', (request, response) => {
+    preconnections.delete(request.socket);
+    response.once('finish', () => {
+      // Shutdown checks idle sockets once; a response finishing later can leave its
+      // keep-alive connection open unless the new idle socket is checked again.
+      if (draining) app.server.closeIdleConnections();
+    });
+  });
   app.addHook('preClose', async () => {
+    draining = true;
+    // Idle cleanup excludes accepted TCP connections that have not sent HTTP headers.
     for (const socket of preconnections) socket.destroy();
     preconnections.clear();
   });
@@ -266,10 +280,6 @@ export function buildApp(
         ),
       };
     }
-  });
-  let draining = false;
-  app.addHook('preClose', async () => {
-    draining = true;
   });
   app.addHook('onRequest', (request, reply, done) => {
     const actionId = request.headers['x-luma-action-id'];

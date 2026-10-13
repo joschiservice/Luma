@@ -1,6 +1,6 @@
 import { createHmac, randomUUID } from 'node:crypto';
-import { createServer } from 'node:http';
-import type { AddressInfo } from 'node:net';
+import { Agent, createServer, request } from 'node:http';
+import { type AddressInfo, createConnection } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { merchantProfiles } from '@luma/simulator-commerce';
@@ -75,6 +75,114 @@ describe.skipIf(!adminUrl)('simulator host', () => {
   afterAll(async () => {
     await app?.close();
     await database?.drop();
+  });
+
+  it('closes unused TCP preconnections when the simulator shuts down', async () => {
+    const server = await createApp({
+      databaseUrl: database.url,
+      token,
+      autonomous: false,
+    });
+    const address = new URL(
+      await server.listen({ host: '127.0.0.1', port: 0 }),
+    );
+    const accepted = new Promise<void>((resolve) =>
+      server.server.once('connection', () => resolve()),
+    );
+    const socket = createConnection({
+      host: address.hostname,
+      port: Number(address.port),
+    });
+    await new Promise<void>((resolve, reject) => {
+      socket.once('connect', resolve);
+      socket.once('error', reject);
+    });
+    await accepted;
+    let closed = false;
+    const closing = server.close().then(() => {
+      closed = true;
+    });
+    try {
+      await expect.poll(() => closed, { timeout: 1000 }).toBe(true);
+    } finally {
+      socket.destroy();
+      await closing;
+    }
+  });
+
+  it('lets active HTTP work finish during simulator shutdown', async () => {
+    const server = await createApp({
+      databaseUrl: database.url,
+      token,
+      autonomous: false,
+    });
+    let entered!: () => void;
+    let finish!: () => void;
+    let draining!: () => void;
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const work = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const stoppedAccepting = new Promise<void>((resolve) => {
+      draining = resolve;
+    });
+    server.get('/api/shutdown-work', async () => {
+      entered();
+      await work;
+
+      return { finished: true };
+    });
+    server.addHook('preClose', async () => {
+      draining();
+    });
+    const origin = await server.listen({ host: '127.0.0.1', port: 0 });
+    const agent = new Agent({ keepAlive: true });
+    const response = new Promise<{ status: number | undefined; body: string }>(
+      (resolve, reject) => {
+        request(
+          `${origin}/api/shutdown-work`,
+          {
+            agent,
+            headers: { authorization: `Bearer ${token}` },
+          },
+          (response) => {
+            let body = '';
+            response.setEncoding('utf8');
+            response.on('data', (chunk: string) => {
+              body += chunk;
+            });
+            response.on('end', () =>
+              resolve({ status: response.statusCode, body }),
+            );
+          },
+        )
+          .on('error', reject)
+          .end();
+      },
+    );
+    await started;
+    let closed = false;
+    const closing = server.close().then(() => {
+      closed = true;
+    });
+    try {
+      await stoppedAccepting;
+      await expect
+        .poll(() => server.server.listening, { timeout: 1000 })
+        .toBe(false);
+      expect(closed).toBe(false);
+      finish();
+      const result = await response;
+      expect(result.status).toBe(200);
+      expect(JSON.parse(result.body)).toEqual({ finished: true });
+      await expect.poll(() => closed, { timeout: 1000 }).toBe(true);
+    } finally {
+      finish();
+      agent.destroy();
+      await closing;
+    }
   });
 
   it('requires its token and provisions runs from a profile and chaos preset', async () => {

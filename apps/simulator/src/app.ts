@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import type { Socket } from 'node:net';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -137,6 +138,31 @@ export async function createApp(options: SimulatorOptions) {
   if (options.token.length < 20)
     throw new Error('Simulator token must have at least 20 characters');
   const app = Fastify({ bodyLimit: 2 * 1024 * 1024 });
+  let draining = false;
+  const preconnections = new Set<Socket>();
+  app.server.on('connection', (socket) => {
+    if (draining) {
+      socket.destroy();
+
+      return;
+    }
+    preconnections.add(socket);
+    socket.once('close', () => preconnections.delete(socket));
+  });
+  app.server.on('request', (request, response) => {
+    preconnections.delete(request.socket);
+    response.once('finish', () => {
+      // Shutdown checks idle sockets once; a response finishing later can leave its
+      // keep-alive connection open unless the new idle socket is checked again.
+      if (draining) app.server.closeIdleConnections();
+    });
+  });
+  app.addHook('preClose', async () => {
+    draining = true;
+    // Idle cleanup excludes accepted TCP connections that have not sent HTTP headers.
+    for (const socket of preconnections) socket.destroy();
+    preconnections.clear();
+  });
   const pool = new pg.Pool({ connectionString: options.databaseUrl, max: 20 });
   // Idle clients can be closed by the server, for example when a test drops its database.
   pool.on('error', (error) =>
