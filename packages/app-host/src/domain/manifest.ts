@@ -8,7 +8,7 @@ function invalid(appId: string, message: string): never {
 
 /**
  * Checks the permission data an app declares: namespaced, unique app permissions; known core
- * scopes; and a core or own permission for every UI slot and decision kind.
+ * scopes; and a core or own permission for every UI slot, decision kind and governed action.
  */
 export function validateManifest(manifest: AppManifest) {
   const { id } = manifest;
@@ -40,6 +40,11 @@ export function validateManifest(manifest: AppManifest) {
   for (const [kind, access] of Object.entries(manifest.decisionAccess ?? {}))
     if (!access || !known(access.view) || !known(access.respond))
       invalid(id, `decision kind ${kind} must declare known permissions`);
+  for (const [capability, permission] of Object.entries(
+    manifest.actionAccess ?? {},
+  ))
+    if (!permission || !known(permission))
+      invalid(id, `action ${capability} must declare a known permission`);
 
   return own;
 }

@@ -2,8 +2,8 @@
 
 The Shopify app reads orders, products, inventory, fulfillment work, shipments, returns,
 refunds and (when approved) customers through the Admin GraphQL API `2026-07`, and offers
-[governed actions](shopify-actions.md) for fulfillment recovery and inventory
-corrections. Merchants connect through standalone OAuth. Reads are observations, not a
+[governed actions](shopify-actions.md) for fulfillment recovery, inventory
+corrections, order quantity edits and returns. Merchants connect through standalone OAuth. Reads are observations, not a
 transactional snapshot of the shop, and scope-limited visibility never establishes
 shop-wide absence. Code: `@luma/app-shopify`, with the protocol client in
 `@luma/connector-shopify`.
@@ -22,8 +22,15 @@ described in its [package README](../packages/apps/shopify/README.md#operational
   because it is not a fulfillment service.
 - `returns.read` is granted with `read_orders` and `read_returns`; connections authorized
   before it existed must reconnect.
+- `orders.quantity.edit` is granted with `write_order_edits` and a fulfillment read scope,
+  because edits are judged against fulfillment work. Connections authorized before Luma
+  requested `write_order_edits` must reconnect to edit orders.
 - `read_customers` is requested only when the deployment has protected customer data
   approval (see [commerce sync](commerce-sync.md#customers)).
+- Order addresses are read with `read_orders` only when the deployment is approved for
+  protected customer data and addresses (see
+  [Shopify partner readiness](shopify-production.md)). Without approval, orders report
+  addresses as not shared rather than absent.
 
 A missing grant returns `permission_denied`; it never becomes an empty successful page.
 
@@ -35,8 +42,10 @@ page size and filters; preserve them and repeat the same query for the next page
 accept GIDs only (InventoryItem and Location for inventory, Order for fulfillment and
 returns), never SKU labels or raw Shopify search expressions.
 
-Nested collections (order lines, variants, inventory locations, fulfillment orders and
-lines, returns and refunds) are fully paginated before a page returns. Missing or repeated
+Nested collections (order lines, shipping lines and discounts, variants, inventory
+locations, fulfillment orders and lines, returns and refunds) are fully paginated before a
+page returns. Order pages hold seven orders, because each order's amounts and first nested
+pages cost about 135 query points against Shopify's 1,000-point limit. Missing or repeated
 cursors, malformed fields, GraphQL partial errors or failed child requests reject the
 whole page, and more than 1,000 continuation pages in one nested collection rejects the
 scan rather than truncating it. Collection absence never emits tombstones. Independent deletion confirmation follows the
@@ -45,8 +54,22 @@ scan rather than truncating it. Collection absence never emits tombstones. Indep
 - **Orders:** `quantity` retains originally ordered units; `currentQuantity` excludes
   refunded and removed units. `cancelledQuantity` is their difference, a reduction fact
   rather than proof of cancellation or its cause. A fully removed line stays with zero
-  current units. Deleted or custom variants have no SKU identity. Unknown financial
+  current units. Deleted or custom variants have no SKU identity; a line whose variant is
+  gone keeps its product (`variant_removed`), and a line without a product is a custom item
+  or a deleted product (`no_product`), which Shopify does not distinguish. Unknown financial
   statuses stay `unknown`; malformed descriptive fields become null without rejecting the order.
+- **Order charges:** shop and presentment currencies, original and current subtotal,
+  shipping, discount, tax, duty and total amounts in both currencies, current tax lines,
+  shipping lines including removed ones, discount codes and titles with their values, tags
+  and operational attributes (edited, test, requires shipping, channel, cancellation
+  reason, Shopify's fulfillment status, processed, closed and cancelled times). Amounts are
+  Shopify's exact decimals and are never recalculated. The order note, custom attributes and
+  manual discount descriptions are free text and are not read. History exports cannot
+  include discounts, because discount applications have no ID to group export rows by;
+  exported orders leave discounts unread until an incremental read reports them.
+- **Order addresses** (delivery and billing address lines, city, province code, postal code
+  and country; no names or phone numbers) are personal data. They are parsed outside raw
+  capture and the commerce sync stores them only in the erasable customer store.
 - **Products:** per variant, the inventory-item SKU identity, variant title (none for
   `Default Title`), price in shop currency and barcode. SKU text preserves case and is
   never identity.

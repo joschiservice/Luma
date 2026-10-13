@@ -62,4 +62,6 @@ separate write permissions.
 Case owners can be assigned, reassigned or cleared by someone with `decisions.assign`.
 The chosen person must be an active workspace member. Writes carry the current ownership
 revision and append audit history atomically; stale revisions return 409. Ownership appears
-in case detail, lists and Needs you. It grants no approval or execution permission.
+in case detail, lists and Needs you. It grants no approval or execution permission. A case
+workflow that hands a case nobody owns to people gives it to the person whose access it runs
+with, through the same audited assignment (see [case workflows](workflows.md#case-workflows)).

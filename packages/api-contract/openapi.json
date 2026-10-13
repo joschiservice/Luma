@@ -81302,6 +81302,7 @@
                 "sync_failure",
                 "stuck_fulfillment",
                 "inventory_mismatch",
+                "order_quantity_mismatch",
                 "workflow_failure"
               ],
               "type": "string"
@@ -90399,6 +90400,7 @@
                                 "fulfillment.hold.release",
                                 "fulfillment.open",
                                 "fulfillment.move",
+                                "orders.quantity.edit",
                                 "customers.read",
                                 "returns.read",
                                 "orders.shipping-method.read",
@@ -90442,6 +90444,7 @@
                                 "fulfillment.hold.release",
                                 "fulfillment.open",
                                 "fulfillment.move",
+                                "orders.quantity.edit",
                                 "customers.read",
                                 "returns.read",
                                 "orders.shipping-method.read",
@@ -90491,9 +90494,8 @@
                           },
                           "credentialVersion": {
                             "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "exclusiveMinimum": 0
+                            "minimum": 0,
+                            "maximum": 9007199254740991
                           },
                           "createdAt": {
                             "type": "string",
@@ -90673,7 +90675,7 @@
                   "permissions": {
                     "type": "array",
                     "minItems": 1,
-                    "maxItems": 35,
+                    "maxItems": 36,
                     "items": {
                       "enum": [
                         "orders.read",
@@ -90684,6 +90686,7 @@
                         "fulfillment.hold.release",
                         "fulfillment.open",
                         "fulfillment.move",
+                        "orders.quantity.edit",
                         "customers.read",
                         "returns.read",
                         "orders.shipping-method.read",
@@ -90810,6 +90813,7 @@
                           "fulfillment.hold.release",
                           "fulfillment.open",
                           "fulfillment.move",
+                          "orders.quantity.edit",
                           "customers.read",
                           "returns.read",
                           "orders.shipping-method.read",
@@ -90853,6 +90857,7 @@
                           "fulfillment.hold.release",
                           "fulfillment.open",
                           "fulfillment.move",
+                          "orders.quantity.edit",
                           "customers.read",
                           "returns.read",
                           "orders.shipping-method.read",
@@ -90902,9 +90907,8 @@
                     },
                     "credentialVersion": {
                       "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991,
-                      "exclusiveMinimum": 0
+                      "minimum": 0,
+                      "maximum": 9007199254740991
                     },
                     "createdAt": {
                       "type": "string",
@@ -91166,6 +91170,7 @@
                           "fulfillment.hold.release",
                           "fulfillment.open",
                           "fulfillment.move",
+                          "orders.quantity.edit",
                           "customers.read",
                           "returns.read",
                           "orders.shipping-method.read",
@@ -91209,6 +91214,7 @@
                           "fulfillment.hold.release",
                           "fulfillment.open",
                           "fulfillment.move",
+                          "orders.quantity.edit",
                           "customers.read",
                           "returns.read",
                           "orders.shipping-method.read",
@@ -91258,9 +91264,8 @@
                     },
                     "credentialVersion": {
                       "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991,
-                      "exclusiveMinimum": 0
+                      "minimum": 0,
+                      "maximum": 9007199254740991
                     },
                     "createdAt": {
                       "type": "string",
@@ -91511,6 +91516,7 @@
                           "fulfillment.hold.release",
                           "fulfillment.open",
                           "fulfillment.move",
+                          "orders.quantity.edit",
                           "customers.read",
                           "returns.read",
                           "orders.shipping-method.read",
@@ -91554,6 +91560,7 @@
                           "fulfillment.hold.release",
                           "fulfillment.open",
                           "fulfillment.move",
+                          "orders.quantity.edit",
                           "customers.read",
                           "returns.read",
                           "orders.shipping-method.read",
@@ -91603,9 +91610,8 @@
                     },
                     "credentialVersion": {
                       "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991,
-                      "exclusiveMinimum": 0
+                      "minimum": 0,
+                      "maximum": 9007199254740991
                     },
                     "createdAt": {
                       "type": "string",
@@ -91870,6 +91876,7 @@
                           "fulfillment.hold.release",
                           "fulfillment.open",
                           "fulfillment.move",
+                          "orders.quantity.edit",
                           "customers.read",
                           "returns.read",
                           "orders.shipping-method.read",
@@ -91913,6 +91920,7 @@
                           "fulfillment.hold.release",
                           "fulfillment.open",
                           "fulfillment.move",
+                          "orders.quantity.edit",
                           "customers.read",
                           "returns.read",
                           "orders.shipping-method.read",
@@ -91962,9 +91970,8 @@
                     },
                     "credentialVersion": {
                       "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991,
-                      "exclusiveMinimum": 0
+                      "minimum": 0,
+                      "maximum": 9007199254740991
                     },
                     "createdAt": {
                       "type": "string",
@@ -92216,6 +92223,7 @@
                           "fulfillment.hold.release",
                           "fulfillment.open",
                           "fulfillment.move",
+                          "orders.quantity.edit",
                           "customers.read",
                           "returns.read",
                           "orders.shipping-method.read",
@@ -92259,6 +92267,7 @@
                           "fulfillment.hold.release",
                           "fulfillment.open",
                           "fulfillment.move",
+                          "orders.quantity.edit",
                           "customers.read",
                           "returns.read",
                           "orders.shipping-method.read",
@@ -92308,9 +92317,8 @@
                     },
                     "credentialVersion": {
                       "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991,
-                      "exclusiveMinimum": 0
+                      "minimum": 0,
+                      "maximum": 9007199254740991
                     },
                     "createdAt": {
                       "type": "string",
@@ -100517,6 +100525,1302 @@
                               }
                             ]
                           },
+                          "currencies": {
+                            "type": "object",
+                            "properties": {
+                              "shop": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "presentment": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": ["shop", "presentment"],
+                            "description": "The shop currency and the currency the customer was charged in; absent when the source does not report them."
+                          },
+                          "amounts": {
+                            "type": "object",
+                            "properties": {
+                              "subtotal": {
+                                "type": "object",
+                                "properties": {
+                                  "original": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "shop": {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"],
+                                            "description": "Amount in the shop currency."
+                                          },
+                                          "presentment": {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"],
+                                            "description": "Amount in the currency the customer was charged in."
+                                          }
+                                        },
+                                        "required": ["shop", "presentment"],
+                                        "description": "An exact amount in the shop and presentment currencies."
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Amount when the order was placed; null when not reported."
+                                  },
+                                  "current": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "shop": {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"],
+                                            "description": "Amount in the shop currency."
+                                          },
+                                          "presentment": {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"],
+                                            "description": "Amount in the currency the customer was charged in."
+                                          }
+                                        },
+                                        "required": ["shop", "presentment"],
+                                        "description": "An exact amount in the shop and presentment currencies."
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Amount after edits, refunds and returns; null when not reported."
+                                  }
+                                },
+                                "required": ["original", "current"],
+                                "description": "Line items after discounts, before shipping and tax."
+                              },
+                              "shipping": {
+                                "type": "object",
+                                "properties": {
+                                  "original": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "shop": {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"],
+                                            "description": "Amount in the shop currency."
+                                          },
+                                          "presentment": {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"],
+                                            "description": "Amount in the currency the customer was charged in."
+                                          }
+                                        },
+                                        "required": ["shop", "presentment"],
+                                        "description": "An exact amount in the shop and presentment currencies."
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Amount when the order was placed; null when not reported."
+                                  },
+                                  "current": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "shop": {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"],
+                                            "description": "Amount in the shop currency."
+                                          },
+                                          "presentment": {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"],
+                                            "description": "Amount in the currency the customer was charged in."
+                                          }
+                                        },
+                                        "required": ["shop", "presentment"],
+                                        "description": "An exact amount in the shop and presentment currencies."
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Amount after edits, refunds and returns; null when not reported."
+                                  }
+                                },
+                                "required": ["original", "current"]
+                              },
+                              "discounts": {
+                                "type": "object",
+                                "properties": {
+                                  "original": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "shop": {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"],
+                                            "description": "Amount in the shop currency."
+                                          },
+                                          "presentment": {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"],
+                                            "description": "Amount in the currency the customer was charged in."
+                                          }
+                                        },
+                                        "required": ["shop", "presentment"],
+                                        "description": "An exact amount in the shop and presentment currencies."
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Amount when the order was placed; null when not reported."
+                                  },
+                                  "current": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "shop": {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"],
+                                            "description": "Amount in the shop currency."
+                                          },
+                                          "presentment": {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"],
+                                            "description": "Amount in the currency the customer was charged in."
+                                          }
+                                        },
+                                        "required": ["shop", "presentment"],
+                                        "description": "An exact amount in the shop and presentment currencies."
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Amount after edits, refunds and returns; null when not reported."
+                                  }
+                                },
+                                "required": ["original", "current"]
+                              },
+                              "tax": {
+                                "type": "object",
+                                "properties": {
+                                  "original": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "shop": {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"],
+                                            "description": "Amount in the shop currency."
+                                          },
+                                          "presentment": {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"],
+                                            "description": "Amount in the currency the customer was charged in."
+                                          }
+                                        },
+                                        "required": ["shop", "presentment"],
+                                        "description": "An exact amount in the shop and presentment currencies."
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Amount when the order was placed; null when not reported."
+                                  },
+                                  "current": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "shop": {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"],
+                                            "description": "Amount in the shop currency."
+                                          },
+                                          "presentment": {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"],
+                                            "description": "Amount in the currency the customer was charged in."
+                                          }
+                                        },
+                                        "required": ["shop", "presentment"],
+                                        "description": "An exact amount in the shop and presentment currencies."
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Amount after edits, refunds and returns; null when not reported."
+                                  }
+                                },
+                                "required": ["original", "current"]
+                              },
+                              "duties": {
+                                "type": "object",
+                                "properties": {
+                                  "original": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "shop": {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"],
+                                            "description": "Amount in the shop currency."
+                                          },
+                                          "presentment": {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"],
+                                            "description": "Amount in the currency the customer was charged in."
+                                          }
+                                        },
+                                        "required": ["shop", "presentment"],
+                                        "description": "An exact amount in the shop and presentment currencies."
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Amount when the order was placed; null when not reported."
+                                  },
+                                  "current": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "shop": {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"],
+                                            "description": "Amount in the shop currency."
+                                          },
+                                          "presentment": {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"],
+                                            "description": "Amount in the currency the customer was charged in."
+                                          }
+                                        },
+                                        "required": ["shop", "presentment"],
+                                        "description": "An exact amount in the shop and presentment currencies."
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Amount after edits, refunds and returns; null when not reported."
+                                  }
+                                },
+                                "required": ["original", "current"]
+                              },
+                              "total": {
+                                "type": "object",
+                                "properties": {
+                                  "original": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "shop": {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"],
+                                            "description": "Amount in the shop currency."
+                                          },
+                                          "presentment": {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"],
+                                            "description": "Amount in the currency the customer was charged in."
+                                          }
+                                        },
+                                        "required": ["shop", "presentment"],
+                                        "description": "An exact amount in the shop and presentment currencies."
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Amount when the order was placed; null when not reported."
+                                  },
+                                  "current": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "shop": {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"],
+                                            "description": "Amount in the shop currency."
+                                          },
+                                          "presentment": {
+                                            "type": "object",
+                                            "properties": {
+                                              "amount": {
+                                                "type": "string"
+                                              },
+                                              "currency": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": ["amount", "currency"],
+                                            "description": "Amount in the currency the customer was charged in."
+                                          }
+                                        },
+                                        "required": ["shop", "presentment"],
+                                        "description": "An exact amount in the shop and presentment currencies."
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Amount after edits, refunds and returns; null when not reported."
+                                  }
+                                },
+                                "required": ["original", "current"]
+                              }
+                            },
+                            "required": [
+                              "subtotal",
+                              "shipping",
+                              "discounts",
+                              "tax",
+                              "duties",
+                              "total"
+                            ],
+                            "description": "Order amounts exactly as the source reports them, never recalculated or converted. Absent when the source does not report them."
+                          },
+                          "taxesIncluded": {
+                            "anyOf": [
+                              {
+                                "type": "boolean"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Whether the order prices include tax."
+                          },
+                          "dutiesIncluded": {
+                            "anyOf": [
+                              {
+                                "type": "boolean"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Whether the order prices include duties."
+                          },
+                          "taxLines": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "title": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "rate": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Fractional rate: 0.19 means 19%."
+                                },
+                                "amount": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "shop": {
+                                          "type": "object",
+                                          "properties": {
+                                            "amount": {
+                                              "type": "string"
+                                            },
+                                            "currency": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": ["amount", "currency"],
+                                          "description": "Amount in the shop currency."
+                                        },
+                                        "presentment": {
+                                          "type": "object",
+                                          "properties": {
+                                            "amount": {
+                                              "type": "string"
+                                            },
+                                            "currency": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": ["amount", "currency"],
+                                          "description": "Amount in the currency the customer was charged in."
+                                        }
+                                      },
+                                      "required": ["shop", "presentment"],
+                                      "description": "An exact amount in the shop and presentment currencies."
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": ["title", "rate", "amount"]
+                            },
+                            "description": "Current tax lines; absent when not reported."
+                          },
+                          "shippingLines": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "title": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "code": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "source": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "carrier": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "removed": {
+                                  "anyOf": [
+                                    {
+                                      "type": "boolean"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Whether an order edit removed the charge."
+                                },
+                                "original": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "shop": {
+                                          "type": "object",
+                                          "properties": {
+                                            "amount": {
+                                              "type": "string"
+                                            },
+                                            "currency": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": ["amount", "currency"],
+                                          "description": "Amount in the shop currency."
+                                        },
+                                        "presentment": {
+                                          "type": "object",
+                                          "properties": {
+                                            "amount": {
+                                              "type": "string"
+                                            },
+                                            "currency": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": ["amount", "currency"],
+                                          "description": "Amount in the currency the customer was charged in."
+                                        }
+                                      },
+                                      "required": ["shop", "presentment"],
+                                      "description": "An exact amount in the shop and presentment currencies."
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "discounted": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "shop": {
+                                          "type": "object",
+                                          "properties": {
+                                            "amount": {
+                                              "type": "string"
+                                            },
+                                            "currency": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": ["amount", "currency"],
+                                          "description": "Amount in the shop currency."
+                                        },
+                                        "presentment": {
+                                          "type": "object",
+                                          "properties": {
+                                            "amount": {
+                                              "type": "string"
+                                            },
+                                            "currency": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": ["amount", "currency"],
+                                          "description": "Amount in the currency the customer was charged in."
+                                        }
+                                      },
+                                      "required": ["shop", "presentment"],
+                                      "description": "An exact amount in the shop and presentment currencies."
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "current": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "shop": {
+                                          "type": "object",
+                                          "properties": {
+                                            "amount": {
+                                              "type": "string"
+                                            },
+                                            "currency": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": ["amount", "currency"],
+                                          "description": "Amount in the shop currency."
+                                        },
+                                        "presentment": {
+                                          "type": "object",
+                                          "properties": {
+                                            "amount": {
+                                              "type": "string"
+                                            },
+                                            "currency": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": ["amount", "currency"],
+                                          "description": "Amount in the currency the customer was charged in."
+                                        }
+                                      },
+                                      "required": ["shop", "presentment"],
+                                      "description": "An exact amount in the shop and presentment currencies."
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "title",
+                                "code",
+                                "source",
+                                "carrier",
+                                "removed",
+                                "original",
+                                "discounted",
+                                "current"
+                              ]
+                            },
+                            "description": "Shipping charges, including removed ones; absent when not reported."
+                          },
+                          "discounts": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "index": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "kind": {
+                                  "enum": [
+                                    "code",
+                                    "automatic",
+                                    "manual",
+                                    "script",
+                                    "unknown"
+                                  ],
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Discount code or title. Descriptions are not imported."
+                                },
+                                "target": {
+                                  "enum": [
+                                    "line_item",
+                                    "shipping_line",
+                                    "unknown"
+                                  ],
+                                  "type": "string"
+                                },
+                                "allocation": {
+                                  "enum": ["across", "each", "unknown"],
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "anyOf": [
+                                    {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "type": {
+                                              "const": "percentage"
+                                            },
+                                            "percentage": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": ["type", "percentage"]
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "type": {
+                                              "const": "fixed"
+                                            },
+                                            "amount": {
+                                              "type": "object",
+                                              "properties": {
+                                                "amount": {
+                                                  "type": "string"
+                                                },
+                                                "currency": {
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": ["amount", "currency"]
+                                            }
+                                          },
+                                          "required": ["type", "amount"]
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "index",
+                                "kind",
+                                "label",
+                                "target",
+                                "allocation",
+                                "value"
+                              ]
+                            },
+                            "description": "Discounts applied to the order; absent when not read, for example after a history import."
+                          },
+                          "tags": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Merchant tags; absent when not reported."
+                          },
+                          "attributes": {
+                            "type": "object",
+                            "properties": {
+                              "edited": {
+                                "anyOf": [
+                                  {
+                                    "type": "boolean"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "requiresShipping": {
+                                "anyOf": [
+                                  {
+                                    "type": "boolean"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "test": {
+                                "anyOf": [
+                                  {
+                                    "type": "boolean"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "cancelReason": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "cancelledAt": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "closedAt": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "processedAt": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "channel": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Sales channel at the source."
+                              },
+                              "fulfillmentStatus": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "The source's own fulfillment status, such as `partially_fulfilled`. Luma's fulfillment state is `fulfillment`."
+                              }
+                            },
+                            "required": [
+                              "edited",
+                              "requiresShipping",
+                              "test",
+                              "cancelReason",
+                              "cancelledAt",
+                              "closedAt",
+                              "processedAt",
+                              "channel",
+                              "fulfillmentStatus"
+                            ],
+                            "description": "Operational facts the source reports about the order."
+                          },
+                          "addresses": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "state": {
+                                    "const": "shared"
+                                  },
+                                  "shipping": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "line1": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "line2": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "city": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "region": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "postalCode": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "country": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "line1",
+                                          "line2",
+                                          "city",
+                                          "region",
+                                          "postalCode",
+                                          "country"
+                                        ]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Null when the order has no delivery address."
+                                  },
+                                  "billing": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "line1": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "line2": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "city": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "region": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "postalCode": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "country": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "line1",
+                                          "line2",
+                                          "city",
+                                          "region",
+                                          "postalCode",
+                                          "country"
+                                        ]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Null when the order has no billing address."
+                                  },
+                                  "observedAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  }
+                                },
+                                "required": [
+                                  "state",
+                                  "shipping",
+                                  "billing",
+                                  "observedAt"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "state": {
+                                    "const": "not_shared"
+                                  },
+                                  "observedAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  }
+                                },
+                                "required": ["state", "observedAt"]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "state": {
+                                    "const": "not_imported"
+                                  }
+                                },
+                                "required": ["state"]
+                              }
+                            ],
+                            "description": "Delivery and billing addresses. `not_shared`: this deployment is not approved to read addresses. `not_imported`: no read has recorded them. Absent without permission to read customers; `hidden` then lists `addresses`."
+                          },
                           "lines": {
                             "type": "array",
                             "items": {
@@ -100649,6 +101953,187 @@
                                       "type": "null"
                                     }
                                   ]
+                                },
+                                "variantTitle": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Variant title at the source; absent when not reported."
+                                },
+                                "prices": {
+                                  "type": "object",
+                                  "properties": {
+                                    "originalUnit": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "shop": {
+                                              "type": "object",
+                                              "properties": {
+                                                "amount": {
+                                                  "type": "string"
+                                                },
+                                                "currency": {
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "amount",
+                                                "currency"
+                                              ],
+                                              "description": "Amount in the shop currency."
+                                            },
+                                            "presentment": {
+                                              "type": "object",
+                                              "properties": {
+                                                "amount": {
+                                                  "type": "string"
+                                                },
+                                                "currency": {
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "amount",
+                                                "currency"
+                                              ],
+                                              "description": "Amount in the currency the customer was charged in."
+                                            }
+                                          },
+                                          "required": ["shop", "presentment"],
+                                          "description": "An exact amount in the shop and presentment currencies."
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "discountedUnit": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "shop": {
+                                              "type": "object",
+                                              "properties": {
+                                                "amount": {
+                                                  "type": "string"
+                                                },
+                                                "currency": {
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "amount",
+                                                "currency"
+                                              ],
+                                              "description": "Amount in the shop currency."
+                                            },
+                                            "presentment": {
+                                              "type": "object",
+                                              "properties": {
+                                                "amount": {
+                                                  "type": "string"
+                                                },
+                                                "currency": {
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "amount",
+                                                "currency"
+                                              ],
+                                              "description": "Amount in the currency the customer was charged in."
+                                            }
+                                          },
+                                          "required": ["shop", "presentment"],
+                                          "description": "An exact amount in the shop and presentment currencies."
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ],
+                                      "description": "Unit price after line and order discounts."
+                                    },
+                                    "totalDiscount": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "shop": {
+                                              "type": "object",
+                                              "properties": {
+                                                "amount": {
+                                                  "type": "string"
+                                                },
+                                                "currency": {
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "amount",
+                                                "currency"
+                                              ],
+                                              "description": "Amount in the shop currency."
+                                            },
+                                            "presentment": {
+                                              "type": "object",
+                                              "properties": {
+                                                "amount": {
+                                                  "type": "string"
+                                                },
+                                                "currency": {
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "amount",
+                                                "currency"
+                                              ],
+                                              "description": "Amount in the currency the customer was charged in."
+                                            }
+                                          },
+                                          "required": ["shop", "presentment"],
+                                          "description": "An exact amount in the shop and presentment currencies."
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ],
+                                      "description": "Discount on the whole line."
+                                    }
+                                  },
+                                  "required": [
+                                    "originalUnit",
+                                    "discountedUnit",
+                                    "totalDiscount"
+                                  ],
+                                  "description": "Source line prices in both currencies; absent when the source does not report them."
+                                },
+                                "requiresShipping": {
+                                  "anyOf": [
+                                    {
+                                      "type": "boolean"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "catalog": {
+                                  "enum": [
+                                    "variant",
+                                    "variant_removed",
+                                    "no_product"
+                                  ],
+                                  "type": "string",
+                                  "description": "Whether the line still refers to a catalog variant. `variant_removed`: the variant was deleted but its product remains. `no_product`: a custom item or a deleted product; the source does not say which. Absent when not reported."
                                 }
                               },
                               "required": [
@@ -101702,6 +103187,21 @@
                       },
                       "required": ["entries", "truncated"]
                     },
+                    "hidden": {
+                      "type": "array",
+                      "items": {
+                        "enum": [
+                          "fulfillments",
+                          "returns",
+                          "issues",
+                          "workflows",
+                          "activity",
+                          "addresses"
+                        ],
+                        "type": "string"
+                      },
+                      "description": "Sections left out because the reader can't read their area. Treat them as unavailable, not as empty."
+                    },
                     "asOf": {
                       "type": "string",
                       "format": "date-time"
@@ -101903,6 +103403,196 @@
                                       },
                                       "unit": {
                                         "type": "string"
+                                      },
+                                      "variantTitle": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ],
+                                        "description": "Variant title at the source; absent when not reported."
+                                      },
+                                      "prices": {
+                                        "type": "object",
+                                        "properties": {
+                                          "originalUnit": {
+                                            "anyOf": [
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "shop": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "amount": {
+                                                        "type": "string"
+                                                      },
+                                                      "currency": {
+                                                        "type": "string"
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "amount",
+                                                      "currency"
+                                                    ],
+                                                    "description": "Amount in the shop currency."
+                                                  },
+                                                  "presentment": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "amount": {
+                                                        "type": "string"
+                                                      },
+                                                      "currency": {
+                                                        "type": "string"
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "amount",
+                                                      "currency"
+                                                    ],
+                                                    "description": "Amount in the currency the customer was charged in."
+                                                  }
+                                                },
+                                                "required": [
+                                                  "shop",
+                                                  "presentment"
+                                                ],
+                                                "description": "An exact amount in the shop and presentment currencies."
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "discountedUnit": {
+                                            "anyOf": [
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "shop": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "amount": {
+                                                        "type": "string"
+                                                      },
+                                                      "currency": {
+                                                        "type": "string"
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "amount",
+                                                      "currency"
+                                                    ],
+                                                    "description": "Amount in the shop currency."
+                                                  },
+                                                  "presentment": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "amount": {
+                                                        "type": "string"
+                                                      },
+                                                      "currency": {
+                                                        "type": "string"
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "amount",
+                                                      "currency"
+                                                    ],
+                                                    "description": "Amount in the currency the customer was charged in."
+                                                  }
+                                                },
+                                                "required": [
+                                                  "shop",
+                                                  "presentment"
+                                                ],
+                                                "description": "An exact amount in the shop and presentment currencies."
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "description": "Unit price after line and order discounts."
+                                          },
+                                          "totalDiscount": {
+                                            "anyOf": [
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "shop": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "amount": {
+                                                        "type": "string"
+                                                      },
+                                                      "currency": {
+                                                        "type": "string"
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "amount",
+                                                      "currency"
+                                                    ],
+                                                    "description": "Amount in the shop currency."
+                                                  },
+                                                  "presentment": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "amount": {
+                                                        "type": "string"
+                                                      },
+                                                      "currency": {
+                                                        "type": "string"
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "amount",
+                                                      "currency"
+                                                    ],
+                                                    "description": "Amount in the currency the customer was charged in."
+                                                  }
+                                                },
+                                                "required": [
+                                                  "shop",
+                                                  "presentment"
+                                                ],
+                                                "description": "An exact amount in the shop and presentment currencies."
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "description": "Discount on the whole line."
+                                          }
+                                        },
+                                        "required": [
+                                          "originalUnit",
+                                          "discountedUnit",
+                                          "totalDiscount"
+                                        ],
+                                        "description": "Source line prices in both currencies; absent when the source does not report them."
+                                      },
+                                      "requiresShipping": {
+                                        "anyOf": [
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "catalog": {
+                                        "enum": [
+                                          "variant",
+                                          "variant_removed",
+                                          "no_product"
+                                        ],
+                                        "type": "string",
+                                        "description": "Whether the line still refers to a catalog variant. `variant_removed`: the variant was deleted but its product remains. `no_product`: a custom item or a deleted product; the source does not say which. Absent when not reported."
                                       }
                                     },
                                     "required": [
@@ -102300,6 +103990,7 @@
                     "workflows",
                     "history",
                     "activity",
+                    "hidden",
                     "asOf",
                     "authority"
                   ]
@@ -102349,6 +104040,667 @@
           },
           "415": {
             "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/orders/{orderId}/change-plan": {
+      "get": {
+        "operationId": "orders.changePlan",
+        "summary": "Plan an order change",
+        "description": "Plans a proposed change, or each change source comparison detected: which systems show it, what has shipped (counted once, never added across mirrored systems), whether the change is still safe and the ordered steps. Each step says whether Luma runs it through a governed capability or a person with a role does it. Missing, stale or incomplete fulfilment evidence makes safety unknown, never safe; without access to fulfilment, safety is unknown. Plans change nothing; Luma steps still need a preview, approval and verification. A line that is not on the order returns 422.",
+        "tags": ["orders"],
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "enum": [
+                "quantity",
+                "item",
+                "address",
+                "location",
+                "cancellation"
+              ],
+              "type": "string",
+              "description": "The change to plan; omit to plan detected differences."
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true
+          },
+          {
+            "name": "lineKey",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The line’s comparison key: its shared line ID or its mapped SKU, as `comparisonKey` in order detail."
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true
+          },
+          {
+            "name": "quantity",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{1,14}(\\.\\d{1,6})?$",
+              "description": "The intended current units of the line."
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "orderId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "comparisonState": {
+                      "enum": [
+                        "matching",
+                        "pending",
+                        "confirmed",
+                        "inconclusive"
+                      ],
+                      "type": "string"
+                    },
+                    "plans": {
+                      "type": "array",
+                      "maxItems": 20,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "change": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "enum": [
+                                  "quantity",
+                                  "item",
+                                  "address",
+                                  "location",
+                                  "cancellation"
+                                ],
+                                "type": "string"
+                              },
+                              "origin": {
+                                "enum": ["detected", "proposed"],
+                                "type": "string"
+                              },
+                              "lineKey": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "line": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "skuCode": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "title": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": ["skuCode", "title"]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "from": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "to": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "The intended value; null when no authoritative source reports it."
+                              },
+                              "unit": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "origin",
+                              "lineKey",
+                              "line",
+                              "from",
+                              "to",
+                              "unit"
+                            ]
+                          },
+                          "acknowledgements": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "connectionId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "state": {
+                                  "enum": ["reflects", "differs", "unknown"],
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "readAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "fresh": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "connectionId",
+                                "state",
+                                "value",
+                                "readAt",
+                                "fresh"
+                              ]
+                            }
+                          },
+                          "shipped": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "lineKey": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "units": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "unit": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "basis": {
+                                  "enum": ["authority", "maximum", "unknown"],
+                                  "type": "string"
+                                },
+                                "connectionId": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "sources": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "connectionId": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      },
+                                      "units": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": ["connectionId", "units"]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "lineKey",
+                                "units",
+                                "unit",
+                                "basis",
+                                "connectionId",
+                                "sources"
+                              ]
+                            },
+                            "description": "Shipped units counted once: summed within one source, never across mirrored sources."
+                          },
+                          "safety": {
+                            "type": "object",
+                            "properties": {
+                              "state": {
+                                "enum": ["safe", "unsafe", "unknown"],
+                                "type": "string"
+                              },
+                              "reasons": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "code": {
+                                      "enum": [
+                                        "work_started",
+                                        "shipped",
+                                        "fulfilled_beyond_target",
+                                        "cancelled",
+                                        "closed",
+                                        "stale_evidence",
+                                        "incomplete_evidence",
+                                        "ambiguous_line",
+                                        "unknown_progress",
+                                        "unknown_value",
+                                        "authority_unknown",
+                                        "authority_conflict",
+                                        "no_fulfilment_source",
+                                        "fulfilment_hidden"
+                                      ],
+                                      "type": "string",
+                                      "description": "Why the change is unsafe (work_started, shipped, fulfilled_beyond_target, cancelled, closed) or unknown (every other code)."
+                                    },
+                                    "connectionId": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "format": "uuid"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "lineKey": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "format": "uuid"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "code",
+                                    "connectionId",
+                                    "lineKey"
+                                  ]
+                                }
+                              }
+                            },
+                            "required": ["state", "reasons"]
+                          },
+                          "steps": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "enum": [
+                                    "confirm",
+                                    "request_hold",
+                                    "reassign_work",
+                                    "update_record",
+                                    "notify",
+                                    "escalate"
+                                  ],
+                                  "type": "string"
+                                },
+                                "action": {
+                                  "enum": [
+                                    "check_progress",
+                                    "confirm_picking",
+                                    "stop_work",
+                                    "hold_for_address",
+                                    "stop_and_reassign",
+                                    "return_or_refund",
+                                    "update_quantity",
+                                    "cancel_order",
+                                    "update_address",
+                                    "reassign_location",
+                                    "carrier_redirect",
+                                    "notify_added_units",
+                                    "notify_customer",
+                                    "escalate_unsafe",
+                                    "escalate_unknown"
+                                  ],
+                                  "type": "string"
+                                },
+                                "performer": {
+                                  "enum": ["luma", "person"],
+                                  "type": "string",
+                                  "description": "Luma steps run a governed capability through approval and execution; person steps are for the named role."
+                                },
+                                "role": {
+                                  "anyOf": [
+                                    {
+                                      "enum": [
+                                        "warehouse",
+                                        "carrier",
+                                        "finance",
+                                        "operator"
+                                      ],
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "connectionId": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "capability": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "executable": {
+                                  "type": "boolean",
+                                  "description": "Whether Luma could run this step now. It still needs a preview, approval and fresh verification."
+                                },
+                                "blockedBy": {
+                                  "anyOf": [
+                                    {
+                                      "enum": [
+                                        "not_granted",
+                                        "unavailable",
+                                        "authority",
+                                        "unmapped",
+                                        "whole_units",
+                                        "observe_only",
+                                        "unsafe",
+                                        "unknown"
+                                      ],
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "permission": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "The permission a person needs to request this Luma step."
+                                },
+                                "viewerCanRequest": {
+                                  "type": "boolean",
+                                  "description": "Whether you hold `permission`."
+                                },
+                                "handoff": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "orderExternalId": {
+                                          "type": "string"
+                                        },
+                                        "lines": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "object",
+                                            "properties": {
+                                              "externalId": {
+                                                "type": "string"
+                                              },
+                                              "quantity": {
+                                                "type": "string",
+                                                "pattern": "^\\d{1,14}(\\.\\d{1,6})?$"
+                                              }
+                                            },
+                                            "required": [
+                                              "externalId",
+                                              "quantity"
+                                            ]
+                                          }
+                                        }
+                                      },
+                                      "required": ["orderExternalId", "lines"]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Source references for the provider action, when mapped."
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "kind",
+                                "action",
+                                "performer",
+                                "role",
+                                "connectionId",
+                                "capability",
+                                "executable",
+                                "blockedBy",
+                                "permission",
+                                "viewerCanRequest",
+                                "handoff"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "change",
+                          "acknowledgements",
+                          "shipped",
+                          "safety",
+                          "steps"
+                        ]
+                      }
+                    },
+                    "hidden": {
+                      "type": "array",
+                      "items": {
+                        "const": "fulfillments"
+                      },
+                      "description": "Fulfilment facts you can’t read; plans then report safety as unknown."
+                    },
+                    "asOf": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "orderId",
+                    "comparisonState",
+                    "plans",
+                    "hidden",
+                    "asOf"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "422",
             "content": {
               "application/json": {
                 "schema": {
@@ -137528,6 +139880,7 @@
                               "replenishment",
                               "fulfillment_recovery",
                               "inventory_correction",
+                              "order_edit",
                               "supplier_commitment",
                               "workflow_handover",
                               "human_task",
@@ -137891,6 +140244,32 @@
                                   }
                                 },
                                 "required": ["kind", "appId", "positionId"]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "const": "app_order"
+                                  },
+                                  "appId": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "connectionId": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "orderId": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "appId",
+                                  "connectionId",
+                                  "orderId"
+                                ]
                               },
                               {
                                 "type": "object",

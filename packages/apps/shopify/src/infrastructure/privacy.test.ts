@@ -70,7 +70,7 @@ it.each([
     expect(inserts()[0]![0]).toContain('ON CONFLICT DO NOTHING');
   },
 );
-it('erases imported customer profiles with redaction intake', async () => {
+it('erases imported customer profiles and order addresses with redaction intake', async () => {
   const f = fixture();
   const erasures = () =>
     f.query.mock.calls
@@ -88,9 +88,26 @@ it('erases imported customer profiles with redaction intake', async () => {
     orders_requested: [],
     data_request: { id: 1 },
   });
+  // A request that names only orders erases their addresses, never every customer.
+  await f.send('customers/redact', {
+    ...base,
+    customer: { email: 'customer@example.test' },
+    orders_to_redact: [7, 8],
+  });
+  await f.send('customers/redact', {
+    ...base,
+    customer: { email: 'customer@example.test' },
+    orders_to_redact: [],
+  });
   expect(erasures()).toEqual([
-    ['development:client', shop, ['gid://shopify/Customer/456']],
-    ['development:client', shop, null],
+    ['development:client', shop, ['gid://shopify/Customer/456'], []],
+    ['development:client', shop, null, null],
+    [
+      'development:client',
+      shop,
+      [],
+      ['gid://shopify/Order/7', 'gid://shopify/Order/8'],
+    ],
   ]);
 });
 it('rejects bad signatures before parsing or persistence', async () => {

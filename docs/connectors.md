@@ -21,6 +21,10 @@ the declared semantics; a different operation needs a contract change.
 - Handlers that declare `filters: ['updatedSince']` accept `updatedSince` and return only
   records changed since then; others reject it. Never represent a creation filter as an
   update filter.
+- `orders.read` handlers that declare `order` read exactly that order by source ID: one
+  observation, or an empty complete page when the source no longer has it, never a cursor.
+  The observation must equal what a scan emits for that order. Shopify, JTL and Luma ERP
+  support it.
 - The first page of a scan may report `total` (progress only) and `history`: the earliest
   creation time the source shares with this connection and the permission that lifts the
   limit.
@@ -37,7 +41,9 @@ Read results contain observations and pagination metadata. `nextCursor` is opaqu
 bound to the connection and query. `completeness: complete` means the requested page is
 fully represented; only a successful scan of every page establishes collection
 completeness. A failed scan, filtered query or partial page cannot establish deletion, and
-tombstones are always explicit. Each observation carries source identity, observation ID
+tombstones are always explicit. The one exception is the [order refresh](orders-workspace.md#refreshing-an-orders-sources):
+a complete read of one order's fulfilment records covers that order completely, so unshipped
+work it no longer returns is retired. Each observation carries source identity, observation ID
 and time, source revision and time, adapter version and schema version. Persist
 observations with stable ingestion keys before projection, and never overwrite absent
 fields from a partial provider event.

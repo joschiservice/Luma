@@ -33,8 +33,8 @@ const payloads = {
 
 /**
  * Verifies compliance deliveries and durably queues encrypted requests for operator
- * fulfillment. Redaction requests also erase imported customer profiles in the same
- * transaction.
+ * fulfillment. Redaction requests also erase imported customer profiles and order addresses
+ * in the same transaction.
  */
 export function createPrivacyIntake(
   db: TenantDatabase,
@@ -90,22 +90,33 @@ export function createPrivacyIntake(
         'INSERT INTO shopify_privacy_requests(tenant_id,app,event_key,topic,payload) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',
         [intakeTenant, app, eventKey, topic, encrypted],
       );
-      // Imported customer profiles are erased with the intake; other retained data still
-      // follows the operator workflow.
-      const request = parsed.data as { customer?: { id?: number } };
+      // Imported customer profiles and order addresses are erased with the intake; other
+      // retained data still follows the operator workflow.
+      const request = parsed.data as {
+        customer?: { id?: number };
+        orders_to_redact?: number[];
+      };
+      const orders = (request.orders_to_redact ?? []).map(
+        (id) => `gid://shopify/Order/${id}`,
+      );
       if (
         topic === 'shop/redact' ||
-        (topic === 'customers/redact' && request.customer?.id)
+        (topic === 'customers/redact' &&
+          (request.customer?.id || orders.length))
       )
         await tx.query(
-          'SELECT erase_shopify_customer_data($1::text,$2::text,$3::text[])',
-          [
-            app,
-            shop,
-            topic === 'shop/redact'
-              ? null
-              : [`gid://shopify/Customer/${request.customer!.id}`],
-          ],
+          'SELECT erase_shopify_customer_data($1::text,$2::text,$3::text[],$4::text[])',
+          topic === 'shop/redact'
+            ? [app, shop, null, null]
+            : [
+                app,
+                shop,
+                // An empty list erases no customer; null would erase every customer.
+                request.customer?.id
+                  ? [`gid://shopify/Customer/${request.customer.id}`]
+                  : [],
+                orders,
+              ],
         );
     });
   };

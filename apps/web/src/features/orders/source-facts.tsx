@@ -45,7 +45,11 @@ function lineColumns(
               ? m.orders_lines_sku({ sku: line.skuCode })
               : m.orders_lines_no_sku()}
             {' · '}
-            {line.skuId ? (
+            {line.catalog === 'variant_removed' ? (
+              m.orders_lines_variant_removed()
+            ) : line.catalog === 'no_product' ? (
+              m.orders_lines_no_product()
+            ) : line.skuId ? (
               <Link
                 to="/app/$organizationId/products/$skuId"
                 params={{ organizationId, skuId: line.skuId }}
@@ -103,6 +107,40 @@ function lineColumns(
 }
 
 /**
+ * Chooses which source's report a section shows when the order has several sources. Sections
+ * share the choice, so switching one switches all.
+ */
+export function SourceSwitch({
+  detail,
+  shown,
+  choose,
+  label,
+}: {
+  detail: OrderDetail;
+  shown: OrderSourceFacts | undefined;
+  choose: (connectionId: string) => void;
+  label: string;
+}) {
+  if (detail.sources.length < 2) return null;
+
+  return (
+    <div className="order-source-switch" role="group" aria-label={label}>
+      {detail.sources.map((source) => (
+        <Button
+          key={source.connectionId}
+          variant="ghost"
+          size="sm"
+          aria-pressed={shown?.connectionId === source.connectionId}
+          onClick={() => choose(source.connectionId)}
+        >
+          {source.label}
+        </Button>
+      ))}
+    </div>
+  );
+}
+
+/**
  * Shows the order lines one source reports. With several sources, a switch chooses which
  * source's lines are shown; `from` is the order path that SKU record links return to.
  */
@@ -121,25 +159,12 @@ export function OrderLines({
 }) {
   return (
     <OrderSection title={m.orders_lines_title()} icon={ListOrdered}>
-      {detail.sources.length > 1 ? (
-        <div
-          className="order-source-switch"
-          role="group"
-          aria-label={m.orders_lines_source_switch()}
-        >
-          {detail.sources.map((source) => (
-            <Button
-              key={source.connectionId}
-              variant="ghost"
-              size="sm"
-              aria-pressed={shown?.connectionId === source.connectionId}
-              onClick={() => choose(source.connectionId)}
-            >
-              {source.label}
-            </Button>
-          ))}
-        </div>
-      ) : null}
+      <SourceSwitch
+        detail={detail}
+        shown={shown}
+        choose={choose}
+        label={m.orders_lines_source_switch()}
+      />
       {shown ? (
         <DataTable
           caption={m.orders_lines_caption({ source: shown.label })}

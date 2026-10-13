@@ -15,16 +15,22 @@ import {
   list,
   text,
   texts,
+  valueConnection,
 } from './connections.js';
 import type { RequestContext } from './context.js';
 import { suggestedExchangeFinancial } from './exchanges.js';
-import { moveOptions, supportedActions } from './fulfillment.js';
+import {
+  moveOptions,
+  supportedActions,
+  unfulfilledUnits,
+} from './fulfillment.js';
 import { available, quantity } from './inventory.js';
 import { mutationResolvers } from './mutations.js';
+import { orderAgreements, orderEditResolvers } from './order-edit-api.js';
+import { outstanding } from './orders.js';
 import {
   all,
   type CustomerData,
-  dayMs,
   decimal,
   type ExchangeLineItemData,
   type FulfillmentData,
@@ -33,6 +39,7 @@ import {
   type FulfillmentOrderLineItemData,
   gid,
   type InventoryAdjustmentGroupData,
+  historyStart,
   type InventoryItemData,
   type InventoryLevelData,
   iso,
@@ -44,6 +51,7 @@ import {
   money,
   moneyBag,
   type OrderData,
+  orderMoneyBag,
   type OrderTransactionData,
   parseGid,
   type ProductData,
@@ -53,6 +61,8 @@ import {
   type ReturnData,
   type ReturnLineItemData,
   type ReverseFulfillmentOrderLineItemData,
+  simulatorAppId,
+  visibleOrder,
   type WebhookSubscriptionData,
 } from './records.js';
 import { suggestedRefund } from './refund-actions.js';
@@ -107,23 +117,6 @@ function isRecord(value: unknown): value is StoredRecord {
   );
 }
 
-/**
- * Orders created before this time are hidden without `read_all_orders`; Shopify then
- * exposes the last 60 days.
- */
-function historyStart(context: RequestContext) {
-  return context.shop.config.scopes.includes('read_all_orders')
-    ? undefined
-    : context.shop.now - 60 * dayMs;
-}
-
-/** Whether an order is visible to the installation's granted order history. */
-function visible(context: RequestContext, order: StoredRecord) {
-  const start = historyStart(context);
-
-  return start === undefined || order.createdAt >= start;
-}
-
 /** Shopify sorts by update time only when asked; other sort keys follow creation order. */
 const sortOrder = (args: Args) =>
   args.sortKey === 'UPDATED_AT' ? ('updated' as const) : ('created' as const);
@@ -138,7 +131,7 @@ function orderQuery(context: RequestContext, args: Args, customer?: string) {
   const filter = searchFilter(query, 'name', (value) =>
     value.startsWith('#') ? value : `#${value}`,
   );
-  const start = historyStart(context);
+  const start = historyStart(context.shop);
 
   return {
     query: {
@@ -231,7 +224,7 @@ async function node(context: RequestContext, id: string | null) {
   }
   if (!nodeKinds.has(parsed.type)) return null;
   const record = await load(context, parsed.type, parsed.id);
-  if (record && parsed.type === 'Order' && !visible(context, record))
+  if (record && parsed.type === 'Order' && !visibleOrder(context.shop, record))
     return null;
 
   return record ?? null;
@@ -243,6 +236,7 @@ const root: TypeResolvers = {
   currentAppInstallation: (_source, _args, context) => ({
     __typename: 'AppInstallation',
     id: gid('AppInstallation', '1'),
+    app: { __typename: 'App', id: simulatorAppId },
     accessScopes: context.shop.config.scopes.map((handle) => ({ handle })),
   }),
   shop: (_source, _args, context) => ({
@@ -314,37 +308,284 @@ const root: TypeResolvers = {
   },
 };
 
+/** Values per request and order, read once per request for the amounts derived from them. */
+function perOrder<T>(
+  cache: WeakMap<RequestContext, Map<string, Promise<T>>>,
+  context: RequestContext,
+  order: string,
+  read: () => Promise<T>,
+) {
+  let orders = cache.get(context);
+  if (!orders) {
+    orders = new Map();
+    cache.set(context, orders);
+  }
+  let value = orders.get(order);
+  if (!value) {
+    value = read();
+    orders.set(order, value);
+  }
+
+  return value;
+}
+
+const requestLines = new WeakMap<
+  RequestContext,
+  Map<string, Promise<StoredRecord<LineItemData>[]>>
+>();
+
+/** An order's line items, read once per request. */
+const orderLines = (context: RequestContext, order: StoredRecord<OrderData>) =>
+  perOrder(requestLines, context, order.id, () =>
+    all<LineItemData>(context.shop, { kind: 'LineItem', parent: order.id }),
+  );
+
+const requestUnfulfilled = new WeakMap<
+  RequestContext,
+  Map<string, Promise<Map<string, number>>>
+>();
+
+/** Units per line of an order still remaining in open fulfillment work, read once per request. */
+const orderUnfulfilled = (context: RequestContext, order: string) =>
+  perOrder(requestUnfulfilled, context, order, () =>
+    unfulfilledUnits(context.shop, order),
+  );
+
+/** A line's tax in minor units, rounded per line as Shopify does. */
+function lineTax(context: RequestContext, line: LineItemData, units: number) {
+  const { taxRate, taxesIncluded } = context.shop.config;
+  if (taxRate === undefined) return 0;
+
+  return Math.round(
+    (line.price * units * taxRate) / (taxesIncluded ? 1 + taxRate : 1),
+  );
+}
+
+/** Sums an amount over the order's lines, as placed or as they currently stand. */
+async function linesTotal(
+  context: RequestContext,
+  order: StoredRecord<OrderData>,
+  amount: (line: LineItemData, units: number) => number,
+  current: boolean,
+) {
+  return (await orderLines(context, order)).reduce(
+    (sum, line) =>
+      sum +
+      amount(
+        line.data,
+        current
+          ? (line.data.currentQuantity ?? line.data.quantity)
+          : line.data.quantity,
+      ),
+    0,
+  );
+}
+
+/** The order's shipping charges; older orders have one free charge for their speed. */
+const shippingLines = (order: StoredRecord<OrderData>) =>
+  order.data.shippingLines ?? [
+    {
+      id: order.id,
+      title: order.data.shipping === 'express' ? 'Express' : 'Standard',
+      code: order.data.shipping === 'express' ? 'EXPRESS' : 'STANDARD',
+      price: 0,
+      removed: false,
+    },
+  ];
+
+const discount = (line: LineItemData, units: number) =>
+  ((line.originalPrice ?? line.price) - line.price) * units;
+
+const subtotal = (line: LineItemData, units: number) => line.price * units;
+
+/** The order's address, or the customer's address for orders stored before addresses. */
+async function orderAddress(
+  context: RequestContext,
+  order: StoredRecord<OrderData>,
+  field: 'shippingAddress' | 'billingAddress',
+) {
+  const customer = await load<CustomerData>(
+    context,
+    'Customer',
+    order.data.customer,
+  );
+  const address =
+    order.data[field] === undefined
+      ? (customer?.data.address ?? null)
+      : order.data[field];
+
+  return address
+    ? {
+        __typename: 'MailingAddress',
+        address1: address.address1,
+        address2: null,
+        city: address.city,
+        provinceCode: null,
+        zip: address.zip,
+        countryCodeV2: address.countryCode,
+      }
+    : null;
+}
+
 const orderResolvers = on<OrderData>({
-  presentmentCurrencyCode: (order) => order.data.currency,
+  currencyCode: (order) => order.data.currency,
+  presentmentCurrencyCode: (order) =>
+    order.data.presentment?.currency ?? order.data.currency,
+  dutiesIncluded: () => false,
+  edited: (order) => order.data.edited ?? false,
+  test: () => false,
+  requiresShipping: () => true,
+  sourceName: () => 'web',
+  tags: (order) => order.data.tags ?? [],
+  processedAt: (order) => iso(order.createdAt),
+  closedAt: (order) => (order.data.closed ? iso(order.updatedAt) : null),
+  shippingAddress: (order, _args, context) =>
+    orderAddress(context, order, 'shippingAddress'),
+  billingAddress: (order, _args, context) =>
+    orderAddress(context, order, 'billingAddress'),
+  subtotalPriceSet: async (order, _args, context) =>
+    orderMoneyBag(
+      await linesTotal(context, order, subtotal, false),
+      order.data,
+    ),
+  currentSubtotalPriceSet: async (order, _args, context) =>
+    orderMoneyBag(await linesTotal(context, order, subtotal, true), order.data),
+  totalDiscountsSet: async (order, _args, context) =>
+    orderMoneyBag(
+      await linesTotal(context, order, discount, false),
+      order.data,
+    ),
+  currentTotalDiscountsSet: async (order, _args, context) =>
+    orderMoneyBag(await linesTotal(context, order, discount, true), order.data),
+  totalTaxSet: async (order, _args, context) =>
+    orderMoneyBag(
+      await linesTotal(
+        context,
+        order,
+        (line, units) => lineTax(context, line, units),
+        false,
+      ),
+      order.data,
+    ),
+  currentTotalTaxSet: async (order, _args, context) =>
+    orderMoneyBag(
+      await linesTotal(
+        context,
+        order,
+        (line, units) => lineTax(context, line, units),
+        true,
+      ),
+      order.data,
+    ),
+  totalShippingPriceSet: (order) =>
+    orderMoneyBag(
+      shippingLines(order).reduce((sum, line) => sum + line.price, 0),
+      order.data,
+    ),
+  currentShippingPriceSet: (order) =>
+    orderMoneyBag(
+      shippingLines(order)
+        .filter((line) => !line.removed)
+        .reduce((sum, line) => sum + line.price, 0),
+      order.data,
+    ),
+  originalTotalDutiesSet: () => null,
+  currentTotalDutiesSet: () => null,
+  originalTotalPriceSet: async (order, _args, context) => {
+    const added = context.shop.config.taxesIncluded
+      ? 0
+      : await linesTotal(
+          context,
+          order,
+          (line, units) => lineTax(context, line, units),
+          false,
+        );
+
+    return orderMoneyBag(
+      (await linesTotal(context, order, subtotal, false)) +
+        added +
+        shippingLines(order).reduce((sum, line) => sum + line.price, 0),
+      order.data,
+    );
+  },
+  currentTaxLines: async (order, _args, context) => {
+    const { taxRate, taxesIncluded } = context.shop.config;
+    if (taxRate === undefined) return [];
+
+    return [
+      {
+        title: taxesIncluded ? 'VAT' : 'Sales tax',
+        rate: taxRate,
+        priceSet: orderMoneyBag(
+          await linesTotal(
+            context,
+            order,
+            (line, units) => lineTax(context, line, units),
+            true,
+          ),
+          order.data,
+        ),
+      },
+    ];
+  },
+  shippingLines: (order, args, context) =>
+    valueConnection(
+      context,
+      args,
+      shippingLines(order)
+        .filter((line) => args.includeRemovals === true || !line.removed)
+        .map((line) => ({
+          __typename: 'ShippingLine',
+          id: gid('ShippingLine', line.id),
+          title: line.title,
+          code: line.code,
+          source: 'shopify',
+          carrierIdentifier: null,
+          isRemoved: line.removed,
+          originalPriceSet: orderMoneyBag(line.price, order.data),
+          discountedPriceSet: orderMoneyBag(line.price, order.data),
+          currentDiscountedPriceSet: orderMoneyBag(
+            line.removed ? 0 : line.price,
+            order.data,
+          ),
+        })),
+    ),
+  discountApplications: (order, args, context) =>
+    valueConnection(
+      context,
+      args,
+      (order.data.discounts ?? []).map((item, index) => ({
+        __typename:
+          item.kind === 'code'
+            ? 'DiscountCodeApplication'
+            : 'AutomaticDiscountApplication',
+        index,
+        ...(item.kind === 'code'
+          ? { code: item.label }
+          : { title: item.label }),
+        allocationMethod: 'ACROSS',
+        targetType: 'LINE_ITEM',
+        targetSelection: 'ALL',
+        value: {
+          __typename: 'PricingPercentageValue',
+          percentage: item.percentage,
+        },
+      })),
+    ),
   taxesIncluded: (_order, _args, context) =>
     context.shop.config.taxesIncluded ?? false,
   customer: (order, _args, context) =>
     load(context, 'Customer', order.data.customer),
   currentTotalPriceSet: (order) =>
-    moneyBag(order.data.total - order.data.refunded, order.data.currency),
-  totalOutstandingSet: async (order, _args, context) => {
-    const transactions = await all<OrderTransactionData>(context.shop, {
-      kind: 'OrderTransaction',
-      parent: order.id,
-    });
-    const captured = transactions
-      .filter(
-        (t) =>
-          ['SALE', 'CAPTURE'].includes(t.data.kind) &&
-          t.data.status === 'SUCCESS',
-      )
-      .reduce((n, t) => n + t.data.amount, 0);
-    const refunded = transactions
-      .filter((t) => t.data.kind === 'REFUND' && t.data.status === 'SUCCESS')
-      .reduce((n, t) => n + t.data.amount, 0);
-
-    return moneyBag(
-      Math.max(0, order.data.total - captured + refunded),
+    orderMoneyBag(order.data.total - order.data.refunded, order.data),
+  totalOutstandingSet: async (order, _args, context) =>
+    moneyBag(
+      await outstanding(context.shop, order.id, order.data.total),
       order.data.currency,
-    );
-  },
+    ),
   lineItems: (order, args, context) =>
     connection(context, args, { kind: 'LineItem', parent: order.id }),
+  agreements: (order, args, context) => orderAgreements(context, order, args),
   fulfillmentOrders: (order, args, context) =>
     connection(context, args, { kind: 'FulfillmentOrder', parent: order.id }),
   fulfillments: (order, args, context) =>
@@ -412,20 +653,44 @@ const workResolvers = on<FulfillmentOrderData>({
   },
 });
 
+/** A line amount in the order's currencies. */
+async function lineMoneyBag(
+  context: RequestContext,
+  line: StoredRecord<LineItemData>,
+  value: number,
+) {
+  const order = await load<OrderData>(context, 'Order', line.data.order);
+
+  return order
+    ? orderMoneyBag(value, order.data)
+    : moneyBag(value, context.shop.config.currency);
+}
+
 /** Field resolvers by GraphQL type; unlisted fields read the record data property of that name. */
 const resolvers: Record<string, TypeResolvers> = {
+  ...orderEditResolvers,
   QueryRoot: root,
   Mutation: mutationResolvers,
   Order: orderResolvers,
   LineItem: on<LineItemData>({
     currentQuantity: (line) => line.data.currentQuantity ?? line.data.quantity,
+    unfulfilledQuantity: async (line, _args, context) =>
+      (await orderUnfulfilled(context, line.data.order)).get(line.id) ?? 0,
     discountedTotalSet: (line, _args, context) =>
       moneyBag(
         line.data.price * line.data.quantity,
         context.shop.config.currency,
       ),
-    originalUnitPriceSet: (line, _args, context) =>
-      moneyBag(line.data.price, context.shop.config.currency),
+    originalUnitPriceSet: async (line, _args, context) =>
+      lineMoneyBag(context, line, line.data.originalPrice ?? line.data.price),
+    discountedUnitPriceAfterAllDiscountsSet: (line, _args, context) =>
+      lineMoneyBag(context, line, line.data.price),
+    totalDiscountSet: (line, _args, context) =>
+      lineMoneyBag(context, line, discount(line.data, line.data.quantity)),
+    variantTitle: (line) => line.data.variantTitle ?? null,
+    requiresShipping: () => true,
+    product: (line, _args, context) =>
+      load(context, 'Product', line.data.product),
     taxLines: (_line, _args, context) =>
       context.shop.config.taxRate === undefined
         ? []

@@ -20,6 +20,7 @@ export async function caseWorkflowFixture(
     origin = 'http://127.0.0.1:3000',
     detection,
     demo,
+    observability,
     timeSkipping = false,
   } = {},
 ) {
@@ -38,6 +39,7 @@ export async function caseWorkflowFixture(
     origin,
     ...(detection ? { detection } : {}),
     ...(demo ? { demo } : {}),
+    ...(observability ? { observability } : {}),
   });
   const base = `/v1/organizations/${f.manifest.organizationId}`;
   const login = async (email) => {
@@ -72,9 +74,14 @@ export async function caseWorkflowFixture(
     return response.json();
   };
   const actor = await f.pilot.operator();
+  // The worker coordinates human tasks and event waits, as the workflow worker does.
+  const activities = {
+    ...f.pilot.caseWorkflows.activities,
+    coordinate: f.pilot.coordination.coordinate,
+  };
   let worker = await createProcessWorker(
     { ...settings, taskQueue: `${settings.taskQueue}-procurement` },
-    f.pilot.caseWorkflows.activities,
+    activities,
   );
   let running = worker.run();
   t.onTestFinished(async () => {
@@ -142,7 +149,7 @@ export async function caseWorkflowFixture(
       await worker.close();
       worker = await createProcessWorker(
         { ...settings, taskQueue: `${settings.taskQueue}-procurement` },
-        f.pilot.caseWorkflows.activities,
+        activities,
       );
       running = worker.run();
     },

@@ -15,6 +15,7 @@
   "connections_capability_fulfillment_hold_release": "Zurückhaltung im Fulfillment aufheben",
   "connections_capability_fulfillment_open": "Fulfillment wieder öffnen",
   "connections_capability_fulfillment_move": "Fulfillment an einen anderen Standort verschieben",
+  "connections_capability_orders_quantity_edit": "Bestellmengen in Shopify ändern",
   "connections_capability_customers_read": "Kunden lesen",
   "connections_capability_returns_read": "Retouren und Erstattungen lesen",
   "connections_capability_shipping_method_read": "Versandarten lesen",

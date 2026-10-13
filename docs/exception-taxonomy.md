@@ -2,7 +2,7 @@
 
 Version: `v0.2`. Owner: `@luma/exceptions`.
 
-This spec defines four exception classes, using the names and lifecycle in
+This spec defines five exception classes, using the names and lifecycle in
 [ADR-002](architecture/002-canonical-commerce-model.md): what evidence each needs, when it
 fires, how it may be resolved and what verifies it. Rules consume normalized evidence,
 never provider payloads. The [golden cases](../packages/exceptions/fixtures/exceptions-v0.json)
@@ -87,6 +87,9 @@ applicable branch wins:
    healthy running/succeeded → exhausted failed/timed-out step → pending retry. An
    interrupted step with known no effect defers for a durable terminal or retry decision.
    Unknown effects take precedence over cancellation or reported success.
+5. **Order quantity:** incomplete comparison → stale/future reads → reported values agree
+   → unresolved authority → authority does not report the line → future change → sources
+   not reread after the propagation window → detect.
 
 ### Identity, repetition and overlap
 
@@ -297,10 +300,47 @@ verification can close the incident; unrelated later runs cannot.
 exhausted retries or missing capability; to an operator for code or configuration
 changes. Keep the incident and causal chain through repair.
 
+## 5. `order_quantity_mismatch`
+
+**Subject:** one line of a canonical order that several source connections report. Subject
+`order`; rule identity `order-line-quantity`; scope `[lineKey, ...sortedConnectionIds]`, where
+the line key is the comparison key Orders uses (a shared canonical line ID, or a mapped SKU
+that occurs once per source) and the connections are every current source of the order.
+
+**Normal:** every source that reports the line's current units shows the same value. Sources
+that report no current units, such as JTL sales orders, are listed with a null value and
+never count as agreeing or differing.
+
+**Trigger:** the Orders comparison is complete (lines match unambiguously, no contributing
+collection read failed or was partial), the oldest and newest contributing order and
+fulfilment reads are fresh, at least two reported values differ, order-line authority
+resolves to a source that reports the line, and every source was read again at least
+`propagationSeconds` after the latest business-state change. Detection is `medium`, reason
+`quantity_mismatch`. A difference read sooner defers with `propagation_pending`, which, as
+for stock, resets the uncertainty window instead of escalating.
+
+**Evidence:** one item per source read (connection, source order ID, snapshot and
+observation IDs, the line's units or null) and one item naming the whole comparison
+(authority and its revision, every contributing snapshot, the change time). Changed
+authority or a new fulfilment read is therefore new evidence.
+
+**Likely causes:** a change made in one system, such as a customer's request in Luma's own
+order record, that has not reached the storefront or the warehouse.
+
+**Safe resolution:** follow the order's [change plan](orders-workspace.md#change-plans):
+started fulfilment work is confirmed or reset by the warehouse first; Shopify receives the
+authoritative value only through the approved [order quantity edit](shopify-actions.md#order-quantity-edits);
+systems without a governed write are updated by a person.
+
+**Verification:** postcondition `workflow_business_postcondition_verified`. Every source in
+the case scope is reread after the latest detection, and the same rule must clear on those
+reads: every reporting source shows one value. A source set that changed since detection
+cannot verify the case.
+
 ## Golden fixture format
 
 The fixture supplies a fixed `now`, versioned thresholds, per-class base facts and named
-cases (`sync-*`, `fulfillment-*`, `inventory-*`, `workflow-*`). Materialize a case with a
+cases (`sync-*`, `fulfillment-*`, `inventory-*`, `order-quantity-*`, `workflow-*`). Materialize a case with a
 **shallow** merge of its class base and `input`; arrays replace whole arrays. Each base
 supplies tenant, subject and synthetic evidence keys. Cases are normalized rule facts, not
 connector responses or database rows. Labels such as `tenant-a` are test identities;
@@ -333,6 +373,9 @@ never counted as autonomous verified success.
   decision `detect`/`high`/`access_lost`, evaluated before the inactive-connection branch.
   Inputs without the fact evaluate as before, so the version stays `v0.1` and stored
   evaluations remain reproducible. Golden case: `sync-access-lost`.
+- **`v0.2`, `order_quantity_mismatch`.** Added the class with its facts, rule identity and
+  golden cases (`order-quantity-*`). It reuses `propagationSeconds` and the freshness
+  window; existing classes evaluate as before, so the version stays `v0.2`.
 - **`v0.2`, `inventory_mismatch` pending sync.** Added the optional fact `mismatchSince`,
   the thresholds `propagationSeconds` and `oversellGuardPercent`, and
   the decision `defer`/`propagation_pending`. Inputs without the facts evaluate as in

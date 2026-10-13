@@ -73,6 +73,7 @@ Some workflows start on their own when Luma detects an issue:
 
 - **Correct Shopify stock from the ERP** starts when Shopify and your ERP disagree on linked stock. It proposes setting Shopify to the ERP quantity and confirms it with a fresh read from Shopify. It never changes ERP stock.
 - **Release an overdue fulfillment hold** starts when a Shopify order stays on a fraud-review or manual hold for too long. It proposes releasing the hold and confirms in Shopify that it’s gone. Payment, address and stock holds go to a person, because their cause has to be fixed first.
+- **Carry an order quantity change to every system** starts when an order line shows a different quantity in Shopify than in the system that holds order-line authority, for example after support changed the quantity in Luma’s own order. The issue says what each system shows, such as “Luma ERP sets this quantity to 1; Shopify still shows 2; JTL doesn’t report it.” First a warehouse task in Needs you asks someone with the Member role to make dispatch carry the new quantity: update the order before picking, or adjust or reset a pick that has started, then answer **Adjusted** or **Cannot adjust** with a short note on what was done. After four hours the task goes to admins, the issue keeps an owner, and the task stays open. Luma then reads every system again; only if that shows the change is safe does it propose the Shopify edit for approval. One check confirms the edit in Shopify and reads every system again: each one that reports the line must show the new quantity. Systems that don’t report quantities are listed as not reporting, never as agreeing.
 - **Check a failing connection** starts when reads from a connection keep failing or a system stopped accepting Luma. Lost access goes to a person straight away, and the issue offers to reconnect. Otherwise it waits 15 minutes, checks again, and hands the issue over only if reads still fail. It changes nothing.
 
 Every change waits in [Needs you](/docs/needs-you) for approval under your [workspace rules](/docs/workspace-settings#approvals). A proposal stays open for four hours. Right before acting, Luma reads stock again: if the change is still the same, it goes ahead; if it would differ, Luma prepares one new proposal in the same Needs you item. A rejected change, a change Luma can’t make safely or an unclear result hands the issue to a person. Nothing is retried without you.
@@ -103,7 +104,10 @@ To build a new workflow, select **New workflow**. See [Create a workflow](/docs/
 
 A **Human task** asks a person or role to choose an answer and add the required evidence.
 Its due time hands responsibility to the fallback person or role; the task stays open.
-Answer it in [Needs you](/docs/needs-you). An answer never approves a later change.
+Answer it in [Needs you](/docs/needs-you). A task about an order links to the order, whose
+change plan shows what to do. An answer never approves a later change. A workflow that starts
+from an issue gives the issue to the person who turned the workflow on when it hands work to
+people and nobody owns the issue yet.
 
 An **Event wait** waits for an event with the workflow's correlation key and required fields.
 Choose its time limit and whether a timeout ends or escalates the run. A timeout is not a

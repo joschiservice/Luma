@@ -51,6 +51,48 @@ function shipment(
 }
 
 describe('order source business comparison', () => {
+  it('matches a line two sources share with a third source that reports it under its own ID by SKU', () => {
+    const store = source('store');
+    // A Luma record copies the store's canonical line; the ERP imports it as its own line.
+    const record = {
+      ...source('record', '1'),
+      lines: [{ ...source('record', '1').lines[0]!, id: 'line-store' }],
+    };
+    const erp = {
+      ...source('erp'),
+      lines: [
+        {
+          ...source('erp').lines[0]!,
+          currentQuantity: null,
+          cancelledQuantity: null,
+        },
+      ],
+    };
+    const result = compareOrderSources([store, record, erp]);
+    expect(result.incomplete).toBe(false);
+    expect(
+      result.differences
+        .filter((difference) => difference.field === 'currentQuantity')
+        .map((difference) => [
+          difference.lineKey,
+          difference.values.map((value) => value.value),
+        ]),
+    ).toEqual([['line-store', ['2', '1', null]]]);
+
+    // A SKU on two shared lines identifies neither.
+    const twice = {
+      ...store,
+      lines: [
+        ...store.lines,
+        { ...store.lines[0]!, id: 'line-store-2', currentQuantity: '2' },
+      ],
+    };
+    expect(
+      compareOrderSources([twice, { ...record, lines: twice.lines }, erp])
+        .incomplete,
+    ).toBe(true);
+  });
+
   it('keeps a reduction pending until both sources are reread after grace, then confirms', () => {
     const a = source('store', '1'),
       b = source('erp');

@@ -91,6 +91,8 @@
   "permissions_shopify_fulfillment_recovery_run_description": "Wiederherstellung festhängender Shopify-Fulfillments ansehen, zur Genehmigung vorlegen und ausführen.",
   "permissions_shopify_inventory_corrections_apply_label": "Shopify-Bestand korrigieren",
   "permissions_shopify_inventory_corrections_apply_description": "Bestandskorrekturen an Shopify-Standorten ansehen, zur Genehmigung vorlegen und anwenden.",
+  "permissions_shopify_order_edits_apply_label": "Shopify-Bestellmengen ändern",
+  "permissions_shopify_order_edits_apply_description": "Mengenänderungen an nicht erfüllten Shopify-Bestellpositionen ansehen, zur Genehmigung vorlegen und senden.",
   "permissions_jtl_purchase_orders_submit_label": "Lieferantenbestellungen an JTL senden",
   "permissions_jtl_purchase_orders_submit_description": "Lieferantenbestellungen an JTL vorschlagen, genehmigen und senden. Zum Genehmigen ist zusätzlich die Berechtigung zum Genehmigen von Änderungen nötig.",
   "permissions_jtl_orders_shipping_method_write_label": "JTL-Versandarten ändern",

@@ -129,12 +129,14 @@ export function createDetectionRepository(
         let reviewRequired = false;
         // Waiting for sync is bounded by the rule itself, so it never accumulates uncertainty.
         const waiting =
-          decision.decision === 'defer' &&
-          decision.reason === 'propagation_pending' &&
-          input.exceptionClass === 'inventory_mismatch' &&
-          input.facts.mismatchSince
-            ? input.facts.mismatchSince
-            : null;
+          decision.decision !== 'defer' ||
+          decision.reason !== 'propagation_pending'
+            ? null
+            : input.exceptionClass === 'inventory_mismatch'
+              ? (input.facts.mismatchSince ?? null)
+              : input.exceptionClass === 'order_quantity_mismatch'
+                ? input.facts.changedAt
+                : null;
         if (decision.decision === 'defer' && !waiting) {
           const uncertainty = await tx.query<{
             first_deferred_at: Date;
@@ -370,7 +372,8 @@ export function createDetectionRepository(
                   ? e.connectionId === subject.subjectId
                   : incident.exceptionClass === 'stuck_fulfillment'
                     ? e.connectionId === subject.scope[0]
-                    : incident.exceptionClass === 'inventory_mismatch'
+                    : incident.exceptionClass === 'inventory_mismatch' ||
+                        incident.exceptionClass === 'order_quantity_mismatch'
                       ? e.connectionId !== null &&
                         subject.scope.slice(1).includes(e.connectionId)
                       : e.connectionId === null;

@@ -9,6 +9,7 @@ import {
   createCommerceServices,
   createExceptionWorkflowRuntime,
   createMetricListener,
+  createOrderLineReader,
   createReadinessCheck,
   createReplenishmentWorker,
   createResourceScope,
@@ -62,6 +63,7 @@ import { lumaCases } from '../simulator/cases.mjs';
 import { createWorkflowDemo, demoDetection } from '../simulator/demo.mjs';
 import { createInventoryScenario } from '../simulator/inventory.mjs';
 import { createStockLinks } from '../simulator/links.mjs';
+import { createQuantityChanges } from '../simulator/quantity-change.mjs';
 import { simulatorShopifyEnv } from '../simulator/shopify-app.mjs';
 import { detectionRequest, readJson } from './fixtures.mjs';
 import { mutateProviderState } from './provider-state.mjs';
@@ -116,12 +118,25 @@ export async function createPilot(
     const simulation = manifest.simulator
       ? createSimulationTransport(manifest.simulator)
       : undefined;
-    // Owners reread stale stock right before they act; created once capabilities exist.
+    // Owners reread stale stock and order sources right before they act; created once
+    // capabilities exist. Plans come from the Orders workspace composed below.
     let stockRefresh = null;
+    let orderRefresh = null;
+    let orderPlans = null;
     const refreshStock = async (actor, positionId) =>
       stockRefresh?.refresh(actor, positionId);
     const installations = createInstalledConnections(db, {
       refreshStock,
+      sourceOrderLines: createOrderLineReader(db),
+      refreshOrder: async (actor, orderId, maxAgeMs) => {
+        await orderRefresh?.(actor, orderId, maxAgeMs);
+      },
+      internalOrdersEnabled: createSalesTenantRelease(observability),
+      orderChangePlans: async (actor, orderId, request) => {
+        if (!orderPlans) throw new Error('Order plans are not composed yet');
+
+        return orderPlans.changePlan(actor, orderId, request);
+      },
       ...(simulation
         ? {
             simulation,
@@ -336,7 +351,10 @@ export async function createPilot(
           },
         })
       : null;
-    if (scheduled) resources.add(scheduled.close);
+    if (scheduled) {
+      resources.add(scheduled.close);
+      orderRefresh = scheduled.refreshOrder;
+    }
     const links = simulation
       ? createStockLinks({ commerce, operator, manifest })
       : null;
@@ -461,6 +479,7 @@ export async function createPilot(
       decisionSources: installations.decisionSources(),
       providerCatalog: installations.providerCatalog,
       workflowSources: installations.registry.workflowSources(),
+      actionPermission: installations.registry.actionPermission,
       ...(detectionTiming.followUps
         ? { followUps: detectionTiming.followUps }
         : {}),
@@ -528,6 +547,7 @@ export async function createPilot(
       library,
       desk: deskService,
     } = application;
+    orderPlans = application.http.orders;
     const desk = {
       ...deskService,
       async review(actor, exceptionId) {
@@ -788,6 +808,11 @@ export async function createPilot(
       })(await context(), exceptionId);
     }
 
+    // Support changes order quantities in Luma when a simulated customer asks for it.
+    const quantityChanges = simulation
+      ? createQuantityChanges({ commerce, application, operator, manifest })
+      : null;
+
     // The merchant's workflow setup for the simulator demo, run in the API process.
     const demo =
       simulation && role === 'api'
@@ -803,6 +828,7 @@ export async function createPilot(
             identity.service,
             application.codeProcesses,
             application.caseWorkflows,
+            application.coordination,
           )
         : undefined;
     if (replenishmentWorker) resources.add(replenishmentWorker.close);
@@ -871,6 +897,8 @@ export async function createPilot(
       runtime,
       replenishment: application.replenishment,
       caseWorkflows: application.caseWorkflows,
+      /** Human tasks and event waits for process workflows, as the worker coordinates them. */
+      coordination: application.coordination,
       procurement: application.procurement,
       commitments: application.commitments,
       procurementContext: application.http.procurementContext,
@@ -927,6 +955,8 @@ export async function createPilot(
       link: async () => links?.pass(),
       /** Turns on demo workflows, suppliers and stock rules once their records are imported. */
       demo: async () => demo?.pass(),
+      /** Carries simulated customers' quantity requests into Luma's order records. */
+      quantityChanges: async () => quantityChanges?.pass(),
       /** Runs one scheduled detection and verification pass, as the sync worker does. */
       detect: async () => {
         if (scheduled) await scheduled.tick(await operator());

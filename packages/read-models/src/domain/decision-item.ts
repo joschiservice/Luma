@@ -6,6 +6,7 @@ type DecisionKind =
   | 'replenishment'
   | 'fulfillment_recovery'
   | 'inventory_correction'
+  | 'order_edit'
   | 'supplier_commitment'
   | 'workflow_handover'
   | 'human_task'
@@ -38,6 +39,7 @@ export type DecisionOwner =
       fulfillmentId: string;
     }
   | { kind: 'app_inventory'; appId: string; positionId: string }
+  | { kind: 'app_order'; appId: string; connectionId: string; orderId: string }
   | { kind: 'purchase_order'; purchaseOrderId: string }
   | { kind: 'message_thread'; threadId: string };
 

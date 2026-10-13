@@ -3,6 +3,7 @@
   "issues_kind_sync_failure": "Verbindungsproblem",
   "issues_kind_stuck_fulfillment": "Fulfillment-Verzögerung",
   "issues_kind_workflow_failure": "Workflow-Problem",
+  "issues_kind_order_quantity_mismatch": "Mengenabweichung",
   "issues_kind_other": "Betriebsproblem",
   "issues_state_detected": "Erkannt",
   "issues_state_diagnosed": "Untersuchung abgeschlossen",
@@ -446,5 +447,9 @@
   "issues_close_running_title": "Bearbeitung läuft möglicherweise noch",
   "issues_close_running_body": "Das Schließen blockiert neue Änderungen für dieses Problem. Bereits gesendete Änderungen werden dadurch weder abgebrochen noch rückgängig gemacht. Laufende Workflows können ihre aktuelle Arbeit und Ergebnisprüfung abschließen. Unklare Änderungen können weiterhin abgeglichen werden.",
   "issues_close_running_confirm": "Ich verstehe, dass bereits laufende Arbeit fortgesetzt werden kann.",
-  "issues_event_closed": "Problem geschlossen"
+  "issues_event_closed": "Problem geschlossen",
+  "issues_summary_quantity_authority": "{system} legt diese Menge auf {quantity} fest",
+  "issues_summary_quantity_differs": "{system} zeigt noch {quantity}",
+  "issues_summary_quantity_not_reported": "{system} meldet sie nicht",
+  "issues_summary_quantity_generic": "Die Mengen einer Bestellposition unterscheiden sich zwischen den Systemen."
 }

@@ -199,6 +199,68 @@ describe('reads', () => {
     });
   });
 
+  it('reports order charges, discounts and amounts in both currencies', async () => {
+    const shop = createShop();
+    await shop.run({ kind: 'seed-catalog', products: catalog });
+    const order = await shop.order({
+      shippingPrice: '4.90',
+      discounts: [{ kind: 'automatic', label: 'Autumn sale', percentage: 20 }],
+      tags: ['gift', 'gift'],
+      presentment: { currency: 'CHF', rate: 0.5 },
+    });
+    const bag = 'shopMoney { amount } presentmentMoney { amount currencyCode }';
+    const body = await shop.query(
+      `query LumaNode($id: ID!) { node(id: $id) { ... on Order { currencyCode presentmentCurrencyCode tags originalTotalPriceSet { ${bag} } currentTotalPriceSet { ${bag} } subtotalPriceSet { ${bag} } totalDiscountsSet { ${bag} } totalShippingPriceSet { ${bag} } shippingLines(first: 5, includeRemovals: true) { nodes { title isRemoved originalPriceSet { ${bag} } } pageInfo { hasNextPage endCursor } } discountApplications(first: 1) { nodes { __typename allocationMethod value { ... on PricingPercentageValue { percentage } } ... on AutomaticDiscountApplication { title } } pageInfo { hasNextPage } } lineItems(first: 1) { nodes { originalUnitPriceSet { ${bag} } discountedUnitPriceAfterAllDiscountsSet { ${bag} } totalDiscountSet { ${bag} } product { id } } } } } }`,
+      { id: `gid://shopify/Order/${order.id}` },
+    );
+    const money = (shop: string, presentment: string) => ({
+      shopMoney: { amount: shop },
+      presentmentMoney: { amount: presentment, currencyCode: 'CHF' },
+    });
+    // Line prices are after the discount; shipping adds to the total.
+    expect(body.data?.node).toEqual({
+      currencyCode: 'EUR',
+      presentmentCurrencyCode: 'CHF',
+      tags: ['gift'],
+      originalTotalPriceSet: money('79.4', '39.7'),
+      currentTotalPriceSet: money('79.4', '39.7'),
+      subtotalPriceSet: money('74.5', '37.25'),
+      totalDiscountsSet: money('18.63', '9.32'),
+      totalShippingPriceSet: money('4.9', '2.45'),
+      shippingLines: {
+        nodes: [
+          {
+            title: 'Standard',
+            isRemoved: false,
+            originalPriceSet: money('4.9', '2.45'),
+          },
+        ],
+        pageInfo: { hasNextPage: false, endCursor: expect.any(String) },
+      },
+      discountApplications: {
+        nodes: [
+          {
+            __typename: 'AutomaticDiscountApplication',
+            allocationMethod: 'ACROSS',
+            value: { percentage: 20 },
+            title: 'Autumn sale',
+          },
+        ],
+        pageInfo: { hasNextPage: false },
+      },
+      lineItems: {
+        nodes: [
+          {
+            originalUnitPriceSet: money('30.0', '15.0'),
+            discountedUnitPriceAfterAllDiscountsSet: money('24.0', '12.0'),
+            totalDiscountSet: money('12.0', '6.0'),
+            product: { id: 'gid://shopify/Product/10' },
+          },
+        ],
+      },
+    });
+  });
+
   it('resolves nodes, inline fragments, aliases and nested connections', async () => {
     const shop = createShop();
     await shop.run({ kind: 'seed-catalog', products: catalog });

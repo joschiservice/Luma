@@ -45,6 +45,24 @@ export const workLines = (context: ShopifyContext, work: string) =>
     parent: work,
   });
 
+/**
+ * Units of each order line still remaining in open fulfillment work (`openStatuses`), by line
+ * item ID; Shopify reports them as the line's unfulfilled quantity. Units in closed, cancelled
+ * or incomplete work do not count.
+ */
+export async function unfulfilledUnits(context: ShopifyContext, order: string) {
+  const units = new Map<string, number>();
+  for (const work of await orderWork(context, order))
+    if (openStatuses.includes(work.data.status))
+      for (const line of await workLines(context, work.id))
+        units.set(
+          line.data.lineItem,
+          (units.get(line.data.lineItem) ?? 0) + line.data.remainingQuantity,
+        );
+
+  return units;
+}
+
 /** Stores an order change and sends `orders/updated`, as Shopify does for any related change. */
 export async function touchOrder(
   context: ShopifyContext,
