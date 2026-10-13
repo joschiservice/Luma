@@ -48,6 +48,17 @@ export const orderLine = z
     sku: descriptiveText,
     variantTitle: descriptiveText,
     requiresShipping: optionalFlag,
+    lineItemGroup: z
+      .object({
+        id: gid('LineItemGroup'),
+        title: z.string().min(1).max(512),
+        quantity: count,
+        productId: gid('Product').nullable(),
+        variantId: gid('ProductVariant').nullable(),
+        variantSku: z.string().nullable(),
+      })
+      .nullable()
+      .optional(),
     originalUnitPriceSet: z
       .object({
         shopMoney: money,
@@ -185,9 +196,22 @@ export const order = z.object({
     .optional(),
 });
 
+export const productVariantComponent = z.object({
+  id: gid('ProductVariantComponent'),
+  quantity: count,
+  productVariant: z.object({
+    id: gid('ProductVariant'),
+    inventoryItem: z.object({ id: gid('InventoryItem') }).nullable(),
+  }),
+});
+
 export const variant = z.object({
   id: gid('ProductVariant'),
   sku: z.string().nullable(),
+  requiresComponents: z.boolean().optional(),
+  productVariantComponents: z
+    .object({ nodes: z.array(productVariantComponent), pageInfo })
+    .optional(),
   inventoryItem: z.object({ id: gid('InventoryItem') }),
   // Descriptive facts become unknown when malformed; they never block the product read.
   title: z.string().nullable().optional().catch(null),

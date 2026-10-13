@@ -307,3 +307,12 @@ are source-reported facts, not invoices. Missing prices, ambiguous tax rates and
 tax inclusion remain unknown.
 Stored earlier schema versions remain readable. See
 [ADR-012](architecture/012-native-order-records.md) for ownership and retention.
+
+## Sold bundles
+
+Bundle groups are source merchandising context on actual component lines, not additional
+order lines. Allocation, fulfillment, sales and returns retain their existing component
+identities and quantities. A current catalog recipe does not change an earlier sale, and
+partial returns or current-unit reductions do not infer a new recipe. Unread group visibility
+remains unknown; null explicitly identifies a standalone line. Deleting a component removes
+its current SKU mapping while retaining the historical group and descriptive text.

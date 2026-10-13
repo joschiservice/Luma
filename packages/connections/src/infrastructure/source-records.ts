@@ -481,8 +481,12 @@ function evidenceIdentities(input: CommerceObservation) {
     });
   }
   if (input.capability === 'products.read')
-    for (const sku of input.observation.data.skus)
+    for (const sku of input.observation.data.skus) {
       refs.push({ ...source, ...sku.id, resource: 'sku' });
+      for (const component of sku.bundle?.components ?? [])
+        if (component.sku)
+          refs.push({ ...source, ...component.sku, resource: 'sku' });
+    }
   if (input.capability === 'fulfillment.read') {
     refs.push({
       ...source,

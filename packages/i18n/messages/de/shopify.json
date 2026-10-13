@@ -182,6 +182,7 @@
   "shopify_subscriptions_unavailable": "Mit aktuellem Zugriff nicht verfügbar",
   "shopify_subscriptions_received": "Letzte verifizierte Zustellung: {time}",
   "shopify_subscriptions_no_delivery": "Noch keine verifizierte Zustellung",
+  "shopify_blocker_correction_bundle_parent": "Der Bundle-Bestand ergibt sich aus den Komponenten. Prüfen Sie deren Bestand.",
   "shopify_scope_order_edits_write": "Mengenänderungen an Bestellungen",
   "shopify_order_edit_title": "Mengen in Shopify ändern",
   "shopify_order_edit_help": "Ändere, wie viele Einheiten nicht erfüllter Positionen diese Bestellung enthält. Die genaue Änderung muss genehmigt werden, und Luma prüft das Fulfillment und berechnet die Bestellung direkt vor dem Senden neu.",

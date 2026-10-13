@@ -200,7 +200,7 @@ async function readListings(
      (SELECT m.external_id FROM connector_source_mappings m WHERE m.tenant_id=k.tenant_id AND m.resource='sku'
       AND m.canonical_id=k.sku_id AND m.connection_id=k.connection_id ORDER BY m.external_id LIMIT 1) AS "externalSku",
      k.code,k.product_title AS "productTitle",k.variant_title AS "variantTitle",k.product_status AS status,
-     k.published,k.vendor,k.barcode,
+     k.published,k.vendor,k.barcode,k.requires_components AS "requiresComponents",
      CASE WHEN k.price_amount IS NULL THEN NULL ELSE jsonb_build_object('amount',k.price_amount::text,'currency',k.price_currency) END AS price,
      k.unit,to_char(k.observed_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "observedAt",
      to_char(k.source_updated_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "sourceUpdatedAt"

@@ -21,6 +21,7 @@ export type CatalogListing = {
   price: { amount: string; currency: string | null } | null;
   unit: string;
   observedAt: string;
+  requiresComponents?: boolean | null;
   sourceUpdatedAt: string | null;
 };
 
@@ -90,6 +91,26 @@ export type ProductDetailSection =
   'stock' | 'sales' | 'orders' | 'purchaseOrders' | 'issues';
 
 export interface ProductDetail {
+  /** Current catalog recipes, independent of previously sold order compositions. */
+  bundles?: {
+    connectionId: string;
+    productId: string;
+    variant: { externalId: string; scopeKey: string };
+    requiresComponents: boolean;
+    components:
+      | {
+          sourceId: { externalId: string; scopeKey: string };
+          sourceVariant: { externalId: string; scopeKey: string };
+          sourceSku: { externalId: string; scopeKey: string } | null;
+          skuId: string | null;
+          /** Current catalog label; it never establishes component identity. */
+          skuLabel?: string | null;
+          quantity: string;
+        }[]
+      | null;
+    observedAt: string;
+    sourceUpdatedAt: string | null;
+  }[];
   item: CatalogItem;
   sources: CatalogSource[];
   variants: {
@@ -111,6 +132,10 @@ export interface ProductDetail {
       status: CatalogListing['status'] | null;
       published: boolean | null;
       price: CatalogListing['price'];
+      bundle?: Omit<
+        NonNullable<ProductDetail['bundles']>[number],
+        'connectionId' | 'productId' | 'observedAt' | 'sourceUpdatedAt'
+      > | null;
     }[];
     truncated: boolean;
   };

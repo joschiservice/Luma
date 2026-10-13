@@ -29,6 +29,7 @@ import {
 import { z } from 'zod';
 
 import { readBulkHistory } from './bulk-history.js';
+import { createBundleReader } from './bundles.js';
 import { createInventoryTransferCapabilities } from './inventory-transfers.js';
 import { lineFacts, mailingAddress, orderFacts } from './order-facts.js';
 import {
@@ -41,6 +42,7 @@ import {
   orderSelection,
   readPageSize,
   readSelection,
+  variantSelection,
   shippingLine,
 } from './read-selections.js';
 import { createShopifyReturnCapabilities } from './return-actions.js';
@@ -273,6 +275,7 @@ export function createShopifyConnector(
   )
     fail('invalid_input');
   const request = createClient(options);
+  const readBundleRecipes = createBundleReader(request);
   const now = options.now ?? (() => new Date());
   const id = options.id ?? randomUUID;
   const orderCustomers = !!options.customerAccess && !!options.orderCustomers;
@@ -967,6 +970,24 @@ export function createShopifyConnector(
                       : null,
                 skuCode: text(line.sku),
                 title: text(line.name),
+                ...(line.lineItemGroup === undefined
+                  ? {}
+                  : {
+                      bundleGroup: line.lineItemGroup
+                        ? {
+                            id: ref(line.lineItemGroup.id),
+                            title: line.lineItemGroup.title,
+                            quantity: String(line.lineItemGroup.quantity),
+                            product: line.lineItemGroup.productId
+                              ? ref(line.lineItemGroup.productId)
+                              : null,
+                            variant: line.lineItemGroup.variantId
+                              ? ref(line.lineItemGroup.variantId)
+                              : null,
+                            skuCode: text(line.lineItemGroup.variantSku),
+                          }
+                        : null,
+                    }),
                 ...lineFacts(line),
               })),
             } satisfies OrderSnapshot);
@@ -981,9 +1002,24 @@ export function createShopifyConnector(
               parent.id,
               'Product',
               'variants',
-              'id sku title price barcode inventoryItem { id }',
+              variantSelection,
               s.variant,
             );
+            // An export establishes older catalog facts, not a historical recipe read now.
+            const bundles = bulk
+              ? new Map(
+                  variants
+                    .filter((v) => v.requiresComponents !== undefined)
+                    .map((v) => [
+                      v.id,
+                      {
+                        variant: ref(v.id),
+                        requiresComponents: v.requiresComponents === true,
+                        components: null,
+                      },
+                    ]),
+                )
+              : await readBundleRecipes(variants);
             const currency =
               product.priceRangeV2?.minVariantPrice.currencyCode ?? null;
             emit('product', ref(product.id), product.updatedAt, {
@@ -1006,6 +1042,9 @@ export function createShopifyConnector(
                     ? null
                     : { amount: variant.price, currency },
                 barcode: text(variant.barcode),
+                ...(bundles.has(variant.id)
+                  ? { bundle: bundles.get(variant.id)! }
+                  : {}),
               })),
             } satisfies ProductSnapshot);
           } else if (capability === 'inventory.read') {

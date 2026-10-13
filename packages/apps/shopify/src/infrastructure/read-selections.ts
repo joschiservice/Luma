@@ -27,7 +27,7 @@ const order = [
 ].join(' ');
 
 /** Order line fields, including the line's prices and whether its variant or product still exists. */
-export const orderLine = `id quantity currentQuantity name sku variantTitle requiresShipping originalUnitPriceSet { ${bag} } discountedUnitPriceAfterAllDiscountsSet { ${bag} } totalDiscountSet { ${bag} } taxLines { rate } variant { inventoryItem { id } } product { id }`;
+export const orderLine = `id quantity currentQuantity name sku lineItemGroup { id title quantity productId variantId variantSku } variantTitle requiresShipping originalUnitPriceSet { ${bag} } discountedUnitPriceAfterAllDiscountsSet { ${bag} } totalDiscountSet { ${bag} } taxLines { rate } variant { inventoryItem { id } } product { id }`;
 
 /** Shipping charges, including those an order edit removed. */
 export const shippingLine = `id title code source carrierIdentifier isRemoved originalPriceSet { ${bag} } discountedPriceSet { ${bag} } currentDiscountedPriceSet { ${bag} }`;
@@ -55,7 +55,11 @@ export function orderSelection(customer = false, addresses = false) {
 }
 const product =
   'id updatedAt title status vendor publishedAt priceRangeV2 { minVariantPrice { currencyCode } }';
-const variant = 'id sku title price barcode inventoryItem { id }';
+const variant =
+  'id sku title price barcode requiresComponents inventoryItem { id }';
+
+/** The first recipe edge proves an empty recipe cheaply; only overflow needs separate reads. */
+export const variantSelection = `${variant} productVariantComponents(first: 1) { nodes { id quantity productVariant { id inventoryItem { id } } } pageInfo { hasNextPage endCursor } }`;
 const level =
   'id updatedAt isActive location { id isActive } quantities(names: ["on_hand", "committed", "reserved", "incoming", "damaged", "quality_control", "safety_stock", "available"]) { name quantity }';
 const work =
@@ -95,7 +99,7 @@ export function readSelection(
         connection('discountApplications', 2, discountApplication),
       ].join(' ');
     case 'products.read':
-      return `${product} ${connection('variants', 8, variant)}`;
+      return `${product} ${connection('variants', 8, variantSelection)}`;
     case 'inventory.read':
       return `id tracked ${connection('inventoryLevels', 4, level)}`;
     case 'fulfillment.read':
@@ -113,6 +117,7 @@ export function readSelection(
 // seven orders fit.
 const rootPageSizes: Partial<Record<ReadCapability, number>> = {
   'orders.read': 7,
+  'products.read': 15,
   'fulfillment.read': 5,
   'returns.read': 5,
 };

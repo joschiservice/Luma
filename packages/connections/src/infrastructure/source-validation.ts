@@ -2,6 +2,10 @@ import { z } from 'zod';
 
 import type { SourceIdentity } from '../domain/capabilities.js';
 import {
+  orderBundleGroupSchema,
+  productBundleSchema,
+} from './bundle-validation.js';
+import {
   shipmentSnapshotSchema,
   transferSnapshotSchema,
 } from './transfer-validation.js';
@@ -436,6 +440,7 @@ export const commerceSchema = z.discriminatedUnion('capability', [
                     .optional(),
                   skuCode: text.nullable().optional(),
                   title: text.nullable().optional(),
+                  bundleGroup: orderBundleGroupSchema.nullable().optional(),
                   ...orderLineFacts,
                 })
                 .strict()
@@ -563,18 +568,29 @@ export const commerceSchema = z.discriminatedUnion('capability', [
             status: z.enum(['active', 'draft', 'archived', 'unknown']),
             vendor: z.string().max(1024).nullable().optional(),
             published: z.boolean().nullable().optional(),
-            skus: z.array(
-              z
-                .object({
-                  id: external,
-                  code: z.string().max(1024).nullable(),
-                  unit,
-                  title: z.string().max(1024).nullable().optional(),
-                  price: listPrice.nullable().optional(),
-                  barcode: z.string().max(512).nullable().optional(),
-                })
-                .strict(),
-            ),
+            skus: z
+              .array(
+                z
+                  .object({
+                    id: external,
+                    code: z.string().max(1024).nullable(),
+                    unit,
+                    title: z.string().max(1024).nullable().optional(),
+                    price: listPrice.nullable().optional(),
+                    barcode: z.string().max(512).nullable().optional(),
+                    bundle: productBundleSchema.optional(),
+                  })
+                  .strict(),
+              )
+              .max(5000)
+              .refine(
+                (skus) =>
+                  skus.reduce(
+                    (sum, sku) => sum + (sku.bundle?.components?.length ?? 0),
+                    0,
+                  ) <= 5000,
+                'Product component budget exceeded',
+              ),
           })
           .strict(),
       ),

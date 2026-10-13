@@ -84,6 +84,50 @@ export async function readSourceFacts(
         return {
           id: String(line.id),
           skuId: text(line.skuId),
+          ...(line.bundleGroup === undefined
+            ? {}
+            : {
+                bundleGroup:
+                  line.bundleGroup === null
+                    ? null
+                    : {
+                        id: {
+                          externalId: String(
+                            object(object(line.bundleGroup).id).externalId,
+                          ),
+                          scopeKey: String(
+                            object(object(line.bundleGroup).id).scopeKey,
+                          ),
+                        },
+                        title: String(object(line.bundleGroup).title),
+                        quantity: String(object(line.bundleGroup).quantity),
+                        product: object(line.bundleGroup).product
+                          ? {
+                              externalId: String(
+                                object(object(line.bundleGroup).product)
+                                  .externalId,
+                              ),
+                              scopeKey: String(
+                                object(object(line.bundleGroup).product)
+                                  .scopeKey,
+                              ),
+                            }
+                          : null,
+                        variant: object(line.bundleGroup).variant
+                          ? {
+                              externalId: String(
+                                object(object(line.bundleGroup).variant)
+                                  .externalId,
+                              ),
+                              scopeKey: String(
+                                object(object(line.bundleGroup).variant)
+                                  .scopeKey,
+                              ),
+                            }
+                          : null,
+                        skuCode: text(object(line.bundleGroup).skuCode),
+                      },
+              }),
           comparisonKey: null as string | null,
           unitPrice: line.unitPrice
             ? {

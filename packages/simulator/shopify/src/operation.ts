@@ -155,9 +155,18 @@ const readCapabilities: [string, string[]][] = [
     ['fulfillmentOrders', 'fulfillments', 'FulfillmentOrder', 'Fulfillment'],
   ],
   ['customers.read', ['customers', 'customersCount', 'Customer']],
-  ['products.read', ['products', 'productsCount', 'Product']],
+  [
+    'products.read',
+    [
+      'products',
+      'productsCount',
+      'Product',
+      'ProductVariant',
+      'ProductVariantComponent',
+    ],
+  ],
   ['inventory.read', ['inventoryItems', 'InventoryItem']],
-  ['orders.read', ['orders', 'ordersCount', 'Order']],
+  ['orders.read', ['orders', 'ordersCount', 'Order', 'LineItemGroup']],
 ];
 
 /** Classifies an operation as the Luma capability it serves. */

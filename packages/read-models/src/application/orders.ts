@@ -139,6 +139,14 @@ export interface OrderSourceFacts extends OrderSource, OrderCommercialData {
   lines: ({
     id: string;
     skuId: string | null;
+    bundleGroup?: {
+      id: { externalId: string; scopeKey: string };
+      title: string;
+      quantity: string;
+      product: { externalId: string; scopeKey: string } | null;
+      variant: { externalId: string; scopeKey: string } | null;
+      skuCode: string | null;
+    } | null;
     comparisonKey: string | null;
     unitPrice?: { amount: string; currency: string } | null;
     /** Whether `unitPrice` includes tax, as the source states it; null when unknown. */

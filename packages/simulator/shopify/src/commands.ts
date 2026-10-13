@@ -55,6 +55,8 @@ export function command(
   value: ShopifyCommand,
 ): Promise<ShopifyCommandResult> {
   switch (value.kind) {
+    case 'bundle-recipe':
+      return replaceBundleRecipe(context, value);
     case 'inventory-transfer':
       return recordInventoryTransfer(context, value.transfer);
     case 'seed-catalog':
@@ -294,4 +296,69 @@ async function setStock(
     id: levelId(value.variant, value.location),
     gid: levelGid(value.variant, value.location),
   };
+}
+
+/** Changes a current catalog recipe without rewriting sold groups or adjusting inventory. */
+async function replaceBundleRecipe(
+  context: ShopifyContext,
+  value: Command<'bundle-recipe'>,
+): Promise<ShopifyCommandResult> {
+  const parent = await load<ProductVariantData>(
+    context,
+    'ProductVariant',
+    value.variant,
+  );
+  if (!parent) throw new Error('Bundle variant not found');
+  if (
+    value.components.length > 5000 ||
+    new Set(value.components.map((c) => c.id)).size !== value.components.length
+  )
+    throw new Error('Invalid recipe identities');
+  for (const component of value.components) {
+    if (
+      !/^[1-9][0-9]*$/.test(component.id) ||
+      !Number.isSafeInteger(component.quantity) ||
+      component.quantity < 1 ||
+      component.variant === value.variant
+    )
+      throw new Error('Invalid component');
+    if (!(await load(context, 'ProductVariant', component.variant)))
+      throw new Error('Component variant not found');
+    const previous = await context.store.get(
+      'ProductVariantComponent',
+      component.id,
+    );
+    if (previous && previous.parent !== value.variant)
+      throw new Error('Component belongs to another parent');
+  }
+  const old = await all(context, {
+    kind: 'ProductVariantComponent',
+    parent: value.variant,
+  });
+  for (const component of old)
+    await context.store.delete('ProductVariantComponent', component.id);
+  await context.store.putMany(
+    value.components.map((c) =>
+      insert(
+        context,
+        'ProductVariantComponent',
+        c.id,
+        { variant: c.variant, quantity: c.quantity },
+        { parent: value.variant },
+      ),
+    ),
+  );
+  await save(context, 'ProductVariant', value.variant, {
+    ...parent.data,
+    requiresComponents: value.requiresComponents,
+  });
+  const product = await load<ProductData>(
+    context,
+    'Product',
+    parent.data.product,
+  );
+  if (product) await save(context, 'Product', product.id, product.data);
+  notify(context, 'products/update', 'Product', parent.data.product);
+
+  return { id: value.variant, gid: gid('ProductVariant', value.variant) };
 }

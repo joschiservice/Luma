@@ -36,6 +36,7 @@ import {
 import { stockQuantity, StockState } from '../inventory/presentation';
 import { recordReturnPath } from '../records/data';
 import { IdentityLinks } from '../sync/identity-links';
+import { BundleRecipes } from './bundle-recipes';
 import { productFilters, productOptions, type ProductsSearch } from './data';
 import {
   catalogState,
@@ -618,6 +619,12 @@ export function ProductDetailView({
           {detail.relatedTruncated ? (
             <Alert>{m.products_related_truncated()}</Alert>
           ) : null}
+          <BundleRecipes
+            detail={detail}
+            organizationId={organizationId}
+            sourceLabel={sourceLabel}
+            from={from}
+          />
           <div id="sku-sources">{identity}</div>
           <section className="products-section">
             <h2>{m.products_history_title()}</h2>
@@ -669,6 +676,35 @@ export function ProductDetailView({
                             (s) => s.connectionId === entry.connectionId,
                           )?.system ?? null,
                         ),
+                },
+                {
+                  key: 'bundle',
+                  header: m.products_bundles_title(),
+                  cell: (entry) =>
+                    entry.bundle?.components ? (
+                      <details>
+                        <summary>
+                          {formatNumber(entry.bundle.components.length)} ·{' '}
+                          {m.products_bundles_title()}
+                        </summary>
+                        <ul>
+                          {entry.bundle.components
+                            .slice(0, 100)
+                            .map((component) => (
+                              <li key={JSON.stringify(component.sourceId)}>
+                                {component.sourceSku?.externalId ??
+                                  component.sourceVariant.externalId}{' '}
+                                · {formatSourceNumber(component.quantity)}
+                              </li>
+                            ))}
+                        </ul>
+                        {entry.bundle.components.length > 100 ? (
+                          <p>{m.products_bundles_limit()}</p>
+                        ) : null}
+                      </details>
+                    ) : (
+                      m.products_bundles_unknown()
+                    ),
                 },
                 {
                   key: 'price',

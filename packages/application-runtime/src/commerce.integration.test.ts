@@ -1906,8 +1906,8 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
         version: 2,
         snapshot: {
           observationId: completed.observation.id,
-          schemaVersion: 6,
-          normalizerVersion: 'commerce/6',
+          schemaVersion: 7,
+          normalizerVersion: 'commerce/7',
           sourceUpdatedAt: null,
           data: {
             status: 'completed',
@@ -2036,18 +2036,18 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       ).toEqual([
         [1, 'commerce/1'],
         [2, 'commerce/2'],
-        [6, 'commerce/6'],
+        [7, 'commerce/7'],
       ]);
       expect(
         (await services.orders.current(context(), id))[0]?.snapshot,
       ).toMatchObject({
-        schemaVersion: 6,
+        schemaVersion: 7,
         data: { total: { amount: '48', currency: 'EUR' } },
       });
       await expect(
         services.orders.project(context(), {
           ...legacy,
-          schemaVersion: 6 as never,
+          schemaVersion: 8 as never,
         }),
       ).rejects.toThrow();
     });

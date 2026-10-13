@@ -1,3 +1,7 @@
+import {
+  orderBundleGroupSchema,
+  productBundleSchema,
+} from '@luma/connections/composition';
 import { count, gid, money, timestamp } from '@luma/connector-shopify/schemas';
 import { z } from 'zod';
 
@@ -7,7 +11,7 @@ export * from '@luma/connector-shopify/schemas';
  * Version of this adapter's normalized output, recorded as observation provenance. Bump it
  * whenever the same provider response would normalize differently.
  */
-export const adapterVersion = 'shopify/10';
+export const adapterVersion = 'shopify/11';
 
 const externalId = z
   .object({ externalId: z.string().min(1), scopeKey: z.string() })
@@ -262,6 +266,7 @@ export const outputs = {
             taxRate: decimal.nullable().optional(),
             skuCode: text,
             title: text,
+            bundleGroup: orderBundleGroupSchema.nullable().optional(),
             variantTitle: text.optional(),
             prices: z
               .object({
@@ -303,6 +308,7 @@ export const outputs = {
               })
               .nullable(),
             barcode: z.string().nullable(),
+            bundle: productBundleSchema.optional(),
           }),
         ),
       }),

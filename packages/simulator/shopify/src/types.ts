@@ -55,7 +55,18 @@ export interface ShopifyCustomerInput {
   address: { address1: string; city: string; zip: string; countryCode: string };
 }
 
+/** Historical merchandising group shared by the actual component order lines. */
+interface ShopifyBundleGroup {
+  id: string;
+  title: string;
+  quantity: number;
+  product: string | null;
+  variant: string | null;
+  sku: string | null;
+}
+
 interface ShopifyOrderLineInput {
+  bundleGroup?: ShopifyBundleGroup;
   /** Numeric variant ID. */
   variant: string;
   quantity: number;
@@ -72,6 +83,12 @@ export type ShipmentStatus =
  * this shop; `order` refers to the numeric order ID.
  */
 export type ShopifyCommand =
+  | {
+      kind: 'bundle-recipe';
+      variant: string;
+      requiresComponents: boolean;
+      components: { id: string; variant: string; quantity: number }[];
+    }
   | { kind: 'inventory-transfer'; transfer: ShopifyInventoryTransfer }
   | { kind: 'seed-catalog'; products: ShopifySeedProduct[] }
   | { kind: 'customer'; customer: ShopifyCustomerInput }

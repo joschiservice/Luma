@@ -1,6 +1,16 @@
 import { z } from 'zod';
 
 const stockSourceSchema = z.object({
+  bundleContext: z
+    .object({
+      observedAt: z.string().datetime({ offset: true }),
+      componentCount: z.number().int().nonnegative().nullable(),
+    })
+    .nullable()
+    .optional()
+    .describe(
+      'Catalog context of a known bundle parent. Its timestamp is independent of the stock read and does not establish physical component stock.',
+    ),
   connectionId: z.string().uuid(),
   label: z.string(),
   status: z.string(),

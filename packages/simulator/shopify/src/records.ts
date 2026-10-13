@@ -89,6 +89,7 @@ interface OrderAddressData {
 }
 
 export interface LineItemData {
+  bundleGroup?: string;
   order: string;
   variant: string | null;
   product: string | null;
@@ -261,6 +262,7 @@ export interface ProductData {
 }
 
 export interface ProductVariantData {
+  requiresComponents?: boolean;
   product: string;
   sku: string;
   title: string;
@@ -580,3 +582,18 @@ export type InventoryShipmentData = Omit<
 export type InventoryShipmentLineData = NonNullable<
   ShopifyInventoryShipment['lines']
 >[number];
+
+/** Exact component recipe edge owned by a merchandising variant. */
+export interface ProductVariantComponentData {
+  variant: string;
+  quantity: number;
+}
+
+/** Historical group identity remains readable after its catalog parent is deleted. */
+export interface LineItemGroupData {
+  title: string;
+  quantity: number;
+  product: string | null;
+  variant: string | null;
+  sku: string | null;
+}

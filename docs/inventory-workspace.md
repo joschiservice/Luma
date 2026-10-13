@@ -96,3 +96,17 @@ downloads do not send a claim.
 Operational lists read scalar stage facts from a tenant-scoped index and return at most 50
 summaries. Detail reads retain at most 5,000 exact lines, 20 scalar history summaries with historical location facts and 50 related records
 per kind. Truncation is explicit. Cursors belong to the tenant, source and filters that produced them.
+
+## Bundle evidence
+
+A catalog variant's source recipe preserves exact component identities and quantities.
+Current recipes are independent of sold order groups and their fulfillment or return lines.
+Provider observations neither post native stock nor create a separate bundle balance;
+physical allocation follows component SKUs under the quantity ledger semantics. Unknown
+visibility differs from a confirmed empty recipe. Plain SKU text cannot establish either
+component or parent identity. SKU remapping replays dependent recipes through the owner's
+current dependency index. Lists return scalar parent flags; recipes are read only for the
+selected SKU, with at most 5,000 source edges. Detail displays the first 100 edges.
+
+Known Shopify bundle parents cannot receive independent available-stock corrections.
+The provider checks the current parent flag and first recipe edge again before dispatch.

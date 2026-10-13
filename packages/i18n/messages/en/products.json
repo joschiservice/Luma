@@ -159,5 +159,14 @@
   "products_sales_daily": "Daily units",
   "products_sales_daily_caption": "{source}: units ordered by day",
   "products_sales_day_column": "Day (UTC)",
-  "products_sales_units_column": "Units"
+  "products_sales_units_column": "Units",
+  "products_bundles_title": "Bundle components",
+  "products_bundles_note": "The parent is merchandising context. Stock and fulfillment use the actual component lines. Current catalog recipes do not rewrite sold bundles.",
+  "products_bundles_unknown": "Component visibility is unknown. SKU text does not establish a relationship.",
+  "products_bundles_empty": "This source reports no component recipe.",
+  "products_bundles_parent": "Bundle parent · component stock",
+  "products_bundles_group": "Bundle: {title} · {quantity} sold groups",
+  "products_bundles_limit": "Showing the first 100 components.",
+  "products_bundles_component": "Component",
+  "products_bundles_quantity": "Units per parent"
 }

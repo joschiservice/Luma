@@ -101,3 +101,8 @@ export {
   transferSnapshotSchema,
   shipmentSnapshotSchema,
 } from './infrastructure/transfer-validation.js';
+
+export {
+  orderBundleGroupSchema,
+  productBundleSchema,
+} from './infrastructure/bundle-validation.js';

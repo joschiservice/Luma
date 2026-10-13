@@ -109,6 +109,14 @@ const lineQuantities = z
  */
 export const shopifyCommandSchema = z.discriminatedUnion('kind', [
   z.object({
+    kind: z.literal('bundle-recipe'),
+    variant: id,
+    requiresComponents: z.boolean(),
+    components: z
+      .array(z.object({ id, variant: id, quantity: positive }))
+      .max(5000),
+  }),
+  z.object({
     kind: z.literal('inventory-transfer'),
     transfer: inventoryTransfer,
   }),

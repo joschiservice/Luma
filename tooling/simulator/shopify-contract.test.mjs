@@ -149,6 +149,8 @@ function createShop(clock = Date.now) {
     drift: false,
     throttles: 0,
     maxCost: 0,
+    requests: 0,
+    actualCost: 0,
     events: [],
     now: Date.now() - 3_600_000,
     context() {
@@ -169,6 +171,7 @@ function createShop(clock = Date.now) {
     },
     fetch: createTransport(async (request) => {
       const cost = rateLimit.cost(request);
+      shop.requests++;
       shop.maxCost = Math.max(shop.maxCost, cost);
       if (!charge(rateLimit, bucket, cost, clock())) {
         shop.throttles++;
@@ -178,6 +181,7 @@ function createShop(clock = Date.now) {
 
       const handled = await shopify.handle(shop.context(), request);
       const response = shop.drift ? shopify.drift(handled) : handled;
+      shop.actualCost += rateLimit.actualCost(response) ?? cost;
       bucket.available = Math.min(
         rateLimit.capacity,
         bucket.available + cost - (rateLimit.actualCost(response) ?? cost),
@@ -1400,15 +1404,30 @@ test('bulk history resumes export and JSONL chunks after restart with identical 
       imported.push(...result.value.items);
       cursor = result.value.nextCursor;
     } while (cursor);
-    // Exports cannot include discounts, so exported orders leave them unread.
+    // A catalog export cannot attach a recipe fetched later to its older snapshot time.
+    const expected =
+      capability === 'products.read'
+        ? paged.items.map((item) => ({
+            ...item,
+            data: {
+              ...item.data,
+              skus: item.data.skus.map((sku) => ({
+                ...sku,
+                ...(sku.bundle
+                  ? { bundle: { ...sku.bundle, components: null } }
+                  : {}),
+              })),
+            },
+          }))
+        : paged.items;
+    // Order exports omit discounts; catalog exports omit recipes read after their timestamp.
     assert.ok(imported.every((item) => !Object.hasOwn(item.data, 'discounts')));
     assert.deepEqual(
       normalized(imported),
       normalized(
-        paged.items.map((item) => {
+        expected.map((item) => {
           const data = { ...item.data };
           delete data.discounts;
-
           return { ...item, data };
         }),
       ),
@@ -1528,9 +1547,28 @@ test('shared pacing admits nested pages within the requested budget without thro
   assert.equal(records, 500);
   assert.equal(shop.throttles, 0);
   assert.ok(shop.maxCost <= 1000);
+  const minimum =
+    Math.max(
+      0,
+      (shop.actualCost - rateLimit.capacity) / rateLimit.restorePerSecond,
+    ) * 1000;
+  // Admission may reserve one maximum-size query ahead; charged work still governs pacing.
   assert.ok(
-    time - started > 15_000 && time - started < 25_000,
-    `Budget pacing took ${time - started} ms`,
+    time - started >= minimum &&
+      time - started <=
+        minimum + (1000 / rateLimit.restorePerSecond) * 1000 + 1,
+    `Budget pacing took ${time - started} ms for ${shop.actualCost} charged points`,
+  );
+  console.info(
+    'Catalog budget measurement',
+    JSON.stringify({
+      records,
+      requests: shop.requests,
+      maxRequestedCost: shop.maxCost,
+      actualCost: shop.actualCost,
+      simulatedPacingMs: time - started,
+      restorePerSecond: rateLimit.restorePerSecond,
+    }),
   );
 });
 

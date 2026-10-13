@@ -232,7 +232,7 @@ describe('Shopify read capabilities', () => {
         items: [
           {
             source: { provider: 'shopify', externalId: commerce.order.id },
-            adapterVersion: 'shopify/10',
+            adapterVersion: 'shopify/11',
             data: {
               paymentStatus: 'paid',
               placedAt: '2026-09-14T08:30:00Z',

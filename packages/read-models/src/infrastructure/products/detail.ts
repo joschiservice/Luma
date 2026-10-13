@@ -44,6 +44,56 @@ export async function readProductContext(
   tenantId: string,
   item: CatalogItem,
 ): Promise<Omit<ProductDetail, 'item' | 'sources' | 'hidden' | 'asOf'>> {
+  const bundles = await tx.query<NonNullable<ProductDetail['bundles']>[number]>(
+    `SELECT k.connection_id AS "connectionId",k.product_id AS "productId",
+    v.value->'bundle'->'variant' AS variant,(v.value->'bundle'->>'requiresComponents')::boolean AS "requiresComponents",
+    v.value->'bundle'->'components' AS components,s.document->>'observedAt' AS "observedAt",s.document->>'sourceUpdatedAt' AS "sourceUpdatedAt"
+    FROM inventory_product_skus k JOIN inventory_snapshots s ON s.tenant_id=k.tenant_id AND s.id=k.snapshot_id
+    CROSS JOIN LATERAL (SELECT value FROM jsonb_array_elements(s.document->'data'->'skus') WHERE value->>'skuId'=$2::text LIMIT 1) v
+    WHERE k.tenant_id=$1 AND k.sku_id=$2::uuid AND v.value ? 'bundle' ORDER BY k.connection_id,k.product_id`,
+    [tenantId, item.skuId],
+  );
+  // Current labels aid navigation; the retained recipe is the only relationship evidence.
+  const componentRefs = [
+    ...new Map(
+      bundles.rows.flatMap((recipe) =>
+        (recipe.components ?? []).flatMap((component) =>
+          component.skuId
+            ? [
+                [
+                  `${recipe.connectionId}:${component.skuId}`,
+                  { connectionId: recipe.connectionId, skuId: component.skuId },
+                ] as const,
+              ]
+            : [],
+        ),
+      ),
+    ).values(),
+  ];
+  if (componentRefs.length) {
+    const labels = await tx.query<{
+      connectionId: string;
+      skuId: string;
+      label: string | null;
+    }>(
+      `SELECT r.connection_id AS "connectionId",r.sku_id AS "skuId",k.code AS label
+      FROM unnest($2::uuid[],$3::uuid[]) AS r(connection_id,sku_id)
+      LEFT JOIN LATERAL (SELECT code FROM inventory_product_skus WHERE tenant_id=$1 AND connection_id=r.connection_id AND sku_id=r.sku_id ORDER BY observed_at DESC,product_id LIMIT 1) k ON true`,
+      [
+        tenantId,
+        componentRefs.map((ref) => ref.connectionId),
+        componentRefs.map((ref) => ref.skuId),
+      ],
+    );
+    const byRef = new Map(
+      labels.rows.map((row) => [`${row.connectionId}:${row.skuId}`, row.label]),
+    );
+    for (const recipe of bundles.rows)
+      for (const component of recipe.components ?? [])
+        component.skuLabel = component.skuId
+          ? (byRef.get(`${recipe.connectionId}:${component.skuId}`) ?? null)
+          : null;
+  }
   const productIds = [...new Set(item.listings.map((l) => l.productId))];
   const variants = await tx.query<ProductDetail['variants'][number]>(
     `SELECT * FROM (SELECT DISTINCT ON (o.sku_id,o.connection_id) o.sku_id AS "skuId",
@@ -60,6 +110,7 @@ export async function readProductContext(
       (s.document->>'deleted')::boolean AS deleted,s.document->>'observedAt' AS "observedAt",
       s.document->>'sourceUpdatedAt' AS "sourceUpdatedAt",s.document->'data'->>'title' AS "productTitle",
       s.document->'data'->>'status' AS status,(s.document->'data'->>'published')::boolean AS published,
+      CASE WHEN (s.document->>'deleted')::boolean THEN NULL ELSE v.value->'bundle' END AS bundle,
       CASE WHEN v.value->'price' IS NULL OR jsonb_typeof(v.value->'price')='null' THEN NULL ELSE v.value->'price' END AS price
      FROM inventory_snapshots s
      LEFT JOIN LATERAL (SELECT value FROM jsonb_array_elements(s.document->'data'->'skus')
@@ -127,6 +178,7 @@ export async function readProductContext(
   );
 
   return {
+    bundles: bundles.rows,
     variants: variants.rows.slice(0, 100),
     history: {
       entries: history.rows.slice(0, 50),

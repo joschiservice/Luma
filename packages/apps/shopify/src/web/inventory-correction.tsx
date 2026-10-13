@@ -32,6 +32,7 @@ import {
 } from '../domain/inventory-correction.js';
 
 const correctionBlockerText: Record<CorrectionBlockerReason, () => string> = {
+  bundle_parent: m.shopify_blocker_correction_bundle_parent,
   write_access: m.shopify_blocker_correction_write_access,
   untracked: m.shopify_blocker_correction_untracked,
   stale: m.shopify_blocker_correction_stale,

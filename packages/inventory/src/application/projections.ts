@@ -64,6 +64,20 @@ type CommerceData =
         /** Source list price; a null currency means the source did not report one. */
         price?: { amount: string; currency: string | null } | null;
         barcode?: string | null;
+        /** Exact recipe metadata; parent merchandising does not add a physical stock balance. */
+        bundle?: {
+          variant: { externalId: string; scopeKey: string };
+          requiresComponents: boolean;
+          components:
+            | {
+                sourceId: { externalId: string; scopeKey: string };
+                sourceVariant: { externalId: string; scopeKey: string };
+                sourceSku: { externalId: string; scopeKey: string } | null;
+                skuId: string | null;
+                quantity: string;
+              }[]
+            | null;
+        };
       }[];
     };
 

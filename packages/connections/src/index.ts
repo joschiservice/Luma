@@ -124,3 +124,5 @@ export type {
   ReturnExchangeRead,
   ReturnExchangeProof,
 } from './domain/return-exchanges.js';
+
+export type { ProductBundle } from './domain/bundles.js';

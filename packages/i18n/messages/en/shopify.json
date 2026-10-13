@@ -182,6 +182,7 @@
   "shopify_subscriptions_unavailable": "Unavailable with current access",
   "shopify_subscriptions_received": "Last verified delivery: {time}",
   "shopify_subscriptions_no_delivery": "No verified delivery yet",
+  "shopify_blocker_correction_bundle_parent": "Bundle stock is derived from its components. Review component stock instead.",
   "shopify_scope_order_edits_write": "changing order quantities",
   "shopify_order_edit_title": "Change quantities in Shopify",
   "shopify_order_edit_help": "Change how many units of unfulfilled lines this order contains. The exact change needs approval, and Luma checks fulfillment and recalculates the order again right before sending it.",

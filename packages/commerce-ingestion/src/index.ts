@@ -31,8 +31,8 @@ const normalizers = {
   inventory: 'commerce/3',
   inventoryTransfers: 'commerce/1',
   inventoryShipments: 'commerce/1',
-  product: 'commerce/2',
-  order: 'commerce/6',
+  product: 'commerce/3',
+  order: 'commerce/7',
   fulfillment: 'commerce/3',
   return: 'commerce/1',
   refund: 'commerce/1',
@@ -288,9 +288,35 @@ export function createCommerceIngestion(
       const skus = [];
       for (const sku of data.skus) {
         const skuId = await resolve('sku', sku.id);
+        const bundle =
+          sku.bundle === undefined
+            ? undefined
+            : {
+                variant: sku.bundle.variant,
+                requiresComponents: sku.bundle.requiresComponents,
+                components:
+                  sku.bundle.components === null
+                    ? null
+                    : await Promise.all(
+                        sku.bundle.components.map(async (component) => ({
+                          sourceId: component.id,
+                          sourceVariant: component.variant,
+                          sourceSku: component.sku,
+                          skuId: component.sku
+                            ? await lookup({
+                                ...o.source,
+                                ...component.sku,
+                                resource: 'sku',
+                              })
+                            : null,
+                          quantity: component.quantity,
+                        })),
+                      ),
+              };
         if (skuId)
           skus.push({
             skuId,
+            ...(bundle === undefined ? {} : { bundle }),
             code: sku.code,
             unit: sku.unit,
             ...(sku.title !== undefined && { title: sku.title }),
@@ -304,12 +330,15 @@ export function createCommerceIngestion(
         owner: 'inventory',
         snapshot: {
           ...provenance,
-          schemaVersion: 2,
+          schemaVersion: 3,
           normalizerVersion: normalizers.product,
           entityId,
           kind: 'product',
           mappingVersion: digest(
-            JSON.stringify([entityId, skus.map((sku) => sku.skuId)]),
+            JSON.stringify([
+              entityId,
+              skus.map((sku) => [sku.skuId, sku.bundle]),
+            ]),
           ),
           data: {
             type: 'product',
@@ -336,6 +365,9 @@ export function createCommerceIngestion(
           lines.push({
             id,
             skuId,
+            ...(line.bundleGroup === undefined
+              ? {}
+              : { bundleGroup: line.bundleGroup }),
             quantity: line.quantity.amount,
             ...(line.currentQuantity === undefined
               ? {}
@@ -367,7 +399,7 @@ export function createCommerceIngestion(
         owner: 'orders',
         snapshot: {
           ...provenance,
-          schemaVersion: 6,
+          schemaVersion: 7,
           normalizerVersion: normalizers.order,
           entityId,
           kind: 'order',
@@ -1063,7 +1095,11 @@ function identities(input: CommerceObservation): SourceIdentity[] {
     add('location', input.observation.data.location);
   }
   if (input.capability === 'products.read')
-    for (const sku of input.observation.data.skus) add('sku', sku.id);
+    for (const sku of input.observation.data.skus) {
+      add('sku', sku.id);
+      for (const component of sku.bundle?.components ?? [])
+        if (component.sku) add('sku', component.sku);
+    }
   if (input.capability === 'fulfillment.read') {
     add('order', input.observation.data.order);
     for (const line of input.observation.data.lines)
