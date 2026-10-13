@@ -30,7 +30,13 @@ type Scenario =
   | 'stale'
   | 'ambiguous';
 
-function Preview({ scenario = 'review' }: { scenario?: Scenario }) {
+function Preview({
+  scenario = 'review',
+  native = false,
+}: {
+  scenario?: Scenario;
+  native?: boolean;
+}) {
   const [storyTime] = useState(() => Date.now());
   const services = useMemo<AppUiProps['services']>(() => {
     const time = new Date(storyTime).toISOString();
@@ -44,10 +50,46 @@ function Preview({ scenario = 'review' }: { scenario?: Scenario }) {
       locationName: 'Tokyo warehouse',
       available: 24,
       tracked: true,
+      itemActive: !native,
+      locationActive: true,
       complete: true,
       source: {
-        connectionId: sourceConnectionId,
-        label: 'JTL-Wawi',
+        connectionId: native ? connectionId : sourceConnectionId,
+        ...(native
+          ? {
+              nativeAllocation: {
+                scope: {
+                  connectionId,
+                  locationId: positionId,
+                  version: '3',
+                  mode: 'own',
+                  authorityRevision: 1,
+                  lastTransitionId: positionId,
+                  updatedAt: time,
+                },
+                authorityRevision: 1,
+                skuId: positionId,
+                locationId: positionId,
+                unit: 'each',
+                available: '18',
+                accounts: [
+                  {
+                    id: positionId,
+                    address: {
+                      skuId: positionId,
+                      locationId: positionId,
+                      unit: 'each',
+                      state: 'available',
+                    },
+                    balance: '18',
+                    version: '1',
+                  },
+                ],
+                openingReviewIds: [positionId],
+              },
+            }
+          : {}),
+        label: native ? 'Luma native stock' : 'JTL-Wawi',
         observationId: '55555555-5555-4555-8555-555555555555',
         observedAt:
           scenario === 'stale'
@@ -123,9 +165,9 @@ function Preview({ scenario = 'review' }: { scenario?: Scenario }) {
               observedAt: time,
             },
             {
-              connectionId: sourceConnectionId,
-              label: 'JTL-Wawi',
-              provider: 'jtl',
+              connectionId: native ? connectionId : sourceConnectionId,
+              label: native ? 'Luma native stock' : 'JTL-Wawi',
+              provider: native ? 'native_stock' : 'jtl',
               available: '18',
               observedAt: time,
             },
@@ -174,7 +216,7 @@ function Preview({ scenario = 'review' }: { scenario?: Scenario }) {
         };
       },
     };
-  }, [scenario, storyTime]);
+  }, [scenario, storyTime, native]);
 
   return (
     <main className="inventory-page">
@@ -240,3 +282,24 @@ export const MissingWriteAccess: Story = {
 export const StaleEvidence: Story = { args: { scenario: 'stale' } };
 
 export const AmbiguousMapping: Story = { args: { scenario: 'ambiguous' } };
+
+export const NativeAllocation: Story = {
+  args: { native: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByRole('heading', { name: 'Publish native allocation' }),
+    ).toBeVisible();
+    await expect(
+      await canvas.findByText(/Inventory item: Inactive. Location: Active./),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole('textbox', { name: 'Whole-unit allocation' }),
+    ).toHaveValue('18');
+  },
+};
+
+export const NativeAllocationDark: Story = {
+  ...NativeAllocation,
+  globals: { theme: 'dark' },
+};

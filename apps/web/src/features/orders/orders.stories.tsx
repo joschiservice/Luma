@@ -906,6 +906,7 @@ export const Journey: Story = {
 };
 
 export const JourneyDark: Story = { ...Journey, globals: { theme: 'dark' } };
+
 /** Source-reported amounts, charges, discounts and addresses, in two currencies. */
 export const RecordCharges: Story = {
   args: { page: 'detail' },

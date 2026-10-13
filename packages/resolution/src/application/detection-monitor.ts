@@ -68,6 +68,8 @@ export interface StockSource {
 
 /** A stock position reported by at least two connections that people linked. */
 export interface StockPosition {
+  /** Native location authority gives channel allocations a different meaning from ERP available stock. */
+  nativeOwned?: boolean | undefined;
   positionId: string;
   skuId: string;
   locationId: string;
@@ -283,6 +285,7 @@ export function createDetectionMonitor(options: DetectionMonitorOptions) {
     position: StockPosition,
     authority: AuthoritySnapshot,
   ): InventoryMapping[] {
+    if (position.nativeOwned) return [];
     const side = (source: StockSource) => ({
       source: {
         tenantId: context.tenantId,

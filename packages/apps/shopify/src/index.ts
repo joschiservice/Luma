@@ -454,5 +454,6 @@ export function createApp(context: AppFactoryContext): AppDefinition {
 export { createShopifyRecordReader } from './infrastructure/records.js';
 
 export { createShopifyUnsettledStockReader } from './infrastructure/stock-effects.js';
+
 /** Order edit persistence, exported so runtime tests can prove its claims, fence and isolation on PostgreSQL. */
 export { createOrderEditStore } from './infrastructure/order-edit-store.js';

@@ -265,7 +265,7 @@ export const orderEditResolvers: Record<string, TypeResolvers> = {
         await outstanding(
           context.shop,
           order.id,
-          order.data.total + totalChange(calculated),
+          order.data.total - order.data.refunded + totalChange(calculated),
         ),
         order.data,
       );

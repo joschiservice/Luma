@@ -81,6 +81,11 @@ export function createLedgerService(deps: LedgerDependencies) {
     bundleParent: false;
     complete: true;
   } {
+    if (source?.channelReplica)
+      throw new LedgerError(
+        'review_required',
+        'This source reports a published channel allocation. Use independent warehouse evidence for physical stock changes and drift.',
+      );
     if (
       !source ||
       !source.complete ||

@@ -116,6 +116,7 @@ JTL and Cin7 stock reads do not expose this adjustment reference. A time-window 
 match can support a low-confidence investigation candidate, but cannot confirm a Luma echo,
 close an issue, suppress a difference or authorize a retry. Their current stock integrations
 remain read-only; no heuristic is promoted to verified authorship.
+
 ## Order quantity edits
 
 Permission: `shopify:order_edits.apply`; capability `orders.quantity.edit`, granted only with

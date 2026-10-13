@@ -5,7 +5,14 @@ import type {
   ExecutionResult,
 } from '@luma/execution';
 import type { TenantContext } from '@luma/identity';
-import { IdentityError, requireTenant } from '@luma/identity';
+import {
+  hasPermission,
+  IdentityError,
+  requireChangesAllowed,
+  requirePermission,
+  requireTenant,
+} from '@luma/identity';
+import { canonicalJson } from '@luma/platform';
 import type { PolicyService, ProposedAction } from '@luma/policies';
 import { z } from 'zod';
 
@@ -173,7 +180,9 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
     const message = withheld
       ? 'No change was accepted by Shopify. Refresh the inventory and review its eligibility before another correction.'
       : verified
-        ? 'A fresh Shopify read matches the approved ERP quantity.'
+        ? run.target.nativeAllocation
+          ? 'A fresh Shopify read verifies the approved stored allocation and unchanged inventory eligibility.'
+          : 'A fresh Shopify read matches the approved ERP quantity.'
         : record
           ? accepted
             ? 'Shopify accepted the correction. The quantity is not yet verified. Verify stock or review the inventory in Shopify.'
@@ -226,6 +235,8 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
           : 'not_sent',
       message,
       canExecute:
+        (!run.target.nativeAllocation ||
+          hasPermission(context, 'inventory.manage')) &&
         !observeOnly &&
         decision !== null &&
         !record &&
@@ -238,6 +249,8 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
         (decision?.outcome !== 'approval_required' ||
           decision.approval?.outcome === 'approved'),
       canApprove:
+        (!run.target.nativeAllocation ||
+          hasPermission(context, 'inventory.approve')) &&
         !observeOnly &&
         !record &&
         !expired &&
@@ -319,13 +332,17 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
       context = await authorize(context);
       const parsed = correctionPreviewInput.parse(input);
       const { requestId, ...target } = parsed;
+      if (target.nativeAllocation) {
+        requirePermission(context, 'inventory.manage');
+        requireChangesAllowed(context);
+      }
       const choice: CorrectionChoice = {
         capability: 'inventory.available.reconcile',
       };
       const existing = await deps.store.get(context, requestId);
       if (existing) {
         if (
-          JSON.stringify(existing.target) !== JSON.stringify(target) ||
+          canonicalJson(existing.target) !== canonicalJson(target) ||
           JSON.stringify(existing.choice) !== JSON.stringify(choice) ||
           existing.action.proposedBy.id !== context.actor.id
         )
@@ -373,7 +390,15 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
         target: { kind: 'shopify_inventory_correction', id: requestId },
         parameters: {
           referenceDocumentUri: `luma://inventory-corrections/v0:${requestId}`,
-          policy: 'erp_to_shopify',
+          policy: target.nativeAllocation
+            ? 'native_stock_to_shopify'
+            : 'erp_to_shopify',
+          ...(before.source.nativeAllocation
+            ? {
+                nativeScopeVersion:
+                  before.source.nativeAllocation.scope.version,
+              }
+            : {}),
           sourceConnectionId: target.sourceConnectionId,
           sourceObservationId: before.source.observationId,
           sourceRevision: before.source.revision,
@@ -408,6 +433,10 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
       context = await authorize(context);
       const { id } = z.object({ id: z.string().uuid() }).strict().parse(input);
       const run = await load(context, id);
+      if (run.target.nativeAllocation) {
+        requirePermission(context, 'inventory.manage');
+        requireChangesAllowed(context);
+      }
       if (context.actor.id !== run.action.proposedBy.id)
         throw new IdentityError(
           403,
@@ -425,7 +454,7 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
             'CONFLICT',
             'This action needs current approval before it can run.',
           );
-        await deps.store.claim(context, run);
+        if (!current.observeOnly) await deps.store.claim(context, run);
       }
       await deps.bind(context, run);
       const result = await deps.admission.execute(context, {
@@ -449,6 +478,10 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
         .strict()
         .parse(input);
       const run = await load(context, id);
+      if (run.target.nativeAllocation) {
+        requirePermission(context, 'inventory.approve');
+        requireChangesAllowed(context);
+      }
       if (!run.decisionId || !(await view(context, run)).canApprove)
         throw new IdentityError(
           409,

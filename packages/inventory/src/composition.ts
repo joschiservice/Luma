@@ -54,3 +54,5 @@ export { createNativeShipmentReader } from './infrastructure/native-shipment-rea
 export { createNativeStockReader } from './infrastructure/native-stock-reader.js';
 
 export { createNativeStockSourceReader } from './infrastructure/native-stock-source-reader.js';
+
+export { createNativePublicationFence } from './infrastructure/publication-fence.js';

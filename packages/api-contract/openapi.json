@@ -100490,6 +100490,9 @@
                         }
                       ]
                     },
+                    "channelReplica": {
+                      "type": "boolean"
+                    },
                     "channelState": {
                       "anyOf": [
                         {
@@ -100497,6 +100500,36 @@
                           "properties": {
                             "semantics": {
                               "const": "shopify/1"
+                            },
+                            "damaged": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "qualityControl": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "safetyStock": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
                             },
                             "committed": {
                               "anyOf": [
@@ -101102,6 +101135,9 @@
                               }
                             ]
                           },
+                          "channelReplica": {
+                            "type": "boolean"
+                          },
                           "channelState": {
                             "anyOf": [
                               {
@@ -101109,6 +101145,36 @@
                                 "properties": {
                                   "semantics": {
                                     "const": "shopify/1"
+                                  },
+                                  "damaged": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "qualityControl": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "safetyStock": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   },
                                   "committed": {
                                     "anyOf": [
@@ -101708,6 +101774,9 @@
                               }
                             ]
                           },
+                          "channelReplica": {
+                            "type": "boolean"
+                          },
                           "channelState": {
                             "anyOf": [
                               {
@@ -101715,6 +101784,36 @@
                                 "properties": {
                                   "semantics": {
                                     "const": "shopify/1"
+                                  },
+                                  "damaged": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "qualityControl": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "safetyStock": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   },
                                   "committed": {
                                     "anyOf": [
@@ -102331,6 +102430,9 @@
                               }
                             ]
                           },
+                          "channelReplica": {
+                            "type": "boolean"
+                          },
                           "channelState": {
                             "anyOf": [
                               {
@@ -102338,6 +102440,36 @@
                                 "properties": {
                                   "semantics": {
                                     "const": "shopify/1"
+                                  },
+                                  "damaged": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "qualityControl": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "safetyStock": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   },
                                   "committed": {
                                     "anyOf": [
@@ -102995,6 +103127,9 @@
                             }
                           ]
                         },
+                        "channelReplica": {
+                          "type": "boolean"
+                        },
                         "channelState": {
                           "anyOf": [
                             {
@@ -103002,6 +103137,36 @@
                               "properties": {
                                 "semantics": {
                                   "const": "shopify/1"
+                                },
+                                "damaged": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "qualityControl": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "safetyStock": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
                                 },
                                 "committed": {
                                   "anyOf": [
@@ -105732,8 +105897,28 @@
                                 "format": "uuid"
                               },
                               "comparisonId": {
-                                "type": "string",
-                                "format": "uuid"
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "channelHandover": {
+                                "type": "object",
+                                "properties": {
+                                  "snapshotId": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "meaningHash": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["snapshotId", "meaningHash"]
                               },
                               "mappingVersion": {
                                 "type": "string"
@@ -106087,8 +106272,28 @@
                                 "format": "uuid"
                               },
                               "comparisonId": {
-                                "type": "string",
-                                "format": "uuid"
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "channelHandover": {
+                                "type": "object",
+                                "properties": {
+                                  "snapshotId": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "meaningHash": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["snapshotId", "meaningHash"]
                               },
                               "mappingVersion": {
                                 "type": "string"
@@ -106415,8 +106620,28 @@
                                 "format": "uuid"
                               },
                               "comparisonId": {
-                                "type": "string",
-                                "format": "uuid"
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "channelHandover": {
+                                "type": "object",
+                                "properties": {
+                                  "snapshotId": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "meaningHash": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["snapshotId", "meaningHash"]
                               },
                               "mappingVersion": {
                                 "type": "string"

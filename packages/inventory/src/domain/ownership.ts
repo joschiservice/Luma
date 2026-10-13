@@ -13,7 +13,9 @@ export interface OwnershipBinding {
     skuId: string;
     unit: string;
     openingReviewId: string;
-    comparisonId: string;
+    comparisonId: string | null;
+    /** Fresh storage alignment for handback is distinct from physical drift verification. */
+    channelHandover?: { snapshotId: string; meaningHash: string } | undefined;
     mappingVersion: string;
     accountVersions: { id: string; version: string }[];
   }[];

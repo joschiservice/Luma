@@ -47,6 +47,7 @@ export {
 export type { JourneyEvent, OrderJourney } from './domain/journey.js';
 
 export { journeyTiming } from './domain/journey.js';
+
 export {
   OrderChangeRequestError,
   orderChangeCapabilities,

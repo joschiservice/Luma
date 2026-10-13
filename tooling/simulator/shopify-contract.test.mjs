@@ -72,6 +72,8 @@ const config = {
     'read_all_orders',
     'read_products',
     'read_inventory',
+    'read_inventory_transfers',
+    'read_inventory_shipments',
     'write_inventory',
     'read_customers',
     'read_returns',
@@ -448,10 +450,21 @@ test('installation verification, scope reads and lifecycle subscriptions', async
     'fulfillment.read',
     'inventory.available.reconcile',
     'inventory.read',
+    'inventory.shipments.read',
+    'inventory.transfers.read',
     'orders.quantity.edit',
     'orders.read',
     'products.read',
+    'returns.created.read',
+    'returns.exchange.options.read',
+    'returns.exchange.price.read',
+    'returns.exchange.proof.read',
+    'returns.exchange.quote.read',
+    'returns.exchange.release',
+    'returns.options.read',
     'returns.read',
+    'returns.settlement.proof.read',
+    'returns.settlement.quote.read',
   ]);
 
   // Mirrors the subscription and scope requests in the app's OAuth lifecycle.
@@ -607,6 +620,7 @@ test('every read capability returns complete, parsed snapshots', async () => {
         },
         requiresShipping: true,
         catalog: 'variant',
+        bundleGroup: null,
       },
       {
         id: {
@@ -630,6 +644,7 @@ test('every read capability returns complete, parsed snapshots', async () => {
         },
         requiresShipping: true,
         catalog: 'variant',
+        bundleGroup: null,
       },
     ],
   });
@@ -657,6 +672,11 @@ test('every read capability returns complete, parsed snapshots', async () => {
     skus: [
       {
         id: ref(gid('InventoryItem', '11')),
+        bundle: {
+          variant: ref(gid('ProductVariant', '11')),
+          requiresComponents: false,
+          components: [],
+        },
         code: 'TOTE-NAT',
         unit: 'each',
         title: 'Natural',
@@ -665,6 +685,11 @@ test('every read capability returns complete, parsed snapshots', async () => {
       },
       {
         id: ref(gid('InventoryItem', '12')),
+        bundle: {
+          variant: ref(gid('ProductVariant', '12')),
+          requiresComponents: false,
+          components: [],
+        },
         code: 'TOTE-BLK',
         unit: 'each',
         title: 'Black',
@@ -838,11 +863,11 @@ test('every read capability returns complete, parsed snapshots', async () => {
   });
 });
 
-test('every read capability requests its largest page within the query cost limit', async () => {
+test('every scan requests its largest page within the query cost limit', async () => {
   const shop = createShop();
   await seed(shop);
   const page = pages(shop);
-  const capabilities = Object.keys(
+  const capabilities = Object.entries(
     createShopifyConnector({
       tenantId,
       connectionId,
@@ -851,7 +876,12 @@ test('every read capability requests its largest page within the query cost limi
       fetch: shop.fetch,
       customerAccess: { contact: true, address: true },
     }).capabilities,
-  ).filter((capability) => capability.endsWith('.read'));
+  )
+    .filter(
+      ([capability, handler]) =>
+        capability.endsWith('.read') && handler.descriptor.filters,
+    )
+    .map(([capability]) => capability);
   assert.ok(capabilities.includes('orders.read'));
   for (const capability of capabilities) {
     // 100 is the largest limit a read accepts.
@@ -1428,6 +1458,7 @@ test('bulk history resumes export and JSONL chunks after restart with identical 
         expected.map((item) => {
           const data = { ...item.data };
           delete data.discounts;
+
           return { ...item, data };
         }),
       ),

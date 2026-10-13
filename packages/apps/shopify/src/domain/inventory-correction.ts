@@ -1,3 +1,7 @@
+import {
+  nativePublicationBindingSchema,
+  nativePublicationChoiceSchema,
+} from '@luma/api-contract';
 import { z } from 'zod';
 
 export const correctionCapabilities = [
@@ -9,6 +13,7 @@ export const correctionTarget = z
     positionId: z.string().uuid(),
     connectionId: z.string().uuid(),
     sourceConnectionId: z.string().uuid(),
+    nativeAllocation: nativePublicationChoiceSchema.optional(),
   })
   .strict();
 
@@ -28,6 +33,8 @@ export const correctionSnapshot = z.object({
   locationName: z.string(),
   available: z.number().int().nullable(),
   tracked: z.boolean(),
+  itemActive: z.boolean().nullable().optional(),
+  locationActive: z.boolean().nullable().optional(),
   bundleParent: z.boolean().nullable().optional(),
   complete: z.boolean(),
   writeAttribution: z
@@ -47,6 +54,7 @@ export const correctionSnapshot = z.object({
     observedAt: z.string().datetime(),
     revision: z.string(),
     available: z.number().int().nonnegative(),
+    nativeAllocation: nativePublicationBindingSchema.optional(),
   }),
 });
 
@@ -118,7 +126,10 @@ export function inventoryReconciled(
     after.locationId === before.locationId &&
     after.source.revision === before.source.revision &&
     after.source.connectionId === before.source.connectionId &&
-    after.available === before.source.available
+    after.available === before.source.available &&
+    (!before.source.nativeAllocation ||
+      (after.itemActive === before.itemActive &&
+        after.locationActive === before.locationActive))
   );
 }
 

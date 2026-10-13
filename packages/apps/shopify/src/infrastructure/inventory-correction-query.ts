@@ -10,6 +10,7 @@ import {
   type CorrectionCandidate,
   correctionTarget,
 } from '../domain/inventory-correction.js';
+import { createNativeAllocationQuery } from './native-allocation-query.js';
 
 const rowSchema = z.object({
   connectionId: z.string().uuid(),
@@ -41,6 +42,8 @@ export function createCorrectionQuery(
   database: TenantDatabase,
   sourceAuthority?: AuthorityReader,
 ) {
+  const nativeAllocation = createNativeAllocationQuery(database);
+
   async function rows(
     context: TenantContext,
     positionId: string,
@@ -102,15 +105,59 @@ export function createCorrectionQuery(
       context: TenantContext,
       positionId: string,
     ): Promise<CorrectionCandidate[]> {
-      return (await rows(context, positionId))
+      const values = await rows(context, positionId);
+      const owned = await database.transaction(
+        context.tenantId,
+        async (tx) =>
+          (
+            await tx.query<{
+              connection_id: string;
+              sku_id: string;
+              location_id: string;
+              available: string;
+            }>(
+              `
+       SELECT o.connection_id,a.sku_id,a.location_id,trim_scale(a.balance)::text available FROM inventory_stock_ownership_scopes o
+       JOIN inventory_ledger_accounts a ON a.tenant_id=o.tenant_id AND a.location_id=o.location_id AND a.state='available'
+       WHERE o.tenant_id=$1 AND o.mode='own' AND a.sku_id=ANY($2::uuid[]) AND a.location_id=ANY($3::uuid[]) AND a.unit='each'`,
+              [
+                context.tenantId,
+                values.map((value) => value.skuId),
+                values.map((value) => value.locationId),
+              ],
+            )
+          ).rows,
+      );
+      const native = values.flatMap((value) => {
+        const scope = owned.find(
+          (row) =>
+            row.connection_id === value.connectionId &&
+            row.sku_id === value.skuId &&
+            row.location_id === value.locationId,
+        );
+
+        return scope
+          ? [
+              {
+                connectionId: value.connectionId,
+                label: 'Luma native stock',
+                provider: 'native_stock',
+                available: scope.available,
+                observedAt: value.observedAt,
+              },
+            ]
+          : [];
+      });
+      const providers = values
         .filter(
-          (r) =>
-            r.active &&
-            r.installed &&
-            r.readable &&
-            !r.deleted &&
-            ['shopify', 'jtl'].includes(r.provider),
+          (row) =>
+            row.active &&
+            row.installed &&
+            row.readable &&
+            !row.deleted &&
+            ['shopify', 'jtl'].includes(row.provider),
         )
+        .filter((row) => !native.length || row.provider === 'shopify')
         .map(({ connectionId, label, provider, available, observedAt }) => ({
           connectionId,
           label,
@@ -118,12 +165,48 @@ export function createCorrectionQuery(
           available,
           observedAt,
         }));
+
+      return [...providers, ...native];
     },
     async authority(
       context: TenantContext,
       target: z.infer<typeof correctionTarget>,
     ) {
       const authority = await sourceAuthority?.read(context);
+      if (target.nativeAllocation) {
+        if (!authority)
+          throw new IdentityError(
+            409,
+            'CONFLICT',
+            'Source authority is unavailable.',
+          );
+        const source = (await rows(context, target.positionId)).find(
+          (row) => row.connectionId === target.connectionId,
+        );
+        if (!source)
+          throw new IdentityError(
+            404,
+            'NOT_FOUND',
+            'The selected Shopify stock position was not found.',
+          );
+        const inventoryItemId = exact(source, 'sku'),
+          locationId = exact(source, 'location');
+        if (
+          !/^gid:\/\/shopify\/InventoryItem\/[0-9]+$/.test(inventoryItemId) ||
+          !/^gid:\/\/shopify\/Location\/[0-9]+$/.test(locationId)
+        )
+          throw new IdentityError(
+            409,
+            'CONFLICT',
+            'Confirm exact Shopify item and location mappings before publication.',
+          );
+
+        return {
+          inventoryItemId,
+          locationId,
+          source: await nativeAllocation(context, target, source, authority),
+        };
+      }
       const stockAuthority = authority?.groups.find(
         (group) => group.group === 'inventory_stock',
       );

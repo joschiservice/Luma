@@ -31,20 +31,20 @@ import { z } from 'zod';
 import { readBulkHistory } from './bulk-history.js';
 import { createBundleReader } from './bundles.js';
 import { createInventoryTransferCapabilities } from './inventory-transfers.js';
-import { lineFacts, mailingAddress, orderFacts } from './order-facts.js';
 import {
   attributeInventoryWrites,
   type InventoryWriteReceipt,
 } from './inventory-write-attribution.js';
+import { lineFacts, mailingAddress, orderFacts } from './order-facts.js';
 import {
-  inventoryCompositionSelection,
   discountApplication,
+  inventoryCompositionSelection,
   orderLine,
   orderSelection,
   readPageSize,
   readSelection,
-  variantSelection,
   shippingLine,
+  variantSelection,
 } from './read-selections.js';
 import { createShopifyReturnCapabilities } from './return-actions.js';
 import { createShopifyExchangeCapabilities } from './return-exchanges.js';

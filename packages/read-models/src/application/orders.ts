@@ -3,10 +3,10 @@ import type { TenantContext } from '@luma/identity';
 import type {
   ComparisonDifference,
   ComparisonState,
-  OrderJourney,
   OrderChangePlan,
   OrderChangeRequest,
   OrderCommercialData,
+  OrderJourney,
   OrderLineCommercialData,
 } from '@luma/orders';
 import type { ActivityActor } from '@luma/resolution';

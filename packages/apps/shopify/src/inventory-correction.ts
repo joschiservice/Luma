@@ -7,6 +7,7 @@ import type {
   InstallationCapability,
   InstallationService,
 } from '@luma/connections';
+import { ConnectorError } from '@luma/connections';
 import {
   createCapabilityRuntime,
   simulationTransport,
@@ -19,6 +20,7 @@ import {
 } from '@luma/execution/composition';
 import type { TenantContext } from '@luma/identity';
 import { IdentityError } from '@luma/identity';
+import { createNativePublicationFence } from '@luma/inventory/composition';
 import { canonicalJson } from '@luma/platform';
 import { createPolicies } from '@luma/policies/composition';
 
@@ -42,6 +44,10 @@ export function createShopifyInventoryCorrection(
   installations: InstallationService,
   fetch?: typeof globalThis.fetch,
 ) {
+  const publicationFence = createNativePublicationFence(
+    context.database,
+    context.refreshContext,
+  );
   const query = createCorrectionQuery(
     context.database,
     context.sourceAuthority,
@@ -127,6 +133,8 @@ export function createShopifyInventoryCorrection(
     connectionId: string,
     capability: InstallationCapability = 'inventory.read',
     eligible?: () => Promise<boolean>,
+    nativeRun?: CorrectionRun,
+    allowInactiveStorage = false,
   ) {
     const current = await credential(tenant, connectionId, capability);
     const shop = current.connection.target.shop!;
@@ -150,6 +158,50 @@ export function createShopifyInventoryCorrection(
 
         return fresh.credentials.token;
       },
+      ...(nativeRun?.before.source.nativeAllocation
+        ? {
+            allowInactiveStorage: true,
+            dispatchFence: async <T>(operation: () => Promise<T>) => {
+              let started = false;
+              try {
+                return await publicationFence(
+                  tenant,
+                  nativeRun.before.source.nativeAllocation!,
+                  () => {
+                    started = true;
+
+                    return operation();
+                  },
+                );
+              } catch (error) {
+                if (!started)
+                  throw new ConnectorError({
+                    code: 'conflict',
+                    effect: 'none',
+                    retry: 'never',
+                    dispatch: 'not_dispatched',
+                  });
+                throw error;
+              }
+            },
+            beforeDispatch: () =>
+              context.database.transaction(tenant.tenantId, async (tx) => {
+                const binding = nativeRun.before.source.nativeAllocation!;
+                await tx.query(
+                  'INSERT INTO shopify_native_stock_replicas(tenant_id,run_id,connection_id,sku_id,location_id,unit,scope_version) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING',
+                  [
+                    tenant.tenantId,
+                    nativeRun.id,
+                    connectionId,
+                    binding.skuId,
+                    binding.locationId,
+                    binding.unit,
+                    binding.scope.version,
+                  ],
+                );
+              }),
+          }
+        : { allowInactiveStorage }),
       record: (evidence) => store.record(tenant, connectionId, evidence),
       receipts: (inventoryItemId, locationId) =>
         readInventoryWriteReceipts(context.database, tenant, connectionId, [
@@ -173,7 +225,14 @@ export function createShopifyInventoryCorrection(
     await context.refreshStock?.(tenant, target.positionId);
     const authority = await query.authority(tenant, target);
     const snapshot = await (
-      await provider(tenant, target.connectionId)
+      await provider(
+        tenant,
+        target.connectionId,
+        'inventory.read',
+        undefined,
+        undefined,
+        !!target.nativeAllocation,
+      )
     ).read(authority.inventoryItemId, authority.locationId);
     // The source revision identifies the authoritative ERP value, independent of which read
     // reported it; freshness is checked from `observedAt`.
@@ -225,6 +284,7 @@ export function createShopifyInventoryCorrection(
                 source.locationId === run.before.locationId
               );
             },
+            run,
           );
 
           return {

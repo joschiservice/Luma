@@ -38,3 +38,8 @@
   margin-inline-start: 0;
   overflow-wrap: anywhere;
 }
+
+.shopify-stock-allocation {
+  display: grid;
+  gap: var(--content-related-gap);
+}

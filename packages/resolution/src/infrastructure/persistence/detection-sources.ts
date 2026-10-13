@@ -37,6 +37,7 @@ const streamRow = z.object({
 });
 
 const positionRow = z.object({
+  nativeOwned: z.boolean().optional(),
   positionId: z.string().uuid(),
   connectionId: z.string().uuid(),
   provider: z.string(),
@@ -200,6 +201,7 @@ export function createDetectionSources(
           )
           SELECT c.entity_id AS "positionId",c.connection_id AS "connectionId",c.provider,
            c.sku_id AS "skuId",c.location_id AS "locationId",
+           EXISTS(SELECT 1 FROM inventory_stock_ownership_scopes n WHERE n.tenant_id=$1 AND n.location_id=c.location_id::uuid AND n.mode='own') AS "nativeOwned",
            COALESCE((SELECT jsonb_agg(jsonb_build_object('id',m.id,'resource',m.resource,'externalId',m.external_id,
              'scopeKey',m.scope_key,'createdAt',m.created_at) ORDER BY m.id)
             FROM connector_source_mappings m WHERE m.tenant_id=$1 AND m.connection_id=c.connection_id
@@ -224,6 +226,7 @@ export function createDetectionSources(
           positionId: row.positionId,
           skuId: row.skuId,
           locationId: row.locationId,
+          nativeOwned: row.nativeOwned,
           sources: [],
         };
         position.sources.push(source);

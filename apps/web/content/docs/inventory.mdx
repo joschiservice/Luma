@@ -153,3 +153,27 @@ Preparing fulfillment does not consume stock. Release only the remaining hold. O
 and cancellation release remaining units together with the order change; new shipments must be
 consumed first. **Release due holds** checks this order's deadlines and retains holds when the
 shipment evidence is stale or uncertain.
+
+## Publish a native allocation
+
+After your team has reviewed stock openings and moved this location through Shadow and
+Propose to Own, open the stock position and choose **Publish native allocation**. Enter a
+whole-unit allocation no larger than the native available balance. The allocation may be
+smaller than the balance. Luma does not round fractional native stock for Shopify.
+
+Choose **Review allocation**. Review the exact change, then have another authorized team
+member approve it when policy requires independent approval. The requester can then choose
+**Publish allocation**. If stock, mappings, authority or eligibility changes before dispatch,
+review a new allocation. **Shopify accepted** means the write was accepted; choose **Verify
+stock** for an independent quantity and eligibility check.
+
+Stored quantity is separate from inventory item and location activation. Luma shows these
+states independently and does not activate them during publication. A later native stock
+change needs a new review and publication. When an outcome is uncertain, verify or
+investigate it; Luma does not resend the same mutation.
+
+Shopify’s published allocation is channel evidence. Its derived on-hand quantity does not
+prove physical warehouse stock. Use an independent warehouse source for physical drift
+and ledger changes. To hand stock authority back, clear holds and pending effects, restore
+and verify the full native baseline, and obtain a separate ownership review. Activation and
+other stock states need their own authorized actions.

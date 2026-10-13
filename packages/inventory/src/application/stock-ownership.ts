@@ -89,6 +89,76 @@ export function createStockOwnershipService(deps: NativeStockDependencies) {
       .map((pool) => {
         const source = pool.source;
         requireFresh(source);
+        if (source.channelReplica) {
+          if (
+            to !== 'observe' ||
+            source.connectionId !== connectionId ||
+            source.locationId !== locationId ||
+            source.skuId !== pool.skuId ||
+            source.unit !== pool.unit
+          )
+            throw new LedgerError(
+              'review_required',
+              'Channel evidence can only establish a reviewed handback baseline.',
+            );
+          const channel = source.channelState;
+          const amount = (state: string) =>
+            pool.accounts.find((account) => account.address.state === state)
+              ?.balance;
+          const matches = (state: string, value: string | null | undefined) =>
+            value != null &&
+            amount(state) !== undefined &&
+            quantityUnits(amount(state)!) === quantityUnits(value);
+          const physical = pool.accounts.filter((account) =>
+            [
+              'available',
+              'reserved',
+              'held',
+              'quarantine',
+              'damaged',
+              'returned_inspection',
+            ].includes(account.address.state),
+          );
+          if (
+            !channel ||
+            channel.committed == null ||
+            channel.reserved == null ||
+            quantityUnits(channel.committed) !== 0n ||
+            quantityUnits(channel.reserved) !== 0n ||
+            physical.length !== 6 ||
+            physical.reduce(
+              (sum, account) => sum + quantityUnits(account.balance),
+              0n,
+            ) !== quantityUnits(source.onHand) ||
+            !matches('available', source.available) ||
+            !matches('reserved', '0') ||
+            !matches('returned_inspection', '0') ||
+            !matches('in_transit', '0') ||
+            !matches('incoming', source.incoming) ||
+            !matches('held', channel.safetyStock) ||
+            !matches('quarantine', channel.qualityControl) ||
+            !matches('damaged', channel.damaged)
+          )
+            throw new LedgerError(
+              'review_required',
+              'Verify the full native baseline, clear provider commitments and align non-promisable states before handback. Activation and state moves require separate authority.',
+            );
+
+          return {
+            skuId: pool.skuId,
+            unit: pool.unit,
+            openingReviewId: pool.openingReviewId,
+            comparisonId: null,
+            channelHandover: {
+              snapshotId: source.snapshotId,
+              meaningHash: source.meaningHash,
+            },
+            mappingVersion: source.mappingVersion,
+            accountVersions: pool.accounts
+              .map((account) => ({ id: account.id, version: account.version }))
+              .sort((a, b) => a.id.localeCompare(b.id)),
+          };
+        }
         const comparison = pool.comparison;
         if (!comparison || comparison.driftQuantity !== '0')
           throw new LedgerError(

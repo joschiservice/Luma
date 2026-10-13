@@ -15,10 +15,11 @@ import {
 } from '@luma/ui/components/primitives/card';
 import { DataTable } from '@luma/ui/components/primitives/data-table';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
+import { Input } from '@luma/ui/components/primitives/input';
 import { Select } from '@luma/ui/components/primitives/select';
 import { StatePill } from '@luma/ui/components/primitives/state';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { z } from 'zod';
 
 import {
@@ -63,6 +64,22 @@ export function ShopifyInventoryCorrection({
   );
   const [connectionId, setConnectionId] = useState('');
   const [sourceConnectionId, setSourceConnectionId] = useState('');
+  const [allocation, setAllocation] = useState('');
+  const nativeSelected =
+    candidates?.some(
+      (value) =>
+        value.provider === 'native_stock' &&
+        value.connectionId === sourceConnectionId,
+    ) ?? false;
+  const nativeChoice = useMemo(
+    () =>
+      nativeSelected &&
+      /^\d{1,10}$/.test(allocation) &&
+      Number(allocation) <= 2147483647
+        ? { available: Number(allocation) }
+        : null,
+    [nativeSelected, allocation],
+  );
   const [data, setData] = useState<z.infer<typeof inspection> | null>(null);
   const [review, setReview] = useState<CorrectionView | null>(null);
   const [pending, setPending] = useState(false);
@@ -83,7 +100,9 @@ export function ShopifyInventoryCorrection({
         const values = z.array(correctionCandidate).parse(result);
         setCandidates(values);
         const shops = values.filter((v) => v.provider === 'shopify'),
-          erps = values.filter((v) => v.provider === 'jtl');
+          erps = values.filter(
+            (v) => v.provider === 'jtl' || v.provider === 'native_stock',
+          );
         setConnectionId((previous) =>
           shops.some((shop) => shop.connectionId === previous)
             ? previous
@@ -91,6 +110,9 @@ export function ShopifyInventoryCorrection({
               ? shops[0]!.connectionId
               : '',
         );
+        const native = erps.find((value) => value.provider === 'native_stock');
+        if (native)
+          setAllocation((previous) => previous || native.available || '');
         setSourceConnectionId((previous) =>
           erps.some((erp) => erp.connectionId === previous)
             ? previous
@@ -118,6 +140,12 @@ export function ShopifyInventoryCorrection({
 
       return;
     }
+    if (nativeSelected && !nativeChoice) {
+      setPending(false);
+      setError(m.shopify_native_publication_whole_units());
+
+      return;
+    }
     setPending(true);
     setError('');
     services
@@ -125,6 +153,7 @@ export function ShopifyInventoryCorrection({
         positionId,
         connectionId,
         sourceConnectionId,
+        ...(nativeChoice ? { nativeAllocation: nativeChoice } : {}),
       })
       .then((result) => {
         if (current !== generation.current) return;
@@ -143,7 +172,16 @@ export function ShopifyInventoryCorrection({
     return () => {
       generation.current++;
     };
-  }, [positionId, connectionId, sourceConnectionId, services, refresh]);
+  }, [
+    positionId,
+    connectionId,
+    sourceConnectionId,
+    services,
+    refresh,
+    allocation,
+    nativeSelected,
+    nativeChoice,
+  ]);
 
   useEffect(() => {
     if (!review || review.acceptance !== 'not_sent') return;
@@ -186,6 +224,7 @@ export function ShopifyInventoryCorrection({
                 positionId,
                 connectionId,
                 sourceConnectionId,
+                ...(nativeChoice ? { nativeAllocation: nativeChoice } : {}),
                 requestId: requestId.current,
               }
             : { id: review!.id, ...(outcome ? { outcome } : {}) },
@@ -208,7 +247,10 @@ export function ShopifyInventoryCorrection({
   }
 
   const shops = candidates?.filter((v) => v.provider === 'shopify') ?? [],
-    erps = candidates?.filter((v) => v.provider === 'jtl') ?? [];
+    erps =
+      candidates?.filter(
+        (v) => v.provider === 'jtl' || v.provider === 'native_stock',
+      ) ?? [];
   const blockerReason = data
     ? correctionBlockerReason(
         data.snapshot,
@@ -227,20 +269,34 @@ export function ShopifyInventoryCorrection({
     <Card
       as="section"
       className="shopify-stock-correction"
-      aria-label={m.shopify_stock_label()}
+      aria-label={
+        nativeSelected
+          ? m.shopify_native_publication_title()
+          : m.shopify_stock_label()
+      }
       aria-busy={pending}
     >
       <CardHeader>
         <div>
-          <CardTitle>{m.shopify_stock_title()}</CardTitle>
-          <CardDescription>{m.shopify_stock_description()}</CardDescription>
+          <CardTitle>
+            {nativeSelected
+              ? m.shopify_native_publication_title()
+              : m.shopify_stock_title()}
+          </CardTitle>
+          <CardDescription>
+            {nativeSelected
+              ? m.shopify_native_publication_rules()
+              : m.shopify_stock_description()}
+          </CardDescription>
         </div>
         <Button variant="ghost" size="sm" disabled={pending} onClick={reload}>
           {m.shopify_stock_refresh()}
         </Button>
       </CardHeader>
       <CardContent className="shopify-stock-content">
-        <p className="field-help">{m.shopify_stock_rules()}</p>
+        {!nativeSelected ? (
+          <p className="field-help">{m.shopify_stock_rules()}</p>
+        ) : null}
         {error ? (
           <Alert tone="danger" role="alert">
             {error}
@@ -270,15 +326,25 @@ export function ShopifyInventoryCorrection({
                 />
               </label>
               <label>
-                {m.shopify_stock_source_label()}
+                {nativeSelected
+                  ? m.shopify_native_publication_source()
+                  : m.shopify_stock_source_label()}
                 <Select
-                  aria-label={m.shopify_stock_source_label()}
+                  aria-label={
+                    nativeSelected
+                      ? m.shopify_native_publication_source()
+                      : m.shopify_stock_source_label()
+                  }
                   value={
                     review?.target.sourceConnectionId ||
                     sourceConnectionId ||
                     null
                   }
-                  placeholder={m.shopify_stock_source_placeholder()}
+                  placeholder={
+                    nativeSelected
+                      ? m.shopify_native_publication_source()
+                      : m.shopify_stock_source_placeholder()
+                  }
                   disabled={pending}
                   options={erps.map((v) => ({
                     value: v.connectionId,
@@ -300,6 +366,26 @@ export function ShopifyInventoryCorrection({
                 />
               </label>
             </div>
+            {nativeSelected ? (
+              <label className="shopify-stock-allocation">
+                {m.shopify_native_publication_allocation()}
+                <Input
+                  aria-label={m.shopify_native_publication_allocation()}
+                  inputMode="numeric"
+                  value={allocation}
+                  disabled={pending && lock.current}
+                  onChange={(event) => {
+                    newReview.current = true;
+                    setReview(null);
+                    requestId.current = null;
+                    setAllocation(event.target.value);
+                  }}
+                />
+                <small className="field-help">
+                  {m.shopify_native_publication_whole_units()}
+                </small>
+              </label>
+            ) : null}
             {pending ? <p role="status">{m.shopify_stock_checking()}</p> : null}
             {snapshot ? (
               <>
@@ -314,7 +400,11 @@ export function ShopifyInventoryCorrection({
                   </span>
                 </div>
                 <DataTable
-                  caption={m.shopify_stock_table_caption()}
+                  caption={
+                    nativeSelected
+                      ? m.shopify_native_publication_table()
+                      : m.shopify_stock_table_caption()
+                  }
                   density="compact"
                   variant="plain"
                   rows={[
@@ -340,13 +430,17 @@ export function ShopifyInventoryCorrection({
                       header: m.common_source(),
                       cell: (row) => (
                         <span>
-                          {row.id === 'erp'
-                            ? m.shopify_stock_role_source({
-                                source: row.source,
-                              })
-                            : m.shopify_stock_role_destination({
-                                source: row.source,
-                              })}
+                          {nativeSelected
+                            ? row.id === 'erp'
+                              ? m.shopify_native_publication_requested()
+                              : m.shopify_native_publication_storage()
+                            : row.id === 'erp'
+                              ? m.shopify_stock_role_source({
+                                  source: row.source,
+                                })
+                              : m.shopify_stock_role_destination({
+                                  source: row.source,
+                                })}
                         </span>
                       ),
                     },
@@ -363,6 +457,29 @@ export function ShopifyInventoryCorrection({
                     },
                   ]}
                 />
+                {snapshot.source.nativeAllocation ? (
+                  <p className="field-help">
+                    {m.shopify_native_publication_binding({
+                      quantity: snapshot.source.nativeAllocation.available,
+                      version: snapshot.source.nativeAllocation.scope.version,
+                    })}{' '}
+                    ·{' '}
+                    {m.shopify_native_publication_eligibility({
+                      item:
+                        snapshot.itemActive == null
+                          ? m.common_unknown()
+                          : snapshot.itemActive
+                            ? m.shopify_native_publication_active()
+                            : m.shopify_native_publication_inactive(),
+                      location:
+                        snapshot.locationActive == null
+                          ? m.common_unknown()
+                          : snapshot.locationActive
+                            ? m.shopify_native_publication_active()
+                            : m.shopify_native_publication_inactive(),
+                    })}
+                  </p>
+                ) : null}
                 <Disclosure>
                   <summary>{m.shopify_stock_details()}</summary>
                   <dl>
@@ -370,7 +487,11 @@ export function ShopifyInventoryCorrection({
                     <dd>{snapshot.inventoryItemId}</dd>
                     <dt>{m.shopify_stock_detail_location()}</dt>
                     <dd>{snapshot.locationId}</dd>
-                    <dt>{m.shopify_stock_detail_reading()}</dt>
+                    <dt>
+                      {snapshot.source.nativeAllocation
+                        ? m.shopify_native_publication_reading()
+                        : m.shopify_stock_detail_reading()}
+                    </dt>
                     <dd>{snapshot.source.observationId}</dd>
                     {review ? (
                       <>
@@ -468,7 +589,9 @@ export function ShopifyInventoryCorrection({
                         disabled={pending}
                         onClick={() => void command('approve', 'approved')}
                       >
-                        {m.shopify_stock_approve()}
+                        {nativeSelected
+                          ? m.shopify_native_publication_approve()
+                          : m.shopify_stock_approve()}
                       </Button>
                       <Button
                         variant="outline"
@@ -484,7 +607,9 @@ export function ShopifyInventoryCorrection({
                       disabled={pending}
                       onClick={() => void command('execute')}
                     >
-                      {m.shopify_stock_send()}
+                      {nativeSelected
+                        ? m.shopify_native_publication_send()
+                        : m.shopify_stock_send()}
                     </Button>
                   ) : null}
                   <Button
@@ -507,7 +632,9 @@ export function ShopifyInventoryCorrection({
                         reload();
                       }}
                     >
-                      {m.shopify_stock_review_new()}
+                      {nativeSelected
+                        ? m.shopify_native_publication_review_new()
+                        : m.shopify_stock_review_new()}
                     </Button>
                   ) : null}
                 </div>
@@ -542,7 +669,9 @@ export function ShopifyInventoryCorrection({
                     disabled={pending || !!blocker}
                     onClick={() => void command('preview')}
                   >
-                    {m.shopify_stock_review()}
+                    {nativeSelected
+                      ? m.shopify_native_publication_review()
+                      : m.shopify_stock_review()}
                   </Button>
                 </div>
               </>

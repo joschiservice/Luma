@@ -83,12 +83,14 @@ export async function nativeStockFixture(t, options = {}) {
     unit: 'each',
   };
 
-  async function stockRead() {
+  async function stockRead(reconcile = true) {
     const evidence = await native.readStock(f.owner, {
       connectionId: f.installed.id,
       ...base,
     });
     const latest = evidence.snapshotId;
+
+    if (!reconcile) return evidence;
 
     return f.ledger.reconcile(f.owner, {
       id: randomUUID(),
