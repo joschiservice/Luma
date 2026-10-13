@@ -1,3 +1,4 @@
+/* global document */
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 import { correctionFixture } from './shopify-inventory-fixture.mjs';
@@ -7,8 +8,16 @@ test('reviews stock in Inventory, obtains approval, then verifies Shopify in bot
 }) => {
   const port = await availablePort(),
     origin = `http://127.0.0.1:${port}`;
-  const { f, admin, call, target, mutations, delayVerification } =
-    await correctionFixture(t, origin);
+  const {
+    f,
+    admin,
+    call,
+    target,
+    mutations,
+    delayVerification,
+    syncStock,
+    changeAvailable,
+  } = await correctionFixture(t, origin);
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
   const web = startProcess(
     t,
@@ -83,6 +92,15 @@ test('reviews stock in Inventory, obtains approval, then verifies Shopify in bot
     panel.getByText('Quantity verified', { exact: true }),
   ).toBeVisible();
   expect(mutations).toHaveLength(1);
+  await syncStock();
+  await page.reload();
+  await expect(
+    page
+      .getByText(
+        'Luma set available stock to 9. This read matches; other changes may also have occurred.',
+      )
+      .first(),
+  ).toBeVisible();
   await panel.getByRole('button', { name: 'Review a new correction' }).click();
   await expect(
     panel.getByText(
@@ -90,5 +108,27 @@ test('reviews stock in Inventory, obtains approval, then verifies Shopify in bot
       { exact: true },
     ),
   ).toBeVisible();
+  await changeAvailable(8);
+  await syncStock();
+  await page.reload();
+  await expect(
+    page
+      .getByText(
+        'Luma set available stock to 9. This read differs; other changes remain unattributed.',
+      )
+      .first(),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: '/tmp/luma-204-attribution-dark-mobile.png',
+    fullPage: true,
+  });
+  expect(mutations).toHaveLength(1);
   expect(errors).toEqual([]);
 });

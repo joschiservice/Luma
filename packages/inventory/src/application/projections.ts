@@ -21,6 +21,14 @@ type CommerceData =
       tracked?: boolean | null;
       /** Versioned quantity meaning; absent for earlier or other provider reports. */
       inventorySemantics?: 'shopify/1' | null;
+      /** Corroborates a known provider adjustment without attributing the whole stock report to it. */
+      writeAttribution?: {
+        evidenceId: string;
+        adjustmentId: string;
+        referenceDocumentUri: string;
+        available: string;
+        quantityMatches: boolean | null;
+      } | null;
       availabilityBasis: 'provider_reported' | 'derived' | 'unknown';
     }
   | {
@@ -52,8 +60,8 @@ export type Dependent = {
 };
 
 export interface CanonicalSnapshot {
-  /** Version 2 includes product descriptions or distinct provider stock states. */
-  schemaVersion: 1 | 2;
+  /** Version 2 adds product/stock facts; position version 3 adds corroborated write attribution. */
+  schemaVersion: 1 | 2 | 3;
   entityId: string;
   kind: EntityKind;
   connectionId: string;

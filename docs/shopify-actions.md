@@ -88,12 +88,30 @@ because its quantity differs. JTL remains a read-only reference.
 - The mutation sets the quantity with an exact `changeFromQuantity` and an idempotency
   key. Do not bypass that compare-and-swap: Shopify rejects any concurrent change to the
   available quantity, including one after Luma's final read.
+- A correction uses a stable `referenceDocumentUri` derived from the persisted execution
+  key. Acceptance retains the exact Shopify adjustment ID, URI and quantity change. Sync
+  and verification independently read that adjustment, filtered to the exact item,
+  location and available state. Missing, changed or ambiguous references leave authorship
+  unknown. New correction verification requires both that proof and the fresh quantity;
+  older previews retain their original quantity-only verification contract.
+- Inventory shows the corroborated correction separately from the latest quantity.
+  A match never proves exclusive authorship; a residual difference remains eligible for
+  detection, including when another app changes stock after Luma's write. Proof scans are
+  bounded to twenty recent targets per read and seven days of receipts. Older or omitted
+  targets keep usable quantity evidence with unknown cause. Uncertain writes without a
+  durable receipt are not attributed or replayed from a timing or quantity match.
 - Verification reads Shopify independently and requires the approved quantity at the
   same item and location, complete tracked inventory and unchanged ERP authority. A
   changed ERP quantity, availability or mapping leaves it unverified. A newer ERP read
   with the same values is not a change, so detection's frequent rereads do not invalidate
   a reviewed correction; its expiry still follows the reviewed read.
 
+### Providers without adjustment references
+
+JTL and Cin7 stock reads do not expose this adjustment reference. A time-window and quantity
+match can support a low-confidence investigation candidate, but cannot confirm a Luma echo,
+close an issue, suppress a difference or authorize a retry. Their current stock integrations
+remain read-only; no heuristic is promoted to verified authorship.
 ## Order quantity edits
 
 Permission: `shopify:order_edits.apply`; capability `orders.quantity.edit`, granted only with

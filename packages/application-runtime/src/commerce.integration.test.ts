@@ -1246,8 +1246,8 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
     )[0]!.snapshot;
     if (initial.data.type !== 'position') throw new Error('Expected position');
     expect(initial).toMatchObject({
-      schemaVersion: 2,
-      normalizerVersion: 'commerce/2',
+      schemaVersion: 3,
+      normalizerVersion: 'commerce/3',
       data: { committed: '5', reserved: null, incoming: null },
     });
     const legacy = {

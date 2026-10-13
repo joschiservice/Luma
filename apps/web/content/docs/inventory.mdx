@@ -46,6 +46,8 @@ Open **Unavailable stock and activation** to see damaged stock, quality control 
 
 **Refresh stock** at the top of the page shows Luma’s latest readings. It doesn’t read the sources again; Luma reads them on its regular sync.
 
+After a confirmed Luma correction, the source and recent readings show the quantity Luma set and whether that reading matches. Other people or apps may also have changed stock. A difference remains visible; a missing adjustment reference leaves the cause unknown.
+
 ## When stock is still syncing
 
 A sale changes stock in one system first, and the other system catches up on its next sync. While that happens, the position shows **Syncing** instead of **Differs by source**. Open it to see when Luma first saw the gap and when it opens an issue if the gap is still there. Luma waits up to 30 minutes for your systems to agree again.
@@ -95,8 +97,10 @@ A correction has three separate steps, and each shows its own state:
 
 - **Review and approval**: the correction is waiting for approval, or approved.
 - **Shopify accepted**: Shopify accepted the request. The quantity isn’t confirmed yet.
-- **Quantity verified**: a fresh read of Shopify matches the approved ERP quantity.
+- **Quantity verified**: a fresh read matches the approved ERP quantity and confirms the adjustment reference for that correction.
 
 Choose **Verify stock** to read Shopify again. Until the quantity is verified, don’t treat the stock as fixed. Stock issues for the position update after Luma’s next sync.
 
 **Outcome unclear** means Luma couldn’t tell whether Shopify received the correction, for example because the connection was interrupted. Luma never sends the same correction twice. Check the stock in Shopify and choose **Verify stock** before you review a new correction.
+
+If Luma cannot confirm the adjustment reference, the action stays uncertain even when the quantity matches. A matching quantity may be another change. Check Shopify before taking another action.

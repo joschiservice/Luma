@@ -945,6 +945,19 @@ test('inventory correction sets available stock once and refuses stale writes', 
     accessToken: async () => 'synthetic',
     fetch: shop.fetch,
     record: async (item) => evidence.push(item),
+    receipts: async (item, location) =>
+      evidence
+        .filter(
+          (entry) =>
+            entry.kind === 'acceptance' &&
+            entry.document.inventoryItemId === item &&
+            entry.document.locationId === location,
+        )
+        .map((entry) => ({
+          ...entry.document,
+          evidenceId: entry.id,
+          observedAt: entry.observedAt,
+        })),
   });
   const item = gid('InventoryItem', '12');
   const location = gid('Location', '1');
@@ -989,6 +1002,49 @@ test('inventory correction sets available stock once and refuses stale writes', 
     available: 7,
   });
   assert.equal((await provider.read(item, location)).available, 7);
+  const receipt = evidence.find((entry) => entry.kind === 'acceptance');
+  assert.equal(
+    receipt.document.referenceDocumentUri,
+    'luma://inventory-corrections/fix-1',
+  );
+  const read = pages(shop, {
+    inventoryWrites: async () => [
+      {
+        ...receipt.document,
+        evidenceId: receipt.id,
+        observedAt: receipt.observedAt,
+      },
+    ],
+  });
+  const echo = await read('inventory.read', {
+    limit: 100,
+    sku: { externalId: item, scopeKey: '' },
+    location: { externalId: location, scopeKey: '' },
+  });
+  assert.equal(echo.ok, true, JSON.stringify(echo));
+  assert.equal(echo.value.items[0].data.writeAttribution.quantityMatches, true);
+  const proof = await provider.read(item, location);
+  assert.equal(
+    proof.writeAttribution.referenceDocumentUri,
+    receipt.document.referenceDocumentUri,
+  );
+  await shop.run({
+    kind: 'available',
+    variant: '12',
+    location: '1',
+    quantity: 6,
+  });
+  const changed = await read('inventory.read', {
+    limit: 100,
+    sku: { externalId: item, scopeKey: '' },
+    location: { externalId: location, scopeKey: '' },
+  });
+  assert.equal(changed.ok, true, JSON.stringify(changed));
+  assert.equal(changed.value.items[0].data.available, '6');
+  assert.equal(
+    changed.value.items[0].data.writeAttribution.quantityMatches,
+    false,
+  );
   await assert.rejects(
     handler.run(invocation('fix-2'), handler.parseInput(input)),
     (error) =>

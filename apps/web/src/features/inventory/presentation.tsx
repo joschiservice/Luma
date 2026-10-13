@@ -15,6 +15,23 @@ type StockField =
   | 'qualityControl'
   | 'safetyStock';
 
+/** Describes corroborated Luma writes separately from the latest quantity and unattributed changes. */
+export function StockWriteAttribution({ source }: { source: StockSource }) {
+  const attribution = source.writeAttribution;
+  if (source.deleted || !attribution) return null;
+  const quantity = stockQuantity(attribution.available);
+
+  return (
+    <small>
+      {attribution.quantityMatches === null
+        ? m.inventory_write_unknown({ quantity })
+        : attribution.quantityMatches
+          ? m.inventory_write_matches({ quantity })
+          : m.inventory_write_changed({ quantity })}
+    </small>
+  );
+}
+
 /** Column labels for each reported quantity. */
 export const quantityLabels: Record<StockField, () => string> = {
   onHand: m.inventory_quantity_on_hand,

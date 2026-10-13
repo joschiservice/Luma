@@ -34,6 +34,7 @@ import {
 import { createInventoryCorrectionProvider } from './infrastructure/inventory-correction-provider.js';
 import { createCorrectionQuery } from './infrastructure/inventory-correction-query.js';
 import { createCorrectionStore } from './infrastructure/inventory-correction-store.js';
+import { readInventoryWriteReceipts } from './infrastructure/inventory-write-store.js';
 
 /** Composes Shopify correction with the platform's persistent Action Admission, policy and audit services. */
 export function createShopifyInventoryCorrection(
@@ -150,6 +151,10 @@ export function createShopifyInventoryCorrection(
         return fresh.credentials.token;
       },
       record: (evidence) => store.record(tenant, connectionId, evidence),
+      receipts: (inventoryItemId, locationId) =>
+        readInventoryWriteReceipts(context.database, tenant, connectionId, [
+          { inventoryItemId, locationId },
+        ]),
     });
   }
 

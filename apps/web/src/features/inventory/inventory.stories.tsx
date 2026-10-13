@@ -88,6 +88,24 @@ const providerStates: StockPosition = {
       : source,
   ),
 };
+const attributed: StockPosition = {
+  ...providerStates,
+  sources: providerStates.sources.map((source) =>
+    source.inventorySemantics === 'shopify/1'
+      ? {
+          ...source,
+          writeAttribution: {
+            evidenceId: '11111111-1111-4111-8111-111111111111',
+            adjustmentId: 'gid://shopify/InventoryAdjustmentGroup/17',
+            referenceDocumentUri:
+              'luma://inventory-corrections/v0:11111111-1111-4111-8111-111111111111',
+            available: '9',
+            quantityMatches: false,
+          },
+        }
+      : source,
+  ),
+};
 // A gap Luma first saw a minute ago and lets the provider sync close.
 const syncing: StockPosition = {
   ...position,
@@ -175,7 +193,8 @@ function Content({ state }: { state: string }) {
   if (
     state === 'detail' ||
     state === 'syncing-detail' ||
-    state === 'provider-states'
+    state === 'provider-states' ||
+    state === 'write-attribution'
   )
     return (
       <StockDetailView
@@ -183,13 +202,17 @@ function Content({ state }: { state: string }) {
         detail={
           state === 'syncing-detail'
             ? { ...detail, position: syncing }
-            : state === 'provider-states'
+            : state === 'provider-states' || state === 'write-attribution'
               ? {
                   ...detail,
-                  position: providerStates,
+                  position:
+                    state === 'write-attribution' ? attributed : providerStates,
                   history: {
                     ...detail.history,
-                    entries: providerStates.sources.map((source, i) => ({
+                    entries: (state === 'write-attribution'
+                      ? attributed
+                      : providerStates
+                    ).sources.map((source, i) => ({
                       ...source,
                       id: String(i),
                       current: true,
@@ -342,5 +365,26 @@ export const ProviderStates: Story = {
 
 export const ProviderStatesDark: Story = {
   ...ProviderStates,
+  globals: { theme: 'dark' },
+};
+
+/** A known correction does not hide a later provider quantity difference. */
+export const WriteAttribution: Story = {
+  args: { state: 'write-attribution' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      (
+        await canvas.findAllByText(
+          'Luma set available stock to 9. This read differs; other changes remain unattributed.',
+        )
+      )[0],
+    ).toBeVisible();
+    await expect(canvas.getByText('Differs by source')).toBeVisible();
+  },
+};
+
+export const WriteAttributionDark: Story = {
+  ...WriteAttribution,
   globals: { theme: 'dark' },
 };

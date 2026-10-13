@@ -46,6 +46,8 @@ Mengen bleiben bei ihrer Quelle und werden nie über Quellen hinweg addiert. Mel
 
 **Bestand aktualisieren** oben auf der Seite zeigt die neuesten Abrufe von Luma. Die Quellen werden dabei nicht erneut gelesen; Luma liest sie beim regelmäßigen Abgleich.
 
+Nach einer bestätigten Luma-Korrektur zeigen die Quelle und frühere Abrufe die von Luma gesetzte Menge und ob der jeweilige Abruf übereinstimmt. Andere Personen oder Apps können ebenfalls Bestand geändert haben. Eine Abweichung bleibt sichtbar; fehlt die Anpassungsreferenz, bleibt die Ursache unbekannt.
+
 ## Wenn Bestand noch synchronisiert wird [#when-stock-is-still-syncing]
 
 Ein Verkauf ändert den Bestand zuerst in einem System, das andere System zieht bei seiner nächsten Synchronisierung nach. Solange das dauert, zeigt die Position **Wird synchronisiert** statt **Quellen weichen ab**. Öffne sie, um zu sehen, wann Luma die Abweichung erkannt hat und wann Luma ein Problem meldet, falls sie dann noch besteht. Luma wartet bis zu 30 Minuten, bis deine Systeme wieder übereinstimmen.
@@ -95,8 +97,10 @@ Eine Korrektur hat drei getrennte Schritte, und jeder zeigt seinen eigenen Stand
 
 - **Prüfung und Genehmigung**: Die Korrektur wartet auf Genehmigung oder ist genehmigt.
 - **Von Shopify angenommen**: Shopify hat die Anfrage angenommen. Die Menge ist noch nicht bestätigt.
-- **Menge bestätigt**: Ein neuer Abruf aus Shopify stimmt mit der genehmigten ERP-Menge überein.
+- **Menge bestätigt**: Ein neuer Abruf stimmt mit der genehmigten ERP-Menge überein und bestätigt die Anpassungsreferenz dieser Korrektur.
 
 Wähle **Bestand prüfen**, um Shopify erneut zu lesen. Solange die Menge nicht bestätigt ist, gilt der Bestand nicht als korrigiert. Bestandsprobleme zur Position werden nach dem nächsten Abgleich von Luma aktualisiert.
 
 **Ergebnis unklar** bedeutet, dass Luma nicht feststellen konnte, ob Shopify die Korrektur erhalten hat, zum Beispiel weil die Verbindung unterbrochen wurde. Luma sendet dieselbe Korrektur nie zweimal. Prüfe den Bestand in Shopify und wähle **Bestand prüfen**, bevor du eine neue Korrektur prüfst.
+
+Kann Luma die Anpassungsreferenz nicht bestätigen, bleibt die Aktion auch bei übereinstimmender Menge unklar. Eine passende Menge kann auf eine andere Änderung zurückgehen. Prüfe Shopify, bevor du eine weitere Aktion ausführst.

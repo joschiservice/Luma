@@ -20,6 +20,7 @@ import {
   all,
   type FulfillmentLineItemData,
   type FulfillmentOrderData,
+  gid,
   type IdempotencyKeyData,
   type InventoryItemData,
   type InventoryLevelData,
@@ -224,6 +225,8 @@ async function setQuantities(
   if (errors.length) return refuse(errors);
 
   const applied: {
+    inventoryItemId: string;
+    locationId: string;
     name: string;
     delta: number;
     quantityAfterChange: number;
@@ -241,19 +244,30 @@ async function setQuantities(
           (level.safetyStock ?? 0);
     await writeLevel(context.shop, { ...level, onHand });
     applied.push({
+      inventoryItemId: gid('InventoryItem', level.item),
+      locationId: gid('Location', level.location),
       name: name ?? 'available',
       delta: quantity - before,
       quantityAfterChange: quantity,
     });
   }
-  const result = {
-    inventoryAdjustmentGroup: {
-      __typename: 'InventoryAdjustmentGroup',
-      id: `gid://shopify/InventoryAdjustmentGroup/${await nextId(context.shop)}`,
+  const adjustmentId = await nextId(context.shop);
+  await save(
+    context.shop,
+    'InventoryAdjustmentGroup',
+    adjustmentId,
+    {
       reason,
       referenceDocumentUri: reference,
       changes: applied,
     },
+    { created: true },
+  );
+  const result = {
+    inventoryAdjustmentGroup: await store.get(
+      'InventoryAdjustmentGroup',
+      adjustmentId,
+    ),
     userErrors: [],
   };
   await save<IdempotencyKeyData>(

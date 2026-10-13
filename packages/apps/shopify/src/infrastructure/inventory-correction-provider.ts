@@ -8,6 +8,11 @@ import {
 } from '@luma/connector-shopify';
 import { z } from 'zod';
 
+import {
+  type InventoryWriteReceipt,
+  readInventoryWriteProofs,
+} from './inventory-write-attribution.js';
+
 const gid = (kind: string) =>
   z.string().regex(new RegExp(`^gid://shopify/${kind}/[0-9]+$`));
 const inputSchema = z
@@ -52,6 +57,11 @@ export function createInventoryCorrectionProvider(
     tenantId: string;
     connectionId: string;
     record(evidence: CorrectionEvidence): Promise<void>;
+    /** Accepted receipts from this tenant and connection; failed proof leaves authorship unknown. */
+    receipts?(
+      inventoryItemId: string,
+      locationId: string,
+    ): Promise<InventoryWriteReceipt[]>;
     /** Rechecks source authority immediately before sending the mutation. */
     eligible?: () => Promise<boolean>;
     now?: () => Date;
@@ -88,9 +98,26 @@ export function createInventoryCorrectionProvider(
         effect: 'none',
         retry: 'never',
       });
+    const observedAt = now().toISOString();
+    const receipts = options.receipts
+      ? await options.receipts(inventoryItemId, locationId)
+      : [];
+    const proof = (
+      await readInventoryWriteProofs(
+        request,
+        receipts.filter(
+          (receipt) =>
+            receipt.inventoryItemId === inventoryItemId &&
+            receipt.locationId === locationId &&
+            Date.parse(receipt.observedAt) <= Date.parse(observedAt),
+        ),
+      )
+    )[0];
+    const available =
+      level?.quantities.find((q) => q.name === 'available')?.quantity ?? null;
     const snapshot = {
       id: randomUUID(),
-      observedAt: now().toISOString(),
+      observedAt,
       targetRevision: createHash('sha256')
         .update(JSON.stringify(node))
         .digest('hex'),
@@ -104,8 +131,17 @@ export function createInventoryCorrectionProvider(
         level.isActive &&
         level.quantities.length === 1 &&
         level.quantities[0]?.name === 'available',
-      available:
-        level?.quantities.find((q) => q.name === 'available')?.quantity ?? null,
+      available,
+      writeAttribution: proof
+        ? {
+            evidenceId: proof.evidenceId,
+            adjustmentId: proof.adjustmentId,
+            referenceDocumentUri: proof.referenceDocumentUri,
+            available: String(proof.available),
+            quantityMatches:
+              available === null ? null : available === proof.available,
+          }
+        : null,
     };
     await options.record({
       id: snapshot.id,
@@ -163,10 +199,11 @@ export function createInventoryCorrectionProvider(
           dispatch: 'not_dispatched',
         });
       try {
+        const referenceDocumentUri = `luma://inventory-corrections/${context.idempotencyKey}`;
         const raw = await request(
           `mutation LumaInventoryCorrection($input: InventorySetQuantitiesInput!, $key: String!) {
           result: inventorySetQuantities(input: $input) @idempotent(key: $key) {
-            inventoryAdjustmentGroup { reason referenceDocumentUri changes { name delta quantityAfterChange } }
+            inventoryAdjustmentGroup { id reason referenceDocumentUri changes { name delta quantityAfterChange } }
             userErrors { field message code }
           }
         }`,
@@ -175,7 +212,7 @@ export function createInventoryCorrectionProvider(
             input: {
               name: 'available',
               reason: 'correction',
-              referenceDocumentUri: `luma://inventory-corrections/${context.idempotencyKey}`,
+              referenceDocumentUri,
               quantities: [
                 {
                   inventoryItemId: input.inventoryItemId,
@@ -191,6 +228,7 @@ export function createInventoryCorrectionProvider(
           z.object({
             inventoryAdjustmentGroup: z
               .object({
+                id: gid('InventoryAdjustmentGroup'),
                 reason: z.string(),
                 referenceDocumentUri: z.string().nullable(),
                 changes: z.array(
@@ -222,6 +260,9 @@ export function createInventoryCorrectionProvider(
         if (
           result.userErrors.length ||
           !result.inventoryAdjustmentGroup ||
+          result.inventoryAdjustmentGroup.reason !== 'correction' ||
+          result.inventoryAdjustmentGroup.referenceDocumentUri !==
+            referenceDocumentUri ||
           result.inventoryAdjustmentGroup.changes.length !== 1 ||
           result.inventoryAdjustmentGroup.changes[0]?.name !== 'available' ||
           result.inventoryAdjustmentGroup.changes[0].quantityAfterChange !==
@@ -241,6 +282,8 @@ export function createInventoryCorrectionProvider(
             expectedAvailable: input.expectedAvailable,
             available: input.available,
             idempotencyKey: context.idempotencyKey,
+            referenceDocumentUri,
+            adjustmentId: result.inventoryAdjustmentGroup.id,
           },
         });
 

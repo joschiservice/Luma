@@ -4,6 +4,7 @@ import type {
   InventoryDetail,
   StockPosition,
 } from '../../application/inventory.js';
+import type { StockSource } from '../../domain/inventory.js';
 
 /** Reads bounded history and SKU relationships; source identities require the same connection scope. */
 export async function readStockContext(
@@ -16,7 +17,10 @@ export async function readStockContext(
     connectionId: string;
     document: {
       schemaVersion: number;
-      data: Record<string, string | boolean | null>;
+      data: Record<string, unknown> & {
+        writeAttribution?: StockSource['writeAttribution'];
+        availabilityBasis: StockSource['availabilityBasis'];
+      };
       observedAt: string;
       sourceUpdatedAt: string | null;
       deleted: boolean;
@@ -100,9 +104,9 @@ export async function readStockContext(
           locationActive: activation('locationActive'),
           itemActive: activation('itemActive'),
           tracked: activation('tracked'),
+          writeAttribution: data.writeAttribution ?? null,
           inventorySemantics: source.inventorySemantics ?? null,
-          availabilityBasis: row.document.data
-            .availabilityBasis as typeof source.availabilityBasis,
+          availabilityBasis: data.availabilityBasis,
         };
       }),
       truncated: history.rows.length > 100,

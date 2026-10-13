@@ -29,6 +29,16 @@ export const correctionSnapshot = z.object({
   available: z.number().int().nullable(),
   tracked: z.boolean(),
   complete: z.boolean(),
+  writeAttribution: z
+    .object({
+      evidenceId: z.string().uuid(),
+      adjustmentId: z.string(),
+      referenceDocumentUri: z.string(),
+      available: z.string(),
+      quantityMatches: z.boolean().nullable(),
+    })
+    .nullable()
+    .optional(),
   source: z.object({
     connectionId: z.string().uuid(),
     label: z.string(),

@@ -51,5 +51,10 @@ as unknown. Earlier Shopify snapshots retain their immutable document: the forme
 field was committed stock and is labeled accordingly, with separate reserved stock unknown.
 Replaying earlier observations writes a new version beside the retained evidence.
 
+Position version 3 adds independently corroborated stock-write attribution. It links the
+accepted action to a provider adjustment and records whether that reading matches the
+action's quantity. A changed or unknown quantity remains distinct; attribution never
+suppresses residual differences. History retains the attribution of each individual read.
+
 See [quantity ledger and ownership](architecture/013-stock-ledger.md) for the separate native
 quantity model. These provider facts neither post ledger entries nor select ownership.

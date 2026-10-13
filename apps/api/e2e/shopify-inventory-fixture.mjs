@@ -1,7 +1,12 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 
+import { createAppHost } from '@luma/app-catalog';
+import { createCommerceServices } from '@luma/application-runtime';
+import { createInstalledRuntime } from '@luma/connections/composition';
+import { createTenantDatabase } from '@luma/platform/composition';
 import { createMemoryStore, createTransport } from '@luma/simulator-core';
 import { readStock, shopify } from '@luma/simulator-shopify';
+import { Pool } from 'pg';
 
 import { appScopes } from './app-scopes.mjs';
 import { inventoryFixture } from './inventory-fixture.mjs';
@@ -194,6 +199,10 @@ export async function correctionFixture(t, origin = 'http://localhost:3000') {
     external: stockItem,
     location: stockLocation,
     amount: '12',
+    // Match Shopify's timestamp resolution; the fixture must not outrank a later real read in the same second.
+    time: new Date((await store.get('InventoryLevel', '1.1')).updatedAt)
+      .toISOString()
+      .replace(/\.\d{3}Z$/, 'Z'),
   });
   const list = await f.request(
     f.owner,
@@ -216,6 +225,55 @@ export async function correctionFixture(t, origin = 'http://localhost:3000') {
       status,
     );
 
+  /** Reconstructs the installed runtime to exercise persisted receipts through normal commerce reads. */
+  async function syncStock() {
+    const pool = new Pool({ connectionString: f.db.runtimeUrl });
+    const db = createTenantDatabase(pool);
+    const host = createAppHost(db, {
+      ...connectionsConfig,
+      refreshContext: f.identity.service.refreshContext,
+      env: {},
+    });
+    const commerce = createCommerceServices(db);
+    const tenant = await f.identity.service.resolveWorkflowContext(
+      f.owner.id,
+      f.org.id,
+      randomUUID(),
+    );
+    const runtime = createInstalledRuntime({
+      installations: host.connections,
+      providers: host.registry.providers(),
+      record: async () => {},
+      recordObservations: async (evidence) => {
+        for (const observation of evidence.observations) {
+          await commerce.ingestion.ingest(tenant, observation.id, {
+            capability: 'inventory.read',
+            observation,
+          });
+        }
+      },
+    });
+    try {
+      const result = await runtime.read(tenant, {
+        connectionId: installed.id,
+        capability: 'inventory.read',
+        version: '0',
+        input: {
+          limit: 100,
+          sku: { externalId: stockItem, scopeKey: '' },
+          location: { externalId: stockLocation, scopeKey: '' },
+        },
+      });
+      if (!result.ok)
+        throw new Error(`Stock read failed: ${result.error.code}`);
+
+      return result.value.items;
+    } finally {
+      await commerce.close();
+      await pool.end();
+    }
+  }
+
   return {
     f,
     connectionsConfig,
@@ -227,6 +285,14 @@ export async function correctionFixture(t, origin = 'http://localhost:3000') {
     mutations,
     target,
     call,
+    syncStock,
+    changeAvailable: (quantity) =>
+      shopify.command(context(), {
+        kind: 'available',
+        variant: '1',
+        location: '1',
+        quantity,
+      }),
     loseResponse: () => {
       lost = true;
     },
