@@ -30,14 +30,18 @@ import { z } from 'zod';
 
 import { readBulkHistory } from './bulk-history.js';
 import { createInventoryTransferCapabilities } from './inventory-transfers.js';
+import { lineFacts, mailingAddress, orderFacts } from './order-facts.js';
 import {
   attributeInventoryWrites,
   type InventoryWriteReceipt,
 } from './inventory-write-attribution.js';
 import {
+  discountApplication,
+  orderLine,
   orderSelection,
   readPageSize,
   readSelection,
+  shippingLine,
 } from './read-selections.js';
 import { createShopifyReturnCapabilities } from './return-actions.js';
 import { createShopifyExchangeCapabilities } from './return-exchanges.js';
@@ -137,6 +141,20 @@ const customerStates: Record<string, CustomerSnapshot['state']> = {
 
 // Without read_all_orders, Shopify returns orders created in the last 60 days.
 const recentOrderWindowMs = 60 * 24 * 60 * 60 * 1000;
+
+/** The order history Shopify hides from an installation without `read_all_orders`, if any. */
+const orderHistory = (
+  scopes: { handle: string }[],
+  at: Date,
+): HistoryLimit | null =>
+  scopes.some((scope) => scope.handle === 'read_all_orders')
+    ? null
+    : {
+        availableFrom: new Date(
+          at.getTime() - recentOrderWindowMs,
+        ).toISOString(),
+        requirement: 'read_all_orders',
+      };
 
 const counted = {
   'orders.read': 'ordersCount',
@@ -258,6 +276,7 @@ export function createShopifyConnector(
   const now = options.now ?? (() => new Date());
   const id = options.id ?? randomUUID;
   const orderCustomers = !!options.customerAccess && !!options.orderCustomers;
+  const orderAddresses = !!options.customerAccess?.address;
 
   function handler<
     K extends Exclude<
@@ -304,6 +323,7 @@ export function createShopifyConnector(
                 capability === 'customers.read'
                   ? ['historyImport' as const]
                   : []),
+                ...(capability === 'orders.read' ? ['order' as const] : []),
               ],
             }),
       },
@@ -318,6 +338,18 @@ export function createShopifyConnector(
           context.provider !== 'shopify'
         )
           fail('unavailable');
+        // A point read of one order is not a scan; it cannot page or filter.
+        if (
+          capability === 'orders.read' &&
+          'order' in input &&
+          input.order &&
+          (input.cursor ||
+            input.updatedSince ||
+            input.createdSince ||
+            input.historyImport ||
+            input.confirmMissing)
+        )
+          fail('invalid_input');
         if ('confirmMissing' in input && input.confirmMissing) {
           if (
             input.cursor ||
@@ -571,16 +603,23 @@ export function createShopifyConnector(
             { id: externalId },
           );
           if (data.node === null) fail('not_found');
+          // Cached so protected fields can be read separately, without raw capture.
+          remember(data.node);
 
           return capture(schema, data.node);
         }
 
+        /**
+         * Reads a nested connection completely, starting from the cached first page. `size`
+         * bounds overflow pages so their requested cost stays under the query cost limit.
+         */
         async function children<T>(
           externalId: string,
           type: string,
           field: string,
           fields: string,
           schema: z.ZodType<T>,
+          { args = '', size = 100 }: { args?: string; size?: number } = {},
         ): Promise<T[]> {
           const result: T[] = [];
           let cursor: string | null = null;
@@ -594,7 +633,7 @@ export function createShopifyConnector(
           const seen = new Set<string>(cursor ? [cursor] : []);
           do {
             const data = await request(
-              `query LumaChildren($id: ID!, $after: String) { node(id: $id) { ... on ${type} { children: ${field}(first: 100, after: $after) { nodes { ${fields} } ${pageFields} } } } }`,
+              `query LumaChildren($id: ID!, $after: String) { node(id: $id) { ... on ${type} { children: ${field}(first: ${size}, after: $after${args ? `, ${args}` : ''}) { nodes { ${fields} } ${pageFields} } } } }`,
               { id: externalId, after: cursor },
             );
             if (data.node === null) fail('not_found');
@@ -694,16 +733,10 @@ export function createShopifyConnector(
           );
           total = start.count?.count ?? null;
           if (root === 'orders')
-            history = start.currentAppInstallation.accessScopes.some(
-              (scope) => scope.handle === 'read_all_orders',
-            )
-              ? null
-              : {
-                  availableFrom: new Date(
-                    now().getTime() - recentOrderWindowMs,
-                  ).toISOString(),
-                  requirement: 'read_all_orders',
-                };
+            history = orderHistory(
+              start.currentAppInstallation.accessScopes,
+              now(),
+            );
         }
         let roots: { id: string }[];
         let nextAfter: string | null = null;
@@ -781,11 +814,44 @@ export function createShopifyConnector(
           }));
           nextAfter = bulk.cursor;
           total = capability === 'inventory.read' ? undefined : bulk.total;
+        } else if (selected && capability === 'orders.read') {
+          // Same selection as an order page, so the observation matches a scan of this order.
+          const data = parse(
+            z.object({ node: record.nullable() }),
+            await request(
+              `query LumaOrder($id: ID!) { node(id: $id) { ... on Order { ${readSelection(capability, orderCustomers, orderAddresses)} } } }`,
+              { id: selected.externalId },
+            ),
+          );
+          roots = [];
+          if (data.node) {
+            if (parse(s.gid('Order'), data.node.id) !== selected.externalId)
+              fail('invalid_response');
+            remember(data.node);
+            roots.push({ id: selected.externalId });
+          } else {
+            // Without read_all_orders, older orders read as absent rather than missing.
+            const start = parse(
+              s.scanStart,
+              await request(
+                'query LumaScanStart { currentAppInstallation { accessScopes { handle } } }',
+                {},
+              ),
+            );
+            history = orderHistory(
+              start.currentAppInstallation.accessScopes,
+              now(),
+            );
+          }
         } else if (selected) {
           if (after) fail('invalid_input');
           roots = [{ id: selected.externalId }];
         } else {
-          const fields = readSelection(capability, orderCustomers);
+          const fields = readSelection(
+            capability,
+            orderCustomers,
+            orderAddresses,
+          );
           const data = await request(
             root === 'inventoryItems'
               ? `query LumaPage($first: Int!, $after: String) { page: ${root}(first: $first, after: $after) { nodes { ${fields} } ${pageFields} } }`
@@ -811,16 +877,39 @@ export function createShopifyConnector(
             const order = await node(
               parent.id,
               'Order',
-              orderSelection(orderCustomers),
+              orderSelection(orderCustomers, orderAddresses),
               s.order,
             );
             const lines = await children(
               parent.id,
               'Order',
               'lineItems',
-              'id quantity currentQuantity name sku originalUnitPriceSet { shopMoney { amount currencyCode } } taxLines { rate } variant { inventoryItem { id } }',
+              orderLine,
               s.orderLine,
+              { size: 50 },
             );
+            const shipping = await children(
+              parent.id,
+              'Order',
+              'shippingLines',
+              shippingLine,
+              s.shippingLine,
+              { args: 'includeRemovals: true', size: 50 },
+            );
+            // Exports cannot include discounts; they stay unread until an incremental read.
+            const discounts = bulk
+              ? undefined
+              : await children(
+                  parent.id,
+                  'Order',
+                  'discountApplications',
+                  discountApplication,
+                  s.discountApplication,
+                );
+            // Protected address fields are parsed from the page cache and never captured.
+            const addresses = orderAddresses
+              ? parse(s.orderAddresses, nested.get(order.id))
+              : null;
             const total = order.currentTotalPriceSet?.shopMoney;
             emit('order', ref(order.id), order.updatedAt, {
               displayNumber: order.name,
@@ -833,6 +922,13 @@ export function createShopifyConnector(
                     customer: order.customer ? ref(order.customer.id) : null,
                   }
                 : {}),
+              addresses: addresses
+                ? {
+                    shared: true,
+                    shipping: mailingAddress(addresses.shippingAddress),
+                    billing: mailingAddress(addresses.billingAddress),
+                  }
+                : { shared: false },
               status: order.cancelledAt
                 ? 'cancelled'
                 : order.closed
@@ -842,6 +938,7 @@ export function createShopifyConnector(
                 paymentStatuses,
                 order.displayFinancialStatus ?? '',
               ),
+              ...orderFacts(order, shipping, discounts),
               lines: lines.map((line) => ({
                 id: ref(line.id, order.id),
                 sku: line.variant ? ref(line.variant.inventoryItem.id) : null,
@@ -870,8 +967,9 @@ export function createShopifyConnector(
                       : null,
                 skuCode: text(line.sku),
                 title: text(line.name),
+                ...lineFacts(line),
               })),
-            });
+            } satisfies OrderSnapshot);
           } else if (capability === 'products.read') {
             const product = await node(
               parent.id,

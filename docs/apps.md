@@ -63,6 +63,9 @@ Manifests are plain data validated at registration:
 - `slotAccess`: the permission required for each UI slot. The host mounts a slot only for
   people who hold it and passes `can(permission)`.
 - `decisionAccess`: the permissions to see and to respond to each decision kind.
+- `actionAccess`: the permission a person needs to request each provider write capability
+  through the app, keyed by installation capability. Order change plans use it to say
+  whether the reader may start a Luma step; the app's routes still check it.
 
 When an app acts for a person, `requirePermission(context, { app, permission, scopes })`
 requires the installation, the app permission, and each scope both granted to the app and
@@ -121,7 +124,9 @@ and uninstall. Members can view connections; `connections.manage` manages them.
 - `page`: the app's own workspace page, listed in navigation.
 - `record`: live source context for a record the host shows. The host passes `kind`,
   `connectionId` and source `externalId`, only for a connection owned by the app. Read
-  through the app's own authorized operations and do not retain the details.
+  through the app's own authorized operations and do not retain the details. An optional
+  `change` asks the app to prefill a planned change by source line ID; the app reviews it
+  through its own preview and approval and ignores lines it doesn't recognize.
 - `inventory`: governed corrections for the supplied canonical `inventory.positionId`.
   The app resolves exact source identity, authority and grants on the server; the host
   never supplies a writable quantity.

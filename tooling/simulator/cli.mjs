@@ -217,6 +217,9 @@ try {
     PATH: process.env.PATH,
     HOME: process.env.HOME,
     ...generated,
+    // Simulated support changes orders in Luma's own records, so the merchant uses them.
+    FEATURE_FLAG_OVERRIDES:
+      process.env.FEATURE_FLAG_OVERRIDES ?? 'luma-erp-orders=true',
     LUMA_PILOT_DIRECTORY: directory,
   };
   // The simulator stays up until the pilot has stopped, so its last pass can finish its reads.

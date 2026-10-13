@@ -1,8 +1,9 @@
 # Shopify actions
 
 The Shopify app offers governed writes for **returns**, **fulfillment recovery** (release a hold,
-reopen, or move remaining items) and **inventory corrections** (set Shopify's available
-quantity from a selected JTL ERP source). They run as exact, persisted previews that
+reopen, or move remaining items), **inventory corrections** (set Shopify's available
+quantity from a selected JTL ERP source) and **order quantity edits** (change quantities of
+unfulfilled order lines). They run as exact, persisted previews that
 someone with approval permission approves under the [workspace rules](workspace-settings.md#approval-preference), dispatch through shared policy, audit, Action Admission and
 execution, and count as done only after an independent Shopify read verifies the outcome.
 Code: `@luma/app-shopify`.
@@ -38,13 +39,13 @@ an operational issue or rewrites canonical snapshots from a receipt; data sync a
 issue monitor own those updates.
 
 **Access.** Reauthorization requests the write scopes (`write_inventory`,
-`write_merchant_managed_fulfillment_orders`, `write_third_party_fulfillment_orders`).
-Connections authorized before that stay usable for reads but cannot run these actions
-until they reconnect.
+`write_merchant_managed_fulfillment_orders`, `write_third_party_fulfillment_orders`,
+`write_order_edits`). Connections authorized before a scope existed stay usable for reads but
+cannot run the actions it covers until they reconnect.
 
 [Needs you](needs-you.md) lists previews awaiting approval, approved actions waiting for
 their requester, and accepted or uncertain actions without verified results, through the
-app's `fulfillment` and `inventory` UI slots.
+app's `fulfillment`, `inventory` and `record` (order) UI slots.
 
 ## Fulfillment recovery
 
@@ -111,6 +112,69 @@ JTL and Cin7 stock reads do not expose this adjustment reference. A time-window 
 match can support a low-confidence investigation candidate, but cannot confirm a Luma echo,
 close an issue, suppress a difference or authorize a retry. Their current stock integrations
 remain read-only; no heuristic is promoted to verified authorship.
+## Order quantity edits
+
+Permission: `shopify:order_edits.apply`; capability `orders.quantity.edit`, granted only with
+`write_order_edits` and a fulfillment read scope. Order detail and the app's record browser
+offer the edit for a single Shopify order. An order change plan's Luma step opens it
+prefilled with the planned quantities; the preview, approval and checks below still apply. One edit changes up to 20 existing lines to whole, nonnegative quantities and
+may restock removed units. Luma never adds products or changes prices, discounts or shipping.
+
+- Every changed line must be unstarted: no fulfilled unit, and every fulfillment order with
+  its remaining units `OPEN`, `SCHEDULED` or `ON_HOLD` and never submitted to a fulfillment
+  service (`UNSUBMITTED`). Held work is allowed and shown. In-progress, incomplete,
+  requested or unrecognized work, remaining units that differ from Shopify's unfulfilled
+  count, and a read truncated at 100 lines or 5 fulfillment orders all block the edit.
+  Cancelled and closed orders cannot be edited.
+- Workspace line authority must resolve. When this store holds it, the edit amends the
+  authoritative record. When another connection holds it (JTL-Wawi, or Luma ERP), the edit
+  may only propagate that source's value: every changed line's new quantity must equal the
+  current units the authoritative source reports for the same line, matched by shared
+  canonical line ID or a mapped SKU that occurs once per source, as order comparisons match
+  lines. That source's stored read must be complete and at most five minutes old, the same
+  freshness as comparisons; an older, future or incomplete read blocks as stale. A stored
+  read older than a minute is first reread through the [order refresh](orders-workspace.md#refreshing-an-orders-sources),
+  so a late approval still dispatches on current values. Luma ERP holds authority here only
+  while the workspace's Luma order records are released. A host
+  without an authority reader or stored order reads, unknown or conflicting authority, or a
+  changed authority revision blocks the edit.
+- A preview binds the order revision (a digest of Shopify's `updatedAt` and every fact
+  above, because `updatedAt` has second precision), each line's reviewed and approved
+  quantity, the restock choice, the authority revision, for a propagated edit the
+  authoritative source's connection, snapshot, observation and read time, and Shopify's
+  calculation. Luma
+  calculates with `orderEditBegin` and `orderEditSetQuantity` and never commits that
+  session; an abandoned session changes nothing. The preview binds the read taken after
+  calculating and is refused if the edit facts changed meanwhile.
+- Observe-only previews send nothing, not even the calculation. They show the money
+  consequences as not calculated and cannot run after writes are enabled; a new preview
+  and approval are needed.
+- Before the commit, Luma reads the order again, rechecks every rule (for a propagated edit,
+  that the same source still holds authority and a fresh, complete read still reports the
+  approved quantities), recalculates in a new
+  session and withholds the edit when quantities or money differ from the approved
+  calculation.
+
+Shopify has no idempotency key for order edits. Luma records a durable fence for each
+operation: `reserved` before calculating, `sent` immediately before `orderEditCommit`, then
+`accepted`, `rejected` or `withheld`. The commit is sent at most once per operation, with
+`notifyCustomer: false` and the staff note `luma-oe:<operation UUID>`. A claim per order
+and per revision keeps a second edit away until the first settles.
+
+A lost commit response stays uncertain and keeps the claim. Reconciliation reads the
+order's recent edit agreements and line quantities; it never resends the commit. The edit
+was applied when exactly one `ORDER_EDIT` agreement by Luma's app since the commit carries
+product sales matching every approved change and the lines show the approved quantities.
+It was not applied when the operation never reached `sent`, which reconciliation fences
+permanently, or when ten minutes after sending no agreement by Luma's app exists and the
+lines still show the reviewed quantities. Not applied ends the operation; a new edit needs a
+new approval. Anything else stays uncertain. Shopify does not document the sign of removed
+units in sales, so the sale's action (`RETURN` or `ORDER`) decides the direction.
+
+Verification needs a fresh complete read of the open order with every approved line at its
+approved quantity and Luma's matching edit agreement. Partial reads, later changes to the
+lines and merchant edits stay unverified. An accepted edit also asks data sync to read the
+connection's orders again; Luma never writes order projections from the receipt.
 
 ## Returns
 

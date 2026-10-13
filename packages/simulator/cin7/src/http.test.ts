@@ -142,6 +142,61 @@ describe('Cin7 Core API', () => {
     });
   });
 
+  it('serves a note still being packed as picked work that has not shipped', async () => {
+    const context = await seeded(1);
+    await context.store.put<ErpOrder>(kinds.order, '1', {
+      id: '1',
+      externalNumber: 'DE1001',
+      cancelled: false,
+      paid: true,
+      shippingMethodId: '7',
+      currency: 'EUR',
+      taxRate: 19,
+      total: 20,
+      date: '2026-10-01T08:00:00.000Z',
+      lines: [
+        {
+          id: '1',
+          itemId: '1',
+          sku: 'SKU-1',
+          name: 'Item 1',
+          quantity: 2,
+          shipped: 2,
+          price: 10,
+        },
+      ],
+    });
+    await context.store.put(
+      kinds.note,
+      '5',
+      {
+        id: '5',
+        orderId: '1',
+        warehouse: '1',
+        date: '2026-10-01T08:00:00.000Z',
+        packages: [
+          {
+            id: '6',
+            shippingDate: null,
+            trackingNumber: 'T',
+            trackingUrl: 'https://tracking.example.test/T',
+          },
+        ],
+        lines: [{ id: '7', orderLineId: '1', quantity: 2 }],
+      },
+      { parent: '1' },
+    );
+    const sale = (await get(context, `sale?ID=${guid('sale', '1')}`)).body as {
+      Fulfilments: Record<string, unknown>[];
+    };
+    expect(sale.Fulfilments[0]).toMatchObject({
+      FulFilmentStatus: 'NOT FULFILLED',
+      Pick: { Status: 'AUTHORISED' },
+      Pack: { Status: 'DRAFT' },
+      Ship: { Status: 'NOT AVAILABLE', Lines: [] },
+    });
+  });
+
   it('pages the stock report by row across products', async () => {
     const context = await seeded();
     const page = async (number: number) =>

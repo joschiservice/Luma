@@ -32,6 +32,8 @@ const minute = 60_000;
 /** How long Luma's rules may take to open a case before an incident counts as missed. */
 const detectionWindow: Record<string, number> = {
   inventory_mismatch: 15 * minute,
+  // The quantity rule waits for the propagation window, then for fresh reads of every source.
+  order_quantity_mismatch: 45 * minute,
   stuck_fulfillment: 3 * 60 * minute,
   sync_failure: 30 * minute,
   workflow_failure: 30 * minute,

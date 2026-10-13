@@ -98,12 +98,14 @@ function exceptionService(
                 sync_failure: 'connection-read',
                 stuck_fulfillment: 'fulfillment-progress',
                 inventory_mismatch: 'available-stock',
+                order_quantity_mismatch: 'order-line-quantity',
                 workflow_failure: 'workflow-step',
               }[request.input.exceptionClass],
               subjectKind: {
                 sync_failure: 'connection',
                 stuck_fulfillment: 'fulfillment',
                 inventory_mismatch: 'sku',
+                order_quantity_mismatch: 'order',
                 workflow_failure: 'workflow_run',
               }[request.input.exceptionClass],
               subjectId:

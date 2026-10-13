@@ -126,7 +126,109 @@ interface Money {
   currency: string;
 }
 
-export interface OrderSnapshot {
+/** An amount in the shop's currency and in the currency the customer was charged in. */
+export interface MoneyPair {
+  shop: Money;
+  presentment: Money;
+}
+
+/**
+ * An order amount as originally placed and as it currently stands after edits, refunds and
+ * returns. Either is null when the source does not report it.
+ */
+interface OrderAmount {
+  original: MoneyPair | null;
+  current: MoneyPair | null;
+}
+
+/** A postal address as the source reported it; every field may be absent. */
+export interface OrderAddress {
+  line1: string | null;
+  line2: string | null;
+  city: string | null;
+  region: string | null;
+  postalCode: string | null;
+  country: string | null;
+}
+
+/**
+ * Commercial and delivery facts of an order as the source reports them. Amounts are exact
+ * decimal strings and are never recomputed from lines or converted between currencies.
+ */
+export interface OrderCommercialFacts {
+  /** The shop's currency and the currency the customer was charged in. */
+  currencies?: { shop: string | null; presentment: string | null };
+  amounts?: {
+    subtotal: OrderAmount;
+    shipping: OrderAmount;
+    discounts: OrderAmount;
+    tax: OrderAmount;
+    duties: OrderAmount;
+    total: OrderAmount;
+  };
+  /** Whether the order's prices include tax and duties; null when not reported. */
+  taxesIncluded?: boolean | null;
+  dutiesIncluded?: boolean | null;
+  /** Current tax lines. `rate` is fractional (0.19 means 19%). */
+  taxLines?: {
+    title: string | null;
+    rate: string | null;
+    amount: MoneyPair | null;
+  }[];
+  /** Shipping charges, including removed ones. `current` is null for a removed charge. */
+  shippingLines?: {
+    id: string | null;
+    title: string | null;
+    code: string | null;
+    source: string | null;
+    carrier: string | null;
+    removed: boolean | null;
+    original: MoneyPair | null;
+    discounted: MoneyPair | null;
+    current: MoneyPair | null;
+  }[];
+  /** Discounts applied to the order. Labels are codes or titles; descriptions are not read. */
+  discounts?: {
+    index: number | null;
+    kind: 'code' | 'automatic' | 'manual' | 'script' | 'unknown';
+    label: string | null;
+    target: 'line_item' | 'shipping_line' | 'unknown';
+    allocation: 'across' | 'each' | 'unknown';
+    value:
+      | { type: 'percentage'; percentage: string }
+      | { type: 'fixed'; amount: Money }
+      | null;
+  }[];
+  /** Merchant labels on the order. */
+  tags?: string[];
+  /** Operational facts the source reports about the order. */
+  attributes?: {
+    edited: boolean | null;
+    requiresShipping: boolean | null;
+    test: boolean | null;
+    cancelReason:
+      | 'customer'
+      | 'declined'
+      | 'fraud'
+      | 'inventory'
+      | 'staff'
+      | 'other'
+      | 'unknown'
+      | null;
+    cancelledAt: string | null;
+    closedAt: string | null;
+    processedAt: string | null;
+    /** Sales channel label, such as `web` or `pos`. */
+    channel: string | null;
+    /**
+     * The source's own fulfillment status label, lowercased, such as `partially_fulfilled`.
+     * It is the source's report, not Luma's fulfillment state.
+     */
+    fulfillmentStatus: string | null;
+  };
+}
+
+export interface OrderSnapshot extends OrderCommercialFacts {
   /** Marketplace order number reported by an ERP; a suggestion signal, never identity. */
   externalOrderNumber?: string | null;
   displayNumber: string | null;
@@ -142,6 +244,19 @@ export interface OrderSnapshot {
    * erasable customer store, so they must be removed before an observation is recorded.
    */
   customer?: ExternalId | null;
+  /**
+   * Delivery and billing addresses. Protected personal data like `customer`: sync stores them
+   * only in the erasable customer store and removes them before the observation is recorded.
+   * `shared` is false when the deployment is not approved to read addresses; omitted when the
+   * adapter does not read them. A null address means the order has none.
+   */
+  addresses?:
+    | {
+        shared: true;
+        shipping: OrderAddress | null;
+        billing: OrderAddress | null;
+      }
+    | { shared: false };
   status: 'open' | 'completed' | 'cancelled' | 'unknown';
   paymentStatus:
     | 'pending'
@@ -173,6 +288,21 @@ export interface OrderSnapshot {
     taxRate?: string | null;
     /** Line title at the source when the order was read. */
     title?: string | null;
+    /** Variant title at the source when the order was read. */
+    variantTitle?: string | null;
+    /** Unit prices and the line's total discount; absent when the adapter does not read them. */
+    prices?: {
+      originalUnit: MoneyPair | null;
+      /** Unit price after line and order discounts. */
+      discountedUnit: MoneyPair | null;
+      totalDiscount: MoneyPair | null;
+    };
+    requiresShipping?: boolean | null;
+    /**
+     * Whether the line still refers to a catalog variant: `variant_removed` when the variant
+     * was deleted but its product remains, `no_product` for a custom item or a deleted product.
+     */
+    catalog?: 'variant' | 'variant_removed' | 'no_product';
   }[];
 }
 
@@ -529,6 +659,19 @@ interface ShippingMethodSnapshot {
 }
 
 /** A recovery command is bound to an exact provider record and reviewed revision. */
+interface OrderQuantityEditInput {
+  /** Luma's operation UUID; the adapter fences and marks the provider write with it. */
+  operationId: string;
+  orderId: string;
+  /** The order revision the approval reviewed. */
+  expectedRevision: string;
+  /** Returns removed units to stock; only applies to reductions. */
+  restock: boolean;
+  lines: { lineItemId: string; currentQuantity: number; quantity: number }[];
+  /** Digest of the approved provider calculation; null when none was approved, which withholds. */
+  calculationDigest: string | null;
+}
+
 interface FulfillmentRecoveryInput {
   orderId: string;
   fulfillmentOrderId: string;
@@ -639,6 +782,15 @@ interface CapabilityContract {
   };
   'fulfillment.open': { input: FulfillmentRecoveryInput; output: WriteReceipt };
   'fulfillment.move': { input: FulfillmentRecoveryInput; output: WriteReceipt };
+  /**
+   * Sets approved quantities on existing, unfulfilled order lines through one provider order
+   * edit. Adapters recalculate before sending, withhold any change from the approved
+   * calculation, and send the commit at most once per operation.
+   */
+  'orders.quantity.edit': {
+    input: OrderQuantityEditInput;
+    output: WriteReceipt;
+  };
   'orders.shipping-method.read': {
     input: PageQuery & { order: ExternalId };
     output: Page<ShippingMethodSnapshot>;
@@ -651,7 +803,15 @@ interface CapabilityContract {
     };
     output: WriteReceipt;
   };
-  'orders.read': { input: PageQuery; output: Page<OrderSnapshot> };
+  /**
+   * `order` reads exactly that order by its source ID; send it only to handlers whose
+   * descriptor lists `order`. The page then holds that order when the source has it, or
+   * nothing, and never a cursor.
+   */
+  'orders.read': {
+    input: PageQuery & { order?: ExternalId };
+    output: Page<OrderSnapshot>;
+  };
   'suppliers.read': {
     input: PageQuery & { supplier?: ExternalId };
     output: Page<SupplierSnapshot>;

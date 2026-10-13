@@ -26,8 +26,13 @@ import {
   shopify,
 } from '@luma/simulator-shopify';
 
+import { editOutcome } from '../../packages/apps/shopify/dist/domain/order-edits.js';
 import { createFulfillmentProvider } from '../../packages/apps/shopify/dist/infrastructure/fulfillment-recovery-provider.js';
 import { createInventoryCorrectionProvider } from '../../packages/apps/shopify/dist/infrastructure/inventory-correction-provider.js';
+import {
+  calculationDigest,
+  createOrderEditProvider,
+} from '../../packages/apps/shopify/dist/infrastructure/order-edit-provider.js';
 import {
   createClient,
   createReadBudget,
@@ -75,6 +80,7 @@ const config = {
     'read_assigned_fulfillment_orders',
     'read_third_party_fulfillment_orders',
     'write_merchant_managed_fulfillment_orders',
+    'write_order_edits',
   ],
 };
 const catalog = [
@@ -230,7 +236,13 @@ async function seed(shop) {
       financialStatus: 'PAID',
       ...extra,
     });
-  const shipped = await order({ shipping: 'express' });
+  // Prices are after a code discount; the customer paid in Swiss francs.
+  const shipped = await order({
+    shipping: 'express',
+    discounts: [{ kind: 'code', label: 'WELCOME10', percentage: 10 }],
+    tags: ['vip', 'gift'],
+    presentment: { currency: 'CHF', rate: 0.95 },
+  });
   await shop.run({
     kind: 'fulfill',
     order: shipped.id,
@@ -432,6 +444,7 @@ test('installation verification, scope reads and lifecycle subscriptions', async
     'fulfillment.read',
     'inventory.available.reconcile',
     'inventory.read',
+    'orders.quantity.edit',
     'orders.read',
     'products.read',
     'returns.read',
@@ -484,12 +497,89 @@ test('every read capability returns complete, parsed snapshots', async () => {
     6,
   );
   const shipped = byId(orders.items, ids.shipped.gid);
+  const eur = (amount) => ({ amount, currency: 'EUR' });
+  // Shop amounts in euros and the customer's amounts in francs at the order's rate.
+  const paid = (shop, presentment) => ({
+    shop: eur(shop),
+    presentment: { amount: presentment, currency: 'CHF' },
+  });
+  const unchanged = (shop, presentment) => ({
+    original: paid(shop, presentment),
+    current: paid(shop, presentment),
+  });
   assert.deepEqual(shipped.data, {
     displayNumber: '#C1001',
     placedAt: shipped.data.placedAt,
-    total: { amount: '74.5', currency: 'EUR' },
+    total: eur('74.5'),
+    addresses: {
+      shared: true,
+      shipping: {
+        line1: 'Hauptstraße 1',
+        line2: null,
+        city: 'Berlin',
+        region: null,
+        postalCode: '10115',
+        country: 'DE',
+      },
+      billing: {
+        line1: 'Hauptstraße 1',
+        line2: null,
+        city: 'Berlin',
+        region: null,
+        postalCode: '10115',
+        country: 'DE',
+      },
+    },
     status: 'completed',
     paymentStatus: 'paid',
+    currencies: { shop: 'EUR', presentment: 'CHF' },
+    // Line prices are after the discount, so the subtotal and total include it.
+    amounts: {
+      subtotal: unchanged('74.5', '70.78'),
+      shipping: unchanged('0.0', '0.0'),
+      discounts: unchanged('8.28', '7.87'),
+      tax: unchanged('11.89', '11.3'),
+      duties: { original: null, current: null },
+      total: unchanged('74.5', '70.78'),
+    },
+    taxesIncluded: true,
+    dutiesIncluded: false,
+    taxLines: [{ title: 'VAT', rate: '0.19', amount: paid('11.89', '11.3') }],
+    shippingLines: [
+      {
+        id: gid('ShippingLine', ids.shipped.id),
+        title: 'Express',
+        code: 'EXPRESS',
+        source: 'shopify',
+        carrier: null,
+        removed: false,
+        original: paid('0.0', '0.0'),
+        discounted: paid('0.0', '0.0'),
+        current: paid('0.0', '0.0'),
+      },
+    ],
+    discounts: [
+      {
+        index: 0,
+        kind: 'code',
+        label: 'WELCOME10',
+        target: 'line_item',
+        allocation: 'across',
+        value: { type: 'percentage', percentage: '10' },
+      },
+    ],
+    tags: ['vip', 'gift'],
+    attributes: {
+      edited: false,
+      requiresShipping: true,
+      test: false,
+      cancelReason: null,
+      cancelledAt: null,
+      closedAt: shipped.data.attributes.closedAt,
+      processedAt: shipped.data.placedAt,
+      channel: 'web',
+      fulfillmentStatus: 'fulfilled',
+    },
     lines: [
       {
         id: {
@@ -501,10 +591,18 @@ test('every read capability returns complete, parsed snapshots', async () => {
         currentQuantity: { amount: '2', unit: 'each' },
         cancelledQuantity: { amount: '0', unit: 'each' },
         skuCode: 'TOTE-NAT',
-        unitPrice: { amount: '24.0', currency: 'EUR' },
+        unitPrice: eur('26.67'),
         taxIncluded: true,
         taxRate: '0.19',
         title: 'Canvas tote - Natural',
+        variantTitle: 'Natural',
+        prices: {
+          originalUnit: paid('26.67', '25.34'),
+          discountedUnit: paid('24.0', '22.8'),
+          totalDiscount: paid('5.34', '5.07'),
+        },
+        requiresShipping: true,
+        catalog: 'variant',
       },
       {
         id: {
@@ -516,10 +614,18 @@ test('every read capability returns complete, parsed snapshots', async () => {
         currentQuantity: { amount: '1', unit: 'each' },
         cancelledQuantity: { amount: '0', unit: 'each' },
         skuCode: 'TOTE-BLK',
-        unitPrice: { amount: '26.5', currency: 'EUR' },
+        unitPrice: eur('29.44'),
         taxIncluded: true,
         taxRate: '0.19',
         title: 'Canvas tote - Black',
+        variantTitle: 'Black',
+        prices: {
+          originalUnit: paid('29.44', '27.97'),
+          discountedUnit: paid('26.5', '25.18'),
+          totalDiscount: paid('2.94', '2.79'),
+        },
+        requiresShipping: true,
+        catalog: 'variant',
       },
     ],
   });
@@ -778,6 +884,31 @@ test('incremental reads see only records changed since the last sync', async () 
   );
 });
 
+test('orders.read rereads one order exactly as a scan observes it', async () => {
+  const shop = createShop();
+  const ids = await seed(shop);
+  const orders = await reads(shop)('orders.read');
+  const page = pages(shop);
+  const single = await page('orders.read', {
+    limit: 1,
+    order: { externalId: ids.shipped.gid, scopeKey: '' },
+  });
+  assert.equal(single.ok, true, JSON.stringify(single));
+  assert.equal(single.value.nextCursor, null);
+  assert.equal(single.value.completeness, 'complete');
+  // Observation IDs and read times differ between the two reads.
+  const facts = (item) => ({ ...item, id: null, observedAt: null });
+  assert.deepEqual(single.value.items.map(facts), [
+    facts(byId(orders.items, ids.shipped.gid)),
+  ]);
+  const missing = await page('orders.read', {
+    limit: 1,
+    order: { externalId: gid('Order', '999999'), scopeKey: '' },
+  });
+  assert.equal(missing.ok, true, JSON.stringify(missing));
+  assert.deepEqual(missing.value.items, []);
+});
+
 test('throttling and drift fail reads the way Luma recovers from them', async () => {
   const shop = createShop();
   await seed(shop);
@@ -997,6 +1128,114 @@ test('fulfillment recovery releases holds, opens scheduled work and moves work',
   );
 });
 
+test('order quantity edits calculate, commit once and reconcile from Shopify’s agreements', async () => {
+  const shop = createShop();
+  await shop.run({ kind: 'seed-catalog', products: catalog });
+  const order = await shop.run({
+    kind: 'order',
+    lines: [
+      { variant: '11', quantity: 3, price: '24.00' },
+      { variant: '12', quantity: 1, price: '26.50' },
+    ],
+    location: '1',
+    shipping: 'standard',
+    financialStatus: 'PAID',
+  });
+  const line = gid('LineItem', order.lines[0].id);
+  let fence = null;
+  const provider = createOrderEditProvider({
+    tenantId,
+    connectionId,
+    shop: domain,
+    accessToken: async () => 'synthetic',
+    fetch: shop.fetch,
+    record: async () => {},
+    eligible: async () => true,
+    fence: {
+      reserve: async () => {
+        if (fence) return false;
+        fence = { state: 'reserved', sentAt: null };
+
+        return true;
+      },
+      send: async () => {
+        fence = { state: 'sent', sentAt: new Date(shop.now).toISOString() };
+
+        return true;
+      },
+      finish: async (_id, state) => {
+        fence = { ...fence, state };
+      },
+    },
+  });
+  const before = await provider.read(order.gid);
+  assert.equal(before.complete, true);
+  assert.deepEqual(
+    before.lines.map((item) => [
+      item.currentQuantity,
+      item.unfulfilledQuantity,
+    ]),
+    [
+      [3, 3],
+      [1, 1],
+    ],
+  );
+  assert.deepEqual(
+    before.fulfillmentOrders.map((work) => [work.status, work.requestStatus]),
+    [['OPEN', 'UNSUBMITTED']],
+  );
+  const lines = [{ lineItemId: line, currentQuantity: 3, quantity: 1 }];
+  const { calculation } = await provider.calculate(order.gid, lines, true);
+  assert.equal(Number(calculation.subtotal.shop.amount), 50.5);
+  assert.deepEqual(
+    (await readOrder(shop.context(), order.id)).lines.map(
+      (item) => item.unfulfilled,
+    ),
+    [3, 1],
+  );
+  const input = {
+    operationId: '00000000-0000-4000-8000-0000000000e1',
+    orderId: order.gid,
+    expectedRevision: (await provider.read(order.gid)).revision,
+    restock: true,
+    lines,
+    calculationDigest: calculationDigest(calculation),
+  };
+  const invocation = {
+    tenant,
+    connectionId,
+    provider: 'shopify',
+    idempotencyKey: `v0:${input.operationId}`,
+  };
+  const receipt = await provider.handler.run(invocation, input);
+  assert.equal(receipt.status, 'accepted');
+  assert.deepEqual(
+    (await readOrder(shop.context(), order.id)).lines.map(
+      (item) => item.unfulfilled,
+    ),
+    [1, 1],
+  );
+  assert.equal(
+    shop.events.filter((event) => event.topic === 'orders/edited').length,
+    1,
+  );
+  const proof = await provider.proof(order.gid, fence.sentAt);
+  assert.equal(proof.complete, true);
+  assert.deepEqual(proof.agreements[0].deltas, { [line]: -2 });
+  assert.equal(
+    editOutcome(lines, fence, proof, new Date(shop.now)),
+    'committed',
+  );
+  await assert.rejects(
+    provider.handler.run(invocation, input),
+    (error) => error.failure.dispatch === 'uncertain',
+  );
+  assert.equal(
+    shop.events.filter((event) => event.topic === 'orders/edited').length,
+    1,
+  );
+});
+
 test('record explorer reads every record kind with available sections', async () => {
   const shop = createShop();
   const ids = await seed(shop);
@@ -1161,7 +1400,19 @@ test('bulk history resumes export and JSONL chunks after restart with identical 
       imported.push(...result.value.items);
       cursor = result.value.nextCursor;
     } while (cursor);
-    assert.deepEqual(normalized(imported), normalized(paged.items));
+    // Exports cannot include discounts, so exported orders leave them unread.
+    assert.ok(imported.every((item) => !Object.hasOwn(item.data, 'discounts')));
+    assert.deepEqual(
+      normalized(imported),
+      normalized(
+        paged.items.map((item) => {
+          const data = { ...item.data };
+          delete data.discounts;
+
+          return { ...item, data };
+        }),
+      ),
+    );
     // Records carry the export's start time, however late Luma reads the file.
     assert.ok(
       imported.every(
