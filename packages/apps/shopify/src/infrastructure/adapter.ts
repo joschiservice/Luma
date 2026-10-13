@@ -1214,6 +1214,7 @@ export function createShopifyConnector(
                   status === 'shipped' && shipment.deliveredAt
                     ? 'delivered'
                     : status,
+                milestones: { deliveredAt: shipment.deliveredAt ?? null },
                 lines: lines.map((line) => ({
                   orderLine: ref(line.lineItem.id, parent.id),
                   quantity: quantity(line.quantity),

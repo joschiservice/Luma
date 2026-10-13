@@ -362,6 +362,12 @@ export interface FulfillmentSnapshot {
     /** Outstanding work reported by the provider; omitted or null when not read. */
     remainingQuantity?: Quantity | null;
   }[];
+  /** Exact milestone times reported by the source; absence means unknown. */
+  milestones?: {
+    pickedAt?: string | null;
+    shippedAt?: string | null;
+    deliveredAt?: string | null;
+  };
   lastProgressAt: string | null;
   progressBasis?: 'note_created_or_package_shipped' | 'source_updated';
   failureCode: string | null;

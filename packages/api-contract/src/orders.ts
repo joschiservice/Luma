@@ -30,6 +30,7 @@ export const orderViewSchema = z.enum([
   'overdue',
   'needs_you',
   'differs',
+  'stuck',
 ]);
 
 export const orderSortSchema = z.enum(['updated', 'placed', 'number', 'due']);
@@ -503,7 +504,81 @@ export const orderActivitySchema = z.object({
   summary: z.string().nullable(),
 });
 
+const journeyStageSchema = z.enum([
+  'placed',
+  'paid',
+  'reserved',
+  'picked',
+  'shipped',
+  'delivered',
+  'returned',
+]);
+const journeySchema = z.object({
+  timings: z.array(
+    z.object({
+      partId: z.string(),
+      orderLineId: z.uuid().nullable(),
+      connectionId: z.uuid().nullable(),
+      from: journeyStageSchema,
+      to: journeyStageSchema,
+      durationMs: z.number().nonnegative().nullable(),
+    }),
+  ),
+  events: z.array(
+    z.object({
+      id: z.string(),
+      orderId: z.uuid(),
+      partId: z.string(),
+      orderLineId: z.uuid().nullable(),
+      stage: journeyStageSchema,
+      provenance: z.enum(['provider_observation', 'luma_action', 'inference']),
+      connectionId: z.uuid().nullable(),
+      actorId: z.string().nullable(),
+      occurredAt: timestamp.nullable(),
+      observedAt: timestamp,
+      quantity: z.string().nullable(),
+      unit: z.string().nullable(),
+      references: z.array(
+        z.object({
+          kind: z.enum([
+            'order',
+            'order_line',
+            'shipment',
+            'return',
+            'invoice',
+            'reservation',
+            'snapshot',
+            'observation',
+            'activity',
+          ]),
+          id: z.string(),
+          connectionId: z.uuid().nullable(),
+        }),
+      ),
+    }),
+  ),
+  truncated: z.boolean(),
+  candidates: z.array(
+    z.object({
+      code: z.enum(['paid_without_reservation', 'shipped_without_reservation']),
+      orderLineId: z.uuid(),
+      connectionId: z.uuid(),
+      observedSince: timestamp,
+    }),
+  ),
+  comparisons: z.array(
+    z.object({
+      from: journeyStageSchema,
+      to: journeyStageSchema,
+      count: z.number().int().nonnegative(),
+      medianMs: z.number().nullable(),
+      p90Ms: z.number().nullable(),
+    }),
+  ),
+});
+
 export const orderDetailSchema = z.object({
+  journey: journeySchema.optional(),
   redirectedFrom: z.string().uuid().nullable().optional(),
   order: orderListItemSchema,
   sources: z.array(orderSourceFactsSchema),

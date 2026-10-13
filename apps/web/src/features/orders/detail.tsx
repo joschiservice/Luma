@@ -59,6 +59,7 @@ import {
   proposedChange,
 } from './data';
 import { OrderIdentityLinks } from './identity-links';
+import { OrderJourney } from './journey';
 import { NativeOrderStock } from './native-stock';
 import { OrderCharges } from './order-charges';
 import { OrderHeader } from './order-header';
@@ -413,6 +414,11 @@ export function OrderDetailView({
                 })}
               </ul>
             </OrderSection>
+            <OrderJourney
+              detail={detail}
+              organizationId={organizationId}
+              from={here}
+            />
             <OrderLines
               detail={detail}
               shown={shown}

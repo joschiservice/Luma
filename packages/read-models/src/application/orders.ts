@@ -3,6 +3,7 @@ import type { TenantContext } from '@luma/identity';
 import type {
   ComparisonDifference,
   ComparisonState,
+  OrderJourney,
   OrderChangePlan,
   OrderChangeRequest,
   OrderCommercialData,
@@ -22,7 +23,7 @@ export interface OrderDifference extends ComparisonDifference {
 }
 
 export type OrderView =
-  'all' | 'outstanding' | 'overdue' | 'needs_you' | 'differs';
+  'all' | 'outstanding' | 'overdue' | 'needs_you' | 'differs' | 'stuck';
 
 export type OrderSort = 'updated' | 'placed' | 'number' | 'due';
 
@@ -176,6 +177,7 @@ export type OrderDetailSection =
   | 'addresses';
 
 export interface OrderDetail {
+  journey?: OrderJourney;
   /** Live source authority and resolved facts; null means no authoritative source report. */
   authority: {
     revision: number;

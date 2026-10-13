@@ -14,6 +14,7 @@ import appStyles from '../../styles.css?inline';
 import { returnItem } from '../returns/returns-fixtures';
 import type { OrdersError, OrdersSearch } from './data';
 import { OrderDetailView, type OrderError } from './detail';
+import { OrderJourney } from './journey';
 import { OrdersView } from './page';
 
 const organizationId = '33333333-3333-4333-8333-333333333333';
@@ -824,6 +825,87 @@ export const RecordStockSyncing: Story = {
   },
 };
 
+const journeyDetail: OrderDetail = {
+  ...detail,
+  journey: {
+    events: (
+      [
+        ['shipped', '2026-09-27T09:00:00.000Z'],
+        ['delivered', '2026-09-27T10:00:00.000Z'],
+      ] as const
+    ).map(([stage, occurredAt]) => ({
+      id: stage,
+      orderId: detail.order.id,
+      partId: detail.fulfillments[0]!.id,
+      orderLineId: detail.fulfillments[0]!.lines[0]!.orderLineId,
+      stage,
+      provenance: 'provider_observation',
+      connectionId: shop,
+      actorId: null,
+      occurredAt,
+      observedAt: '2026-09-27T10:05:00.000Z',
+      quantity: '1',
+      unit: 'each',
+      references: [
+        {
+          kind: 'shipment',
+          id: detail.fulfillments[0]!.id,
+          connectionId: shop,
+        },
+        {
+          kind: 'snapshot',
+          id: '99999999-9999-4999-8999-999999999999',
+          connectionId: shop,
+        },
+      ],
+    })),
+    truncated: false,
+    candidates: [],
+    timings: [
+      {
+        partId: detail.fulfillments[0]!.id,
+        orderLineId: detail.fulfillments[0]!.lines[0]!.orderLineId,
+        connectionId: shop,
+        from: 'shipped',
+        to: 'delivered',
+        durationMs: 3600000,
+      },
+    ],
+    comparisons: [
+      {
+        from: 'shipped',
+        to: 'delivered',
+        count: 10,
+        medianMs: 7200000,
+        p90Ms: 14400000,
+      },
+    ],
+  },
+};
+
+export const Journey: Story = {
+  render: () => (
+    <Routed>
+      {() => (
+        <div style={{ padding: 16 }}>
+          <OrderJourney
+            detail={journeyDetail}
+            organizationId={organizationId}
+            from="/"
+          />
+        </div>
+      )}
+    </Routed>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText('1 h since Shipped.')).toBeVisible();
+    await userEvent.click(canvas.getAllByText('Evidence references')[0]!);
+    await expect(canvas.getAllByText(/99999999-9999/)[0]!).toBeVisible();
+  },
+};
+
+export const JourneyDark: Story = { ...Journey, globals: { theme: 'dark' } };
 /** Source-reported amounts, charges, discounts and addresses, in two currencies. */
 export const RecordCharges: Story = {
   args: { page: 'detail' },

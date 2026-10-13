@@ -232,7 +232,7 @@ describe('Shopify read capabilities', () => {
         items: [
           {
             source: { provider: 'shopify', externalId: commerce.order.id },
-            adapterVersion: 'shopify/12',
+            adapterVersion: 'shopify/13',
             data: {
               paymentStatus: 'paid',
               placedAt: '2026-09-14T08:30:00Z',
@@ -1720,6 +1720,29 @@ describe('Shopify independent deletion confirmation', () => {
       value: { confirmation: 'present', items: [] },
     });
     expect(f.recordObservations).not.toHaveBeenCalled();
+  });
+});
+
+it('retains an explicit delivery milestone without inventing a shipment occurrence time', async () => {
+  const f = fixture();
+  const shipments: Record<string, unknown>[] = f.data.shipments;
+  shipments[0]!.deliveredAt = '2026-09-16T10:00:00Z';
+  expect(await f.read('fulfillment.read')).toMatchObject({
+    ok: true,
+    value: {
+      items: expect.arrayContaining([
+        expect.objectContaining({
+          source: expect.objectContaining({
+            externalId: commerce.shipments[0]!.id,
+          }),
+          data: expect.objectContaining({
+            kind: 'shipment',
+            status: 'delivered',
+            milestones: { deliveredAt: '2026-09-16T10:00:00Z' },
+          }),
+        }),
+      ]),
+    },
   });
 });
 

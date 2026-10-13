@@ -316,3 +316,25 @@ identities and quantities. A current catalog recipe does not change an earlier s
 partial returns or current-unit reductions do not infer a new recipe. Unread group visibility
 remains unknown; null explicitly identifies a standalone line. Deleting a component removes
 its current SKU mapping while retaining the historical group and descriptive text.
+
+### Journey evidence and follow-up checks
+
+Milestones index retained canonical snapshots under Orders RLS. Each source, shipment or
+return part and order line keeps its own identity. New source imports cannot turn
+`sourceUpdatedAt` or a read time into a payment, picking, dispatch or delivery time.
+Explicit milestone timestamps are retained when reported. A later read may supply a
+previously unknown occurrence time, with its supporting snapshot and observation.
+Partial returns record received units, not requested or refunded units. Inventory-owned
+reservations supply local reservation milestones and retain their initiating actor for
+new holds. Existing holds have unknown attribution.
+
+Detail reads return at most 500 milestones and disclose truncation. Known stage pairs use the same source and part. Workspace median and p90 exclude unknown,
+negative and cross-source pairs and deduplicate shipment lines over a 90-day occurrence
+window ending at the destination milestone. A missing pair means unknown duration, not zero elapsed time.
+
+Journey checks identify current paid open orders first observed paid at least four hours
+ago without a recorded Luma reservation, and reported shipments without one. These are
+investigation candidates: missing Luma history does not establish that another system
+failed to reserve stock. The view requires inventory and fulfillment read permissions;
+detail hides milestones and checks from areas the reader cannot access. These checks
+do not open or close cases, change stock or dispatch provider actions.

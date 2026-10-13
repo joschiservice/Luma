@@ -176,7 +176,10 @@ it('counts linked orders once, reconciles with the Orders list and states covera
 
   // Imported history marks earlier buckets as unknown and bounds the data-through time.
   const historyFrom = data.points[3].from;
-  const watermark = ago(1);
+  // Near midnight, an hour ago belongs to yesterday; keep this fixture's watermark in the latest bucket.
+  const watermark = new Date(
+    Math.max(Date.now() - hour, Date.parse(data.points.at(-1).from)),
+  ).toISOString();
   for (const connectionId of [work.store, work.erp])
     await f.db.owner.query(
       `INSERT INTO commerce_sync_streams(tenant_id,id,connection_id,record_type,principal_id,phase,

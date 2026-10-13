@@ -241,6 +241,14 @@ const fulfillment = z
       'failed',
       'unknown',
     ]),
+    milestones: z
+      .object({
+        pickedAt: timestamp.nullable().optional(),
+        shippedAt: timestamp.nullable().optional(),
+        deliveredAt: timestamp.nullable().optional(),
+      })
+      .strict()
+      .optional(),
     lastProgressAt: timestamp.nullable(),
     failureCode: z.string().nullable(),
     lines: z
@@ -436,7 +444,12 @@ export const snapshotSchema = z.union([
     .strict(),
   base
     .extend({
-      schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+      schemaVersion: z.union([
+        z.literal(1),
+        z.literal(2),
+        z.literal(3),
+        z.literal(4),
+      ]),
       kind: z.literal('fulfillment'),
       data: fulfillment,
     })

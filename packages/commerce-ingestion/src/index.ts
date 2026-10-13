@@ -33,7 +33,7 @@ const normalizers = {
   inventoryShipments: 'commerce/1',
   product: 'commerce/3',
   order: 'commerce/7',
-  fulfillment: 'commerce/3',
+  fulfillment: 'commerce/4',
   return: 'commerce/1',
   refund: 'commerce/1',
 } as const;
@@ -560,7 +560,7 @@ export function createCommerceIngestion(
       owner: 'orders',
       snapshot: {
         ...provenance,
-        schemaVersion: 3,
+        schemaVersion: 4,
         normalizerVersion: normalizers.fulfillment,
         entityId,
         kind: 'fulfillment',
@@ -574,6 +574,7 @@ export function createCommerceIngestion(
         ),
         data: {
           type: 'fulfillment',
+          ...optional('milestones'),
           orderId,
           status: data.status,
           lastProgressAt: data.lastProgressAt,
