@@ -76,7 +76,7 @@ because its quantity differs. JTL remains a read-only reference.
 - Both sources must be active, installed, readable and mapped to the same canonical SKU,
   location and `each` unit, each with exactly one unscoped SKU and location mapping.
   Shopify needs real InventoryItem and Location IDs, tracked inventory and an active
-  location.
+  location with an active inventory level for that item.
 - The ERP quantity must be a known, nonnegative integer, and its evidence must be under
   five minutes old when Luma judges it. Every read of the target, including the final
   check before the write, first rereads stale stock sources, so a late approval acts on

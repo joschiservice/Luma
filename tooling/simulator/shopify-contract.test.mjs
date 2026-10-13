@@ -358,6 +358,66 @@ const byId = (items, id) => {
   return item;
 };
 
+test('stock reads separate unavailable states and activation without deriving availability', async () => {
+  const shop = createShop();
+  await shop.run({ kind: 'seed-catalog', products: catalog });
+  const level = await shop.store.get('InventoryLevel', '11.1');
+  assert.ok(level);
+  await shop.store.put(
+    'InventoryLevel',
+    level.id,
+    {
+      ...level.data,
+      onHand: 3,
+      committed: 5,
+      reserved: 1,
+      incoming: 7,
+      damaged: 0,
+      qualityControl: 2,
+      safetyStock: 3,
+      isActive: false,
+    },
+    {
+      parent: level.parent,
+      key: level.key,
+      updatedAt: level.updatedAt,
+      createdAt: level.createdAt,
+    },
+  );
+  const inventory = await reads(shop)('inventory.read');
+  const source = inventory.items.find(
+    (item) =>
+      item.data.sku.externalId === gid('InventoryItem', '11') &&
+      item.data.location.externalId === gid('Location', '1'),
+  );
+  assert.ok(source);
+  assert.equal(source.data.available, '-8');
+  assert.equal(source.data.onHand, '3');
+  assert.equal(source.data.committed, '5');
+  assert.equal(source.data.reserved, '1');
+  assert.equal(source.data.incoming, '7');
+  assert.equal(source.data.damaged, '0');
+  assert.equal(source.data.qualityControl, '2');
+  assert.equal(source.data.safetyStock, '3');
+  assert.equal(source.data.itemActive, false);
+  assert.equal(source.data.locationActive, true);
+  await shop.run({
+    kind: 'available',
+    variant: '11',
+    location: '1',
+    quantity: 4,
+  });
+  const changed = await reads(shop)('inventory.read');
+  const after = changed.items.find(
+    (item) =>
+      item.data.sku.externalId === gid('InventoryItem', '11') &&
+      item.data.location.externalId === gid('Location', '1'),
+  );
+  assert.equal(after.data.available, '4');
+  assert.equal(after.data.reserved, '1');
+  assert.equal(after.data.incoming, '7');
+});
+
 test('simulator serves the schema the adapter is validated against', async () => {
   const [simulated, fixture] = await Promise.all(
     [
@@ -627,7 +687,16 @@ test('every read capability returns complete, parsed snapshots', async () => {
     location: ref(gid('Location', '1')),
     unit: 'each',
     onHand: String(stock.onHand),
-    reserved: String(stock.committed),
+    reserved: '0',
+    committed: String(stock.committed),
+    incoming: '0',
+    damaged: '0',
+    qualityControl: '0',
+    safetyStock: '0',
+    locationActive: true,
+    itemActive: true,
+    tracked: true,
+    inventorySemantics: 'shopify/1',
     available: String(stock.available),
     availabilityBasis: 'provider_reported',
   });

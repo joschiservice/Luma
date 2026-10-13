@@ -21,6 +21,7 @@ const base = z.object({
 
 const position = base
   .extend({
+    schemaVersion: z.union([z.literal(1), z.literal(2)]),
     kind: z.literal('position'),
     data: z
       .object({
@@ -31,6 +32,15 @@ const position = base
         onHand: decimal.nullable(),
         reserved: decimal.nullable(),
         available: decimal.nullable(),
+        committed: decimal.nullable().optional(),
+        incoming: decimal.nullable().optional(),
+        damaged: decimal.nullable().optional(),
+        qualityControl: decimal.nullable().optional(),
+        safetyStock: decimal.nullable().optional(),
+        locationActive: z.boolean().nullable().optional(),
+        itemActive: z.boolean().nullable().optional(),
+        tracked: z.boolean().nullable().optional(),
+        inventorySemantics: z.literal('shopify/1').nullable().optional(),
         availabilityBasis: z.enum(['provider_reported', 'derived', 'unknown']),
       })
       .strict(),

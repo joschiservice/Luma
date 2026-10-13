@@ -30,7 +30,7 @@ export const inventoryContract = {
       path: '/v1/organizations/{organizationId}/inventory/{positionId}',
       summary: 'Inspect a stock position',
       description:
-        'Compare sources for one SKU, location and unit. Includes up to 100 observed snapshots and 50 entries per related record type. Orders and purchase orders relate to the SKU; they do not confirm location allocation or incoming supply. Product relationships and incoming quantities remain unknown until a source reports them.',
+        'Compare sources for one SKU, location and unit. Includes up to 100 observed snapshots and 50 entries per related record type. Orders and purchase orders relate to the SKU; they do not confirm location allocation or incoming supply. Incoming quantities and distinct provider stock states remain unknown until reported. Location activity, item activation and tracking are separate facts; quantities do not establish sellability.',
     })
     .meta({ access: requires('inventory.read'), errors: [401, 404, 503] })
     .input(

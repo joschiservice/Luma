@@ -39,8 +39,17 @@ const sourceRows = `SELECT p.entity_id AS id,
  jsonb_build_object('connectionId',p.connection_id,'label',COALESCE(c.document->>'label','Connected source'),
  'status',COALESCE(c.document->>'status','unknown'),
  'externalSku',sku.external_id,'externalLocation',location.external_id,'mappingMethod',sku.method,
- 'onHand',s.document->'data'->'onHand','reserved',s.document->'data'->'reserved',
- 'available',s.document->'data'->'available','incoming',NULL,
+ 'onHand',s.document->'data'->'onHand',
+ 'reserved',CASE WHEN c.document->>'provider'='shopify' AND s.document->>'schemaVersion'='1' THEN NULL ELSE s.document->'data'->'reserved' END,
+ 'committed',CASE WHEN c.document->>'provider'='shopify' AND s.document->>'schemaVersion'='1' THEN s.document->'data'->'reserved' ELSE s.document->'data'->'committed' END,
+ 'available',s.document->'data'->'available','incoming',s.document->'data'->'incoming',
+ 'damaged',s.document->'data'->'damaged',
+ 'qualityControl',s.document->'data'->'qualityControl',
+ 'safetyStock',s.document->'data'->'safetyStock',
+ 'locationActive',s.document->'data'->'locationActive',
+ 'itemActive',s.document->'data'->'itemActive',
+ 'tracked',s.document->'data'->'tracked',
+ 'inventorySemantics',CASE WHEN c.document->>'provider'='shopify' THEN to_jsonb('shopify/1'::text) ELSE s.document->'data'->'inventorySemantics' END,
  'availabilityBasis',s.document->'data'->>'availabilityBasis','observedAt',s.document->>'observedAt',
  'sourceUpdatedAt',s.document->>'sourceUpdatedAt','deleted',s.document->'deleted') AS source
  ${positionRows}
@@ -81,7 +90,8 @@ export async function readPositions(
     AND ($9='all' OR ($9='unknown' AND bool_or((source->>'deleted')::boolean OR source->>'onHand' IS NULL OR source->>'reserved' IS NULL OR source->>'available' IS NULL))
       OR ($9='differs' AND (
        count(DISTINCT (source->>'onHand')::numeric) FILTER (WHERE NOT (source->>'deleted')::boolean)>1
-       OR count(DISTINCT (source->>'reserved')::numeric) FILTER (WHERE NOT (source->>'deleted')::boolean)>1
+       OR count(DISTINCT (source->>'reserved')::numeric) FILTER (WHERE NOT (source->>'deleted')::boolean AND source->>'inventorySemantics' IS NULL)>1
+       OR count(DISTINCT (source->>'reserved')::numeric) FILTER (WHERE NOT (source->>'deleted')::boolean AND source->>'inventorySemantics'='shopify/1')>1
        OR count(DISTINCT (source->>'available')::numeric) FILTER (WHERE NOT (source->>'deleted')::boolean)>1)))
     ORDER BY id LIMIT 51
   ) SELECT sources.* FROM sources JOIN selected USING(id) ORDER BY id,source->>'label',source->>'connectionId'`,

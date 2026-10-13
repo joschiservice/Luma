@@ -12,6 +12,58 @@ it('compares mapped stock without summing sources and follows scoped related rec
   expect(position.differences).toEqual(['available']);
   expect(position.sources.map((s) => s.available).sort()).toEqual(['12', '9']);
   expect(position.sources.every((s) => s.incoming === null)).toBe(true);
+  await stock.stock({
+    onHand: '3',
+    reserved: '1',
+    amount: '-2',
+    states: {
+      committed: '5',
+      incoming: '7',
+      damaged: '0',
+      qualityControl: '2',
+      safetyStock: '3',
+      locationActive: true,
+      itemActive: false,
+      tracked: true,
+      inventorySemantics: 'shopify/1',
+    },
+  });
+  const stateDetail = await f.request(
+    f.member,
+    `${f.base}/inventory/${position.id}`,
+  );
+  const stateSource = stateDetail.position.sources.find(
+    (source) => source.connectionId === stock.store,
+  );
+  expect(stateSource).toMatchObject({
+    committed: '5',
+    reserved: '1',
+    available: '-2',
+    incoming: '7',
+    damaged: '0',
+    qualityControl: '2',
+    safetyStock: '3',
+    locationActive: true,
+    itemActive: false,
+  });
+  expect(stateDetail.position.differences).toEqual(['onHand', 'available']);
+  expect(
+    stateDetail.history.entries.find(
+      (entry) => entry.connectionId === stock.store && entry.current,
+    ),
+  ).toMatchObject({
+    committed: '5',
+    reserved: '1',
+    incoming: '7',
+    itemActive: false,
+  });
+  await f.request(
+    f.outsider,
+    `${f.base}/inventory/${position.id}`,
+    'GET',
+    undefined,
+    404,
+  );
   const searched = await f.request(
     f.member,
     `${f.base}/inventory?q=77&connectionId=${stock.erp}`,
@@ -90,7 +142,7 @@ it('compares mapped stock without summing sources and follows scoped related rec
   expect(detail.issues.map((issue) => issue.id)).toEqual([issueId]);
   expect(detail.orders[0].id).toBe(stock.orderId);
   expect(detail.purchaseOrders[0].id).toBe(poId);
-  expect(detail.history.entries).toHaveLength(3);
+  expect(detail.history.entries).toHaveLength(4);
   expect(detail.history.entries.filter((e) => e.current)).toHaveLength(2);
   await stock.stock({ location: 'Osaka', amount: null });
   const all = await f.request(
@@ -103,7 +155,7 @@ it('compares mapped stock without summing sources and follows scoped related rec
   ).toHaveLength(1);
   expect(
     (await f.request(f.member, `${f.base}/inventory?view=unknown`)).items,
-  ).toHaveLength(2);
+  ).toHaveLength(1);
   await stock.stock({ unit: 'box', amount: '3' });
   const withUnit = await f.request(
     f.member,

@@ -20,7 +20,8 @@ Search by SKU or location, or narrow the list with **SKU**, **Location** and **S
 ## Read the quantities
 
 - **On hand**: the units the source reports at the location.
-- **Reserved**: the units the source holds back, for example for open orders.
+- **Committed**: Shopify units committed to orders or other supported operations.
+- **Reserved**: the source’s separate reservation state. Shopify reserved stock is different from committed stock and isn’t compared with ERP order reservations.
 - **Available**: the units the source can still sell. Below it, **Reported** means the source reported the quantity, and **Derived** means Luma calculated it as on hand minus reserved.
 - **Incoming**: units the source reports as on their way. Purchase orders don’t count as incoming stock.
 
@@ -40,6 +41,8 @@ Open a row to see one SKU at one location:
 - **SKU and locations** links to the product, the SKU record, all locations for this SKU and other SKUs at this location.
 - **Linked sources** lists the source records Luma treats as this SKU.
 - **Recent readings** lists the readings Luma recorded from each source, newest first. **Current** marks the reading Luma uses for that source. A reading shows what the source reported, not necessarily a stock movement.
+
+Open **Unavailable stock and activation** to see damaged stock, quality control and safety stock. Location activity, item activation at that location and inventory tracking appear separately. A stored quantity does not prove the location can sell it. Missing facts stay **Not reported**. Shopify’s available quantity is reported directly, even when other quantities are unknown.
 
 **Refresh stock** at the top of the page shows Luma’s latest readings. It doesn’t read the sources again; Luma reads them on its regular sync.
 

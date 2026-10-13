@@ -7,9 +7,14 @@ import {
   type ShopifyContext,
 } from './records.js';
 
-/** Shopify's available quantity: on hand minus units committed to open orders. */
+/** Shopify's sellable units, excluding committed and unavailable states; incoming is separate. */
 export const available = (level: InventoryLevelData) =>
-  level.onHand - level.committed;
+  level.onHand -
+  level.committed -
+  (level.reserved ?? 0) -
+  (level.damaged ?? 0) -
+  (level.qualityControl ?? 0) -
+  (level.safetyStock ?? 0);
 
 /** Reads an item's stock at a location. */
 export function readLevel(
@@ -29,7 +34,15 @@ export async function writeLevel(
   data: InventoryLevelData,
 ) {
   if (
-    ![data.onHand, data.committed].every(
+    ![
+      data.onHand,
+      data.committed,
+      data.reserved ?? 0,
+      data.incoming ?? 0,
+      data.damaged ?? 0,
+      data.qualityControl ?? 0,
+      data.safetyStock ?? 0,
+    ].every(
       (value) => Number.isSafeInteger(value) && Math.abs(value) <= 2147483647,
     )
   )
@@ -87,11 +100,15 @@ export function quantity(level: InventoryLevelData, name: string) {
     case 'available':
       return available(level);
     case 'damaged':
+      return level.damaged ?? 0;
     case 'incoming':
+      return level.incoming ?? 0;
     case 'quality_control':
+      return level.qualityControl ?? 0;
     case 'reserved':
+      return level.reserved ?? 0;
     case 'safety_stock':
-      return 0;
+      return level.safetyStock ?? 0;
     default:
       return undefined;
   }

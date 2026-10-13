@@ -9,6 +9,15 @@ export interface StockSource {
   reserved: string | null;
   available: string | null;
   incoming: string | null;
+  committed?: string | null;
+  damaged?: string | null;
+  qualityControl?: string | null;
+  safetyStock?: string | null;
+  locationActive?: boolean | null;
+  itemActive?: boolean | null;
+  tracked?: boolean | null;
+  /** Versioned quantity meaning; absent for earlier or other provider reports. */
+  inventorySemantics?: 'shopify/1' | null;
   availabilityBasis: 'provider_reported' | 'derived' | 'unknown';
   observedAt: string;
   sourceUpdatedAt: string | null;
@@ -45,14 +54,18 @@ export function stockDecimal(value: string): bigint {
 
 /** Compares known quantities of current sources for the same canonical position; missing is not zero. */
 export function stockDifferences(sources: StockSource[]) {
-  return (['onHand', 'reserved', 'available'] as const).filter(
-    (field) =>
-      new Set(
-        sources.flatMap((source) =>
-          source.deleted || source[field] === null
-            ? []
-            : [stockDecimal(source[field])],
-        ),
-      ).size > 1,
-  );
+  return (['onHand', 'reserved', 'available'] as const).filter((field) => {
+    const quantities = new Map<string, Set<bigint>>();
+    for (const source of sources) {
+      const value = source[field];
+      if (source.deleted || value === null) continue;
+      const meaning =
+        field === 'reserved' ? (source.inventorySemantics ?? 'legacy') : field;
+      const values = quantities.get(meaning) ?? new Set<bigint>();
+      values.add(stockDecimal(value));
+      quantities.set(meaning, values);
+    }
+
+    return [...quantities.values()].some((values) => values.size > 1);
+  });
 }

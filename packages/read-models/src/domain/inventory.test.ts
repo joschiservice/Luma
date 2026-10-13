@@ -28,6 +28,33 @@ describe('stock comparison', () => {
     ).toBe(1n);
     expect(stockDecimal('-0.000001')).toBe(-1n);
   });
+  it('compares reservation quantities only when their meanings agree', () => {
+    expect(
+      stockDifferences([
+        source({
+          reserved: '1',
+          inventorySemantics: 'shopify/1',
+          available: '-2',
+        }),
+        source({ reserved: '5', available: '3' }),
+      ]),
+    ).toEqual(['available']);
+    expect(
+      stockDifferences([
+        source({ reserved: '1', inventorySemantics: 'shopify/1' }),
+        source({ reserved: '2', inventorySemantics: 'shopify/1' }),
+      ]),
+    ).toEqual(['reserved']);
+  });
+  it('keeps differences within comparable sources when another meaning is present', () => {
+    expect(
+      stockDifferences([
+        source({ reserved: '1', inventorySemantics: 'shopify/1' }),
+        source({ reserved: '5' }),
+        source({ reserved: '7' }),
+      ]),
+    ).toEqual(['reserved']);
+  });
   it('compares known values only and ignores removed snapshots', () => {
     expect(
       stockDifferences([

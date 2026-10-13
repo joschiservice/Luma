@@ -243,7 +243,8 @@
       "id": "gid://shopify/InventoryLevel/41?inventory_item_id=31",
       "updatedAt": "2026-09-17T00:00:00Z",
       "location": {
-        "id": "gid://shopify/Location/41"
+        "id": "gid://shopify/Location/41",
+        "isActive": true
       },
       "quantities": [
         {
@@ -257,21 +258,44 @@
         {
           "name": "available",
           "quantity": -2
+        },
+        {
+          "name": "reserved",
+          "quantity": 1
+        },
+        {
+          "name": "incoming",
+          "quantity": 7
+        },
+        {
+          "name": "damaged",
+          "quantity": 0
+        },
+        {
+          "name": "quality_control",
+          "quantity": 2
+        },
+        {
+          "name": "safety_stock",
+          "quantity": 3
         }
-      ]
+      ],
+      "isActive": false
     },
     {
       "id": "gid://shopify/InventoryLevel/42?inventory_item_id=31",
       "updatedAt": "2026-09-17T00:00:00Z",
       "location": {
-        "id": "gid://shopify/Location/42"
+        "id": "gid://shopify/Location/42",
+        "isActive": false
       },
       "quantities": [
         {
           "name": "available",
           "quantity": 0
         }
-      ]
+      ],
+      "isActive": true
     }
   ],
   "work": [

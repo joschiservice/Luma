@@ -190,3 +190,9 @@ recalculated from lines, compared across sources or converted between currencies
 source's own fulfillment status label is a reported fact, separate from Luma's fulfillment
 state. Internal record publication uses the same owner transaction as Sales, unlike replay
 recovery across independent external observations.
+
+Inventory position schema version 2 preserves distinct provider stock states and activation.
+Older Shopify observations reported committed stock in the reserved field; replay labels it
+as committed and leaves the separate reserved state unknown. Earlier snapshots remain
+readable and immutable. Shopify availability remains a reported fact, regardless of whether
+its other state quantities are present.

@@ -26,6 +26,7 @@ function fixture() {
     tracked: true,
     inventoryLevel: {
       id: 'gid://shopify/InventoryLevel/1',
+      isActive: true,
       updatedAt: new Date().toISOString(),
       location: { id: locationId, name: 'Tokyo', isActive: true },
       quantities: [{ name: 'available', quantity: 12 }],
@@ -134,13 +135,20 @@ it('validates pinned GraphQL queries and sends exact CAS with provider idempoten
   expect(f.record.mock.calls).toHaveLength(3);
 });
 it('withholds incomplete, untracked, concurrent or revoked-authority stock before dispatch', async () => {
-  for (const change of ['quantity', 'tracked', 'location', 'source'] as const) {
+  for (const change of [
+    'quantity',
+    'tracked',
+    'location',
+    'item',
+    'source',
+  ] as const) {
     const f = fixture(),
       input = await f.input();
     if (change === 'quantity')
       f.node.inventoryLevel.quantities[0]!.quantity = 10;
     if (change === 'tracked') f.node.tracked = false;
     if (change === 'location') f.node.inventoryLevel.location.isActive = false;
+    if (change === 'item') f.node.inventoryLevel.isActive = false;
     if (change === 'source') f.eligible.mockResolvedValue(false);
     await expect(f.handler.run(f.context, input)).rejects.toMatchObject({
       failure: { effect: 'none', dispatch: 'not_dispatched' },

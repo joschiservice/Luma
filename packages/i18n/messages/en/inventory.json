@@ -98,5 +98,16 @@
   "inventory_history_removed": "Removed at source",
   "inventory_history_current": "Current",
   "inventory_history_earlier": "Earlier reading",
-  "inventory_history_truncated": "{count, plural, one {Showing the most recent reading.} other {Showing the {count, number} most recent readings.}}"
+  "inventory_history_truncated": "{count, plural, one {Showing the most recent reading.} other {Showing the {count, number} most recent readings.}}",
+  "inventory_quantity_committed": "Committed",
+  "inventory_quantity_damaged": "Damaged",
+  "inventory_quantity_quality_control": "Quality control",
+  "inventory_quantity_safety_stock": "Safety stock",
+  "inventory_provider_states_title": "Unavailable stock and activation",
+  "inventory_provider_states_note": "Shopify committed stock and its separate reserved state have different meanings. Quantities stay as reported; incoming stock is not added to available stock. Activation does not establish stock ownership.",
+  "inventory_location_active": "Location active",
+  "inventory_item_active": "Item active at location",
+  "inventory_item_tracked": "Inventory tracked",
+  "inventory_activation_yes": "Yes",
+  "inventory_activation_no": "No"
 }

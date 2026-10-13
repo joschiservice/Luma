@@ -272,11 +272,19 @@ async function setStock(
   const level = await readLevel(context, value.variant, value.location);
   const committed = level?.data.committed ?? 0;
   await writeLevel(context, {
+    ...level?.data,
     item: value.variant,
     location: value.location,
     committed,
     onHand:
-      value.kind === 'stock' ? value.quantity : value.quantity + committed,
+      value.kind === 'stock'
+        ? value.quantity
+        : value.quantity +
+          committed +
+          (level?.data.reserved ?? 0) +
+          (level?.data.damaged ?? 0) +
+          (level?.data.qualityControl ?? 0) +
+          (level?.data.safetyStock ?? 0),
   });
 
   return {

@@ -17,10 +17,13 @@ Suche nach SKU oder Lagerort, oder grenze die Liste mit **SKU**, **Lagerort** un
 
 **Noch kein Bestand importiert** bedeutet, dass noch kein verbundenes System Bestand geteilt hat. Den Fortschritt siehst du unter [Datenabgleich](/docs/data-sync). **Kein passender Bestand** bedeutet, dass Suche oder Filter alle Positionen ausschließen.
 
+Shopifys **gebundener Bestand** gehört zu Aufträgen oder anderen unterstützten Vorgängen. Der separate **reservierte Bestand** hat eine andere Bedeutung und wird nicht mit ERP-Auftragsreservierungen verglichen. Öffne **Nicht verfügbarer Bestand und Aktivierung**, um beschädigten Bestand, Qualitätskontrolle und Sicherheitsbestand zu sehen. Standortaktivität, Artikelaktivierung und Bestandserfassung bleiben getrennt. Eingehender Bestand wird nicht zum verfügbaren Bestand addiert; fehlende Werte bleiben **Nicht gemeldet**.
+
 ## Mengen lesen [#read-the-quantities]
 
 - **Physischer Bestand**: die Einheiten, die die Quelle am Lagerort meldet.
-- **Reserviert**: die Einheiten, die die Quelle zurückhält, zum Beispiel für offene Bestellungen.
+- **Gebunden**: Shopify-Einheiten, die zu Aufträgen oder anderen unterstützten Vorgängen gehören.
+- **Reserviert**: der separate Reservierungszustand der Quelle. Shopifys reservierter Bestand wird nicht mit ERP-Auftragsreservierungen verglichen.
 - **Verfügbar**: die Einheiten, die die Quelle noch verkaufen kann. Darunter bedeutet **Gemeldet**, dass die Quelle die Menge gemeldet hat, und **Berechnet**, dass Luma sie als physischen Bestand minus reservierte Menge berechnet hat.
 - **Im Zulauf**: Einheiten, die laut Quelle unterwegs sind. Lieferantenbestellungen zählen nicht als Zulauf.
 

@@ -300,8 +300,19 @@ export interface InventorySnapshot {
   location: ExternalId;
   unit: string;
   onHand: string | null;
+  /** Source-reported reservation state; compare only under the same inventory semantics. */
   reserved: string | null;
   available: string | null;
+  committed?: string | null;
+  incoming?: string | null;
+  damaged?: string | null;
+  qualityControl?: string | null;
+  safetyStock?: string | null;
+  locationActive?: boolean | null;
+  itemActive?: boolean | null;
+  tracked?: boolean | null;
+  /** Versioned quantity meaning; absent for earlier or other provider reports. */
+  inventorySemantics?: 'shopify/1' | null;
   availabilityBasis: 'provider_reported' | 'derived' | 'unknown';
 }
 

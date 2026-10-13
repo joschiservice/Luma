@@ -1006,7 +1006,7 @@ export function createShopifyConnector(
               parent.id,
               'InventoryItem',
               'inventoryLevels',
-              'id updatedAt location { id } quantities(names: ["on_hand", "committed", "available"]) { name quantity }',
+              'id updatedAt isActive location { id isActive } quantities(names: ["on_hand", "committed", "reserved", "incoming", "damaged", "quality_control", "safety_stock", "available"]) { name quantity }',
               s.level,
             );
             for (const level of levels) {
@@ -1031,7 +1031,16 @@ export function createShopifyConnector(
                 location: ref(level.location.id),
                 unit: 'each',
                 onHand: value('on_hand'),
-                reserved: value('committed'),
+                reserved: value('reserved'),
+                committed: value('committed'),
+                incoming: value('incoming'),
+                damaged: value('damaged'),
+                qualityControl: value('quality_control'),
+                safetyStock: value('safety_stock'),
+                locationActive: level.location.isActive ?? null,
+                itemActive: level.isActive ?? null,
+                tracked: item.tracked,
+                inventorySemantics: 'shopify/1',
                 available,
                 availabilityBasis:
                   available === null ? 'unknown' : 'provider_reported',

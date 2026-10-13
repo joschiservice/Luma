@@ -757,6 +757,7 @@ const resolvers: Record<string, TypeResolvers> = {
       connection(context, args, { kind: 'InventoryLevel', parent: item.id }),
   }),
   InventoryLevel: on<InventoryLevelData>({
+    isActive: (level) => level.data.isActive ?? true,
     id: (level) => levelGid(level.data.item, level.data.location),
     location: (level, _args, context) =>
       locationNode(context.shop, level.data.location),

@@ -84,6 +84,7 @@ export const inventoryDetail = identity('InventoryItem').extend({
 });
 
 export const inventoryLevel = z.object({
+  isActive: z.boolean().nullable().optional(),
   id: z.string().startsWith('gid://shopify/InventoryLevel/'),
   updatedAt: timestamp,
   location: identity('Location').extend({
