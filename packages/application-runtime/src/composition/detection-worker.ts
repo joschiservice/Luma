@@ -6,6 +6,7 @@ import type { ConnectionsConfig } from '@luma/config';
 import type { CapabilityReader } from '@luma/connections';
 import {
   createInstalledRuntime,
+  createOrderReadChecks,
   createOrderSourceVisibility,
   createSourceAuthority,
 } from '@luma/connections/composition';
@@ -25,6 +26,7 @@ import {
 import { createDetectionSources } from '@luma/resolution/composition';
 import type { Pool } from 'pg';
 
+import { createTenantFeatureRelease } from './feature-release.js';
 import { createSalesReadSource, createSalesTenantRelease } from './sales.js';
 import { createCommerceServices, createDetectionServices } from './services.js';
 
@@ -80,6 +82,7 @@ export function createOrderRefreshService(options: {
   const refresh = createOrderRefresh({
     sources: createDetectionSources(options.database),
     capabilities: options.capabilities,
+    recordRead: createOrderReadChecks(options.database),
     id: randomUUID,
     project: async (context, read) => {
       const outcome = await commerce.ingestion.ingest(
@@ -205,6 +208,7 @@ export function createDetectionWorker(options: {
   const host = createAppHost(options.database, {
     ...options.connections,
     refreshContext: options.identity.refreshContext,
+    featureEnabled: createTenantFeatureRelease(options.observability),
     ...(options.env ? { env: options.env } : {}),
   });
   const log = options.log ?? createFailureLog();

@@ -14,6 +14,7 @@ import type { Random } from '@luma/simulator-core';
 import type { GmailConfig } from '@luma/simulator-gmail';
 import type { JtlConfig } from '@luma/simulator-jtl';
 import type { ShopifyConfig } from '@luma/simulator-shopify';
+import type { StarshipitConfig } from '@luma/simulator-starshipit';
 
 export type Instance =
   | { name: string; kind: 'jtl'; label: string; config: JtlConfig }
@@ -25,7 +26,13 @@ export type Instance =
       config: ShopifyConfig;
       shop: ShopProfile;
     }
-  | { name: string; kind: 'gmail'; label: string; config: GmailConfig };
+  | { name: string; kind: 'gmail'; label: string; config: GmailConfig }
+  | {
+      name: string;
+      kind: 'starshipit';
+      label: string;
+      config: StarshipitConfig;
+    };
 
 /** JTL shipping methods: Standard, Express and Pickup, as in the seeded fixtures. */
 export const shippingMethods = { standard: '7', express: '8', pickup: '9' };
@@ -108,6 +115,12 @@ export function instancesFor(profile: MerchantProfile): Instance[] {
         scopes: shopifyScopes,
       },
     })),
+    {
+      name: 'starshipit',
+      kind: 'starshipit',
+      label: 'Starshipit',
+      config: { name: profile.company.name },
+    },
     {
       name: mailboxName,
       kind: 'gmail',

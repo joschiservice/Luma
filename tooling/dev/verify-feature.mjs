@@ -7,7 +7,18 @@ import { fail, run } from './process.mjs';
 try {
   const feature = process.argv[2];
   const packages = {
-    simulator: ['simulator', 'simulator-*', 'resolution', 'exceptions'],
+    simulator: [
+      'simulator',
+      'simulator-*',
+      'app-starshipit',
+      'connector-starshipit',
+      'app-shopify',
+      'connector-shopify',
+      'commerce-ingestion',
+      'commerce-sync',
+      'resolution',
+      'exceptions',
+    ],
     workflows: [
       'workflows',
       'workflow-temporal',

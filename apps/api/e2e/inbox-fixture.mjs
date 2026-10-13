@@ -84,6 +84,55 @@ export async function inboxFixture(t, origin = 'http://127.0.0.1:3000') {
 
   await f.pilot.observe({ check: false });
   await f.pilot.link();
+  // The merchant confirms the two seeded integration pairs before Inbox reads references.
+  // Separate shipping records must otherwise remain ambiguous, even with the same number.
+  for (const [shopOrder, shippingOrder] of [
+    ['1', '1'],
+    ['10', '2'],
+  ]) {
+    const mapped = async (connectionId, externalId) =>
+      (
+        await f.db.owner.query(
+          "SELECT canonical_id FROM connector_source_mappings WHERE tenant_id=$1 AND connection_id=$2 AND resource='order' AND external_id=$3",
+          [org, connectionId, externalId],
+        )
+      ).rows[0]?.canonical_id;
+    const entityId = await mapped(
+      f.manifest.connections.shopify,
+      `gid://shopify/Order/${shopOrder}`,
+    );
+    const otherId = await mapped(
+      f.manifest.connections.starshipit,
+      shippingOrder,
+    );
+    assert.ok(
+      entityId && otherId,
+      'The merchant can identify both exact seeded source orders',
+    );
+    const link = await request(
+      '/identities/links',
+      {
+        operation: 'link',
+        kind: 'order',
+        entityId,
+        otherId,
+        reason:
+          'Merchant confirmed these exact seeded Shopify and Starshipit source orders from the integration.',
+      },
+      { status: 202 },
+    );
+    await until(
+      async () => {
+        await f.pilot.observe({ refresh: false, check: false });
+        const current = await request(`/identities/links/${link.id}`);
+        assert.notEqual(current.state, 'failed', current.message);
+
+        return current.state === 'completed';
+      },
+      'merchant-confirmed order identity',
+      30_000,
+    );
+  }
   // The demo adds inbox rules once its supplier exists in Procurement.
   await until(
     async () => {

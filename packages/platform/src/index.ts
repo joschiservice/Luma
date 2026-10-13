@@ -1,6 +1,9 @@
 export { canonicalJson } from './domain/canonical-json.js';
 
+export { featureFlags } from './application/observability.js';
+
 export type {
+  FeatureFlag,
   Observability,
   Observation,
   Operation,

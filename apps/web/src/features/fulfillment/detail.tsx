@@ -40,6 +40,7 @@ import {
   deliveryLabels,
   diagnosis,
   fulfillmentState,
+  handoffLabels,
   holdText,
   kindLabels,
   lastChange,
@@ -48,6 +49,7 @@ import {
   orderLabel,
   otherSignals,
   quantity,
+  shippingFreshness,
   signalLabels,
   statusLabels,
   timelineGroups,
@@ -82,8 +84,10 @@ export function FulfillmentDetailPage() {
   const actionable =
     !!detail &&
     !!appId &&
-    detail.item.kind === 'fulfillment_order' &&
-    detail.item.open &&
+    ((detail.item.kind === 'fulfillment_order' && detail.item.open) ||
+      (appId === 'shopify' &&
+        detail.item.kind === 'shipment' &&
+        !detail.item.deleted)) &&
     !!detail.item.externalId &&
     !!detail.order.externalId &&
     (apps.data?.catalog ?? []).some(
@@ -158,15 +162,39 @@ function NewTab() {
 /** The facts a source reports about the fulfillment, including what it does not report. */
 function Facts({ detail }: { detail: FulfillmentDetail }) {
   const { item, source } = detail;
+  const freshness = shippingFreshness(item, detail.asOf);
 
   return (
     <Card className="fulfillment-section">
       <h2>{m.fulfillment_facts_title()}</h2>
+      {freshness.staleRead ? (
+        <Alert role="status">{m.fulfillment_read_stale()}</Alert>
+      ) : null}
+      {freshness.quietTracking ? (
+        <Alert role="status">{m.fulfillment_tracking_stale()}</Alert>
+      ) : null}
       <dl className="fulfillment-facts">
         <Fact label={m.fulfillment_fact_type()}>{kindLabels[item.kind]}</Fact>
         <Fact label={m.fulfillment_fact_status()}>
           {statusLabels[item.status] ?? item.status}
         </Fact>
+        {item.shipping ? (
+          <>
+            <Fact label={m.fulfillment_fact_handoff()}>
+              {handoffLabels[item.shipping.stage]}
+              {item.shipping.stage === 'unknown' ? (
+                <small>{m.fulfillment_handoff_unknown_note()}</small>
+              ) : null}
+            </Fact>
+            <Fact label={m.fulfillment_fact_tracking_update()}>
+              {item.shipping.trackingUpdatedAt ? (
+                <WorkspaceDate value={item.shipping.trackingUpdatedAt} />
+              ) : (
+                <Missing />
+              )}
+            </Fact>
+          </>
+        ) : null}
         <Fact label={m.fulfillment_fact_holds()}>
           {item.holds === null ? (
             <Missing>{m.fulfillment_fact_holds_unreported()}</Missing>
@@ -250,6 +278,18 @@ function Facts({ detail }: { detail: FulfillmentDetail }) {
         <Fact label={m.fulfillment_fact_source()}>
           {source.label}
           {item.externalId ? <small>{item.externalId}</small> : null}
+          {item.shipping?.sourceUrl ? (
+            <a
+              className="fulfillment-source-link"
+              href={item.shipping.sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {m.fulfillment_source_open()}{' '}
+              <ExternalLink size={12} aria-hidden="true" />
+              <NewTab />
+            </a>
+          ) : null}
         </Fact>
         <Fact label={m.fulfillment_fact_read()}>
           <WorkspaceDate value={item.observedAt} />

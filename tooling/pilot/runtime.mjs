@@ -16,7 +16,10 @@ import {
   createSalesReadSource,
   createSalesTenantRelease,
   createScheduledDetection,
+  createShipmentDispatchOptionsReader,
+  createShipmentDispatchReader,
   createStockRefreshService,
+  createTenantFeatureRelease,
 } from '@luma/application-runtime';
 import {
   createAutomaticLinkStore,
@@ -65,6 +68,7 @@ import { createInventoryScenario } from '../simulator/inventory.mjs';
 import { createStockLinks } from '../simulator/links.mjs';
 import { createQuantityChanges } from '../simulator/quantity-change.mjs';
 import { simulatorShopifyEnv } from '../simulator/shopify-app.mjs';
+import { syntheticFeatureRelease } from './feature-release.mjs';
 import { detectionRequest, readJson } from './fixtures.mjs';
 import { mutateProviderState } from './provider-state.mjs';
 import { identitySettings } from './seed.mjs';
@@ -128,10 +132,21 @@ export async function createPilot(
     const installations = createInstalledConnections(db, {
       refreshStock,
       sourceOrderLines: createOrderLineReader(db),
+      shipmentDispatchOptions: createShipmentDispatchOptionsReader(db),
+      shipmentDispatchEvidence: createShipmentDispatchReader(
+        db,
+        async (actor, orderId, maxAgeMs) => {
+          await orderRefresh?.(actor, orderId, maxAgeMs);
+        },
+      ),
       refreshOrder: async (actor, orderId, maxAgeMs) => {
         await orderRefresh?.(actor, orderId, maxAgeMs);
       },
       internalOrdersEnabled: createSalesTenantRelease(observability),
+      featureEnabled: syntheticFeatureRelease(
+        env,
+        createTenantFeatureRelease(observability),
+      ),
       orderChangePlans: async (actor, orderId, request) => {
         if (!orderPlans) throw new Error('Order plans are not composed yet');
 
@@ -270,6 +285,11 @@ export async function createPilot(
         });
     const commerce = simulation ? createCommerceServices(db) : undefined;
     const installedOptions = {
+      providers: installations.registry.providers(),
+      featureEnabled: syntheticFeatureRelease(
+        env,
+        createTenantFeatureRelease(observability),
+      ),
       internalSource: createSalesReadSource(db, observability),
       installations,
       simulation,
@@ -895,6 +915,7 @@ export async function createPilot(
     return {
       app,
       runtime,
+      capabilities,
       replenishment: application.replenishment,
       caseWorkflows: application.caseWorkflows,
       /** Human tasks and event waits for process workflows, as the worker coordinates them. */

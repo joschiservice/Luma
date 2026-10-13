@@ -128,6 +128,14 @@ export const incidentKinds = {
     exceptionClass: null,
     surface: 'orders',
   },
+  'shipping-provider-outage': {
+    label: 'Shipping provider unavailable',
+    description:
+      'Starshipit stops answering shipment and tracking reads, so fresh verification cannot confirm warehouse or carrier progress.',
+    unit: 'day',
+    exceptionClass: 'sync_failure',
+    surface: 'connections',
+  },
   'provider-outage': {
     label: 'Provider outage',
     description: 'One provider API is unavailable for 20 to 40 minutes.',

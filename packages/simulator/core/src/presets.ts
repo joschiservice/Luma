@@ -30,6 +30,7 @@ const realisticIncidents = {
   'order-quantity-change': 0,
   'shipping-method-mismatch': 0.5,
   'provider-outage': 0.5,
+  'shipping-provider-outage': 0,
   'auth-revoked': 0.05,
 } satisfies Record<IncidentKindName, number>;
 

@@ -13,6 +13,7 @@ const recordTables = [
   'sim_jtl_records',
   'sim_cin7_records',
   'sim_gmail_records',
+  'sim_starshipit_records',
   'sim_world_records',
 ] as const;
 

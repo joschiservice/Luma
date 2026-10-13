@@ -35,3 +35,8 @@ export {
 } from './infrastructure/decisions/providers.js';
 
 export { createProcurementContext } from './infrastructure/procurement/context.js';
+
+export {
+  createShipmentDispatchReader,
+  createShipmentDispatchOptionsReader,
+} from './infrastructure/fulfillment/dispatch-evidence.js';

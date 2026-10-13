@@ -24,6 +24,11 @@ import {
   type ShopifyCommand,
   type ShopifyCommandResult,
 } from '@luma/simulator-shopify';
+import {
+  starshipit,
+  type StarshipitCommand,
+  type StarshipitContext,
+} from '@luma/simulator-starshipit';
 
 import { cin7 } from './cin7.js';
 import type {
@@ -247,7 +252,7 @@ export async function handleEvents(
 ) {
   for (const event of events) {
     const kind = instance(world, name).kind;
-    if (kind === 'shopify') {
+    if (kind === 'shopify' || kind === 'starshipit') {
       world.webhook(name, event);
       continue;
     }
@@ -384,4 +389,24 @@ export async function closeIncident(world: World, id: string, reason: string) {
   );
 
   return incident;
+}
+
+/** Builds the merchant shipping account context. */
+export function shippingContext(
+  world: World,
+  events: ProviderEvent[] = [],
+): StarshipitContext {
+  return providerContext(world, 'starshipit', events) as StarshipitContext;
+}
+
+/** Runs a warehouse or carrier command against Starshipit and delivers its notifications. */
+export async function shipping(world: World, input: StarshipitCommand) {
+  const events: ProviderEvent[] = [];
+  const result = await starshipit.command(
+    shippingContext(world, events),
+    input,
+  );
+  await handleEvents(world, 'starshipit', events);
+
+  return result;
 }

@@ -178,6 +178,14 @@ const permissionText: Record<
     m.permissions_shopify_order_edits_apply_label,
     m.permissions_shopify_order_edits_apply_description,
   ],
+  'shopify:shipment_publishing.run': [
+    m.permissions_shopify_shipment_publishing_run_label,
+    m.permissions_shopify_shipment_publishing_run_description,
+  ],
+  'starshipit:order_update.run': [
+    m.permissions_starshipit_order_update_run_label,
+    m.permissions_starshipit_order_update_run_description,
+  ],
   'jtl:purchase_orders.submit': [
     m.permissions_jtl_purchase_orders_submit_label,
     m.permissions_jtl_purchase_orders_submit_description,

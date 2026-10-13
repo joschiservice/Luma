@@ -216,6 +216,7 @@ describe.skipIf(!databaseUrl)('Workspace activity on PostgreSQL', () => {
     client: PoolClient,
     runId: string,
     target: { kind: string; id: string },
+    subject?: { kind: string; id: string },
   ) {
     const proposalId = randomUUID();
     await client.query(
@@ -228,6 +229,7 @@ describe.skipIf(!databaseUrl)('Workspace activity on PostgreSQL', () => {
           tenantId: tenant,
           runId,
           stepId: 'step',
+          ...(subject ? { subject } : {}),
           action: { id: proposalId, target },
         },
       ],
@@ -352,6 +354,18 @@ describe.skipIf(!databaseUrl)('Workspace activity on PostgreSQL', () => {
       );
       expected['admission step targeting the order'] = policyId;
 
+      expected['governed operation with an explicit order subject'] =
+        await audit(
+          client,
+          await admissionStep(
+            client,
+            randomUUID(),
+            { kind: 'starshipit_order_update', id: randomUUID() },
+            { kind: 'order', id: orderRefs[0]! },
+          ),
+          '2026-09-07T01:00:00Z',
+        );
+
       playbookRunId = await playbookRun(client, { target: other });
       expected['event of a given run'] = await audit(
         client,
@@ -379,6 +393,16 @@ describe.skipIf(!databaseUrl)('Workspace activity on PostgreSQL', () => {
       );
 
       unrelated.push(
+        await audit(
+          client,
+          await admissionStep(
+            client,
+            randomUUID(),
+            { kind: 'starshipit_order_update', id: randomUUID() },
+            { kind: 'order', id: 'OTHER-ORDER' },
+          ),
+          '2026-09-11T01:00:00Z',
+        ),
         await exceptionEvent(client, otherIssue, '2026-09-11T00:00:00Z'),
         await audit(
           client,
@@ -413,15 +437,24 @@ describe.skipIf(!databaseUrl)('Workspace activity on PostgreSQL', () => {
       ),
     ).toEqual({});
     expect(linked.items).toHaveLength(Object.keys(expected).length);
+    expect(
+      linked.items.find(
+        (item) =>
+          item.id ===
+          expected['governed operation with an explicit order subject'],
+      )?.resource,
+    ).toBe(orderRefs[0]);
 
     const all = await store.list(context, window);
     expect(all.items.map((item) => item.id)).toEqual(
       expect.arrayContaining([
         ...Object.values(expected),
-        ...unrelated.slice(0, 3),
+        ...unrelated.slice(0, -1),
       ]),
     );
-    expect(all.items).toHaveLength(Object.keys(expected).length + 3);
+    expect(all.items).toHaveLength(
+      Object.keys(expected).length + unrelated.length - 1,
+    );
 
     const paged: string[] = [];
     let cursor: string | undefined;

@@ -94,6 +94,8 @@ export async function prepareOrderChildren(
       boundParent !== mapping.previousCanonicalId
     )
       throw new Error('Canonical child belongs to another order');
+    // Same-parent mappings include explicit line confirmations and must survive later imports.
+    if (boundParent === orderId) continue;
     const next = await orders.identify(
       context,
       child.resource,

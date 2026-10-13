@@ -41,6 +41,7 @@ export const kindLabels: Record<DecisionKind, () => string> = {
   fulfillment_recovery: m.decisions_kind_fulfillment_recovery,
   inventory_correction: m.decisions_kind_inventory_correction,
   order_edit: m.decisions_kind_order_edit,
+  shipment_publication: m.decisions_kind_shipment_publication,
   supplier_commitment: m.decisions_kind_supplier_commitment,
   human_task: m.authoring_coordination_human_label,
   workflow_handover: m.decisions_kind_workflow_handover,

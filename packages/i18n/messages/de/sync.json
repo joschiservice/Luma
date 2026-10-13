@@ -289,5 +289,14 @@
   "sync_autolink_error_role": "Deine Rolle enthält nicht mehr die Berechtigung „Importe verwalten“.",
   "sync_autolink_error_conflict": "Diese Regel wurde geändert oder existiert bereits. Schließe diesen Dialog und lade die Seite neu, bevor du es erneut versuchst.",
   "sync_autolink_error_save": "Luma konnte das automatische Verknüpfen nicht aktualisieren. Versuch es erneut.",
-  "sync_note_retired": "Löschung oder Trennung bestätigt: {records}. Aktuelle Ansichten schließen diese Quelldaten aus; ihre Nachweise bleiben erhalten."
+  "sync_note_retired": "Löschung oder Trennung bestätigt: {records}. Aktuelle Ansichten schließen diese Quelldaten aus; ihre Nachweise bleiben erhalten.",
+  "sync_links_description_line": "Bestätige denselben Bestellartikel in einer anderen Quelle. Die Positionen müssen zu dieser verknüpften Bestellung gehören und kompatible Mengeneinheiten verwenden. Luma ordnet Positionen nie allein anhand des SKU-Texts zu.",
+  "sync_links_suggestions_line": "Positionen in anderen Quellen dieser Bestellung",
+  "sync_links_candidate_order": "Übereinstimmende Auftragsreferenz der Quelle",
+  "sync_links_candidate_line": "Andere Quellposition in dieser verknüpften Bestellung",
+  "sync_links_linking_line": "Positionen werden zugeordnet. Luma aktualisiert die Bestellung und ihre Fulfillment-Nachweise.",
+  "sync_links_unlinking_line": "Positionen werden getrennt. Luma aktualisiert die Bestellung und ihre Fulfillment-Nachweise.",
+  "sync_links_link_line_description": "Bestätige, dass diese Quellpositionen denselben Artikel in dieser Bestellung darstellen. Jede Quelle behält ihre Mengen und Versandnachweise. Die Zuordnung kann beeinflussen, ob kontrollierte Änderungen ausgeführt werden dürfen. Luma protokolliert deinen Grund. Du kannst die Verknüpfung später lösen.",
+  "sync_links_unlink_line_description": "Diese Quellposition wird wieder zu einem separaten Artikel in derselben Bestellung. Kontrollierte Änderungen können bis zu einer erneuten Zuordnung nicht verfügbar sein. Luma protokolliert die Änderung und deinen Grund.",
+  "sync_links_title_line": "Quellen für {line}"
 }

@@ -54,10 +54,10 @@ export async function sendSyncCommand(
   });
 }
 
-/** Query-key prefix for the sources behind one SKU or location. */
+/** Query-key prefix for one record's source identities. */
 export const identityKey = (
   organizationId: string,
-  kind: 'sku' | 'location' | 'order',
+  kind: IdentityDetail['entity']['kind'],
   entityId: string,
 ) =>
   [
@@ -70,12 +70,12 @@ export const identityKey = (
   ] as const;
 
 /**
- * Loads the source records behind a SKU or location with link suggestions. Refreshes while
+ * Loads a record's source identities and reviewed link suggestions. Refreshes while
  * a link request is waiting or running.
  */
 export const identityOptions = (
   organizationId: string,
-  kind: 'sku' | 'location' | 'order',
+  kind: IdentityDetail['entity']['kind'],
   entityId: string,
 ) =>
   queryOptions<

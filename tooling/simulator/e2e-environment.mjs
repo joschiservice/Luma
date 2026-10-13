@@ -29,6 +29,11 @@ export async function createSimulatorEnvironment({
   demo,
   observability,
 }) {
+  env = {
+    FEATURE_FLAG_OVERRIDES:
+      'starshipit-fulfillment=true,starshipit-actions=true,shopify-shipment-publishing=true',
+    ...env,
+  };
   const token = 'operational-simulator-test-token';
   const databaseUrl = await testSimulatorDatabase(t);
   let client;
@@ -102,6 +107,35 @@ export async function createSimulatorEnvironment({
       token,
       /** Waits until the run is ready again, for example after a reset. */
       ready: () => waitForRun(call, 'operations'),
+      /** Recreates every API service against the same isolated state, exercising restart fences. */
+      async restartPilot({ featureOverrides } = {}) {
+        await pilot.close();
+        if (featureOverrides)
+          env = {
+            ...env,
+            FEATURE_FLAG_OVERRIDES: Object.entries(featureOverrides)
+              .map(([flag, enabled]) => `${flag}=${enabled}`)
+              .join(','),
+          };
+        pilot = await createPilot(env, directory, manifest, temporal, {
+          ...(detection ? { detection } : {}),
+          ...(observability ? { observability } : {}),
+        });
+        const restartedOrigin = await pilot.app.listen({
+          host: '127.0.0.1',
+          port: 0,
+        });
+        await registerWebhooks(call, manifest, restartedOrigin);
+        client = createOperationsClient({
+          apiOrigin: restartedOrigin,
+          webOrigin: env.BETTER_AUTH_URL,
+          password: saved.seedPassword,
+          organizationId: manifest.organizationId,
+          runId: manifest.simulator.runId,
+        });
+
+        return pilot;
+      },
       async close() {
         await pilot.close();
         await simulator.close();

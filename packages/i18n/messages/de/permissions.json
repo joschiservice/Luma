@@ -124,5 +124,9 @@
   "permissions_inventory_manage_label": "Nativen Bestand verwalten",
   "permissions_inventory_manage_description": "Geprüfte Eröffnungsbestände und Korrekturen vorbereiten, native Bestandsbewegungen verwalten und das Schattenbuch abstimmen.",
   "permissions_inventory_approve_label": "Native Bestandsänderungen prüfen",
-  "permissions_inventory_approve_description": "Den genauen Eröffnungsbestand oder die Korrektur eines anderen Mitglieds genehmigen oder ablehnen."
+  "permissions_inventory_approve_description": "Den genauen Eröffnungsbestand oder die Korrektur eines anderen Mitglieds genehmigen oder ablehnen.",
+  "permissions_starshipit_order_update_run_label": "Unversandte Starshipit-Bestellungen korrigieren",
+  "permissions_starshipit_order_update_run_description": "Genehmigte Mengenkorrekturen vor der Etiketterstellung vorschlagen und anwenden.",
+  "permissions_shopify_shipment_publishing_run_label": "Shopify-Sendungen veröffentlichen",
+  "permissions_shopify_shipment_publishing_run_description": "Prüfe, genehmige und veröffentliche versandte Sendungen und Sendungsverfolgung in Shopify."
 }

@@ -37,6 +37,13 @@ Facts a source does not report stay distinguishable from empty values: `holds` i
 the adapter does not read holds (JTL), and the UI says "Not reported". Snapshots written
 before fulfillment snapshot version 2 carry none of the newer facts until the next read.
 
+Shipping sources can report possession by the merchant, warehouse or carrier. Unknown
+handoffs remain explicit: label creation or booking alone does not establish dispatch.
+The detail keeps the source read time apart from the carrier update time, warns when a
+shipping read is more than 15 minutes old, and highlights an undelivered shipment with
+no carrier update for 48 hours. A quiet carrier is an investigation cue, not proof of loss.
+Older snapshots have no handoff evidence until the next source read.
+
 ## Storage
 
 `orders_fulfillment_list` holds one row per current fulfillment projection, with the same

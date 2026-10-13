@@ -7,6 +7,7 @@ type DecisionKind =
   | 'fulfillment_recovery'
   | 'inventory_correction'
   | 'order_edit'
+  | 'shipment_publication'
   | 'supplier_commitment'
   | 'workflow_handover'
   | 'human_task'

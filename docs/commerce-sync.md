@@ -150,12 +150,20 @@ full read.
 
 ## Links
 
-SKU, location and order links are requested through the API and applied by the runner
+SKU, location, order and order-line links are requested through the API and applied by the runner
 with the requester's current permissions, because only the worker login may write
 projections. Suggestions come from equal normalized SKU codes in other connections. Order
 suggestions require an ERP order's (JTL, Cin7) external marketplace order number matching
 a Shopify order number; dates and totals support review but never establish identity. Multiple candidates
 stay visible and require review.
+
+Order-line matches require an already shared canonical parent order and the same known
+quantity unit. Suggestions show current lines from other sources of that parent; titles
+and SKU text help a person review them but never establish identity. The worker rechecks
+the parent, units and current mappings under the ingestion lock before applying a match.
+An ordinary reread preserves explicit line matches; relinking a parent order rekeys its
+children so a line cannot remain linked across different orders. Each source retains its
+quantities, fulfillment records and evidence.
 
 Automatic linking is opt-in for a selected connection pair and record type. SKU rules
 match a nonempty code after lowercasing and trimming surrounding spaces; each connection

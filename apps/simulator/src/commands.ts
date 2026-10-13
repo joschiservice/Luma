@@ -357,3 +357,58 @@ export const gmailCommandSchema = z.discriminatedUnion('kind', [
       .optional(),
   }),
 ]);
+
+/** Shipping controls reproduce partial parcels, stale tracking and reordered webhook notifications. */
+export const starshipitCommandSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('status'),
+    order: id,
+    status: z.enum(['Unshipped', 'Printed', 'Shipped']),
+  }),
+  z.object({
+    kind: z.literal('tracking'),
+    order: id,
+    package: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+    status: z.string().min(1).max(80),
+    at: z.string().datetime().optional(),
+    tracking_url: z.string().url().max(2048).optional(),
+    carrier: z.string().min(1).max(100).optional(),
+  }),
+  z.object({
+    kind: z.literal('webhook'),
+    order: id,
+    updatedAt: z.string().datetime().optional(),
+    copies: positive.max(20).optional(),
+  }),
+  z.object({
+    kind: z.literal('ship'),
+    order: id,
+    parcel: z.object({
+      package_id: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+      tracking_number: z.string().min(1).max(100),
+      tracking_url: z.string().url(),
+      carrier: z.string().min(1).max(100),
+      status: z.string().min(1).max(80),
+      shipment_date: z.string().datetime(),
+      last_updated_date: z.string().datetime(),
+      items: z
+        .array(
+          z.object({
+            item_id: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+            quantity: positive,
+          }),
+        )
+        .min(1)
+        .max(500),
+      tracking_events: z
+        .array(
+          z.object({
+            status: z.string().max(80),
+            description: z.string().max(512),
+            event_date: z.string().datetime(),
+          }),
+        )
+        .max(500),
+    }),
+  }),
+]);

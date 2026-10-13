@@ -101,6 +101,8 @@ const mutationCapabilities: Record<string, string> = {
   fulfillmentOrderReleaseHold: 'fulfillment.hold.release',
   fulfillmentOrderOpen: 'fulfillment.open',
   fulfillmentOrderMove: 'fulfillment.move',
+  fulfillmentCreate: 'fulfillment.shipment.create',
+  fulfillmentTrackingInfoUpdate: 'fulfillment.tracking.update',
   webhookSubscriptionCreate: 'connection.verify',
 };
 
@@ -131,6 +133,7 @@ const namedCapabilities: Record<string, string> = {
   LumaCustomerOrders: 'records.read',
   LumaInventoryCorrection: 'inventory.available.reconcile',
   LumaFulfillmentRecovery: 'fulfillment.read',
+  LumaShipmentPublishingRead: 'fulfillment.read',
   LumaFulfillmentLocations: 'fulfillment.read',
   LumaOrderEditRead: 'orders.quantity.read',
   LumaOrderEditProof: 'orders.quantity.read',

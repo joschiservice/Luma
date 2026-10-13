@@ -32,6 +32,7 @@ export async function setupSimulator(
     detection,
     demo,
     observability,
+    featureFlagOverrides,
   } = {},
 ) {
   const db = await database(t);
@@ -61,6 +62,18 @@ export async function setupSimulator(
     demo,
     observability,
     env: {
+      ...(featureFlagOverrides
+        ? {
+            FEATURE_FLAG_OVERRIDES: Object.entries({
+              'starshipit-fulfillment': true,
+              'starshipit-actions': true,
+              'shopify-shipment-publishing': true,
+              ...featureFlagOverrides,
+            })
+              .map(([flag, value]) => `${flag}=${value}`)
+              .join(','),
+          }
+        : {}),
       IDENTITY_DATABASE_URL: db.runtimeUrl,
       WORKFLOW_DATABASE_URL: db.runtimeUrl,
       BETTER_AUTH_SECRET: secret,
@@ -126,5 +139,15 @@ export async function setupSimulator(
     }
   });
 
-  return { ...fixture, db };
+  return {
+    ...fixture,
+    db,
+    async restartPilot(options) {
+      const current = await fixture.restartPilot(options);
+      // Failure evidence and cleanup must use the reconstructed services, too.
+      fixture.pilot = current;
+
+      return current;
+    },
+  };
 }

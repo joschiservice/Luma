@@ -590,6 +590,8 @@ export function createShopifyOAuth(
             'fulfillment.hold.release',
             'fulfillment.open',
             'fulfillment.move',
+            'fulfillment.shipment.create',
+            'fulfillment.tracking.update',
             'orders.quantity.edit',
           ],
           granted: [],

@@ -40,6 +40,7 @@ for Luma's users live in `apps/web/content/docs`.
 - [Shopify connector](shopify.md), [Shopify actions](shopify-actions.md) and
   [Shopify partner readiness](shopify-production.md).
 - [JTL-Wawi connector](jtl.md) and [Cin7 Core connector](cin7.md).
+- [Starshipit shipping](starshipit.md): handoff evidence and unshipped corrections.
 - [Gmail connector](gmail.md): Google authorization, rule-scoped mailbox reads, sends and
   push.
 - [Canonical commerce projections](commerce-projections.md) and

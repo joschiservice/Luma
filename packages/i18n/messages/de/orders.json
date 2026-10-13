@@ -515,5 +515,12 @@
   "orders_plan_story_differs": "{system} zeigt noch {quantity}",
   "orders_plan_story_unconfirmed": "{system} zeigte beim letzten Lesen {quantity}",
   "orders_plan_story_reflects": "{system} zeigt sie ebenfalls",
-  "orders_plan_story_not_reported": "{system} meldet sie nicht"
+  "orders_plan_story_not_reported": "{system} meldet sie nicht",
+  "orders_line_links_title": "Bestellpositionen zuordnen",
+  "orders_line_links_description": "Bestätige, welche Positionen in den Quellen dieser Bestellung denselben Artikel darstellen. Gleiche Namen und SKU-Texte sind nur Hinweise. Jede Quelle behält ihre eigenen Mengen und Sendungen.",
+  "orders_line_links_choose": "Bestellposition zuordnen",
+  "orders_line_links_placeholder": "Bestellposition auswählen",
+  "orders_line_links_search": "Position nach Artikel oder Quelle suchen",
+  "orders_line_links_limit": "Die ersten 100 passenden Positionen werden angezeigt. Grenze die Suche ein, um eine andere Position zu finden.",
+  "orders_line_links_fallback": "Position {id}"
 }

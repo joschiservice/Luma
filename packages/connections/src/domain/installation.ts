@@ -5,6 +5,7 @@ export type InstallationCapability =
   | 'inventory.available.reconcile'
   | 'orders.shipping-method.write'
   | 'orders.quantity.edit'
+  | 'orders.quantity.update'
   | 'purchase-orders.submit'
   | 'returns.create'
   | 'returns.refund'
@@ -16,6 +17,8 @@ export type InstallationCapability =
   | 'fulfillment.hold.release'
   | 'fulfillment.open'
   | 'fulfillment.move'
+  | 'fulfillment.shipment.create'
+  | 'fulfillment.tracking.update'
   | 'messages.send';
 
 /** Public provider settings; each app validates its own fields. */

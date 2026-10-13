@@ -106,10 +106,16 @@ export async function injectIncident(world: World, input: InjectIncident) {
 
     return incident;
   }
-  if (kind === 'provider-outage' || kind === 'auth-revoked') {
+  if (
+    kind === 'provider-outage' ||
+    kind === 'auth-revoked' ||
+    kind === 'shipping-provider-outage'
+  ) {
     const target = instance(
       world,
-      input.instance ?? world.model.shops[0]!.name,
+      kind === 'shipping-provider-outage'
+        ? 'starshipit'
+        : (input.instance ?? world.model.shops[0]!.name),
     );
     if (world.run.health[target.name]?.until !== undefined)
       throw new Error(`${target.label} already has a provider incident`);
@@ -492,6 +498,7 @@ export async function recoverIncident(world: World, id: string) {
     await recoverDrift(world, incident);
   else if (
     incident.kind === 'provider-outage' ||
+    incident.kind === 'shipping-provider-outage' ||
     incident.kind === 'auth-revoked'
   )
     delete world.run.health[incident.instance ?? ''];

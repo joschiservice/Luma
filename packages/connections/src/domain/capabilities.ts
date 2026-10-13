@@ -392,6 +392,12 @@ export interface FulfillmentSnapshot {
   tracking?: FulfillmentTracking[];
   /** The latest carrier-reported delivery state of a shipment; null when none is reported. */
   delivery?: FulfillmentDelivery | null;
+  /** Source handoff evidence; a label alone cannot establish possession by the carrier. */
+  shipping?: {
+    stage: 'merchant' | 'warehouse' | 'carrier' | 'delivered' | 'unknown';
+    sourceUrl: string | null;
+    trackingUpdatedAt: string | null;
+  };
 }
 
 type FulfillmentKind = 'fulfillment_order' | 'shipment';
@@ -799,6 +805,33 @@ interface CapabilityContract {
   };
   'fulfillment.open': { input: FulfillmentRecoveryInput; output: WriteReceipt };
   'fulfillment.move': { input: FulfillmentRecoveryInput; output: WriteReceipt };
+  /** Publishes a persisted, approved physical dispatch once against exact provider work lines. */
+  'fulfillment.shipment.create': {
+    input: { operationId: string; orderId: string; expectedRevision: string };
+    output: WriteReceipt;
+  };
+  /** Publishes persisted tracking and notification choices for an exact existing shipment. */
+  'fulfillment.tracking.update': {
+    input: { operationId: string; orderId: string; expectedRevision: string };
+    output: WriteReceipt;
+  };
+  /** Copies reviewed authoritative quantities to an existing unshipped shipping order.
+   * The provider may lack atomic revisions and idempotency; the adapter must fence one dispatch.
+   * This does not recalculate storefront prices, restock units, or create/delete source lines.
+   */
+  'orders.quantity.update': {
+    input: {
+      operationId: string;
+      orderId: string;
+      expectedRevision: string;
+      lines: {
+        lineItemId: string;
+        currentQuantity: number;
+        quantity: number;
+      }[];
+    };
+    output: WriteReceipt;
+  };
   /**
    * Sets approved quantities on existing, unfulfilled order lines through one provider order
    * edit. Adapters recalculate before sending, withhold any change from the approved

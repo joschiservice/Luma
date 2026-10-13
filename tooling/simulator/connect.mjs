@@ -54,6 +54,13 @@ export function simulatorInstances(run) {
             accountId: simulatedAccountId,
           }
         : { name: erp.name, kind: 'jtl', label: 'JTL' },
+      ...run.instances
+        .filter((instance) => instance.kind === 'starshipit')
+        .map((instance) => ({
+          name: instance.name,
+          kind: 'starshipit',
+          label: 'Starshipit',
+        })),
       ...shops.map((shop) => ({
         name: shop.instance,
         kind: 'shopify',
@@ -96,11 +103,14 @@ export function simulatorInstances(run) {
  */
 export async function registerWebhooks(call, manifest, apiOrigin) {
   const targets = manifest.simulator.instances
-    .filter((instance) => instance.kind === 'shopify')
+    .filter(
+      (instance) =>
+        instance.kind === 'shopify' || instance.kind === 'starshipit',
+    )
     .map((instance) => ({
       instance: instance.name,
       url: new URL(
-        `/v1/shopify/changes/${manifest.organizationId}/${manifest.connections[instance.name]}`,
+        `/v1/${instance.kind}/changes/${manifest.organizationId}/${manifest.connections[instance.name]}`,
         apiOrigin,
       ).toString(),
       secret: manifest.simulator.webhookSecret,

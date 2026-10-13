@@ -1,6 +1,6 @@
 # Commerce simulator
 
-The simulator plays a merchant's commerce systems: several Shopify stores, one ERP (JTL-Wawi or Cin7 Core) and a shared Gmail mailbox, the integration between them, a warehouse, carriers, customers and suppliers. Luma connects to it only through its real installed adapters, the commerce sync runner and the Shopify webhook route; it never reads simulator data any other way. The simulator also records ground truth about the incidents it causes, so it can score what Luma detected.
+The simulator plays a merchant's commerce systems: several Shopify stores, one ERP (JTL-Wawi or Cin7 Core) a shared Gmail mailbox and a Starshipit shipping account, the integration between them, a warehouse, carriers, customers and suppliers. Luma connects to it only through its real installed adapters, the commerce sync runner and authenticated provider webhook routes; it never reads simulator data any other way. The simulator also records ground truth about the incidents it causes, so it can score what Luma detected.
 
 ## Start it
 
@@ -55,6 +55,36 @@ The `test` profile holds the fixed fixtures that platform tests rely on and does
 On Cin7 the same ERP model (orders, shipments, stock, purchasing and suppliers) answers through Cin7 Core's API, and Luma connects through the read-only Cin7 app. Records keep their numeric IDs inside the simulator and appear to Luma as stable GUIDs. Warehouses are Cin7 locations. The account, customers and suppliers use the profile's base currency; a sale in another currency reports it as `CustomerCurrency` with the `CurrencyRate` to the base currency. Sale lines carry net prices and tax, and the order total includes tax. Shop sales carry the shop channel and the shop order number as customer reference; wholesale sales have neither, so Luma suggests no link for them. The ERP model reserves stock per item, not per warehouse, so the stock report spreads each item's reservations over its locations in configured order, up to each location's stock, and puts the rest on the first location. The simulated stock sync pushes the same per-location number to the shop that sells that warehouse, so linked stock compares like for like.
 
 Cin7 holds no credit notes here, because returns happen in the shops. Luma sends nothing to Cin7, so supplier links and stock rules work but purchase-order proposals stay unsent, and the shipping-method approval example does not apply. Cin7 allows 60 requests per minute, and Luma reads each sale separately, so a day of history takes Luma minutes to import and the `large` profile takes hours. That matches a real first import; use `--history-days 0` for a quick loop.
+
+### Starshipit shipping account
+
+Every merchant has a separate Starshipit account. Shop order creation imports its items
+into that account, warehouse picking records each partial parcel there, and carrier
+updates change its tracking. Shopify, the ERP and Starshipit remain separate canonical
+sources until a person confirms their identities.
+
+The shipping controls can record a partial parcel, split the remaining units into another
+parcel, leave a Printed label without carrier acceptance, or record a scan with an old
+provider timestamp. Repeated or old webhook notifications schedule a fresh read and never
+replace canonical shipment evidence. As with every provider, a response-loss fault applies
+after a quantity update commits; the real client does not repeat the write.
+
+Tracking controls can correct a parcel's URL or carrier while keeping its package and
+tracking number stable. These corrections change downstream evidence; publishing the
+correction to Shopify still requires a new review and approval.
+
+Starshipit dispatch and scan timestamps follow the merchant world's virtual clock.
+If fast-forwarding creates a shipment or scan after the real read time, the adapter rejects
+that fulfillment read as invalid evidence. Use a world clock at or before real time when
+checking handoff and publishing journeys; simulator timestamps are never rewritten to make
+future events look current.
+
+**Shipping provider unavailable** interrupts Starshipit reads. Scheduled detection opens a
+sync-failure case after its normal retry threshold. Recovery restores the API, but the case
+stays open until an independent complete scan establishes restored access. The scorecard
+matches the exact Starshipit connection in that evidence. Tracking age and an uncertain
+warehouse-to-carrier handoff remain visibility states; they do not manufacture a stuck
+fulfillment case when the provider has not established progress or parcel line allocation.
 
 ## Operations mailbox
 
@@ -124,7 +154,9 @@ The demo also adds inbox rules once its suppliers exist: each demo supplier's or
 
 ## Luma wiring
 
-The pilot provisions one connection per instance (the ERP, one per shop and the mailbox) with all read capabilities and the write capabilities each provider supports; the mailbox may read messages, threads and attachments and send. A checkout without the Gmail app skips the mailbox. The manifest `.luma/simulator/pilot.json` binds each connection to its run and instance. The transport selector checks tenant, connection, provider and target, and fails closed for unbound synthetic installations. Simulation is rejected in production.
+The pilot provisions one connection per instance (the ERP, one per shop, the shipping account and the mailbox) with all read capabilities and the write capabilities each provider supports; the mailbox may read messages, threads and attachments and send. A checkout without the Gmail app skips the mailbox. Synthetic runs explicitly enable the shipping visibility, shipping actions and Shopify
+shipment-publication release flags through local overrides. Production defaults remain off.
+The manifest `.luma/simulator/pilot.json` binds each connection to its run and instance. The transport selector checks tenant, connection, provider and target, and fails closed for unbound synthetic installations. Simulation is rejected in production.
 
 - **Sync:** the pilot API runs the real commerce sync runner with its normal backfill, incremental and reconcile schedule. Orders are imported source-local; Luma suggests cross-source links from the shop order name, and people confirm them.
 - **Webhooks:** the simulator delivers signed Shopify webhooks for every change to Luma's real change route. The pilot configures a synthetic Shopify app whose client secret is the run's webhook secret; its settings point to an `.invalid` origin that is never contacted.

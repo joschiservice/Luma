@@ -37,6 +37,7 @@ import {
 import { Pool } from 'pg';
 
 import { createDetectionWorker } from './detection-worker.js';
+import { createTenantFeatureRelease } from './feature-release.js';
 import { createMailboxSyncWorker } from './mailbox-sync.js';
 import { createResourceScope } from './resources.js';
 import { createSalesReadSource, createSalesTenantRelease } from './sales.js';
@@ -68,6 +69,7 @@ export function createCommerceSyncWorker(options: {
   const host = createAppHost(options.database, {
     ...options.connections,
     refreshContext: options.identity.refreshContext,
+    featureEnabled: createTenantFeatureRelease(options.observability),
     ...(options.env ? { env: options.env } : {}),
   });
   const commerce = createCommerceServices(options.database);

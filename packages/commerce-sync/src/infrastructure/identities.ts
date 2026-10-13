@@ -22,9 +22,19 @@ type SourceRow = {
 async function sources(
   tx: SqlTransaction,
   tenantId: string,
-  kind: 'sku' | 'location' | 'order',
+  kind: 'sku' | 'location' | 'order' | 'order_line',
   ids: string[],
 ) {
+  if (kind === 'order_line') {
+    const grouped = new Map<string, IdentitySource[]>();
+    for (const line of await readLineFacts(tx, tenantId, ids))
+      grouped.set(line.canonicalId, [
+        ...(grouped.get(line.canonicalId) ?? []),
+        line.source,
+      ]);
+
+    return grouped;
+  }
   const rows = await tx.query<SourceRow>(
     `SELECT m.canonical_id,m.connection_id,COALESCE(c.document->>'label','Connected source') AS connection_label,
       COALESCE(c.document->>'provider',c.document->'target'->>'kind','source') AS provider,
@@ -71,7 +81,7 @@ async function sources(
 }
 
 function label(
-  kind: 'sku' | 'location' | 'order',
+  kind: 'sku' | 'location' | 'order' | 'order_line',
   key: string,
   items: IdentitySource[],
 ) {
@@ -82,7 +92,9 @@ function label(
   const title = items.flatMap((item) => item.titles)[0];
   if (title) return title;
 
-  return readableKey(kind, key, items[0]?.connectionLabel);
+  return kind === 'order_line'
+    ? (items[0]?.externalId ?? 'Order line')
+    : readableKey(kind, key, items[0]?.connectionLabel);
 }
 
 /**
@@ -95,6 +107,8 @@ export function createIdentityReader(db: TenantDatabase): IdentityReader {
       tenantId,
       async (tx) => {
         if (kind === 'order') return readOrderIdentity(tx, tenantId, entityId);
+        if (kind === 'order_line')
+          return readLineIdentity(tx, tenantId, entityId);
         const entity = (
           await tx.query<{ reconciliation_key: string }>(
             'SELECT reconciliation_key FROM inventory_entities WHERE tenant_id=$1 AND kind=$2 AND id=$3',
@@ -157,7 +171,7 @@ export function createIdentityReader(db: TenantDatabase): IdentityReader {
     );
 }
 
-/** Suggests only an ERP order's marketplace reference matching a Shopify order number in this tenant. */
+/** Suggests an external source reference matching a Shopify order number for manual confirmation. */
 async function readOrderIdentity(
   tx: SqlTransaction,
   tenantId: string,
@@ -202,8 +216,129 @@ async function readOrderIdentity(
     suggestions: candidates.map((candidate) => ({
       id: candidate.id,
       label: label('order', '', others.get(candidate.id) ?? []),
-      reason: `ERP external order number “${candidate.number}” matches Shopify`,
+      reason: `Source external order number “${candidate.number}” matches Shopify`,
       sources: others.get(candidate.id) ?? [],
+    })),
+  };
+}
+
+/** Current, source-specific line facts; historical parent bindings alone never make a line selectable. */
+async function readLineFacts(
+  tx: SqlTransaction,
+  tenantId: string,
+  ids: string[],
+) {
+  const { rows } = await tx.query<{
+    canonical_id: string;
+    order_id: string;
+    unit: string;
+    connection_id: string;
+    connection_label: string;
+    provider: string;
+    external_id: string;
+    scope_key: string;
+    method: string;
+    created_at: Date;
+    revised_at: Date | null;
+    title: string | null;
+    sku_code: string | null;
+  }>(
+    `SELECT m.canonical_id,r.order_id,line->>'unit' AS unit,m.connection_id,
+      COALESCE(c.document->>'label','Connected source') AS connection_label,
+      COALESCE(c.document->>'provider',c.document->'target'->>'kind','source') AS provider,
+      m.external_id,m.scope_key,COALESCE(revision.method,m.method) AS method,m.created_at,
+      revision.created_at AS revised_at,line->>'title' AS title,line->>'skuCode' AS sku_code
+     FROM connector_source_mappings m
+     JOIN orders_relationships r ON r.tenant_id=m.tenant_id AND r.child_id=m.canonical_id
+     JOIN orders_projections p ON p.tenant_id=r.tenant_id AND p.entity_id=r.order_id AND p.connection_id=m.connection_id
+     JOIN orders_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id AND s.kind='order'
+     CROSS JOIN LATERAL jsonb_array_elements(s.document->'data'->'lines') line
+     JOIN connector_installations c ON c.tenant_id=m.tenant_id AND c.id=m.connection_id
+     LEFT JOIN LATERAL (SELECT method,created_at FROM connector_mapping_revisions revision
+       WHERE revision.tenant_id=m.tenant_id AND revision.mapping_id=m.id
+       ORDER BY revision.created_at DESC,revision.id DESC LIMIT 1) revision ON true
+     WHERE m.tenant_id=$1 AND m.resource='order_line' AND m.canonical_id=ANY($2::uuid[])
+       AND line->>'id'=m.canonical_id::text AND NOT COALESCE((s.document->>'deleted')::boolean,false)
+     ORDER BY m.canonical_id,m.connection_id,m.external_id`,
+    [tenantId, ids],
+  );
+
+  return rows.map((row) => ({
+    canonicalId: row.canonical_id,
+    orderId: row.order_id,
+    unit: row.unit,
+    source: {
+      connectionId: row.connection_id,
+      connectionLabel: row.connection_label,
+      provider: row.provider,
+      externalId: row.external_id,
+      scopeKey: row.scope_key,
+      method: row.method,
+      linkedAt: row.created_at.toISOString(),
+      revisedAt: row.revised_at?.toISOString() ?? null,
+      codes: row.sku_code ? [row.sku_code] : [],
+      titles: row.title ? [row.title] : [],
+    } satisfies IdentitySource,
+  }));
+}
+
+/** Offers bounded, explicit choices from other sources of the already-linked order; text never matches identity. */
+async function readLineIdentity(
+  tx: SqlTransaction,
+  tenantId: string,
+  entityId: string,
+) {
+  const facts = await readLineFacts(tx, tenantId, [entityId]);
+  const first = facts[0];
+  if (
+    !first ||
+    facts.some(
+      (line) => line.orderId !== first.orderId || line.unit !== first.unit,
+    )
+  )
+    return null;
+  const candidates = (
+    await tx.query<{ id: string }>(
+      `SELECT DISTINCT m.canonical_id AS id FROM connector_source_mappings m
+     JOIN orders_relationships r ON r.tenant_id=m.tenant_id AND r.child_id=m.canonical_id
+     JOIN orders_projections p ON p.tenant_id=r.tenant_id AND p.entity_id=r.order_id AND p.connection_id=m.connection_id
+     JOIN orders_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id AND s.kind='order'
+     CROSS JOIN LATERAL jsonb_array_elements(s.document->'data'->'lines') line
+     WHERE m.tenant_id=$1 AND m.resource='order_line' AND r.order_id=$2 AND m.canonical_id<>$3
+       AND line->>'id'=m.canonical_id::text AND line->>'unit'=$4
+       AND NOT COALESCE((s.document->>'deleted')::boolean,false)
+       AND NOT EXISTS (SELECT 1 FROM connector_source_mappings own JOIN connector_source_mappings other
+         ON other.tenant_id=own.tenant_id AND other.connection_id=own.connection_id AND other.resource='order_line' AND other.canonical_id=m.canonical_id
+         WHERE own.tenant_id=m.tenant_id AND own.resource='order_line' AND own.canonical_id=$3)
+     ORDER BY m.canonical_id LIMIT 100`,
+      [tenantId, first.orderId, entityId, first.unit],
+    )
+  ).rows;
+  const other = await sources(
+    tx,
+    tenantId,
+    'order_line',
+    candidates.map((line) => line.id),
+  );
+
+  return {
+    entity: {
+      id: entityId,
+      kind: 'order_line' as const,
+      label: label(
+        'order_line',
+        '',
+        facts.map((line) => line.source),
+      ),
+      orderId: first.orderId,
+      unit: first.unit,
+    },
+    sources: facts.map((line) => line.source),
+    suggestions: candidates.map((line) => ({
+      id: line.id,
+      label: label('order_line', '', other.get(line.id) ?? []),
+      reason: 'Order line from another source on the linked order',
+      sources: other.get(line.id) ?? [],
     })),
   };
 }

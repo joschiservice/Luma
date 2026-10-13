@@ -205,16 +205,24 @@ revoked ones.
 
 ### Query cost check
 
-The Shopify contract test keeps every read query under Shopify's 1,000-point query limit using
+The Shopify contract test keeps collection read queries under Shopify's 1,000-point query limit using
 the simulator's cost model. `pnpm shopify:cost-check` checks that model against a real store: it
-reads every capability once at the largest page a sync requests and lists, per query, the
+verifies the account and token scopes, reads each authorized collection capability at the largest sync page, and lists, per query, the
 requested cost Shopify reports beside the simulator's estimate. It fails when a read fails or
 the simulator estimates less than Shopify charges; then correct the model in
 `packages/simulator/shopify`. It only reads.
 
 Run it against a development store with synthetic data. Set `SHOPIFY_COST_CHECK_SHOP` to the
 store domain and `SHOPIFY_COST_CHECK_TOKEN` to an Admin API access token with the read scopes
-Luma requests, in the shell rather than a committed file. Follow-up queries for line items and
+Luma requests, in the shell rather than a committed file. Missing scopes and operations
+requiring an exact order or return target are reported as skipped. Their query shapes require
+the corresponding action contract checks; an empty-store collection probe cannot exercise them.
+
+Customer reads are skipped unless you explicitly set `SHOPIFY_COST_CHECK_CUSTOMER_ACCESS`
+to `basic`, `contact`, `address` or `contact,address`, matching the app's approved protected
+customer data access. This setting does not add token scopes or grant Shopify approval.
+Transfer and shipment collections also require their separate native read scopes.
+Follow-up queries for line items and
 other nested lists run only when a record has more than a first page, so include an order with
 more than eight lines. Run it after changing a read selection or the API version.
 

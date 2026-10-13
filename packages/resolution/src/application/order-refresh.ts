@@ -52,6 +52,14 @@ export function createOrderRefresh(deps: {
   ): Promise<boolean>;
   /** Creates an observation ID. */
   id(): string;
+  /** Records exact order-read completeness after validation; failed or unfinished rereads keep a false proof. */
+  recordRead?(
+    context: TenantContext,
+    connectionId: string,
+    order: ExternalId,
+    capability: 'orders.read' | 'fulfillment.read',
+    check: { observedAt: string; complete: boolean; observationIds: string[] },
+  ): Promise<void>;
   now?: () => Date;
   log?: (message: string, error?: unknown) => void;
 }) {
@@ -150,13 +158,27 @@ export function createOrderRefresh(deps: {
       }));
   }
 
-  /** Reads one source completely before storing anything, so a failed read changes nothing. */
+  /** Reads one source completely before projection; unfinished reads retain an inconclusive proof. */
   async function reread(context: TenantContext, source: OrderSource) {
+    const startedAt = now().toISOString();
+    const record = async (
+      capability: 'orders.read' | 'fulfillment.read',
+      complete: boolean,
+      observationIds: string[] = [],
+    ) =>
+      deps.recordRead?.(
+        context,
+        source.connectionId,
+        source.order,
+        capability,
+        { observedAt: startedAt, complete, observationIds },
+      );
+    await record('orders.read', false);
+    if (source.fulfillments) await record('fulfillment.read', false);
     const descriptor = (
       await deps.capabilities.discover(context, source.connectionId)
     ).find((item) => item.capability === 'orders.read');
     if (!descriptor?.filters?.includes('order')) return false;
-    const startedAt = now().toISOString();
     const order = await readOrder(context, source);
     const read = source.fulfillments
       ? await readFulfillments(context, source)
@@ -172,6 +194,16 @@ export function createOrderRefresh(deps: {
           capability: 'fulfillment.read',
           observation,
         })) && current;
+
+    if (current) {
+      await record('orders.read', true, [order.id]);
+      if (source.fulfillments)
+        await record(
+          'fulfillment.read',
+          true,
+          read.map((item) => item.id),
+        );
+    }
 
     return current;
   }

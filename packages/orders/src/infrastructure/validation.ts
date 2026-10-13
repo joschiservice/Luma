@@ -328,6 +328,25 @@ const fulfillment = z
       )
       .max(50)
       .optional(),
+    shipping: z
+      .object({
+        stage: z.enum([
+          'merchant',
+          'warehouse',
+          'carrier',
+          'delivered',
+          'unknown',
+        ]),
+        sourceUrl: z
+          .string()
+          .max(2048)
+          .url()
+          .regex(/^https?:\/\//i)
+          .nullable(),
+        trackingUpdatedAt: timestamp.nullable(),
+      })
+      .strict()
+      .optional(),
     delivery: z
       .enum([
         'label_created',
@@ -449,6 +468,7 @@ export const snapshotSchema = z.union([
         z.literal(2),
         z.literal(3),
         z.literal(4),
+        z.literal(5),
       ]),
       kind: z.literal('fulfillment'),
       data: fulfillment,

@@ -448,6 +448,8 @@ test('installation verification, scope reads and lifecycle subscriptions', async
     'fulfillment.move',
     'fulfillment.open',
     'fulfillment.read',
+    'fulfillment.shipment.create',
+    'fulfillment.tracking.update',
     'inventory.available.reconcile',
     'inventory.read',
     'inventory.shipments.read',

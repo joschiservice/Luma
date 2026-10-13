@@ -36,8 +36,8 @@ export interface PlanAuthority {
 /**
  * Provider write capabilities that change orders. A Luma step exists only for a change kind a
  * capability covers; every other step is for a person. `authority` names the fact group the
- * target connection must hold, as the capability's own preview requires; `wholeUnits` means
- * the provider accepts only whole quantities.
+ * target connection must hold or copy from with fresh mapped evidence; `downstreamOnly` forbids
+ * changing that authority through a shipping update. `wholeUnits` means whole quantities.
  */
 export const orderChangeCapabilities = [
   {
@@ -45,6 +45,14 @@ export const orderChangeCapabilities = [
     kinds: ['quantity', 'item'] as OrderChangeKind[],
     authority: 'order_lines' as AuthorityGroup,
     wholeUnits: true,
+    downstreamOnly: false,
+  },
+  {
+    capability: 'orders.quantity.update',
+    kinds: ['quantity', 'item'] as OrderChangeKind[],
+    authority: 'order_lines' as AuthorityGroup,
+    wholeUnits: true,
+    downstreamOnly: true,
   },
 ] as const;
 
@@ -851,14 +859,20 @@ function planSteps({
         item.source.externalId &&
         lines.length === 1 &&
         lines.every((line) => line.externalId);
-      const authorityBlock = governedAuthority(
-        input.authority.find((rule) => rule.group === governed.authority),
-        connectionId,
-        current,
-        kind,
-        lineKey,
-        target,
+      const ruling = input.authority.find(
+        (rule) => rule.group === governed.authority,
       );
+      const authorityBlock =
+        governed.downstreamOnly && ruling?.connectionId === connectionId
+          ? 'authority'
+          : governedAuthority(
+              ruling,
+              connectionId,
+              current,
+              kind,
+              lineKey,
+              target,
+            );
       const blockedBy: StepBlock | null =
         !item.source.connection.capabilities.includes(governed.capability)
           ? 'not_granted'

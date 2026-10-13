@@ -1,0 +1,40 @@
+{
+  "name": "@luma/app-starshipit",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "luma-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@luma/app-host": "workspace:*",
+    "@luma/connections": "workspace:*",
+    "@luma/i18n": "workspace:*",
+    "@luma/identity": "workspace:*",
+    "@luma/ui": "workspace:*",
+    "react": "catalog:",
+    "zod": "catalog:",
+    "@luma/connector-starshipit": "workspace:*",
+    "@luma/audit": "workspace:*",
+    "@luma/execution": "workspace:*",
+    "@luma/platform": "workspace:*",
+    "@luma/policies": "workspace:*",
+    "fastify": "catalog:",
+    "@tanstack/react-query": "catalog:"
+  },
+  "devDependencies": {
+    "@luma/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "vitest": "catalog:"
+  }
+}

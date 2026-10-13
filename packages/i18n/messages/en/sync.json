@@ -289,5 +289,14 @@
   "sync_autolink_error_role": "Your role no longer includes Manage imports.",
   "sync_autolink_error_conflict": "This rule changed or already exists. Close this dialog and refresh the page before trying again.",
   "sync_autolink_error_save": "Luma couldn’t update automatic linking. Try again.",
-  "sync_note_retired": "Confirmed deleted or disconnected: {records}. Current views exclude these source facts; their evidence is kept."
+  "sync_note_retired": "Confirmed deleted or disconnected: {records}. Current views exclude these source facts; their evidence is kept.",
+  "sync_links_description_line": "Confirm the same order item in another source. Lines must belong to this linked order and use compatible quantity units. Luma never matches lines by SKU text alone.",
+  "sync_links_suggestions_line": "Lines in other sources of this order",
+  "sync_links_candidate_order": "Matching source order reference",
+  "sync_links_candidate_line": "Another source line in this linked order",
+  "sync_links_linking_line": "Matching lines. Luma is refreshing the order and its fulfillment evidence.",
+  "sync_links_unlinking_line": "Separating lines. Luma is refreshing the order and its fulfillment evidence.",
+  "sync_links_link_line_description": "Confirm that these source lines represent the same item in this order. Each source keeps its quantities and shipment evidence. This match can affect which changes Luma can run. Luma records your reason; you can unlink later.",
+  "sync_links_unlink_line_description": "This source line becomes a separate item in the same order. Luma may be unable to run changes until the line is matched again. Luma records the change and your reason.",
+  "sync_links_title_line": "Sources for {line}"
 }

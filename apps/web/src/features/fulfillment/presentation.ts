@@ -102,6 +102,29 @@ export const methodLabels: Record<string, string> = localized({
   unknown: m.fulfillment_method_unknown,
 });
 
+export const handoffLabels = localized({
+  merchant: m.fulfillment_handoff_merchant,
+  warehouse: m.fulfillment_handoff_warehouse,
+  carrier: m.fulfillment_handoff_carrier,
+  delivered: m.fulfillment_handoff_delivered,
+  unknown: m.fulfillment_handoff_unknown,
+});
+
+/** Keeps an old provider read separate from a carrier that has stopped reporting progress. */
+export function shippingFreshness(item: FulfillmentItem, asOf: string) {
+  const now = Date.parse(asOf);
+  const lastUpdate = item.shipping?.trackingUpdatedAt;
+
+  return {
+    staleRead:
+      !!item.shipping && now - Date.parse(item.observedAt) > 15 * 60_000,
+    quietTracking:
+      !!lastUpdate &&
+      item.shipping?.stage === 'carrier' &&
+      now - Date.parse(lastUpdate) >= 48 * 60 * 60_000,
+  };
+}
+
 export const sortLabels = localized({
   waiting: m.fulfillment_sort_waiting,
   recent: m.fulfillment_sort_recent,
@@ -196,6 +219,14 @@ export function fulfillmentState(item: FulfillmentItem): {
       label: m.fulfillment_state_stalled(),
       signal: 'stalled',
     };
+  if (
+    item.shipping &&
+    ['pending', 'processing', 'unknown'].includes(item.status)
+  )
+    return {
+      state: item.shipping.stage === 'warehouse' ? 'running' : 'waiting',
+      label: handoffLabels[item.shipping.stage],
+    };
   switch (item.status) {
     case 'delivered':
       return { state: 'verified', label: m.fulfillment_state_delivered() };
@@ -266,6 +297,8 @@ export function fulfillmentReason(item: FulfillmentItem, asOf: string) {
     return m.fulfillment_reason_stalled({
       duration: duration(now - Date.parse(item.progressAt)),
     });
+  if (item.shipping?.stage === 'unknown')
+    return m.fulfillment_handoff_unknown_note();
   if (item.status === 'shipped')
     return tracking
       ? [tracking.carrier, tracking.number].filter(Boolean).join(' ')
@@ -363,6 +396,16 @@ export function nextStep(
       body: m.fulfillment_next_location_body(),
       action: 'none',
     };
+  if (
+    item.shipping?.stage === 'unknown' &&
+    !item.deleted &&
+    item.status !== 'cancelled'
+  )
+    return {
+      title: m.fulfillment_next_handoff_title(),
+      body: m.fulfillment_next_handoff_body(),
+      action: tracking?.url ? 'carrier' : 'none',
+    };
   if (item.open)
     return {
       title: m.fulfillment_next_none_title(),
@@ -433,6 +476,8 @@ export function timelineChanges(entries: TimelineEntry[], truncated = false) {
           status: deliveryLabels[entry.delivery] ?? entry.delivery,
         }),
       );
+    if (entry.shipping?.stage !== before.shipping?.stage && entry.shipping)
+      changes.push(handoffLabels[entry.shipping.stage]);
     if (entry.locationName !== before.locationName && entry.locationName)
       changes.push(
         m.fulfillment_change_location({ location: entry.locationName }),
@@ -561,6 +606,12 @@ export function diagnosis(item: FulfillmentItem, asOf: string) {
         duration: duration(now - Date.parse(item.progressAt)),
       }),
       body: sentences(m.fulfillment_diagnosis_stalled_body(), deadline),
+    };
+
+  if (item.shipping?.stage === 'unknown' && item.status !== 'cancelled')
+    return {
+      title: m.fulfillment_handoff_unknown(),
+      body: m.fulfillment_handoff_unknown_note(),
     };
 
   return {

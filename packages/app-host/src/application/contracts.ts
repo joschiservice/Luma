@@ -76,7 +76,11 @@ export interface AppDecision {
    * same problem waits on a person, so a refreshed proposal updates the item in place.
    */
   id: string;
-  kind: 'fulfillment_recovery' | 'inventory_correction' | 'order_edit';
+  kind:
+    | 'shipment_publication'
+    | 'fulfillment_recovery'
+    | 'inventory_correction'
+    | 'order_edit';
   reason: 'approval' | 'run' | 'recovery';
   domain: 'orders' | 'fulfillment' | 'inventory';
   title: string;
@@ -157,6 +161,14 @@ export interface AppOperation {
 
 export interface AppFactoryContext {
   database: TenantDatabase;
+  /** Server-side release checks for a trusted tenant; absent checks withhold unreleased features. */
+  featureEnabled?(
+    tenantId: string,
+    flag:
+      | 'starshipit-fulfillment'
+      | 'starshipit-actions'
+      | 'shopify-shipment-publishing',
+  ): Promise<boolean>;
   /** Shared workspace source authority; absent hosts must withhold authority-dependent writes. */
   sourceAuthority?: AuthorityReader;
   cipher: SecretCipher;
@@ -186,6 +198,23 @@ export interface AppFactoryContext {
    * current, so an app can act on fresh stock. Absent where the host has no capability runtime.
    */
   refreshStock?(context: TenantContext, positionId: string): Promise<void>;
+  /** Lists actual downstream shipment references for a Shopify order; choosing one never implies dispatch eligibility. */
+  shipmentDispatchOptions?(
+    context: TenantContext,
+    input: { connectionId: string; orderId: string },
+  ): Promise<
+    { downstreamConnectionId: string; shipmentId: string; label: string }[]
+  >;
+  /** Reads a fresh physical dispatch with exact canonical-to-Shopify line and warehouse mappings. Missing or ambiguous allocation returns null. */
+  shipmentDispatchEvidence?(
+    context: TenantContext,
+    input: {
+      connectionId: string;
+      orderId: string;
+      downstreamConnectionId: string;
+      shipmentId: string;
+    },
+  ): Promise<ShipmentDispatchEvidence | null>;
   /**
    * Another connection's current quantities for the lines of a source order, from Luma's stored
    * reads: the order linked to `orderId` on `connectionId`, and each of its lines by source line
@@ -236,7 +265,7 @@ interface SourceOrderLines {
   observationId: string;
   /** When Luma read the source order, on Luma's clock. */
   observedAt: string;
-  /** False when the source's latest collection read failed, was partial or unfinished. */
+  /** False when current collection evidence or a newer exact order refresh is incomplete. */
   complete: boolean;
   lines: { externalId: string; quantity: string | null }[];
 }
@@ -249,4 +278,19 @@ export interface AppLifecycleContext {
   actorId: string;
   version: number;
   transaction: SqlTransaction;
+}
+
+/** Allowlisted evidence for publishing a physical dispatch; labels alone never qualify. */
+interface ShipmentDispatchEvidence {
+  id: string;
+  observationId: string;
+  observedAt: string;
+  revision: string;
+  complete: boolean;
+  connectionId: string;
+  shipmentId: string;
+  stage: 'carrier' | 'delivered' | 'unknown';
+  locationId: string | null;
+  lines: { orderLineId: string; quantity: number }[];
+  tracking: { company: string | null; number: string; url: string | null }[];
 }

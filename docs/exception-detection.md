@@ -50,12 +50,14 @@ reads decide:
   most 25 positions per pass. Before the reread, the monitor reads the stored reports of
   the last 24 hours to find when the pair last agreed, so the rule can let a fresh gap wait
   for provider sync.
-- **Stuck fulfillment:** open work without progress for the stuck threshold is reread
+- **Stuck fulfillment:** open work with an established source progress time older than the stuck threshold is reread
   through its order, at most 25 per pass, oldest progress first. A future start time
   exempts the work. A reported hold exempts it until the work has gone 24 hours
   (`holdOverdueSeconds`) without progress; then the hold is why it is stuck and the
   eligibility evidence records `holdOverdue`. Work from an adapter that does not read
-  holds stays `unknown`.
+  holds stays `unknown`. Read times and source update times do not establish progress for
+  new candidates. Persisted cases are still included for fresh verification when the latest
+  progress time is unknown.
 
 - **Order quantity:** orders whose maintained source comparison shows a current-units
   difference that changed at least the propagation window ago are checked, at most 25 per

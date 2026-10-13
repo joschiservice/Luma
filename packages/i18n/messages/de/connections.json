@@ -79,5 +79,8 @@
   "connections_capability_exchange_price": "Nachweis des Ersatzpreises",
   "connections_capability_exchange_reservation": "Nachweis von Ersatzauftrag und Reservierung",
   "connections_capability_inventory_transfers_read": "Bestandsumlagerungen lesen",
-  "connections_capability_inventory_shipments_read": "Bestandssendungen lesen"
+  "connections_capability_inventory_shipments_read": "Bestandssendungen lesen",
+  "connections_capability_orders_quantity_update": "Mengen in einer unversandten nachgelagerten Bestellung korrigieren",
+  "connections_capability_fulfillment_shipment_create": "Versandte Sendungen in Shopify veröffentlichen",
+  "connections_capability_fulfillment_tracking_update": "Sendungsverfolgung in Shopify aktualisieren"
 }

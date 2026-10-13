@@ -38,6 +38,7 @@ import { refundCreate } from './refund-actions.js';
 import type { TypeResolvers } from './resolvers.js';
 import { approveReturn, requestReturn } from './returns.js';
 import { idempotent } from './schema.js';
+import { shipmentMutations } from './shipment-actions.js';
 
 /** Reads an input object argument as a record of its fields. */
 function fields(value: unknown): Record<string, unknown> {
@@ -443,6 +444,7 @@ async function returnMutation(
 /** Shopify Admin API mutations Luma sends. */
 export const mutationResolvers: TypeResolvers = {
   ...orderEditMutations,
+  ...shipmentMutations,
   refundCreate: (_source, args, context, info) =>
     refundCreate(context, args, info),
   returnCreate: (_source, args, context) =>

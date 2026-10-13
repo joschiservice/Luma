@@ -3,7 +3,8 @@
 The Shopify app offers governed writes for **returns**, **fulfillment recovery** (release a hold,
 reopen, or move remaining items), **inventory corrections** (set Shopify's available
 quantity from a selected JTL ERP source) and **order quantity edits** (change quantities of
-unfulfilled order lines). They run as exact, persisted previews that
+unfulfilled order lines), and **shipment publishing** (record an independently observed physical
+dispatch or update its tracking). They run as exact, persisted previews that
 someone with approval permission approves under the [workspace rules](workspace-settings.md#approval-preference), dispatch through shared policy, audit, Action Admission and
 execution, and count as done only after an independent Shopify read verifies the outcome.
 Code: `@luma/app-shopify`.
@@ -234,3 +235,50 @@ independent reads verify the marker, quantities, native processed lines and exac
 fulfillment. Payment verification remains separate. Cancellation is limited to the exact unprocessed
 intent; hold release removes only its independently observed awaiting-payment hold. Truncated source
 collections, changed mappings, unexpected transactions and unavailable reads leave work unverified.
+
+## Shipment publishing
+
+Permission: `shopify:shipment_publishing.run`. Shopify needs order and fulfillment reads
+and an applicable merchant-managed or third-party fulfillment write scope. The server
+checks the workspace release flag before preview eligibility and again immediately before
+the send; an unavailable flag reader keeps publishing disabled.
+
+A fresh, complete downstream read must show carrier dispatch or delivery, with explicit
+tracking identity. A printed label, pickup request or accepted warehouse task is never
+physical dispatch evidence. The downstream connection must remain installed and readable.
+Read evidence must be at most five minutes old and must not come from the future.
+
+The exact preview binds the downstream parcel, its revision, Shopify order, fulfillment
+order lines, quantities, warehouse, tracking and an explicit customer notification choice.
+Partial publishing sends only the selected fulfillment-order lines; it never omits a line
+subset and accidentally fulfills all remaining units. Shopify work must be open or in
+progress, unsubmitted to a fulfillment service, and support creation. Cancelled orders,
+changed quantities, holds and warehouse changes prevent sending. No carrier shipment or
+label is created by this action.
+
+When a downstream provider identifies the parcel's items and warehouse, Luma requires
+exact canonical line and location mappings. Provider-reported quantities cannot be
+overridden. Starshipit's tracking endpoint does not always identify items or warehouse
+per parcel. In that case, the requester explicitly confirms the exact allocation against
+the warehouse dispatch record. This operator allocation is saved in the same immutable
+preview and shown to the approver; it is never presented as provider evidence. Split
+parcels require their own allocations and approvals.
+
+A durable claim covers the physical downstream parcel, independent of the preview's
+quantities or Shopify revision. Another claim serializes writes for the Shopify order.
+The send fence is persisted before the native mutation, and neither retries nor runtime
+reconstruction resend it. Unknown outcomes retain the order claim. Tracking updates bind
+one existing Shopify fulfillment, its exact line allocation and the notification choice;
+a parcel's tracking lineage cannot move to a different fulfillment.
+
+Reconciliation only reads Shopify. Creation is verified when exactly one new successful
+fulfillment has the reviewed allocation, location and complete tracking identities.
+Tracking updates verify those facts on the exact existing fulfillment. Acceptance alone
+is unverified; missing, changed, duplicate, cancelled or incomplete evidence remains
+unverified without a replay. Notification preferences are recorded in the preview and
+audit; Shopify's fulfillment read does not independently prove email delivery.
+
+Shopify reads are bounded to five fulfillment orders with twenty lines each and fewer
+than five shipments with twenty lines and twenty tracking identities each. A collection
+truncated at any bound prevents eligibility or verification. These limits keep the review
+within Shopify's synchronous query budget; larger orders need review directly in Shopify.

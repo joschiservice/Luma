@@ -79,6 +79,16 @@ const trackingSchema = z.object({
   url: z.string().url().nullable(),
 });
 
+const shippingSchema = z.object({
+  stage: z.enum(['merchant', 'warehouse', 'carrier', 'delivered', 'unknown']),
+  sourceUrl: z
+    .string()
+    .url()
+    .regex(/^https?:\/\//i)
+    .nullable(),
+  trackingUpdatedAt: timestamp.nullable(),
+});
+
 const fulfillmentItemSchema = z.object({
   id: z.string().uuid(),
   connectionId: z.string().uuid(),
@@ -106,6 +116,7 @@ const fulfillmentItemSchema = z.object({
   delivery: fulfillmentDeliverySchema.nullable(),
   failureCode: z.string().nullable(),
   tracking: z.array(trackingSchema),
+  shipping: shippingSchema.nullable().optional(),
   units: z.string(),
   unit: z.string().nullable(),
   order: z.object({
@@ -197,6 +208,7 @@ export const fulfillmentDetailSchema = z.object({
         status: fulfillmentStatusSchema,
         holds: z.array(fulfillmentHoldReasonSchema).nullable(),
         delivery: fulfillmentDeliverySchema.nullable(),
+        shipping: shippingSchema.nullable().optional(),
         lastProgressAt: timestamp.nullable(),
         locationName: z.string().nullable(),
         fulfillBy: timestamp.nullable(),

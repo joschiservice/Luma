@@ -9,6 +9,10 @@ import { createIdentity } from '@luma/identity/composition';
 import type { Observability } from '@luma/platform';
 import { createTenantDatabase } from '@luma/platform/composition';
 import type { ProposedAction } from '@luma/policies';
+import {
+  createShipmentDispatchOptionsReader,
+  createShipmentDispatchReader,
+} from '@luma/read-models/composition';
 import type {
   DeskService,
   PlaybookService,
@@ -34,6 +38,7 @@ import {
   createOrderRefreshService,
   createStockRefreshService,
 } from './detection-worker.js';
+import { createTenantFeatureRelease } from './feature-release.js';
 import { createReplenishmentWorker } from './replenishment-worker.js';
 import { createResourceScope } from './resources.js';
 import { createSalesReadSource, createSalesTenantRelease } from './sales.js';
@@ -235,10 +240,19 @@ export async function createDefaultExceptionWorker(
           refreshContext: identity.service.refreshContext,
           refreshStock,
           sourceOrderLines: createOrderLineReader(database),
+          shipmentDispatchOptions:
+            createShipmentDispatchOptionsReader(database),
+          shipmentDispatchEvidence: createShipmentDispatchReader(
+            database,
+            async (context, orderId, maxAgeMs) => {
+              await orderRefresh?.refresh(context, orderId, maxAgeMs);
+            },
+          ),
           refreshOrder: async (context, orderId, maxAgeMs) => {
             await orderRefresh?.refresh(context, orderId, maxAgeMs);
           },
           internalOrdersEnabled: createSalesTenantRelease(observability),
+          featureEnabled: createTenantFeatureRelease(observability),
           orderChangePlans: async (context, orderId, request) => {
             if (!composed.orders)
               throw new Error('Order plans are not composed yet');

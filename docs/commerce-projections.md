@@ -56,7 +56,7 @@ the projection pointer, holding the SKU's normalized source code (which labels S
 drives link suggestions) and the facts the [Products workspace](products-workspace.md)
 compares.
 
-Linking confirms that another SKU, location or order is the same record:
+Linking confirms that another SKU, location, order or order line is the same record:
 
 - Every mapping of the other entity moves to the target through a remap that appends a
   mapping revision; the database rejects mapping changes without one.
@@ -66,6 +66,13 @@ Linking confirms that another SKU, location or order is the same record:
 - Order links re-key each source child (lines, fulfillments, returns, refunds) under the
   new order mapping revision. The immutable parent guard still rejects children bound to
   an unrelated order. Unlink restores a source-local order with another child generation.
+- Order-line links require the parent orders to be explicitly linked first. Both lines must
+  occur once in their current source snapshots and use the same units. People choose the
+  exact lines; descriptions and SKU text never establish identity. Confirmed line mappings
+  survive later reads of the same order. A later order relink creates a new child generation
+  and requires line equivalence to be confirmed again. Native owned record identities remain
+  anchored: manual links cannot move or extend their line mappings. Confirm provider lines
+  before accepting an order into an owned record.
 - Unlink moves one connection's source back to its own entity and replays the same way.
 - Both are idempotent: repeating one finishes any remaining replay. Two entities that
   share a connection cannot be linked.

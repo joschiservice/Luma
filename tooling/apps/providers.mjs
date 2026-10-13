@@ -4,6 +4,10 @@ import { createApp as gmail, createGmailProvider } from '@luma/app-gmail';
 import { createApp as jtl, createJtlProvider } from '@luma/app-jtl';
 import { createApp as shopify, createShopifyProvider } from '@luma/app-shopify';
 import {
+  createApp as starshipit,
+  createStarshipitProvider,
+} from '@luma/app-starshipit';
+import {
   createInstalledMessageRuntime as mailboxes,
   createInstalledPurchaseOrderRuntime as purchaseOrders,
   createInstalledReturnRuntime as returns,
@@ -17,6 +21,7 @@ function fixtureProviders(options) {
     createJtlProvider({ ...options, jtlEndpoints: options.jtlEndpoints ?? [] }),
     createShopifyProvider(options),
     createCin7Provider(options),
+    createStarshipitProvider(options),
     // Token-based mailbox access through the simulator; no Google OAuth or push in fixtures.
     createGmailProvider({
       ...(options.simulation ? { simulation: options.simulation } : {}),
@@ -41,14 +46,16 @@ export function createInstalledConnections(db, options) {
   const host = createAppHost(db, {
     ...options,
     env: options.env ?? {},
-    factories: [jtl, shopify, cin7, gmail].map(
+    factories: [jtl, shopify, cin7, starshipit, gmail].map(
       (factory, index) => (context) => {
         const definition = factory(context);
 
         return {
           ...definition,
           connector: {
-            ...providers[index],
+            ...(factory === starshipit
+              ? definition.connector
+              : providers[index]),
             ...(options.verify ? { verify: options.verify } : {}),
           },
         };
@@ -67,25 +74,40 @@ export function createInstalledConnections(db, options) {
 
 /** Builds a simulator capability runtime with explicit provider contributions. */
 export function createInstalledRuntime(options) {
-  return runtime({ ...options, providers: fixtureProviders(options) });
+  return runtime({
+    ...options,
+    providers: options.providers ?? fixtureProviders(options),
+  });
 }
 
 /** Builds simulator effects with explicit provider contributions. */
 export function createInstalledShippingMethodEffects(options, binding) {
-  return effects({ ...options, providers: fixtureProviders(options) }, binding);
+  return effects(
+    { ...options, providers: options.providers ?? fixtureProviders(options) },
+    binding,
+  );
 }
 
 /** Builds simulator purchase-order reads and submission effects with explicit providers. */
 export function createInstalledPurchaseOrderRuntime(options) {
-  return purchaseOrders({ ...options, providers: fixtureProviders(options) });
+  return purchaseOrders({
+    ...options,
+    providers: options.providers ?? fixtureProviders(options),
+  });
 }
 
 /** Builds simulator mailbox reads and reply send effects with explicit providers. */
 export function createInstalledMessageRuntime(options) {
-  return mailboxes({ ...options, providers: fixtureProviders(options) });
+  return mailboxes({
+    ...options,
+    providers: options.providers ?? fixtureProviders(options),
+  });
 }
 
 /** Builds simulator return reads and return-creation effects with explicit providers. */
 export function createInstalledReturnRuntime(options) {
-  return returns({ ...options, providers: fixtureProviders(options) });
+  return returns({
+    ...options,
+    providers: options.providers ?? fixtureProviders(options),
+  });
 }

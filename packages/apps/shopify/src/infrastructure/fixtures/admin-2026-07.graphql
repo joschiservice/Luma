@@ -1341,6 +1341,13 @@ enum FulfillmentOrderAction {
 }
 
 type Fulfillment implements Node {
+  fulfillmentOrders(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    reverse: Boolean = false
+  ): FulfillmentOrderConnection!
   deliveredAt: DateTime
   displayStatus: FulfillmentDisplayStatus
   estimatedDeliveryAt: DateTime
@@ -2057,6 +2064,15 @@ type WebhookSubscription implements Node {
 }
 
 type Mutation {
+  fulfillmentCreate(
+    fulfillment: FulfillmentInput!
+    message: String
+  ): FulfillmentCreatePayload
+  fulfillmentTrackingInfoUpdate(
+    fulfillmentId: ID!
+    trackingInfoInput: FulfillmentTrackingInput!
+    notifyCustomer: Boolean
+  ): FulfillmentTrackingInfoUpdatePayload
   bulkOperationRunQuery(
     query: String!
     groupObjects: Boolean! = false
@@ -2589,4 +2605,29 @@ type ProductVariantComponentConnection {
 }
 type ProductVariantComponentEdge {
   node: ProductVariantComponent!
+}
+
+input FulfillmentInput {
+  lineItemsByFulfillmentOrder: [FulfillmentOrderLineItemsInput!]!
+  notifyCustomer: Boolean
+  trackingInfo: FulfillmentTrackingInput
+}
+input FulfillmentOrderLineItemsInput {
+  fulfillmentOrderId: ID!
+  fulfillmentOrderLineItems: [FulfillmentOrderLineItemInput!]
+}
+input FulfillmentTrackingInput {
+  company: String
+  number: String
+  numbers: [String!]
+  url: URL
+  urls: [URL!]
+}
+type FulfillmentCreatePayload {
+  fulfillment: Fulfillment
+  userErrors: [UserError!]!
+}
+type FulfillmentTrackingInfoUpdatePayload {
+  fulfillment: Fulfillment
+  userErrors: [UserError!]!
 }

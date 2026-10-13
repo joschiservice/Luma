@@ -214,6 +214,25 @@ const orderLineFacts = {
 
 /** Optional fulfillment facts; each rule is repeated in the orders owner's snapshot schema. */
 const fulfillmentFacts = {
+  shipping: z
+    .object({
+      stage: z.enum([
+        'merchant',
+        'warehouse',
+        'carrier',
+        'delivered',
+        'unknown',
+      ]),
+      sourceUrl: z
+        .string()
+        .max(2048)
+        .url()
+        .regex(/^https?:\/\//i)
+        .nullable(),
+      trackingUpdatedAt: timestamp.nullable(),
+    })
+    .strict()
+    .optional(),
   kind: z.enum(['fulfillment_order', 'shipment']).nullable().optional(),
   holds: z
     .array(

@@ -23,6 +23,10 @@ import {
   createTenantDatabase,
 } from '@luma/platform/composition';
 import {
+  createShipmentDispatchOptionsReader,
+  createShipmentDispatchReader,
+} from '@luma/read-models/composition';
+import {
   createDeskWorkflowReader,
   createProcessClient,
 } from '@luma/workflow-temporal';
@@ -46,6 +50,7 @@ import {
   createOrderRefreshService,
   createStockRefreshService,
 } from './detection-worker.js';
+import { createTenantFeatureRelease } from './feature-release.js';
 import { buildApp } from './http-app.js';
 import { createReadinessCheck } from './readiness.js';
 import { createResourceScope } from './resources.js';
@@ -110,10 +115,19 @@ export async function buildRuntimeApp(
             refreshContext: identity.service.refreshContext,
             refreshStock,
             sourceOrderLines: createOrderLineReader(tenantDatabase()),
+            shipmentDispatchOptions:
+              createShipmentDispatchOptionsReader(tenantDatabase()),
+            shipmentDispatchEvidence: createShipmentDispatchReader(
+              tenantDatabase(),
+              async (context, orderId, maxAgeMs) => {
+                await orderRefresh?.refresh(context, orderId, maxAgeMs);
+              },
+            ),
             refreshOrder: async (context, orderId, maxAgeMs) => {
               await orderRefresh?.refresh(context, orderId, maxAgeMs);
             },
             internalOrdersEnabled: createSalesTenantRelease(observability),
+            featureEnabled: createTenantFeatureRelease(observability),
             orderChangePlans: async (context, orderId, request) => {
               if (!composed.orders)
                 throw new Error('Order plans are not composed yet');

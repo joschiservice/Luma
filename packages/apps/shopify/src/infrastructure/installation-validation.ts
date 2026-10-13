@@ -11,6 +11,8 @@ const installationPermissions = z.enum([
   'fulfillment.hold.release',
   'fulfillment.open',
   'fulfillment.move',
+  'fulfillment.shipment.create',
+  'fulfillment.tracking.update',
   'orders.quantity.edit',
   'customers.read',
   'returns.read',

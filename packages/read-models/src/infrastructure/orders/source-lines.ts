@@ -48,6 +48,7 @@ export function currentUnits(line: {
  * reads, matching lines as source comparisons do: by shared canonical line ID or a mapped SKU
  * that occurs once per source. Lines without such a match report a null quantity. Requires
  * `orders.read`; returns null unless the order is linked, once, to both connections.
+ * A failed exact refresh makes older stored quantities incomplete even after a successful scan.
  */
 export function createSourceOrderLines(
   db: TenantDatabase,
@@ -112,6 +113,26 @@ export function createSourceOrderLines(
           [input.sourceConnectionId],
           source.observedAt,
         );
+        // A failed exact refresh supersedes an older successful collection scan.
+        const pointRead = (
+          await tx.query<{ complete: boolean }>(
+            `SELECT c.complete AND $4::uuid=ANY(c.observation_ids) AS complete
+             FROM connector_order_read_checks c JOIN connector_source_mappings m
+              ON m.tenant_id=c.tenant_id AND m.connection_id=c.connection_id
+               AND m.resource='order' AND m.external_id=c.order_external_id AND m.scope_key=c.order_scope_key
+             WHERE c.tenant_id=$1 AND c.connection_id=$2 AND m.canonical_id=$3
+              AND c.capability='orders.read' AND c.observed_at>=$5 AND c.observed_at<=$6
+             ORDER BY c.observed_at DESC,c.created_at DESC,c.id DESC LIMIT 1`,
+            [
+              tenantId,
+              input.sourceConnectionId,
+              orderId,
+              snapshot.observationId,
+              source.observedAt,
+              asOf,
+            ],
+          )
+        ).rows[0];
         const refs =
           (
             await lineReferences(
@@ -131,7 +152,9 @@ export function createSourceOrderLines(
           snapshotId: snapshot.id,
           observationId: snapshot.observationId,
           observedAt: source.observedAt,
-          complete: !incomplete.has(input.sourceConnectionId),
+          complete:
+            !incomplete.has(input.sourceConnectionId) &&
+            pointRead?.complete !== false,
           lines: shown.lines.flatMap((line) => {
             const externalId = refs[line.id];
             if (!externalId) return [];

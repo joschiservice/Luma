@@ -124,5 +124,9 @@
   "permissions_inventory_manage_label": "Manage native stock",
   "permissions_inventory_manage_description": "Prepare reviewed stock openings and corrections, manage native stock movements and reconcile the shadow ledger.",
   "permissions_inventory_approve_label": "Review native stock changes",
-  "permissions_inventory_approve_description": "Approve or reject another member’s exact stock opening or correction."
+  "permissions_inventory_approve_description": "Approve or reject another member’s exact stock opening or correction.",
+  "permissions_starshipit_order_update_run_label": "Correct unshipped Starshipit orders",
+  "permissions_starshipit_order_update_run_description": "Propose and apply approved quantity corrections before labels are created.",
+  "permissions_shopify_shipment_publishing_run_label": "Publish Shopify shipments",
+  "permissions_shopify_shipment_publishing_run_description": "Preview, approve and publish dispatched shipments and tracking to Shopify."
 }

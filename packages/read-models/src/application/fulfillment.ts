@@ -43,6 +43,12 @@ export interface FulfillmentItem {
   delivery: string | null;
   failureCode: string | null;
   tracking: Tracking[];
+  /** Provider-reported handoff; unavailable and ambiguous possession remain explicit. */
+  shipping?: {
+    stage: 'merchant' | 'warehouse' | 'carrier' | 'delivered' | 'unknown';
+    sourceUrl: string | null;
+    trackingUpdatedAt: string | null;
+  } | null;
   units: string;
   unit: string | null;
   order: {
@@ -120,6 +126,7 @@ export interface FulfillmentDetail {
       status: string;
       holds: string[] | null;
       delivery: string | null;
+      shipping?: FulfillmentItem['shipping'];
       lastProgressAt: string | null;
       locationName: string | null;
       fulfillBy: string | null;

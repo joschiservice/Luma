@@ -142,6 +142,94 @@ const steps = (value: ReturnType<typeof plan>) =>
   ]);
 
 describe('order change plans', () => {
+  it('offers only authoritative downstream copies through the shipping update capability', () => {
+    const shipping = source(
+      'shipping',
+      {
+        lines: [
+          {
+            id: 'line-shipping',
+            skuId: sku,
+            quantity: '3',
+            currentQuantity: '3',
+            cancelledQuantity: '0',
+            unit: 'each',
+          },
+        ],
+        externalId: '901',
+        lineRefs: { 'line-shipping': '902' },
+      },
+      {
+        category: null,
+        capabilities: [
+          'orders.read',
+          'fulfillment.read',
+          'orders.quantity.update',
+        ],
+        access: {
+          'orders.quantity.update': {
+            permission: 'starshipit:order_update.run',
+            viewerHas: true,
+          },
+        },
+      },
+    );
+    const authoritative = source(store, {
+      lines: [
+        {
+          id: 'line-store',
+          skuId: sku,
+          quantity: '3',
+          currentQuantity: '2',
+          cancelledQuantity: '1',
+          unit: 'each',
+        },
+      ],
+    });
+    const result = plan({
+      sources: [authoritative, shipping],
+      authority: resolved(store, store),
+      request: { kind: 'quantity', lineKey: sku, quantity: '2' },
+    });
+    expect(
+      result.steps.find(
+        (step) =>
+          step.connectionId === 'shipping' &&
+          step.capability === 'orders.quantity.update',
+      ),
+    ).toMatchObject({
+      performer: 'luma',
+      executable: true,
+      handoff: {
+        orderExternalId: '901',
+        lines: [{ externalId: '902', quantity: '2' }],
+      },
+    });
+    const conflicting = plan({
+      sources: [authoritative, shipping],
+      authority: resolved(store, store),
+      request: { kind: 'quantity', lineKey: sku, quantity: '1' },
+    });
+    expect(
+      conflicting.steps.find(
+        (step) =>
+          step.connectionId === 'shipping' &&
+          step.capability === 'orders.quantity.update',
+      ),
+    ).toMatchObject({ executable: false, blockedBy: 'authority' });
+    const owning = plan({
+      sources: [authoritative, shipping],
+      authority: resolved('shipping', store),
+      request: { kind: 'quantity', lineKey: sku, quantity: '2' },
+    });
+    expect(
+      owning.steps.find(
+        (step) =>
+          step.connectionId === 'shipping' &&
+          step.capability === 'orders.quantity.update',
+      ),
+    ).toMatchObject({ executable: false, blockedBy: 'authority' });
+  });
   it('lets Luma reduce a quantity before picking and hands other systems to people', () => {
     const result = plan();
     expect(result.change).toEqual({

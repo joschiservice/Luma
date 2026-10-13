@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
-import { createShopifyConnector } from '@luma/app-shopify';
+import {
+  createInstallationVerifier,
+  createShopifyConnector,
+} from '@luma/app-shopify';
 import { createCapabilityRuntime } from '@luma/connections/adapters';
 import {
   builtInMembership,
@@ -13,7 +16,7 @@ export const maxQueryCost = 1000;
 
 /**
  * @typedef {{ capability: string, operation: string, shopify: number | null, simulator: number }} QueryCost
- * @typedef {{ queries: QueryCost[], failures: { capability: string, error: unknown }[] }} CostReport
+ * @typedef {{ queries: QueryCost[], failures: { capability: string, error: unknown }[], skipped: { capability: string, reason: string }[] }} CostReport
  */
 
 /**
@@ -24,23 +27,25 @@ export const maxQueryCost = 1000;
 const isRead = (name) => name.endsWith('.read');
 
 /**
- * Reads every Shopify read capability once at the largest page a sync requests and records,
- * for each distinct query, the requested cost Shopify reports beside the simulator's estimate.
+ * Verifies the account and token scopes, then reads authorized collection capabilities at
+ * the largest sync page. Records Shopify’s requested cost beside the simulator’s estimate.
+ * Reports omitted scopes, unapproved customer access and reads requiring an exact target.
  * Reads only; nothing is stored. Nested follow-up queries run only when the shop has records
  * that overflow a first page, so a shop with such records covers more query shapes.
- * @param {{ shop: string, accessToken: string, fetch?: typeof globalThis.fetch }} options
+ * @param {{ shop: string, accessToken: string, fetch?: typeof globalThis.fetch, customerAccess?: {contact: boolean, address: boolean} }} options
  * @returns {Promise<CostReport>}
  */
 export async function checkReadCosts({
   shop,
   accessToken,
   fetch = globalThis.fetch,
+  customerAccess,
 }) {
   const tenantId = randomUUID();
   const connectionId = randomUUID();
   /** @type {Map<string, QueryCost>} */
   const queries = new Map();
-  let capability = '';
+  let capability = 'installation.verify';
   /**
    * Passes each request through and records its cost once per query shape.
    * @type {typeof globalThis.fetch}
@@ -71,13 +76,30 @@ export async function checkReadCosts({
 
     return response;
   };
+  const granted = await createInstallationVerifier({ fetch: recording })(
+    {
+      id: connectionId,
+      tenantId,
+      label: 'Cost check',
+      target: { kind: 'shopify', shop },
+      permissions: [],
+      granted: [],
+      status: 'pending',
+      version: 0,
+      credentialVersion: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    { token: accessToken },
+  );
   const connector = createShopifyConnector({
     tenantId,
     connectionId,
     shop,
     accessToken: async () => accessToken,
     fetch: recording,
-    customerAccess: { contact: true, address: true },
+    ...(customerAccess ? { customerAccess } : {}),
+    inventoryShipmentAccess: granted.includes('inventory.shipments.read'),
     recordObservations: async () => {
       // The check keeps no observations.
     },
@@ -104,7 +126,30 @@ export async function checkReadCosts({
     'request',
   );
   const failures = [];
+  const skipped = [];
+  if (!customerAccess)
+    skipped.push({
+      capability: 'customers.read',
+      reason: 'Protected customer data access was not explicitly approved.',
+    });
   for (const name of Object.keys(connector.capabilities).filter(isRead)) {
+    if (!granted.includes(name)) {
+      skipped.push({
+        capability: name,
+        reason: 'The verified token does not grant this read capability.',
+      });
+      continue;
+    }
+    try {
+      connector.capabilities[name]?.parseInput({ limit: 100 });
+    } catch {
+      skipped.push({
+        capability: name,
+        reason:
+          'This operation requires an exact target; collection input cannot probe it.',
+      });
+      continue;
+    }
     capability = name;
     // 100 is the largest limit a read accepts; adapters bound each root page below it.
     const result = await runtime.read(tenant, {
@@ -116,7 +161,7 @@ export async function checkReadCosts({
     if (!result.ok) failures.push({ capability: name, error: result.error });
   }
 
-  return { queries: [...queries.values()], failures };
+  return { queries: [...queries.values()], failures, skipped };
 }
 
 /**

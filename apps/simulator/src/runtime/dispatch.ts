@@ -17,6 +17,7 @@ import {
 import { gmail } from '@luma/simulator-gmail';
 import { jtl } from '@luma/simulator-jtl';
 import { shopify } from '@luma/simulator-shopify';
+import { starshipit } from '@luma/simulator-starshipit';
 import type { Pool, PoolClient } from 'pg';
 
 import { cin7 } from '../engine/cin7.js';
@@ -25,6 +26,7 @@ import {
   erpContext,
   handleEvents,
   mailContext,
+  shippingContext,
   shopContext,
   type World,
 } from '../engine/world.js';
@@ -42,7 +44,7 @@ import {
 export type DispatchResult =
   { kind: 'response'; response: ProviderResponse } | { kind: 'reset' };
 
-const providers = { jtl, cin7, shopify, gmail };
+const providers = { jtl, cin7, shopify, gmail, starshipit };
 
 type ProviderKind = keyof typeof providers;
 
@@ -56,6 +58,7 @@ type Provider = Pick<
 function providerKind(run: RunRecord, name: string): ProviderKind | undefined {
   if (name === (run.profile.erp ?? 'jtl')) return run.profile.erp ?? 'jtl';
   if (name === mailboxName) return 'gmail';
+  if (name === 'starshipit') return 'starshipit';
 
   return run.profile.shops.some((item) => item.instance === name)
     ? 'shopify'
@@ -72,6 +75,8 @@ function handleWith(
 ) {
   if (kind === 'shopify')
     return shopify.handle(shopContext(world, name, events), request);
+  if (kind === 'starshipit')
+    return starshipit.handle(shippingContext(world, events), request);
   if (kind === 'gmail')
     return gmail.handle(mailContext(world, events), request);
   const context = erpContext(world, events);

@@ -17,7 +17,10 @@ import {
   createInstallationVerifier,
   createInstalledConnections,
 } from '../apps/providers.mjs';
+import { syntheticFeatureRelease } from './feature-release.mjs';
 import { detectionRequest, jtl, newManifest, readJson } from './fixtures.mjs';
+import { identitySettings } from './settings.mjs';
+import { ensureShippingInstallation } from './shipping-installation.mjs';
 
 /** What the pilot's mailbox connection may do: read relevant mail and send governed replies. */
 const mailboxPermissions = [
@@ -27,14 +30,7 @@ const mailboxPermissions = [
   'messages.send',
 ];
 
-/** Builds identity-service settings from the pilot's environment. */
-export const identitySettings = (env) => ({
-  databaseUrl: env.IDENTITY_DATABASE_URL,
-  secret: env.BETTER_AUTH_SECRET,
-  cookiePrefix: env.BETTER_AUTH_COOKIE_PREFIX,
-  baseURL: env.BETTER_AUTH_URL,
-  trustedOrigins: [env.BETTER_AUTH_URL],
-});
+export { identitySettings } from './settings.mjs';
 
 /**
  * Seeds an isolated synthetic scenario and writes its manifest and fixtures to the pilot
@@ -51,7 +47,12 @@ export async function seedPilot(
   const path = join(directory, 'pilot.json');
   if (!reset) {
     try {
-      return await readJson(path);
+      return await ensureShippingInstallation(
+        env,
+        await readJson(path),
+        path,
+        simulator,
+      );
     } catch (error) {
       if (error.code !== 'ENOENT') throw error;
     }
@@ -64,12 +65,14 @@ export async function seedPilot(
       // Signs simulated Shopify webhooks; local synthetic value, never a real app secret.
       webhookSecret: randomBytes(24).toString('hex'),
     };
+  const featureEnabled = syntheticFeatureRelease(env);
   const settings = identitySettings(env);
   const app = await buildRuntimeApp(settings);
   const identity = createIdentity(settings);
   const pool = new Pool({ connectionString: env.WORKFLOW_DATABASE_URL });
   const detection = createDetectionServices(env.WORKFLOW_DATABASE_URL);
   const connections = createInstalledConnections(createTenantDatabase(pool), {
+    featureEnabled,
     refreshContext: identity.service.refreshContext,
     activeKeyId: env.CONNECTIONS_ACTIVE_KEY_ID,
     keys: new Map(
@@ -83,6 +86,7 @@ export async function seedPilot(
       if (!manifest.simulator) throw new Error('Synthetic connection');
 
       return createInstallationVerifier({
+        featureEnabled,
         jtlEndpoints: [],
         simulation: createSimulationTransport(manifest.simulator),
       })(...args);
@@ -204,18 +208,20 @@ export async function seedPilot(
     ).name;
     for (const instance of instances) {
       const target =
-        instance.kind === 'gmail'
-          ? { kind: 'gmail', emailAddress: instance.emailAddress }
-          : instance.kind === 'jtl'
-            ? {
-                kind: 'jtl-onprem',
-                baseUrl: 'https://jtl.synthetic.invalid/api/eazybusiness/',
-                appId: 'LumaSyntheticPilot',
-                appVersion: '1',
-              }
-            : instance.kind === 'cin7'
-              ? { kind: 'cin7-core', accountId: instance.accountId }
-              : { kind: 'shopify', shop: instance.shop };
+        instance.kind === 'starshipit'
+          ? { kind: 'starshipit', accountId: 'luma-synthetic-starshipit' }
+          : instance.kind === 'gmail'
+            ? { kind: 'gmail', emailAddress: instance.emailAddress }
+            : instance.kind === 'jtl'
+              ? {
+                  kind: 'jtl-onprem',
+                  baseUrl: 'https://jtl.synthetic.invalid/api/eazybusiness/',
+                  appId: 'LumaSyntheticPilot',
+                  appVersion: '1',
+                }
+              : instance.kind === 'cin7'
+                ? { kind: 'cin7-core', accountId: instance.accountId }
+                : { kind: 'shopify', shop: instance.shop };
       const appId = instance.kind;
       const apps = await connections.apps.list(context);
       // The mailbox needs the Gmail app; checkouts without it run without an inbox.
@@ -237,69 +243,90 @@ export async function seedPilot(
         label: `SIMULATED ${instance.label.toUpperCase()} · no live health`,
         target,
         permissions:
-          instance.kind === 'gmail'
-            ? mailboxPermissions
-            : [
+          instance.kind === 'starshipit'
+            ? [
                 'orders.read',
-                'inventory.read',
                 'fulfillment.read',
-                ...(simulator
-                  ? [
-                      'products.read',
-                      ...(instance.kind === 'shopify'
-                        ? [
-                            'inventory.available.reconcile',
-                            'returns.read',
-                            'returns.options.read',
-                            'returns.created.read',
-                            'returns.create',
-                            'returns.exchange.options.read',
-                            'returns.exchange.quote.read',
-                            'returns.exchange.proof.read',
-                            'returns.exchange.price.read',
-                            'returns.exchange.request',
-                            'returns.exchange.process',
-                            'returns.exchange.cancel',
-                            'returns.exchange.release',
-
-                            'returns.settlement.quote.read',
-                            'returns.settlement.proof.read',
-                            'returns.refund',
-                            'customers.read',
-                            'fulfillment.hold.release',
-                            'fulfillment.open',
-                            'fulfillment.move',
-                            'orders.quantity.edit',
-                          ]
-                        : instance.kind === 'cin7'
+                ...((await featureEnabled(
+                  manifest.organizationId,
+                  'starshipit-actions',
+                ))
+                  ? ['orders.quantity.update']
+                  : []),
+              ]
+            : instance.kind === 'gmail'
+              ? mailboxPermissions
+              : [
+                  'orders.read',
+                  'inventory.read',
+                  'fulfillment.read',
+                  ...(simulator
+                    ? [
+                        'products.read',
+                        ...(instance.kind === 'shopify'
                           ? [
+                              'inventory.available.reconcile',
                               'returns.read',
-                              'customers.read',
-                              'suppliers.read',
-                              'purchase-orders.read',
-                            ]
-                          : [
-                              'customers.read',
-                              'orders.shipping-method.read',
-                              'orders.shipping-method.write',
-                              'suppliers.read',
-                              'purchase-orders.read',
-                              'purchase-orders.submit',
                               'returns.options.read',
                               'returns.created.read',
                               'returns.create',
+                              'returns.exchange.options.read',
+                              'returns.exchange.quote.read',
+                              'returns.exchange.proof.read',
+                              'returns.exchange.price.read',
+                              'returns.exchange.request',
+                              'returns.exchange.process',
+                              'returns.exchange.cancel',
+                              'returns.exchange.release',
 
                               'returns.settlement.quote.read',
                               'returns.settlement.proof.read',
-                              'returns.exchange.reservation.read',
-                              'returns.restock',
-                            ]),
-                    ]
-                  : []),
-              ],
+                              'returns.refund',
+                              'customers.read',
+                              'fulfillment.hold.release',
+                              'fulfillment.open',
+                              'fulfillment.move',
+                              'fulfillment.shipment.create',
+                              'fulfillment.tracking.update',
+                              'orders.quantity.edit',
+                            ]
+                          : instance.kind === 'cin7'
+                            ? [
+                                'returns.read',
+                                'customers.read',
+                                'suppliers.read',
+                                'purchase-orders.read',
+                              ]
+                            : [
+                                'customers.read',
+                                'orders.shipping-method.read',
+                                'orders.shipping-method.write',
+                                'suppliers.read',
+                                'purchase-orders.read',
+                                'purchase-orders.submit',
+                                'returns.options.read',
+                                'returns.created.read',
+                                'returns.create',
+
+                                'returns.settlement.quote.read',
+                                'returns.settlement.proof.read',
+                                'returns.exchange.reservation.read',
+                                'returns.restock',
+                              ]),
+                      ]
+                    : []),
+                ],
         credentials: {
           token: 'synthetic-not-a-provider-secret',
           ...(instance.kind === 'jtl' ? { challengeCode: 'synthetic' } : {}),
+          ...(instance.kind === 'starshipit'
+            ? {
+                subscriptionKey: 'synthetic-subscription-key',
+                ...(manifest.simulator
+                  ? { webhookSecret: manifest.simulator.webhookSecret }
+                  : {}),
+              }
+            : {}),
         },
       });
       manifest.connections[instance.name] = connection.id;

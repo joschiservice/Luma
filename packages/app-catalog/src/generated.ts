@@ -4,5 +4,6 @@ import { createApp as app1 } from '@luma/app-gmail';
 import type { AppFactory } from '@luma/app-host';
 import { createApp as app2 } from '@luma/app-jtl';
 import { createApp as app3 } from '@luma/app-shopify';
+import { createApp as app4 } from '@luma/app-starshipit';
 
-export const factories: readonly AppFactory[] = [app0, app1, app2, app3];
+export const factories: readonly AppFactory[] = [app0, app1, app2, app3, app4];

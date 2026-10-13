@@ -111,6 +111,8 @@ export function createInstallationVerifier(options: {
         'fulfillment.hold.release',
         'fulfillment.open',
         'fulfillment.move',
+        'fulfillment.shipment.create',
+        'fulfillment.tracking.update',
       );
     }
 

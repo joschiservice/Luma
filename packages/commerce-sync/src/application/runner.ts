@@ -55,14 +55,14 @@ export interface SyncRunnerDependencies {
     ): Promise<ProjectionOutcome[]>;
     link(
       context: TenantContext,
-      kind: 'sku' | 'location' | 'order',
+      kind: 'sku' | 'location' | 'order' | 'order_line',
       targetId: string,
       otherId: string,
       reason: string,
     ): Promise<unknown>;
     unlink(
       context: TenantContext,
-      kind: 'sku' | 'location' | 'order',
+      kind: 'sku' | 'location' | 'order' | 'order_line',
       entityId: string,
       connectionId: string,
       reason: string,

@@ -9,6 +9,7 @@ import { customerHref, useCustomerRecord } from './customer-data.js';
 import { ShopifyFulfillmentRecovery } from './fulfillment-recovery.js';
 import { ShopifyOrderEdits } from './order-edits.js';
 import { ShopifyRecordSections } from './sections.js';
+import { ShopifyShipmentPublishing } from './shipment-publishing.js';
 
 const orderId = /^gid:\/\/shopify\/Order\/(\d+)$/;
 
@@ -18,12 +19,15 @@ export function ShopifyOrderContext({
   services,
   organizationId,
   canEdit = false,
+  canPublish = false,
 }: {
   record: NonNullable<AppUiProps['record']>;
   services: AppUiProps['services'];
   organizationId?: string;
   /** Whether the reader may change order quantities; the server checks again. */
   canEdit?: boolean;
+  /** Whether the reader may review Shopify shipment publication; the server checks again. */
+  canPublish?: boolean;
 }) {
   const [trail, setTrail] = useState<{ kind: ShopifyRecordKind; id: string }[]>(
     [{ kind: 'Order', id: record.externalId }],
@@ -126,6 +130,13 @@ export function ShopifyOrderContext({
                 </a>
               ))
             : null}
+          {canPublish && current.kind === 'Order' ? (
+            <ShopifyShipmentPublishing
+              connectionId={record.connectionId}
+              orderId={record.externalId}
+              services={services}
+            />
+          ) : null}
           {current.kind === 'FulfillmentOrder' ? (
             <ShopifyFulfillmentRecovery
               key={`${record.connectionId}:${current.id}`}

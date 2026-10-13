@@ -3,6 +3,7 @@ import type { AppDecision } from '@luma/app-host';
 import type { RecoveryView } from '../domain/fulfillment-recovery.js';
 import type { CorrectionView } from '../domain/inventory-correction.js';
 import type { OrderEditView } from '../domain/order-edits.js';
+import type { PublishingView } from '../domain/shipment-publishing.js';
 
 const tail = (gid: string) => gid.split('/').at(-1) ?? gid;
 
@@ -22,7 +23,7 @@ type Stage = Pick<
 // Shared lifecycle wording for Shopify actions: approval, a run by the requester, then
 // an independent read. A receipt is never presented as the outcome.
 function stage(
-  view: RecoveryView | CorrectionView | OrderEditView,
+  view: PublishingView | RecoveryView | CorrectionView | OrderEditView,
   actorId: string,
   verify: string,
 ): Stage {
@@ -103,6 +104,11 @@ const groupLabels: Record<
   AppDecision['kind'],
   Record<AppDecision['reason'], string>
 > = {
+  shipment_publication: {
+    approval: 'Shipment publications awaiting approval',
+    run: 'Approved shipments to publish',
+    recovery: 'Shipment publications to check',
+  },
   fulfillment_recovery: {
     approval: 'Fulfillment recoveries awaiting approval',
     run: 'Approved fulfillment recoveries to run',
@@ -369,5 +375,87 @@ export function orderEditDecision(
       orderId: target.orderId,
     },
     group: group('order_edit', state.reason),
+  };
+}
+
+/** Presents the exact approved shipment and notification choice in Needs you. */
+export function publishingDecision(
+  view: PublishingView,
+  actorId: string,
+): AppDecision {
+  const state = stage(
+    view,
+    actorId,
+    'Only an independent read of the exact line allocation and tracking verifies publication.',
+  );
+  const fulfillmentId =
+    view.choice.capability === 'fulfillment.shipment.create'
+      ? view.choice.allocations[0]!.fulfillmentOrderId
+      : view.choice.fulfillmentId;
+
+  return {
+    id: decisionId(
+      'shipment_publication',
+      state.reason,
+      view.choice.source.shipmentId,
+      view.id,
+    ),
+    observeOnly: view.observeOnly ?? false,
+    kind: 'shipment_publication',
+    domain: 'fulfillment',
+    title:
+      view.choice.capability === 'fulfillment.shipment.create'
+        ? 'Publish dispatched shipment to Shopify'
+        : 'Update Shopify shipment tracking',
+    ...state,
+    change: [
+      { label: 'Downstream shipment', value: view.choice.source.shipmentId },
+      { label: 'Shopify order', value: tail(view.target.orderId) },
+      {
+        label: 'Customer notification',
+        value: view.choice.notifyCustomer
+          ? 'Send shipping notification'
+          : 'Do not notify',
+      },
+      {
+        label: 'Allocation evidence',
+        value:
+          view.choice.allocationSource === 'operator'
+            ? 'Explicit operator allocation'
+            : 'Provider allocation',
+      },
+      ...(view.before.dispatch?.tracking.map((t) => ({
+        label: t.company ?? 'Tracking',
+        value: t.number,
+      })) ?? []),
+    ],
+    impact: {
+      level: 'unknown',
+      text: 'Publishes shipment records and tracking',
+    },
+    requestedAt: view.before.observedAt,
+    requesterId: view.requesterId,
+    evidence: {
+      observedAt: view.before.observedAt,
+      validUntil: view.expiresAt,
+    },
+    subject: {
+      label: 'Dispatched shipment',
+      detail: view.choice.source.shipmentId,
+    },
+    record: {
+      kind: 'fulfillment',
+      source: {
+        connectionId: view.target.connectionId,
+        externalId: fulfillmentId,
+      },
+    },
+    owner: {
+      kind: 'app_fulfillment',
+      connectionId: view.target.connectionId,
+      orderId: view.target.orderId,
+      fulfillmentId,
+    },
+    group: group('shipment_publication', state.reason),
   };
 }

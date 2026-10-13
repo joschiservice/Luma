@@ -921,6 +921,20 @@ const resolvers: Record<string, TypeResolvers> = {
       load(context, 'LineItem', line.data.lineItem),
   }),
   Fulfillment: on<FulfillmentData>({
+    fulfillmentOrders: (shipment, args, context) =>
+      connection(
+        context,
+        args,
+        { kind: 'FulfillmentOrder' },
+        {
+          match: (work) =>
+            (
+              shipment.data.fulfillmentOrders ?? [
+                shipment.data.fulfillmentOrder,
+              ]
+            ).includes(work.id),
+        },
+      ),
     fulfillmentLineItems: (shipment, args, context) =>
       connection(context, args, {
         kind: 'FulfillmentLineItem',

@@ -314,6 +314,63 @@ const actions = (
 
 function Content({ state }: { state: string }) {
   const [search, change] = useState<FulfillmentSearch>({});
+  if (state === 'shipping-handoff' || state === 'stale-tracking') {
+    const carrier = state === 'stale-tracking';
+
+    return (
+      <FulfillmentDetailView
+        organizationId={org}
+        refresh={() => {}}
+        detail={{
+          ...shipmentDetail,
+          source: {
+            ...shipmentDetail.source,
+            label: 'Starshipit',
+            system: 'starshipit',
+            appId: 'starshipit',
+          },
+          order: {
+            ...shipmentDetail.order,
+            paymentStatus: 'unknown',
+            fulfillment: carrier ? 'fulfilled' : 'unknown',
+          },
+          related: [],
+          item: {
+            ...shipmentDetail.item,
+            externalId: '1042:parcel:STAR1042',
+            status: carrier ? 'shipped' : 'pending',
+            lastProgressAt: carrier ? '2026-09-27T05:00:00.000Z' : null,
+            open: !carrier,
+            delivery: carrier ? 'in_transit' : 'label_created',
+            signals: [],
+            shipping: {
+              stage: carrier ? 'carrier' : 'unknown',
+              sourceUrl: 'https://app.starshipit.com/',
+              trackingUpdatedAt: carrier ? '2026-09-27T05:00:00.000Z' : null,
+            },
+          },
+          timeline: {
+            entries: [
+              {
+                ...shipmentDetail.timeline.entries[0]!,
+                status: carrier ? 'shipped' : 'pending',
+                delivery: carrier ? 'in_transit' : 'label_created',
+                lastProgressAt: carrier ? '2026-09-27T05:00:00.000Z' : null,
+                shipping: {
+                  stage: carrier ? 'carrier' : 'unknown',
+                  sourceUrl: 'https://app.starshipit.com/',
+                  trackingUpdatedAt: carrier
+                    ? '2026-09-27T05:00:00.000Z'
+                    : null,
+                },
+              },
+            ],
+            truncated: false,
+          },
+        }}
+      />
+    );
+  }
   if (state === 'detail' || state === 'shipment')
     return (
       <FulfillmentDetailView
@@ -491,6 +548,33 @@ export const ShipmentDetail: Story = {
 };
 
 export const NothingStuck: Story = { args: { state: 'calm' } };
+
+export const ShippingHandoff: Story = {
+  args: { state: 'shipping-handoff' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByRole('heading', { name: 'Handoff not confirmed' }),
+    ).toBeVisible();
+    await expect(
+      canvas.getAllByText(
+        'A label or booking does not confirm that the warehouse or carrier has received the shipment.',
+      ),
+    ).toHaveLength(2);
+  },
+};
+
+export const ShippingHandoffDark: Story = {
+  args: { state: 'shipping-handoff' },
+  globals: { theme: 'dark' },
+};
+
+export const ShippingHandoffNarrow: Story = {
+  args: { state: 'shipping-handoff' },
+  globals: { viewport: { value: 'mobile1', isRotated: false } },
+};
+
+export const StaleTracking: Story = { args: { state: 'stale-tracking' } };
 
 export const NotFound: Story = { args: { state: 'not-found' } };
 

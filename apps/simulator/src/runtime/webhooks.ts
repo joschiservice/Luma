@@ -76,15 +76,19 @@ export function createWebhookDelivery(
               signal: AbortSignal.timeout(5_000),
               headers: {
                 'content-type': 'application/json',
-                'x-shopify-topic': row.topic,
-                'x-shopify-shop-domain': shop,
-                'x-shopify-api-version': '2026-07',
-                'x-shopify-webhook-id': `${row.event_id}-${row.id}`,
-                'x-shopify-event-id': row.event_id,
-                'x-shopify-triggered-at': new Date().toISOString(),
-                'x-shopify-hmac-sha256': createHmac('sha256', row.secret)
-                  .update(payload)
-                  .digest('base64'),
+                ...(row.instance === 'starshipit'
+                  ? { authorization: `Bearer ${row.secret}` }
+                  : {
+                      'x-shopify-topic': row.topic,
+                      'x-shopify-shop-domain': shop,
+                      'x-shopify-api-version': '2026-07',
+                      'x-shopify-webhook-id': `${row.event_id}-${row.id}`,
+                      'x-shopify-event-id': row.event_id,
+                      'x-shopify-triggered-at': new Date().toISOString(),
+                      'x-shopify-hmac-sha256': createHmac('sha256', row.secret)
+                        .update(payload)
+                        .digest('base64'),
+                    }),
               },
               body: payload,
             });

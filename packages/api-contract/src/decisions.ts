@@ -9,6 +9,7 @@ const decisionKindSchema = z.enum([
   'case',
   'return_case',
   'replenishment',
+  'shipment_publication',
   'fulfillment_recovery',
   'inventory_correction',
   'order_edit',

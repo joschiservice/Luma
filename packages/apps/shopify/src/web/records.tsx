@@ -15,6 +15,7 @@ import { ShopifyFulfillmentRecovery } from './fulfillment-recovery.js';
 import { ShopifyOrderEdits } from './order-edits.js';
 import { recordError } from './record-error.js';
 import { ShopifyRecordSections } from './sections.js';
+import { ShopifyShipmentPublishing } from './shipment-publishing.js';
 
 const kindLabels = {
   Order: m.shopify_kind_order,
@@ -32,11 +33,14 @@ export function ShopifyRecords({
   connectionId,
   services,
   canEdit = false,
+  canPublish = false,
 }: {
   connectionId: string;
   services: AppUiProps['services'];
   /** Whether the reader may change order quantities; the server checks again. */
   canEdit?: boolean;
+  /** Whether the reader may review Shopify shipment publication; the server checks again. */
+  canPublish?: boolean;
 }) {
   const [kind, setKind] = useState<ShopifyRecordKind>('Order');
   const [id, setId] = useState('');
@@ -177,6 +181,13 @@ export function ShopifyRecords({
                   />
                 ))
             : null}
+          {canPublish && detail.kind === 'Order' && detail.id ? (
+            <ShopifyShipmentPublishing
+              connectionId={connectionId}
+              orderId={detail.id}
+              services={services}
+            />
+          ) : null}
           {canEdit && /^gid:\/\/shopify\/Order\/\d+$/.test(detail.id) ? (
             <ShopifyOrderEdits
               key={`${connectionId}:${detail.id}`}

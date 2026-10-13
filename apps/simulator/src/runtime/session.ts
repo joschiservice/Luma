@@ -8,6 +8,7 @@ import {
 import { gmail } from '@luma/simulator-gmail';
 import { jtl } from '@luma/simulator-jtl';
 import { shopify } from '@luma/simulator-shopify';
+import { starshipit } from '@luma/simulator-starshipit';
 import type { Pool, PoolClient } from 'pg';
 
 import { cin7 } from '../engine/cin7.js';
@@ -51,6 +52,7 @@ export const createSinks = (): Sinks => ({
 export function tableFor(run: RunRecord, name: string): RecordTable {
   if (name === worldInstance) return 'sim_world_records';
   if (name === mailboxName) return gmail.table as RecordTable;
+  if (name === 'starshipit') return starshipit.table as RecordTable;
   const erp = run.profile.erp ?? 'jtl';
   const kind =
     name === erp

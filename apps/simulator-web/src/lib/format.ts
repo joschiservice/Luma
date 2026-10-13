@@ -1,4 +1,4 @@
-import type { RunSummary } from '@luma/simulator-contract';
+import type { RunDetail, RunSummary } from '@luma/simulator-contract';
 
 const counts = new Intl.NumberFormat('en');
 
@@ -141,8 +141,14 @@ export const incidentUnitLabel = (unit: 'order' | 'day') =>
   unit === 'order' ? 'per 1,000 orders' : 'per day';
 
 /** Labels a provider kind. */
-export const providerLabel = (kind: 'shopify' | 'jtl' | 'cin7' | 'gmail') =>
-  ({ shopify: 'Shopify', cin7: 'Cin7', jtl: 'JTL', gmail: 'Gmail' })[kind];
+export const providerLabel = (kind: RunDetail['instances'][number]['kind']) =>
+  ({
+    shopify: 'Shopify',
+    cin7: 'Cin7',
+    jtl: 'JTL',
+    gmail: 'Gmail',
+    starshipit: 'Starshipit',
+  })[kind];
 
 /** Pretty-prints JSON, falling back to the string form of values JSON cannot represent. */
 export function formatJson(value: unknown) {

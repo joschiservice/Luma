@@ -42,6 +42,13 @@ Flags are server-side release toggles evaluated through `Observability.flag`. Th
 
 `FEATURE_FLAG_OVERRIDES=luma-erp-orders=true` enables native order intake in development and the pilot. The API reports availability per workspace. Enabling the release does not select Luma ERP as the authoritative source; that remains an audited workspace setting.
 
+Shipping releases default off: `starshipit-fulfillment` enables Starshipit visibility,
+`starshipit-actions` enables governed downstream quantity updates, and
+`shopify-shipment-publishing` enables Shopify fulfillment and tracking publication.
+Downstream actions require visibility too. Development and synthetic runs use explicit
+overrides; hosted workspaces use the same server-side PostHog evaluation. Disabling a
+write release prevents new dispatch without turning an uncertain send into a safe retry.
+
 Flags never decide authorization, policy admission or approval. Keep tenant entitlements and execution controls in their owning domain, where they are scoped and audited. Temporal workflow code cannot evaluate flags: evaluate in an activity or before starting the workflow and pass the value as input, so replays see the same value. Change workflow code with Temporal versioning, not flags.
 
 ## Data policy

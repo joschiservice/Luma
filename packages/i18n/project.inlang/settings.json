@@ -40,6 +40,7 @@
       "./messages/{locale}/settings.json",
       "./messages/{locale}/shadow.json",
       "./messages/{locale}/shopify.json",
+      "./messages/{locale}/starshipit.json",
       "./messages/{locale}/sync.json",
       "./messages/{locale}/ui.json",
       "./messages/{locale}/vocabulary.json",

@@ -42,4 +42,11 @@ export {
 
 export { createMetricListener } from './infrastructure/metric-listener.js';
 
+export { createTenantFeatureRelease } from './composition/feature-release.js';
+
+export {
+  createShipmentDispatchOptionsReader,
+  createShipmentDispatchReader,
+} from '@luma/read-models/composition';
+
 export { createNativeStockRuntime } from './composition/native-stock.js';

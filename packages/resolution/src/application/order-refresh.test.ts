@@ -55,12 +55,17 @@ function fixture({
   filters = { jtl: ['order'], shop: ['order'] } as Record<string, string[]>,
   notes = [] as Observation<FulfillmentSnapshot>[],
   failing = new Set<string>(),
+  partial = false,
+  pages,
 }: {
   sources: OrderSource[];
   filters?: Record<string, string[]>;
   notes?: Observation<FulfillmentSnapshot>[];
   failing?: Set<string>;
+  partial?: boolean;
+  pages?: Observation<FulfillmentSnapshot>[][];
 }) {
+  let nextPage = 0;
   const read = vi.fn(
     async (_context: unknown, request: CapabilityRequest<ReadCapability>) => {
       if (failing.has(request.connectionId))
@@ -85,15 +90,27 @@ function fixture({
                 ),
               },
             ]
-          : notes;
+          : (pages?.[nextPage++] ?? notes);
 
       return {
         ok: true as const,
-        value: { items, nextCursor: null, completeness: 'complete' as const },
+        value: {
+          items,
+          nextCursor:
+            request.capability === 'fulfillment.read' &&
+            pages &&
+            nextPage < pages.length
+              ? String(nextPage)
+              : null,
+          completeness: partial ? ('partial' as const) : ('complete' as const),
+        },
       };
     },
   );
   const project = vi.fn(async () => true);
+  const recordRead = vi
+    .fn<NonNullable<Parameters<typeof createOrderRefresh>[0]['recordRead']>>()
+    .mockResolvedValue(undefined);
   const refresh = createOrderRefresh({
     sources: { orderSources: async () => sources },
     capabilities: {
@@ -110,11 +127,12 @@ function fixture({
       ],
     },
     project,
+    recordRead,
     id: () => 'tombstone-read',
     now: () => now,
   });
 
-  return { read, project, refresh };
+  return { read, project, recordRead, refresh };
 }
 
 const source = (
@@ -198,5 +216,70 @@ describe('order source refresh', () => {
       failed: 2,
     });
     expect(f.project).not.toHaveBeenCalled();
+    expect(
+      f.recordRead.mock.calls.every(([, , , , proof]) => !proof.complete),
+    ).toBe(true);
+  });
+
+  it('binds completeness to every page of one order after its projections become current', async () => {
+    const first = note('one', 'shipped'),
+      second = note('two', 'shipped');
+    const f = fixture({
+      sources: [source('jtl', ago(5))],
+      pages: [[first], [second]],
+    });
+    expect(await f.refresh.refresh(context, 'order', 0)).toEqual({
+      refreshed: 1,
+      failed: 0,
+    });
+    expect(
+      f.recordRead.mock.calls.filter(
+        ([, , , capability, proof]) =>
+          capability === 'fulfillment.read' && proof.complete,
+      ),
+    ).toEqual([
+      [
+        context,
+        'jtl',
+        { externalId: '1', scopeKey: '' },
+        'fulfillment.read',
+        {
+          observedAt: now.toISOString(),
+          complete: true,
+          observationIds: [first.id, second.id],
+        },
+      ],
+    ]);
+  });
+
+  it('keeps incomplete pages or rejected projections from certifying a fresh read', async () => {
+    const incomplete = fixture({
+      sources: [source('jtl', ago(5))],
+      partial: true,
+    });
+    expect(await incomplete.refresh.refresh(context, 'order', 0)).toEqual({
+      refreshed: 0,
+      failed: 1,
+    });
+    expect(incomplete.project).not.toHaveBeenCalled();
+    expect(
+      incomplete.recordRead.mock.calls.every(
+        ([, , , , proof]) => !proof.complete,
+      ),
+    ).toBe(true);
+    const retained = fixture({
+      sources: [source('jtl', ago(5))],
+      notes: [note('one', 'shipped')],
+    });
+    retained.project.mockResolvedValue(false);
+    expect(await retained.refresh.refresh(context, 'order', 0)).toEqual({
+      refreshed: 0,
+      failed: 1,
+    });
+    expect(
+      retained.recordRead.mock.calls.every(
+        ([, , , , proof]) => !proof.complete,
+      ),
+    ).toBe(true);
   });
 });

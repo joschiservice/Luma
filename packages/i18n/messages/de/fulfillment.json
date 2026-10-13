@@ -275,5 +275,18 @@
   "fulfillment_issue_on_fulfillment_detected": "Bei diesem Fulfillment · erkannt {time}",
   "fulfillment_issue_on_order_detected": "Bei der Bestellung · erkannt {time}",
   "fulfillment_issue_needs_you": "Wartet auf dich",
-  "fulfillment_issues_empty": "Für dieses Fulfillment und seine Bestellung sind keine Probleme erfasst."
+  "fulfillment_issues_empty": "Für dieses Fulfillment und seine Bestellung sind keine Probleme erfasst.",
+  "fulfillment_fact_handoff": "Gemeldete Übergabe",
+  "fulfillment_handoff_merchant": "Wartet beim Händler",
+  "fulfillment_handoff_warehouse": "Im Lager",
+  "fulfillment_handoff_carrier": "Beim Versanddienstleister",
+  "fulfillment_handoff_delivered": "Zugestellt",
+  "fulfillment_handoff_unknown": "Übergabe nicht bestätigt",
+  "fulfillment_handoff_unknown_note": "Ein Etikett oder eine Buchung bestätigt nicht, dass das Lager oder der Versanddienstleister die Sendung erhalten hat.",
+  "fulfillment_fact_tracking_update": "Letzte Meldung des Versanddienstleisters",
+  "fulfillment_tracking_stale": "Seit mindestens 48 Stunden keine Meldung des Versanddienstleisters. Aktualisiere die Quelle oder kläre den Status mit dem Versanddienstleister.",
+  "fulfillment_read_stale": "Diese Quelle wurde vor mehr als 15 Minuten gelesen. Aktualisiere sie, bevor du dich auf den Status verlässt.",
+  "fulfillment_source_open": "Quellenlink öffnen",
+  "fulfillment_next_handoff_title": "Bestätige die Übergabe der Sendung",
+  "fulfillment_next_handoff_body": "Kläre mit dem Händler oder Lager, ob der Versanddienstleister diese Sendung abgeholt hat. Aktualisiere das Tracking für eine unabhängige Bestätigung."
 }

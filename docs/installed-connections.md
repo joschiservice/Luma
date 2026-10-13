@@ -63,6 +63,9 @@ grants:
   [JTL returns](jtl.md#returns)).
 - **Shopify fulfillment recovery and inventory corrections** need the corresponding
   Shopify write scopes; see [Shopify actions](shopify-actions.md).
+- **Starshipit quantity updates** require matching order and fulfillment reads, confirmed
+  write access and both shipping releases. The default verifier grants writes only to
+  synthetic installations; see [Starshipit](starshipit.md).
 
 Existing read-only connections stay read-only until they are reauthorized with the new
 permissions.

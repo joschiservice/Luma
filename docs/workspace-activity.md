@@ -44,6 +44,11 @@ execution outbox events take precedence over their audit delivery copies, preser
 recording time and event ID. No per-row issue fetches or streams run, and evidence arrays,
 associated connections and displayed strings have explicit size bounds.
 
+Governed operations can bind an explicit order subject independently of their execution
+target. Their decisions, dispatch and verification then appear on that order's activity
+timeline. The subject is supplied by the trusted service from its reviewed mappings;
+neither action parameters nor display numbers establish an activity association.
+
 Issue-level events resolve connections from persisted proposals, source evidence and
 connection subjects, so system and connection filters also find resolutions and escalations.
 Raw documents, credentials, grants and unrestricted audit details never enter the response.

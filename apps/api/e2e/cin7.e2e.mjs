@@ -78,7 +78,9 @@ test('a merchant on Cin7 Core imports through the read-only Cin7 app and links o
     suggestions.push(...response.json().suggestions);
   }
   expect(suggestions.map((item) => item.reason)).toContainEqual(
-    expect.stringMatching(/^ERP external order number “.+” matches Shopify$/),
+    expect.stringMatching(
+      /^Source external order number “.+” matches Shopify$/,
+    ),
   );
 }, 120_000);
 
@@ -146,7 +148,9 @@ test('an ANZ merchant on Cin7 imports foreign-currency shop sales and unlinked w
     return response.json().suggestions.map((item) => item.reason);
   };
   expect(await suggestions(nz.entityId)).toContainEqual(
-    expect.stringMatching(/^ERP external order number “NZ.+” matches Shopify$/),
+    expect.stringMatching(
+      /^Source external order number “NZ.+” matches Shopify$/,
+    ),
   );
   // A wholesale sale has no shop counterpart; Luma suggests no link and opens no case.
   expect(await suggestions(wholesale.entityId)).toEqual([]);

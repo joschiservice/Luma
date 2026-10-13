@@ -173,6 +173,9 @@ try {
     timeoutMs: 1_800_000,
     report: (line) => console.log(`Simulator: ${line}`),
   });
+  generated.FEATURE_FLAG_OVERRIDES =
+    process.env.FEATURE_FLAG_OVERRIDES ??
+    'luma-erp-orders=true,starshipit-fulfillment=true,starshipit-actions=true,shopify-shipment-publishing=true';
   const { seedPilot } = await import('../pilot/seed.mjs');
   const manifest = await seedPilot(
     saved,
@@ -218,8 +221,7 @@ try {
     HOME: process.env.HOME,
     ...generated,
     // Simulated support changes orders in Luma's own records, so the merchant uses them.
-    FEATURE_FLAG_OVERRIDES:
-      process.env.FEATURE_FLAG_OVERRIDES ?? 'luma-erp-orders=true',
+    FEATURE_FLAG_OVERRIDES: generated.FEATURE_FLAG_OVERRIDES,
     LUMA_PILOT_DIRECTORY: directory,
   };
   // The simulator stays up until the pilot has stopped, so its last pass can finish its reads.

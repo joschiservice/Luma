@@ -1699,6 +1699,12 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
             data: {
               order: { externalId: 'order-1', scopeKey: '' },
               status,
+              shipping: {
+                stage: status === 'shipped' ? 'carrier' : 'unknown',
+                sourceUrl: 'https://tracking.example.test/shipment',
+                trackingUpdatedAt:
+                  status === 'shipped' ? '2026-09-18T00:00:00Z' : null,
+              },
               lines: [
                 {
                   orderLine: { externalId: 'line-1', scopeKey: 'order-1' },
@@ -1730,6 +1736,10 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       expect(current.data.type === 'fulfillment' && current.data.status).toBe(
         status,
       );
+      expect(current.schemaVersion).toBe(5);
+      expect(
+        current.data.type === 'fulfillment' && current.data.shipping,
+      ).toEqual(shipment.observation.data.shipping);
       const zero = structuredClone(shipment);
       zero.observation.id = randomUUID();
       zero.observation.data.lines[0]!.quantity.amount = '0';

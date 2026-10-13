@@ -18,10 +18,12 @@ import { registerRecoveryRoutes } from './api/fulfillment-recovery.js';
 import { registerInventoryCorrectionRoutes } from './api/inventory-correction.js';
 import { registerOrderEditRoutes } from './api/order-edits.js';
 import { registerRecordRoutes } from './api/records.js';
+import { registerPublishingRoutes } from './api/shipment-publishing.js';
 import { registerShopifyRoutes } from './api/shopify.js';
 import {
   correctionDecision,
   orderEditDecision,
+  publishingDecision,
   recoveryDecision,
 } from './application/decisions.js';
 import type { ShopifyOAuth } from './application/oauth.js';
@@ -42,6 +44,7 @@ import { createShopifyRecordReader } from './infrastructure/records.js';
 import { createInstallationVerifier } from './infrastructure/verifier.js';
 import { createShopifyInventoryCorrection } from './inventory-correction.js';
 import { createShopifyOrderEdits } from './order-edits.js';
+import { createShopifyPublishing } from './shipment-publishing.js';
 import { createShopifyWorkflows } from './workflows.js';
 
 export {
@@ -209,6 +212,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
       context.env.SHOPIFY_CUSTOMER_CONTACT_APPROVED === 'true',
   });
 
+  const publishing = createShopifyPublishing(context, installations);
   const recovery = createShopifyRecovery(context, installations);
   const corrections = createShopifyInventoryCorrection(context, installations);
   const edits = createShopifyOrderEdits(context, installations);
@@ -237,6 +241,13 @@ export function createApp(context: AppFactoryContext): AppDefinition {
       ],
       connectionTypes: [{ kind: 'shopify', name: 'Shopify' }],
       permissions: [
+        {
+          key: 'shopify:shipment_publishing.run',
+          label: 'Publish Shopify shipments',
+          description:
+            'Preview, approve and publish dispatched shipments and tracking to Shopify.',
+          consequential: true,
+        },
         {
           key: 'shopify:returns.manage',
           label: 'Manage Shopify returns',
@@ -282,9 +293,13 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         page: 'orders.read',
         record: 'orders.read',
         inventory: 'shopify:inventory_corrections.apply',
-        fulfillment: 'shopify:fulfillment_recovery.run',
+        fulfillment: 'fulfillment.read',
       },
       decisionAccess: {
+        shipment_publication: {
+          view: 'shopify:shipment_publishing.run',
+          respond: 'shopify:shipment_publishing.run',
+        },
         fulfillment_recovery: {
           view: 'shopify:fulfillment_recovery.run',
           respond: 'shopify:fulfillment_recovery.run',
@@ -314,13 +329,15 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         : {}),
     }),
     async decisions(tenant) {
-      const [recoveries, stock, quantities] = await Promise.all([
+      const [recoveries, stock, quantities, shipments] = await Promise.all([
         recovery.pending(tenant),
         corrections.pending(tenant),
         edits.pending(tenant),
+        publishing.pending(tenant),
       ]);
 
       const items = [
+        ...shipments.map((view) => publishingDecision(view, tenant.actor.id)),
         ...recoveries.map((view) => recoveryDecision(view, tenant.actor.id)),
         ...stock.map((view) => correctionDecision(view, tenant.actor.id)),
         ...quantities.map((view) => orderEditDecision(view, tenant.actor.id)),
@@ -371,6 +388,53 @@ export function createApp(context: AppFactoryContext): AppDefinition {
       registerRecordRoutes(server, records);
       registerInventoryCorrectionRoutes(server, corrections);
       registerRecoveryRoutes(server, recovery);
+      registerPublishingRoutes(server, publishing);
+      server.post(
+        '/v1/organizations/:organizationId/apps/shopify/shipment-publishing-sources',
+        {
+          config: {
+            access: { permission: 'shopify:shipment_publishing.run' },
+            readOnly: true,
+          },
+        },
+        async (request, reply) => {
+          reply.header('cache-control', 'no-store');
+          if (!request.tenantContext)
+            throw new IdentityError(
+              401,
+              'UNAUTHENTICATED',
+              'Sign in to continue.',
+            );
+          const tenant = await context.refreshContext(request.tenantContext);
+          await context.requirePermission(tenant, {
+            app: 'shopify',
+            permission: 'shopify:shipment_publishing.run',
+            scopes: ['orders.read', 'fulfillment.read'],
+          });
+          const target = z
+            .object({
+              connectionId: z.string().uuid(),
+              orderId: z.string().regex(/^gid:\/\/shopify\/Order\/[0-9]+$/),
+            })
+            .strict()
+            .parse(request.body);
+          await installations.credential(
+            tenant,
+            target.connectionId,
+            'fulfillment.read',
+          );
+
+          return {
+            enabled:
+              (await context.featureEnabled?.(
+                tenant.tenantId,
+                'shopify-shipment-publishing',
+              )) ?? false,
+            sources:
+              (await context.shipmentDispatchOptions?.(tenant, target)) ?? [],
+          };
+        },
+      );
       registerOrderEditRoutes(server, edits);
       server.post(
         '/v1/organizations/:organizationId/apps/shopify/record-connections',

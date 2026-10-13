@@ -8,6 +8,7 @@ import { readItemStock, readOrder as readErpOrder } from '@luma/simulator-jtl';
 
 import { customerDelayMail, supplierConfirmationMail } from './mail.js';
 import { orderIncident, type WorldOrder, worldOrder } from './orders.js';
+import { shipParcel, trackParcel } from './shipping.js';
 import {
   type EngineEvents,
   erp,
@@ -134,6 +135,10 @@ async function pickOne(
     trackingUrl: `${carrier.trackingUrl}${trackingNumber}`,
     transitMs: days(random, carrier.transitDays),
   };
+  const parcel = await shipParcel(world, worldRecord, shipmentSync);
+  await store.put('shipping-tracking', trackingNumber, parcel, {
+    updatedAt: world.now,
+  });
   if (worldRecord.incidents.includes('shipment-sync-failure')) {
     await orderIncident(world, worldRecord, {
       kind: 'shipment-sync-failure',
@@ -211,6 +216,21 @@ export async function syncShipment(
 
     return;
   }
+  const parcel = await world
+    .store(worldInstance)
+    .get<{ order: string; package: number }>(
+      'shipping-tracking',
+      payload.trackingNumber,
+    );
+  if (parcel)
+    await world
+      .store(worldInstance)
+      .put(
+        'shipping-fulfillment',
+        `${payload.shop}:${result.id}`,
+        parcel.data,
+        { updatedAt: world.now },
+      );
   // The carrier scans the parcel when it leaves the warehouse.
   await shop(world, payload.shop, {
     kind: 'shipment-status',
@@ -272,6 +292,7 @@ export async function carrierUpdate(
     fulfillment: payload.fulfillment,
     status: payload.status,
   });
+  await trackParcel(world, payload.shop, payload.fulfillment, payload.status);
   if (payload.status === 'DELAYED') {
     // Some customers write to the shop when tracking stalls.
     const order = await worldOrder(world, payload.shop, payload.order);

@@ -240,3 +240,8 @@ section.fulfillment-section {
     max-width: none;
   }
 }
+.fulfillment-source-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}

@@ -36,9 +36,12 @@ export function createAppHost(
     refreshContext: InstallationDependencies['refreshContext'];
     env?: Readonly<Record<string, string | undefined>>;
     factories?: readonly AppFactory[];
+    featureEnabled?: AppFactoryContext['featureEnabled'];
     simulation?: AppFactoryContext['simulation'];
     refreshStock?: AppFactoryContext['refreshStock'];
     sourceOrderLines?: AppFactoryContext['sourceOrderLines'];
+    shipmentDispatchEvidence?: AppFactoryContext['shipmentDispatchEvidence'];
+    shipmentDispatchOptions?: AppFactoryContext['shipmentDispatchOptions'];
     refreshOrder?: AppFactoryContext['refreshOrder'];
     orderChangePlans?: AppFactoryContext['orderChangePlans'];
     /**
@@ -70,12 +73,21 @@ export function createAppHost(
     (options.factories ?? factories).map((factory) =>
       factory({
         database,
+        ...(options.featureEnabled
+          ? { featureEnabled: options.featureEnabled }
+          : {}),
         sourceAuthority: { read: (context) => sourceAuthority.read(context) },
         cipher,
         ...(options.simulation ? { simulation: options.simulation } : {}),
         ...(options.refreshStock ? { refreshStock: options.refreshStock } : {}),
         ...(options.sourceOrderLines
           ? { sourceOrderLines: options.sourceOrderLines }
+          : {}),
+        ...(options.shipmentDispatchEvidence
+          ? { shipmentDispatchEvidence: options.shipmentDispatchEvidence }
+          : {}),
+        ...(options.shipmentDispatchOptions
+          ? { shipmentDispatchOptions: options.shipmentDispatchOptions }
           : {}),
         ...(options.refreshOrder ? { refreshOrder: options.refreshOrder } : {}),
         ...(options.orderChangePlans

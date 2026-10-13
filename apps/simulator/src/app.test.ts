@@ -203,6 +203,7 @@ describe.skipIf(!adminUrl)('simulator host', () => {
       instances: [
         { name: 'jtl', kind: 'jtl', health: 'healthy' },
         { name: 'shopify', kind: 'shopify', health: 'healthy' },
+        { name: 'starshipit', kind: 'starshipit', health: 'healthy' },
         { name: 'gmail', kind: 'gmail', health: 'healthy' },
       ],
       counts: { orders: 2, activeIncidents: 0 },

@@ -46,7 +46,7 @@ test('pilot imports simulated history through commerce sync, serves live metrics
     headers: { cookie },
   });
   expect(sync.statusCode).toBe(200);
-  expect(sync.json().connections).toHaveLength(2);
+  expect(sync.json().connections).toHaveLength(3);
   const metrics = async () => {
     const response = await f.pilot.app.inject({
       method: 'POST',
@@ -67,7 +67,7 @@ test('pilot imports simulated history through commerce sync, serves live metrics
       )
     ).rows;
   // Imports bind each source order only to itself; people link orders across sources.
-  expect(await canonicalOrders()).toHaveLength(4);
+  expect(await canonicalOrders()).toHaveLength(6);
   expect((await canonicalOrders()).every((row) => row.sources === 1)).toBe(
     true,
   );
@@ -80,7 +80,7 @@ test('pilot imports simulated history through commerce sync, serves live metrics
     milliseconds: 60_000,
   });
   await f.pilot.observe();
-  expect(await canonicalOrders()).toHaveLength(6);
+  expect(await canonicalOrders()).toHaveLength(9);
   await until(
     () =>
       streams.every((stream, index) =>
@@ -405,6 +405,38 @@ test('stuck-fulfillment candidates carry the source references their import mapp
     limit: 50,
   });
   expect(open.length).toBeGreaterThan(0);
+  // Shipping work remains visible, but an observation time cannot establish progress.
+  const unknownShipping = await f.db.owner.query(
+    'SELECT entity_id,last_progress_at FROM orders_fulfillment_list WHERE tenant_id=$1 AND connection_id=$2 AND open',
+    [f.manifest.organizationId, f.manifest.connections.starshipit],
+  );
+  expect(unknownShipping.rows.length).toBeGreaterThan(0);
+  expect(
+    unknownShipping.rows.every((row) => row.last_progress_at === null),
+  ).toBe(true);
+  expect(
+    open.some(
+      (work) => work.connectionId === f.manifest.connections.starshipit,
+    ),
+  ).toBe(false);
+  const persistedShipping = unknownShipping.rows[0];
+  expect(
+    await f.pilot.detectionSources.fulfillments(actor, {
+      before: new Date(Date.now() - 86_400_000).toISOString(),
+      include: [
+        {
+          fulfillmentId: persistedShipping.entity_id,
+          connectionId: f.manifest.connections.starshipit,
+        },
+      ],
+      limit: 50,
+    }),
+  ).toEqual([
+    expect.objectContaining({
+      fulfillmentId: persistedShipping.entity_id,
+      connectionId: f.manifest.connections.starshipit,
+    }),
+  ]);
   for (const work of open) {
     expect(work.connectionId).toBe(f.manifest.connections.shopify);
     expect(work.source).toMatchObject({

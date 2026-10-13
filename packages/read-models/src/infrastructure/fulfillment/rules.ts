@@ -55,7 +55,7 @@ export const itemJson = `jsonb_build_object('id',c.entity_id,'connectionId',c.co
  'locationId',c.location_id,'locationName',c.location_name,'methodType',c.method_type,'methodName',c.method_name,
  'fulfillAt',c.fulfill_at,'fulfillBy',c.fulfill_by,'estimatedDeliveryAt',c.estimated_delivery_at,
  'lastProgressAt',c.last_progress_at,'progressAt',c.progress_at,'delivery',c.delivery,'failureCode',c.failure_code,
- 'tracking',COALESCE(s.document->'data'->'tracking','[]'),'units',trim_scale(c.units)::text,'unit',c.unit,
+ 'tracking',COALESCE(s.document->'data'->'tracking','[]'),'shipping',s.document->'data'->'shipping','units',trim_scale(c.units)::text,'unit',c.unit,
  'orderId',c.order_id,'orderNumber',c.order_number,'orderStatus',c.order_status,'orderPlacedAt',c.order_placed_at,
  'observedAt',c.observed_at,'sourceUpdatedAt',c.source_updated_at)`;
 
@@ -100,6 +100,7 @@ export function readItem(value: Record<string, unknown>): FulfillmentItem {
         url: text(item.url),
       };
     }),
+    shipping: readShipping(value.shipping),
     units: text(value.units) ?? '0',
     unit: text(value.unit),
     order: {
@@ -111,6 +112,26 @@ export function readItem(value: Record<string, unknown>): FulfillmentItem {
     observedAt: iso(value.observedAt)!,
     sourceUpdatedAt: iso(value.sourceUpdatedAt),
   };
+}
+
+/** Reads optional handoff evidence from a stored snapshot; older snapshots have none. */
+export function readShipping(
+  value: unknown,
+): Exclude<FulfillmentItem['shipping'], undefined> {
+  const shipping = object(value);
+  const stage = shipping.stage;
+
+  return stage === 'merchant' ||
+    stage === 'warehouse' ||
+    stage === 'carrier' ||
+    stage === 'delivered' ||
+    stage === 'unknown'
+    ? {
+        stage,
+        sourceUrl: text(shipping.sourceUrl),
+        trackingUpdatedAt: iso(shipping.trackingUpdatedAt),
+      }
+    : null;
 }
 
 /** Lists the given connections, or every connection with fulfillment rows, with their app. */

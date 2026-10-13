@@ -133,3 +133,15 @@ or **Use workspace write mode** to restore inheritance. A connection cannot enab
 while the workspace observes only. Each mode change is recorded in the audit history.
 Enabling writes keeps normal permissions, approvals and verification requirements. Work
 already recorded as not executed needs a fresh proposal before it can run.
+
+## Connect Starshipit
+
+When Starshipit is available in your workspace, install the app and choose **Add connection**.
+Enter a recognizable connection name and account name, then the **API key** and
+**Subscription key** from Starshipit **Settings → API**. Choose **Save connection** and
+**Validate access**. The account name is your label for the account connected by those keys.
+
+Luma reads shipping orders and carrier tracking. Link its source records to your existing
+orders before using them in an order change plan. Printed labels do not count as carrier
+handoff. Corrections require separately enabled and confirmed write access; requesting
+unconfirmed access makes the connection need attention.

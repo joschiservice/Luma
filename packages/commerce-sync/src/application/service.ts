@@ -33,7 +33,7 @@ import type {
 /** Reads a canonical record's sources and suggestions for a person to review. */
 export type IdentityReader = (
   tenantId: string,
-  kind: 'sku' | 'location' | 'order',
+  kind: 'sku' | 'location' | 'order' | 'order_line',
   entityId: string,
 ) => Promise<Omit<IdentityDetail, 'requests' | 'canManage'> | null>;
 
@@ -306,7 +306,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
     /** Reads source identity, suggestions and recent link requests with current access. */
     async identity(
       context: TenantContext,
-      kind: 'sku' | 'location' | 'order',
+      kind: 'sku' | 'location' | 'order' | 'order_line',
       entityId: string,
     ): Promise<IdentityDetail> {
       const fresh = await deps.refreshContext(context);
@@ -400,6 +400,18 @@ export function createSyncService(deps: SyncServiceDependencies) {
         );
         if (!other || !other.sources.length)
           throw new IdentityError(404, 'NOT_FOUND', 'Record not found');
+        if (
+          input.kind === 'order_line' &&
+          (!detail.entity.orderId ||
+            detail.entity.orderId !== other.entity.orderId ||
+            !detail.entity.unit ||
+            detail.entity.unit !== other.entity.unit)
+        )
+          throw new IdentityError(
+            422,
+            'CONFLICT',
+            'Match current lines with the same units after linking their parent orders',
+          );
         if (
           other.sources.some((source) =>
             [...policy.hidden, ...policy.fixed].includes(source.connectionId),

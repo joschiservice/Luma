@@ -110,7 +110,8 @@ async function readLinkedKeys(
       UNION SELECT id FROM playbook_runs WHERE tenant_id=$1 AND incident_id=ANY($2::uuid[]::text[])
       UNION SELECT id FROM playbook_runs WHERE tenant_id=$1 AND target_kind='order' AND target_id=ANY($4)
       UNION SELECT proposal_id FROM action_admission_steps WHERE tenant_id=$1 AND (run_id=ANY($3::uuid[])
-       OR (document->'action'->'target'->>'kind'='order' AND document->'action'->'target'->>'id'=ANY($4)))
+       OR (document->'action'->'target'->>'kind'='order' AND document->'action'->'target'->>'id'=ANY($4))
+       OR (subject_kind='order' AND subject_id=ANY($4)))
       UNION SELECT proposal_id FROM audit_entries WHERE tenant_id=$1 AND EXISTS(SELECT 1 FROM trigger_runs)
        AND created_at>=$5::timestamptz AND created_at<$6::timestamptz
        AND document->>'correlationId' IN (SELECT id FROM trigger_runs)
@@ -191,8 +192,8 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
       WITH enriched AS (
         SELECT s.*,COALESCE(s.exception_id,p.exception_id,(r.document->>'incidentId')::uuid) AS issue_id,
         COALESCE(s.connection_id,(s.doc->>'connectionId')::uuid,(p.document->>'connectionId')::uuid,(r.document->'action'->>'connectionId')::uuid) AS conn_id,
-        COALESCE(s.doc->'details'->>'purchaseOrderId',p.document->'target'->>'id',r.document->'action'->'target'->>'id',a.document->'action'->'target'->>'id',e.document->'subject'->>'subjectId') AS resource,
-        COALESCE(CASE WHEN s.doc->'details'->>'purchaseOrderId' IS NOT NULL THEN 'purchase_order' END,p.document->'target'->>'kind',r.document->'action'->'target'->>'kind',a.document->'action'->'target'->>'kind',e.document->'subject'->>'subjectKind') AS resource_kind,
+        COALESCE(s.doc->'details'->>'purchaseOrderId',CASE WHEN a.subject_kind='order' THEN a.subject_id END,p.document->'target'->>'id',r.document->'action'->'target'->>'id',a.document->'action'->'target'->>'id',e.document->'subject'->>'subjectId') AS resource,
+        COALESCE(CASE WHEN s.doc->'details'->>'purchaseOrderId' IS NOT NULL THEN 'purchase_order' END,CASE WHEN a.subject_kind='order' THEN 'order' END,p.document->'target'->>'kind',r.document->'action'->'target'->>'kind',a.document->'action'->'target'->>'kind',e.document->'subject'->>'subjectKind') AS resource_kind,
         COALESCE(CASE WHEN s.doc->>'eventType' LIKE 'purchase_order.%' THEN s.doc->'details'->>'reason' END,p.document->>'capability',r.document->'action'->>'capability',a.document->'action'->>'capability') AS summary,
         CASE WHEN e.document->'subject'->>'subjectKind'='connection' THEN e.document->'subject'->>'subjectId' END AS subject_connection,
         COALESCE(r.definition_id,w.definition_id,s.doc->'details'->>'definitionId') AS playbook_id,COALESCE(v.document->'provenance'->>'kind',wv.document->'provenance'->>'kind') AS mode,

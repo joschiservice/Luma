@@ -135,6 +135,8 @@ export interface FulfillmentOrderLineItemData {
 export interface FulfillmentData {
   order: string;
   fulfillmentOrder: string;
+  /** Native fulfillment creation can combine work at the same location. */
+  fulfillmentOrders?: string[];
   location: string;
   status: 'SUCCESS' | 'FAILURE' | 'CANCELLED';
   displayStatus: string;

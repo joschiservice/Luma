@@ -412,3 +412,8 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+.orders-line-links {
+  display: grid;
+  gap: var(--content-gap);
+  min-width: 0;
+}

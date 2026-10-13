@@ -267,7 +267,7 @@ export interface RunSummary {
   chaos: { preset: string };
   instances: {
     name: string;
-    kind: 'shopify' | 'jtl' | 'cin7' | 'gmail';
+    kind: 'shopify' | 'jtl' | 'cin7' | 'gmail' | 'starshipit';
     label: string;
     health: z.infer<typeof serviceHealthSchema>;
   }[];

@@ -14,6 +14,7 @@ import { ShopifyInventoryCorrection } from './inventory-correction.js';
 import { ShopifyOrderContext } from './order-context.js';
 import { ShopifyRecordPage } from './record-page.js';
 import { ShopifyRecords } from './records.js';
+import { ShopifyShipmentPublishing } from './shipment-publishing.js';
 
 /** Renders Shopify authorization, the record browser page or live context for a host record. */
 export default function ShopifySettings(props: AppUiProps) {
@@ -27,14 +28,29 @@ export default function ShopifySettings(props: AppUiProps) {
     ) : null;
   if (props.slot === 'fulfillment')
     return props.fulfillment ? (
-      <ShopifyFulfillmentRecovery
-        key={`${props.fulfillment.connectionId}:${props.fulfillment.fulfillmentId}`}
-        connectionId={props.fulfillment.connectionId}
-        orderId={props.fulfillment.orderId}
-        fulfillmentOrderId={props.fulfillment.fulfillmentId}
-        services={props.services}
-        headingLevel={3}
-      />
+      <>
+        {props.can('shopify:shipment_publishing.run') ? (
+          <ShopifyShipmentPublishing
+            key={`publishing:${props.fulfillment.connectionId}:${props.fulfillment.orderId}`}
+            connectionId={props.fulfillment.connectionId}
+            orderId={props.fulfillment.orderId}
+            services={props.services}
+          />
+        ) : null}
+        {props.can('shopify:fulfillment_recovery.run') &&
+        props.fulfillment.fulfillmentId.startsWith(
+          'gid://shopify/FulfillmentOrder/',
+        ) ? (
+          <ShopifyFulfillmentRecovery
+            key={`${props.fulfillment.connectionId}:${props.fulfillment.fulfillmentId}`}
+            connectionId={props.fulfillment.connectionId}
+            orderId={props.fulfillment.orderId}
+            fulfillmentOrderId={props.fulfillment.fulfillmentId}
+            services={props.services}
+            headingLevel={3}
+          />
+        ) : null}
+      </>
     ) : null;
   if (props.slot === 'record')
     return props.record ? (
@@ -43,6 +59,7 @@ export default function ShopifySettings(props: AppUiProps) {
         services={props.services}
         organizationId={props.organizationId}
         canEdit={props.can('shopify:order_edits.apply')}
+        canPublish={props.can('shopify:shipment_publishing.run')}
       />
     ) : null;
 

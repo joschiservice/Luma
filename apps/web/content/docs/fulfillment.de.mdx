@@ -75,3 +75,55 @@ Die Versandart einer Bestellung zu korrigieren ist etwas anderes, als sie zu erf
 Bei anderen Systemen und bei Sendungen, die das Lager bereits verlassen haben, nennt **Nächster sicherer Schritt**, wo du handelst: im Quellsystem, am ausführenden Lagerort oder beim Versanddienstleister. JTL-Wawi meldet keine Sperren, deshalb erscheinen sie dort als nicht gemeldet. Luma zeigt den neuen Stand nach dem nächsten Abruf.
 
 Zum Ansehen von Fulfillment brauchst du **Fulfillment ansehen**. Du erreichst ein Fulfillment über eine Bestellung, ein Problem zu einem Fulfillment, **Datensätze** und die Suche.
+
+## Starshipit-Versandmengen prüfen
+
+Eine verknüpfte Starshipit-Bestellung zeigt Versand- und Carrier-Nachweise neben den
+anderen Quellen. Eine unbekannte Übergabe bedeutet, dass Luma den aktuellen Besitzer
+des Pakets nicht bestätigt hat. Ein gedrucktes Etikett belegt keinen Versand. Prüfe das
+Alter der Abfrage und der Carrier-Aktualisierung. Teilsendungen behalten getrennte
+Sendungsverfolgungen; Luma schätzt keine Aufteilung der Artikel.
+
+Vor der Etiketterstellung kann ein Mengenänderungsplan **Unversandte Versandmengen
+korrigieren** anbieten. Öffne die Prüfung, kontrolliere jede alte und vorgeschlagene
+Menge und wähle **Korrektur prüfen**. Die Zielmenge muss der maßgeblichen Bestellquelle
+entsprechen. Falls eine Genehmigung nötig ist, wählt ein berechtigter Genehmiger
+**Korrektur genehmigen** oder **Korrektur ablehnen**. Der Antragsteller wählt danach
+**Genehmigte Korrektur senden**.
+
+Wähle **Aktuelles Ergebnis prüfen**, bis eine neue Starshipit-Abfrage die Mengen bestätigt.
+Bei unklarem Ergebnis liest Luma erneut und sendet dieselbe Korrektur niemals zweimal.
+Bei deaktivierten Schreibvorgängen wird nichts gesendet. Nach Etiketterstellung oder
+Versand folgst du der Übergabe an Lager oder Versanddienstleister im Plan.
+
+## Ein versandtes Paket in Shopify veröffentlichen
+
+Wenn die Sendungsveröffentlichung in deinem Arbeitsbereich verfügbar ist, erscheint
+**Sendung in Shopify veröffentlichen** auf Shopify-Fulfillment-Datensätzen und in den
+Shopify-Details der Bestellung. Dafür brauchst du **Shopify-Sendungen veröffentlichen**.
+Die Aktion erfasst einen tatsächlichen Versand in Shopify. Sie erstellt keine Sendung
+oder kein Etikett beim Versanddienstleister.
+
+1. Wähle das versandte Paket. Eine aktuelle Abfrage muss die Übergabe an den
+   Versanddienstleister oder die Zustellung bestätigen. Ein gedrucktes Etikett reicht
+   nicht aus.
+2. Wähle **Shopify-Fulfillment erstellen**, den Fulfillment-Auftrag und das Lager sowie
+   die genau in diesem Paket versandten Einheiten. Bei Teilsendungen wählst du nur die
+   Artikel dieses Pakets. Wenn der Versanddienstleister keine Artikel oder kein Lager
+   pro Paket nennt, bestätige die Zuordnung anhand des Versandbelegs aus dem Lager.
+3. Entscheide, ob der Kunde benachrichtigt werden soll. Benachrichtigungen sind zunächst
+   ausgeschaltet.
+4. Wähle **Genaue Vorschau speichern**. Eine andere Person mit Freigaberecht und
+   **Shopify-Sendungen veröffentlichen** genehmigt die genaue Zuordnung, Sendungsverfolgung
+   und Benachrichtigungsentscheidung. Aktualisiere danach die Versandnachweise und wähle
+   als anfragende Person **Freigegebene Sendung veröffentlichen**.
+
+Um eine bereits in Shopify erfasste Sendungsverfolgung zu korrigieren, wähle
+**Vorhandene Sendungsverfolgung aktualisieren** und die genaue Shopify-Sendung. Prüfe und
+genehmige die Sendungsverfolgung und Benachrichtigungsentscheidung auf dieselbe Weise.
+
+Ein erfolgreicher Versand der Änderung ist noch keine unabhängige Bestätigung.
+**Shopify erneut prüfen** liest die genaue Zuordnung und Sendungsverfolgung. Ist das
+Ergebnis unbekannt, gleicht Luma es durch Shopify-Abfragen ab und sendet die Aktion nicht
+erneut. Große oder unvollständige Abfragen, geänderte Lagerarbeit und stornierte
+Bestellungen brauchen eine Prüfung in Shopify.

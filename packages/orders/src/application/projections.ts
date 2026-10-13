@@ -161,6 +161,12 @@ export type CommerceData =
         url: string | null;
       }[];
       delivery?: string | null;
+      /** Source handoff and tracking freshness; absent when the source does not report them. */
+      shipping?: {
+        stage: 'merchant' | 'warehouse' | 'carrier' | 'delivered' | 'unknown';
+        sourceUrl: string | null;
+        trackingUpdatedAt: string | null;
+      };
     }
   | ReturnData
   | RefundData;
@@ -170,7 +176,7 @@ export interface CanonicalSnapshot {
    * Order snapshots use version 7 for sold bundle groups, version 6 for commercial facts,
    * version 5 for whether unit prices include tax, and version 4 for optional unit prices
    * and fractional tax rates.
-   * Fulfillment version 4 adds explicit milestone times.
+   * Fulfillment version 5 adds handoff and tracking freshness; version 4 adds explicit milestone times.
    * Order and fulfillment snapshots use version 3 for current and remaining line quantities.
    * Stored versions 1 and 2 remain readable. Return and refund snapshots use version 1.
    */

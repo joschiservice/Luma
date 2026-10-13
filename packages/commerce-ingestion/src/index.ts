@@ -14,11 +14,15 @@ import type {
 } from '@luma/inventory';
 import type { CommerceProjections as Orders } from '@luma/orders';
 
+import { LinkError } from './application/errors.js';
+import { validateOrderLineIdentity } from './application/order-line-links.js';
 import {
   orderParent,
   prepareOrderChildren,
 } from './application/order-links.js';
 import { sourceLocalKey } from './application/source-local.js';
+
+export { LinkError } from './application/errors.js';
 
 export type ProjectionOutcome =
   | { status: 'pending'; missing: SourceIdentity[] }
@@ -33,7 +37,7 @@ const normalizers = {
   inventoryShipments: 'commerce/1',
   product: 'commerce/3',
   order: 'commerce/7',
-  fulfillment: 'commerce/4',
+  fulfillment: 'commerce/5',
   return: 'commerce/1',
   refund: 'commerce/1',
 } as const;
@@ -560,7 +564,7 @@ export function createCommerceIngestion(
       owner: 'orders',
       snapshot: {
         ...provenance,
-        schemaVersion: 4,
+        schemaVersion: 5,
         normalizerVersion: normalizers.fulfillment,
         entityId,
         kind: 'fulfillment',
@@ -595,6 +599,7 @@ export function createCommerceIngestion(
           ...optional('method'),
           ...optional('tracking'),
           ...optional('delivery'),
+          ...optional('shipping'),
         },
       },
     };
@@ -749,6 +754,32 @@ export function createCommerceIngestion(
       ]);
       if (!target.length)
         throw new LinkError('The record to link to was not found');
+      if (kind === 'order_line' && !other.length) {
+        const moved = target.filter(
+          (item) => item.previousCanonicalId === otherId,
+        );
+        if (!moved.length)
+          throw new LinkError('The other order line was not found');
+        const parent = await validateOrderLineIdentity(
+          orders,
+          context,
+          targetId,
+          targetId,
+          target,
+          target,
+        );
+        if ((await orders.childParent(context, otherId)) !== parent)
+          throw new LinkError(
+            'Link the parent orders before matching their lines',
+          );
+        // Mapping and replay committed before the worker marked its request complete.
+        for (const connectionId of new Set(
+          moved.map((item) => item.source.connectionId),
+        ))
+          await reprojectOrder(context, parent, connectionId, reason);
+
+        return { moved: 0 };
+      }
       if (
         other.some((item) =>
           target.some(
@@ -759,6 +790,17 @@ export function createCommerceIngestion(
         throw new LinkError(
           'Both records come from the same connection, so they cannot be the same record',
         );
+      const lineParent =
+        kind === 'order_line'
+          ? await validateOrderLineIdentity(
+              orders,
+              context,
+              targetId,
+              otherId,
+              target,
+              other,
+            )
+          : null;
       for (const item of other)
         await sources.remap(
           context,
@@ -770,6 +812,16 @@ export function createCommerceIngestion(
         );
       if (kind === 'order') {
         await reprojectOrder(context, otherId, undefined, reason);
+
+        return { moved: other.length };
+      }
+      if (kind === 'order_line') {
+        if (!lineParent)
+          throw new LinkError('The order line has no linked parent order');
+        for (const connectionId of new Set(
+          other.map((item) => item.source.connectionId),
+        ))
+          await reprojectOrder(context, lineParent, connectionId, reason);
 
         return { moved: other.length };
       }
@@ -794,10 +846,25 @@ export function createCommerceIngestion(
         throw new LinkError('This record is not linked to another source');
       for (const item of own) {
         const identify = (key: string) =>
-          kind === 'order'
+          kind === 'order' || kind === 'order_line'
             ? orders.identify(context, kind, key)
             : inventory.identify(context, kind, key);
-        let target = await identify(sourceLocalKey(item.source));
+        const parent =
+          kind === 'order_line'
+            ? await orders.childParent(context, entityId)
+            : null;
+        if (kind === 'order_line' && !parent)
+          throw new LinkError('The order line has no linked parent order');
+        let target = await identify(
+          kind === 'order_line'
+            ? JSON.stringify([
+                'line-unlink',
+                parent,
+                sourceLocalKey(item.source),
+                entityId,
+              ])
+            : sourceLocalKey(item.source),
+        );
         // The source may have been this record's origin; give it a new record instead.
         if (target === entityId)
           target = await identify(
@@ -814,7 +881,10 @@ export function createCommerceIngestion(
       }
       if (kind === 'order')
         await reprojectOrder(context, entityId, connectionId, reason);
-      else await reproject(context, kind, entityId, connectionId, reason);
+      else if (kind === 'order_line') {
+        const parent = await orders.childParent(context, entityId);
+        if (parent) await reprojectOrder(context, parent, connectionId, reason);
+      } else await reproject(context, kind, entityId, connectionId, reason);
 
       return { moved: own.length };
     },
@@ -927,7 +997,7 @@ export function createCommerceIngestion(
    */
   async function reproject(
     context: TenantContext,
-    kind: Exclude<LinkableKind, 'order'>,
+    kind: Exclude<LinkableKind, 'order' | 'order_line'>,
     id: string,
     connectionId: string | undefined,
     reason: string,
@@ -970,10 +1040,7 @@ export function createCommerceIngestion(
   }
 }
 
-export type LinkableKind = 'sku' | 'location' | 'order';
-
-/** A link request that cannot be applied as asked; the message is written for the requester. */
-export class LinkError extends Error {}
+export type LinkableKind = 'sku' | 'location' | 'order' | 'order_line';
 
 const linkedMethod = 'Linked by a person as the same record in another source';
 

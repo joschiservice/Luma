@@ -52,24 +52,45 @@ const sources: IdentityDetail['sources'] = [
 function Preview({
   state = 'suggested',
   canManage = true,
+  kind = 'order',
 }: {
   state?: 'suggested' | 'ambiguous' | 'linked' | 'running' | 'failed';
   canManage?: boolean;
+  kind?: 'order' | 'order_line';
 }) {
   const [sent, setSent] = useState(false);
   const linked = state === 'linked';
   const busy = state === 'running' || sent;
+  const line = kind === 'order_line';
+  const sourceRecords = line
+    ? sources.map((source, index) => ({
+        ...source,
+        externalId: index ? '51' : 'gid://shopify/LineItem/10011',
+        scopeKey: source.externalId,
+        titles: ['Linen shirt · M'],
+        codes: ['LINEN-SHIRT-M'],
+      }))
+    : sources;
   const detail: IdentityDetail = {
-    entity: { id: orderId, kind: 'order', label: '#1001' },
-    sources: linked ? sources : [sources[0]!],
+    entity: {
+      id: orderId,
+      kind,
+      label: line ? 'Linen shirt · M' : '#1001',
+      ...(line
+        ? { orderId: '99999999-9999-4999-8999-999999999999', unit: 'each' }
+        : {}),
+    },
+    sources: linked ? sourceRecords : [sourceRecords[0]!],
     suggestions: linked
       ? []
       : [
           {
             id: otherId,
-            label: 'SO-10',
-            reason: 'ERP external order number “#1001” matches Shopify',
-            sources: [sources[1]!],
+            label: line ? 'Linen shirt · M' : 'SO-10',
+            reason: line
+              ? 'Same linked order and quantity unit; confirm the item'
+              : 'ERP external order number “#1001” matches Shopify',
+            sources: [sourceRecords[1]!],
           },
           ...(state === 'ambiguous'
             ? [
@@ -98,7 +119,7 @@ function Preview({
         ? [
             {
               id: otherId,
-              kind: 'order',
+              kind,
               operation: 'link',
               entityId: orderId,
               otherId,
@@ -173,4 +194,44 @@ export const ConfirmMatch: Story = {
       canvas.getByText('Linking records.', { exact: false }),
     ).toBeVisible();
   },
+};
+
+export const MatchOrderLine: Story = {
+  args: { kind: 'order_line' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole('heading', {
+        name: 'Lines in other sources of this order',
+      }),
+    ).toBeVisible();
+    await userEvent.click(canvas.getByRole('button', { name: /^Link$/ }));
+    const dialog = within(within(document.body).getByRole('dialog'));
+    await expect(
+      dialog.getByRole('button', { name: 'Link records' }),
+    ).toBeDisabled();
+    await waitFor(async () => {
+      await expect(
+        dialog.getByText(/This match can affect which changes Luma can run/),
+      ).toBeVisible();
+    });
+    await userEvent.type(
+      dialog.getByLabelText('Why is this correct?'),
+      'Confirmed the same shirt and size in the linked order',
+    );
+    await userEvent.click(dialog.getByRole('button', { name: 'Link records' }));
+    await expect(
+      canvas.getByText('Matching lines.', { exact: false }),
+    ).toBeVisible();
+  },
+};
+
+export const MatchOrderLineDark: Story = {
+  args: { kind: 'order_line' },
+  globals: { theme: 'dark' },
+};
+
+export const MatchOrderLineNarrow: Story = {
+  args: { kind: 'order_line' },
+  globals: { viewport: { value: 'mobile1', isRotated: false } },
 };

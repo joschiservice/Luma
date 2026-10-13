@@ -115,7 +115,7 @@ export interface IdentitySource {
 
 export interface LinkRequestView {
   id: string;
-  kind: 'sku' | 'location' | 'order';
+  kind: 'sku' | 'location' | 'order' | 'order_line';
   operation: 'link' | 'unlink';
   entityId: string;
   otherId: string | null;
@@ -128,7 +128,13 @@ export interface LinkRequestView {
 }
 
 export interface IdentityDetail {
-  entity: { id: string; kind: 'sku' | 'location' | 'order'; label: string };
+  entity: {
+    id: string;
+    kind: 'sku' | 'location' | 'order' | 'order_line';
+    label: string;
+    orderId?: string;
+    unit?: string;
+  };
   sources: IdentitySource[];
   suggestions: {
     id: string;
@@ -143,14 +149,14 @@ export interface IdentityDetail {
 export type LinkInput =
   | {
       operation: 'link';
-      kind: 'sku' | 'location' | 'order';
+      kind: 'sku' | 'location' | 'order' | 'order_line';
       entityId: string;
       otherId: string;
       reason: string;
     }
   | {
       operation: 'unlink';
-      kind: 'sku' | 'location' | 'order';
+      kind: 'sku' | 'location' | 'order' | 'order_line';
       entityId: string;
       connectionId: string;
       reason: string;

@@ -134,7 +134,12 @@ export const syncCommandSchema = z
   })
   .strict();
 
-export const identityKindSchema = z.enum(['sku', 'location', 'order']);
+export const identityKindSchema = z.enum([
+  'sku',
+  'location',
+  'order',
+  'order_line',
+]);
 
 export const linkRequestSchema = z.object({
   id: z.string().uuid(),
@@ -176,6 +181,8 @@ export const identityDetailSchema = z.object({
     id: z.string().uuid(),
     kind: identityKindSchema,
     label: z.string(),
+    orderId: z.string().uuid().optional(),
+    unit: z.string().min(1).max(64).optional(),
   }),
   sources: z.array(identitySourceSchema),
   suggestions: z.array(

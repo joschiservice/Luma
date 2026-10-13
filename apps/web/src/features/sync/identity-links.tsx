@@ -155,6 +155,7 @@ export function IdentityLinksView({
   const [reason, setReason] = useState('');
   const [sending, setSending] = useState(false);
   const order = detail.entity.kind === 'order';
+  const line = detail.entity.kind === 'order_line';
   const location = detail.entity.kind === 'location';
   const latest = detail.requests[0];
   const busy =
@@ -168,13 +169,19 @@ export function IdentityLinksView({
     <Card className="sync-identity" as="section">
       <CardHeader>
         <div>
-          <CardTitle>{m.sync_links_title()}</CardTitle>
+          <CardTitle>
+            {line
+              ? m.sync_links_title_line({ line: detail.entity.label })
+              : m.sync_links_title()}
+          </CardTitle>
           <CardDescription>
             {order
               ? m.sync_links_description_order()
-              : location
-                ? m.sync_links_description_location()
-                : m.sync_links_description_sku()}
+              : line
+                ? m.sync_links_description_line()
+                : location
+                  ? m.sync_links_description_location()
+                  : m.sync_links_description_sku()}
           </CardDescription>
         </div>
       </CardHeader>
@@ -221,9 +228,11 @@ export function IdentityLinksView({
             <h3>
               {order
                 ? m.sync_links_suggestions_order()
-                : location
-                  ? m.sync_links_suggestions_location()
-                  : m.sync_links_suggestions_sku()}
+                : line
+                  ? m.sync_links_suggestions_line()
+                  : location
+                    ? m.sync_links_suggestions_location()
+                    : m.sync_links_suggestions_sku()}
             </h3>
             {order && detail.suggestions.length > 1 ? (
               <Alert>{m.sync_links_suggestions_ambiguous()}</Alert>
@@ -245,7 +254,12 @@ export function IdentityLinksView({
                       )}
                     </strong>
                     <small>
-                      {suggestion.reason} ·{' '}
+                      {order
+                        ? m.sync_links_candidate_order()
+                        : line
+                          ? m.sync_links_candidate_line()
+                          : suggestion.reason}{' '}
+                      ·{' '}
                       {formatList(
                         suggestion.sources.map(
                           (source) => source.connectionLabel,
@@ -266,11 +280,12 @@ export function IdentityLinksView({
                           operation: 'link',
                           otherId: suggestion.id,
                           label: suggestion.label,
-                          reason: order
-                            ? ''
-                            : m.sync_links_reason_prefill({
-                                reason: suggestion.reason,
-                              }),
+                          reason:
+                            order || line
+                              ? ''
+                              : m.sync_links_reason_prefill({
+                                  reason: suggestion.reason,
+                                }),
                           sources: suggestion.sources,
                         })
                       }
@@ -304,10 +319,14 @@ export function IdentityLinksView({
               {latest.operation === 'link'
                 ? order
                   ? m.sync_links_linking_order()
-                  : m.sync_links_linking_sku()
+                  : line
+                    ? m.sync_links_linking_line()
+                    : m.sync_links_linking_sku()
                 : order
                   ? m.sync_links_unlinking_order()
-                  : m.sync_links_unlinking_sku()}
+                  : line
+                    ? m.sync_links_unlinking_line()
+                    : m.sync_links_unlinking_sku()}
             </Alert>
           ) : (
             <p className="sync-identity-note">
@@ -355,13 +374,17 @@ export function IdentityLinksView({
                 ? pending?.operation === 'link'
                   ? m.sync_links_link_order_description()
                   : m.sync_links_unlink_order_description()
-                : location
+                : line
                   ? pending?.operation === 'link'
-                    ? m.sync_links_link_location_description()
-                    : m.sync_links_unlink_location_description()
-                  : pending?.operation === 'link'
-                    ? m.sync_links_link_sku_description()
-                    : m.sync_links_unlink_sku_description()}
+                    ? m.sync_links_link_line_description()
+                    : m.sync_links_unlink_line_description()
+                  : location
+                    ? pending?.operation === 'link'
+                      ? m.sync_links_link_location_description()
+                      : m.sync_links_unlink_location_description()
+                    : pending?.operation === 'link'
+                      ? m.sync_links_link_sku_description()
+                      : m.sync_links_unlink_sku_description()}
             </DialogDescription>
             {order && pending?.operation === 'link' ? (
               <div className="sync-order-match">

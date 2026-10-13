@@ -10,6 +10,7 @@ import { readOrder } from '@luma/simulator-shopify';
 
 import type { Pick } from './fulfillment.js';
 import { shippingMethods } from './model.js';
+import { importShippingOrder } from './shipping.js';
 import { driftStock } from './stock.js';
 import {
   erp,
@@ -300,6 +301,7 @@ export async function placeOrder(
     customer: buyer?.number ?? null,
   };
   await saveWorldOrder(world, order);
+  await importShippingOrder(world, order);
   world.metric('orders.created', 1, shopName);
   world.journal(
     'order',

@@ -10,6 +10,7 @@ import {
   nextStep,
   otherSignals,
   quantity,
+  shippingFreshness,
   timelineChanges,
 } from './presentation';
 
@@ -55,6 +56,47 @@ const source = {
   status: 'active',
   appId: 'shopify',
 };
+
+it('separates stale reads from quiet carrier progress and keeps label handoffs unknown', () => {
+  const shipping = {
+    stage: 'carrier' as const,
+    sourceUrl: null,
+    trackingUpdatedAt: '2026-09-28T12:00:00.000Z',
+  };
+  expect(shippingFreshness(item({ shipping, observedAt: asOf }), asOf)).toEqual(
+    { staleRead: false, quietTracking: true },
+  );
+  expect(shippingFreshness(item({ shipping }), asOf)).toEqual({
+    staleRead: true,
+    quietTracking: true,
+  });
+  expect(
+    shippingFreshness(
+      item({
+        shipping: { ...shipping, stage: 'unknown' },
+        delivery: 'label_created',
+      }),
+      asOf,
+    ),
+  ).toEqual({ staleRead: true, quietTracking: false });
+  expect(
+    shippingFreshness(
+      item({ shipping: { ...shipping, stage: 'delivered' } }),
+      asOf,
+    ).quietTracking,
+  ).toBe(false);
+  expect(shippingFreshness(item(), asOf)).toEqual({
+    staleRead: false,
+    quietTracking: false,
+  });
+  const ambiguous = item({
+    shipping: { ...shipping, stage: 'unknown' },
+    delivery: 'label_created',
+  });
+  expect(
+    nextStep({ item: ambiguous, source, stalledAfterHours: 48 }, false),
+  ).toMatchObject({ title: 'Confirm the shipment handoff' });
+});
 
 it('names the most urgent state and keeps other signals as badges', () => {
   const held = item({

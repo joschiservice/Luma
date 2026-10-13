@@ -275,5 +275,18 @@
   "fulfillment_issue_on_fulfillment_detected": "On this fulfillment · detected {time}",
   "fulfillment_issue_on_order_detected": "On the order · detected {time}",
   "fulfillment_issue_needs_you": "Needs you",
-  "fulfillment_issues_empty": "No issues recorded for this fulfillment or its order."
+  "fulfillment_issues_empty": "No issues recorded for this fulfillment or its order.",
+  "fulfillment_fact_handoff": "Reported handoff",
+  "fulfillment_handoff_merchant": "Waiting at merchant",
+  "fulfillment_handoff_warehouse": "At warehouse",
+  "fulfillment_handoff_carrier": "With carrier",
+  "fulfillment_handoff_delivered": "Delivered",
+  "fulfillment_handoff_unknown": "Handoff not confirmed",
+  "fulfillment_handoff_unknown_note": "A label or booking does not confirm that the warehouse or carrier has received the shipment.",
+  "fulfillment_fact_tracking_update": "Last carrier update",
+  "fulfillment_tracking_stale": "No carrier update for at least 48 hours. Refresh the source or investigate with the carrier.",
+  "fulfillment_read_stale": "This source was last read more than 15 minutes ago. Refresh before relying on its status.",
+  "fulfillment_source_open": "Open source link",
+  "fulfillment_next_handoff_title": "Confirm the shipment handoff",
+  "fulfillment_next_handoff_body": "Check with the merchant or warehouse whether the carrier has collected this shipment. Refresh tracking for independent confirmation."
 }

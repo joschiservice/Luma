@@ -161,7 +161,11 @@ async function providerIncidents(world: World) {
       await closeIncident(world, window.incident, 'Provider recovered');
   }
   if (!world.live) return;
-  for (const kind of ['provider-outage', 'auth-revoked'] as const) {
+  for (const kind of [
+    'provider-outage',
+    'shipping-provider-outage',
+    'auth-revoked',
+  ] as const) {
     const rate = world.run.chaos.incidents[kind] ?? 0;
     if (
       !(
@@ -178,7 +182,11 @@ async function providerIncidents(world: World) {
     );
     // Outages and revoked access hit the commerce systems; the mailbox keeps the original draw.
     const target = random.pick(
-      world.model.instances.filter((item) => item.kind !== 'gmail'),
+      world.model.instances.filter((item) =>
+        kind === 'shipping-provider-outage'
+          ? item.kind === 'starshipit'
+          : item.kind !== 'gmail',
+      ),
     );
     if (world.run.health[target.name]) continue;
     const duration =

@@ -76,6 +76,12 @@ from the Shopify app's live read.
 
 ### Comparison evidence and propagation
 
+An operator can explicitly match current lines from different sources of the same linked
+order. Matching requires compatible quantity units and a recorded reason; names and SKU
+text alone cannot establish equivalence. An ordinary source reread preserves the match,
+while unlinking or relinking the parent order rekeys its children. Removing a match can
+withhold an existing change plan without changing any provider quantities.
+
 Comparisons use explicitly shared canonical line IDs, or a mapped SKU that occurs once
 per source. A source that reports a shared line under its own ID, such as an ERP import of
 an order a Luma record copied, matches that line by SKU when the SKU occurs once in every
@@ -115,6 +121,11 @@ complete, order-scoped `fulfillment.read`. Reads are stored through the normal i
 which updates projections and comparisons; customer references and addresses are dropped,
 as sync does. A source without a point read, or whose read fails or is incomplete, keeps
 its stored reads, so freshness checks fail honestly.
+
+The refresh records completeness for the exact source order and its observed records,
+separately from collection coverage. A failed, incomplete or unfinished refresh leaves an
+inconclusive proof. Only complete pagination and current projections certify that read;
+an earlier successful scan cannot stand in for a new dispatch check.
 
 Unshipped fulfilment work that a complete order-scoped reread no longer returns is retired
 with a tombstone: the source removed it, as a warehouse that stops packing deletes a JTL

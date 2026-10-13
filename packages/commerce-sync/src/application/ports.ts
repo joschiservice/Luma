@@ -119,7 +119,7 @@ export type StreamCommand =
 
 export interface LinkRequest {
   id: string;
-  kind: 'sku' | 'location' | 'order';
+  kind: 'sku' | 'location' | 'order' | 'order_line';
   operation: 'link' | 'unlink';
   entityId: string;
   otherId: string | null;

@@ -91,6 +91,7 @@ export function ShopifyRecordPage({
             connectionId={selected}
             services={services}
             canEdit={can('shopify:order_edits.apply')}
+            canPublish={can('shopify:shipment_publishing.run')}
           />
         </>
       )}

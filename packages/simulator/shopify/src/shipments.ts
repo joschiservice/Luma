@@ -39,6 +39,7 @@ type Command<K extends ShopifyCommand['kind']> = Extract<
 export async function fulfillOrder(
   context: ShopifyContext,
   command: Command<'fulfill'>,
+  exact?: { fulfillmentOrderId: string; lineId: string; quantity: number }[],
 ): Promise<ShopifyCommandResult> {
   const order = await load<OrderData>(context, 'Order', command.order);
   if (order.data.cancelledAt) throw new Error('The order is cancelled');
@@ -64,28 +65,55 @@ export async function fulfillOrder(
         quantity: line.data.remainingQuantity,
       }));
   const shipped = new Map<string, Map<string, number>>();
-  for (const request of requested) {
-    if (!Number.isSafeInteger(request.quantity) || request.quantity < 1)
-      throw new Error('Fulfilled quantities must be positive whole numbers');
-    let left = request.quantity;
-    for (const { work: item, line } of candidates) {
-      if (line.data.lineItem !== request.lineItem || !left) continue;
-      const taken = Math.min(
-        left,
-        line.data.remainingQuantity - (shipped.get(item.id)?.get(line.id) ?? 0),
+  if (exact) {
+    for (const request of exact) {
+      const candidate = candidates.find(
+        (v) =>
+          v.work.id === request.fulfillmentOrderId &&
+          v.line.id === request.lineId,
       );
-      if (taken <= 0) continue;
-      if (item.data.status === 'ON_HOLD')
-        throw new Error('Release the fulfillment hold before shipping');
-      if (item.data.status === 'SCHEDULED')
-        throw new Error('Open the scheduled fulfillment order before shipping');
-      const lines = shipped.get(item.id) ?? new Map<string, number>();
-      lines.set(line.id, (lines.get(line.id) ?? 0) + taken);
-      shipped.set(item.id, lines);
-      left -= taken;
+      if (
+        !candidate ||
+        !Number.isSafeInteger(request.quantity) ||
+        request.quantity < 1 ||
+        request.quantity > candidate.line.data.remainingQuantity ||
+        !['OPEN', 'IN_PROGRESS'].includes(candidate.work.data.status)
+      )
+        throw new Error('Exact fulfillment-order allocation changed');
+      const allocation =
+        shipped.get(candidate.work.id) ?? new Map<string, number>();
+      if (allocation.has(candidate.line.id))
+        throw new Error('Duplicate fulfillment-order line');
+      allocation.set(candidate.line.id, request.quantity);
+      shipped.set(candidate.work.id, allocation);
     }
-    if (left)
-      throw new Error(`Line ${request.lineItem} has fewer unfulfilled units`);
+  } else {
+    for (const request of requested) {
+      if (!Number.isSafeInteger(request.quantity) || request.quantity < 1)
+        throw new Error('Fulfilled quantities must be positive whole numbers');
+      let left = request.quantity;
+      for (const { work: item, line } of candidates) {
+        if (line.data.lineItem !== request.lineItem || !left) continue;
+        const taken = Math.min(
+          left,
+          line.data.remainingQuantity -
+            (shipped.get(item.id)?.get(line.id) ?? 0),
+        );
+        if (taken <= 0) continue;
+        if (item.data.status === 'ON_HOLD')
+          throw new Error('Release the fulfillment hold before shipping');
+        if (item.data.status === 'SCHEDULED')
+          throw new Error(
+            'Open the scheduled fulfillment order before shipping',
+          );
+        const lines = shipped.get(item.id) ?? new Map<string, number>();
+        lines.set(line.id, (lines.get(line.id) ?? 0) + taken);
+        shipped.set(item.id, lines);
+        left -= taken;
+      }
+      if (left)
+        throw new Error(`Line ${request.lineItem} has fewer unfulfilled units`);
+    }
   }
   if (!shipped.size) throw new Error('Nothing left to fulfill');
 
@@ -95,54 +123,69 @@ export async function fulfillOrder(
     ).map((line) => [line.id, line]),
   );
   const fulfillments: string[] = [];
+  const combinedId = exact ? await nextId(context) : null;
+  const combinedLineIds = new Map<string, string>();
+  const combinedQuantities = new Map<string, number>();
   const result: NonNullable<ShopifyCommandResult['lines']> = [];
   for (const item of work) {
     const lines = shipped.get(item.id);
     if (!lines) continue;
-    const id = await nextId(context);
-    fulfillments.push(id);
-    const records = [
-      insert(
-        context,
-        'Fulfillment',
-        id,
-        {
-          order: order.id,
-          fulfillmentOrder: item.id,
-          location: item.data.location,
-          status: 'SUCCESS',
-          displayStatus: 'CONFIRMED',
-          inTransitAt: null,
-          deliveredAt: null,
-          estimatedDeliveryAt:
-            command.estimatedDeliveryAt === undefined
-              ? null
-              : iso(command.estimatedDeliveryAt),
-          tracking: [
+    const id = combinedId ?? (await nextId(context));
+    const firstShipment = !fulfillments.includes(id);
+    if (firstShipment) fulfillments.push(id);
+    const records = firstShipment
+      ? [
+          insert(
+            context,
+            'Fulfillment',
+            id,
             {
-              company: command.carrier,
-              number: command.trackingNumber,
-              url: command.trackingUrl,
-            },
-          ],
-        } satisfies FulfillmentData,
-        { parent: order.id },
-      ),
-    ];
+              order: order.id,
+              fulfillmentOrder: item.id,
+              ...(exact ? { fulfillmentOrders: [...shipped.keys()] } : {}),
+              location: item.data.location,
+              status: 'SUCCESS',
+              displayStatus: 'CONFIRMED',
+              inTransitAt: null,
+              deliveredAt: null,
+              estimatedDeliveryAt:
+                command.estimatedDeliveryAt === undefined
+                  ? null
+                  : iso(command.estimatedDeliveryAt),
+              tracking: [
+                {
+                  company: command.carrier,
+                  number: command.trackingNumber,
+                  url: command.trackingUrl,
+                },
+              ],
+            } satisfies FulfillmentData,
+            { parent: order.id },
+          ),
+        ]
+      : [];
     let remaining = 0;
     for (const line of workLinesById.get(item.id) ?? []) {
       const quantity = lines.get(line.id) ?? 0;
       remaining += line.data.remainingQuantity - quantity;
       if (!quantity) continue;
+      const combinedQuantity =
+        (combinedQuantities.get(line.data.lineItem) ?? 0) + quantity;
+      combinedQuantities.set(line.data.lineItem, combinedQuantity);
+      let lineId = exact ? combinedLineIds.get(line.data.lineItem) : undefined;
+      if (!lineId) {
+        lineId = await nextId(context);
+        if (exact) combinedLineIds.set(line.data.lineItem, lineId);
+      }
       records.push(
         insert(
           context,
           'FulfillmentLineItem',
-          await nextId(context),
+          lineId,
           {
             fulfillment: id,
             lineItem: line.data.lineItem,
-            quantity,
+            quantity: exact ? combinedQuantity : quantity,
           } satisfies FulfillmentLineItemData,
           { parent: id },
         ),

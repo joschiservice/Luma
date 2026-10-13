@@ -19,6 +19,7 @@ import {
   classified,
   itemJson,
   readItem,
+  readShipping,
   readSources,
   stalledAfterHours,
 } from './rules.js';
@@ -156,6 +157,7 @@ async function readTimeline(
           ? data.holds.map((hold) => String(object(hold).reason))
           : null,
         delivery: text(data.delivery),
+        shipping: readShipping(data.shipping),
         lastProgressAt: iso(data.lastProgressAt),
         locationName: text(object(data.location).name),
         fulfillBy: iso(data.fulfillBy),

@@ -60,6 +60,7 @@ import {
 } from './data';
 import { OrderIdentityLinks } from './identity-links';
 import { OrderJourney } from './journey';
+import { OrderLineIdentityLinks } from './line-identity-links';
 import { NativeOrderStock } from './native-stock';
 import { OrderCharges } from './order-charges';
 import { OrderHeader } from './order-header';
@@ -270,6 +271,10 @@ export function OrderPage() {
             <OrderIdentityLinks
               organizationId={organizationId}
               orderId={query.data.order.id}
+            />
+            <OrderLineIdentityLinks
+              organizationId={organizationId}
+              detail={query.data}
             />
           </>
         ) : null

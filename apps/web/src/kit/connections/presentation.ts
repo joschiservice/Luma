@@ -30,6 +30,11 @@ export const capabilities = localized({
   'fulfillment.open': m.connections_capability_fulfillment_open,
   'fulfillment.move': m.connections_capability_fulfillment_move,
   'orders.quantity.edit': m.connections_capability_orders_quantity_edit,
+  'orders.quantity.update': m.connections_capability_orders_quantity_update,
+  'fulfillment.shipment.create':
+    m.connections_capability_fulfillment_shipment_create,
+  'fulfillment.tracking.update':
+    m.connections_capability_fulfillment_tracking_update,
   'customers.read': m.connections_capability_customers_read,
   'returns.read': m.connections_capability_returns_read,
   'orders.shipping-method.read': m.connections_capability_shipping_method_read,
@@ -87,6 +92,7 @@ export function connectionKindName(kind: string) {
   if (kind === 'jtl-onprem') return m.connections_kind_jtl_onprem();
   if (kind === 'cin7-core') return 'Cin7 Core';
   if (kind === 'gmail') return 'Gmail';
+  if (kind === 'starshipit') return 'Starshipit';
 
   return kind;
 }

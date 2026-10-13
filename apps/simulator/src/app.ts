@@ -37,12 +37,20 @@ import {
   gmailCommandSchema,
   jtlCommandSchema,
   shopifyCommandSchema,
+  starshipitCommandSchema,
 } from './commands.js';
 import { advanceWorld } from './engine/advance.js';
 import { injectIncident, recoverIncident } from './engine/incidents.js';
 import { forgetModel, worldModel } from './engine/model.js';
 import { placeOrder, placeWholesaleOrder } from './engine/orders.js';
-import { erp, type Incident, mail, shop, type World } from './engine/world.js';
+import {
+  erp,
+  type Incident,
+  mail,
+  shipping,
+  shop,
+  type World,
+} from './engine/world.js';
 import { createDispatcher } from './runtime/dispatch.js';
 import { clearRun, provisionRun } from './runtime/provision.js';
 import {
@@ -444,7 +452,9 @@ export async function createApp(options: SimulatorOptions) {
             (item) => item.name === input.instance,
           );
           if (!target) throw notFound('Unknown instance');
-          if (target.kind === 'gmail')
+          if (target.kind === 'starshipit')
+            await shipping(world, starshipitCommandSchema.parse(input.command));
+          else if (target.kind === 'gmail')
             await mail(world, gmailCommandSchema.parse(input.command));
           else if (target.kind !== 'shopify')
             await erp(
@@ -666,11 +676,12 @@ export async function createApp(options: SimulatorOptions) {
       ]);
       for (const target of input.targets) {
         if (
+          target.instance !== 'starshipit' &&
           !run.profile.shops.some(
             (shopProfile) => shopProfile.instance === target.instance,
           )
         )
-          throw notFound(`Unknown shop ${target.instance}`);
+          throw notFound(`Unknown webhook instance ${target.instance}`);
         await client.query(
           'INSERT INTO sim_webhook_targets (run_id, instance, url, secret) VALUES ($1, $2, $3, $4)',
           [run.id, target.instance, target.url, target.secret],

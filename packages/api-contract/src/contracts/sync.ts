@@ -103,7 +103,7 @@ export const syncContract = {
       path: '/v1/organizations/{organizationId}/identities/{kind}/{entityId}',
       summary: 'Inspect linked source records',
       description:
-        'Lists the source records that represent one SKU, location or order, how each was linked, and possible matches in other sources. Suggestions share a SKU code or an ERP order’s marketplace order reference. Configured automatic linking rules may apply unambiguous matches; other suggestions require review.',
+        'Lists the source records that represent one SKU, location, order or order line, how each was linked, and possible matches in other sources. Suggestions share a SKU code or an ERP order’s marketplace order reference. Configured automatic linking rules may apply unambiguous matches; other suggestions require review. Order-line choices are current lines in other sources of an already-linked order, with the same units. Descriptions and SKU text never establish line identity.',
     })
     .meta({ access: anyMember, errors: [401, 403, 404, 503] })
     .input(
@@ -122,7 +122,7 @@ export const syncContract = {
       successStatus: 202,
       summary: 'Link or unlink source records',
       description:
-        'Requires `sync.manage`. Confirms that another SKU, location or order is the same record (`link`), or separates one connection’s source from it (`unlink`). Luma applies the change in the background, keeps the previous mapping as history and re-projects affected projections. Order links keep each source’s lines and shipments separate and preserve old references. Poll the returned request for its outcome.',
+        'Requires `sync.manage`. Confirms that another SKU, location, order or order line is the same record (`link`), or separates one connection’s source from it (`unlink`). Luma applies the change in the background, keeps the previous mapping as history and re-projects affected projections. Order links keep each source’s lines and shipments separate and preserve old references. Line links require a shared parent order and equal quantity units, and survive later source reads. Poll the returned request for its outcome.',
     })
     .meta({
       access: requires('sync.manage'),

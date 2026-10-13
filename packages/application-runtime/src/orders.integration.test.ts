@@ -9,6 +9,7 @@ import {
 import type { CommerceObservation } from '@luma/connections';
 import {
   createConnectionCoverage,
+  createOrderReadChecks,
   createSourceAuthority,
 } from '@luma/connections/composition';
 import {
@@ -379,7 +380,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
   beforeEach(async () => {
     clock = new Date('2026-09-20T12:00:00Z');
     await owner.query(
-      'TRUNCATE connector_authority_settings,connector_authority_events,connector_observations,connector_source_mappings,orders_entities,inventory_entities,exceptions,playbook_definitions CASCADE',
+      'TRUNCATE connector_authority_settings,connector_authority_events,connector_observations,connector_order_read_checks,connector_source_mappings,orders_entities,inventory_entities,exceptions,playbook_definitions CASCADE',
     );
   });
 
@@ -2173,6 +2174,44 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
         observedAt: new Date(read).toISOString(),
         complete: true,
         lines: [{ externalId: 'gid://shopify/LineItem/21', quantity: '3' }],
+      });
+      const sourceLines = createSourceOrderLines(createTenantDatabase(reader), {
+        state: orderStateQueries,
+      });
+      const lineInput = {
+        connectionId: shopify,
+        orderId: 'gid://shopify/Order/2001',
+        sourceConnectionId: jtl,
+      };
+      const recordRead = createOrderReadChecks(createTenantDatabase(writer));
+      // A failed point refresh must withhold propagation even while stored quantities are recent.
+      await recordRead(
+        context(),
+        jtl,
+        { externalId: 'jtl-order-20', scopeKey: '' },
+        'orders.read',
+        {
+          observedAt: new Date(Date.parse(read) + 1000).toISOString(),
+          complete: false,
+          observationIds: [],
+        },
+      );
+      expect(await sourceLines(context(), lineInput)).toMatchObject({
+        complete: false,
+      });
+      await recordRead(
+        context(),
+        jtl,
+        { externalId: 'jtl-order-20', scopeKey: '' },
+        'orders.read',
+        {
+          observedAt: new Date(Date.parse(read) + 2000).toISOString(),
+          complete: true,
+          observationIds: [lines!.observationId],
+        },
+      );
+      expect(await sourceLines(context(), lineInput)).toMatchObject({
+        complete: true,
       });
       expect(
         await createSourceOrderLines(createTenantDatabase(reader), {

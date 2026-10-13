@@ -341,7 +341,8 @@ export function createDetectionSources(
           JOIN connector_observations o ON o.tenant_id=s.tenant_id AND o.connection_id=s.connection_id
            AND o.id=s.observation_id
           WHERE l.tenant_id=$1 AND ${readable('fulfillment.read')}
-           AND ((l.open AND l.progress_at<$2) OR l.entity_id::text||'/'||l.connection_id::text=ANY($3::text[]))
+           AND ((l.open AND l.last_progress_at IS NOT NULL AND l.last_progress_at<$2)
+             OR l.entity_id::text||'/'||l.connection_id::text=ANY($3::text[]))
           ORDER BY (l.entity_id::text||'/'||l.connection_id::text=ANY($3::text[])) DESC,l.progress_at,l.entity_id
           LIMIT $4`,
           [context.tenantId, before, named, limit],

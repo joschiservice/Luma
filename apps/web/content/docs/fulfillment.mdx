@@ -75,3 +75,49 @@ Correcting an order’s shipping method is different from fulfilling it: it chan
 For other systems, and for shipments that already left, **Next safe step** tells you where to act: in the source system, at the fulfilling location or with the carrier. JTL-Wawi doesn’t report holds, so its holds show as not reported. Luma shows the new state after its next read.
 
 Viewing fulfillment needs **View fulfillment**. You can reach a fulfillment from an order, an issue about a fulfillment, **Records** and search.
+
+## Review Starshipit shipping quantities
+
+A linked Starshipit order shows its shipping and carrier evidence beside the order's other
+sources. Unknown handoff means Luma has not confirmed who has the parcel. A printed label
+alone does not establish dispatch. Check the read age and carrier update time before acting.
+Split shipments keep their tracking separately; Luma does not guess how items were split.
+
+Before a label is created, a quantity change plan can offer **Correct unshipped shipping
+quantities**. Open the plan's review, check each old and proposed quantity, then choose
+**Review correction**. The target must match your authoritative order source. If approval
+is required, a permitted approver chooses **Approve correction** or **Reject correction**.
+The requester then chooses **Send approved correction**.
+
+Use **Check current result** until a fresh Starshipit read confirms the quantities. If the
+outcome is uncertain, Luma reads again and never sends that same correction twice. When
+writes are off, no correction is sent. Once labels exist or shipments have left, follow
+the warehouse or carrier handoff in the plan.
+
+## Publish a dispatched parcel to Shopify
+
+When shipment publishing is available in your workspace, **Publish shipment to Shopify**
+appears on Shopify fulfillment records and in the order's Shopify details. It needs
+**Publish Shopify shipments**. This records an actual dispatch in Shopify; it creates no
+carrier shipment or label.
+
+1. Choose the dispatched parcel. A fresh carrier dispatch or delivery read is required;
+   a printed label is not enough.
+2. Choose **Create Shopify fulfillment**, the fulfillment order and warehouse, and the
+   exact units that left in this parcel. For a split shipment, select only this parcel's
+   items. If the carrier does not identify the parcel's items or warehouse, confirm the
+   allocation against the warehouse dispatch record.
+3. Choose whether to notify the customer. Notifications start off.
+4. Choose **Save exact preview**. Someone else with approval permission and
+   **Publish Shopify shipments** approves the exact allocation, tracking and notification
+   choice. After approval, refresh the shipping evidence and choose
+   **Publish approved shipment** as the requester.
+
+To correct tracking already recorded in Shopify, choose **Update existing tracking** and
+the exact Shopify shipment. Review and approve its tracking and notification choice in
+the same way.
+
+A successful send is not independent proof. **Check Shopify again** reads the exact
+allocation and tracking. If the send result is unknown, Luma reads Shopify to reconcile it
+and never resends the action. Large or incomplete source reads, changed warehouse work
+and cancelled orders require review in Shopify.
