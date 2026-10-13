@@ -174,6 +174,10 @@ const permissionText: Record<
     m.permissions_shopify_inventory_corrections_apply_label,
     m.permissions_shopify_inventory_corrections_apply_description,
   ],
+  'shopify:order_edits.apply': [
+    m.permissions_shopify_order_edits_apply_label,
+    m.permissions_shopify_order_edits_apply_description,
+  ],
   'jtl:purchase_orders.submit': [
     m.permissions_jtl_purchase_orders_submit_label,
     m.permissions_jtl_purchase_orders_submit_description,

@@ -22,6 +22,8 @@ export const knownOperations = [
   'items.read',
   'inventory.read',
   'inventory.available.reconcile',
+  'orders.quantity.calculate',
+  'orders.quantity.edit',
   'fulfillment.read',
   'returns.read',
   'customers.read',

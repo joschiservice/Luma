@@ -48,6 +48,44 @@ export interface OrderData {
   total: number;
   /** Successfully refunded amount in minor units. */
   refunded: number;
+  /**
+   * Shipping charges in minor units. Orders stored before charges were recorded have one free
+   * charge for their shipping speed.
+   */
+  shippingLines?: OrderShippingLineData[];
+  /** Discounts across line items; line prices are already after them. */
+  discounts?: OrderDiscountData[];
+  tags?: string[];
+  /** The customer's currency and its rate per shop currency unit; the shop currency when absent. */
+  presentment?: { currency: string; rate: number } | null;
+  /** Delivery address; orders stored before addresses were recorded use the customer's address. */
+  shippingAddress?: OrderAddressData | null;
+  billingAddress?: OrderAddressData | null;
+  /** Whether a merchant edited the order after it was placed. */
+  edited?: boolean;
+}
+
+interface OrderShippingLineData {
+  id: string;
+  title: string;
+  code: string;
+  /** Charge in minor units. */
+  price: number;
+  removed: boolean;
+}
+
+interface OrderDiscountData {
+  kind: 'code' | 'automatic';
+  /** Discount code or automatic discount title. */
+  label: string;
+  percentage: number;
+}
+
+interface OrderAddressData {
+  address1: string;
+  city: string;
+  zip: string;
+  countryCode: string;
 }
 
 export interface LineItemData {
@@ -60,8 +98,12 @@ export interface LineItemData {
   quantity: number;
   /** Missing on records stored before order edits were supported. */
   currentQuantity?: number;
-  /** Unit price in minor units. */
+  /** Unit price in minor units, after the order's discounts. */
   price: number;
+  /** Unit price before discounts in minor units; `price` when absent. */
+  originalPrice?: number;
+  /** Variant title when the order was placed; absent for records stored before titles. */
+  variantTitle?: string | null;
 }
 
 interface FulfillmentHoldData {
@@ -272,6 +314,42 @@ export interface InventoryAdjustmentGroupData {
   }[];
 }
 
+/** A quantity change staged in an order edit session. */
+interface StagedQuantityData {
+  lineItem: string;
+  /** Target current quantity of the line. */
+  quantity: number;
+  restock: boolean;
+  /** Current quantity when the change was staged; a commit refuses lines changed since. */
+  from: number;
+}
+
+/** An API order edit between `orderEditBegin` and `orderEditCommit`; the order is unchanged until commit. */
+export interface OrderEditSessionData {
+  order: string;
+  state: 'open' | 'committed';
+  changes: StagedQuantityData[];
+}
+
+/** One changed line of an order edit; removed units have negative quantities. */
+export interface OrderEditSaleData {
+  id: string;
+  lineItem: string;
+  quantity: number;
+  actionType: 'ORDER' | 'RETURN';
+}
+
+/** The sales agreement Shopify records for a committed order edit. */
+export interface OrderEditAgreementData {
+  order: string;
+  happenedAt: string;
+  /** App GID of the editing app; null for a staff edit in Shopify admin. */
+  app: string | null;
+  staffNote: string | null;
+  notifyCustomer: boolean;
+  sales: OrderEditSaleData[];
+}
+
 /** Stored response of an idempotent mutation. */
 export interface IdempotencyKeyData {
   input: string;
@@ -280,8 +358,38 @@ export interface IdempotencyKeyData {
 
 export const dayMs = 86_400_000;
 
-/** A merchant or API action that Shopify refuses in the current state. */
-export class RuleError extends Error {}
+/** The app GID of this simulator's installation; agreements of API order edits name it. */
+export const simulatorAppId = 'gid://shopify/App/1';
+
+/**
+ * Orders created before the returned time are hidden without `read_all_orders`; Shopify then
+ * exposes the last 60 days. Undefined when the whole history is visible.
+ */
+export function historyStart(context: ShopifyContext) {
+  return context.config.scopes.includes('read_all_orders')
+    ? undefined
+    : context.now - 60 * dayMs;
+}
+
+/** Whether an order is visible to the installation's granted order history. */
+export function visibleOrder(context: ShopifyContext, order: StoredRecord) {
+  const start = historyStart(context);
+
+  return start === undefined || order.createdAt >= start;
+}
+
+/**
+ * A merchant or API action that Shopify refuses in the current state. `field` names the
+ * mutation argument a user error points to, when the refusal concerns one.
+ */
+export class RuleError extends Error {
+  constructor(
+    message: string,
+    readonly field?: string,
+  ) {
+    super(message);
+  }
+}
 
 /** Formats a Shopify global ID. */
 export const gid = (type: string, id: string) => `gid://shopify/${type}/${id}`;
@@ -326,6 +434,20 @@ export const money = (value: number) => (value / 100).toFixed(2);
 export const moneyBag = (value: number, currency: string) => ({
   shopMoney: { amount: decimal(value), currencyCode: currency },
   presentmentMoney: { amount: decimal(value), currencyCode: currency },
+});
+
+/**
+ * Builds a `MoneyBag` of an order amount: the shop currency, and the customer's currency at
+ * the order's rate, rounded to minor units, when the order was presented in another currency.
+ */
+export const orderMoneyBag = (value: number, order: OrderData) => ({
+  shopMoney: { amount: decimal(value), currencyCode: order.currency },
+  presentmentMoney: order.presentment
+    ? {
+        amount: decimal(Math.round(value * order.presentment.rate)),
+        currencyCode: order.presentment.currency,
+      }
+    : { amount: decimal(value), currencyCode: order.currency },
 });
 
 /** Store ID of an inventory level. */

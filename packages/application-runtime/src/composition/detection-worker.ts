@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { createAppHost } from '@luma/app-catalog';
@@ -6,15 +6,22 @@ import type { ConnectionsConfig } from '@luma/config';
 import type { CapabilityReader } from '@luma/connections';
 import {
   createInstalledRuntime,
+  createOrderSourceVisibility,
   createSourceAuthority,
 } from '@luma/connections/composition';
 import type { Configuration } from '@luma/exceptions';
 import { defaultConfiguration } from '@luma/exceptions';
 import type { IdentityService, TenantContext } from '@luma/identity';
 import { pausesBackgroundWork } from '@luma/identity';
+import { orderStateQueries } from '@luma/orders/composition';
 import type { Observability, TenantDatabase } from '@luma/platform';
 import { createFailureLog } from '@luma/platform';
-import { createDetectionMonitor, createStockRefresh } from '@luma/resolution';
+import { createOrderQuantities } from '@luma/read-models/composition';
+import {
+  createDetectionMonitor,
+  createOrderRefresh,
+  createStockRefresh,
+} from '@luma/resolution';
 import { createDetectionSources } from '@luma/resolution/composition';
 import type { Pool } from 'pg';
 
@@ -60,12 +67,46 @@ export function createStockRefreshService(options: {
 }
 
 /**
+ * Composes the order reread that detection and owners use before they judge an order: every
+ * stale source of one canonical order is read through the installed capabilities' point reads
+ * and stored as current. A source that can't be reread keeps its stored reads.
+ */
+export function createOrderRefreshService(options: {
+  database: TenantDatabase;
+  capabilities: Pick<CapabilityReader, 'read' | 'discover'>;
+  log?: (message: string, error?: unknown) => void;
+}) {
+  const commerce = createCommerceServices(options.database);
+  const refresh = createOrderRefresh({
+    sources: createDetectionSources(options.database),
+    capabilities: options.capabilities,
+    id: randomUUID,
+    project: async (context, read) => {
+      const outcome = await commerce.ingestion.ingest(
+        context,
+        `refresh:${read.observation.id}`,
+        read,
+      );
+
+      return outcome.status === 'applied';
+    },
+    ...(options.log ? { log: options.log } : {}),
+  });
+
+  return {
+    refresh: (context: TenantContext, orderId: string, maxAgeMs?: number) =>
+      refresh.refresh(context, orderId, maxAgeMs),
+    close: commerce.close,
+  };
+}
+
+/**
  * Composes scheduled detection over stored commerce state. `detection` is read on every call,
  * so it may be created after this monitor and receive the monitor's verifier.
  */
 export function createScheduledDetection(options: {
   database: TenantDatabase;
-  capabilities: Pick<CapabilityReader, 'read'>;
+  capabilities: Pick<CapabilityReader, 'read' | 'discover'>;
   internalOrdersEnabled?: (tenantId: string) => Promise<boolean>;
   category(provider: string): 'erp' | 'storefront' | null;
   detection(): Detection;
@@ -77,14 +118,35 @@ export function createScheduledDetection(options: {
   const commerce = createCommerceServices(options.database);
   const sources = createDetectionSources(options.database);
   const exceptions = () => options.detection().exceptions;
-  const authority = createSourceAuthority(
+  const authorityOf = (database: TenantDatabase) =>
+    createSourceAuthority(
+      database,
+      options.category,
+      async (context) => context,
+      options.internalOrdersEnabled,
+    );
+  const authority = authorityOf(options.database);
+  const orders = createOrderRefreshService({
+    database: options.database,
+    capabilities: options.capabilities,
+    ...(options.log ? { log: options.log } : {}),
+  });
+  const quantities = createOrderQuantities(
     options.database,
-    options.category,
-    async (context) => context,
-    options.internalOrdersEnabled,
+    { state: orderStateQueries },
+    authorityOf,
+    createOrderSourceVisibility(
+      options.database,
+      options.internalOrdersEnabled ?? (async () => false),
+    ),
   );
   const monitor = createDetectionMonitor({
     sources,
+    orders: {
+      ...quantities,
+      refresh: (context, orderId, maxAgeMs) =>
+        orders.refresh(context, orderId, maxAgeMs),
+    },
     capabilities: options.capabilities,
     exceptions: {
       ingest: (...args) => exceptions().ingest(...args),
@@ -112,7 +174,17 @@ export function createScheduledDetection(options: {
     ...(options.log ? { log: options.log } : {}),
   });
 
-  return { ...monitor, sources, authority, close: commerce.close };
+  return {
+    ...monitor,
+    sources,
+    authority,
+    /** Rereads one order's stale sources; owners call it before judging the order. */
+    refreshOrder: orders.refresh,
+    close: async () => {
+      await orders.close();
+      await commerce.close();
+    },
+  };
 }
 
 /**

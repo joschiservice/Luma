@@ -23,6 +23,116 @@ const money = z
   .object({ amount: decimal, currency: z.string().regex(/^[A-Z]{3}$/) })
   .strict();
 
+const currency = z.string().regex(/^[A-Z]{3}$/);
+const moneyPair = z.object({ shop: money, presentment: money }).strict();
+const amount = z
+  .object({ original: moneyPair.nullable(), current: moneyPair.nullable() })
+  .strict();
+
+// Order schema version 6 facts; the same rules apply to the source observation.
+const commercialFacts = {
+  currencies: z
+    .object({ shop: currency.nullable(), presentment: currency.nullable() })
+    .strict()
+    .optional(),
+  amounts: z
+    .object({
+      subtotal: amount,
+      shipping: amount,
+      discounts: amount,
+      tax: amount,
+      duties: amount,
+      total: amount,
+    })
+    .strict()
+    .optional(),
+  taxesIncluded: z.boolean().nullable().optional(),
+  dutiesIncluded: z.boolean().nullable().optional(),
+  taxLines: z
+    .array(
+      z
+        .object({
+          title: text.nullable(),
+          rate: count.refine((v) => Number(v) <= 1).nullable(),
+          amount: moneyPair.nullable(),
+        })
+        .strict(),
+    )
+    .max(100)
+    .optional(),
+  shippingLines: z
+    .array(
+      z
+        .object({
+          id: z.string().min(1).max(1024).nullable(),
+          title: text.nullable(),
+          code: text.nullable(),
+          source: text.nullable(),
+          carrier: text.nullable(),
+          removed: z.boolean().nullable(),
+          original: moneyPair.nullable(),
+          discounted: moneyPair.nullable(),
+          current: moneyPair.nullable(),
+        })
+        .strict(),
+    )
+    .max(100)
+    .optional(),
+  discounts: z
+    .array(
+      z
+        .object({
+          index: z.number().int().min(0).nullable(),
+          kind: z.enum(['code', 'automatic', 'manual', 'script', 'unknown']),
+          label: text.nullable(),
+          target: z.enum(['line_item', 'shipping_line', 'unknown']),
+          allocation: z.enum(['across', 'each', 'unknown']),
+          value: z
+            .discriminatedUnion('type', [
+              z
+                .object({
+                  type: z.literal('percentage'),
+                  percentage: count.refine((v) => Number(v) <= 100),
+                })
+                .strict(),
+              z.object({ type: z.literal('fixed'), amount: money }).strict(),
+            ])
+            .nullable(),
+        })
+        .strict(),
+    )
+    .max(250)
+    .optional(),
+  tags: z.array(z.string().min(1).max(255)).max(250).optional(),
+  attributes: z
+    .object({
+      edited: z.boolean().nullable(),
+      requiresShipping: z.boolean().nullable(),
+      test: z.boolean().nullable(),
+      cancelReason: z
+        .enum([
+          'customer',
+          'declined',
+          'fraud',
+          'inventory',
+          'staff',
+          'other',
+          'unknown',
+        ])
+        .nullable(),
+      cancelledAt: timestamp.nullable(),
+      closedAt: timestamp.nullable(),
+      processedAt: timestamp.nullable(),
+      channel: text.nullable(),
+      fulfillmentStatus: z
+        .string()
+        .regex(/^[a-z][a-z0-9_]{0,63}$/)
+        .nullable(),
+    })
+    .strict()
+    .optional(),
+};
+
 const base = z.object({
   entityId: uuid,
   connectionId: uuid,
@@ -71,6 +181,17 @@ const line = z
       .strict()
       .nullable()
       .optional(),
+    variantTitle: text.nullable().optional(),
+    prices: z
+      .object({
+        originalUnit: moneyPair.nullable(),
+        discountedUnit: moneyPair.nullable(),
+        totalDiscount: moneyPair.nullable(),
+      })
+      .strict()
+      .optional(),
+    requiresShipping: z.boolean().nullable().optional(),
+    catalog: z.enum(['variant', 'variant_removed', 'no_product']).optional(),
   })
   .strict()
   .refine(
@@ -99,6 +220,7 @@ const order = z
       'failed',
       'unknown',
     ]),
+    ...commercialFacts,
     lines: z
       .array(line)
       .refine((v) => new Set(v.map((l) => l.id)).size === v.length),
@@ -306,6 +428,7 @@ export const snapshotSchema = z.union([
         z.literal(4),
         z.literal(5),
         z.literal(6),
+        z.literal(7),
       ]),
       kind: z.literal('order'),
       data: order,

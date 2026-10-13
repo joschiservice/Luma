@@ -30,6 +30,7 @@ const config: ShopifyConfig = {
     'read_customers',
     'read_returns',
     'write_orders',
+    'write_order_edits',
     'read_locations',
     'read_merchant_managed_fulfillment_orders',
     'write_merchant_managed_fulfillment_orders',

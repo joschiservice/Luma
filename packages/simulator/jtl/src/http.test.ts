@@ -224,6 +224,27 @@ describe('JTL ERP API', () => {
     expect((await call(context, 'delivery-notes/9')).status).toBe(404);
   });
 
+  it('serves a delivery note being packed without a shipping date', async () => {
+    const { context } = await seeded();
+    await order(context, 2);
+    const note = await jtl.command(context, {
+      kind: 'ship',
+      id: '1',
+      warehouse: '1',
+      trackingNumber: 'JJD1',
+      trackingUrl: 'https://tracking.example.test/JJD1',
+      packing: true,
+    });
+    expect(
+      (await call(context, `delivery-notes/${note.id}`)).body,
+    ).toMatchObject({
+      packages: [{ shippingDate: null, trackingNumber: 'JJD1' }],
+    });
+    expect((await call(context, 'sales-orders/1')).body).toMatchObject({
+      shippingDetails: { shippingDate: null },
+    });
+  });
+
   it('assigns orders to customers by email address and lists customers changed after a time', async () => {
     const { context } = await seeded();
     const buyer = {

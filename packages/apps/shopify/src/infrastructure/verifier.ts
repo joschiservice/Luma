@@ -95,6 +95,9 @@ export function createInstallationVerifier(options: {
       ].some(has)
     )
       granted.push('fulfillment.read');
+    // Edits are checked against fulfillment work first, so they need fulfillment reads too.
+    if (granted.includes('fulfillment.read') && scopes.has('write_order_edits'))
+      granted.push('orders.quantity.edit');
 
     if (
       has('orders') &&

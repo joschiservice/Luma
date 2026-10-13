@@ -9,6 +9,14 @@ import { decimalString, decimalUnits } from './facts.js';
 
 export const diagnosisVersion = 'diagnosis-v1';
 
+/** How people name the systems a case's evidence comes from. */
+const systemNames: Record<string, string> = {
+  'luma-erp': 'Luma ERP',
+  shopify: 'Shopify',
+  jtl: 'JTL',
+  cin7: 'Cin7',
+};
+
 interface Finding {
   code: string;
   text: string;
@@ -231,7 +239,12 @@ export function diagnose(snapshot: DiagnosisInput, now: string): Diagnosis {
                 Date.parse(input.facts.observedAt) +
                   configuration.thresholds.freshnessSeconds * 1000,
               ).toISOString()
-            : null,
+            : input.exceptionClass === 'order_quantity_mismatch'
+              ? new Date(
+                  Date.parse(input.facts.oldestReadAt) +
+                    configuration.thresholds.freshnessSeconds * 1000,
+                ).toISOString()
+              : null,
       model: { status: 'disabled', model: null, promptVersion: null },
       reread: { status: 'not_requested', retryAfter: null },
     },
@@ -440,6 +453,114 @@ export function diagnose(snapshot: DiagnosisInput, now: string): Diagnosis {
         'Ask the warehouse owner to inspect the operation and reread its order and shipments.',
         'Fresh shipment evidence proves the intended line quantities shipped or a reviewed cancellation disposition.',
         ['Reconcile ambiguous shipment effects before any retry.'],
+      );
+      break;
+    }
+    case 'order_quantity_mismatch': {
+      const f = input.facts;
+      const providers = new Map(
+        evidence.flatMap((e) =>
+          e.connectionId && e.source
+            ? [[e.connectionId, e.source.provider]]
+            : [],
+        ),
+      );
+      const name = (connectionId: string) =>
+        systemNames[providers.get(connectionId) ?? ''] ??
+        providers.get(connectionId) ??
+        'Another system';
+      const authority = f.quantities.find(
+        (item) => item.connectionId === f.authorityConnectionId,
+      );
+      const value = (quantity: string) =>
+        decimalString(decimalUnits(quantity)).replace(/\.?0+$/, '');
+      result.summary = 'Order line quantities differ between systems.';
+      result.facts.push(
+        finding(
+          'line_quantities',
+          // The authority's quantity comes first; the others follow in source order.
+          [
+            ...(authority ? [authority] : []),
+            ...f.quantities.filter((item) => item !== authority),
+          ]
+            .map(
+              (item) =>
+                `${name(item.connectionId)} reports ${item.quantity === null ? 'no current quantity' : `${value(item.quantity)} ${f.unit}`}`,
+            )
+            .join('; ')
+            .concat('.'),
+        ),
+      );
+      result.constraints.push(
+        'A source that does not report current line quantities is listed as not reporting, never as agreeing.',
+        'A provider receipt or a person’s answer does not show the change reached a system; only fresh reads do.',
+      );
+      if (decision.decision === 'detect' && authority?.quantity) {
+        result.summary = [
+          `${name(authority.connectionId)} sets this quantity to ${value(authority.quantity)}`,
+          ...f.quantities
+            .filter(
+              (item) =>
+                item !== authority &&
+                item.quantity !== null &&
+                decimalUnits(item.quantity) !==
+                  decimalUnits(authority.quantity!),
+            )
+            .map(
+              (item) =>
+                `${name(item.connectionId)} still shows ${value(item.quantity!)}`,
+            ),
+          ...f.quantities
+            .filter((item) => item.quantity === null)
+            .map((item) => `${name(item.connectionId)} doesn’t report it`),
+        ]
+          .join('; ')
+          .concat('.');
+        result.impact.potential.push(
+          finding(
+            'wrong_quantity_risk',
+            'Systems that still show another quantity may charge, pick or ship the wrong units.',
+          ),
+        );
+      }
+      hypothesis(
+        'change_not_propagated',
+        'The change was made in one system and has not reached the others.',
+        [
+          'Check which system holds order-line authority.',
+          'Check whether fulfilment work has started on the line.',
+        ],
+      );
+      immediate = decision.decision === 'detect';
+      result.nextSteps.push(
+        {
+          ...finding(
+            'reread_order_sources',
+            'Reread every source of the order and its fulfilment records.',
+          ),
+          kind: 'read_investigate',
+          preconditions: [],
+          verificationCriteria: [
+            'Fresh complete reads of every source that reports the line show the same quantity.',
+          ],
+          capabilityLimitations: [],
+        },
+        {
+          ...finding(
+            'carry_quantity_change',
+            'Carry the authoritative quantity to every system as the order’s change plan describes, after the warehouse confirms any started work.',
+          ),
+          kind: 'manual_intervention',
+          preconditions: [
+            'Confirm order-line authority and fulfilment progress on a fresh read.',
+          ],
+          verificationCriteria: [
+            'Fresh complete reads of every source that reports the line show the same quantity.',
+          ],
+          capabilityLimitations: [
+            'Luma changes Shopify quantities only through an approved edit; other systems need a person.',
+          ],
+        },
       );
       break;
     }

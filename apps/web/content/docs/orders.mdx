@@ -28,7 +28,8 @@ The view, filters, sort and page are part of the page address, so you can share 
 The order number appears in the bar at the top, after **Orders**. Below it are the order’s status, payment, fulfillment, total, when it was placed, its due date and when Luma last read it. Values that need attention, such as a failed payment, are highlighted. When the due date has passed, it’s labeled **Overdue since**. Below that:
 
 - **Current state** sums up the order: how many units are still to fulfill, whether it’s overdue, and which issues need you. It’s based on the source updated most recently. When more than one source reports the order, it also names that source’s status and payment.
-- **Order lines** shows current, originally ordered, reduced, fulfilled and remaining quantities for each item. Shopify’s reduced quantity includes removed and refunded units; it does not tell you why they were reduced. If the order comes from more than one source, choose the source under **Show lines from**. Fulfilled quantities count shipped, delivered or completed shipments that the same source reports. When a source reports neither current nor reduced quantities, Luma says it can’t tell how much remains instead of guessing. **Product and stock** opens the item’s product.
+- **Order lines** shows current, originally ordered, reduced, fulfilled and remaining quantities for each item. Shopify’s reduced quantity includes removed and refunded units; it does not tell you why they were reduced. If the order comes from more than one source, choose the source under **Show lines from**. Fulfilled quantities count shipped, delivered or completed shipments that the same source reports. When a source reports neither current nor reduced quantities, Luma says it can’t tell how much remains instead of guessing. **Product and stock** opens the item’s product. A line marked **Custom item or deleted product** has no product in the source; Shopify doesn’t say which of the two it is. **Variant deleted at source** means the product still exists but the ordered variant doesn’t.
+- **Delivery and charges** shows what the chosen source reports about the order’s money and delivery: the shop currency and the currency the customer paid in, amounts when the order was placed and now, shipping charges (including removed ones), discount codes, tax lines, tags, the sales channel and whether the order was edited or is a test order. Amounts are shown exactly as the source reports them; Luma doesn’t recalculate them. **Not reported by** means the source doesn’t share that detail, which is different from zero. **Addresses** shows the delivery and billing address when you can view customers and the store is approved to share addresses. Otherwise it says access is restricted or that the source doesn’t share addresses.
 - **Fulfillments** lists the fulfillment work each source reports. Work mirrored in two systems is never added together. Choose a fulfillment to open it.
 - **Returns and refunds** lists the returns and refunds imported for the order. See [Returns](/docs/returns).
 - **Source readings** lists each state Luma read from a source, newest first. It shows what the source reported at that time, not every change the source made.
@@ -44,19 +45,47 @@ If an order exists in more than one system, **Source comparison** lines up what 
 
 **Current state** names each difference, for example: Payment differs between sources: “Paid” in Shopify and “Payment pending” in JTL-Wawi. The **Authoritative source** column shows which connection your workspace trusts for lines, cancellation, fulfillment, location and tracking. Each fact can use a different source. **Unknown authority** or **Conflicting authority** means Luma cannot choose a trusted source. Review the choice in [Source authority settings](/docs/workspace-settings#source-authority). Payment and totals have no authority rule yet. Systems often update at different times, so compare when each source last updated the order before you decide which one is wrong. Correct the order in that system; Luma shows the change after its next read.
 
+## Plan a change before you make it
+
+**Change plan** shows what a change to an order still needs before every system shows it. When sources disagree about a line’s quantity, a cancellation or a location, the plan for that difference appears by itself. To plan a change yourself, choose a line under **Propose a quantity**, enter the new quantity and choose **Plan this change**. **Show detected changes** returns to the differences Luma found. The same plan appears on an issue about the order. Plans change nothing.
+
+Each plan shows:
+
+- **Who shows the change**: each system’s current value and whether it already shows the change. **Unknown** means the system doesn’t report the value or its last read is too old.
+- **Shipped**: units already shipped, counted once. Luma uses the system your workspace trusts for fulfillment, or otherwise the largest count any system reports. The same shipment in two systems is never added up.
+- Whether the change is still safe: **Safe to change**, **Not safe to change** or **Safety unknown**, with the reasons. A quantity can go down only before any system starts fulfilling the line and never below the units already shipped. An address can change only before work starts, a location only while its work is pending, and an order can be canceled only before any work starts. Luma says **Safety unknown** instead of safe when a read is more than five minutes old, a read was incomplete, lines can’t be matched, no trusted source is set, no system reports fulfillment, or you don’t have access to fulfillment.
+- **Steps**, in order. Steps marked **Luma** run through Luma with a preview and approval. Steps marked **Person** name who does them, such as the warehouse, the carrier, finance or operations. When work may already be in progress, the plan asks the warehouse to confirm or hold it first.
+
+Today Luma can change quantities in Shopify itself; every other system is updated by a person. When a Luma step is ready, choose **Review in** and the store name to open [Change quantities in Shopify](#change-quantities-in-shopify) with the planned quantity filled in. You still preview and approve it there. If the step says you need a permission, ask a workspace admin. Plans update when the order is read again, for example after the warehouse starts packing.
+
+A detected quantity difference also reads as one sentence, led by the system that holds order-line authority: for example “Luma ERP sets this quantity to 1; Shopify still shows 2; JTL doesn’t report it.” When the difference persists, Luma opens an issue, and the workflow [Carry an order quantity change to every system](/docs/workflows#workflows-that-start-from-issues) can carry it for you.
+
 ## Manage an order in Luma
 
 When native orders are available in your workspace, open a Shopify order and choose **Accept into Luma**. You need **Manage Luma orders** and **Manage imports**. Luma creates a record linked to the existing order. The list continues to show one order with Shopify and Luma ERP as sources.
 
 Before editing, choose **Luma ERP** for order lifecycle and order lines under [Source authority](/docs/workspace-settings#source-authority). In **Luma order record**, change the status or current line quantities. Expand **Billing address** or **Shipping address** to edit an address, then choose **Save order**. If another person changed the record, refresh it before trying again.
 
-Cancellation is final. Reducing a line quantity makes the total unknown because shipping, discounts and tax adjustments cannot be calculated from the line price alone. Address changes do not create a new source version in order history. Edits stay in Luma; they are not sent to Shopify. You can compare the sources to see their differences. An accepted record’s source identity remains fixed, so it cannot be linked or unlinked through the source controls.
+Cancellation is final. Reducing a line quantity makes the total unknown because shipping, discounts and tax adjustments cannot be calculated from the line price alone. Address changes do not create a new source version in order history. Edits stay in Luma; they are not sent to Shopify. To change a Shopify order itself, see [Change quantities in Shopify](#change-quantities-in-shopify). You can compare the sources to see their differences. An accepted record’s source identity remains fixed, so it cannot be linked or unlinked through the source controls.
 
 ## See live Shopify details
 
 For an order from Shopify, a live details section reads payments, the customer, fulfillment holds, returns, refunds and events directly from your store, with the connection’s permissions. Luma doesn’t store these details. Choose **Refresh** to read them again, or **Open in Shopify admin** to open the order in Shopify.
 
 **Open customer in Luma →** opens the order’s customer in [Customers](/docs/customers). Customer details appear only after Shopify approves Luma’s access to customer data and your store grants it. If an order has no Shopify order ID, Luma can’t read live details for it.
+
+## Change quantities in Shopify
+
+To change how many units of a Shopify order’s unfulfilled lines the customer receives, open the order and choose **Change quantities…** in the live Shopify details. You need **Change Shopify order quantities**, and the store connection must allow order edits. A store connected before Luma asked for this access shows it as missing until someone with **Manage connections** reconnects it.
+
+1. Enter the new quantity for each line you want to change. Leave other lines empty. Choose **Restock removed units** to return removed units to stock.
+2. Choose **Preview change**. Shopify calculates the new subtotal, total and outstanding amount without changing the order. When the customer pays in another currency, both amounts are shown.
+3. Someone with approval permission approves the exact change in the order or in [Needs you](/docs/needs-you). Your workspace’s approval rules decide whether that must be another person.
+4. The requester chooses **Send to Shopify**. Luma reads the order again and sends the change only if nothing relevant changed and Shopify calculates the same amounts. Otherwise review a new change.
+
+A line can’t change once any unit is fulfilled, its fulfillment has started, or it was sent to a fulfillment service. Cancelled and closed orders can’t change. If order lines come from this store under [Source authority](/docs/workspace-settings#source-authority), you can choose any quantity. If they come from another system, such as JTL-Wawi, you can only set the quantity that system shows, so Shopify matches it; Luma needs a complete read of that system from the last five minutes. Luma doesn’t notify the customer. While [observe-only](/docs/apps-and-connections#observe-only) applies, Luma records the change but sends nothing to Shopify, not even the calculation.
+
+**Accepted by Shopify** doesn’t mean done: the change is **Verified** only after a fresh read shows the new quantities. If Shopify’s answer is lost, the status shows **Sent, outcome unknown**. Choose **Check Shopify**; Luma reads the order to find out and never sends the change twice. **Not applied** means Shopify shows the change was never made.
 
 ## Link a Shopify order with its JTL-Wawi order
 

@@ -27,6 +27,7 @@ const realisticIncidents = {
   'supplier-silent': 0,
   'supplier-split-delivery-mail': 0,
   'customer-delay-mail': 0,
+  'order-quantity-change': 0,
   'shipping-method-mismatch': 0.5,
   'provider-outage': 0.5,
   'auth-revoked': 0.05,

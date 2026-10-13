@@ -128,6 +128,34 @@ describe('app registry', () => {
     ).toThrow('UI slot page');
   });
 
+  it('names the permission that governs each app action and rejects unknown ones', () => {
+    const registry = createAppRegistry([
+      {
+        manifest: {
+          ...app.manifest,
+          actionAccess: { 'orders.quantity.edit': 'notes:notes.write' },
+        },
+      },
+    ]);
+    expect(registry.actionPermission('notes', 'orders.quantity.edit')).toBe(
+      'notes:notes.write',
+    );
+    expect(registry.actionPermission('notes', 'returns.refund')).toBeNull();
+    expect(
+      registry.actionPermission('other', 'orders.quantity.edit'),
+    ).toBeNull();
+    expect(() =>
+      createAppRegistry([
+        {
+          manifest: {
+            ...app.manifest,
+            actionAccess: { 'orders.quantity.edit': 'notes:missing' },
+          },
+        },
+      ]),
+    ).toThrow('action orders.quantity.edit');
+  });
+
   it('filters app decisions by the permissions each kind declares', async () => {
     const decision = {
       kind: 'inventory_correction',
