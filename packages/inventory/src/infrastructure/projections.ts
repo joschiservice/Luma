@@ -10,6 +10,7 @@ import type {
   CommerceProjections,
   Dependent,
 } from '../application/projections.js';
+import { refreshTransferProjection } from './transfer-projection.js';
 import { snapshotSchema } from './validation.js';
 
 /**
@@ -71,6 +72,9 @@ export function createCommerceProjections(
         [randomUUID(), tenant, snapshot, context.actor.id],
       );
       await refreshProductSkus(tx, tenant, [{ snapshotId: snapshot, value }]);
+      await refreshTransferProjection(tx, tenant, [
+        { snapshotId: snapshot, value },
+      ]);
 
       return 'applied';
     }
@@ -178,6 +182,7 @@ export function createCommerceProjections(
         [tenant, applied.map((item) => item.snapshotId), context.actor.id],
       );
       await refreshProductSkus(tx, tenant, applied);
+      await refreshTransferProjection(tx, tenant, applied);
     }
 
     return statuses;
@@ -330,8 +335,12 @@ export function createCommerceProjections(
           JOIN inventory_projections p ON p.tenant_id=k.tenant_id AND p.entity_id=k.product_id AND p.connection_id=k.connection_id
           JOIN inventory_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
           WHERE $4 AND k.tenant_id=$1 AND k.sku_id=$2 AND ($3::uuid IS NULL OR k.connection_id=$3)
+          UNION ALL
+          SELECT k.entity_id,s.kind,k.connection_id,s.observation_id
+          FROM inventory_transfer_references k JOIN inventory_snapshots s ON s.tenant_id=k.tenant_id AND s.id=k.snapshot_id
+          WHERE k.tenant_id=$1 AND k.resource=$5 AND k.canonical_id=$2 AND ($3::uuid IS NULL OR k.connection_id=$3)
           ORDER BY 1,3`,
-          [context.tenantId, id, connectionId ?? null, kind === 'sku'],
+          [context.tenantId, id, connectionId ?? null, kind === 'sku', kind],
         );
 
         return rows.rows;
@@ -451,6 +460,22 @@ export function supersedes(
 function references(value: CanonicalSnapshot): { kind: string; id: string }[] {
   if (value.data.type === 'product')
     return value.data.skus.map((sku) => ({ kind: 'sku', id: sku.skuId }));
+  if (
+    value.data.type === 'inventory_transfer' ||
+    value.data.type === 'inventory_shipment'
+  ) {
+    const refs = (value.data.lines ?? []).flatMap((line) =>
+      line.skuId ? [{ kind: 'sku', id: line.skuId }] : [],
+    );
+    if (value.data.type === 'inventory_transfer') {
+      for (const location of [value.data.origin, value.data.destination]) {
+        if (location?.locationId)
+          refs.push({ kind: 'location', id: location.locationId });
+      }
+    }
+
+    return refs;
+  }
 
   return [
     { kind: 'sku', id: value.data.skuId },

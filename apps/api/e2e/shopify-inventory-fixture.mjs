@@ -29,11 +29,17 @@ const config = {
     'read_merchant_managed_fulfillment_orders',
     'read_returns',
     'write_inventory',
+    'read_inventory_transfers',
+    'read_inventory_shipments',
   ],
 };
 
 /** Exercises real stock, approval and execution services against an isolated Shopify simulator. */
-export async function correctionFixture(t, origin = 'http://localhost:3000') {
+export async function correctionFixture(
+  t,
+  origin = 'http://localhost:3000',
+  options = {},
+) {
   const originalFetch = globalThis.fetch;
   const store = createMemoryStore();
   const context = () => ({
@@ -163,7 +169,13 @@ export async function correctionFixture(t, origin = 'http://localhost:3000') {
     {
       label: 'Shopify stock',
       target: { kind: 'shopify', shop: 'stock.myshopify.com' },
-      permissions: ['inventory.read', 'inventory.available.reconcile'],
+      permissions: [
+        'inventory.read',
+        'inventory.available.reconcile',
+        ...(options.transferReads
+          ? ['inventory.transfers.read', 'inventory.shipments.read']
+          : []),
+      ],
       credentials: { token: 'synthetic' },
     },
     201,
@@ -226,7 +238,14 @@ export async function correctionFixture(t, origin = 'http://localhost:3000') {
     );
 
   /** Reconstructs the installed runtime to exercise persisted receipts through normal commerce reads. */
-  async function syncStock() {
+  async function syncRecords(
+    capability = 'inventory.read',
+    input = {
+      limit: 100,
+      sku: { externalId: stockItem, scopeKey: '' },
+      location: { externalId: stockLocation, scopeKey: '' },
+    },
+  ) {
     const pool = new Pool({ connectionString: f.db.runtimeUrl });
     const db = createTenantDatabase(pool);
     const host = createAppHost(db, {
@@ -245,29 +264,38 @@ export async function correctionFixture(t, origin = 'http://localhost:3000') {
       providers: host.registry.providers(),
       record: async () => {},
       recordObservations: async (evidence) => {
-        for (const observation of evidence.observations) {
-          await commerce.ingestion.ingest(tenant, observation.id, {
-            capability: 'inventory.read',
-            observation,
-          });
-        }
+        const outcomes = await commerce.ingestion.importMany(
+          tenant,
+          evidence.observations.map((observation) => ({
+            ingestKey: observation.id,
+            input: { capability: evidence.capability, observation },
+          })),
+        );
+        if (outcomes.some((outcome) => outcome.status === 'pending'))
+          throw new Error('Imported evidence was not projected');
       },
     });
     try {
-      const result = await runtime.read(tenant, {
-        connectionId: installed.id,
-        capability: 'inventory.read',
-        version: '0',
-        input: {
-          limit: 100,
-          sku: { externalId: stockItem, scopeKey: '' },
-          location: { externalId: stockLocation, scopeKey: '' },
-        },
-      });
-      if (!result.ok)
-        throw new Error(`Stock read failed: ${result.error.code}`);
+      const items = [];
+      let cursor = input.cursor;
+      const seen = new Set();
+      do {
+        const result = await runtime.read(tenant, {
+          connectionId: installed.id,
+          capability,
+          version: '0',
+          input: { ...input, ...(cursor ? { cursor } : {}) },
+        });
+        if (!result.ok)
+          throw new Error(`Provider read failed: ${result.error.code}`);
+        items.push(...result.value.items);
+        cursor = result.value.nextCursor;
+        if (cursor && seen.has(cursor))
+          throw new Error('Repeated provider cursor');
+        if (cursor) seen.add(cursor);
+      } while (cursor);
 
-      return result.value.items;
+      return items;
     } finally {
       await commerce.close();
       await pool.end();
@@ -285,7 +313,10 @@ export async function correctionFixture(t, origin = 'http://localhost:3000') {
     mutations,
     target,
     call,
-    syncStock,
+    syncStock: () => syncRecords(),
+    syncRecords,
+    recordTransfer: (transfer) =>
+      shopify.command(context(), { kind: 'inventory-transfer', transfer }),
     changeAvailable: (quantity) =>
       shopify.command(context(), {
         kind: 'available',

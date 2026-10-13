@@ -72,6 +72,7 @@ export type ShipmentStatus =
  * this shop; `order` refers to the numeric order ID.
  */
 export type ShopifyCommand =
+  | { kind: 'inventory-transfer'; transfer: ShopifyInventoryTransfer }
   | { kind: 'seed-catalog'; products: ShopifySeedProduct[] }
   | { kind: 'customer'; customer: ShopifyCustomerInput }
   | {
@@ -171,4 +172,78 @@ export interface ShopifyCommandResult {
   gid: string;
   /** Changed line items with their numeric IDs, for orders. */
   lines?: { id: string; variant: string; quantity: number }[] | undefined;
+}
+
+/** Immutable location facts captured by a merchant's transfer request. A deleted live location stays null. */
+interface ShopifyTransferLocation {
+  location: string | null;
+  name: string;
+  snapshottedAt: string;
+  address: {
+    address1: string | null;
+    address2: string | null;
+    city: string | null;
+    provinceCode: string | null;
+    countryCode: string | null;
+    zip: string | null;
+  };
+}
+
+/** Merchant-supplied transfer evidence; changing it does not implicitly change stock balances. */
+export interface ShopifyInventoryTransfer {
+  id: string;
+  name: string;
+  status:
+    | 'DRAFT'
+    | 'READY_TO_SHIP'
+    | 'IN_PROGRESS'
+    | 'TRANSFERRED'
+    | 'CANCELED'
+    | 'OTHER';
+  dateCreated: string | null;
+  origin: ShopifyTransferLocation | null;
+  destination: ShopifyTransferLocation | null;
+  totalQuantity: number;
+  receivedQuantity: number;
+  lines: {
+    id: string;
+    inventoryItem: string | null;
+    title: string | null;
+    totalQuantity: number;
+    pickedForShipmentQuantity: number;
+    shippableQuantity: number;
+    shippedQuantity: number;
+  }[];
+  shipments: ShopifyInventoryShipment[];
+}
+
+/** Receiving evidence includes independently reported accepted, rejected and unreceived units. */
+export interface ShopifyInventoryShipment {
+  id: string;
+  name: string;
+  status: 'DRAFT' | 'IN_TRANSIT' | 'PARTIALLY_RECEIVED' | 'RECEIVED' | 'OTHER';
+  dateCreated: string | null;
+  dateShipped: string | null;
+  dateReceived: string | null;
+  lineItemTotalQuantity: number;
+  totalAcceptedQuantity: number;
+  totalRejectedQuantity: number;
+  totalReceivedQuantity: number;
+  tracking: {
+    arrivesAt: string | null;
+    company: string | null;
+    trackingNumber: string | null;
+    trackingUrl: string | null;
+  } | null;
+  /** Null represents an unavailable collection, rather than an empty shipment. */
+  lines:
+    | {
+        id: string;
+        inventoryItem: string | null;
+        quantity: number;
+        acceptedQuantity: number;
+        rejectedQuantity: number;
+        unreceivedQuantity: number;
+      }[]
+    | null;
 }

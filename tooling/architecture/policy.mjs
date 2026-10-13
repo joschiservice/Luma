@@ -50,6 +50,8 @@ export const dependencies = {
   ],
   // Read-only workspace views. Business rules come from their owners; see ADR-008.
   reads: [
+    // Receiving projections and discrepancy rules are owned by inventory.
+    'inventory',
     'resolution',
     'platform',
     'identity',

@@ -9,6 +9,95 @@ const date = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
   .refine((value) => !Number.isNaN(Date.parse(`${value}T00:00:00Z`)));
+const transferLocation = z
+  .object({
+    location: id.nullable(),
+    name: z.string().min(1).max(512),
+    snapshottedAt: z.string().datetime(),
+    address: z.object({
+      address1: z.string().nullable(),
+      address2: z.string().nullable(),
+      city: z.string().nullable(),
+      provinceCode: z.string().nullable(),
+      countryCode: z.string().nullable(),
+      zip: z.string().nullable(),
+    }),
+  })
+  .nullable();
+const optionalTime = z.string().datetime().nullable();
+const inventoryTransfer = z.object({
+  id,
+  name: z.string().min(1).max(512),
+  status: z.enum([
+    'DRAFT',
+    'READY_TO_SHIP',
+    'IN_PROGRESS',
+    'TRANSFERRED',
+    'CANCELED',
+    'OTHER',
+  ]),
+  dateCreated: optionalTime,
+  origin: transferLocation,
+  destination: transferLocation,
+  totalQuantity: quantity,
+  receivedQuantity: quantity,
+  lines: z
+    .array(
+      z.object({
+        id,
+        inventoryItem: id.nullable(),
+        title: z.string().nullable(),
+        totalQuantity: quantity,
+        pickedForShipmentQuantity: quantity,
+        shippableQuantity: quantity,
+        shippedQuantity: quantity,
+      }),
+    )
+    .max(5000),
+  shipments: z
+    .array(
+      z.object({
+        id,
+        name: z.string().min(1).max(512),
+        status: z.enum([
+          'DRAFT',
+          'IN_TRANSIT',
+          'PARTIALLY_RECEIVED',
+          'RECEIVED',
+          'OTHER',
+        ]),
+        dateCreated: optionalTime,
+        dateShipped: optionalTime,
+        dateReceived: optionalTime,
+        lineItemTotalQuantity: quantity,
+        totalAcceptedQuantity: quantity,
+        totalRejectedQuantity: quantity,
+        totalReceivedQuantity: quantity,
+        tracking: z
+          .object({
+            arrivesAt: optionalTime,
+            company: z.string().nullable(),
+            trackingNumber: z.string().nullable(),
+            trackingUrl: z.string().url().nullable(),
+          })
+          .nullable(),
+        lines: z
+          .array(
+            z.object({
+              id,
+              inventoryItem: id.nullable(),
+              quantity,
+              acceptedQuantity: quantity,
+              rejectedQuantity: quantity,
+              unreceivedQuantity: quantity,
+            }),
+          )
+          .max(5000)
+          .nullable(),
+      }),
+    )
+    .max(1000),
+});
 const lineQuantities = z
   .array(z.object({ lineItem: id, quantity: positive }))
   .min(1)
@@ -19,6 +108,10 @@ const lineQuantities = z
  * accepted here.
  */
 export const shopifyCommandSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('inventory-transfer'),
+    transfer: inventoryTransfer,
+  }),
   z.object({
     kind: z.literal('customer'),
     customer: z.object({

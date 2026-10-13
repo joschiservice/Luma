@@ -212,6 +212,8 @@ export * from './orders.js';
 
 export * from './inventory.js';
 
+export * from './inventory-transfers.js';
+
 export * from './fulfillment.js';
 
 export * from './products.js';

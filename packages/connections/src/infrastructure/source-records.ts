@@ -450,6 +450,23 @@ export function createSourceRecords(
 function evidenceIdentities(input: CommerceObservation) {
   const source = input.observation.source;
   const refs = [source];
+  if (
+    input.capability === 'inventory.transfers.read' ||
+    input.capability === 'inventory.shipments.read'
+  ) {
+    for (const line of input.observation.data.lines ?? [])
+      if (line.sku) refs.push({ ...source, ...line.sku, resource: 'sku' });
+    if (input.capability === 'inventory.transfers.read') {
+      for (const location of [
+        input.observation.data.origin,
+        input.observation.data.destination,
+      ])
+        if (location?.id)
+          refs.push({ ...source, ...location.id, resource: 'location' });
+      for (const shipment of input.observation.data.shipments ?? [])
+        refs.push({ ...source, ...shipment, resource: 'inventory_shipment' });
+    }
+  }
   if (input.capability === 'orders.read')
     for (const line of input.observation.data.lines) {
       refs.push({ ...source, ...line.id, resource: 'order_line' });

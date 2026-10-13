@@ -77,5 +77,7 @@
   "connections_capability_exchange_cancel": "Cancel an unprocessed exchange",
   "connections_capability_exchange_release": "Release a paid exchange hold",
   "connections_capability_exchange_price": "Replacement price evidence",
-  "connections_capability_exchange_reservation": "Replacement order and reservation evidence"
+  "connections_capability_exchange_reservation": "Replacement order and reservation evidence",
+  "connections_capability_inventory_transfers_read": "Read inventory transfers",
+  "connections_capability_inventory_shipments_read": "Read inventory shipments"
 }

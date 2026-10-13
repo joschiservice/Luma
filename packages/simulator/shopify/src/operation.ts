@@ -139,6 +139,14 @@ const namedCapabilities: Record<string, string> = {
 /** Read capabilities by the fields and type conditions a query selects, most specific first. */
 const readCapabilities: [string, string[]][] = [
   [
+    'inventory.transfers.read',
+    ['inventoryTransfer', 'inventoryTransfers', 'InventoryTransfer'],
+  ],
+  [
+    'inventory.shipments.read',
+    ['inventoryShipment', 'inventoryShipments', 'InventoryShipment'],
+  ],
+  [
     'returns.read',
     ['returns', 'refunds', 'Return', 'Refund', 'ReverseFulfillmentOrder'],
   ],

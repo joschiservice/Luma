@@ -205,6 +205,18 @@ export function InventoryView({
     <main className="inventory-page">
       {from ? <Link to={from}>← {m.inventory_back_context()}</Link> : null}
       <PageTitle title={m.inventory_page_title()} />
+      <Button
+        variant="outline"
+        render={
+          <Link
+            to="/app/$organizationId/inventory/transfers"
+            params={{ organizationId }}
+          />
+        }
+        nativeButton={false}
+      >
+        {m.inventory_transfer_nav()}
+      </Button>
       <CollectionToolbar
         refreshLabel={m.inventory_list_refresh()}
         refreshing={refreshing}

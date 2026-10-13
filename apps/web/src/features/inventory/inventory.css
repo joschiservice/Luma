@@ -137,3 +137,13 @@
 .inventory-list-table table {
   min-width: 820px;
 }
+
+.inventory-transfer-facts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 0.5rem 1rem;
+}
+.inventory-transfer-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

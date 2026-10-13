@@ -281,9 +281,11 @@ export function createShopifyOAuth(
     }
   }
 
-  // Returns are optional: a connection without them stays active and shows the missing access.
+  // Supplemental reads are optional: missing grants do not disable baseline commerce reads.
   const permissions = [
     ...shopifyReads,
+    'inventory.transfers.read' as const,
+    'inventory.shipments.read' as const,
     'returns.read' as const,
     'returns.options.read' as const,
     'returns.created.read' as const,
@@ -314,6 +316,8 @@ export function createShopifyOAuth(
     'write_orders',
     'write_order_edits',
     'read_locations',
+    'read_inventory_transfers',
+    'read_inventory_shipments',
     ...(config.protectedCustomerDataApproved ? ['read_customers'] : []),
     ...(config.allOrdersApproved ? ['read_all_orders'] : []),
   ];

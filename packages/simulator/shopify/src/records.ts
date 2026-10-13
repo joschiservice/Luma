@@ -4,7 +4,12 @@ import type {
   StoredRecord,
 } from '@luma/simulator-core';
 
-import type { ShopifyConfig, ShopifyHoldReason } from './types.js';
+import type {
+  ShopifyConfig,
+  ShopifyHoldReason,
+  ShopifyInventoryShipment,
+  ShopifyInventoryTransfer,
+} from './types.js';
 
 /** Execution context of one Shopify request or command. */
 export type ShopifyContext = ProviderContext<ShopifyConfig>;
@@ -558,3 +563,20 @@ export function locationNode(context: ShopifyContext, id: string) {
       }
     : null;
 }
+
+export type InventoryTransferData = Omit<
+  ShopifyInventoryTransfer,
+  'id' | 'lines' | 'shipments'
+> & { shipmentIds: string[] };
+
+export type InventoryTransferLineData =
+  ShopifyInventoryTransfer['lines'][number];
+
+export type InventoryShipmentData = Omit<
+  ShopifyInventoryShipment,
+  'id' | 'lines'
+> & { linesAvailable: boolean };
+
+export type InventoryShipmentLineData = NonNullable<
+  ShopifyInventoryShipment['lines']
+>[number];

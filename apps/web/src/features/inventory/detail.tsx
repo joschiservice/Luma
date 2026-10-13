@@ -181,6 +181,22 @@ export function StockDetailView({
       ) : null}
       {detail && position ? (
         <>
+          <Button
+            variant="outline"
+            render={
+              <Link
+                to="/app/$organizationId/inventory/transfers"
+                params={{ organizationId }}
+                search={{
+                  skuId: position.skuId,
+                  locationId: position.locationId,
+                }}
+              />
+            }
+            nativeButton={false}
+          >
+            {m.inventory_transfer_nav()}
+          </Button>
           <section
             className="inventory-explanation"
             aria-labelledby="stock-explanation"

@@ -4,6 +4,8 @@ const installationPermissions = z.enum([
   'orders.read',
   'products.read',
   'inventory.read',
+  'inventory.transfers.read',
+  'inventory.shipments.read',
   'inventory.available.reconcile',
   'fulfillment.read',
   'fulfillment.hold.release',

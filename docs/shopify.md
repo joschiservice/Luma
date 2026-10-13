@@ -211,3 +211,13 @@ more than eight lines. Run it after changing a read selection or the API version
 Use a separate custom-distribution app only for an eligible live merchant pilot, in a
 separate database and environment. Custom distribution cannot convert to public; the
 merchant later installs the public app and reconnects.
+
+### Inventory transfers and shipments
+
+Optional `read_inventory_transfers` and `read_inventory_shipments` grants enable separate
+read streams. Existing installations keep baseline commerce reads when these grants are absent.
+Shipment relationships require the shipment grant; otherwise the transfer's collection remains
+unknown. Nested inventory item and live location identities require their own inventory,
+product or location grants and are omitted when inaccessible. Historical location facts remain.
+See [Inventory transfers and receiving](inventory-workspace.md#transfers-and-receiving) for
+quantity semantics and the limits on discrepancy and claim conclusions.

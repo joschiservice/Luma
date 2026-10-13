@@ -1,6 +1,7 @@
 import type { TenantContext } from '@luma/identity';
 
 import type { StockPosition, StockSource } from '../domain/inventory.js';
+import type { TransferWorkspace } from './transfers.js';
 
 export type { StockPosition, StockSource } from '../domain/inventory.js';
 
@@ -54,7 +55,7 @@ export interface InventoryDetail {
  * Reads stock by canonical SKU, location and unit while preserving each source's quantities.
  * Requires `inventory.read`; detail sections of other areas need their read permission.
  */
-export interface InventoryWorkspace {
+export interface InventoryWorkspace extends TransferWorkspace {
   /** Returns up to 50 positions. A cursor must belong to the same tenant and filters. */
   list(context: TenantContext, query: InventoryQuery): Promise<InventoryList>;
   /** Returns current facts, observed history and confirmed related work, or null when absent. */

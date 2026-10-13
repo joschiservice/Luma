@@ -6,7 +6,106 @@ schema {
 }
 directive @idempotent(key: String!) on FIELD
 
+type LocationAddress {
+  address1: String
+  address2: String
+  city: String
+  provinceCode: String
+  countryCode: String
+  zip: String
+}
+type LocationSnapshot {
+  name: String!
+  snapshottedAt: DateTime!
+  address: LocationAddress!
+  location: Location
+}
+enum InventoryTransferStatus {
+  DRAFT
+  READY_TO_SHIP
+  IN_PROGRESS
+  TRANSFERRED
+  CANCELED
+  OTHER
+}
+enum InventoryShipmentStatus {
+  DRAFT
+  IN_TRANSIT
+  PARTIALLY_RECEIVED
+  RECEIVED
+  OTHER
+}
+type InventoryTransfer implements Node {
+  id: ID!
+  name: String!
+  status: InventoryTransferStatus!
+  dateCreated: DateTime
+  origin: LocationSnapshot
+  destination: LocationSnapshot
+  totalQuantity: Int!
+  receivedQuantity: Int!
+  lineItems(first: Int, after: String): InventoryTransferLineItemConnection!
+  shipments(first: Int, after: String): InventoryShipmentConnection!
+}
+type InventoryTransferLineItem implements Node {
+  id: ID!
+  inventoryItem: InventoryItem
+  title: String
+  totalQuantity: Int!
+  pickedForShipmentQuantity: Int!
+  shippableQuantity: Int!
+  shippedQuantity: Int!
+}
+type InventoryTransferConnection {
+  nodes: [InventoryTransfer!]!
+  pageInfo: PageInfo!
+}
+type InventoryTransferLineItemConnection {
+  nodes: [InventoryTransferLineItem!]!
+  pageInfo: PageInfo!
+}
+type InventoryShipment implements Node {
+  id: ID!
+  name: String!
+  status: InventoryShipmentStatus!
+  dateCreated: DateTime
+  dateShipped: DateTime
+  dateReceived: DateTime
+  lineItemTotalQuantity: Int!
+  totalAcceptedQuantity: Int!
+  totalRejectedQuantity: Int!
+  totalReceivedQuantity: Int!
+  lineItems(first: Int, after: String): InventoryShipmentLineItemConnection
+  tracking: InventoryShipmentTracking
+}
+type InventoryShipmentLineItem implements Node {
+  id: ID!
+  inventoryItem: InventoryItem
+  quantity: Int!
+  acceptedQuantity: Int!
+  rejectedQuantity: Int!
+  unreceivedQuantity: Int!
+}
+type InventoryShipmentConnection {
+  nodes: [InventoryShipment!]!
+  pageInfo: PageInfo!
+}
+type InventoryShipmentLineItemConnection {
+  nodes: [InventoryShipmentLineItem!]!
+  pageInfo: PageInfo!
+}
+type InventoryShipmentTracking {
+  arrivesAt: DateTime
+  company: String
+  trackingNumber: String
+  trackingUrl: URL
+}
+
 type QueryRoot {
+  inventoryTransfer(id: ID!): InventoryTransfer
+  inventoryTransfers(first: Int, after: String): InventoryTransferConnection!
+  inventoryShipment(id: ID!): InventoryShipment
+  inventoryShipments(first: Int, after: String): InventoryShipmentConnection
   bulkOperation(id: ID!): BulkOperation
   bulkOperations(
     first: Int

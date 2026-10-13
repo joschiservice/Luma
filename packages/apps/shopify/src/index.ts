@@ -136,6 +136,9 @@ export function createShopifyProvider(
           ).credentials.token;
         },
         recordObservations: runtime.recordObservations,
+        inventoryShipmentAccess:
+          current.connection.permissions.includes('inventory.shipments.read') &&
+          current.connection.granted.includes('inventory.shipments.read'),
         ...(database
           ? {
               inventoryWrites: (targets) =>

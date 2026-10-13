@@ -34,12 +34,14 @@ stay with those owners.
     metrics use the same blocks.
   - `@luma/exceptions` `orderAttentionQuery`: the inbox attention rule for orders
     (`orders.attention` v1).
+- Inventory owns pure receiving rules shared by its transfer list and detail. These rules
+  consume scalar provider facts and explicit freshness and capability availability.
 - Rules that exist only for a view, such as "differs by source" in Orders, live in the read
   model and are written once in SQL for both list and detail.
 - Owners' public `index.ts` exports only the types of these building blocks
   (`OrderStateQueries`). Fragments document the parameters they bind (`$1` tenant, `$2`
   evaluation time).
-- The module may import platform, identity, orders, exceptions, connectors, procurement and resolution
+- The module may import platform, identity, orders, exceptions, connectors, procurement, inventory and resolution
   (see `tooling/architecture/policy.mjs`). Nothing imports it except composition roots.
 
 Resolution keeps diagnosis, case coordination, learning, activity and the operations

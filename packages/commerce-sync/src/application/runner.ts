@@ -851,7 +851,9 @@ function createdAt(recordType: RecordType, observation: Observation<unknown>) {
   const value =
     recordType === 'orders'
       ? data.placedAt
-      : recordType === 'customers'
+      : recordType === 'customers' ||
+          recordType === 'inventory_transfers' ||
+          recordType === 'inventory_shipments'
         ? data.createdAt
         : recordType === 'returns'
           ? (data.requestedAt ?? data.createdAt)

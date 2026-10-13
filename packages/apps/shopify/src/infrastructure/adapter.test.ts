@@ -219,6 +219,8 @@ describe('Shopify read capabilities', () => {
       'orders.read',
       'products.read',
       'inventory.read',
+      'inventory.transfers.read',
+      'inventory.shipments.read',
       'fulfillment.read',
       'returns.read',
     ]);
@@ -230,7 +232,7 @@ describe('Shopify read capabilities', () => {
         items: [
           {
             source: { provider: 'shopify', externalId: commerce.order.id },
-            adapterVersion: 'shopify/9',
+            adapterVersion: 'shopify/10',
             data: {
               paymentStatus: 'paid',
               placedAt: '2026-09-14T08:30:00Z',

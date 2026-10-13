@@ -22,6 +22,8 @@ export const capabilities = localized({
   'orders.read': m.connections_capability_orders_read,
   'products.read': m.connections_capability_products_read,
   'inventory.read': m.connections_capability_inventory_read,
+  'inventory.transfers.read': m.connections_capability_inventory_transfers_read,
+  'inventory.shipments.read': m.connections_capability_inventory_shipments_read,
   'inventory.available.reconcile': m.connections_capability_inventory_reconcile,
   'fulfillment.read': m.connections_capability_fulfillment_read,
   'fulfillment.hold.release': m.connections_capability_fulfillment_hold_release,

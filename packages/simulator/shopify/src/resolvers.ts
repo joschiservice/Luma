@@ -42,6 +42,10 @@ import {
   historyStart,
   type InventoryItemData,
   type InventoryLevelData,
+  type InventoryShipmentData,
+  type InventoryShipmentLineData,
+  type InventoryTransferData,
+  type InventoryTransferLineData,
   iso,
   levelGid,
   levelId,
@@ -92,6 +96,10 @@ const nodeKinds = new Set([
   'FulfillmentOrder',
   'FulfillmentOrderLineItem',
   'InventoryItem',
+  'InventoryTransfer',
+  'InventoryTransferLineItem',
+  'InventoryShipment',
+  'InventoryShipmentLineItem',
   'InventoryAdjustmentGroup',
   'LineItem',
   'Order',
@@ -223,6 +231,10 @@ async function node(context: RequestContext, id: string | null) {
       : null;
   }
   if (!nodeKinds.has(parsed.type)) return null;
+  if (parsed.type.startsWith('InventoryTransfer'))
+    transferAccess(context, 'inventory_transfers');
+  if (parsed.type.startsWith('InventoryShipment'))
+    transferAccess(context, 'inventory_shipments');
   const record = await load(context, parsed.type, parsed.id);
   if (record && parsed.type === 'Order' && !visibleOrder(context.shop, record))
     return null;
@@ -230,7 +242,39 @@ async function node(context: RequestContext, id: string | null) {
   return record ?? null;
 }
 
+/** Denies transfer access independently from shipment access. */
+function transferAccess(context: RequestContext, scope: string) {
+  if (
+    !context.shop.config.scopes.some(
+      (s) => s === `read_${scope}` || s === `write_${scope}`,
+    )
+  )
+    throw new GraphQLError('Access denied', {
+      extensions: { code: 'ACCESS_DENIED' },
+    });
+}
+
 const root: TypeResolvers = {
+  inventoryTransfer: (_source, args, context) => {
+    transferAccess(context, 'inventory_transfers');
+
+    return node(context, text(args, 'id'));
+  },
+  inventoryTransfers: (_source, args, context) => {
+    transferAccess(context, 'inventory_transfers');
+
+    return connection(context, args, { kind: 'InventoryTransfer' });
+  },
+  inventoryShipment: (_source, args, context) => {
+    transferAccess(context, 'inventory_shipments');
+
+    return node(context, text(args, 'id'));
+  },
+  inventoryShipments: (_source, args, context) => {
+    transferAccess(context, 'inventory_shipments');
+
+    return connection(context, args, { kind: 'InventoryShipment' });
+  },
   nodes: (_source, args, context) =>
     Promise.all((texts(args, 'ids') ?? []).map((id) => node(context, id))),
   currentAppInstallation: (_source, _args, context) => ({
@@ -759,6 +803,48 @@ const resolvers: Record<string, TypeResolvers> = {
           (!names || names.includes(change.name)),
       );
     },
+  }),
+  LocationSnapshot: {
+    location: (snapshot, _args, context) => {
+      if (typeof snapshot !== 'object' || !snapshot) return null;
+      const id: unknown = Reflect.get(snapshot, 'location');
+
+      return typeof id === 'string' ? locationNode(context.shop, id) : null;
+    },
+  },
+  InventoryTransfer: on<InventoryTransferData>({
+    lineItems: (transfer, args, context) =>
+      connection(context, args, {
+        kind: 'InventoryTransferLineItem',
+        parent: transfer.id,
+      }),
+    shipments: async (transfer, args, context) => {
+      transferAccess(context, 'inventory_shipments');
+
+      return connection(
+        context,
+        args,
+        { kind: 'InventoryShipment' },
+        { match: (r) => transfer.data.shipmentIds.includes(r.id) },
+      );
+    },
+  }),
+  InventoryTransferLineItem: on<InventoryTransferLineData>({
+    inventoryItem: (line, _args, context) =>
+      load(context, 'InventoryItem', line.data.inventoryItem),
+  }),
+  InventoryShipment: on<InventoryShipmentData>({
+    lineItems: (shipment, args, context) =>
+      shipment.data.linesAvailable
+        ? connection(context, args, {
+            kind: 'InventoryShipmentLineItem',
+            parent: shipment.id,
+          })
+        : null,
+  }),
+  InventoryShipmentLineItem: on<InventoryShipmentLineData>({
+    inventoryItem: (line, _args, context) =>
+      load(context, 'InventoryItem', line.data.inventoryItem),
   }),
   InventoryItem: on<InventoryItemData>({
     variant: (item, _args, context) =>

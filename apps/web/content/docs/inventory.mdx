@@ -104,3 +104,27 @@ Choose **Verify stock** to read Shopify again. Until the quantity is verified, d
 **Outcome unclear** means Luma couldn’t tell whether Shopify received the correction, for example because the connection was interrupted. Luma never sends the same correction twice. Check the stock in Shopify and choose **Verify stock** before you review a new correction.
 
 If Luma cannot confirm the adjustment reference, the action stays uncertain even when the quantity matches. A matching quantity may be another change. Check Shopify before taking another action.
+
+## Follow transfers and receiving
+
+Choose **Transfers** in Inventory to follow stock moving between locations. Switch between
+transfer requests and shipments. Open a record to inspect its exact source lines, requested,
+ready, shipped and receiving quantities. These quantities provide context; Luma does not add
+them to the stock reported at a location.
+
+Transfer and shipment reads need separate Shopify grants. Enable the reads on the connection
+and sync their record types. A location snapshot shows the historical name and address.
+If the live location is unavailable, its name alone cannot link it to a current stock pool.
+
+Accepted, rejected and unreceived quantities remain separate. Shopify's receipt total includes
+cancelled units. A late arrival estimate means receipt is still unconfirmed; it does not prove
+goods were lost. Luma pauses these checks when a source is unavailable, evidence is older than
+five minutes or a line collection is unavailable.
+
+Linked shipments and purchase orders appear only when an explicit relationship is recorded.
+Open a linked purchase order for its receipt context. Procurement access is required.
+
+Choose **Download receiving evidence** to retain the source identities, observed facts and
+explicit links for investigation. Gather supplier confirmations, delivery documents and photos
+separately, and confirm the claim deadline with the applicable provider policy. The download
+does not submit a claim or change stock.

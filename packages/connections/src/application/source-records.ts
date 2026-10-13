@@ -2,7 +2,9 @@ import type { TenantContext } from '@luma/identity';
 
 import type {
   FulfillmentSnapshot,
+  InventoryShipmentSnapshot,
   InventorySnapshot,
+  InventoryTransferSnapshot,
   Observation,
   OrderSnapshot,
   ProductSnapshot,
@@ -12,6 +14,14 @@ import type {
 } from '../domain/capabilities.js';
 
 export type CommerceObservation =
+  | {
+      capability: 'inventory.transfers.read';
+      observation: Observation<InventoryTransferSnapshot>;
+    }
+  | {
+      capability: 'inventory.shipments.read';
+      observation: Observation<InventoryShipmentSnapshot>;
+    }
   | { capability: 'orders.read'; observation: Observation<OrderSnapshot> }
   | {
       capability: 'inventory.read';

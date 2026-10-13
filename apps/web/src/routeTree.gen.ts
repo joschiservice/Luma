@@ -63,6 +63,8 @@ import { Route as AppInvitationsOrganizationIdInvitationIdRouteImport } from './
 import { Route as AppOrganizationIdAppsAppIdSettingsRouteImport } from './routes/app.$organizationId.apps.$appId_.settings'
 import { Route as AppOrganizationIdExceptionsExceptionIdDetailRouteImport } from './routes/app.$organizationId.exceptions_.$exceptionId.detail'
 import { Route as AppOrganizationIdInboxDocumentsDocumentIdRouteImport } from './routes/app.$organizationId.inbox.documents.$documentId'
+import { Route as AppOrganizationIdInventoryTransfersIndexRouteImport } from './routes/app.$organizationId.inventory.transfers.index'
+import { Route as AppOrganizationIdInventoryTransfersTransferIdRouteImport } from './routes/app.$organizationId.inventory.transfers.$transferId'
 import { Route as AppOrganizationIdProcurementSuppliersSupplierIdRouteImport } from './routes/app.$organizationId.procurement.suppliers.$supplierId'
 import { Route as AppOrganizationIdRecordsKindRecordIdRouteImport } from './routes/app.$organizationId.records.$kind.$recordId'
 import { Route as AppOrganizationIdReturnsCasesCaseIdRouteImport } from './routes/app.$organizationId.returns.cases.$caseId'
@@ -375,6 +377,18 @@ const AppOrganizationIdInboxDocumentsDocumentIdRoute =
     path: '/inbox/documents/$documentId',
     getParentRoute: () => AppOrganizationIdRoute,
   } as any)
+const AppOrganizationIdInventoryTransfersIndexRoute =
+  AppOrganizationIdInventoryTransfersIndexRouteImport.update({
+    id: '/inventory/transfers/',
+    path: '/inventory/transfers/',
+    getParentRoute: () => AppOrganizationIdRoute,
+  } as any)
+const AppOrganizationIdInventoryTransfersTransferIdRoute =
+  AppOrganizationIdInventoryTransfersTransferIdRouteImport.update({
+    id: '/inventory/transfers/$transferId',
+    path: '/inventory/transfers/$transferId',
+    getParentRoute: () => AppOrganizationIdRoute,
+  } as any)
 const AppOrganizationIdProcurementSuppliersSupplierIdRoute =
   AppOrganizationIdProcurementSuppliersSupplierIdRouteImport.update({
     id: '/procurement/suppliers/$supplierId',
@@ -455,10 +469,12 @@ export interface FileRoutesByFullPath {
   '/app/$organizationId/apps/$appId/settings': typeof AppOrganizationIdAppsAppIdSettingsRoute
   '/app/$organizationId/exceptions/$exceptionId/detail': typeof AppOrganizationIdExceptionsExceptionIdDetailRoute
   '/app/$organizationId/inbox/documents/$documentId': typeof AppOrganizationIdInboxDocumentsDocumentIdRoute
+  '/app/$organizationId/inventory/transfers/$transferId': typeof AppOrganizationIdInventoryTransfersTransferIdRoute
   '/app/$organizationId/procurement/suppliers/$supplierId': typeof AppOrganizationIdProcurementSuppliersSupplierIdRoute
   '/app/$organizationId/records/$kind/$recordId': typeof AppOrganizationIdRecordsKindRecordIdRoute
   '/app/$organizationId/returns/cases/$caseId': typeof AppOrganizationIdReturnsCasesCaseIdRoute
   '/app/$organizationId/workflows/drafts/$draftId': typeof AppOrganizationIdWorkflowsDraftsDraftIdRoute
+  '/app/$organizationId/inventory/transfers/': typeof AppOrganizationIdInventoryTransfersIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -514,10 +530,12 @@ export interface FileRoutesByTo {
   '/app/$organizationId/apps/$appId/settings': typeof AppOrganizationIdAppsAppIdSettingsRoute
   '/app/$organizationId/exceptions/$exceptionId/detail': typeof AppOrganizationIdExceptionsExceptionIdDetailRoute
   '/app/$organizationId/inbox/documents/$documentId': typeof AppOrganizationIdInboxDocumentsDocumentIdRoute
+  '/app/$organizationId/inventory/transfers/$transferId': typeof AppOrganizationIdInventoryTransfersTransferIdRoute
   '/app/$organizationId/procurement/suppliers/$supplierId': typeof AppOrganizationIdProcurementSuppliersSupplierIdRoute
   '/app/$organizationId/records/$kind/$recordId': typeof AppOrganizationIdRecordsKindRecordIdRoute
   '/app/$organizationId/returns/cases/$caseId': typeof AppOrganizationIdReturnsCasesCaseIdRoute
   '/app/$organizationId/workflows/drafts/$draftId': typeof AppOrganizationIdWorkflowsDraftsDraftIdRoute
+  '/app/$organizationId/inventory/transfers': typeof AppOrganizationIdInventoryTransfersIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -575,10 +593,12 @@ export interface FileRoutesById {
   '/app/$organizationId/apps/$appId_/settings': typeof AppOrganizationIdAppsAppIdSettingsRoute
   '/app/$organizationId/exceptions_/$exceptionId/detail': typeof AppOrganizationIdExceptionsExceptionIdDetailRoute
   '/app/$organizationId/inbox/documents/$documentId': typeof AppOrganizationIdInboxDocumentsDocumentIdRoute
+  '/app/$organizationId/inventory/transfers/$transferId': typeof AppOrganizationIdInventoryTransfersTransferIdRoute
   '/app/$organizationId/procurement/suppliers/$supplierId': typeof AppOrganizationIdProcurementSuppliersSupplierIdRoute
   '/app/$organizationId/records/$kind/$recordId': typeof AppOrganizationIdRecordsKindRecordIdRoute
   '/app/$organizationId/returns/cases/$caseId': typeof AppOrganizationIdReturnsCasesCaseIdRoute
   '/app/$organizationId/workflows/drafts/$draftId': typeof AppOrganizationIdWorkflowsDraftsDraftIdRoute
+  '/app/$organizationId/inventory/transfers/': typeof AppOrganizationIdInventoryTransfersIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -637,10 +657,12 @@ export interface FileRouteTypes {
     | '/app/$organizationId/apps/$appId/settings'
     | '/app/$organizationId/exceptions/$exceptionId/detail'
     | '/app/$organizationId/inbox/documents/$documentId'
+    | '/app/$organizationId/inventory/transfers/$transferId'
     | '/app/$organizationId/procurement/suppliers/$supplierId'
     | '/app/$organizationId/records/$kind/$recordId'
     | '/app/$organizationId/returns/cases/$caseId'
     | '/app/$organizationId/workflows/drafts/$draftId'
+    | '/app/$organizationId/inventory/transfers/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -696,10 +718,12 @@ export interface FileRouteTypes {
     | '/app/$organizationId/apps/$appId/settings'
     | '/app/$organizationId/exceptions/$exceptionId/detail'
     | '/app/$organizationId/inbox/documents/$documentId'
+    | '/app/$organizationId/inventory/transfers/$transferId'
     | '/app/$organizationId/procurement/suppliers/$supplierId'
     | '/app/$organizationId/records/$kind/$recordId'
     | '/app/$organizationId/returns/cases/$caseId'
     | '/app/$organizationId/workflows/drafts/$draftId'
+    | '/app/$organizationId/inventory/transfers'
   id:
     | '__root__'
     | '/'
@@ -756,10 +780,12 @@ export interface FileRouteTypes {
     | '/app/$organizationId/apps/$appId_/settings'
     | '/app/$organizationId/exceptions_/$exceptionId/detail'
     | '/app/$organizationId/inbox/documents/$documentId'
+    | '/app/$organizationId/inventory/transfers/$transferId'
     | '/app/$organizationId/procurement/suppliers/$supplierId'
     | '/app/$organizationId/records/$kind/$recordId'
     | '/app/$organizationId/returns/cases/$caseId'
     | '/app/$organizationId/workflows/drafts/$draftId'
+    | '/app/$organizationId/inventory/transfers/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1156,6 +1182,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrganizationIdInboxDocumentsDocumentIdRouteImport
       parentRoute: typeof AppOrganizationIdRoute
     }
+    '/app/$organizationId/inventory/transfers/': {
+      id: '/app/$organizationId/inventory/transfers/'
+      path: '/inventory/transfers'
+      fullPath: '/app/$organizationId/inventory/transfers/'
+      preLoaderRoute: typeof AppOrganizationIdInventoryTransfersIndexRouteImport
+      parentRoute: typeof AppOrganizationIdRoute
+    }
+    '/app/$organizationId/inventory/transfers/$transferId': {
+      id: '/app/$organizationId/inventory/transfers/$transferId'
+      path: '/inventory/transfers/$transferId'
+      fullPath: '/app/$organizationId/inventory/transfers/$transferId'
+      preLoaderRoute: typeof AppOrganizationIdInventoryTransfersTransferIdRouteImport
+      parentRoute: typeof AppOrganizationIdRoute
+    }
     '/app/$organizationId/procurement/suppliers/$supplierId': {
       id: '/app/$organizationId/procurement/suppliers/$supplierId'
       path: '/procurement/suppliers/$supplierId'
@@ -1240,10 +1280,12 @@ interface AppOrganizationIdRouteChildren {
   AppOrganizationIdAppsAppIdSettingsRoute: typeof AppOrganizationIdAppsAppIdSettingsRoute
   AppOrganizationIdExceptionsExceptionIdDetailRoute: typeof AppOrganizationIdExceptionsExceptionIdDetailRoute
   AppOrganizationIdInboxDocumentsDocumentIdRoute: typeof AppOrganizationIdInboxDocumentsDocumentIdRoute
+  AppOrganizationIdInventoryTransfersTransferIdRoute: typeof AppOrganizationIdInventoryTransfersTransferIdRoute
   AppOrganizationIdProcurementSuppliersSupplierIdRoute: typeof AppOrganizationIdProcurementSuppliersSupplierIdRoute
   AppOrganizationIdRecordsKindRecordIdRoute: typeof AppOrganizationIdRecordsKindRecordIdRoute
   AppOrganizationIdReturnsCasesCaseIdRoute: typeof AppOrganizationIdReturnsCasesCaseIdRoute
   AppOrganizationIdWorkflowsDraftsDraftIdRoute: typeof AppOrganizationIdWorkflowsDraftsDraftIdRoute
+  AppOrganizationIdInventoryTransfersIndexRoute: typeof AppOrganizationIdInventoryTransfersIndexRoute
 }
 
 const AppOrganizationIdRouteChildren: AppOrganizationIdRouteChildren = {
@@ -1296,6 +1338,8 @@ const AppOrganizationIdRouteChildren: AppOrganizationIdRouteChildren = {
     AppOrganizationIdExceptionsExceptionIdDetailRoute,
   AppOrganizationIdInboxDocumentsDocumentIdRoute:
     AppOrganizationIdInboxDocumentsDocumentIdRoute,
+  AppOrganizationIdInventoryTransfersTransferIdRoute:
+    AppOrganizationIdInventoryTransfersTransferIdRoute,
   AppOrganizationIdProcurementSuppliersSupplierIdRoute:
     AppOrganizationIdProcurementSuppliersSupplierIdRoute,
   AppOrganizationIdRecordsKindRecordIdRoute:
@@ -1304,6 +1348,8 @@ const AppOrganizationIdRouteChildren: AppOrganizationIdRouteChildren = {
     AppOrganizationIdReturnsCasesCaseIdRoute,
   AppOrganizationIdWorkflowsDraftsDraftIdRoute:
     AppOrganizationIdWorkflowsDraftsDraftIdRoute,
+  AppOrganizationIdInventoryTransfersIndexRoute:
+    AppOrganizationIdInventoryTransfersIndexRoute,
 }
 
 const AppOrganizationIdRouteWithChildren =
