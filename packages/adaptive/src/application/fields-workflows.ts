@@ -455,26 +455,32 @@ export function createFieldsWorkflowAdapter(deps: {
         reads,
         capabilities,
         subjects,
-        stepKinds: (
-          ['read', 'capability', 'approval', 'verification'] as const
-        ).map((kind) => ({
-          kind,
-          executable: deps.enabled,
-          ...(!deps.enabled
-            ? { reason: 'The workflow worker is unavailable.' }
-            : {}),
-        })),
-        evaluators: [
-          {
-            version: fieldVerificationVersion,
-            label: 'Verify custom field value',
-            description:
-              'Read the field independently and compare the admitted value and revision.',
-            fields: { matches: 'boolean' },
-            executable: deps.enabled,
-            reason: deps.enabled ? null : 'The workflow worker is unavailable.',
-          },
-        ],
+        stepKinds: reads.length
+          ? (['read', 'capability', 'approval', 'verification'] as const).map(
+              (kind) => ({
+                kind,
+                executable: deps.enabled,
+                ...(!deps.enabled
+                  ? { reason: 'The workflow worker is unavailable.' }
+                  : {}),
+              }),
+            )
+          : [],
+        evaluators: capabilities.length
+          ? [
+              {
+                version: fieldVerificationVersion,
+                label: 'Verify custom field value',
+                description:
+                  'Read the field independently and compare the admitted value and revision.',
+                fields: { matches: 'boolean' },
+                executable: deps.enabled,
+                reason: deps.enabled
+                  ? null
+                  : 'The workflow worker is unavailable.',
+              },
+            ]
+          : [],
       };
     },
     async read(run: ProcessRun, step: Extract<ProcessStep, { kind: 'read' }>) {
