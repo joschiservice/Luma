@@ -631,7 +631,11 @@ const orderResolvers = on<OrderData>({
     orderMoneyBag(order.data.total - order.data.refunded, order.data),
   totalOutstandingSet: async (order, _args, context) =>
     moneyBag(
-      await outstanding(context.shop, order.id, order.data.total),
+      await outstanding(
+        context.shop,
+        order.id,
+        order.data.total - order.data.refunded,
+      ),
       order.data.currency,
     ),
   lineItems: (order, args, context) =>
