@@ -132,7 +132,8 @@ export interface NoteRecord {
   date: string;
   packages: {
     id: string;
-    shippingDate: string;
+    /** Null while the package is still being packed. */
+    shippingDate: string | null;
     trackingNumber: string;
     trackingUrl: string;
   }[];

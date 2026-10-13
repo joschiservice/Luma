@@ -36,10 +36,53 @@ import { workflowGenerationContract } from './contracts/workflow-generation.js';
 import { workflowsContract } from './contracts/workflows.js';
 
 /**
+ * The route record's type, named so declaration output references each area's contract instead
+ * of expanding every route schema into one type that exceeds the compiler's serialization limit.
+ */
+type ApiContract = {
+  shadow: typeof shadowContract;
+  activity: typeof activityContract;
+  playbooks: typeof playbooksContract;
+  workflows: typeof workflowsContract;
+  workflowDrafts: typeof workflowDraftsContract;
+  workflowGeneration: typeof workflowGenerationContract;
+  draftTests: typeof draftTestsContract;
+  procurement: typeof procurementContract;
+  procurementContext: typeof procurementContextContract;
+  messaging: typeof messagingContract;
+  resolutionLearning: typeof resolutionLearningContract;
+  caseDesk: typeof caseDeskContract;
+  operations: typeof operationsContract;
+  metrics: typeof metricsContract;
+  exceptions: typeof exceptionsContract;
+  identity: typeof identityContract;
+  settings: typeof settingsContract;
+  roles: typeof rolesContract;
+  connections: typeof connectionsContract;
+  apps: typeof appsContract;
+  system: typeof systemContract;
+  connectorProviders: typeof connectorProvidersContract;
+  records: typeof recordsContract;
+  fulfillment: typeof fulfillmentContract;
+  inventory: typeof inventoryContract;
+  products: typeof productsContract;
+  orders: typeof ordersContract;
+  sales: typeof salesContract;
+  returns: typeof returnsContract;
+  returnCases: typeof returnCasesContract;
+  customers: typeof customersContract;
+  sync: typeof syncContract;
+  decisions: typeof decisionsContract;
+  insights: typeof insightsContract;
+  assistant: typeof assistantContract;
+  sourceAuthority: typeof sourceAuthorityContract;
+};
+
+/**
  * Every customer API route, keyed by area. Route keys form OpenAPI operation IDs, such as
  * `orders.list`.
  */
-export const apiContract = {
+export const apiContract: ApiContract = {
   shadow: shadowContract,
   activity: activityContract,
   playbooks: playbooksContract,

@@ -331,27 +331,36 @@ async function sale(
         Quantity: line.quantity,
       }));
 
+      // A note whose parcel is still being packed is picked, with packing and shipping open.
+      const sent = note.packages.every((value) => value.shippingDate);
+
       return {
         TaskID: guid('fulfilment', note.id),
         FulfillmentNumber: index + 1,
-        FulFilmentStatus: 'FULFILLED',
+        FulFilmentStatus: sent ? 'FULFILLED' : 'NOT FULFILLED',
         Pick: { Status: 'AUTHORISED', Lines: lines },
         Pack: {
-          Status: 'AUTHORISED',
+          Status: sent ? 'AUTHORISED' : 'DRAFT',
           Lines: lines.map((line) => ({ ...line, Box: 'Box 1' })),
         },
         Ship: {
-          Status: 'AUTHORISED',
+          Status: sent ? 'AUTHORISED' : 'NOT AVAILABLE',
           RequireBy: null,
-          Lines: note.packages.map((value) => ({
-            ID: guid('shipment', value.id),
-            ShipmentDate: `${value.shippingDate.slice(0, 10)}T00:00:00`,
-            Carrier: method,
-            Boxes: 'Box 1',
-            TrackingNumber: value.trackingNumber,
-            TrackingURL: value.trackingUrl,
-            IsShipped: true,
-          })),
+          Lines: note.packages.flatMap((value) =>
+            value.shippingDate
+              ? [
+                  {
+                    ID: guid('shipment', value.id),
+                    ShipmentDate: `${value.shippingDate.slice(0, 10)}T00:00:00`,
+                    Carrier: method,
+                    Boxes: 'Box 1',
+                    TrackingNumber: value.trackingNumber,
+                    TrackingURL: value.trackingUrl,
+                    IsShipped: true,
+                  },
+                ]
+              : [],
+          ),
         },
       };
     }),

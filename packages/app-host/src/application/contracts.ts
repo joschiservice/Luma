@@ -1,3 +1,4 @@
+import type { OrderChangePlans } from '@luma/api-contract';
 import type {
   AuthorityReader,
   ConnectionProvider,
@@ -53,6 +54,12 @@ export interface AppManifest {
   decisionAccess?: Partial<
     Record<AppDecision['kind'], { view: string; respond: string }>
   >;
+  /**
+   * The permission a person needs to request each provider write capability through this app,
+   * keyed by installation capability such as `orders.quantity.edit`. Plans use it to say who may
+   * start a Luma step; the app's own routes still check the permission.
+   */
+  actionAccess?: Partial<Record<string, string>>;
 }
 
 export type { WorkspaceApp } from '../domain/installation.js';
@@ -69,7 +76,7 @@ export interface AppDecision {
    * same problem waits on a person, so a refreshed proposal updates the item in place.
    */
   id: string;
-  kind: 'fulfillment_recovery' | 'inventory_correction';
+  kind: 'fulfillment_recovery' | 'inventory_correction' | 'order_edit';
   reason: 'approval' | 'run' | 'recovery';
   domain: 'orders' | 'fulfillment' | 'inventory';
   title: string;
@@ -104,7 +111,8 @@ export interface AppDecision {
         orderId: string;
         fulfillmentId: string;
       }
-    | { kind: 'app_inventory'; positionId: string };
+    | { kind: 'app_inventory'; positionId: string }
+    | { kind: 'app_order'; connectionId: string; orderId: string };
   group: { key: string; label: string };
 }
 
@@ -178,6 +186,59 @@ export interface AppFactoryContext {
    * current, so an app can act on fresh stock. Absent where the host has no capability runtime.
    */
   refreshStock?(context: TenantContext, positionId: string): Promise<void>;
+  /**
+   * Another connection's current quantities for the lines of a source order, from Luma's stored
+   * reads: the order linked to `orderId` on `connectionId`, and each of its lines by source line
+   * ID, matched to `sourceConnectionId` by shared canonical line ID or unambiguous mapped SKU.
+   * `quantity` is null when that source doesn't report the line's current units. Returns null
+   * when the order isn't linked to both connections or the reader can't read orders. Absent
+   * where the host has no order read model; apps must then treat the values as unknown.
+   */
+  sourceOrderLines?(
+    context: TenantContext,
+    input: {
+      connectionId: string;
+      orderId: string;
+      sourceConnectionId: string;
+    },
+  ): Promise<SourceOrderLines | null>;
+  /**
+   * Rereads every source of a canonical order whose stored read is older than `maxAgeMs` (a
+   * minute by default): the order and its fulfilment records, through the installed
+   * capabilities' point reads, stored as the sources' current reads. Unshipped work a complete
+   * reread no longer returns is retired. Sources that can't be reread keep their stored reads,
+   * so plans then report them as stale. Absent where the host has no capability runtime.
+   */
+  refreshOrder?(
+    context: TenantContext,
+    orderId: string,
+    maxAgeMs?: number,
+  ): Promise<void>;
+  /**
+   * A canonical order's change plans as Orders shows them, from Luma's stored reads: a proposed
+   * quantity for one line, or every change the source comparison detected when `request` is null.
+   * Requires `orders.read`; null when the order has no current source. Rejects a line that is not
+   * on the order with 422. Absent where the host has no order read model.
+   */
+  orderChangePlans?(
+    context: TenantContext,
+    orderId: string,
+    request: { kind: 'quantity'; lineKey: string; quantity: string } | null,
+  ): Promise<OrderChangePlans | null>;
+}
+
+/** A source's stored read of an order's line quantities; see `sourceOrderLines`. */
+interface SourceOrderLines {
+  /** The canonical order both sources report. */
+  orderId: string;
+  connectionId: string;
+  snapshotId: string;
+  observationId: string;
+  /** When Luma read the source order, on Luma's clock. */
+  observedAt: string;
+  /** False when the source's latest collection read failed, was partial or unfinished. */
+  complete: boolean;
+  lines: { externalId: string; quantity: string | null }[];
 }
 
 /** Builds deployment contributions using explicit host services and environment configuration. */

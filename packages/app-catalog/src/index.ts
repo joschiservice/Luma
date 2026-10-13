@@ -38,6 +38,14 @@ export function createAppHost(
     factories?: readonly AppFactory[];
     simulation?: AppFactoryContext['simulation'];
     refreshStock?: AppFactoryContext['refreshStock'];
+    sourceOrderLines?: AppFactoryContext['sourceOrderLines'];
+    refreshOrder?: AppFactoryContext['refreshOrder'];
+    orderChangePlans?: AppFactoryContext['orderChangePlans'];
+    /**
+     * Whether a workspace's Luma-owned order records are released. Without it, source authority
+     * leaves Luma ERP out, as for workspaces without the release.
+     */
+    internalOrdersEnabled?: (tenantId: string) => Promise<boolean>;
   },
 ): {
   registry: AppRegistry;
@@ -66,6 +74,13 @@ export function createAppHost(
         cipher,
         ...(options.simulation ? { simulation: options.simulation } : {}),
         ...(options.refreshStock ? { refreshStock: options.refreshStock } : {}),
+        ...(options.sourceOrderLines
+          ? { sourceOrderLines: options.sourceOrderLines }
+          : {}),
+        ...(options.refreshOrder ? { refreshOrder: options.refreshOrder } : {}),
+        ...(options.orderChangePlans
+          ? { orderChangePlans: options.orderChangePlans }
+          : {}),
         refreshContext: options.refreshContext,
         env: options.env ?? process.env,
         requireInstalled: (context, appId) =>
@@ -138,6 +153,8 @@ export function createAppHost(
   const sourceAuthority = createSourceAuthority(
     database,
     (provider) => {
+      // Luma-owned order records are Luma's built-in ERP source, not an installed app.
+      if (provider === 'luma-erp') return 'erp';
       const category = registry
         .list()
         .find((app) => app.id === provider)?.category;
@@ -145,6 +162,7 @@ export function createAppHost(
       return category === 'erp' || category === 'storefront' ? category : null;
     },
     options.refreshContext,
+    options.internalOrdersEnabled,
   );
 
   return {

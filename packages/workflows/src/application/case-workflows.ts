@@ -107,6 +107,12 @@ export interface CaseWorkflowAdapter {
    * open; `owner` when the owner's own item already asks. Cases always ask through the case.
    */
   handover?: 'needs_you' | 'owner';
+  /**
+   * `principal` gives the case to the person whose access the run uses when the run hands work to
+   * people (a human task or an escalation) and nobody owns the case, so it stays with someone
+   * responsible. An existing owner is kept. Cases only.
+   */
+  caseOwner?: 'principal';
   /** Plain-language titles and descriptions keyed by step ID. */
   stepCopy: Record<string, { title: string; description: string }>;
   /** Workspace prerequisites. Unmet ones block turning the workflow on. */
@@ -117,10 +123,12 @@ export interface CaseWorkflowAdapter {
     signal: CaseSignal,
     evidence: CaseEvidence[],
   ): Promise<{ kind: string; id: string } | null>;
+  /** `outputs` are the run's recorded step outputs so far, oldest first. */
   read(
     context: TenantContext,
     run: CaseRun,
     step: ReadStep,
+    outputs?: ProcessStepOutput[],
   ): ReturnType<ProcessActivities['read']>;
   action(
     context: TenantContext,
@@ -158,6 +166,11 @@ export interface CaseReader {
   open(context: TenantContext): Promise<CaseSignal[]>;
   get(context: TenantContext, id: string): Promise<CaseSignal | null>;
   evidence(context: TenantContext, id: string): Promise<CaseEvidence[]>;
+  /**
+   * Gives a case nobody owns to `userId` through the case owner's audited assignment; keeps an
+   * existing owner. Absent where the host can't assign cases.
+   */
+  claim?(context: TenantContext, id: string, userId: string): Promise<unknown>;
 }
 
 /** An owner's follow-ups for one workflow, within the caller's tenant. */
@@ -228,8 +241,11 @@ export function createCaseWorkflows(deps: {
   catalog: Pick<WorkflowCatalogStore, 'publish'>;
   cases: CaseReader;
   identity: Pick<IdentityService, 'refreshContext' | 'resolveWorkflowContext'> &
-    /** Without it, a suspended owner isn't reported; their runs still pause. */
-    Partial<Pick<IdentityService, 'suspendedMembers'>>;
+    /**
+     * Without `suspendedMembers`, a suspended owner isn't reported; their runs still pause.
+     * Without `listMembers`, nobody checks that human task roles have someone to answer.
+     */
+    Partial<Pick<IdentityService, 'suspendedMembers' | 'listMembers'>>;
   policies: Pick<PolicyService, 'approvalRequirement' | 'currentVersion'>;
   audit: { append(entry: WorkflowAuditEntry): Promise<void> };
   transport?: CaseRunTransport;
@@ -341,6 +357,50 @@ export function createCaseWorkflows(deps: {
     });
   }
 
+  /**
+   * The adapter's prerequisites plus one per role its human tasks name: someone active must hold
+   * it, or its tasks would have nobody to answer them. Unreadable prerequisites block.
+   */
+  async function caseRequirements(
+    context: TenantContext,
+    found: CaseWorkflowAdapter,
+  ): Promise<TemplateRequirement[]> {
+    const own = await found.requirements(context).catch(() => [unchecked]);
+    const roles = [
+      ...new Set(
+        found.version.steps.flatMap((step) =>
+          step.kind === 'human_task'
+            ? [step.assignee, step.escalationTarget].flatMap((target) =>
+                target.kind === 'role' ? [target.key] : [],
+              )
+            : [],
+        ),
+      ),
+    ];
+    if (!roles.length || !deps.identity.listMembers) return own;
+    const members = await deps.identity.listMembers(context).catch(() => null);
+    if (!members) return [...own, unchecked];
+
+    return [
+      ...own,
+      ...roles.map((key): TemplateRequirement => {
+        const holders = members.filter((member) => member.role.id === key);
+        const name =
+          holders[0]?.role.name ?? key.replace(/^./, (c) => c.toUpperCase());
+        const met = holders.some((member) => member.status !== 'suspended');
+
+        return {
+          label: `Someone with the ${name} role`,
+          met,
+          detail: met
+            ? `People with the ${name} role answer this workflow’s tasks.`
+            : `Nobody active has the ${name} role, so this workflow’s tasks would have nobody to answer them. Give someone the role in Team.`,
+          fix: null,
+        };
+      }),
+    ];
+  }
+
   async function approval(
     context: TenantContext,
     found: CaseWorkflowAdapter,
@@ -394,7 +454,7 @@ export function createCaseWorkflows(deps: {
     const [activations, requirements, runs, open, policyVersion] =
       await Promise.all([
         deps.store.list(context),
-        found.requirements(context).catch(() => [unchecked]),
+        caseRequirements(context, found),
         recent(context, id),
         reader(found)
           .open(context)
@@ -601,8 +661,9 @@ export function createCaseWorkflows(deps: {
   const activities: ProcessActivities = {
     async read(run, step) {
       const { context, adapter: found, caseRun } = await bound(run);
+      const outputs = (await deps.steps.list(context, [run.id])).get(run.id);
 
-      return found.read(context, caseRun, step);
+      return found.read(context, caseRun, step, outputs ?? []);
     },
     // Case workflows have no explicit approval steps; policy approval happens at the action.
     decision: async () => ({ state: 'pending' }),
@@ -624,8 +685,30 @@ export function createCaseWorkflows(deps: {
       return found.verify(context, caseRun, step, outputs);
     },
     async record(run, output) {
-      const { context } = await bound(run);
+      const { context, adapter: found } = await bound(run);
       await deps.steps.record(context, run.id, output);
+      // Work handed to people keeps a responsible person on the case.
+      if (
+        found.caseOwner === 'principal' &&
+        !found.signals &&
+        deps.cases.claim &&
+        (output.state === 'escalated' ||
+          (output.kind === 'human_task' && output.state === 'waiting'))
+      )
+        try {
+          await deps.cases.claim(
+            context,
+            String(run.context.inputs.caseId),
+            run.actor.id,
+          );
+        } catch (error) {
+          // People without assignment access, or a closed case, keep the case as it is.
+          if (
+            !(error instanceof IdentityError) ||
+            ![403, 404, 409, 422].includes(error.statusCode)
+          )
+            throw error;
+        }
       await deps.audit.append({
         id: deps.id(`${run.id}:${output.stepId}:${output.state}`),
         tenantId: context.tenantId,
@@ -723,7 +806,7 @@ export function createCaseWorkflows(deps: {
     async template(context) {
       const { version } = found;
       const [requirements, current] = await Promise.all([
-        found.requirements(context).catch(() => [unchecked]),
+        caseRequirements(context, found),
         detail(context, version.definition.id),
       ]);
       const all: TemplateRequirement[] = [
@@ -904,7 +987,7 @@ export function createCaseWorkflows(deps: {
         (await deps.policies.currentVersion(context.tenantId))
       )
         conflict('The approval policy changed. Review it again.');
-      const missing = (await found.requirements(context)).find(
+      const missing = (await caseRequirements(context, found)).find(
         (item) => !item.met,
       );
       if (missing) conflict(missing.detail);

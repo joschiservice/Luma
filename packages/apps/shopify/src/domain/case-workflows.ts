@@ -188,3 +188,144 @@ export const releasableHoldReasons: readonly string[] = [
   'HIGH_RISK_OF_FRAUD',
   'OTHER',
 ];
+
+/** Who answers the dispatch task and who takes it over once it is overdue. */
+export const dispatchTask = {
+  assignee: { kind: 'role', key: 'member' },
+  escalationTarget: { kind: 'role', key: 'admin' },
+  dueAfterSeconds: 4 * 60 * 60,
+  adjusted: 'Adjusted',
+  notAdjusted: 'Cannot adjust',
+} as const;
+
+/**
+ * Carries an order line quantity that detection found differing between systems to dispatch and
+ * Shopify. The warehouse makes dispatch carry the authoritative quantity, because Luma cannot
+ * write dispatch records; a fresh plan must then show the change safe before Luma proposes the
+ * Shopify edit, which someone else approves. Fresh reads of every system confirm the outcome,
+ * and the run never closes the case.
+ */
+export const quantityChangeSource = {
+  schemaVersion: 2,
+  definition: {
+    id: 'order-quantity-change',
+    name: 'Carry an order quantity change to every system',
+    intent:
+      'When an order line shows a different quantity in Shopify than in the system that holds order-line authority, ask the warehouse to make dispatch carry the new quantity, check fresh reads, propose the Shopify edit, wait for someone else who can approve changes, and confirm the quantity with fresh reads of every system.',
+    category: 'orders',
+  },
+  version: '1.0.0',
+  applicability: {
+    trigger: { kind: 'exception', issueType: 'order_quantity_mismatch' },
+    subjectKind: 'order',
+  },
+  inputs: caseInputs,
+  context: {
+    kind: 'order_quantity_mismatch',
+    fields: { severity: 'string' },
+    maxAgeSeconds: 300,
+  },
+  steps: [
+    {
+      id: 'plan',
+      kind: 'read',
+      source: 'orders.change-plan',
+      fields: {
+        ready: 'boolean',
+        targetQuantity: 'number',
+        workStarted: 'boolean',
+        problem: 'string',
+      },
+    },
+    {
+      id: 'plan-usable',
+      kind: 'condition',
+      field: 'ready',
+      equals: true,
+      onFalse: 'escalate',
+    },
+    {
+      id: 'dispatch',
+      kind: 'human_task',
+      assignee: dispatchTask.assignee,
+      instructions:
+        'A customer’s quantity change must reach dispatch. Open the order and read its change plan for the line and the new quantity. In the dispatch system, update the order to the new quantity. If picking or packing has started, adjust the pick to the new quantity, or cancel the open delivery note so the order is picked again. Answer Adjusted once dispatch carries the new quantity, or Cannot adjust if the parcel can no longer change. Luma rereads every system before it changes Shopify.',
+      choices: [dispatchTask.adjusted, dispatchTask.notAdjusted],
+      evidence: 'text',
+      dueAfterSeconds: dispatchTask.dueAfterSeconds,
+      escalationTarget: dispatchTask.escalationTarget,
+    },
+    {
+      id: 'dispatch-adjusted',
+      kind: 'condition',
+      field: 'choice',
+      equals: dispatchTask.adjusted,
+      onFalse: 'escalate',
+    },
+    {
+      id: 'replan',
+      kind: 'read',
+      source: 'orders.change-plan',
+      fields: {
+        ready: 'boolean',
+        safe: 'boolean',
+        shopifyDiffers: 'boolean',
+        targetQuantity: 'number',
+        workStarted: 'boolean',
+        problem: 'string',
+      },
+    },
+    {
+      id: 'shopify-differs',
+      kind: 'condition',
+      field: 'shopifyDiffers',
+      equals: true,
+      onFalse: 'end',
+    },
+    {
+      id: 'safe-now',
+      kind: 'condition',
+      field: 'safe',
+      equals: true,
+      onFalse: 'escalate',
+    },
+    {
+      id: 'edit-shopify',
+      kind: 'capability',
+      capability: 'orders.quantity.edit',
+      capabilityVersion: '0',
+      targetKind: 'shopify_order_edit',
+      minimumRisk: 'medium',
+      parameters: {
+        quantity: { source: 'step', stepId: 'replan', field: 'targetQuantity' },
+      },
+      expectedPostcondition: {
+        quantity: { source: 'step', stepId: 'replan', field: 'targetQuantity' },
+      },
+    },
+    {
+      id: 'check-everywhere',
+      kind: 'verification',
+      forStep: 'edit-shopify',
+      evaluatorVersion: 'order-quantity-agreement/1',
+      maxDurationSeconds: 300,
+      recheck: { attempts: 4, intervalSeconds: 30 },
+      fields: {
+        quantity: 'number',
+        agreed: 'boolean',
+        reporting: 'number',
+        notReporting: 'number',
+      },
+    },
+    {
+      id: 'done',
+      kind: 'end',
+      outcome:
+        'Every system that reports the line shows the new quantity in fresh reads; detection closes the case',
+    },
+  ],
+  provenance: {
+    ...provenance,
+    evidenceRefs: ['order-quantity-agreement/1'],
+  },
+};

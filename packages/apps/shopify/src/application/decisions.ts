@@ -2,6 +2,7 @@ import type { AppDecision } from '@luma/app-host';
 
 import type { RecoveryView } from '../domain/fulfillment-recovery.js';
 import type { CorrectionView } from '../domain/inventory-correction.js';
+import type { OrderEditView } from '../domain/order-edits.js';
 
 const tail = (gid: string) => gid.split('/').at(-1) ?? gid;
 
@@ -21,7 +22,7 @@ type Stage = Pick<
 // Shared lifecycle wording for Shopify actions: approval, a run by the requester, then
 // an independent read. A receipt is never presented as the outcome.
 function stage(
-  view: RecoveryView | CorrectionView,
+  view: RecoveryView | CorrectionView | OrderEditView,
   actorId: string,
   verify: string,
 ): Stage {
@@ -111,6 +112,11 @@ const groupLabels: Record<
     approval: 'Stock corrections awaiting approval',
     run: 'Approved stock corrections to run',
     recovery: 'Stock corrections to check',
+  },
+  order_edit: {
+    approval: 'Order quantity changes awaiting approval',
+    run: 'Approved order quantity changes to send',
+    recovery: 'Order quantity changes to check',
   },
 };
 
@@ -277,5 +283,91 @@ export function correctionDecision(
     record: { kind: 'position', id: target.positionId },
     owner: { kind: 'app_inventory', positionId: target.positionId },
     group: group('inventory_correction', state.reason),
+  };
+}
+
+/** Presents a Shopify order quantity edit that waits on a person, with each line's change and Shopify's new total. */
+export function orderEditDecision(
+  view: OrderEditView,
+  actorId: string,
+): AppDecision {
+  const { before, target, calculation } = view;
+  const state = stage(
+    view,
+    actorId,
+    'It counts as done only when a fresh Shopify read shows the approved quantities and Luma’s edit.',
+  );
+  const names = new Map(before.lines.map((line) => [line.id, line.name]));
+  const total = (bag: NonNullable<typeof calculation>['total']) =>
+    bag.presentment.currencyCode === bag.shop.currencyCode
+      ? `${bag.shop.amount} ${bag.shop.currencyCode}`
+      : `${bag.shop.amount} ${bag.shop.currencyCode} (${bag.presentment.amount} ${bag.presentment.currencyCode})`;
+  const removed = view.lines.reduce(
+    (sum, line) => sum + Math.max(0, line.currentQuantity - line.quantity),
+    0,
+  );
+  const added = view.lines.reduce(
+    (sum, line) => sum + Math.max(0, line.quantity - line.currentQuantity),
+    0,
+  );
+
+  return {
+    id: decisionId(
+      'order_edit',
+      state.reason,
+      `${target.connectionId}:${tail(target.orderId)}`,
+      view.id,
+    ),
+    observeOnly: view.observeOnly ?? false,
+    kind: 'order_edit',
+    domain: 'orders',
+    title: `Change quantities on Shopify order ${tail(target.orderId)}`,
+    ...state,
+    change: [
+      { label: 'Shopify order', value: tail(target.orderId) },
+      ...view.lines.map((line) => ({
+        label: names.get(line.lineItemId) ?? `Line ${tail(line.lineItemId)}`,
+        value: `${line.currentQuantity} → ${line.quantity}`,
+      })),
+      ...(removed
+        ? [
+            {
+              label: 'Removed units',
+              value: view.change.restock ? 'Restocked' : 'Not restocked',
+            },
+          ]
+        : []),
+      { label: 'Order total now', value: total(before.totals.total) },
+      {
+        label: 'Order total after the edit',
+        value: calculation ? total(calculation.total) : 'Not calculated',
+      },
+    ],
+    impact: {
+      level: 'unknown',
+      text: [
+        removed ? `${units(removed)} removed` : null,
+        added ? `${units(added)} added` : null,
+      ]
+        .filter(Boolean)
+        .join(', '),
+    },
+    requestedAt: before.observedAt,
+    requesterId: view.requesterId,
+    evidence: { observedAt: before.observedAt, validUntil: view.expiresAt },
+    subject: {
+      label: `Shopify order ${tail(target.orderId)}`,
+      detail: `${view.lines.length} ${view.lines.length === 1 ? 'line' : 'lines'}`,
+    },
+    record: {
+      kind: 'order',
+      source: { connectionId: target.connectionId, externalId: target.orderId },
+    },
+    owner: {
+      kind: 'app_order',
+      connectionId: target.connectionId,
+      orderId: target.orderId,
+    },
+    group: group('order_edit', state.reason),
   };
 }

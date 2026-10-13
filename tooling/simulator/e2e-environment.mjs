@@ -13,7 +13,7 @@ import { createOperationsClient } from './platform-client.mjs';
  * Starts an isolated healthy Luma workspace and simulator using the same provisioning, HTTP
  * bridge and sync runner as the local stack. The run uses the deterministic `test` profile on
  * the profile's ERP with `calm` failures unless options choose otherwise; its clock only moves
- * when tests advance it.
+ * when tests advance it. `observability` evaluates workspace releases such as Luma orders.
  */
 export async function createSimulatorEnvironment({
   t,
@@ -27,6 +27,7 @@ export async function createSimulatorEnvironment({
   chaos = 'calm',
   detection,
   demo,
+  observability,
 }) {
   const token = 'operational-simulator-test-token';
   const databaseUrl = await testSimulatorDatabase(t);
@@ -78,6 +79,7 @@ export async function createSimulatorEnvironment({
     });
     pilot = await createPilot(env, directory, manifest, temporal, {
       ...(detection ? { detection } : {}),
+      ...(observability ? { observability } : {}),
     });
     const apiOrigin = await pilot.app.listen({ host: '127.0.0.1', port: 0 });
     await registerWebhooks(call, manifest, apiOrigin);

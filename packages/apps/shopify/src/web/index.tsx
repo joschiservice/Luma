@@ -42,6 +42,7 @@ export default function ShopifySettings(props: AppUiProps) {
         record={props.record}
         services={props.services}
         organizationId={props.organizationId}
+        canEdit={props.can('shopify:order_edits.apply')}
       />
     ) : null;
 

@@ -29,7 +29,19 @@ export interface AppUiProps {
   connection?: InstalledConnection | undefined;
   /** The source record the host is showing, identified by its connection and source ID. */
   record?:
-    { kind: 'order'; connectionId: string; externalId: string } | undefined;
+    | {
+        kind: 'order';
+        connectionId: string;
+        externalId: string;
+        /**
+         * A change the host asks the app to prefill for review, such as a planned quantity
+         * edit, by source line ID. The app still previews, checks and asks for approval as
+         * usual, and ignores lines it doesn't recognize.
+         */
+        change?:
+          { lines: { externalId: string; quantity: string }[] } | undefined;
+      }
+    | undefined;
   /** Closes setup and refreshes workspace data after a successful mutation. */
   done(): Promise<void>;
   /**

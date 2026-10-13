@@ -12,7 +12,7 @@ pnpm pilot
 pnpm pilot:worker
 ```
 
-Open the printed web URL and sign in as `pilot-operator@example.test` with the password in `.luma/demo.json`, then select **Synthetic pilot · approval-required**. The requester, `pilot-requester@example.test`, uses the same password and owns the organization; the operator is an admin. High-risk actions need approval from a different user than the requester. Both accounts are synthetic.
+Open the printed web URL and sign in as `pilot-operator@example.test` with the password in `.luma/demo.json`, then select **Synthetic pilot · approval-required**. The requester, `pilot-requester@example.test`, uses the same password and owns the organization; the operator is an admin. `pilot-warehouse@example.test`, a member, answers the tasks workflows hand to the warehouse. High-risk actions need approval from a different user than the requester. All accounts are synthetic; a pilot seeded before the warehouse member existed needs `pnpm pilot:reset` to get it.
 
 The API and worker use a dedicated Temporal task queue per pilot run, so `pnpm dev:workflows`' ordinary worker does not pick up pilot work; use `pilot:worker`. The pilot shares this checkout's web and API ports with `pnpm dev`, so stop one before starting the other. The worker prints its PID for the recovery drill.
 

@@ -31,6 +31,7 @@ export async function setupSimulator(
     chaos = 'calm',
     detection,
     demo,
+    observability,
   } = {},
 ) {
   const db = await database(t);
@@ -58,6 +59,7 @@ export async function setupSimulator(
       ...detection,
     },
     demo,
+    observability,
     env: {
       IDENTITY_DATABASE_URL: db.runtimeUrl,
       WORKFLOW_DATABASE_URL: db.runtimeUrl,

@@ -95,6 +95,20 @@ export function OwnerReview({
           done={onChange}
         />
       );
+    case 'app_order':
+      return (
+        <AppExtension
+          appId={owner.appId}
+          organizationId={organizationId}
+          slot="record"
+          record={{
+            kind: 'order',
+            connectionId: owner.connectionId,
+            externalId: owner.orderId,
+          }}
+          done={onChange}
+        />
+      );
     case 'app_inventory':
       return (
         <AppExtension

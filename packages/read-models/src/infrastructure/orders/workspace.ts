@@ -12,6 +12,7 @@ import type {
   OrderActivityReader,
   OrderWorkspace,
 } from '../../application/orders.js';
+import { type ActionPermission, readChangePlan } from './change-plan.js';
 import { readDetail } from './detail.js';
 import { listOrders } from './list.js';
 import type { OrderReadQueries } from './list-query.js';
@@ -19,7 +20,8 @@ import type { OrderReadQueries } from './list-query.js';
 /**
  * Reads the Orders workspace from canonical projections in one repeatable-read snapshot.
  * Order state and needs-you come from the owners' SQL in `queries`, so the list, the detail
- * and the order metrics classify an order the same way.
+ * and the order metrics classify an order the same way. `actionPermission` names the app
+ * permission that lets a person request a provider write, for change plans.
  */
 export function createOrderWorkspace(
   db: TenantDatabase,
@@ -31,6 +33,7 @@ export function createOrderWorkspace(
   excludedSources: (
     context: TenantContext,
   ) => Promise<string[]> = async () => [],
+  actionPermission: ActionPermission = () => null,
 ): OrderWorkspace {
   async function read<T>(
     context: TenantContext,
@@ -104,6 +107,19 @@ export function createOrderWorkspace(
           authority(scoped),
           fresh,
           orderId,
+          asOf,
+        ),
+      ),
+    changePlan: (context, orderId, request) =>
+      read(context, (tx, scoped, fresh, asOf) =>
+        readChangePlan(
+          tx,
+          queries,
+          authority(scoped),
+          actionPermission,
+          fresh,
+          orderId,
+          request,
           asOf,
         ),
       ),

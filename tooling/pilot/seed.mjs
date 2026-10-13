@@ -103,7 +103,7 @@ export async function seedPilot(
     return response;
   }
 
-  async function login(email) {
+  async function login(email, name = 'Synthetic pilot operator') {
     const payload = { email, password: saved.seedPassword };
     let response = await app.inject({
       method: 'POST',
@@ -112,10 +112,7 @@ export async function seedPilot(
       payload,
     });
     if (response.statusCode === 401)
-      response = await request('/auth/sign-up/email', {
-        ...payload,
-        name: 'Synthetic pilot operator',
-      });
+      response = await request('/auth/sign-up/email', { ...payload, name });
     if (response.statusCode !== 200) throw new Error('Pilot sign-in failed');
     const cookies = response.headers['set-cookie'];
     cookie = (Array.isArray(cookies) ? cookies : [cookies])
@@ -128,6 +125,12 @@ export async function seedPilot(
 
   try {
     manifest.operatorId = await login('pilot-operator@example.test');
+    await request('/auth/sign-out', {});
+    // A warehouse member answers the tasks workflows hand to the warehouse.
+    manifest.warehouseId = await login(
+      'pilot-warehouse@example.test',
+      'Synthetic warehouse',
+    );
     await request('/auth/sign-out', {});
     manifest.requesterId = await login('pilot-requester@example.test');
     const organization = (
@@ -160,6 +163,11 @@ export async function seedPilot(
       action: 'add',
       userId: manifest.operatorId,
       roleId: 'admin',
+    });
+    await identity.service.changeMember(context, {
+      action: 'add',
+      userId: manifest.warehouseId,
+      roleId: 'member',
     });
     // An example custom role so the pilot shows how workspaces tailor access.
     const roles = identity.roles();
@@ -261,6 +269,7 @@ export async function seedPilot(
                             'fulfillment.hold.release',
                             'fulfillment.open',
                             'fulfillment.move',
+                            'orders.quantity.edit',
                           ]
                         : instance.kind === 'cin7'
                           ? [

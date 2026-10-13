@@ -14,6 +14,18 @@ const text = (max: number) => z.string().min(1).max(max).nullable();
 
 const timestamp = z.string().datetime({ offset: true });
 
+const addressSchema = z
+  .object({
+    line1: text(512),
+    line2: text(512),
+    city: text(256),
+    region: text(256),
+    postalCode: text(64),
+    country: text(128),
+  })
+  .strict()
+  .nullable();
+
 const profileSchema = z
   .object({
     connectionId: z.string().uuid(),
@@ -21,17 +33,7 @@ const profileSchema = z
     displayName: text(512),
     email: text(320),
     phone: text(100),
-    address: z
-      .object({
-        line1: text(512),
-        line2: text(512),
-        city: text(256),
-        region: text(256),
-        postalCode: text(64),
-        country: text(128),
-      })
-      .strict()
-      .nullable(),
+    address: addressSchema,
     state: z.enum(['enabled', 'disabled', 'invited', 'declined', 'unknown']),
     sourceCreatedAt: timestamp.nullable(),
     orderCount: z.number().int().min(0).nullable(),
@@ -91,6 +93,35 @@ const orderSchema = z
   })
   .strict();
 
+const orderReference = z
+  .object({
+    externalId: z.string().min(1).max(1024),
+    scopeKey: z.string().max(1024),
+  })
+  .strict();
+
+const orderAddressesSchema = z
+  .object({
+    order: orderReference,
+    customerExternalId: z.string().min(1).max(1024).nullable().optional(),
+    shared: z.boolean(),
+    shipping: addressSchema,
+    billing: addressSchema,
+    observedAt: timestamp,
+  })
+  .strict()
+  // Addresses the source did not share stay empty, like withheld profile groups.
+  .refine((v) => v.shared || (v.shipping === null && v.billing === null));
+
+const uniqueOrders = <T extends { order: z.infer<typeof orderReference> }>(
+  items: T[],
+) =>
+  new Set(
+    items.map((item) =>
+      JSON.stringify([item.order.scopeKey, item.order.externalId]),
+    ),
+  ).size === items.length;
+
 const iso = (value: Date | null) => value?.toISOString() ?? null;
 
 // Erasure and imports of one connection's customers serialize, so a read that started before
@@ -103,6 +134,38 @@ const lockConnection = (
   tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
     `customers:${tenantId}:${connectionId}`,
   ]);
+
+// Deletes the addresses of one connection's orders, or of the orders linked to the listed
+// source customers. Erased orders are remembered so later reads cannot store them again.
+async function eraseOrderAddresses(
+  tx: SqlTransaction,
+  tenantId: string,
+  connectionId: string,
+  externalIds: string[] | null,
+) {
+  if (externalIds === null) {
+    await tx.query(
+      'DELETE FROM customer_order_addresses WHERE tenant_id=$1 AND connection_id=$2',
+      [tenantId, connectionId],
+    );
+
+    return;
+  }
+  await tx.query(
+    `INSERT INTO customer_erasures(tenant_id,connection_id,external_digest)
+    SELECT DISTINCT $1::uuid,$2::uuid,sha256(convert_to(o.order_external_id,'UTF8')) FROM customer_orders o
+    WHERE o.tenant_id=$1 AND o.connection_id=$2 AND o.customer_external_id=ANY($3)
+    ON CONFLICT DO NOTHING`,
+    [tenantId, connectionId, externalIds],
+  );
+  await tx.query(
+    `DELETE FROM customer_order_addresses a USING customer_orders o
+    WHERE a.tenant_id=$1 AND a.connection_id=$2 AND o.tenant_id=$1 AND o.connection_id=$2
+    AND o.customer_external_id=ANY($3) AND a.order_scope_key=o.order_scope_key
+    AND a.order_external_id=o.order_external_id`,
+    [tenantId, connectionId, externalIds],
+  );
+}
 
 // Deletes profiles and order links of one connection, or only of the listed source customers.
 async function deleteCustomers(
@@ -155,9 +218,10 @@ function stored(row: Row): StoredCustomerProfile {
 }
 
 /**
- * Stores the current customer profile per connection and source customer, and which source
- * customer placed each order. Erased customers are remembered by a digest of their source ID
- * so later reads cannot restore them or their order links.
+ * Stores the current customer profile per connection and source customer, which source
+ * customer placed each order and each order's addresses. Erased customers and orders are
+ * remembered by a digest of their source ID so later reads cannot restore them, their order
+ * links or their orders' addresses.
  */
 export function createCustomerProfiles(db: TenantDatabase): CustomerProfiles {
   return {
@@ -237,15 +301,7 @@ export function createCustomerProfiles(db: TenantDatabase): CustomerProfiles {
       const values = z
         .array(orderSchema)
         .max(1000)
-        .refine(
-          (items) =>
-            new Set(
-              items.map((item) =>
-                JSON.stringify([item.order.scopeKey, item.order.externalId]),
-              ),
-            ).size === items.length,
-          { message: 'Each order may appear once' },
-        )
+        .refine(uniqueOrders, { message: 'Each order may appear once' })
         .parse(orders);
       if (!values.length) return;
       const columns = [
@@ -278,6 +334,53 @@ export function createCustomerProfiles(db: TenantDatabase): CustomerProfiles {
         );
       });
     },
+    async recordOrderAddresses(context, connectionId, orders) {
+      requirePermission(context, 'sync.manage');
+      z.string().uuid().parse(connectionId);
+      const values = z
+        .array(orderAddressesSchema)
+        .max(1000)
+        .refine(uniqueOrders, { message: 'Each order may appear once' })
+        .parse(orders);
+      if (!values.length) return;
+      const address = (value: z.infer<typeof addressSchema>) =>
+        value ? JSON.stringify(value) : null;
+      const columns = [
+        values.map((item) => item.order.scopeKey),
+        values.map((item) => item.order.externalId),
+        values.map((item) => item.customerExternalId ?? null),
+        values.map((item) => item.shared),
+        values.map((item) => address(item.shipping)),
+        values.map((item) => address(item.billing)),
+        values.map((item) => item.observedAt),
+      ];
+      const rows = `unnest($3::text[],$4::text[],$5::text[],$6::boolean[],$7::text[],$8::text[],$9::timestamptz[])
+        AS v(scope_key,external_id,customer,shared,shipping,billing,observed_at)`;
+      const erased = `EXISTS (SELECT 1 FROM customer_erasures x WHERE x.tenant_id=$1 AND x.connection_id=$2
+        AND (x.external_digest=sha256(convert_to(v.external_id,'UTF8'))
+         OR x.external_digest=sha256(convert_to(v.customer,'UTF8'))))`;
+
+      await db.transaction(context.tenantId, async (tx) => {
+        await lockConnection(tx, context.tenantId, connectionId);
+        await tx.query(
+          `DELETE FROM customer_order_addresses a USING ${rows}
+          WHERE a.tenant_id=$1 AND a.connection_id=$2 AND a.order_scope_key=v.scope_key
+          AND a.order_external_id=v.external_id AND ${erased}`,
+          [context.tenantId, connectionId, ...columns],
+        );
+        await tx.query(
+          `INSERT INTO customer_order_addresses(tenant_id,connection_id,order_scope_key,order_external_id,shared,
+            shipping,billing,observed_at)
+          SELECT $1,$2,v.scope_key,v.external_id,v.shared,v.shipping::jsonb,v.billing::jsonb,v.observed_at
+          FROM ${rows} WHERE NOT ${erased}
+          ON CONFLICT(tenant_id,connection_id,order_scope_key,order_external_id) DO UPDATE
+          SET shared=EXCLUDED.shared,shipping=EXCLUDED.shipping,billing=EXCLUDED.billing,
+            observed_at=EXCLUDED.observed_at
+          WHERE customer_order_addresses.observed_at<=EXCLUDED.observed_at`,
+          [context.tenantId, connectionId, ...columns],
+        );
+      });
+    },
     async erase(context, connectionId, externalIds) {
       requirePermission(context, 'sync.manage');
       z.string().uuid().parse(connectionId);
@@ -292,6 +395,13 @@ export function createCustomerProfiles(db: TenantDatabase): CustomerProfiles {
             SELECT $1,$2,sha256(convert_to(id,'UTF8')) FROM unnest($3::text[]) id ON CONFLICT DO NOTHING`,
             [context.tenantId, connectionId, externalIds],
           );
+        // Linked orders are read before their links are deleted.
+        await eraseOrderAddresses(
+          tx,
+          context.tenantId,
+          connectionId,
+          externalIds ?? null,
+        );
 
         return deleteCustomers(
           tx,

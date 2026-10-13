@@ -62,3 +62,18 @@ export interface CustomerOrder {
   customerExternalId: string | null;
   observedAt: string;
 }
+
+/**
+ * The delivery and billing addresses one connection reports for one of its orders, as of
+ * `observedAt`. `shared` is false when the deployment may not read addresses; then both are
+ * null. A null address with `shared` means the order has none. `customerExternalId` is the
+ * order's customer when the same read reports it, so an erased customer's orders stay erased.
+ */
+export interface OrderAddresses {
+  order: { externalId: string; scopeKey: string };
+  customerExternalId?: string | null;
+  shared: boolean;
+  shipping: CustomerAddress | null;
+  billing: CustomerAddress | null;
+  observedAt: string;
+}

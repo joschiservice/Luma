@@ -243,7 +243,7 @@ export async function shipOrder(context: JtlContext, command: ShipCommand) {
     packages: [
       {
         id: await next(context, 'delivery-note-package'),
-        shippingDate: at,
+        shippingDate: command.packing ? null : at,
         trackingNumber: command.trackingNumber,
         trackingUrl: command.trackingUrl,
       },
@@ -262,7 +262,7 @@ export async function shipOrder(context: JtlContext, command: ShipCommand) {
     });
   }
   order.warehouse = warehouse;
-  order.shippedAt ??= at;
+  if (!command.packing) order.shippedAt ??= at;
   await context.store.put(kinds.note, note.id, note, {
     parent: order.id,
     createdAt: context.now,
@@ -284,6 +284,62 @@ export async function shipOrder(context: JtlContext, command: ShipCommand) {
       quantity,
     })),
   };
+}
+
+/**
+ * Removes the order's delivery notes whose parcels have not shipped, as a warehouse does when it
+ * stops packing to pick the order again. Their units return to the warehouse's stock and the
+ * order's reservations. Refuses an order without such a note.
+ */
+export async function unpackOrder(context: JtlContext, id: string) {
+  const order = await loadOrder(context, id);
+  const notes: NoteRecord[] = [];
+  let after: string | null = null;
+  do {
+    const page: Awaited<ReturnType<typeof context.store.page<NoteRecord>>> =
+      await context.store.page<NoteRecord>({
+        kind: kinds.note,
+        parent: order.id,
+        after,
+        limit: 100,
+      });
+    notes.push(
+      ...page.items
+        .map((item) => item.data)
+        .filter((note) => note.packages.every((value) => !value.shippingDate)),
+    );
+    after = page.next;
+  } while (after);
+  if (!notes.length) refuse('No delivery note is being packed', 409);
+  const items = await loadItems(
+    context,
+    notes.flatMap((note) =>
+      note.lines.map(
+        (value) =>
+          order.lines.find((line) => line.id === value.orderLineId)!.itemId,
+      ),
+    ),
+  );
+  for (const note of notes) {
+    for (const value of note.lines) {
+      const line = order.lines.find((item) => item.id === value.orderLineId)!;
+      const item = items.get(line.itemId)!;
+      item.stock[note.warehouse] =
+        (item.stock[note.warehouse] ?? 0) + value.quantity;
+      item.reserved += value.quantity;
+      line.shipped -= value.quantity;
+    }
+    await context.store.delete(kinds.note, note.id);
+    context.notify({
+      topic: 'delivery-notes/delete',
+      resource: note.id,
+      payload: { deliveryNoteId: note.id, salesOrderId: order.id },
+    });
+  }
+  await saveOrder(context, order, 'sales-orders/update');
+  await saveStock(context, items.values());
+
+  return { id: order.id, deliveryNotes: notes.map((note) => note.id) };
 }
 
 /**
@@ -382,6 +438,31 @@ export function salesOrderJson(order: OrderRecord) {
     currencyIso: order.currency,
     shippingMethodId: configId(order.shippingMethodId),
     shippingDetails: { shippingDate: order.shippedAt },
+  };
+}
+
+/**
+ * Serializes one sales order as `GET sales-orders/{id}` reports it: status, amounts and currency
+ * are nested in detail objects instead of the list row's top-level fields.
+ */
+export function salesOrderDetailJson(order: OrderRecord) {
+  return {
+    id: Number(order.id),
+    salesOrderNumber: order.number,
+    companyId: Number(COMPANY_ID),
+    customerId: order.customerId ? Number(order.customerId) : null,
+    isCancelled: order.cancelled,
+    salesOrderDate: order.date,
+    shippingMethodId: configId(order.shippingMethodId),
+    externalDetails: { externalSalesOrderNumber: order.externalNumber },
+    paymentDetails: { currencyIso: order.currency },
+    shippingDetails: { shippingDate: order.shippedAt },
+    keyFigures: {
+      salesOrderId: Number(order.id),
+      deliveryStatus: deliveryStatus(order),
+      paymentStatus: order.paid ? 2 : 0,
+      totalGrossAmount: order.total,
+    },
   };
 }
 
