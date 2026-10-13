@@ -236,3 +236,11 @@ export function planPostings(
 
   return changes;
 }
+
+/** Advances a signed PostgreSQL bigint version without rounding; exhausted or malformed versions are rejected. */
+export function nextStockVersion(value: string): string {
+  if (!/^\d{1,19}$/.test(value) || BigInt(value) >= 9_223_372_036_854_775_807n)
+    throw new LedgerError('invalid_entry', 'Stock version limit reached.');
+
+  return String(BigInt(value) + 1n);
+}

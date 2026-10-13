@@ -179,6 +179,22 @@ export function createCorrectionQuery(
           'CONFLICT',
           'Sources must be active, installed and mapped to the same SKU, location and whole-unit stock.',
         );
+      const owned = await database.transaction(
+        context.tenantId,
+        async (tx) =>
+          (
+            await tx.query(
+              `SELECT 1 FROM inventory_stock_ownership_scopes WHERE tenant_id=$1 AND location_id=$2 AND mode='own'`,
+              [context.tenantId, shopify.locationId],
+            )
+          ).rowCount,
+      );
+      if (owned)
+        throw new IdentityError(
+          409,
+          'CONFLICT',
+          'This location uses native stock. Publish a reviewed native allocation instead of applying an ERP correction.',
+        );
       exact(erp, 'sku');
       exact(erp, 'location');
       const inventoryItemId = exact(shopify, 'sku'),

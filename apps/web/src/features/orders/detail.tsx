@@ -59,6 +59,7 @@ import {
   proposedChange,
 } from './data';
 import { OrderIdentityLinks } from './identity-links';
+import { NativeOrderStock } from './native-stock';
 import { OrderCharges } from './order-charges';
 import { OrderHeader } from './order-header';
 import { OrderInspector } from './order-inspector';
@@ -261,6 +262,10 @@ export function OrderPage() {
         query.data ? (
           <>
             <SalesRecord organizationId={organizationId} detail={query.data} />
+            <NativeOrderStock
+              organizationId={organizationId}
+              detail={query.data}
+            />
             <OrderIdentityLinks
               organizationId={organizationId}
               orderId={query.data.order.id}

@@ -5,14 +5,36 @@ import {
   formatCalendarDate,
   formatCurrency,
   formatDateTime,
+  formatExactQuantity,
   formatList,
   formatNumber,
   formatRelativeTime,
+  parseExactQuantityInput,
 } from './format';
 
 afterEach(() => overwriteGetLocale(() => 'en'));
 
 describe('formatting', () => {
+  it('parses local decimal quantities exactly and refuses grouping and excess precision', () => {
+    expect(parseExactQuantityInput('999999999999999999.123456')).toBe(
+      '999999999999999999.123456',
+    );
+    expect(parseExactQuantityInput('1,234')).toBeNull();
+    expect(parseExactQuantityInput('1.1234567')).toBeNull();
+    overwriteGetLocale(() => 'de');
+    expect(parseExactQuantityInput('3,125001')).toBe('3.125001');
+    expect(parseExactQuantityInput('1.234')).toBeNull();
+  });
+  it('retains exact stock quantities beyond floating point precision in both languages', () => {
+    expect(formatExactQuantity('999999999999999999.123456')).toBe(
+      '999,999,999,999,999,999.123456',
+    );
+    expect(formatExactQuantity('-0.125001')).toBe('-0.125001');
+    overwriteGetLocale(() => 'de');
+    expect(formatExactQuantity('999999999999999999.123456')).toBe(
+      '999.999.999.999.999.999,123456',
+    );
+  });
   it('follows the active language', () => {
     expect(formatNumber(12345.5)).toBe('12,345.5');
     expect(formatCalendarDate('2026-10-08', { dateStyle: 'long' })).toBe(

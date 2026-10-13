@@ -44,6 +44,37 @@ export function formatNumber(
   ).format(value);
 }
 
+/** Formats an exact decimal string without converting its magnitude to floating point. */
+export function formatExactQuantity(value: string) {
+  if (!/^-?\d+(?:\.\d+)?$/.test(value))
+    throw new RangeError('Expected a decimal quantity');
+  const [whole, fraction] = value.split('.');
+  const formatter = cached(
+    numberFormats,
+    { maximumFractionDigits: 0 },
+    (locale) => new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }),
+  );
+  const grouped = formatter.format(BigInt(whole!));
+  const decimal = new Intl.NumberFormat(formattingLocale())
+    .formatToParts(1.1)
+    .find((part) => part.type === 'decimal')!.value;
+  const negativeZero = value.startsWith('-') && BigInt(whole!) === 0n;
+
+  return `${negativeZero ? '-' : ''}${grouped}${fraction ? `${decimal}${fraction}` : ''}`;
+}
+
+/** Parses an ungrouped quantity using the active decimal separator; invalid or excessive precision returns null. */
+export function parseExactQuantityInput(value: string): string | null {
+  const decimal = new Intl.NumberFormat(formattingLocale())
+    .formatToParts(1.1)
+    .find((part) => part.type === 'decimal')!.value;
+  const trimmed = value.trim();
+  if (decimal !== '.' && trimmed.includes('.')) return null;
+  const canonical = trimmed.split(decimal).join('.');
+
+  return /^-?\d{1,18}(?:\.\d{1,6})?$/.test(canonical) ? canonical : null;
+}
+
 /** Formats a ratio such as 0.25 as a percentage in the active language. */
 export function formatPercent(
   ratio: number,

@@ -36,6 +36,8 @@ import {
   rolesRoutes,
   settingsRoutes,
 } from '@luma/identity/http';
+import type { NativeStockRuntime } from '@luma/inventory';
+import { nativeStockRoutes } from '@luma/inventory/http';
 import type {
   DocumentService,
   MessagingService,
@@ -154,6 +156,7 @@ export interface AppDependencies {
   operationalSummary?: OperationalSummary;
   records?: RecordExplorer;
   inventory?: InventoryWorkspace;
+  nativeStock?: NativeStockRuntime;
   products?: ProductWorkspace;
   procurementContext?: ProcurementContextReader;
   fulfillment?: FulfillmentWorkspace;
@@ -446,6 +449,7 @@ export function buildApp(
       connectorProviders: createConnectors(dependencies.providerCatalog),
       records: recordRoutes(dependencies.records),
       inventory: inventoryRoutes(dependencies.inventory),
+      nativeStock: nativeStockRoutes(dependencies.nativeStock),
       products: productRoutes(dependencies.products),
       procurementContext: procurementContextRoutes(
         dependencies.procurementContext,

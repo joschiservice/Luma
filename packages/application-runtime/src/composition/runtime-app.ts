@@ -198,6 +198,12 @@ export async function buildRuntimeApp(
             workflowSources: installedConnections.registry.workflowSources(),
             actionPermission: installedConnections.registry.actionPermission,
             ...(stockRefresh ? { refreshStock } : {}),
+            nativeStockReader: createInstalledRuntime({
+              installations: installedConnections.connections,
+              providers: installedConnections.registry.providers(),
+              record: async () => undefined,
+              recordObservations: async () => undefined,
+            }),
           }
         : {}),
       ...(modelGateway ? { modelGateway } : {}),

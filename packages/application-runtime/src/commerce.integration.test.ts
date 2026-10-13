@@ -268,13 +268,23 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       );
     const sales = createSalesRuntime(
       db,
-      { refreshContext: async (c) => c },
+      {
+        refreshContext: async (c) => c,
+        resolveWorkflowContext: async () => {
+          throw new Error('This Sales fixture has no stock approval reviewer');
+        },
+      },
       async () => true,
       authority,
     );
     const off = createSalesRuntime(
       db,
-      { refreshContext: async (c) => c },
+      {
+        refreshContext: async (c) => c,
+        resolveWorkflowContext: async () => {
+          throw new Error('This Sales fixture has no stock approval reviewer');
+        },
+      },
       async () => false,
       authority,
     );
@@ -466,6 +476,7 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
                 source: createInternalOrderSource(scoped),
                 authority: authority(scoped),
                 audit: createAuditLog(scoped),
+                reconcileStock: async () => undefined,
               });
               const previous = await persistence.get(orderId);
               if (!previous) throw new Error('Benchmark record missing');
@@ -543,7 +554,12 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
     };
     const failing = createSalesRuntime(
       failingDb,
-      { refreshContext: async (c) => c },
+      {
+        refreshContext: async (c) => c,
+        resolveWorkflowContext: async () => {
+          throw new Error('This Sales fixture has no stock approval reviewer');
+        },
+      },
       async () => true,
       authority,
     );

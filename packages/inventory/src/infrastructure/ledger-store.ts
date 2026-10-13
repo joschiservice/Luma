@@ -65,7 +65,8 @@ const account = (row: AccountRow): LedgerAccount => ({
 });
 const columns =
   'id,sku_id,location_id,unit,state,connection_id,trim_scale(balance)::text AS balance,version::text AS version';
-const sourceSchema = z.object({
+
+export const stockEvidenceSchema = z.object({
   snapshotId: z.string().uuid(),
   observationId: z.string().uuid(),
   connectionId: z.string().uuid(),
@@ -80,6 +81,17 @@ const sourceSchema = z.object({
   mappingVersion: z.string(),
   sourceRevision: z.string().nullable(),
   meaningHash: z.string().regex(/^[a-f0-9]{64}$/),
+  channelState: z
+    .object({
+      semantics: z.literal('shopify/1'),
+      committed: z.string().nullable(),
+      reserved: z.string().nullable(),
+      itemActive: z.boolean().nullable(),
+      locationActive: z.boolean().nullable(),
+      tracked: z.boolean().nullable(),
+    })
+    .nullable()
+    .optional(),
   complete: z.boolean(),
   bundleParent: z.boolean().nullable(),
 });
@@ -104,7 +116,7 @@ const review = (row: ReviewRow): LedgerReview => ({
   commandHash: row.command_hash,
   intentHash: row.intent_hash,
   command: postingCommandSchema.parse(row.command_document),
-  sources: z.array(sourceSchema).parse(row.source_bindings),
+  sources: z.array(stockEvidenceSchema).parse(row.source_bindings),
   preparedBy: row.prepared_by,
   reviewedBy: row.reviewed_by,
   reviewedAt: row.reviewed_at ? iso(row.reviewed_at) : null,
@@ -232,7 +244,19 @@ export function createLedgerStore(
                 [tenant, key],
               )
             ).rows[0];
-            if (!row) return null;
+            if (!row) {
+              const used = await tx.query(
+                `SELECT 1 FROM inventory_native_stock_commands WHERE tenant_id=$1 AND command_key=$2 UNION ALL SELECT 1 FROM inventory_stock_ownership_reviews WHERE tenant_id=$1 AND command_key=$2 LIMIT 1`,
+                [tenant, key],
+              );
+              if (used.rowCount)
+                throw new LedgerError(
+                  'changed_command',
+                  'This key belongs to another stock operation.',
+                );
+
+              return null;
+            }
             if (hash && row.command_hash !== hash)
               throw new LedgerError(
                 'changed_command',
@@ -340,7 +364,7 @@ export function createLedgerStore(
             return {
               id: row.id,
               key: row.command_key,
-              source: sourceSchema.parse(row.source_document),
+              source: stockEvidenceSchema.parse(row.source_document),
               nativeQuantity: row.native_quantity,
               driftQuantity: row.drift_quantity,
               nativeVersions: row.native_versions,
@@ -700,7 +724,17 @@ async function stockEvidence(
           data.safetyStock,
         ]
       : [data.onHand, data.available, data.reserved];
+  const check = (
+    await tx.query<{ state: string; recorded_at: Date }>(
+      `SELECT state,recorded_at FROM inventory_native_stock_read_checks WHERE tenant_id=$1 AND connection_id=$2 AND sku_id=$3 AND location_id=$4 AND unit=$5 ORDER BY recorded_at DESC,id DESC LIMIT 1`,
+      [tenant, value.connectionId, data.skuId, data.locationId, data.unit],
+    )
+  ).rows[0];
+  const unavailable =
+    check?.state === 'unavailable' &&
+    Date.parse(value.observedAt) <= check.recorded_at.getTime();
   const complete =
+    !unavailable &&
     !value.deleted &&
     ['active', 'degraded'].includes(row.status) &&
     row.granted.includes('inventory.read') &&
@@ -726,6 +760,17 @@ async function stockEvidence(
     mappingVersion: value.mappingVersion,
     sourceRevision: value.sourceRevision,
     meaningHash: createHash('sha256').update(canonicalJson(data)).digest('hex'),
+    channelState:
+      data.inventorySemantics === 'shopify/1'
+        ? {
+            semantics: 'shopify/1',
+            committed: data.committed ?? null,
+            reserved: data.reserved,
+            itemActive: data.itemActive ?? null,
+            locationActive: data.locationActive ?? null,
+            tracked: data.tracked ?? null,
+          }
+        : null,
     complete,
     bundleParent: parent,
   };

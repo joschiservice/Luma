@@ -9,26 +9,33 @@ import {
 import type { IdentityService, TenantContext } from '@luma/identity';
 import { requireTenant } from '@luma/identity';
 import type { Observability, TenantDatabase } from '@luma/platform';
+import type { SalesService } from '@luma/sales';
 import {
   createSalesPersistence,
   createSalesService,
   createSalesSource,
 } from '@luma/sales/composition';
 
+import { createNativeStockRuntime } from './native-stock.js';
 import { createCommerceServices } from './services.js';
 
 /** Composes record persistence and evidence publication on one tenant transaction. */
 export function createSalesRuntime(
   db: TenantDatabase,
-  identity: Pick<IdentityService, 'refreshContext'>,
+  identity: Pick<IdentityService, 'refreshContext' | 'resolveWorkflowContext'>,
   enabled: (context: TenantContext) => Promise<boolean>,
   authority: (db: TenantDatabase) => AuthorityReader,
-) {
+): SalesService {
   return createSalesService({
     refreshContext: identity.refreshContext,
     enabled,
-    atomic: (context, operation) =>
+    atomic: (context, operation, orderId) =>
       db.transaction(context.tenantId, async (tx) => {
+        if (orderId)
+          await tx.query(
+            'SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
+            [`native-stock-order:${context.tenantId}:${orderId}`],
+          );
         await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
           `sales:${context.tenantId}`,
         ]);
@@ -52,6 +59,30 @@ export function createSalesRuntime(
             source: createInternalOrderSource(scoped),
             authority: authority(scoped),
             audit: createAuditLog(scoped),
+            reconcileStock: async (previous, next, commandId) => {
+              if (
+                previous.status === next.status &&
+                JSON.stringify(
+                  previous.lines.map((line) => line.currentQuantity),
+                ) ===
+                  JSON.stringify(next.lines.map((line) => line.currentQuantity))
+              )
+                return;
+              await createNativeStockRuntime(
+                scoped,
+                identity,
+                enabled,
+                authority,
+              ).reservations.reconcileDemand(context, {
+                commandId,
+                orderId: next.orderId,
+                status: next.status,
+                lines: next.lines.map((line) => ({
+                  id: line.id,
+                  currentQuantity: line.currentQuantity,
+                })),
+              });
+            },
           }),
         );
       }),

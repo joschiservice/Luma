@@ -69,8 +69,10 @@ export function createCin7Provider(
       );
       const target = installationTarget.parse(current.connection.target);
       const fetch =
-        simulationTransport(current.connection, runtime.simulation) ??
-        runtime.fetch;
+        simulationTransport(
+          current.connection,
+          runtime.simulation ?? options.simulation,
+        ) ?? runtime.fetch;
       const state = stateOf(context.tenantId, id);
 
       return createCin7Connector({

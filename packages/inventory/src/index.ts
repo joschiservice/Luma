@@ -11,3 +11,7 @@ export { receivingSignals } from './domain/receiving.js';
 export type { TransferFacts, ReceivingSignal } from './domain/receiving.js';
 
 export type { LedgerService } from './application/ledger-service.js';
+
+export type { NativeStockRuntime } from './application/native-stock.js';
+
+export { LedgerError } from './domain/ledger.js';

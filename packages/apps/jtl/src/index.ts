@@ -77,7 +77,7 @@ export function createJtlProvider(options: {
       const target = installationTarget.parse(current.connection.target);
       const simulated = simulationTransport(
         current.connection,
-        runtime.simulation,
+        runtime.simulation ?? options.simulation,
       );
       const token = async () => {
         if (target.kind === 'jtl-onprem' && !simulated)

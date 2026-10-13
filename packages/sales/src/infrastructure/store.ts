@@ -10,9 +10,9 @@ export function createSalesStore(
   actorId: string,
 ) {
   return {
-    async get(orderId: string): Promise<SalesOrder | null> {
+    async get(orderId: string, lock = true): Promise<SalesOrder | null> {
       const rows = await tx.query<{ document: Omit<SalesOrder, 'lines'> }>(
-        'SELECT document FROM sales_orders WHERE tenant_id=$1 AND order_id=$2 FOR UPDATE',
+        `SELECT document FROM sales_orders WHERE tenant_id=$1 AND order_id=$2 ${lock ? 'FOR UPDATE' : ''}`,
         [tenantId, orderId],
       );
       const order = rows.rows[0]?.document;

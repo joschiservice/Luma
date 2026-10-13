@@ -142,3 +142,34 @@ Transit, returned-inspection and drift aging returns bounded advisory candidates
 entry that started the current nonzero episode. The age describes a continuously nonzero aggregate
 balance, not the age of individual units. Unknown effective time uses recording time explicitly.
 A candidate alone does not establish physical loss, delay or resolution.
+
+## Native reservations and location ownership
+
+Allocations bind native order authority, the exact order-line version and SKU/location/unit,
+current available balance/version and the reviewed location scope. Available and reserved
+move atomically with the reservation record and retry receipt. One active reservation per
+order line/location/unit can be extended only with its current identity and version. Shortages
+remain demand; they never create negative physical stock or an inferred provider promise.
+
+Shipment reads retain complete empty results and exact order, line, location and fulfillment
+mapping identities. Reads older than five minutes, unknown location/stage, changed mappings,
+pending shipments and unsettled external effects stop changes. Independently verified shipped
+units move reserved stock to the customer counterparty once. An unallocated shipment requires
+review; it cannot consume a different line or location. Shipment effective time stays unknown
+when the read does not establish it. Cancellation and quantity reductions release only remaining
+units in the Sales transaction. A newly observed shipment must be consumed before release.
+Expiry sweeps retain blocked holds and their reasons rather than freeing uncertain stock.
+
+Each location progresses explicitly through observe, shadow, propose and own. Every step binds
+reviewed openings, fresh zero-drift reconciliation, mappings, balances, active reservations and
+workspace authority to another member's current approval. Workspace authority changes invalidate
+prepared operations without changing location ownership. Initial own transitions require zero
+provider commitments and reservations; ambiguous provider promises cannot be silently migrated.
+Handback requires independently aligned available stock, no remaining native holds and no unsettled
+effects. These operations send no provider writes or activation requests. Legacy ERP corrections
+are refused at natively owned locations.
+
+Failed native point reads retain uncertainty separately from immutable provider observations and
+native balances. They pause older stock evidence until a fresh successful read. Source replacement
+is refused for a location with ownership history: shipment identities need an explicit migration
+review before another connection can assume the binding.
