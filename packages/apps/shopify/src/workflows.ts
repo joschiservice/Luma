@@ -7,17 +7,21 @@ import { IdentityError } from '@luma/identity';
 import { compileProcessWorkflow } from '@luma/workflows/composition';
 
 import { createShopifyCaseWorkflows } from './application/case-workflows.js';
+import { createQuantityChangeWorkflow } from './application/quantity-change.js';
 import {
   holdReleaseSource,
+  quantityChangeSource,
   stockCorrectionSource,
 } from './domain/case-workflows.js';
 import type { createShopifyRecovery } from './fulfillment-recovery.js';
 import { createCorrectionQuery } from './infrastructure/inventory-correction-query.js';
 import type { createShopifyInventoryCorrection } from './inventory-correction.js';
+import type { createShopifyOrderEdits } from './order-edits.js';
 
 /**
- * Composes the Shopify case workflows over the app's governed correction and recovery services.
- * Workspaces without the Shopify app have no Shopify connections for these workflows to use.
+ * Composes the Shopify case workflows over the app's governed correction, recovery and order
+ * edit services. Workspaces without the Shopify app have no Shopify connections for these
+ * workflows to use. The order quantity change reads plans and rereads orders through the host.
  */
 export function createShopifyWorkflows(
   context: AppFactoryContext,
@@ -25,6 +29,7 @@ export function createShopifyWorkflows(
     installations: InstallationService;
     recovery: ReturnType<typeof createShopifyRecovery>;
     corrections: ReturnType<typeof createShopifyInventoryCorrection>;
+    edits: ReturnType<typeof createShopifyOrderEdits>;
   },
 ) {
   const query = createCorrectionQuery(
@@ -52,20 +57,34 @@ export function createShopifyWorkflows(
     }
   }
 
-  return createShopifyCaseWorkflows({
-    corrections: services.corrections,
-    recovery: services.recovery,
-    position: query.position,
-    connections,
-    versions: {
-      stock: compileProcessWorkflow(stockCorrectionSource),
-      hold: compileProcessWorkflow(holdReleaseSource),
-    },
-    id: (value) => {
-      const hex = createHash('sha256').update(value).digest('hex');
+  const id = (value: string) => {
+    const hex = createHash('sha256').update(value).digest('hex');
 
-      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
-    },
-    now: () => new Date(),
-  });
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+  };
+  const now = () => new Date();
+
+  return [
+    ...createShopifyCaseWorkflows({
+      corrections: services.corrections,
+      recovery: services.recovery,
+      position: query.position,
+      connections,
+      versions: {
+        stock: compileProcessWorkflow(stockCorrectionSource),
+        hold: compileProcessWorkflow(holdReleaseSource),
+      },
+      id,
+      now,
+    }),
+    createQuantityChangeWorkflow({
+      edits: services.edits,
+      ...(context.orderChangePlans ? { plans: context.orderChangePlans } : {}),
+      ...(context.refreshOrder ? { refresh: context.refreshOrder } : {}),
+      connections,
+      version: compileProcessWorkflow(quantityChangeSource),
+      id,
+      now,
+    }),
+  ];
 }

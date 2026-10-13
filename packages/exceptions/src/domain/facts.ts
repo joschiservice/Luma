@@ -4,7 +4,10 @@ interface Thresholds {
   syncFailureSeconds: number;
   stuckSeconds: number;
   uncertaintySeconds: number;
-  /** How long a stock gap may wait for provider sync after Luma first saw it. */
+  /**
+   * How long a stock gap may wait for provider sync after Luma first saw it, and how long every
+   * source of an order must keep showing a line quantity difference before it opens a case.
+   */
   propagationSeconds: number;
   /**
    * Storefront overstatement, in percent of the authority's available stock, that is raised at
@@ -103,6 +106,25 @@ interface FactMap {
      * within tolerance; null when no agreement is recorded. Absent on legacy input.
      */
     mismatchSince?: string | null;
+  };
+  order_quantity_mismatch: Common & {
+    /** Canonical line ID, or a mapped SKU that occurs once per source, as comparisons match lines. */
+    lineKey: string;
+    /** Every current source connection of the order. */
+    connectionIds: string[];
+    /** Workspace order-line authority when the sources were read. */
+    authorityState: 'resolved' | 'unknown' | 'conflicting';
+    authorityConnectionId: string | null;
+    /** Each source's current units of the line; null when the source does not report them. */
+    quantities: { connectionId: string; quantity: string | null }[];
+    unit: string;
+    /** Lines match unambiguously and no contributing collection read failed or was partial. */
+    complete: boolean;
+    /** Latest observed business-state change of any source, on Luma's clock. */
+    changedAt: string;
+    /** Oldest and newest contributing order and fulfillment reads, on Luma's clock. */
+    oldestReadAt: string;
+    latestReadAt: string;
   };
   workflow_failure: Common & {
     runId: string;

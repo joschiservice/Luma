@@ -25,6 +25,7 @@ const operation = z.object({
 const fields = 'id status query url rootObjectCount createdAt';
 const childField: Record<string, string> = {
   LineItem: 'lineItems',
+  ShippingLine: 'shippingLines',
   ProductVariant: 'variants',
   InventoryLevel: 'inventoryLevels',
 };
@@ -240,15 +241,16 @@ export async function readBulkHistory(options: {
       if (typeof item.id !== 'string') fail('invalid_response');
       rootNode = item;
       childCount = 0;
-      const child =
+      // Exports list every nested record, so a connection without rows is empty.
+      const nested =
         root === 'orders'
-          ? 'lineItems'
+          ? ['lineItems', 'shippingLines']
           : root === 'products'
-            ? 'variants'
+            ? ['variants']
             : root === 'inventoryItems'
-              ? 'inventoryLevels'
-              : null;
-      if (child) rootNode[child] = emptyConnection();
+              ? ['inventoryLevels']
+              : [];
+      for (const child of nested) rootNode[child] = emptyConnection();
       nodes.push(rootNode);
     } else {
       if (

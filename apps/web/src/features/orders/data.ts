@@ -1,6 +1,9 @@
-import { type OrderListQuery } from '@luma/api-contract';
+import {
+  type OrderChangePlanQuery,
+  type OrderListQuery,
+} from '@luma/api-contract';
 import { nextCalendarDay, workspaceInstant } from '@luma/ui/lib/timezone';
-import { queryOptions } from '@tanstack/react-query';
+import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 import { z } from 'zod';
 
 import { IdentityError } from '../../kit/identity/data';
@@ -66,6 +69,15 @@ export const ordersSearch = z.object({
   page: z.coerce.number().int().min(1).max(100000).optional().catch(undefined),
   linkedFrom: z.uuid().optional().catch(undefined),
   from: z.string().max(2048).optional().catch(undefined),
+  /** A proposed quantity change to plan: the line's comparison key and its new quantity. */
+  changeLine: z.uuid().optional().catch(undefined),
+  changeQuantity: z
+    .string()
+    .regex(/^\d{1,14}(\.\d{1,6})?$/)
+    .optional()
+    .catch(undefined),
+  /** The connection whose app should open its edit, prefilled from the plan's Luma step. */
+  edit: z.uuid().optional().catch(undefined),
 });
 
 export type OrdersSearch = z.infer<typeof ordersSearch>;
@@ -105,6 +117,9 @@ export function orderFilters(search: OrdersSearch): OrdersSearch {
   delete filters.page;
   delete filters.from;
   delete filters.linkedFrom;
+  delete filters.changeLine;
+  delete filters.changeQuantity;
+  delete filters.edit;
 
   return filters;
 }
@@ -158,5 +173,53 @@ export function orderOptions(organizationId: string, orderId: string) {
     refetchOnReconnect: 'always',
     queryFn: ({ signal }) =>
       api.orders.get({ params: { organizationId, orderId } }, { signal }),
+  });
+}
+
+/** A proposed quantity change from the order URL, or null to plan detected changes. */
+export function proposedChange(
+  search: OrdersSearch,
+): OrderChangePlanQuery | null {
+  return search.changeLine && search.changeQuantity !== undefined
+    ? {
+        kind: 'quantity',
+        lineKey: search.changeLine,
+        quantity: search.changeQuantity,
+      }
+    : null;
+}
+
+/**
+ * Plans the proposed change, or the detected ones, for one order. `asOf` is the order detail's
+ * read time, so the plan is read again whenever the detail is, and fresh observations update
+ * its safety.
+ */
+export function changePlanOptions(
+  organizationId: string,
+  orderId: string,
+  proposal: OrderChangePlanQuery | null,
+  asOf: string | null,
+) {
+  const query = proposal ?? {};
+
+  return queryOptions({
+    ...privateQueryDefaults,
+    queryKey: [
+      'private',
+      'organization',
+      organizationId,
+      'order',
+      orderId,
+      'change-plan',
+      query,
+      asOf,
+    ],
+    refetchOnReconnect: 'always',
+    placeholderData: keepPreviousData,
+    queryFn: ({ signal }) =>
+      api.orders.changePlan(
+        { params: { organizationId, orderId }, query },
+        { signal },
+      ),
   });
 }

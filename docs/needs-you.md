@@ -9,14 +9,14 @@ decisions.
 
 ## Sources
 
-| Source (ID prefix)               | Owner and rule                                                                                                                                                                                             | Responses                                                               |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Cases (`case:`)                  | Exceptions: the inbox attention rules (approval, manual step, uncertainty), minus approvals whose current proposal already has a response                                                                  | Case desk review and decisions                                          |
-| Replenishment (`replenishment:`) | Procurement: runs awaiting a decision whose proposal is bound, unexpired and unanswered, with the same `canRespond` rule as the run review                                                                 | The workflow run's replenishment decision                               |
-| Supplier orders (`supplier:`)    | Procurement: order-progress attention (submission approvals, uncertain sends, facts to review, changed commitments, overdue confirmations and deliveries)                                                  | The purchase order's own review                                         |
-| Message replies (`message:`)     | Messaging: open threads whose reply deadline passed or falls within 30 minutes, owned by the reader or unassigned                                                                                          | The thread: reply, change the deadline or close it                      |
-| Reply sends (`message-send:`)    | Messaging: replies awaiting approval, approved replies for their requester, and sends not yet confirmed by a thread read                                                                                   | The thread: approve or reject, send, or check the reply                 |
-| Apps (`<appId>:<kind>:`)         | `AppDefinition.decisions`. Shopify lists stock corrections and fulfillment recoveries awaiting approval, awaiting a run by their requester, or accepted/uncertain without a verified outcome (last 7 days) | The app's own commands through its `inventory` or `fulfillment` UI slot |
+| Source (ID prefix)               | Owner and rule                                                                                                                                                                                                                   | Responses                                                                                 |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Cases (`case:`)                  | Exceptions: the inbox attention rules (approval, manual step, uncertainty), minus approvals whose current proposal already has a response                                                                                        | Case desk review and decisions                                                            |
+| Replenishment (`replenishment:`) | Procurement: runs awaiting a decision whose proposal is bound, unexpired and unanswered, with the same `canRespond` rule as the run review                                                                                       | The workflow run's replenishment decision                                                 |
+| Supplier orders (`supplier:`)    | Procurement: order-progress attention (submission approvals, uncertain sends, facts to review, changed commitments, overdue confirmations and deliveries)                                                                        | The purchase order's own review                                                           |
+| Message replies (`message:`)     | Messaging: open threads whose reply deadline passed or falls within 30 minutes, owned by the reader or unassigned                                                                                                                | The thread: reply, change the deadline or close it                                        |
+| Reply sends (`message-send:`)    | Messaging: replies awaiting approval, approved replies for their requester, and sends not yet confirmed by a thread read                                                                                                         | The thread: approve or reject, send, or check the reply                                   |
+| Apps (`<appId>:<kind>:`)         | `AppDefinition.decisions`. Shopify lists stock corrections, fulfillment recoveries and order quantity edits awaiting approval, awaiting a run by their requester, or accepted/uncertain without a verified outcome (last 7 days) | The app's own commands through its `inventory`, `fulfillment` or `record` (order) UI slot |
 
 Owners present their decisions: why, consequences (what each response causes), the exact
 change (source, record, location and quantities) and evidence validity. Unknown impact is
@@ -46,7 +46,8 @@ not resolved, and the rest of the queue still loads.
 Human tasks appear only for their current assignee or fallback person or role. Their
 review collects a published choice and required evidence, with an optional note. The task's
 deadline changes responsibility without removing the open handoff. Responses remain input
-and cannot authorize a later action.
+and cannot authorize a later action. A task about an order links to it, where the order's
+change plan shows what the task asks for.
 
 ## Assignment
 

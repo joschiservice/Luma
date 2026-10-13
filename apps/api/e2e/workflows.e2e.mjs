@@ -96,6 +96,7 @@ it('publishes native workflows without cases, retains immutable versions and exp
       'connection-sync-check',
       'shopify-stock-correction',
       'shopify-hold-release',
+      'order-quantity-change',
       'supplier-follow-up',
       'refund-follow-up',
       'return-case-follow-up',

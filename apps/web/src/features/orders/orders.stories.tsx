@@ -115,6 +115,16 @@ const line = (
   ...overrides,
 });
 
+const paid = (shop: string, presentment: string) => ({
+  shop: { amount: shop, currency: 'EUR' },
+  presentment: { amount: presentment, currency: 'CHF' },
+});
+
+const same = (shop: string, presentment: string) => ({
+  original: paid(shop, presentment),
+  current: paid(shop, presentment),
+});
+
 const detail: OrderDetail = {
   authority: {
     revision: 0,
@@ -156,11 +166,95 @@ const detail: OrderDetail = {
       dueAt: null,
       fulfillment: 'partial',
       open: null,
+      currencies: { shop: 'EUR', presentment: 'CHF' },
+      amounts: {
+        subtotal: same('48.00', '46.40'),
+        shipping: same('4.90', '4.70'),
+        discounts: { original: paid('5.33', '5.15'), current: null },
+        tax: same('7.66', '7.41'),
+        duties: { original: null, current: null },
+        total: same('52.90', '51.10'),
+      },
+      taxesIncluded: true,
+      dutiesIncluded: false,
+      taxLines: [{ title: 'VAT', rate: '0.19', amount: paid('7.66', '7.41') }],
+      shippingLines: [
+        {
+          id: 'gid://shopify/ShippingLine/71',
+          title: 'Standard',
+          code: 'STANDARD',
+          source: 'shopify',
+          carrier: null,
+          removed: false,
+          original: paid('4.90', '4.70'),
+          discounted: paid('4.90', '4.70'),
+          current: paid('4.90', '4.70'),
+        },
+        {
+          id: 'gid://shopify/ShippingLine/72',
+          title: 'Express',
+          code: 'EXPRESS',
+          source: 'shopify',
+          carrier: 'DHL',
+          removed: true,
+          original: paid('9.90', '9.50'),
+          discounted: paid('9.90', '9.50'),
+          current: paid('0.00', '0.00'),
+        },
+      ],
+      discounts: [
+        {
+          index: 0,
+          kind: 'code',
+          label: 'WELCOME10',
+          target: 'line_item',
+          allocation: 'across',
+          value: { type: 'percentage', percentage: '10' },
+        },
+      ],
+      tags: ['vip', 'gift'],
+      attributes: {
+        edited: true,
+        requiresShipping: true,
+        test: false,
+        cancelReason: null,
+        cancelledAt: null,
+        closedAt: null,
+        processedAt: '2026-09-11T08:00:05.000Z',
+        channel: 'web',
+        fulfillmentStatus: 'partially_fulfilled',
+      },
+      addresses: {
+        state: 'shared',
+        shipping: {
+          line1: 'Hafenstraße 1',
+          line2: null,
+          city: 'Hamburg',
+          region: null,
+          postalCode: '20457',
+          country: 'DE',
+        },
+        billing: null,
+        observedAt: '2026-09-28T08:00:00.000Z',
+      },
       lines: [
         line({
           currentQuantity: null,
           cancelledQuantity: null,
           remainingQuantity: null,
+        }),
+        line({
+          id: '89898989-8989-4898-8989-898989898989',
+          skuId: null,
+          comparisonKey: null,
+          skuCode: null,
+          title: 'Gift wrapping',
+          quantity: '1',
+          currentQuantity: '1',
+          cancelledQuantity: '0',
+          remainingQuantity: '0',
+          fulfilledQuantity: '0',
+          catalog: 'no_product',
         }),
       ],
     },
@@ -176,6 +270,7 @@ const detail: OrderDetail = {
       dueAt: '2026-09-30T00:00:00.000Z',
       fulfillment: 'unfulfilled',
       open: true,
+      addresses: { state: 'not_imported' },
       lines: [line({ fulfilledQuantity: '0', remainingQuantity: '2' })],
     },
   ],
@@ -363,6 +458,7 @@ const detail: OrderDetail = {
     ],
     truncated: false,
   },
+  hidden: [],
   asOf: '2026-09-28T09:00:00.000Z',
 };
 
@@ -427,6 +523,7 @@ function DetailPreview({
     | 'pending'
     | 'inconclusive'
     | 'syncing'
+    | 'restricted'
     | undefined;
 }) {
   return (
@@ -442,42 +539,53 @@ function DetailPreview({
           : undefined
       }
       detail={
-        state === 'pending' || state === 'inconclusive'
+        state === 'restricted'
           ? {
               ...detail,
-              order: {
-                ...detail.order,
-                differs: false,
-                comparisonState: state,
-              },
+              hidden: ['addresses'],
+              sources: detail.sources.map((source) => {
+                const restricted = { ...source };
+                delete restricted.addresses;
+
+                return restricted;
+              }),
             }
-          : state === 'syncing'
+          : state === 'pending' || state === 'inconclusive'
             ? {
                 ...detail,
-                issues: [
-                  ...detail.issues,
-                  {
-                    id: '78787878-7878-4878-8878-787878787878',
-                    class: 'inventory_mismatch',
-                    state: 'resolved',
-                    severity: 'high',
-                    relationship: 'sku',
-                    needsYou: false,
-                    lastDetectedAt: '2026-09-28T08:40:00.000Z',
-                    occurrences: 54,
-                  },
-                ],
-                stockSync: [
-                  {
-                    skuId: '99999999-9999-4999-8999-999999999999',
-                    since: '2026-09-28T08:58:00.000Z',
-                    until: '2026-09-28T09:13:00.000Z',
-                  },
-                ],
+                order: {
+                  ...detail.order,
+                  differs: false,
+                  comparisonState: state,
+                },
               }
-            : state === 'ready' || state === 'offline'
-              ? detail
-              : undefined
+            : state === 'syncing'
+              ? {
+                  ...detail,
+                  issues: [
+                    ...detail.issues,
+                    {
+                      id: '78787878-7878-4878-8878-787878787878',
+                      class: 'inventory_mismatch',
+                      state: 'resolved',
+                      severity: 'high',
+                      relationship: 'sku',
+                      needsYou: false,
+                      lastDetectedAt: '2026-09-28T08:40:00.000Z',
+                      occurrences: 54,
+                    },
+                  ],
+                  stockSync: [
+                    {
+                      skuId: '99999999-9999-4999-8999-999999999999',
+                      since: '2026-09-28T08:58:00.000Z',
+                      until: '2026-09-28T09:13:00.000Z',
+                    },
+                  ],
+                }
+              : state === 'ready' || state === 'offline'
+                ? detail
+                : undefined
       }
       sourceContext={(source) =>
         source.appId === 'shopify' ? (
@@ -651,7 +759,12 @@ export const OrderRecord: Story = {
         'Payment differs between sources: “Payment pending” in JTL-Wawi and “Paid” in Tokyo store.',
       ),
     ).toBeVisible();
-    await userEvent.click(canvas.getByRole('button', { name: 'Tokyo store' }));
+    await userEvent.click(
+      within(canvas.getByRole('group', { name: 'Show lines from' })).getByRole(
+        'button',
+        { name: 'Tokyo store' },
+      ),
+    );
     const lines = within(
       canvas.getByRole('table', {
         name: 'Lines reported by Tokyo store',
@@ -793,3 +906,63 @@ export const Journey: Story = {
 };
 
 export const JourneyDark: Story = { ...Journey, globals: { theme: 'dark' } };
+
+/** Source-reported amounts, charges, discounts and addresses, in two currencies. */
+export const RecordCharges: Story = {
+  args: { page: 'detail' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const section = within(
+      await canvas.findByRole('region', { name: 'Delivery and charges' }),
+    );
+    await userEvent.click(section.getByRole('button', { name: 'Tokyo store' }));
+    await expect(section.getByText('EUR, charged in CHF')).toBeVisible();
+    const amounts = within(
+      section.getByRole('table', {
+        name: 'Order amounts reported by Tokyo store',
+      }),
+    );
+    await expect(amounts.getAllByText(/Charged/).length).toBeGreaterThan(0);
+    // Unreported amounts, such as the current discount and duties, are not shown as zero.
+    await expect(
+      amounts.getAllByText('Not reported by Tokyo store'),
+    ).toHaveLength(3);
+    await expect(section.getByText('Removed')).toBeVisible();
+    await expect(section.getByText('WELCOME10')).toBeVisible();
+    await expect(section.getByText('Hafenstraße 1')).toBeVisible();
+    // The custom line says the source has no product for it.
+    await expect(
+      canvas.getByText(/Custom item or deleted product/),
+    ).toBeVisible();
+
+    await userEvent.click(section.getByRole('button', { name: 'JTL-Wawi' }));
+    await expect(
+      section.getByText(
+        'JTL-Wawi reports no delivery or charge details for this order.',
+      ),
+    ).toBeVisible();
+    await expect(
+      section.getByText('No addresses imported from JTL-Wawi yet.'),
+    ).toBeVisible();
+  },
+};
+
+/** Without permission to read customers, addresses are restricted rather than empty. */
+export const RecordAddressesRestricted: Story = {
+  args: { page: 'detail', state: 'restricted' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const section = within(
+      await canvas.findByRole('region', { name: 'Delivery and charges' }),
+    );
+    await expect(
+      section.getByText(/Addresses are customer data/),
+    ).toBeVisible();
+    await expect(section.queryByText('Hafenstraße 1')).toBeNull();
+  },
+};
+
+export const RecordChargesNarrow: Story = {
+  args: { page: 'detail' },
+  globals: { viewport: { value: 'mobile1', isRotated: false } },
+};

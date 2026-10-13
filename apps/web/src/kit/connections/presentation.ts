@@ -29,6 +29,7 @@ export const capabilities = localized({
   'fulfillment.hold.release': m.connections_capability_fulfillment_hold_release,
   'fulfillment.open': m.connections_capability_fulfillment_open,
   'fulfillment.move': m.connections_capability_fulfillment_move,
+  'orders.quantity.edit': m.connections_capability_orders_quantity_edit,
   'customers.read': m.connections_capability_customers_read,
   'returns.read': m.connections_capability_returns_read,
   'orders.shipping-method.read': m.connections_capability_shipping_method_read,

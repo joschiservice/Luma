@@ -48,6 +48,12 @@ export function createAppRegistry(
     list: () => [...apps.values()].map((a) => structuredClone(a.manifest)),
     /** Returns a trusted app contribution, or undefined if its package is absent. */
     get: (id: string) => apps.get(id),
+    /**
+     * The permission a person needs to request a provider write capability through an app, or
+     * null when the app governs no such action.
+     */
+    actionPermission: (appId: string, capability: string) =>
+      apps.get(appId)?.manifest.actionAccess?.[capability] ?? null,
     /** Resolves the app contribution that owns a connection target. */
     provider: (kind: string) => targets.get(kind),
     /** Lists connector contributions for capability runtime composition. */

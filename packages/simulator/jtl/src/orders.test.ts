@@ -34,13 +34,16 @@ describe('JTL sales orders', () => {
     expect((await call(context, 'sales-orders/1')).body).toMatchObject({
       id: 1,
       salesOrderNumber: 'AU-000001',
-      externalSalesOrderNumber: '#1001',
-      deliveryStatus: 1,
-      paymentStatus: 2,
-      totalGrossAmount: 72,
-      currencyIso: 'EUR',
       salesOrderDate: new Date(start).toISOString(),
+      externalDetails: { externalSalesOrderNumber: '#1001' },
+      paymentDetails: { currencyIso: 'EUR' },
       shippingDetails: { shippingDate: null },
+      keyFigures: {
+        salesOrderId: 1,
+        deliveryStatus: 1,
+        paymentStatus: 2,
+        totalGrossAmount: 72,
+      },
     });
     expect(events.map((event) => event.topic)).toEqual([
       'sales-orders/create',
@@ -139,7 +142,7 @@ describe('JTL sales orders', () => {
       lines: [{ id: '1', quantity: 3, open: 2 }],
     });
     expect((await call(context, 'sales-orders/1')).body).toMatchObject({
-      deliveryStatus: 3,
+      keyFigures: { deliveryStatus: 3 },
       shippingDetails: { shippingDate: new Date(start + 1000).toISOString() },
     });
     context.now += 1000;
@@ -161,6 +164,47 @@ describe('JTL sales orders', () => {
     await expect(
       jtl.command(context, { kind: 'cancel', id: '1' }),
     ).rejects.toThrow('has shipped');
+  });
+
+  it('removes a delivery note that is still being packed and returns its units', async () => {
+    const { context, events } = await seeded();
+    await order(context);
+    const before = await readItemStock(context, '1');
+    await expect(
+      jtl.command(context, { kind: 'unpack', id: '1' }),
+    ).rejects.toThrow('No delivery note');
+    context.now += 1000;
+    await jtl.command(context, {
+      kind: 'ship',
+      id: '1',
+      warehouse: '1',
+      lines: [{ lineId: '1', quantity: 2 }],
+      trackingNumber: 'JJD000000000001',
+      trackingUrl: 'https://tracking.example.test/JJD000000000001',
+      packing: true,
+    });
+    expect(
+      (await call(context, 'delivery-notes?pageNumber=1&pageSize=10')).body,
+    ).toMatchObject({ totalItems: 1 });
+    events.length = 0;
+    context.now += 1000;
+    expect(await jtl.command(context, { kind: 'unpack', id: '1' })).toEqual({
+      id: '1',
+      deliveryNotes: ['1'],
+    });
+    expect(events.map((event) => event.topic)).toEqual([
+      'delivery-notes/delete',
+      'sales-orders/update',
+      'items/stock',
+    ]);
+    expect(
+      (await call(context, 'delivery-notes?pageNumber=1&pageSize=10')).body,
+    ).toMatchObject({ totalItems: 0 });
+    expect(await readItemStock(context, '1')).toEqual(before);
+    expect(await readOrder(context, '1')).toMatchObject({
+      deliveryStatus: 1,
+      lines: [{ id: '1', quantity: 3, open: 3 }],
+    });
   });
 
   it('refuses shipments the warehouse cannot cover', async () => {
@@ -203,7 +247,7 @@ describe('JTL sales orders', () => {
       paid: false,
     });
     expect((await call(context, 'sales-orders/1')).body).toMatchObject({
-      paymentStatus: 0,
+      keyFigures: { paymentStatus: 0 },
     });
     await jtl.command(context, { kind: 'paid', id: '1' });
     expect(await readOrder(context, '1')).toMatchObject({ paid: true });

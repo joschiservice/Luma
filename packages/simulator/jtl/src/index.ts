@@ -9,6 +9,7 @@ import {
   markPaid,
   placeOrder,
   shipOrder,
+  unpackOrder,
 } from './orders.js';
 import {
   confirmPurchaseOrder,
@@ -62,6 +63,8 @@ async function command(
       return deleteCustomer(context, value.id);
     case 'ship':
       return shipOrder(context, value);
+    case 'unpack':
+      return unpackOrder(context, value.id);
     case 'stock':
       await countStock(context, value.itemId, value.warehouse, value.quantity);
 

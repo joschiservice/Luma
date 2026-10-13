@@ -139,6 +139,62 @@
   color: var(--signal-text);
 }
 
+.order-charges {
+  display: grid;
+  gap: 18px;
+}
+
+.order-charges-group {
+  display: grid;
+  gap: 8px;
+}
+
+.order-charges-group h3 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.order-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.order-facts > div {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.order-facts dt {
+  color: var(--muted-foreground);
+}
+
+.order-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.order-muted {
+  color: var(--muted-foreground);
+}
+
+.order-tags,
+.order-charge-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.order-address-line {
+  display: block;
+}
+
 .order-comparison-field {
   min-width: 10rem;
   display: flex;
@@ -264,5 +320,95 @@
 @media (width < 600px) {
   .order-history li {
     flex-wrap: wrap;
+  }
+}
+
+.order-plan-body {
+  display: grid;
+  gap: 16px;
+}
+
+.order-plan {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.order-plan h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.order-plan h4 {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.order-plan-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.order-plan-reasons,
+.order-plan-shipped,
+.order-plan-steps {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+}
+
+.order-plan-reasons small,
+.order-plan-shipped small {
+  color: var(--muted-foreground);
+}
+
+.order-plan-step {
+  display: grid;
+  gap: 4px;
+}
+
+.order-plan-step-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 8px;
+}
+
+.order-plan-step .order-note {
+  margin: 0;
+}
+
+.order-plan-propose {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px 12px;
+}
+
+.order-plan-propose-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.order-plan-propose > [role='alert'] {
+  grid-column: 1 / -1;
+}
+
+.order-source-context {
+  scroll-margin-top: 16px;
+}
+
+@media (max-width: 640px) {
+  .order-plan-propose {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

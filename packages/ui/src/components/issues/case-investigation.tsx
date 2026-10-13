@@ -28,6 +28,7 @@ import { StatePill } from '../primitives/state';
 import { WorkspaceDate } from '../primitives/workspace-date';
 import {
   caseStateLabel,
+  caseSummaryText,
   elapsed,
   freshnessLabel,
   issueKind,
@@ -108,7 +109,7 @@ export function CaseRow({ item }: { item: CaseSummary }) {
       <DomainIcon domain={kind.domain} size="sm" className="issue-row-icon" />
       <div className="issue-row-copy">
         <strong className="case-row-summary">
-          {item.summary.replace(/\.+$/, '')}
+          {caseSummaryText(item.summary).replace(/\.+$/, '')}
         </strong>
         <span className="case-row-subject">
           <span>{kind.label}</span>
@@ -342,7 +343,7 @@ function FailedInvestigation({
               {severityFullLabel(item.severity)}
             </span>
           </div>
-          <h2>{item.summary.replace(/\.+$/, '')}</h2>
+          <h2>{caseSummaryText(item.summary).replace(/\.+$/, '')}</h2>
           <IssueContext item={item} />
         </header>
       )}
@@ -546,7 +547,7 @@ function InvestigationReport({
       {!hideHeader && !embedded && (
         <header>
           <CaseStatus item={item} />
-          <h2>{item.summary.replace(/\.+$/, '')}</h2>
+          <h2>{caseSummaryText(item.summary).replace(/\.+$/, '')}</h2>
           <IssueContext item={item} />
         </header>
       )}

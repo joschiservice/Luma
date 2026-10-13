@@ -130,6 +130,9 @@ function inIncidentScope(
     case 'workflow_failure':
       // Workflow effects require the execution owner's reconciliation path.
       return false;
+    case 'order_quantity_mismatch':
+      // Scheduled detection rereads every source of the order itself before evaluating.
+      return false;
   }
 }
 

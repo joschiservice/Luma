@@ -119,6 +119,16 @@ export const workflowScenarios = {
       'Luma revokes the connection and a sync-failure case opens for lost access. Check a failing connection hands it to a person at once with Reconnect. The case closes only after the store is reconnected and completes a fresh scan.',
     steps: [{ kind: 'incident', incident: 'auth-revoked', on: 'shop' }],
   },
+  'order-quantity-change': {
+    label: 'Customer changes a quantity',
+    description:
+      'A customer of the first shop asks support for one unit less of an open order. Support changes the order in Luma, which holds order-line authority.',
+    expected:
+      'Once the shop and the warehouse are read again after the propagation window, a quantity case says what each system shows. Carry an order quantity change to every system asks the warehouse in Needs you to make dispatch carry the new quantity. After the answer, Luma rereads every system and proposes the Shopify edit; approve it in Needs you. Luma edits Shopify once, confirms the quantity with fresh reads of every system, and detection then closes the case.',
+    steps: [
+      { kind: 'incident', incident: 'order-quantity-change', on: 'shop' },
+    ],
+  },
   'supplier-split-delivery-mail': {
     label: 'Supplier split delivery by email',
     description:

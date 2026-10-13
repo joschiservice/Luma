@@ -60,6 +60,9 @@ it('fans out committed changes, coalesces bursts and recovers listeners, subscri
       'inventory_ledger_accounts',
       'inventory_ledger_reviews',
       'inventory_native_stock_read_checks',
+      'shopify_order_edits',
+      'shopify_order_edit_claims',
+      'shopify_order_edit_fences',
     ]),
   );
   expect(

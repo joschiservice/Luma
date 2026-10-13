@@ -1,6 +1,10 @@
 import type { TenantContext } from '@luma/identity';
 
-import type { CustomerOrder, CustomerProfile } from '../domain/profiles.js';
+import type {
+  CustomerOrder,
+  CustomerProfile,
+  OrderAddresses,
+} from '../domain/profiles.js';
 
 interface CustomerProfileQuery {
   /** Matches the start of a name or email address, case-insensitively. */
@@ -35,9 +39,20 @@ export interface CustomerProfiles {
     orders: Omit<CustomerOrder, 'connectionId'>[],
   ): Promise<void>;
   /**
-   * Deletes stored profiles and their order links for one connection, or only those of the
-   * listed source customers, and prevents listed customers from being imported again.
+   * Records the addresses one connection reports for its orders, replacing an order's stored
+   * addresses unless they were observed later. Addresses of erased orders, and of orders whose
+   * reported customer was erased, are removed instead of stored. Order keys must be unique.
    * Requires `sync.manage`.
+   */
+  recordOrderAddresses(
+    context: TenantContext,
+    connectionId: string,
+    orders: OrderAddresses[],
+  ): Promise<void>;
+  /**
+   * Deletes stored profiles, their order links and the addresses of their orders for one
+   * connection, or only those of the listed source customers, and prevents listed customers and
+   * their linked orders' addresses from being imported again. Requires `sync.manage`.
    */
   erase(
     context: TenantContext,
@@ -46,8 +61,9 @@ export interface CustomerProfiles {
   ): Promise<number>;
   /**
    * Deletes the listed source customers' profiles and order links, for customers the source no
-   * longer has. Unlike `erase`, a later read that reports them again imports them again. Accepts
-   * up to 1000 IDs. Requires `sync.manage`.
+   * longer has. Order addresses stay: they belong to orders the source still reports. Unlike
+   * `erase`, a later read that reports the customers again imports them again. Accepts up to
+   * 1000 IDs. Requires `sync.manage`.
    */
   remove(
     context: TenantContext,

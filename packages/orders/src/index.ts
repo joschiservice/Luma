@@ -1,6 +1,9 @@
 export type {
   CanonicalSnapshot,
   CommerceProjections,
+  MoneyPair,
+  OrderCommercialData,
+  OrderLineCommercialData,
   RefundData,
   ReturnData,
 } from './application/projections.js';
@@ -28,7 +31,12 @@ export type {
   ComparisonDifference,
 } from './domain/source-comparison.js';
 
-export { orderComparisonState } from './domain/source-comparison.js';
+export {
+  lineComparisonKeys,
+  orderComparisonPolicy,
+  orderComparisonState,
+  sharedComparisonLines,
+} from './domain/source-comparison.js';
 
 export {
   settlementRefundProgress,
@@ -39,3 +47,15 @@ export {
 export type { JourneyEvent, OrderJourney } from './domain/journey.js';
 
 export { journeyTiming } from './domain/journey.js';
+
+export {
+  OrderChangeRequestError,
+  orderChangeCapabilities,
+  planOrderChanges,
+} from './domain/order-change-plan.js';
+
+export type {
+  OrderChangePlan,
+  OrderChangeRequest,
+  PlanSource,
+} from './domain/order-change-plan.js';
