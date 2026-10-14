@@ -1,4 +1,9 @@
-import type { CaseDetail, CaseReview, Diagnosis } from '@luma/api-contract';
+import type {
+  CaseDetail,
+  CaseProgress,
+  CaseReview,
+  Diagnosis,
+} from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import { ChevronRight } from 'lucide-react';
 import { type ReactNode, useContext } from 'react';
@@ -33,11 +38,13 @@ export function IssueOverview({
   unconfirmed = false,
   children,
   review,
+  lifecycle,
 }: {
   item: CaseDetail;
   unconfirmed?: boolean;
   children?: ReactNode;
   review?: CaseReview | undefined;
+  lifecycle?: CaseProgress | undefined;
 }) {
   const navigate = useContext(IssuePageNavigation);
   const diagnosis = item.diagnosis;
@@ -66,7 +73,11 @@ export function IssueOverview({
     quantity != null && diagnosis?.impact.unit
       ? unitLabel(diagnosis.impact.unit, quantity)
       : null;
-  const summary = caseSummaryText(diagnosis?.summary ?? item.summary);
+  const summary = caseSummaryText(
+    item.diagnosisStatus === 'pending'
+      ? item.summary
+      : (diagnosis?.summary ?? item.summary),
+  );
   const limitations = [
     ...new Set(
       steps
@@ -148,7 +159,15 @@ export function IssueOverview({
             {m.issues_review_proposed_change()}
           </Button>
         ) : null}
-        {steps[0] ? (
+        {item.state === 'resolved' ? (
+          <p>
+            {item.resolution === 'verified'
+              ? m.issues_overview_verified()
+              : m.issues_overview_closed()}
+          </p>
+        ) : lifecycle?.workflowRuns?.length ? (
+          <p>{m.issues_overview_workflow()}</p>
+        ) : steps[0] ? (
           <>
             <p className="issue-overview-next">{stepLabel(steps[0])}</p>
             {steps[1] ? (

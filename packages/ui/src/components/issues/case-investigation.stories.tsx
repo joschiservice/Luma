@@ -115,6 +115,31 @@ export const Inventory: Story = {
 
 export const Pending: Story = { args: { item: caseFixture('pending') } };
 
+export const ResolvedWithoutInvestigation: Story = {
+  args: {
+    item: {
+      ...caseFixture('pending'),
+      state: 'resolved',
+      resolution: 'verified',
+    },
+    expanded: true,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.queryByText('Investigation in progress'),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByText('Investigation is pending.'),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.getByText(
+        /The issue is resolved. An independent fresh read confirmed the outcome/,
+      ),
+    ).toBeVisible();
+  },
+};
+
 export const MissingAuthority: Story = {
   args: { item: caseFixture('uncertain') },
   play: async ({ canvasElement }) => {

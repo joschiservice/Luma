@@ -17,7 +17,7 @@ import {
 const facts = (
   attention: string,
 ) => `WITH ${currentOrderSources('order_sources')}, selected AS MATERIALIZED (
- SELECT DISTINCT ON (entity_id) * FROM order_sources WHERE ($3::uuid IS NULL OR connection_id=$3)
+ SELECT DISTINCT ON (entity_id) * FROM order_sources WHERE NOT shipping_view AND ($3::uuid IS NULL OR connection_id=$3)
  ORDER BY entity_id,${sourceSelectionOrder}
 ), scoped AS MATERIALIZED (
  SELECT * FROM selected WHERE NOT deleted AND ($4::timestamptz IS NULL OR source_updated_at >= $4)

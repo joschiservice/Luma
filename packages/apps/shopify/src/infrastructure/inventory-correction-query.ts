@@ -94,6 +94,34 @@ export function createCorrectionQuery(
 
   return {
     receipts,
+    /** Pins the stock position's product label to the catalog read available at preview time. */
+    product: (
+      context: TenantContext,
+      target: z.infer<typeof correctionTarget>,
+    ) =>
+      database.transaction(context.tenantId, async (tx) => {
+        const result = await tx.query<{
+          skuId: string;
+          sku: string | null;
+          title: string | null;
+          observationId: string | null;
+          observedAt: string | null;
+        }>(
+          `SELECT s.sku_id AS "skuId",
+         CASE WHEN count(DISTINCT k.code)=1 THEN min(k.code) END AS sku,
+         CASE WHEN count(DISTINCT p.document->'data'->>'title')=1 THEN min(p.document->'data'->>'title') END AS title,
+         CASE WHEN count(DISTINCT p.observation_id)=1 THEN min(p.observation_id::text) END AS "observationId",
+         min(p.document->>'observedAt') AS "observedAt"
+         FROM inventory_projections i JOIN inventory_snapshots s ON s.tenant_id=i.tenant_id AND s.id=i.snapshot_id
+         LEFT JOIN inventory_product_skus k ON k.tenant_id=s.tenant_id AND k.sku_id=s.sku_id AND k.connection_id=i.connection_id
+         LEFT JOIN inventory_projections ip ON ip.tenant_id=k.tenant_id AND ip.entity_id=k.product_id AND ip.connection_id=k.connection_id
+         LEFT JOIN inventory_snapshots p ON p.tenant_id=ip.tenant_id AND p.id=ip.snapshot_id
+         WHERE i.tenant_id=$1 AND i.entity_id=$2 AND i.connection_id=$3 AND s.kind='position' GROUP BY s.sku_id`,
+          [context.tenantId, target.positionId, target.connectionId],
+        );
+
+        return result.rows[0] ?? null;
+      }),
     /** Finds the stock position that projects a canonical SKU at a canonical location. */
     position: (context: TenantContext, skuId: string, locationId: string) =>
       database.transaction(context.tenantId, async (tx) => {

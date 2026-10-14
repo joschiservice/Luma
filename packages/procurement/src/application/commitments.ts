@@ -1397,6 +1397,7 @@ export function createSupplierCommitments(deps: CommitmentDependencies) {
 
       return {
         ...recordData,
+        value: orderValue(data.order),
         timeline,
         submission: submission
           ? await submissionView(context, submission)

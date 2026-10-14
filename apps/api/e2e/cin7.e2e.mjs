@@ -62,12 +62,11 @@ test('a merchant on Cin7 Core imports through the read-only Cin7 app and links o
   for (const row of locations.rows)
     expect(row.external_id).toMatch(/^c1700003-/);
 
-  // A Cin7 sale from the shop channel suggests the Shopify order with the same number.
+  // Exact shop references are linked automatically rather than left as manual suggestions.
   const orders = await f.db.owner.query(
     "SELECT DISTINCT p.entity_id FROM orders_projections p JOIN orders_snapshots s ON s.id=p.snapshot_id WHERE p.connection_id=$1 AND s.kind='order'",
     [connectionId],
   );
-  const suggestions = [];
   for (const { entity_id: entityId } of orders.rows) {
     const response = await f.pilot.app.inject({
       method: 'GET',
@@ -75,13 +74,13 @@ test('a merchant on Cin7 Core imports through the read-only Cin7 app and links o
       headers: { cookie },
     });
     expect(response.statusCode).toBe(200);
-    suggestions.push(...response.json().suggestions);
+    expect(response.json().suggestions).toEqual([]);
+    const linked = await f.db.owner.query(
+      'SELECT 1 FROM orders_projections WHERE tenant_id=$1 AND entity_id=$2 AND connection_id=$3',
+      [f.manifest.organizationId, entityId, f.manifest.connections.shopify],
+    );
+    expect(linked.rowCount).toBe(1);
   }
-  expect(suggestions.map((item) => item.reason)).toContainEqual(
-    expect.stringMatching(
-      /^Source external order number “.+” matches Shopify$/,
-    ),
-  );
 }, 120_000);
 
 // The ANZ profile is Luma's realistic Cin7 setup: AUD base currency, NZD sales from the NZ shop

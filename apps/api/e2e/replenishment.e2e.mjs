@@ -1,10 +1,85 @@
 import { randomUUID } from 'node:crypto';
 
+import { createObservability } from '@luma/platform/composition';
 import { processWorkflowId } from '@luma/workflow-temporal';
 import { Client } from 'pg';
 import { expect, it, vi } from 'vitest';
 
 import { replenishmentFixture } from './replenishment-fixture.mjs';
+
+it('retains supplier cost and lead time with the proposal and draft even when terms change during approval', async (t) => {
+  const f = await replenishmentFixture(t, undefined, {
+    featureFlagOverrides: { 'supplier-purchasing-terms': true },
+    observability: createObservability({
+      environment: 'test',
+      release: 'test',
+      sampleRate: 0,
+      featureFlagOverrides: { 'supplier-purchasing-terms': true },
+    }),
+  });
+  const skuId = (
+    await f.db.owner.query(
+      'SELECT s.sku_id FROM inventory_projections p JOIN inventory_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id WHERE p.tenant_id=$1 AND p.entity_id=$2 AND p.connection_id=$3',
+      [
+        f.manifest.organizationId,
+        f.position.positionId,
+        f.position.connectionId,
+      ],
+    )
+  ).rows[0].sku_id;
+  const terms = async (amount, expectedRevision) => {
+    const response = await f.pilot.app.inject({
+      method: 'POST',
+      url: `/v1/organizations/${f.manifest.organizationId}/procurement/supplier-terms`,
+      headers: { cookie: f.ownerCookie, origin: 'http://127.0.0.1:3000' },
+      payload: {
+        id: randomUUID(),
+        supplierId: f.supplier.id,
+        skuId,
+        expectedRevision,
+        reason: 'Reviewed supplier price',
+        values: {
+          unitPrice: { amount, currency: 'AUD', validFrom: null },
+          leadTimeDays: 7,
+        },
+      },
+    });
+    expect(response.statusCode, response.body).toBe(200);
+
+    return response.json();
+  };
+  const saved = await terms('12.50', 0);
+  const rule = await f.configure();
+  const run = await f.request('/replenishment/starts', {
+    id: randomUUID(),
+    activationId: rule.id,
+  });
+  await f.waitFor(run.id, 'awaiting_decision');
+  const review = await f.request(`/replenishment/runs/${run.id}`, undefined, {
+    cookie: f.approverCookie,
+  });
+  expect(review.context).toMatchObject({
+    unitPrice: { amount: '12.50', currency: 'AUD' },
+    totalValue: { amount: '625', currency: 'AUD' },
+    leadTimeDays: 7,
+  });
+  await terms('22.50', saved.revision);
+  expect((await f.request(`/replenishment/runs/${run.id}`)).context).toEqual(
+    review.context,
+  );
+  await f.decide(run);
+  await f.waitFor(run.id, 'verified');
+  const result = await f.request(`/replenishment/runs/${run.id}`);
+  const order = await f.pilot.commitments.order(
+    f.actor,
+    result.purchaseOrder.id,
+  );
+  expect(order.order.lines[0].unitPrice).toEqual({
+    amount: '12.50',
+    currency: 'AUD',
+  });
+  expect(order.value).toEqual({ amount: '625', currency: 'AUD' });
+});
 
 it('replenishes through Temporal, policy, procurement and verification without an exception', async (t) => {
   const f = await replenishmentFixture(t);

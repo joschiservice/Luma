@@ -182,12 +182,15 @@ it('places an approved order once, follows supplier confirmation and receipt, an
     await call(`/purchase-orders/${order.id}/submissions`, observedRequest),
   ).toMatchObject({ state: 'not_executed' });
   const submissionRequest = { id: randomUUID(), requestedDeliveryDate };
-  const [requested, retried] = await Promise.all([
+  const attempts = await Promise.allSettled([
     call(`/purchase-orders/${order.id}/submissions`, submissionRequest),
-    call(`/purchase-orders/${order.id}/submissions`, submissionRequest).catch(
-      () => null,
-    ),
+    call(`/purchase-orders/${order.id}/submissions`, submissionRequest),
   ]);
+  const successful = attempts.flatMap((attempt) =>
+    attempt.status === 'fulfilled' ? [attempt.value] : [],
+  );
+  expect(successful.length).toBeGreaterThan(0);
+  const [requested, retried] = successful;
   expect(requested.state, JSON.stringify(requested)).toBe('approval_required');
   if (retried) expect(retried.id).toBe(requested.id);
   expect(requested.canApprove).toBe(false);

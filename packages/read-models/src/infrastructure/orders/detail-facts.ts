@@ -153,6 +153,8 @@ export async function readSourceFacts(
 
     return {
       connectionId: row.connectionId,
+      lineCoverage:
+        connection.provider === 'starshipit' ? 'partial' : 'complete',
       label: connectionLabel(connection),
       system: text(object(connection.target).kind),
       connectionStatus: text(connection.status) ?? 'unknown',

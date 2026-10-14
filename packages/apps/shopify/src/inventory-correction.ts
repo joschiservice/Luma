@@ -308,7 +308,12 @@ export function createShopifyInventoryCorrection(
       )
       .digest('hex');
 
-    return { ...snapshot, source: authority.source, revision };
+    return {
+      ...snapshot,
+      source: authority.source,
+      revision,
+      product: await query.product(tenant, target),
+    };
   };
   const effects: EffectRegistry = {
     async resolve(tenant, intent) {

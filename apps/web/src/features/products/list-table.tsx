@@ -64,6 +64,17 @@ function productColumns(
                     {item.sku.trim()}
                   </DataTableRowLink>
                   <small>{item.title ?? m.products_no_title()}</small>
+                  <small>
+                    {context.sources
+                      .filter((source) =>
+                        item.listings.some(
+                          (listing) =>
+                            listing.connectionId === source.connectionId,
+                        ),
+                      )
+                      .map((source) => source.label)
+                      .join(' · ')}
+                  </small>
                   <ProductFlags item={item} sources={context.sources} />
                 </div>
               )

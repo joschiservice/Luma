@@ -66,6 +66,11 @@ function orderColumns(
                 <DataTableRowLink render={link(order)}>
                   {orderLabel(order)}
                 </DataTableRowLink>
+                <small>
+                  {[
+                    ...new Set(order.sources.map((source) => source.label)),
+                  ].join(' · ')}
+                </small>
                 <OrderFlags order={order} />
               </>
             )

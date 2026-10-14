@@ -36,6 +36,7 @@ import { ArrowRight, PackageCheck, Plus, ShieldCheck } from 'lucide-react';
 import { useContext, useEffect, useState } from 'react';
 
 import { IdentityError } from '../../kit/identity/data';
+import { ApprovalContext } from '../../shared/procurement/approval-context';
 import {
   decideReplenishment,
   replenishmentOptions,
@@ -503,6 +504,9 @@ export function ReplenishmentRunReview({
                 {m.workflows_review_eyebrow()}
               </span>
               <h3>
+                {review.context?.productTitle ? (
+                  <>{review.context.productTitle} · </>
+                ) : null}
                 {review.quantity === null
                   ? review.sku
                   : m.workflows_review_quantity_sku({
@@ -552,6 +556,10 @@ export function ReplenishmentRunReview({
               <dd>{quantity(review.quantity)}</dd>
             </div>
           </dl>
+          <ApprovalContext
+            context={review.context}
+            organizationId={organizationId}
+          />
           {review.stock.checkedAt ? (
             <p>
               {rich(m.workflows_review_stock_checked, {

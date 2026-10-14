@@ -419,7 +419,9 @@ export const OverviewChecks: Story = {
       }),
     ).toBeVisible();
     await expect(
-      overview.getAllByText('Luma can’t fix or retry this automatically.'),
+      overview.getAllByText(
+        'Review this manual step. Luma keeps checking for recovery.',
+      ),
     ).toHaveLength(1);
     await expect(
       overview.getByText('Obtain current observations before correcting.'),

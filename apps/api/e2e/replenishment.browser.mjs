@@ -98,7 +98,12 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
   const run = (await f.request('/runs')).items[0];
   await f.waitFor(run.id, 'awaiting_decision');
   await page.getByRole('button', { name: 'Activity', exact: true }).click();
-  await page.getByRole('heading', { name: `50 × ${f.position.sku}` }).waitFor();
+  await page
+    .getByRole('heading', { name: new RegExp(`50 × ${sku}$`) })
+    .waitFor();
+  await page.getByLabel('Cost and demand at proposal time').waitFor();
+  await page.getByText('Unit cost', { exact: true }).waitFor();
+  await page.getByText('Estimated order value', { exact: true }).waitFor();
   expect(
     await page.getByRole('button', { name: 'Approve 50 units' }).count(),
   ).toBe(0);

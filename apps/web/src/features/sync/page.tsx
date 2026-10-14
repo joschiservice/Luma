@@ -137,6 +137,7 @@ export function SyncPage() {
           <AutomaticLinks
             organizationId={organizationId}
             connections={query.data.connections}
+            coverage={query.data.linkCoverage}
             canManage={can('sync.manage') && query.data.canManage}
           />
         ) : null

@@ -1,5 +1,6 @@
 import type {
   CaseDetail,
+  CaseProgress,
   CaseReview,
   CaseSummary,
   Diagnosis,
@@ -183,6 +184,13 @@ function InvestigationNotices({
   item: CaseDetail;
   unconfirmed: boolean;
 }) {
+  if (item.state === 'resolved')
+    return unconfirmed ? (
+      <CaseNotice title={m.issues_notice_unconfirmed_title()}>
+        {m.issues_notice_unconfirmed_body()}
+      </CaseNotice>
+    ) : null;
+
   return (
     <>
       {unconfirmed ? (
@@ -249,6 +257,7 @@ type InvestigationProps = {
   item: CaseDetail;
   progress?: ReactNode;
   review?: CaseReview;
+  lifecycle?: CaseProgress;
   unconfirmed?: boolean;
   onRefresh?: (() => void) | undefined;
   refreshing?: boolean;
@@ -259,7 +268,10 @@ type InvestigationProps = {
  * Expanded pages open findings and display record metadata in their own surrounding layout.
  */
 export function CaseInvestigation(props: InvestigationProps) {
-  if (props.item.diagnosisStatus === 'failed')
+  if (
+    props.item.diagnosisStatus === 'failed' &&
+    props.item.state !== 'resolved'
+  )
     return <FailedInvestigation {...props} />;
 
   return <InvestigationReport {...props} />;
@@ -467,6 +479,7 @@ function InvestigationReport({
   item,
   progress,
   review,
+  lifecycle,
   unconfirmed = false,
   hideHeader = false,
   recordedOnly = false,
@@ -476,6 +489,7 @@ function InvestigationReport({
   item: CaseDetail;
   progress?: ReactNode;
   review?: CaseReview;
+  lifecycle?: CaseProgress;
   unconfirmed?: boolean;
   hideHeader?: boolean;
   recordedOnly?: boolean;
@@ -661,6 +675,7 @@ function InvestigationReport({
                 item={item}
                 unconfirmed={unconfirmed}
                 review={review}
+                lifecycle={lifecycle}
               >
                 <InvestigationNotices item={item} unconfirmed={unconfirmed} />
               </IssueOverview>

@@ -247,6 +247,11 @@ export interface SyncStore {
     coverage: StreamCoverage[];
     runs: SyncRun[];
   }>;
+  /** Counts current source identities linked across connections, excluding withheld sources. */
+  linkCoverage(
+    tenantId: string,
+    excluded: string[],
+  ): Promise<Record<'sku' | 'order', { total: number; linked: number }>>;
   /**
    * Applies an idempotent operator command. Commands that continue work make `principalId`
    * the person the stream runs as. Returns false when the stream does not exist.

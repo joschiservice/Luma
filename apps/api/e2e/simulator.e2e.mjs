@@ -66,9 +66,9 @@ test('pilot imports simulated history through commerce sync, serves live metrics
         "SELECT p.entity_id,count(DISTINCT p.connection_id)::int AS sources FROM orders_projections p JOIN orders_snapshots s ON s.id=p.snapshot_id WHERE s.kind='order' GROUP BY p.entity_id",
       )
     ).rows;
-  // Imports bind each source order only to itself; people link orders across sources.
-  expect(await canonicalOrders()).toHaveLength(6);
-  expect((await canonicalOrders()).every((row) => row.sources === 1)).toBe(
+  // Exact references link the shop, ERP and shipping views without manual steps.
+  expect(await canonicalOrders()).toHaveLength(2);
+  expect((await canonicalOrders()).every((row) => row.sources === 3)).toBe(
     true,
   );
   await f.call('runs/operations/control', {
@@ -80,7 +80,7 @@ test('pilot imports simulated history through commerce sync, serves live metrics
     milliseconds: 60_000,
   });
   await f.pilot.observe();
-  expect(await canonicalOrders()).toHaveLength(9);
+  expect(await canonicalOrders()).toHaveLength(3);
   await until(
     () =>
       streams.every((stream, index) =>
@@ -531,7 +531,11 @@ test('reads simulated quantity edits into new immutable snapshots and exposes cu
     [tenantId, orderId, connectionId],
   );
   const before = original.rows[0];
-  expect((await detail()).sources[0].lines[0]).toMatchObject({
+  expect(
+    (await detail()).sources.find(
+      (source) => source.connectionId === connectionId,
+    ).lines[0],
+  ).toMatchObject({
     quantity: '2',
     currentQuantity: '2',
     cancelledQuantity: '0',
@@ -576,7 +580,10 @@ test('reads simulated quantity edits into new immutable snapshots and exposes cu
   );
   await f.pilot.observe();
   const edited = await detail();
-  expect(edited.sources[0].lines[0]).toMatchObject({
+  expect(
+    edited.sources.find((source) => source.connectionId === connectionId)
+      .lines[0],
+  ).toMatchObject({
     quantity: '2',
     currentQuantity: '1',
     cancelledQuantity: '1',
@@ -629,7 +636,10 @@ test('reads simulated quantity edits into new immutable snapshots and exposes cu
       ),
     ),
   ).toBe(true);
-  expect(removed.sources[0].lines[0]).toMatchObject({
+  expect(
+    removed.sources.find((source) => source.connectionId === connectionId)
+      .lines[0],
+  ).toMatchObject({
     quantity: '2',
     currentQuantity: '0',
     cancelledQuantity: '2',

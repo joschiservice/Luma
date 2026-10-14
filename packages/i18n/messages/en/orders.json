@@ -1,5 +1,6 @@
 {
   "orders_page_title": "Orders",
+  "orders_lines_shipping_view": "Shipping view. These items may cover only part of the order. Missing items are not reported as zero ordered units.",
   "orders_view_all": "All orders",
   "orders_view_outstanding": "Outstanding",
   "orders_view_overdue": "Overdue",

@@ -11,11 +11,11 @@ import {
 // evaluation time (`asOf`, timestamptz).
 
 /**
- * Prefers active sources of one canonical order, then the newest source update,
+ * Prefers active commercial sources of one canonical order, then the newest source update,
  * the newest observation and the connection ID.
  */
 export const sourceSelectionOrder =
-  'deleted ASC,source_updated_at DESC NULLS LAST,observed_at DESC,connection_id';
+  'deleted ASC,shipping_view ASC,source_updated_at DESC NULLS LAST,observed_at DESC,connection_id';
 
 /**
  * Returns a CTE with every current order snapshot, one row per order and source connection.
@@ -28,9 +28,11 @@ export const sourceSelectionOrder =
 export function currentOrderSources(name: string, filter = 'true') {
   return `${name} AS MATERIALIZED (
  SELECT p.entity_id,p.connection_id,s.id AS snapshot_id,s.status,s.payment_status,s.display_number,s.observed_at,s.source_updated_at,
+ COALESCE(c.document->>'provider',c.document->'target'->>'kind','')='starshipit' AS shipping_view,
  (s.document->>'deleted')::boolean AS deleted,(s.document->'data'->>'placedAt')::timestamptz AS placed_at,
  (s.document->'data'->>'dueAt')::timestamptz AS due_at
  FROM orders_projections p JOIN orders_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
+ LEFT JOIN connector_installations c ON c.tenant_id=p.tenant_id AND c.id=p.connection_id
  WHERE p.tenant_id=$1 AND s.kind='order' AND p.connection_id <> ALL(COALESCE(NULLIF(current_setting('app.hidden_order_sources',true),''),'{}')::uuid[]) AND (${filter})
 )`;
 }

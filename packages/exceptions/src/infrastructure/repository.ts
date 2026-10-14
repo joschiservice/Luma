@@ -204,6 +204,7 @@ export function createDetectionRepository(
             [tenantId, fingerprint, key],
           );
           if (!duplicate.rows.length) {
+            const firstDetection = !incident;
             if (!incident) {
               const previous = await tx.query<{ id: string }>(
                 "SELECT id FROM exceptions WHERE tenant_id=$1 AND fingerprint=$2 AND state='resolved' ORDER BY updated_at DESC,id DESC LIMIT 1",
@@ -250,7 +251,9 @@ export function createDetectionRepository(
               [tenantId, incident.id, key, fingerprint],
             );
             await audit(tx, tenantId, incident.id, {
-              type: 'exception.detected',
+              type: firstDetection
+                ? 'exception.detected'
+                : 'exception.observed',
               evidenceKey: key,
               decision,
               at: now,

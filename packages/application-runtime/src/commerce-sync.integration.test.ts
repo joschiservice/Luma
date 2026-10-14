@@ -45,6 +45,7 @@ import type { TenantDatabase } from '@luma/platform';
 import { createTenantDatabase } from '@luma/platform/composition';
 import {
   createCustomerWorkspace,
+  createFulfillmentWorkspace,
   createOrderWorkspace,
   createRecordExplorer,
 } from '@luma/read-models/composition';
@@ -558,6 +559,7 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
     runner = createSyncRunner({
       store: createSyncStore(db),
       automaticLinks: createAutoLinkRunner({
+        createDefaults: false,
         store: createAutomaticLinkStore(db),
         resolveContext: async (principal) => context(principal),
         log: () => undefined,
@@ -1949,6 +1951,246 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
     kind,
     targetConnectionId: shop,
     sourceConnectionId: erp,
+  });
+
+  it('links a fresh store and ERP without configuring rules, reports coverage and preserves a disabled rule on restart', async () => {
+    source.set(shop, 'products.read', [product(shop, 'p1', 'item-1', 'ABC-1')]);
+    source.set(erp, 'products.read', [product(erp, 'p9', 'item-9', ' abc-1 ')]);
+    source.set(shop, 'orders.read', [order(shop, '1')]);
+    source.set(erp, 'orders.read', [
+      order(erp, '9', { sku: 'item-9', number: 'SO-9', externalNumber: '#1' }),
+    ]);
+    const defaults = createAutoLinkRunner({
+      store: createAutomaticLinkStore(db),
+      resolveContext: async (principal) => context(principal),
+      log: () => undefined,
+    });
+    await defaults.tick(tenant);
+    expect(
+      (await service.autoLinkRules(context())).every(
+        (rule) => rule.state === 'waiting',
+      ),
+    ).toBe(true);
+    await drain();
+    await Promise.all([defaults.tick(tenant), defaults.tick(tenant)]);
+    expect(await canonical(erp, 'sku', 'item-9')).toBe(
+      await canonical(shop, 'sku', 'item-1'),
+    );
+    expect(await canonical(erp, 'order', '9')).toBe(
+      await canonical(shop, 'order', '1'),
+    );
+    expect(
+      (
+        await workspace().list(context(), {
+          q: '',
+          view: 'all',
+          sort: 'updated',
+          direction: 'desc',
+          limit: 50,
+          count: 'exact',
+        })
+      ).totalCount,
+    ).toBe(1);
+    expect((await service.overview(context())).linkCoverage).toEqual({
+      sku: { total: 2, linked: 2 },
+      order: { total: 2, linked: 2 },
+    });
+    const updatedAt = new Date().toISOString();
+    source.set(shop, 'orders.read', [
+      order(shop, '1'),
+      { ...order(shop, '2'), sourceUpdatedAt: updatedAt },
+    ]);
+    source.set(erp, 'orders.read', [
+      order(erp, '9', { sku: 'item-9', number: 'SO-9', externalNumber: '#1' }),
+      {
+        ...order(erp, '10', {
+          sku: 'item-9',
+          number: 'SO-10',
+          externalNumber: '#2',
+        }),
+        sourceUpdatedAt: updatedAt,
+      },
+    ]);
+    await due();
+    await drain();
+    await defaults.tick(tenant);
+    expect(await canonical(erp, 'order', '10')).toBe(
+      await canonical(shop, 'order', '2'),
+    );
+    expect((await service.overview(context())).linkCoverage?.order).toEqual({
+      total: 4,
+      linked: 4,
+    });
+    const rule = (await service.autoLinkRules(context())).find(
+      (item) => item.kind === 'sku',
+    )!;
+    await service.saveAutoLinkRule(context(), { ...rule, enabled: false });
+    await defaults.tick(tenant);
+    expect(
+      (await service.autoLinkRules(context())).find(
+        (item) => item.id === rule.id,
+      ),
+    ).toMatchObject({ enabled: false, revision: 2 });
+  });
+
+  it('leaves equal SKU codes with conflicting product names for review', async () => {
+    source.set(shop, 'products.read', [product(shop, 'p1', 'item-1', 'ABC-1')]);
+    const other = product(erp, 'p9', 'item-9', 'ABC-1');
+    source.set(erp, 'products.read', [
+      {
+        ...other,
+        data: {
+          ...(other.data as Record<string, unknown>),
+          title: 'Different product',
+        },
+      },
+    ]);
+    await drain();
+    expect(
+      await service.previewAutoLinks(context(), autoPair('sku')),
+    ).toMatchObject({ ready: true, counts: { eligible: 0, conflict: 1 } });
+  });
+
+  it('counts a store, ERP and shipping view as one order while preserving split shipments in the selected shipping view', async () => {
+    const shipping = randomUUID();
+    await owner.query(
+      `INSERT INTO connector_installations(tenant_id,id,version,document,secret) VALUES($1,$2,1,$3,'fixture')`,
+      [
+        tenant,
+        shipping,
+        {
+          id: shipping,
+          tenantId: tenant,
+          version: 1,
+          status: 'active',
+          provider: 'starshipit',
+          label: 'Shipping',
+          target: { kind: 'starshipit' },
+          permissions: reads,
+          granted: reads,
+        },
+      ],
+    );
+    await owner.query(
+      `INSERT INTO connector_lifecycle_events(tenant_id,connection_id,version,event,actor_id,status,credential_version)
+       VALUES($1,$2,1,'installed','operator','active',1)`,
+      [tenant, shipping],
+    );
+    const shippingOrder = order(shipping, 's1', {
+      externalNumber: '#1',
+      updated: new Date().toISOString(),
+    });
+    source.set(shop, 'orders.read', [order(shop, '1')]);
+    source.set(erp, 'orders.read', [
+      order(erp, '9', { number: 'SO-9', externalNumber: '#1' }),
+    ]);
+    source.set(shipping, 'orders.read', [
+      {
+        ...shippingOrder,
+        source: { ...shippingOrder.source, provider: 'starshipit' },
+      },
+    ]);
+    for (const [connection, orderId, ids] of [
+      [shop, '1', ['shop-f']],
+      [erp, '9', ['erp-f']],
+      [shipping, 's1', ['ship-f1', 'ship-f2']],
+    ] as const) {
+      source.set(
+        connection,
+        'fulfillment.read',
+        ids.map((id) => {
+          const item = shipment(connection, id, orderId);
+
+          return {
+            ...item,
+            source: {
+              ...item.source,
+              provider:
+                connection === shipping ? 'starshipit' : item.source.provider,
+            },
+            data: {
+              ...(item.data as Record<string, unknown>),
+              kind: 'shipment',
+            },
+          };
+        }),
+      );
+    }
+    await drain();
+    // Shipping-only evidence is not counted as an additional commercial order even before linking.
+    expect(
+      (
+        await workspace().list(context(), {
+          q: '',
+          view: 'all',
+          sort: 'updated',
+          direction: 'desc',
+          limit: 50,
+          count: 'exact',
+        })
+      ).totalCount,
+    ).toBe(2);
+    const defaults = createAutoLinkRunner({
+      store: createAutomaticLinkStore(db),
+      resolveContext: async (principal) => context(principal),
+      log: () => undefined,
+    });
+    await defaults.tick(tenant);
+    await autoDue();
+    await defaults.tick(tenant);
+    const orderId = await canonical(shop, 'order', '1');
+    expect(await canonical(erp, 'order', '9')).toBe(orderId);
+    expect(await canonical(shipping, 'order', 's1')).toBe(orderId);
+    const orders = await workspace().list(context(), {
+      q: '',
+      view: 'all',
+      sort: 'updated',
+      direction: 'desc',
+      limit: 50,
+      count: 'exact',
+    });
+    expect(orders.totalCount).toBe(1);
+    expect(orders.items[0]!.sources).toHaveLength(3);
+    expect(
+      orders.items[0]!.sources.find((item) => item.selected)?.system,
+    ).not.toBe('starshipit');
+    const fulfillments = createFulfillmentWorkspace(
+      db,
+      queries,
+      createActivityStore,
+      async (value) => value,
+    );
+    const list = await fulfillments.list(context(), {
+      q: '',
+      view: 'all',
+      sort: 'waiting',
+      direction: 'desc',
+      limit: 50,
+    });
+    expect(list.counts.all).toBe(2);
+    expect(list.items.every((item) => item.connectionId === shipping)).toBe(
+      true,
+    );
+    expect(
+      (
+        await fulfillments.list(context(), {
+          q: '',
+          view: 'all',
+          sort: 'waiting',
+          direction: 'desc',
+          limit: 50,
+          connectionId: erp,
+        })
+      ).counts.all,
+    ).toBe(1);
+    expect(
+      (
+        await createRecordExplorer(db).list(context(), {
+          q: '#1',
+          kind: 'order',
+        })
+      ).items,
+    ).toHaveLength(1);
   });
 
   it('automatically links unique SKUs and explicit order references, replays related records and respects manual separation', async () => {

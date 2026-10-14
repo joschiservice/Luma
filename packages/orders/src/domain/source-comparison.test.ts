@@ -51,6 +51,62 @@ function shipment(
 }
 
 describe('order source business comparison', () => {
+  it('compares commercial quantities while unmatched partial shipping items stay unreported', () => {
+    const shipping: ComparisonSource = {
+      ...source('shipping'),
+      lineCoverage: 'partial',
+      status: 'unknown',
+      paymentStatus: 'unknown',
+      lines: [{ ...source('shipping').lines[0]!, skuId: null }],
+    };
+    const result = compareOrderSources([
+      source('shop'),
+      source('erp', '1'),
+      shipping,
+    ]);
+    expect(result.incomplete).toBe(false);
+    expect(
+      result.differences.find((item) => item.field === 'currentQuantity'),
+    ).toMatchObject({
+      lineKey: 'sku',
+      values: [{ value: '2' }, { value: '1' }, { value: null }],
+    });
+    expect(
+      compareOrderSources([
+        source('shop'),
+        { ...shipping, lineCoverage: 'complete' },
+      ]).incomplete,
+    ).toBe(true);
+  });
+  it('uses an explicitly matched partial item without inferring zero for its missing lines', () => {
+    const shop = source('shop');
+    const shipping: ComparisonSource = {
+      ...source('shipping'),
+      lineCoverage: 'partial',
+      lines: [{ ...shop.lines[0]!, skuId: null }],
+    };
+    const result = compareOrderSources([shop, source('erp', '1'), shipping]);
+    expect(result.incomplete).toBe(false);
+    expect(
+      result.differences.filter((item) => item.field === 'currentQuantity'),
+    ).toEqual([
+      expect.objectContaining({
+        lineKey: 'line-shop',
+        values: expect.arrayContaining([
+          expect.objectContaining({ connectionId: 'erp', value: '1' }),
+          expect.objectContaining({ connectionId: 'shipping', value: '2' }),
+        ]),
+      }),
+    ]);
+    expect(
+      compareOrderSources([
+        source('shop'),
+        source('erp', '1'),
+        { ...shipping, lines: [] },
+      ]).differences.find((item) => item.field === 'currentQuantity')?.values[2]
+        ?.value,
+    ).toBeNull();
+  });
   it('matches a line two sources share with a third source that reports it under its own ID by SKU', () => {
     const store = source('store');
     // A Luma record copies the store's canonical line; the ERP imports it as its own line.

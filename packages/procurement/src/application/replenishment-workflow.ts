@@ -55,6 +55,8 @@ import {
   stockReasonMessage,
   suspendedOwnerReadiness,
 } from '../domain/replenishment-readiness.js';
+import type { ReplenishmentApprovalContext } from '../domain/replenishment-review-context.js';
+import { replenishmentReviewContext } from '../domain/replenishment-review-context.js';
 import type { ProcurementService } from './procurement.js';
 import type {
   ReplenishmentActivation,
@@ -87,6 +89,7 @@ export interface ReplenishmentTransport {
 
 /** A purchase-order proposal that waits for a person's approval. */
 export interface ReplenishmentDecision {
+  context?: ReplenishmentApprovalContext | null;
   runId: string;
   definitionId: string;
   positionId: string;
@@ -169,6 +172,13 @@ export function createReplenishmentService(deps: {
   refreshStock?(context: TenantContext, positionId: string): Promise<void>;
   /** How long a person has to decide on a proposal. Defaults to four hours. */
   decisionWindowMs?: number;
+  /** Reads informational facts once before binding a proposal; dispatch still rechecks its own guards. */
+  reviewContext?(
+    context: TenantContext,
+    rule: ReplenishmentActivation,
+    quantity: number,
+    available: number | null,
+  ): Promise<ReplenishmentApprovalContext>;
 }) {
   const { version, store, steps, catalog, runs, effects, audit, triggers } =
     deps;
@@ -394,6 +404,7 @@ export function createReplenishmentService(deps: {
       const line = JSON.parse(String(binding.action.parameters.lines))[0];
       const inventory = outputs.find((step) => step.stepId === 'inventory');
       items.push({
+        context: await store.reviewContext(context, run.id),
         runId: run.id,
         definitionId,
         positionId: rule.positionId,
@@ -1247,6 +1258,7 @@ export function createReplenishmentService(deps: {
 
       return {
         runId: id,
+        context: await store.reviewContext(context, id),
         supplierId: rule.supplierId,
         stock: {
           available:
@@ -1460,6 +1472,28 @@ export function createReplenishmentService(deps: {
       const id = deps.id(`${run.id}:order`);
       // People get a decision window; stock is reread and checked again before the order is created.
       const validUntil = new Date(Date.now() + decisionWindowMs).toISOString();
+      const quantity = Number(proposal.values.quantity);
+      const available =
+        typeof inventory.values.available === 'number'
+          ? inventory.values.available
+          : null;
+      const reviewed =
+        (await store.reviewContext(context, run.id)) ??
+        (await store.reviewContext(
+          context,
+          run.id,
+          deps.reviewContext
+            ? await deps.reviewContext(context, rule, quantity, available)
+            : replenishmentReviewContext({
+                productTitle: null,
+                terms: null,
+                demand: null,
+                available,
+                quantity,
+                openOrders: null,
+                now: new Date().toISOString(),
+              }),
+        ));
       await deps.safety.provisioning.bind(context, {
         runId: run.id,
         stepId: step.id,
@@ -1487,9 +1521,12 @@ export function createReplenishmentService(deps: {
               {
                 id: deps.id(`${run.id}:line`),
                 sku: rule.sku,
-                description: `Replenish ${rule.sku}`,
+                description: reviewed?.productTitle ?? `Replenish ${rule.sku}`,
                 quantity: proposal.values.quantity,
                 unit: inventory.values.unit,
+                ...(reviewed?.unitPrice
+                  ? { unitPrice: reviewed.unitPrice }
+                  : {}),
               },
             ]),
           },

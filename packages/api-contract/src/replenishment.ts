@@ -210,7 +210,39 @@ export const workflowCoverageSchema = z.object({
   ),
 });
 
+/** Frozen commercial and demand facts retained with a replenishment proposal. */
+const replenishmentApprovalContextSchema = z.object({
+  productTitle: z.string().nullable(),
+  unitPrice: z.object({ amount: z.string(), currency: z.string() }).nullable(),
+  totalValue: z.object({ amount: z.string(), currency: z.string() }).nullable(),
+  leadTimeDays: z.number().nonnegative().nullable(),
+  dailySales: z.number().nonnegative().nullable(),
+  demandPeriodDays: z.number().int().positive(),
+  coverBeforeDays: z.number().nonnegative().nullable(),
+  coverAfterDays: z.number().nonnegative().nullable(),
+  openOrders: z
+    .array(
+      z.object({
+        id: z.string().uuid(),
+        reference: z.string(),
+        quantity: z.number(),
+        status: z.string(),
+      }),
+    )
+    .max(100),
+  termsSource: z.string().nullable(),
+  termsObservedAt: z.string().datetime().nullable(),
+  demandObservedAt: z.string().datetime().nullable(),
+  recordedAt: z.string().datetime(),
+  unavailable: z.array(z.string()),
+});
+
+export type ReplenishmentApprovalContext = z.infer<
+  typeof replenishmentApprovalContextSchema
+>;
+
 export const replenishmentReviewSchema = z.object({
+  context: replenishmentApprovalContextSchema.nullable().optional(),
   runId: z.string().uuid(),
   supplierId: z.string().uuid(),
   stock: z.object({

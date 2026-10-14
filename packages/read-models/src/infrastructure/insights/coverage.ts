@@ -36,6 +36,7 @@ export async function readSourceReads(
      LEFT JOIN commerce_sync_streams st ON st.tenant_id=c.tenant_id AND st.connection_id=c.id
       AND st.record_type=$2
      WHERE c.tenant_id=$1 AND ($4::uuid IS NULL OR c.id=$4)
+      ${input.recordType === 'orders' ? "AND COALESCE(c.document->>'provider',c.document->'target'->>'kind','')<>'starshipit'" : ''}
       AND ((c.document->'permissions' ? $3 AND COALESCE(c.document->>'status','') NOT IN ('disconnected','revoked'))
        OR EXISTS (SELECT 1 FROM ${input.table} r WHERE r.tenant_id=$1 AND r.connection_id=c.id))
      ORDER BY c.id`,

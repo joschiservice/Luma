@@ -36,6 +36,7 @@ import {
   verificationLabel,
   workflowStatusLabel,
 } from './case-presentation';
+import { CaseWorkflowHistory } from './case-workflow-history';
 import {
   ExecutionMetadata,
   executionStatus,
@@ -58,6 +59,7 @@ const eventNames: Record<string, () => string> = {
   'workflow.human_task_escalated': m.authoring_coordination_overdue,
   'workflow.human_task_answered': m.authoring_coordination_answered,
   'exception.detected': m.issues_event_detected,
+  'exception.observed': m.issues_event_observed,
   'execution.prepared': m.issues_event_change_queued,
   'execution.completed': m.issues_event_change_finished,
   'execution.withheld': m.issues_event_change_withheld,
@@ -125,7 +127,7 @@ export function CaseTimeline({
   expanded = false,
   progress,
   review,
-  timeline,
+  timeline: recordedTimeline,
   evidence,
   connection,
   confirmed = connection === 'live' ||
@@ -138,6 +140,7 @@ export function CaseTimeline({
   hasMoreEvidence = false,
   loadingHistory = false,
   onLoadMore,
+  workflowLink,
 }: {
   expanded?: boolean;
   progress: CaseProgress;
@@ -153,9 +156,46 @@ export function CaseTimeline({
   hasMoreEvidence?: boolean;
   loadingHistory?: boolean;
   onLoadMore?: (() => void) | undefined;
+  workflowLink?:
+    | ((run: NonNullable<CaseProgress['workflowRuns']>[number]) => ReactNode)
+    | undefined;
 }) {
   const Subheading = expanded ? 'h3' : 'h4';
-  const execution = progress.execution;
+  const firstDetection = recordedTimeline
+    .filter((event) => event.type === 'exception.detected')
+    .sort(
+      (a, b) =>
+        a.occurredAt.localeCompare(b.occurredAt) || a.id.localeCompare(b.id),
+    )[0]?.id;
+  const timeline = recordedTimeline.map((event) =>
+    event.type === 'exception.detected' && event.id !== firstDetection
+      ? { ...event, type: 'exception.observed' }
+      : event,
+  );
+  const recordedExecutions = (progress.workflowRuns ?? []).flatMap((run) =>
+    run.actions.flatMap((action) =>
+      action.execution ? [action.execution] : [],
+    ),
+  );
+  const execution =
+    progress.execution ??
+    recordedExecutions
+      .sort(
+        (a, b) =>
+          a.startedAt.localeCompare(b.startedAt) || a.id.localeCompare(b.id),
+      )
+      .at(-1) ??
+    null;
+  const displayProgress = { ...progress, execution };
+  const recordedCriteria = progress.workflowRuns?.some((run) =>
+    run.actions.some(
+      (action) =>
+        action.proposalId === execution?.proposalId &&
+        action.diff?.records.some((record) =>
+          record.changes.some((change) => change.afterKnown),
+        ),
+    ),
+  );
   const verification = execution?.verification;
   const proposal = review.proposal;
   const boundProposal =
@@ -243,7 +283,7 @@ export function CaseTimeline({
         section="execution"
         preview={
           confirmed
-            ? executionStatus(progress)
+            ? executionStatus(displayProgress)
             : m.issues_state_unconfirmed_preview()
         }
         enabled={expanded}
@@ -268,7 +308,7 @@ export function CaseTimeline({
           </CaseNotice>
         ) : null}
         {expanded ? (
-          <ExecutionSummary progress={progress} confirmed={current} />
+          <ExecutionSummary progress={displayProgress} confirmed={current} />
         ) : (
           <>
             <ol className="case-lifecycle" aria-label={m.issues_stage_list()}>
@@ -304,7 +344,9 @@ export function CaseTimeline({
               </p>
               <p>
                 {m.issues_progress_workflow({
-                  status: workflowStatusLabel(progress.workflow),
+                  status: progress.workflowRuns?.length
+                    ? m.issues_workflow_recorded_status()
+                    : workflowStatusLabel(progress.workflow),
                 })}
               </p>
               {progress.workflow.progress?.reason ? (
@@ -328,7 +370,9 @@ export function CaseTimeline({
                 <strong>
                   {execution
                     ? executionStateLabel(execution.state)
-                    : m.issues_change_not_sent()}
+                    : progress.resolution
+                      ? m.issues_execution_no_record()
+                      : m.issues_change_not_sent()}
                 </strong>
                 <p>{m.issues_change_accepted_note()}</p>
               </div>
@@ -361,6 +405,7 @@ export function CaseTimeline({
             </div>
           </>
         )}
+        <CaseWorkflowHistory progress={progress} link={workflowLink} />
         {boundProposal ? (
           <Disclosure className="case-evidence">
             <summary>{m.issues_criteria_title()}</summary>
@@ -431,7 +476,7 @@ export function CaseTimeline({
               </p>
             ) : null}
           </Disclosure>
-        ) : execution || !expanded ? (
+        ) : (execution || !expanded) && !recordedCriteria ? (
           <p>{m.issues_criteria_unavailable()}</p>
         ) : null}
         {execution ? (

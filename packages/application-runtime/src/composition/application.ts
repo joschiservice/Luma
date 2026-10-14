@@ -76,6 +76,7 @@ import {
   createPurchasingOutcomesService,
   createPurchasingOverview,
   createPurchasingStore,
+  createReplenishmentReviewContext,
   createStockRiskReader,
   createSupplierCommitmentService,
   createSupplierEmailService,
@@ -914,6 +915,12 @@ export function createApplicationServices(
     identity,
     procurement,
     safety,
+    reviewContext: createReplenishmentReviewContext({
+      database,
+      terms: supplierTerms,
+      inputs: createPurchasingInputs(database, authority(database)),
+      procurement,
+    }),
     enabled: options.execution.kind === 'enabled',
     ...(options.replenishmentTransport
       ? { transport: options.replenishmentTransport }

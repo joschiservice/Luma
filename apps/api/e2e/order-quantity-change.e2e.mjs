@@ -25,13 +25,20 @@ test('carries a quantity change from Luma ERP to Shopify after the warehouse con
     subjectId: f.shop,
     scope: [
       f.lineKey,
-      ...[f.connections.erp, f.connections.jtl, f.connections.shopify].sort(),
+      ...[
+        f.connections.erp,
+        f.connections.jtl,
+        f.connections.shopify,
+        f.manifest.connections.starshipit,
+      ].sort(),
     ],
   });
   const caseDetail = await f.request(`/exceptions/${opened.id}`);
-  expect(caseDetail.summary).toBe(
-    'Luma ERP sets this quantity to 1; Shopify still shows 2; JTL doesn’t report it.',
+  expect(caseDetail.summary).toContain(
+    'Luma ERP sets this quantity to 1; Shopify still shows 2',
   );
+  expect(caseDetail.summary).toContain('JTL doesn’t report it');
+  expect(caseDetail.summary).toMatch(/Starshipit.*report/i);
   const evidence = await f.pilot.detection.exceptions.evidence(
     f.actor,
     opened.id,
@@ -45,6 +52,7 @@ test('carries a quantity change from Luma ERP to Shopify after the warehouse con
     [
       [f.connections.erp, '1'],
       [f.connections.jtl, null],
+      [f.manifest.connections.starshipit, null],
       [f.connections.shopify, '2'],
     ].sort(),
   );
@@ -96,7 +104,7 @@ test('carries a quantity change from Luma ERP to Shopify after the warehouse con
     verified.processSteps.find((step) => step.stepId === 'check-everywhere'),
   ).toMatchObject({
     state: 'completed',
-    values: { quantity: 1, agreed: true, reporting: 2, notReporting: 1 },
+    values: { quantity: 1, agreed: true, reporting: 2, notReporting: 2 },
   });
   expect(proposalId).toBeTruthy();
   expect(await f.commits()).toHaveLength(1);
@@ -128,6 +136,7 @@ test('carries a quantity change from Luma ERP to Shopify after the warehouse con
     [
       [f.connections.erp, 'reflects'],
       [f.connections.jtl, 'unknown'],
+      [f.manifest.connections.starshipit, 'unknown'],
       [f.connections.shopify, 'reflects'],
     ].sort(),
   );

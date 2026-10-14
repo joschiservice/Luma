@@ -134,6 +134,8 @@ export function listSql(
  filtered AS NOT MATERIALIZED (
  SELECT o.* FROM orders_list o
  WHERE o.tenant_id=$1 AND NOT o.deleted AND ${connection ? 'o.connection_id=$3' : 'o.selected AND ($3::uuid IS NULL)'}
+ AND NOT EXISTS (SELECT 1 FROM connector_installations c WHERE c.tenant_id=$1 AND c.id=$3
+  AND COALESCE(c.document->>'provider',c.document->'target'->>'kind')='starshipit')
  AND ($4::text IS NULL OR o.status=$4) AND ($5::text IS NULL OR o.payment_status=$5)
  AND ($6::timestamptz IS NULL OR o.placed_at >= $6) AND ($7::timestamptz IS NULL OR o.placed_at < $7)
  AND ($8::timestamptz IS NULL OR o.source_updated_at >= $8) AND ($9::timestamptz IS NULL OR o.source_updated_at < $9)

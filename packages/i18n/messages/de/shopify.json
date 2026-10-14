@@ -316,5 +316,8 @@
   "shopify_publishing_new": "Weitere Sendung prüfen",
   "shopify_publishing_read_at": "Versandnachweise zuletzt abgefragt: {time}",
   "shopify_publishing_notification_unknown": "Ob Shopify die Kundenbenachrichtigung angenommen hat, ist unbekannt. Ihre Zustellung ist nicht bestätigt.",
-  "shopify_publishing_state_ready": "Diese genaue Sendung ist freigegeben und kann von der anfragenden Person veröffentlicht werden."
+  "shopify_publishing_state_ready": "Diese genaue Sendung ist freigegeben und kann von der anfragenden Person veröffentlicht werden.",
+  "shopify_stock_product_unknown": "Produktname nicht gemeldet",
+  "shopify_stock_product_sku": "SKU {sku}",
+  "shopify_stock_sku_unknown": "SKU nicht gemeldet"
 }

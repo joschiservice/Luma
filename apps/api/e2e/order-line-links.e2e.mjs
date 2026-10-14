@@ -7,13 +7,18 @@ test('explicit line links require a shared order, persist across fresh reads and
   const f = await starshipitOperationsFixture(t);
   const shopify = f.manifest.connections.shopify;
   const starshipit = f.manifest.connections.starshipit;
+  const shipping = await f.separateShippingOrder();
   const initialShop = await f.detail();
-  const initialShipping = await f.api(`/orders/${f.shipping}`);
+  const initialShipping = await f.api(`/orders/${shipping}`);
   const request = {
     operation: 'link',
     kind: 'order_line',
-    entityId: initialShop.sources[0].lines[0].id,
-    otherId: initialShipping.sources[0].lines[0].id,
+    entityId: initialShop.sources.find(
+      (source) => source.connectionId === shopify,
+    ).lines[0].id,
+    otherId: initialShipping.sources.find(
+      (source) => source.connectionId === starshipit,
+    ).lines[0].id,
     reason: 'Exact merchant confirmation',
   };
   await f.api('/identities/links', {
@@ -27,7 +32,7 @@ test('explicit line links require a shared order, persist across fresh reads and
     actor: 'warehouse',
     status: 403,
   });
-  await f.link('order', f.shop, f.shipping);
+  await f.link('order', f.shop, shipping);
   const detail = await f.detail();
   const left = detail.sources.find((source) => source.connectionId === shopify)
     .lines[0];
@@ -41,11 +46,16 @@ test('explicit line links require a shared order, persist across fresh reads and
   expect(identity.suggestions.map((item) => item.id)).toContain(right.id);
   await f.link('order_line', left.id, right.id);
   const matched = await f.detail();
+  const linkedSources = (detail) =>
+    detail.sources.filter((source) =>
+      [shopify, starshipit].includes(source.connectionId),
+    );
+  expect(linkedSources(matched)).toHaveLength(2);
   expect(
-    matched.sources.every((source) => source.lines[0].id === left.id),
+    linkedSources(matched).every((source) => source.lines[0].id === left.id),
   ).toBe(true);
   expect(
-    matched.sources.every(
+    linkedSources(matched).every(
       (source) => source.lines[0].comparisonKey === left.id,
     ),
   ).toBe(true);
@@ -63,7 +73,7 @@ test('explicit line links require a shared order, persist across fresh reads and
   ).resolves.toEqual({ moved: 0 });
   await f.pilot.observe({ check: false });
   expect(
-    (await f.detail()).sources.every(
+    linkedSources(await f.detail()).every(
       (source) => source.lines[0].id === left.id,
     ),
   ).toBe(true);

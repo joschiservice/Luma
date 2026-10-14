@@ -12,6 +12,7 @@ import {
 } from '../domain/source-comparison.js';
 
 type SnapshotRow = {
+  shippingView: boolean;
   orderId: string;
   snapshotId: string;
   document: CanonicalSnapshot;
@@ -27,9 +28,11 @@ export async function readOrderComparisons(
 ) {
   const { rows } = await tx.query<SnapshotRow>(
     `SELECT COALESCE(s.order_id,s.entity_id) AS "orderId",s.id AS "snapshotId",s.document,
+    COALESCE(c.document->>'provider',c.document->'target'->>'kind','')='starshipit' AS "shippingView",
     o.comparison_signature AS signature,o.comparison_changed_at AS "changedAt"
     FROM orders_snapshots s JOIN orders_projections p ON p.tenant_id=s.tenant_id AND p.entity_id=s.entity_id
      AND p.connection_id=s.connection_id AND p.snapshot_id=s.id
+    LEFT JOIN connector_installations c ON c.tenant_id=s.tenant_id AND c.id=s.connection_id
     LEFT JOIN orders_list o ON o.tenant_id=s.tenant_id AND o.entity_id=s.entity_id AND o.connection_id=s.connection_id
     WHERE s.tenant_id=$1 AND (s.entity_id=ANY($2::uuid[]) OR s.order_id=ANY($2::uuid[]))
      AND s.kind IN ('order','fulfillment')
@@ -51,6 +54,7 @@ export async function readOrderComparisons(
         : [
             {
               ...row.document.data,
+              ...(row.shippingView ? { lineCoverage: 'partial' as const } : {}),
               snapshotId: row.snapshotId,
               observationId: row.document.observationId,
               observedAt: row.document.observedAt,

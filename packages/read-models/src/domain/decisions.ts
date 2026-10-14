@@ -323,6 +323,7 @@ export function presentCase(
 
 /** The procurement owner's pending purchase-order proposal, as the queue reads it. */
 export interface ReplenishmentProposal {
+  context?: { productTitle: string | null } | null;
   runId: string;
   definitionId: string;
   positionId: string;
@@ -359,10 +360,10 @@ export function presentReplenishment(
     kind: 'replenishment',
     reason: 'approval',
     domain: 'procurement',
-    title: `Approve purchase-order draft for ${item.quantity} × ${item.sku}`,
+    title: `Approve purchase-order draft for ${item.quantity} × ${item.context?.productTitle ? `${item.context.productTitle} (${item.sku})` : item.sku}`,
     why: `Each replenishment proposal needs someone who can manage procurement, other than the rule’s principal, to approve it before Luma creates the draft.${
       high
-        ? ` The quantity is above the rule’s ${item.approvalQuantity}-unit limit, so it is high risk.`
+        ? ` The quantity is above the rule’s ${item.approvalQuantity}-unit approval threshold. This does not measure financial impact.`
         : ''
     }`,
     consequences: [
@@ -376,6 +377,7 @@ export function presentReplenishment(
       },
     ],
     change: [
+      { label: 'Product', value: item.context?.productTitle ?? 'Not reported' },
       { label: 'SKU', value: item.sku },
       { label: 'Supplier', value: item.supplier },
       { label: 'Quantity', value: plural(item.quantity, unit) },
@@ -392,7 +394,7 @@ export function presentReplenishment(
       { label: 'Result', value: 'Purchase-order draft, not sent' },
     ],
     impact: {
-      level: high ? 'high' : 'medium',
+      level: 'unknown',
       text:
         item.available === null
           ? 'Available stock unknown'

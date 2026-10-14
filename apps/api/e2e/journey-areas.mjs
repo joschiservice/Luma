@@ -298,6 +298,7 @@ const procurement = [
   'packages/application-runtime/src/composition/{procurement-effects,procurement-submissions}.ts',
 ];
 const replenishment = [
+  'apps/web/src/shared/procurement/approval-context.tsx',
   ...procurement,
   ...workflows,
   'packages/application-runtime/src/composition/{replenishment,replenishment-worker}.ts',

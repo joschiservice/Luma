@@ -74,16 +74,21 @@ function object(value: unknown): Record<string, unknown> {
 }
 
 function summary(rows: Row[]): RecordSummary {
-  const ordered = [...rows].sort((left, right) =>
-    (
-      string(right.document?.sourceUpdatedAt) ??
-      string(right.document?.observedAt) ??
-      ''
-    ).localeCompare(
-      string(left.document?.sourceUpdatedAt) ??
-        string(left.document?.observedAt) ??
-        '',
-    ),
+  const shipping = (row: Row) =>
+    (string(row.connection?.provider) ??
+      string(object(row.connection?.target).kind)) === 'starshipit';
+  const ordered = [...rows].sort(
+    (left, right) =>
+      Number(shipping(left)) - Number(shipping(right)) ||
+      (
+        string(right.document?.sourceUpdatedAt) ??
+        string(right.document?.observedAt) ??
+        ''
+      ).localeCompare(
+        string(left.document?.sourceUpdatedAt) ??
+          string(left.document?.observedAt) ??
+          '',
+      ),
   );
   const first = ordered[0]!;
   const snapshots = ordered
@@ -104,7 +109,7 @@ function summary(rows: Row[]): RecordSummary {
       : first.kind === 'issue'
         ? `${string(subject.subjectKind) ?? 'Record'} · ${string(subject.subjectId) ?? 'unknown'}`
         : first.kind === 'order'
-          ? `${Array.isArray(data.lines) ? data.lines.length : 0} lines · ${string(data.paymentStatus) ?? 'Payment unknown'}`
+          ? `${Array.isArray(data.lines) ? data.lines.length : 0} ${Array.isArray(data.lines) && data.lines.length === 1 ? 'line' : 'lines'} · ${string(data.paymentStatus) ?? 'Payment unknown'}`
           : first.kind === 'fulfillment'
             ? `Order ${string(data.orderId)?.slice(0, 8) ?? 'unknown'}`
             : (first.externalId ?? 'Source identity');
@@ -140,7 +145,10 @@ function summary(rows: Row[]): RecordSummary {
     kind: first.kind,
     id: first.id,
     label,
-    description,
+    description:
+      first.kind === 'order' && ordered.every(shipping)
+        ? `Shipping view · ${description}`
+        : description,
     status:
       current.deleted === true
         ? 'removed at source'

@@ -214,7 +214,7 @@
   "sync_links_method_matched": "Matched on import",
   "sync_links_unlink": "Unlink",
   "sync_links_link": "Link",
-  "sync_links_suggestions_order": "Possibly the same order",
+  "sync_links_suggestions_order": "Unambiguous order references are linked by enabled automatic rules. Review these remaining suggestions before linking them.",
   "sync_links_suggestions_sku": "Possibly the same SKU",
   "sync_links_suggestions_location": "Possibly the same location",
   "sync_links_suggestions_ambiguous": "More than one order shares this reference. Check each source record before choosing.",
@@ -243,7 +243,7 @@
   "sync_autolink_load_failed": "Luma couldn’t load the automatic linking rules.",
   "sync_autolink_unavailable_connection": "Unavailable connection",
   "sync_autolink_title": "Automatic linking",
-  "sync_autolink_description": "Link matching SKUs and orders between the connections you choose. Each source keeps its own data.",
+  "sync_autolink_description": "With one Shopify store, Luma automatically links unique SKU codes and explicit order references from your ERP and shipping system. Preview matches, review conflicts or disable a rule here.",
   "sync_autolink_add": "Add linking rule",
   "sync_autolink_loading": "Loading linking rules…",
   "sync_autolink_kind_sku": "Unique SKU code",
@@ -298,5 +298,8 @@
   "sync_links_unlinking_line": "Separating lines. Luma is refreshing the order and its fulfillment evidence.",
   "sync_links_link_line_description": "Confirm that these source lines represent the same item in this order. Each source keeps its quantities and shipment evidence. This match can affect which changes Luma can run. Luma records your reason; you can unlink later.",
   "sync_links_unlink_line_description": "This source line becomes a separate item in the same order. Luma may be unable to run changes until the line is matched again. Luma records the change and your reason.",
-  "sync_links_title_line": "Sources for {line}"
+  "sync_links_title_line": "Sources for {line}",
+  "sync_link_coverage_sku": "{linked} of {total} SKU records linked across systems",
+  "sync_link_coverage_order": "{linked} of {total} order records linked across systems",
+  "sync_link_coverage_monitoring": "Linked SKUs support stock comparisons once locations are linked and source reads are current. Unlinked records are not compared."
 }

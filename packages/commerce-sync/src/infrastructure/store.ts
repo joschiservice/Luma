@@ -601,6 +601,22 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
             [...scope, JSON.stringify(page.forget)],
           );
         if (!page.complete) return true;
+        if (
+          current.record_type === 'products' ||
+          current.record_type === 'orders'
+        ) {
+          // Fresh source coverage should not wait for the rule's periodic retry after an earlier incomplete read.
+          await tx.query(
+            `UPDATE commerce_auto_link_rules SET due_at=now() WHERE tenant_id=$1 AND enabled
+             AND state<>'blocked' AND due_at>now() AND kind=$3
+             AND (target_connection_id=$2 OR source_connection_id=$2)`,
+            [
+              tenantId,
+              current.connection_id,
+              current.record_type === 'products' ? 'sku' : 'order',
+            ],
+          );
+        }
         const full =
           current.scan_since === null && current.scan_created_since === null;
         let missing: number | null = null;
@@ -719,6 +735,37 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
           );
       });
     },
+    linkCoverage: (tenantId, excluded) =>
+      db.transaction(
+        tenantId,
+        async (tx) => {
+          const result = await tx.query<{
+            kind: 'sku' | 'order';
+            total: number;
+            linked: number;
+          }>(
+            `WITH records AS (
+         SELECT DISTINCT 'sku' AS kind,k.sku_id AS id,k.connection_id FROM inventory_product_skus k
+          WHERE k.tenant_id=$1 AND k.connection_id<>ALL($2::uuid[])
+         UNION ALL SELECT 'order',o.entity_id,o.connection_id FROM orders_list o
+          WHERE o.tenant_id=$1 AND NOT o.deleted AND o.connection_id<>ALL($2::uuid[])
+        ), identities AS (
+         SELECT kind,id,count(DISTINCT connection_id)::int AS sources FROM records GROUP BY kind,id
+        ) SELECT kind,COALESCE(sum(sources),0)::int AS total,
+         COALESCE(sum(sources) FILTER (WHERE sources>1),0)::int AS linked FROM identities GROUP BY kind`,
+            [tenantId, excluded],
+          );
+
+          const count = (kind: 'sku' | 'order') => {
+            const row = result.rows.find((row) => row.kind === kind);
+
+            return { total: row?.total ?? 0, linked: row?.linked ?? 0 };
+          };
+
+          return { sku: count('sku'), order: count('order') };
+        },
+        { readOnlySnapshot: true },
+      ),
     async overview(tenantId) {
       return db.transaction(
         tenantId,

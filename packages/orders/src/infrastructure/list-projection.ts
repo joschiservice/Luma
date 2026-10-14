@@ -48,12 +48,12 @@ export async function refreshOrderList(
   await tx.query(
     `WITH comparisons AS (SELECT * FROM jsonb_to_recordset($4::jsonb) AS v(entity_id uuid,connection_id uuid,signature text,changed_at timestamptz,raw text,read_at timestamptz,latest_read_at timestamptz,confirm_after timestamptz,differences jsonb)), ${currentOrderSources('sources', 'p.entity_id=ANY($3::uuid[])')},
     ${orderProgress('sources')},
-    winners AS (SELECT DISTINCT ON(entity_id) entity_id,connection_id FROM sources ORDER BY entity_id,${sourceSelectionOrder})
+    winners AS (SELECT DISTINCT ON(entity_id) entity_id,connection_id FROM sources WHERE NOT shipping_view ORDER BY entity_id,${sourceSelectionOrder})
     INSERT INTO orders_list(tenant_id,entity_id,connection_id,snapshot_id,selected,status,payment_status,display_number,
       observed_at,source_updated_at,placed_at,due_at,deleted,line_count,fulfillment,open,state_valid_from,differs,
       updated_key,placed_key,placed_rank,number_key,number_rank,due_key,due_rank,external_order_number,comparison_signature,comparison_changed_at,comparison_raw,comparison_read_at,comparison_latest_read_at,comparison_confirm_after,comparison_differences,total_amount,total_currency,
       channel,currency,test,cancel_reason)
-    SELECT $1,o.entity_id,o.connection_id,o.snapshot_id,w.connection_id=o.connection_id,o.status,o.payment_status,o.display_number,
+    SELECT $1,o.entity_id,o.connection_id,o.snapshot_id,COALESCE(w.connection_id=o.connection_id,false),o.status,o.payment_status,o.display_number,
       o.observed_at,o.source_updated_at,o.placed_at,o.due_at,o.deleted,o.line_count,o.fulfillment,o.open,
       GREATEST(o.observed_at,COALESCE((SELECT max(s.observed_at) FROM orders_snapshots s
        JOIN orders_projections p ON p.tenant_id=s.tenant_id AND p.entity_id=s.entity_id AND p.snapshot_id=s.id AND p.connection_id=s.connection_id
@@ -69,7 +69,7 @@ export async function refreshOrderList(
        WHERE snap.tenant_id=$1 AND snap.id=o.snapshot_id),
       v.signature,v.changed_at,COALESCE(v.raw,'inconclusive'),v.read_at,v.latest_read_at,v.confirm_after,COALESCE(v.differences,'[]'::jsonb),
       total.amount,total.currency,facts.channel,facts.currency,facts.test,facts.cancel_reason
-    FROM order_state o JOIN winners w USING(entity_id) LEFT JOIN comparisons v ON v.entity_id=o.entity_id AND v.connection_id=o.connection_id
+    FROM order_state o LEFT JOIN winners w USING(entity_id) LEFT JOIN comparisons v ON v.entity_id=o.entity_id AND v.connection_id=o.connection_id
     LEFT JOIN LATERAL (${orderTotal('o.snapshot_id')}) total ON true
     LEFT JOIN LATERAL (SELECT f.* FROM orders_snapshots snap CROSS JOIN LATERAL orders_commercial_scalars(snap.document->'data') f
       WHERE snap.tenant_id=$1 AND snap.id=o.snapshot_id) facts ON true

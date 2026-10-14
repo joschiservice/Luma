@@ -156,11 +156,11 @@ describe('replenishment decisions', () => {
       domain: 'procurement',
       response: 'decide',
       deadline: proposal.expiresAt,
-      impact: { level: 'high' },
+      impact: { level: 'unknown' },
       record: { kind: 'position', id: proposal.positionId },
       owner: { kind: 'workflow_run', runId: proposal.runId },
     });
-    expect(item.why).toContain('20-unit limit');
+    expect(item.why).toContain('20-unit approval threshold');
     expect(item.change).toContainEqual({ label: 'Quantity', value: '50 each' });
     expect(item.consequences[0]!.text).toContain('Nothing is sent');
   });
@@ -173,7 +173,7 @@ describe('replenishment decisions', () => {
       ),
     ).toMatchObject({
       response: 'awaiting_other',
-      impact: { level: 'medium' },
+      impact: { level: 'unknown' },
     });
   });
 });

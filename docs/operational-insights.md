@@ -9,13 +9,13 @@ Code: `@luma/read-models` (charts), with counting rules from the owning domains.
 
 ## Charts and rules
 
-| Chart         | Unit               | Kind      | Placement and series                                                                                                                                             |
-| ------------- | ------------------ | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `orders`      | canonical order    | timeline  | Source `placed_at` in the bucket; series is the current status. Without a source filter the selected `orders_list` row counts, so linked orders count once.      |
-| `fulfillment` | source fulfillment | breakdown | Open work from the [Fulfillment workspace](fulfillment-workspace.md) rules, by hours since progress; series is the first of held, overdue, stalled, else `none`. |
-| `stock`       | stock position     | breakdown | Procurement's stock classification: unknown stock, below minimum with or without a draft/open purchase order, or at/above minimum.                               |
-| `cases`       | issue              | timeline  | First detection from Exceptions; series is the issue class. Reopened issues keep their first detection.                                                          |
-| `procurement` | purchase order     | breakdown | Stage from Procurement's commitment summaries, excluding closed and cancelled; series is whether a confirmation or delivery is overdue.                          |
+| Chart         | Unit                 | Kind      | Placement and series                                                                                                                                             |
+| ------------- | -------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `orders`      | canonical order      | timeline  | Source `placed_at` in the bucket; series is the current status. Without a source filter the selected `orders_list` row counts, so linked orders count once.      |
+| `fulfillment` | selected fulfillment | breakdown | Open work from the [Fulfillment workspace](fulfillment-workspace.md) rules, by hours since progress; series is the first of held, overdue, stalled, else `none`. |
+| `stock`       | stock position       | breakdown | Procurement's stock classification: unknown stock, below minimum with or without a draft/open purchase order, or at/above minimum.                               |
+| `cases`       | issue                | timeline  | First detection from Exceptions; series is the issue class. Reopened issues keep their first detection.                                                          |
+| `procurement` | purchase order       | breakdown | Stage from Procurement's commitment summaries, excluding closed and cancelled; series is whether a confirmation or delivery is overdue.                          |
 
 Timelines never reconstruct past states: statuses are current, and breakdowns describe only
 the evaluation time. Resolution performance stays in
@@ -31,6 +31,8 @@ Buckets are calendar days or Monday-based weeks in the requested IANA time zone,
 PostgreSQL. The last bucket ends at the start of the next local day. The orders chart
 reconciles with the Orders list: a point's `start`/`end` days are the list's
 `placedFrom`/`placedTo`, and its series is the list's `status`.
+
+Without a source filter, fulfillment uses one source view per linked order and work kind: Starshipit shipments, otherwise Shopify, then another source. Split shipments from that view remain separate. Source-filtered reads retain that source’s own records. Shipping-only order views do not contribute to commercial order totals.
 
 ## Coverage and data-through time
 

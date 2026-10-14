@@ -390,6 +390,17 @@ export function ShopifyInventoryCorrection({
             {snapshot ? (
               <>
                 <div className="shopify-stock-location">
+                  <strong>
+                    {snapshot.product?.title ??
+                      m.shopify_stock_product_unknown()}
+                  </strong>
+                  <span>
+                    {snapshot.product?.sku
+                      ? m.shopify_stock_product_sku({
+                          sku: snapshot.product.sku,
+                        })
+                      : m.shopify_stock_sku_unknown()}
+                  </span>
                   <strong>{snapshot.locationName}</strong>
                   <span className="field-help">
                     {m.shopify_stock_item({

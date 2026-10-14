@@ -58,6 +58,8 @@ export const orderChangeCapabilities = [
 
 /** One source connection's report of the order, its fulfilment records and what Luma may do there. */
 export interface PlanSource {
+  /** Partial views contribute matched lines; missing line quantities remain unknown. */
+  lineCoverage?: 'complete' | 'partial';
   connectionId: string;
   deleted: boolean;
   /** When Luma read the order, on Luma's clock. */
@@ -386,7 +388,10 @@ function sourceValue(
   if (line) return line.currentQuantity;
 
   // A complete report without the line has none of it, as comparisons treat it.
-  return item.facts.lines.every((candidate) => candidate.key) ? '0' : null;
+  return item.source.lineCoverage !== 'partial' &&
+    item.facts.lines.every((candidate) => candidate.key)
+    ? '0'
+    : null;
 }
 
 function sameValue(kind: OrderChangeKind, a: string, b: string) {
@@ -509,9 +514,25 @@ function planChange(
     reason('ambiguous_line', null, lineKey);
   if (
     current.length > 1 &&
-    current.some((item) => item.facts.lines.some((line) => !line.key))
+    current.some(
+      (item) =>
+        item.source.lineCoverage !== 'partial' &&
+        item.facts.lines.some((line) => !line.key),
+    )
   )
     reason('ambiguous_line');
+  // A partial view's unmapped item can still be the affected line. Started or uncertain work
+  // on it needs a person; omitting its quantity must never bypass the dispatch fence.
+  if (lineKey)
+    for (const item of current.filter(
+      (item) => item.source.lineCoverage === 'partial',
+    )) {
+      const unmatched = item.facts.lines
+        .filter((line) => !line.key)
+        .map((line) => line.lineId);
+      if (workStarted(item, unmatched) || unknownStatus(item, unmatched))
+        reason('unknown_progress', item.source.connectionId, lineKey);
+    }
   if (!input.fulfillmentsVisible) reason('fulfilment_hidden');
   else if (!current.some((item) => item.reportsFulfilment))
     reason('no_fulfilment_source');

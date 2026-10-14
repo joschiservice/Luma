@@ -213,6 +213,8 @@ export type OrderSourceAddresses =
  * them; see `OrderCommercialData`.
  */
 export interface OrderSourceFacts extends OrderSource, OrderCommercialData {
+  /** Partial shipping views only report matched items; missing lines are unreported. */
+  lineCoverage?: 'complete' | 'partial';
   appId: string | null;
   mappingMethod: string | null;
   displayNumber: string | null;

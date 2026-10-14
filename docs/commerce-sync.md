@@ -165,13 +165,13 @@ An ordinary reread preserves explicit line matches; relinking a parent order rek
 children so a line cannot remain linked across different orders. Each source retains its
 quantities, fulfillment records and evidence.
 
-Automatic linking is opt-in for a selected connection pair and record type. SKU rules
+With exactly one active Shopify store, the worker creates enabled SKU and order rules for JTL and Cin7, and order rules for Starshipit, using the installer’s current access. Existing rules, including disabled rules, are never replaced. Multiple Shopify stores require an explicitly selected pair. SKU rules
 match a nonempty code after lowercasing and trimming surrounding spaces; each connection
 must identify exactly one SKU with that code, with equal known units. Order rules match an
 ERP order's external marketplace reference to the order number in one selected Shopify
 store; any non-Shopify connection can be the ERP side.
-Order references preserve case and ignore surrounding spaces and `#`. Automatic
-order rules skip records already linked outside their selected connection pair. Dates, totals and
+Different known product titles remain conflicts for review. Order references preserve case and ignore surrounding spaces and `#`. Automatic
+order rules permit another linked source only when an enabled rule connects it to the same store. Dates, totals and
 customer details never establish identity. Source products and fulfillment operations
 remain separate.
 
@@ -187,6 +187,8 @@ rules; a person can link it again explicitly. Pending manual requests take prece
 Rule saves require current `sync.manage`, check the expected revision and append the
 configuring actor and enabled state to immutable history. Rules run with that person's
 current access. Lost access blocks a rule until a manager previews and enables it again.
+Completed product and order reads make their enabled rules due again, so fresh matches do not wait for a retry after incomplete coverage. Disabled and blocked rules stay unchanged.
+
 Disabling stops future links and preserves existing ones. The worker checks enabled rules
 once a minute, in batches of at most 20 non-overlapping matches. Preview uses the same
 rules but writes nothing; each application rechecks current evidence under the exclusive

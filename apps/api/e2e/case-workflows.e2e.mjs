@@ -154,6 +154,63 @@ test('corrects Shopify stock from the ERP after a different admin approves, and 
     state: 'resolved',
     resolution: { kind: 'verification', outcome: 'passed' },
   });
+  const progress = await f.request(`/exceptions/${opened.id}/progress`);
+  expect(progress).toMatchObject({
+    state: 'resolved',
+    resolution: { kind: 'verification' },
+    workflowRuns: [
+      {
+        id: run.id,
+        definitionId: stock,
+        actions: [
+          {
+            proposalId: correction,
+            diff: {
+              capability: 'inventory.available.reconcile',
+              records: [
+                {
+                  changes: expect.arrayContaining([
+                    expect.objectContaining({ field: 'available', after: erp }),
+                  ]),
+                },
+              ],
+            },
+            approval: { outcome: 'approved' },
+            execution: {
+              state: 'succeeded',
+              verification: { outcome: 'passed' },
+            },
+          },
+        ],
+      },
+    ],
+  });
+  expect(
+    progress.people.some(
+      (person) =>
+        person.id === progress.workflowRuns[0].actions[0].approval.actorId,
+    ),
+  ).toBe(true);
+  expect(
+    progress.workflowRuns[0].steps.find(
+      (step) => step.stepId === 'check-stock',
+    ),
+  ).toMatchObject({ kind: 'verification', state: 'completed' });
+  const history = await f.request(
+    `/exceptions/${opened.id}/timeline?limit=100`,
+  );
+  expect(
+    history.items.filter((event) => event.type === 'exception.detected'),
+  ).toHaveLength(1);
+  expect(
+    history.items.some(
+      (event) =>
+        event.type === 'execution.completed' && event.proposalId === correction,
+    ),
+  ).toBe(true);
+  await f.request(`/exceptions/${randomUUID()}/progress`, undefined, {
+    status: 404,
+  });
   // A later pass starts nothing new for the closed case.
   await f.tick();
   expect(await f.runs(stock)).toHaveLength(1);

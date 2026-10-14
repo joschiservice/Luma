@@ -64,6 +64,11 @@ function inventoryColumns(
                 <small>
                   {position.location} · {unitOfMeasure(position.unit)}
                 </small>
+                <small>
+                  {[
+                    ...new Set(position.sources.map((source) => source.label)),
+                  ].join(' · ')}
+                </small>
                 <StockState position={position} />
               </div>
             )

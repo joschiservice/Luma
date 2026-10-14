@@ -10,9 +10,12 @@ import {
 } from '../domain/automatic-links.js';
 
 const skuRecords = `SELECT k.connection_id,k.code_key AS key,k.sku_id AS id,k.unit,
+ NULLIF(lower(btrim(s.document->'data'->>'title')),'') AS title,
  COALESCE(i.status='current' AND i.missing_since IS NULL AND i.last_seen_at>=$4::timestamptz
   AND (k.source_updated_at IS NULL OR i.source_updated_at>=k.source_updated_at),false) AS fresh
  FROM inventory_product_skus k
+ JOIN inventory_projections p ON p.tenant_id=k.tenant_id AND p.entity_id=k.product_id AND p.connection_id=k.connection_id
+ JOIN inventory_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
  LEFT JOIN connector_source_mappings m ON m.tenant_id=k.tenant_id AND m.connection_id=k.connection_id
   AND m.resource='product' AND m.canonical_id=k.product_id
  LEFT JOIN commerce_sync_items i ON i.tenant_id=m.tenant_id AND i.connection_id=m.connection_id
@@ -21,7 +24,7 @@ const skuRecords = `SELECT k.connection_id,k.code_key AS key,k.sku_id AS id,k.un
 
 const orderRecords = `SELECT o.connection_id,
  CASE WHEN o.connection_id=$2 THEN o.display_number_key ELSE o.external_order_key END AS key,
- o.entity_id AS id,'order' AS unit,
+ o.entity_id AS id,'order' AS unit,NULL::text AS title,
  COALESCE(i.status='current' AND i.missing_since IS NULL AND i.last_seen_at>=$4::timestamptz
   AND (o.source_updated_at IS NULL OR i.source_updated_at>=o.source_updated_at),false) AS fresh
  FROM orders_list o
@@ -84,12 +87,14 @@ export async function readAutoLinkPreview(
   }>(
     `WITH records AS (${pair.kind === 'sku' ? skuRecords : orderRecords}), grouped AS (
    SELECT connection_id,key,array_agg(DISTINCT id ORDER BY id) AS ids,
-    array_agg(DISTINCT unit ORDER BY unit) AS units,bool_and(fresh) AS fresh
+    array_agg(DISTINCT unit ORDER BY unit) AS units,
+    array_agg(DISTINCT title ORDER BY title) FILTER (WHERE title IS NOT NULL) AS titles,bool_and(fresh) AS fresh
    FROM records WHERE key IS NOT NULL GROUP BY connection_id,key
   ), pairs AS (
    SELECT a.key,a.ids AS targets,b.ids AS sources,a.ids[1] AS target_id,b.ids[1] AS source_id,
     cardinality(a.ids)<>1 OR cardinality(b.ids)<>1 AS ambiguous,
-    cardinality(a.units)<>1 OR cardinality(b.units)<>1 OR a.units<>b.units OR 'unknown'=ANY(a.units) AS unit_conflict,
+    cardinality(a.units)<>1 OR cardinality(b.units)<>1 OR a.units<>b.units OR 'unknown'=ANY(a.units)
+     OR COALESCE(a.titles<>b.titles,false) AS unit_conflict,
     NOT (a.fresh AND b.fresh) AS stale
    FROM grouped a JOIN grouped b ON b.key=a.key AND b.connection_id=$3
    WHERE a.connection_id=$2 AND NOT (cardinality(a.ids)=1 AND a.ids=b.ids)
@@ -100,7 +105,9 @@ export async function readAutoLinkPreview(
       AND b.resource=a.resource AND b.canonical_id=ANY(p.sources)
      WHERE a.tenant_id=$1 AND a.resource=$5 AND a.canonical_id=ANY(p.targets))
     OR ($5='order' AND EXISTS (SELECT 1 FROM connector_source_mappings m WHERE m.tenant_id=$1
-      AND m.resource='order' AND m.canonical_id=ANY(p.targets||p.sources) AND m.connection_id NOT IN ($2,$3)))
+      AND m.resource='order' AND m.canonical_id=ANY(p.targets||p.sources) AND m.connection_id NOT IN ($2,$3)
+      AND NOT EXISTS (SELECT 1 FROM commerce_auto_link_rules r WHERE r.tenant_id=$1 AND r.kind='order'
+        AND r.enabled AND r.target_connection_id=$2 AND r.source_connection_id=m.connection_id)))
     OR (SELECT count(*) FROM connector_source_mappings m WHERE m.tenant_id=$1 AND m.resource=$5
       AND m.connection_id=$2 AND m.canonical_id=p.target_id)<>1
     OR (SELECT count(*) FROM connector_source_mappings m WHERE m.tenant_id=$1 AND m.resource=$5

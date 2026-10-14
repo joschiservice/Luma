@@ -50,4 +50,16 @@ export async function refreshFulfillmentList(
     WHERE r.tenant_id=$1 AND r.order_id=ANY($2::uuid[])`,
     [tenant, orderIds],
   );
+  await tx.query(
+    `WITH sources AS (
+      SELECT DISTINCT f.order_id,f.kind,f.connection_id,
+       CASE WHEN f.kind='shipment' AND COALESCE(c.document->>'provider',c.document->'target'->>'kind')='starshipit' THEN 0
+        WHEN COALESCE(c.document->>'provider',c.document->'target'->>'kind')='shopify' THEN 1 ELSE 2 END AS priority
+      FROM orders_fulfillment_list f LEFT JOIN connector_installations c ON c.tenant_id=f.tenant_id AND c.id=f.connection_id
+      WHERE f.tenant_id=$1 AND f.order_id=ANY($2::uuid[]) AND NOT f.deleted
+     ), chosen AS (SELECT DISTINCT ON(order_id,kind) * FROM sources ORDER BY order_id,kind,priority,connection_id)
+     UPDATE orders_fulfillment_list f SET selected=COALESCE(f.connection_id=c.connection_id,false)
+     FROM chosen c WHERE f.tenant_id=$1 AND f.order_id=c.order_id AND f.kind=c.kind`,
+    [tenant, orderIds],
+  );
 }

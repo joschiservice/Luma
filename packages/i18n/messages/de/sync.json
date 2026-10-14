@@ -214,7 +214,7 @@
   "sync_links_method_matched": "Beim Import zugeordnet",
   "sync_links_unlink": "Trennen",
   "sync_links_link": "Verknüpfen",
-  "sync_links_suggestions_order": "Möglicherweise dieselbe Bestellung",
+  "sync_links_suggestions_order": "Eindeutige Auftragsreferenzen werden durch aktive Regeln automatisch verknüpft. Prüfe diese übrigen Vorschläge vor dem Verknüpfen.",
   "sync_links_suggestions_sku": "Möglicherweise dieselbe SKU",
   "sync_links_suggestions_location": "Möglicherweise derselbe Lagerort",
   "sync_links_suggestions_ambiguous": "Mehrere Bestellungen haben diese Referenz. Prüfe jeden Datensatz, bevor du einen auswählst.",
@@ -243,7 +243,7 @@
   "sync_autolink_load_failed": "Luma konnte die Regeln für automatisches Verknüpfen nicht laden.",
   "sync_autolink_unavailable_connection": "Nicht verfügbare Verbindung",
   "sync_autolink_title": "Automatisches Verknüpfen",
-  "sync_autolink_description": "Verknüpft übereinstimmende SKUs und Bestellungen zwischen den Verbindungen, die du auswählst. Jede Quelle behält ihre eigenen Daten.",
+  "sync_autolink_description": "Bei einem Shopify-Shop verknüpft Luma eindeutige SKU-Codes und explizite Auftragsreferenzen aus ERP und Versandsystem automatisch. Hier kannst du Treffer prüfen, Konflikte klären oder eine Regel deaktivieren.",
   "sync_autolink_add": "Verknüpfungsregel hinzufügen",
   "sync_autolink_loading": "Verknüpfungsregeln werden geladen…",
   "sync_autolink_kind_sku": "Eindeutiger SKU-Code",
@@ -298,5 +298,8 @@
   "sync_links_unlinking_line": "Positionen werden getrennt. Luma aktualisiert die Bestellung und ihre Fulfillment-Nachweise.",
   "sync_links_link_line_description": "Bestätige, dass diese Quellpositionen denselben Artikel in dieser Bestellung darstellen. Jede Quelle behält ihre Mengen und Versandnachweise. Die Zuordnung kann beeinflussen, ob kontrollierte Änderungen ausgeführt werden dürfen. Luma protokolliert deinen Grund. Du kannst die Verknüpfung später lösen.",
   "sync_links_unlink_line_description": "Diese Quellposition wird wieder zu einem separaten Artikel in derselben Bestellung. Kontrollierte Änderungen können bis zu einer erneuten Zuordnung nicht verfügbar sein. Luma protokolliert die Änderung und deinen Grund.",
-  "sync_links_title_line": "Quellen für {line}"
+  "sync_links_title_line": "Quellen für {line}",
+  "sync_link_coverage_sku": "{linked} von {total} SKU-Datensätzen systemübergreifend verknüpft",
+  "sync_link_coverage_order": "{linked} von {total} Auftragsdatensätzen systemübergreifend verknüpft",
+  "sync_link_coverage_monitoring": "Verknüpfte SKUs ermöglichen Bestandsvergleiche, sobald Lagerorte verknüpft und Quelldaten aktuell sind. Unverknüpfte Datensätze werden nicht verglichen."
 }

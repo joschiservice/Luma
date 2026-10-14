@@ -78,6 +78,8 @@ export function createProcurement(
 
 export { createReplenishmentStore } from './infrastructure/replenishment-store.js';
 
+export { createReplenishmentReviewContext } from './infrastructure/replenishment-review-context.js';
+
 export {
   createProcurementMetricReader,
   createStockRiskReader,

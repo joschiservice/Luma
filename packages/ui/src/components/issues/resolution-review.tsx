@@ -79,7 +79,7 @@ function fieldLabel(value: string) {
  */
 export function ResolutionReview({
   review,
-  progress,
+  progress: recordedProgress,
   connectionLabel,
   disabled = false,
   pending = false,
@@ -94,7 +94,27 @@ export function ResolutionReview({
   checking?: boolean;
   onDecision: (kind: CaseDecision['kind'], reason: string) => void;
 }) {
+  const recordedExecutions =
+    recordedProgress?.workflowRuns?.flatMap((run) =>
+      run.actions.flatMap((action) =>
+        action.execution ? [action.execution] : [],
+      ),
+    ) ?? [];
+  const progress = recordedProgress
+    ? {
+        ...recordedProgress,
+        execution:
+          recordedProgress.execution ??
+          recordedExecutions
+            .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
+            .at(-1) ??
+          null,
+      }
+    : undefined;
   const proposal = review.proposal;
+  const workflowRecorded = progress?.workflowRuns?.some(
+    (run) => run.actions.length > 0,
+  );
   const canClose = review.permittedDecisions.includes('close');
   const decisions = review.permittedDecisions.filter(
     (kind): kind is DecisionKind =>
@@ -117,7 +137,11 @@ export function ResolutionReview({
         ) : null}
         <h3>
           <ClipboardCheck size={16} aria-hidden="true" />{' '}
-          {proposal ? m.issues_review_title() : m.issues_review_none_title()}
+          {proposal
+            ? m.issues_review_title()
+            : workflowRecorded
+              ? m.issues_workflow_history()
+              : m.issues_review_none_title()}
         </h3>
         {proposal ? (
           <>
@@ -265,19 +289,25 @@ export function ResolutionReview({
         ) : (
           <>
             <p>
-              {progress?.resolution
-                ? m.issues_review_none_closed()
-                : review.permittedDecisions.includes('escalate')
-                  ? m.issues_review_none_escalate()
-                  : m.issues_review_none_investigation()}
+              {workflowRecorded
+                ? m.issues_review_workflow_recorded()
+                : progress?.resolution
+                  ? m.issues_review_none_closed()
+                  : review.permittedDecisions.includes('escalate')
+                    ? m.issues_review_none_escalate()
+                    : m.issues_review_none_investigation()}
             </p>
             {navigate ? (
               <Button
                 className="resolution-next-step"
                 variant="outline"
-                onClick={() => navigate('overview')}
+                onClick={() =>
+                  navigate(workflowRecorded ? 'execution' : 'overview')
+                }
               >
-                {m.issues_review_view_next_step()}
+                {workflowRecorded
+                  ? m.issues_review_view_progress()
+                  : m.issues_review_view_next_step()}
               </Button>
             ) : null}
           </>
@@ -367,7 +397,8 @@ export function ResolutionReview({
                   })}
                 </p>
               ) : null}
-              {progress.workflow.availability === 'unavailable' ? (
+              {!workflowRecorded &&
+              progress.workflow.availability === 'unavailable' ? (
                 <CaseNotice
                   title={m.issues_review_workflow_unavailable_title()}
                 >

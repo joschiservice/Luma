@@ -446,6 +446,9 @@ export function WorkspaceSearch({
                 <strong>{record.label}</strong>
                 <span>
                   {recordKinds[record.kind]()} · {record.description}
+                  {record.sources.length
+                    ? ` · ${[...new Set(record.sources.map((source) => source.label))].join(' · ')}`
+                    : ''}
                 </span>
               </span>
               <CornerDownLeft

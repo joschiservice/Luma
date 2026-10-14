@@ -316,5 +316,8 @@
   "shopify_publishing_new": "Review another shipment",
   "shopify_publishing_read_at": "Downstream dispatch read at {time}",
   "shopify_publishing_notification_unknown": "Whether Shopify accepted the customer notification is unknown. Notification delivery is not verified.",
-  "shopify_publishing_state_ready": "This exact shipment is approved and ready for the requester to publish."
+  "shopify_publishing_state_ready": "This exact shipment is approved and ready for the requester to publish.",
+  "shopify_stock_product_unknown": "Product name not reported",
+  "shopify_stock_product_sku": "SKU {sku}",
+  "shopify_stock_sku_unknown": "SKU not reported"
 }

@@ -302,6 +302,12 @@ const orderLineSchema = z.object({
 });
 
 const orderSourceFactsSchema = orderSourceSchema.extend({
+  lineCoverage: z
+    .enum(['complete', 'partial'])
+    .optional()
+    .describe(
+      'Partial shipping views only report matched items. Missing lines stay unreported rather than establishing zero ordered units.',
+    ),
   appId: z.string().nullable(),
   mappingMethod: z.string().nullable(),
   displayNumber: z.string().nullable(),

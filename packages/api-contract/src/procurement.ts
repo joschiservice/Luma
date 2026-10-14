@@ -507,6 +507,13 @@ const orderProgressSchema = z.object({
 });
 
 export const purchaseOrderRecordSchema = z.object({
+  value: z
+    .union([
+      z.object({ amount: z.string(), currency: z.string() }),
+      z.literal('unknown'),
+    ])
+    .nullable()
+    .optional(),
   timeline: purchasingTimelineSchema,
   order: purchaseOrderSchema,
   supplier: supplierSchema.nullable(),

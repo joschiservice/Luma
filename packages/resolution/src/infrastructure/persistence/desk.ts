@@ -21,6 +21,10 @@ import type {
 import type { ActivityActor } from '../../domain/activity.js';
 import { approvalBlocksRenewal } from '../../domain/proposal-renewal.js';
 import { actorSql, personSql, readPeople } from './actors.js';
+import {
+  caseWorkflowProposals,
+  readCaseWorkflowHistory,
+} from './case-workflow-history.js';
 
 const snapshotSql = `SELECT e.document AS incident,e.version AS revision,d.document AS diagnosis,
  (SELECT jsonb_build_object('action',p.document,'actionHash',p.action_hash,'version',p.version,'diagnosisRevision',p.diagnosis_revision)) AS proposal,
@@ -45,6 +49,7 @@ async function load(tx: SqlTransaction, tenantId: string, id: string) {
   ).rows[0];
   if (!row) throw new IdentityError(404, 'NOT_FOUND', 'Case not found');
   if (!row.proposal?.action) row.proposal = null;
+  Object.assign(row, await readCaseWorkflowHistory(tx, tenantId, id));
   const policy = (
     await tx.query<{
       revision: number;
@@ -402,7 +407,7 @@ export function createDeskStore(
           actor: ActivityActor;
         }>(
           `
-        WITH proposals AS (SELECT id FROM case_proposals WHERE tenant_id=$1 AND exception_id=$2),
+        WITH proposals AS (SELECT id FROM case_proposals WHERE tenant_id=$1 AND exception_id=$2 UNION ${caseWorkflowProposals}),
         events AS (
           SELECT 0 AS priority,id,created_at,document AS doc FROM audit_entries WHERE tenant_id=$1 AND (proposal_id IN (SELECT id FROM proposals) OR proposal_id=$2)
           UNION ALL SELECT 1,id,created_at,document FROM execution_outbox WHERE tenant_id=$1 AND proposal_id IN (SELECT id FROM proposals)

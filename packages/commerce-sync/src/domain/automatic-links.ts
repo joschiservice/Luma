@@ -93,3 +93,43 @@ export function autoLinkEvidence(rule: AutoLinkRule, key: string) {
       ),
   };
 }
+
+/** Chooses defaults only when one store identifies the marketplace; multiple stores need an explicit pair. */
+export function defaultAutoLinkPairs(
+  connections: {
+    id: string;
+    provider: string;
+    status: string;
+    granted: string[];
+  }[],
+): AutoLinkPair[] {
+  const stores = connections.filter(
+    (connection) =>
+      connection.provider === 'shopify' && connection.status === 'active',
+  );
+  if (stores.length !== 1) return [];
+  const store = stores[0]!;
+
+  return connections.flatMap((source): AutoLinkPair[] => {
+    if (source.status !== 'active' || source.id === store.id) return [];
+    const kinds: AutoLinkPair['kind'][] = [];
+    if (
+      ['jtl', 'cin7'].includes(source.provider) &&
+      store.granted.includes('products.read') &&
+      source.granted.includes('products.read')
+    )
+      kinds.push('sku');
+    if (
+      ['jtl', 'cin7', 'starshipit'].includes(source.provider) &&
+      store.granted.includes('orders.read') &&
+      source.granted.includes('orders.read')
+    )
+      kinds.push('order');
+
+    return kinds.map((kind) => ({
+      kind,
+      targetConnectionId: store.id,
+      sourceConnectionId: source.id,
+    }));
+  });
+}

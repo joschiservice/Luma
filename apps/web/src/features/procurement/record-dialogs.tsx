@@ -23,6 +23,7 @@ import { quantityWithUnit } from '@luma/ui/lib/units';
 import { useQuery } from '@tanstack/react-query';
 import { useContext, useState } from 'react';
 
+import { formatMoney } from '../../shared/orders/presentation';
 import {
   linkSupplier,
   procurementError,
@@ -193,9 +194,20 @@ export function SubmitDialog({
                     {line.description}
                   </span>
                   <code>{line.sku}</code>
+                  <span>
+                    {m.workflows_review_unit_cost()}:{' '}
+                    {formatMoney(line.unitPrice ?? null) ??
+                      m.workflows_review_not_reported()}
+                  </span>
                 </li>
               ))}
             </ul>
+            <p>
+              {m.workflows_review_total_value()}:{' '}
+              {record.value && record.value !== 'unknown'
+                ? formatMoney(record.value)
+                : m.workflows_review_not_reported()}
+            </p>
             <p>
               {system
                 ? m.procurement_submit_prices({ system })

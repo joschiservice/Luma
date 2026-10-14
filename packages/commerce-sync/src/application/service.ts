@@ -175,6 +175,10 @@ export function createSyncService(deps: SyncServiceDependencies) {
     );
 
     return {
+      linkCoverage: await deps.store.linkCoverage(
+        fresh.tenantId,
+        policy.hidden,
+      ),
       connections: connections
         .filter((connection) => !policy.hidden.includes(connection.id))
         .filter((connection) => {

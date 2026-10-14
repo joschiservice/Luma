@@ -170,8 +170,7 @@ withhold an existing change plan without changing any provider quantities.
 
 Comparisons use explicitly shared canonical line IDs, or a mapped SKU that occurs once
 per source. A source that reports a shared line under its own ID, such as an ERP import of
-an order a Luma record copied, matches that line by SKU when the SKU occurs once in every
-source and on no other shared line; otherwise its line stays unmatched. Repeated SKU lines
+an order a Luma record copied, matches that line by SKU when known identities on the shared line agree, the SKU occurs at most once per source and on no other shared line; otherwise its line stays unmatched. Complete sources holding the shared line must report its SKU; partial shipping views may omit it. Repeated SKU lines
 without line mappings are inconclusive; quantities are never summed to guess line identity. Ordered, current, cancelled, fulfilled and remaining units,
 unit, fulfillment state and mapped location allocations are compared independently. A
 missing line in a complete order report has zero current units. Other missing facts stay
@@ -182,6 +181,10 @@ work, labels and tracking alone do not establish dispatch. Only shipped, deliver
 completed shipment records contribute. Split shipments retain their location allocations;
 mirrors in another source are compared, never added. Shipped units above known current
 units produce overfulfillment evidence, including for a single source.
+
+Shipping order views are partial line reports. Unmatched items do not block comparisons between commercial sources, and a missing item never establishes zero ordered units. Explicitly matched shipping items contribute their known quantities and retain unknown-fulfillment checks. A partial view may omit SKU identity from an explicitly shared line; known SKU identities must still agree and be unique before another source matches that line by SKU.
+
+Change plans keep unmatched shipping quantities unknown. Started, shipped or uncertain work on an unmatched shipping item still requires a dispatch check before a line change; incomplete reads and stale evidence retain their existing safety fences.
 
 The default propagation window is 15 minutes from the last observed business-state change.
 Identical polls retain that change time. A difference stays pending until every contributing

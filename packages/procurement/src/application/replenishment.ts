@@ -2,6 +2,7 @@ import type { TenantContext } from '@luma/identity';
 import type { ReplenishmentPositionQuery } from '@luma/workflows';
 
 import type { ReplenishmentRule } from '../domain/replenishment.js';
+import type { ReplenishmentApprovalContext } from '../domain/replenishment-review-context.js';
 
 export interface ReplenishmentActivation extends ReplenishmentRule {
   principalId: string;
@@ -29,6 +30,12 @@ export interface ReplenishmentStock {
 
 /** Stores immutable grants and serializes overlapping replenishment actions. */
 export interface ReplenishmentStore {
+  /** Reads frozen approval facts; with an input, inserts once and returns the original on retry. */
+  reviewContext(
+    context: TenantContext,
+    runId: string,
+    input?: ReplenishmentApprovalContext,
+  ): Promise<ReplenishmentApprovalContext | null>;
   /** Checks whether any non-deleted stock has been projected without loading stock records. */
   hasStock(context: TenantContext): Promise<boolean>;
   /** Reads only the named positions. Omit a connection to read every source of that position. Empty scopes read nothing. */

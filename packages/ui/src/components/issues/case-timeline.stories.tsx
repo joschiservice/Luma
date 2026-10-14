@@ -544,7 +544,7 @@ export const PageAuditHistory: Story = {
       proposalId: null,
       outcome: null,
       evidenceRefs: [],
-    })),
+    })).reverse(),
   },
   decorators: [
     (Story) => (
@@ -559,6 +559,7 @@ export const PageAuditHistory: Story = {
     const events = history.getAllByRole('listitem');
     await expect(events).toHaveLength(3);
     const newest = within(events[0]!);
+    await expect(newest.getByText('Issue observed again')).toBeVisible();
     await expect(newest.getByText(/^24 Sept? 2026 06:50$/)).toBeVisible();
     await expect(newest.getByText('By Luma')).toBeVisible();
     await expect(newest.getByText('Luma', { exact: true })).not.toBeVisible();
@@ -576,10 +577,117 @@ export const PageAuditHistory: Story = {
         'Issue detected',
         { selector: 'strong' },
       ),
-    ).toHaveLength(4);
+    ).toHaveLength(1);
     await userEvent.click(
       canvas.getByRole('button', { name: 'Back to issue' }),
     );
     await expect(newest.getByText('2026-09-24T06:50:03.123Z')).toBeVisible();
+  },
+};
+
+export const PageWorkflowVerified: Story = {
+  args: {
+    expanded: true,
+    review: { ...review, proposal: null, permittedDecisions: [] },
+    progress: {
+      ...progress,
+      state: 'resolved',
+      execution: null,
+      resolution: {
+        kind: 'verification',
+        at,
+        actorId: operator.id!,
+        evidenceRefs: ['stock-after'],
+      },
+      workflowRuns: [
+        {
+          id,
+          definitionId: 'shopify-stock-correction',
+          name: 'Correct Shopify stock from the ERP',
+          version: '1.0.0',
+          truncated: false,
+          steps: [
+            {
+              stepId: 'check-stock',
+              kind: 'verification',
+              state: 'completed',
+              recordedAt: at,
+              observedAt: at,
+              evidenceRefs: ['stock-after'],
+            },
+          ],
+          actions: [
+            {
+              proposalId: id,
+              capability: 'inventory.available.reconcile',
+              diff: {
+                schemaVersion: 1,
+                capability: 'inventory.available.reconcile',
+                records: [
+                  {
+                    system: 'provider',
+                    connectionId: id,
+                    kind: 'inventory_item',
+                    id: 'item-1',
+                    changes: [
+                      {
+                        field: 'available',
+                        before: 15,
+                        beforeKnown: true,
+                        after: 12,
+                        afterKnown: true,
+                        expected: 15,
+                        expectedKnown: true,
+                      },
+                    ],
+                  },
+                ],
+                scope: [{ kind: 'inventory_item', count: 1, ids: ['item-1'] }],
+                reversibility: 'compensatable',
+                evidence: {
+                  refs: ['stock-before'],
+                  observedAt: at,
+                  validUntil: at,
+                },
+                retryProtection: 'immutable_intent_reconcile_before_retry',
+                canonicalOutcome: 'requires_fresh_verification',
+              },
+              approval: {
+                actorId: operator.id!,
+                outcome: 'approved',
+                createdAt: at,
+              },
+              execution: {
+                ...execution,
+                verification: {
+                  outcome: 'passed',
+                  observationRefs: ['stock-after'],
+                  observedAt: at,
+                  evaluatorVersion: 'stock-v1',
+                },
+              },
+            },
+          ],
+        },
+      ],
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole('heading', { name: 'Resolved and confirmed' }),
+    ).toBeVisible();
+    await expect(
+      canvas.queryByText('Luma hasn’t sent a change for this issue.'),
+    ).not.toBeInTheDocument();
+    await expect(canvas.getByText(/^Approved by Mia Keller/)).toBeVisible();
+    await expect(
+      canvas.queryByText(
+        'The expected outcome isn’t available for this attempt.',
+      ),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.getByRole('heading', { name: 'Workflow changes and checks' }),
+    ).toBeVisible();
   },
 };

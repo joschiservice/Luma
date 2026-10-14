@@ -41,6 +41,9 @@ export function createReplenishmentRuntime(deps: {
   transport?: ReplenishmentTransport;
   enabled: boolean;
   refreshStock?: (context: TenantContext, positionId: string) => Promise<void>;
+  reviewContext?: NonNullable<
+    Parameters<typeof createReplenishmentService>[0]['reviewContext']
+  >;
 }) {
   const version = compileProcessWorkflow(replenishmentSource);
   const store = createReplenishmentStore(deps.db);

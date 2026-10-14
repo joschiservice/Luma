@@ -90,8 +90,10 @@ export async function quantityChangeFixture(t, options = {}) {
   )?.lines[0]?.comparisonKey;
   assert.ok(
     lineKey &&
-      detail.sources.every(
-        (source) => source.lines[0]?.comparisonKey === lineKey,
+      Object.values(connections).every(
+        (connectionId) =>
+          detail.sources.find((source) => source.connectionId === connectionId)
+            ?.lines[0]?.comparisonKey === lineKey,
       ),
     'the line is matched across Luma ERP, Shopify and JTL',
   );

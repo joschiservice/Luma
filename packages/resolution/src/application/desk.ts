@@ -10,6 +10,7 @@ import {
 } from '@luma/identity';
 import type { Approval, PolicyDecision, ProposedAction } from '@luma/policies';
 import { currentPolicyVersion } from '@luma/policies';
+import type { ProcessStepOutput } from '@luma/workflows';
 
 import type { ActivityActor } from '../domain/activity.js';
 import { approvalBlocksRenewal } from '../domain/proposal-renewal.js';
@@ -35,6 +36,21 @@ export interface DeskSnapshot {
   decision: PolicyDecision | null;
   approval: Approval | null;
   execution: ExecutionRecord | null;
+  /** Recorded workflow work stays distinct from proposals the case desk may authorize. */
+  workflowRuns?: {
+    id: string;
+    definitionId: string;
+    name: string;
+    version: string;
+    steps: ProcessStepOutput[];
+    actions: {
+      action: ProposedAction;
+      approval: Approval | null;
+      execution: ExecutionRecord | null;
+    }[];
+    truncated: boolean;
+  }[];
+  workflowRunsTruncated?: boolean;
 }
 
 export interface CaseDecision {
@@ -167,6 +183,33 @@ function conflict(
   message = 'The case changed. Refresh before deciding.',
 ): never {
   throw new IdentityError(409, 'CONFLICT', message);
+}
+
+/** Exposes persisted dispatch and independent verification without treating acceptance as resolution. */
+function executionView(e: ExecutionRecord | null) {
+  return e
+    ? {
+        id: e.id,
+        proposalId: e.proposalId,
+        state: e.state,
+        attemptId: e.attempt.id,
+        attempt: e.attempt.number,
+        requestedBy: e.attempt.requestedBy,
+        executor: { kind: e.attempt.executor.kind, id: e.attempt.executor.id },
+        startedAt: e.attempt.startedAt,
+        finishedAt: e.attempt.finishedAt ?? null,
+        effectEvidenceRefs: (e.attempt.effectEvidenceRefs ?? []).slice(0, 100),
+        verification: e.attempt.verification
+          ? {
+              ...e.attempt.verification,
+              observationRefs: e.attempt.verification.observationRefs.slice(
+                0,
+                100,
+              ),
+            }
+          : null,
+      }
+    : null;
 }
 
 /**
@@ -538,10 +581,49 @@ export function createDeskService(deps: DeskDependencies) {
 
           return {
             schemaVersion: 1 as const,
-            people: await people([
-              e?.attempt.requestedBy,
-              s.incident.resolution?.actorId,
-            ]),
+            people: (
+              await people([
+                e?.attempt.requestedBy,
+                s.incident.resolution?.actorId,
+                ...(s.workflowRuns ?? []).flatMap((run) =>
+                  run.actions.flatMap((action) => [
+                    action.approval?.approverId,
+                    action.execution?.attempt.requestedBy,
+                  ]),
+                ),
+              ])
+            ).slice(0, 100),
+            workflowRuns: (s.workflowRuns ?? []).map((run) => ({
+              id: run.id,
+              definitionId: run.definitionId,
+              name: run.name,
+              version: run.version,
+              truncated: run.truncated,
+              steps: run.steps.map((step) => ({
+                stepId: step.stepId,
+                kind: step.kind,
+                state: step.state,
+                recordedAt: step.recordedAt,
+                observedAt: step.observedAt ?? null,
+                evidenceRefs: step.evidenceRefs.slice(0, 100),
+              })),
+              actions: run.actions
+                .slice(0, 100)
+                .map(({ action, approval, execution }) => ({
+                  proposalId: action.id,
+                  capability: action.capability,
+                  diff: describeActionDiff(action),
+                  approval: approval
+                    ? {
+                        actorId: approval.approverId,
+                        outcome: approval.outcome,
+                        createdAt: approval.createdAt,
+                      }
+                    : null,
+                  execution: executionView(execution),
+                })),
+            })),
+            workflowRunsTruncated: s.workflowRunsTruncated ?? false,
             caseRevision: s.revision,
             state: s.incident.state,
             diagnosisRevision: s.diagnosis?.revision ?? 0,

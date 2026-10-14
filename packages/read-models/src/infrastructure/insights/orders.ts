@@ -39,6 +39,8 @@ const rows = `${bucketRelation(4, 5, 6)}, rows AS (
   o.placed_at,o.connection_id,o.snapshot_id,o.display_number,o.status,o.fulfillment
  FROM orders_list o JOIN buckets b ON o.placed_at>=b.from_at AND o.placed_at<b.before_at
  WHERE o.tenant_id=$1 AND (CASE WHEN $3::uuid IS NULL THEN o.selected ELSE o.connection_id=$3 END)
+  AND NOT EXISTS (SELECT 1 FROM connector_installations c WHERE c.tenant_id=$1 AND c.id=$3
+   AND COALESCE(c.document->>'provider',c.document->'target'->>'kind')='starshipit')
   AND o.placed_at>=$7 AND o.placed_at<$8 AND $2::timestamptz IS NOT NULL
 )`;
 
@@ -95,7 +97,9 @@ export async function orderChart(
   );
   const undated = await tx.query<{ count: number }>(
     `SELECT count(*)::int AS count FROM orders_list o WHERE o.tenant_id=$1 AND o.placed_at IS NULL
-     AND (CASE WHEN $2::uuid IS NULL THEN o.selected ELSE o.connection_id=$2 END)`,
+     AND (CASE WHEN $2::uuid IS NULL THEN o.selected ELSE o.connection_id=$2 END)
+     AND NOT EXISTS (SELECT 1 FROM connector_installations c WHERE c.tenant_id=$1 AND c.id=$2
+      AND COALESCE(c.document->>'provider',c.document->'target'->>'kind')='starshipit')`,
     [tenantId, query.connectionId ?? null],
   );
   const sources = insightSources(

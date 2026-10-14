@@ -14,6 +14,7 @@ import { setupSimulator } from './simulator-fixture.mjs';
 export async function replenishmentFixture(
   t,
   origin = 'http://127.0.0.1:3000',
+  options = {},
 ) {
   const temporal = await TestWorkflowEnvironment.createLocal();
   t.onTestFinished(() => temporal.teardown());
@@ -23,7 +24,7 @@ export async function replenishmentFixture(
     taskQueue: randomUUID(),
     dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
   };
-  const f = await setupSimulator(t, { temporal: settings, origin });
+  const f = await setupSimulator(t, { temporal: settings, origin, ...options });
   await f.pilot.observe();
   const root = `/v1/organizations/${f.manifest.organizationId}/workflows/inventory-replenishment`;
   const login = async (email) => {

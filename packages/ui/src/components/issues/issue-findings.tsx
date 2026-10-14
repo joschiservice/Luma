@@ -172,6 +172,8 @@ export function IssueFindings({
   unconfirmed?: boolean;
 }) {
   const diagnosis = item.diagnosis;
+  if (item.state === 'resolved' && !diagnosis?.facts.length)
+    return <p>{m.issues_findings_outcome_recorded()}</p>;
   if (!diagnosis) return <p>{m.issues_findings_none()}</p>;
   const quantities = diagnosis.facts.find(
     (fact) => fact.code === 'reported_availability',

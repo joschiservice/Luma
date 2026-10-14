@@ -4,8 +4,8 @@ import { until } from './helpers.mjs';
 import { setupSimulator } from './simulator-fixture.mjs';
 
 /**
- * Imports fixture order 1 from Shopify and its JTL import and links the two source orders as an
- * operator would, through `api`, an operator request helper for the workspace. Returns the
+ * Imports fixture order 1 from Shopify and JTL and waits for its automatic reference link.
+ * `api` is an operator request helper for the workspace. Returns the
  * canonical order, its line's comparison key and the order detail.
  */
 export async function linkFixtureOrder(f, api) {
@@ -26,31 +26,17 @@ export async function linkFixtureOrder(f, api) {
   const shop = await mapped(shopify, 'gid://shopify/Order/1');
   const erp = await mapped(jtl, '1');
   assert.ok(shop && erp, 'both source orders were imported');
-  const request = await api(
-    '/identities/links',
-    {
-      method: 'POST',
-      payload: {
-        operation: 'link',
-        kind: 'order',
-        entityId: shop,
-        otherId: erp,
-        reason: 'The JTL order carries the shop order number',
-      },
-    },
-    202,
-  );
-  await until(
-    async () => {
-      await f.pilot.observe({ refresh: false, check: false });
+  if (shop !== erp) {
+    await until(
+      async () => {
+        await f.pilot.observe({ refresh: false, check: false });
 
-      return (
-        (await api(`/identities/links/${request.id}`)).state === 'completed'
-      );
-    },
-    'the order link was applied',
-    30_000,
-  );
+        return (await mapped(jtl, '1')) === shop;
+      },
+      'the exact order references link automatically',
+      30_000,
+    );
+  }
   await f.pilot.observe({ check: false });
   const detail = await api(`/orders/${shop}`);
   const lineKey = detail.sources.find(

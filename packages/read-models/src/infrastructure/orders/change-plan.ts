@@ -180,6 +180,7 @@ export async function readChangePlan(
 
     return {
       connectionId: source.connectionId,
+      ...(source.lineCoverage ? { lineCoverage: source.lineCoverage } : {}),
       deleted: source.deleted,
       observedAt: source.observedAt,
       status: source.status,

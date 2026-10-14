@@ -38,7 +38,7 @@ export { fulfillmentDirection } from './collection-fields.js';
 
 // Search matches order numbers, tracking numbers, location names and source order or
 // fulfillment IDs literally.
-const filters = `($4::uuid IS NULL OR f.connection_id=$4) AND ($5::uuid IS NULL OR f.location_id=$5)
+const filters = `(CASE WHEN $4::uuid IS NULL THEN f.selected ELSE f.connection_id=$4 END) AND ($5::uuid IS NULL OR f.location_id=$5)
  AND ($6::text IS NULL OR f.kind=$6) AND ($7='' OR f.order_number ILIKE $8 OR f.location_name ILIKE $8
   OR EXISTS (SELECT 1 FROM unnest(f.tracking_numbers) t WHERE t ILIKE $8)
   OR f.entity_id IN (SELECT m.canonical_id FROM connector_source_mappings m WHERE m.tenant_id=$1

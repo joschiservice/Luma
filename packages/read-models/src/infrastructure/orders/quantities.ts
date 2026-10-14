@@ -239,6 +239,7 @@ export function createOrderQuantities(
                       ? currentUnits(found[0]!)
                       : // A complete report without the line has none of it, as comparisons treat it.
                         !found.length &&
+                          source.lineCoverage !== 'partial' &&
                           source.lines.every((line) => line.comparisonKey)
                         ? '0'
                         : null,

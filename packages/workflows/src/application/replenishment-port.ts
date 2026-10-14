@@ -9,6 +9,32 @@ import type { presentProcessVersion } from '../domain/process-presentation.js';
 import type { WorkflowReadiness } from '../domain/readiness.js';
 import type { presentTriggerRun } from './trigger-presentation.js';
 
+/**
+ * Commercial facts frozen with the governed proposal; null fields are unavailable, never zero.
+ * @public Declaration emit names this context in the inferred type of `createWorkflows`.
+ */
+export interface ReplenishmentApprovalContext {
+  productTitle: string | null;
+  unitPrice: { amount: string; currency: string } | null;
+  totalValue: { amount: string; currency: string } | null;
+  leadTimeDays: number | null;
+  dailySales: number | null;
+  demandPeriodDays: number;
+  coverBeforeDays: number | null;
+  coverAfterDays: number | null;
+  openOrders: {
+    id: string;
+    reference: string;
+    quantity: number;
+    status: string;
+  }[];
+  termsSource: string | null;
+  termsObservedAt: string | null;
+  demandObservedAt: string | null;
+  recordedAt: string;
+  unavailable: string[];
+}
+
 export type WorkflowActivationView = Omit<
   PlaybookActivationView,
   'tenantId' | 'definitionId'
@@ -210,6 +236,7 @@ export interface ReplenishmentWorkflow {
     runId: string,
   ): Promise<{
     runId: string;
+    context?: ReplenishmentApprovalContext | null;
     supplierId: string;
     stock: {
       available: number | null;

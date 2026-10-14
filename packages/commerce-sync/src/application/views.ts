@@ -91,6 +91,7 @@ export interface SyncOverview {
   runs: SyncRunView[];
   canManage: boolean;
   asOf: string;
+  linkCoverage?: Record<'sku' | 'order', { total: number; linked: number }>;
 }
 
 export interface IdentitySource {

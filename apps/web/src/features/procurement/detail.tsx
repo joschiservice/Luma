@@ -43,6 +43,7 @@ import { type ReactNode, useRef, useState, useSyncExternalStore } from 'react';
 import { SignInRedirect } from '../../kit/identity/common';
 import { IdentityError } from '../../kit/identity/data';
 import { RecordMessages } from '../../kit/record-messages';
+import { formatMoney } from '../../shared/orders/presentation';
 import { RecordFields } from '../adaptive/record-fields';
 import { stockQuantity } from '../inventory/presentation';
 import { WorkflowCoverageCard } from '../workflows/coverage';
@@ -851,6 +852,16 @@ function Lines({
             ),
           },
           {
+            key: 'unit_cost',
+            header: m.workflows_review_unit_cost(),
+            numeric: true,
+            cell: ({ line }) =>
+              formatMoney(
+                record.order.lines.find((item) => item.id === line.lineId)
+                  ?.unitPrice ?? null,
+              ) ?? m.workflows_review_not_reported(),
+          },
+          {
             key: 'ordered',
             header: m.procurement_lines_ordered(),
             numeric: true,
@@ -1040,6 +1051,12 @@ function Lines({
         ]}
       />
       <p className="procurement-note">{m.procurement_lines_note()}</p>
+      <p>
+        {m.workflows_review_total_value()}:{' '}
+        {record.value && record.value !== 'unknown'
+          ? formatMoney(record.value)
+          : m.workflows_review_not_reported()}
+      </p>
     </section>
   );
 }

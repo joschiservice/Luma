@@ -142,6 +142,35 @@ const steps = (value: ReturnType<typeof plan>) =>
   ]);
 
 describe('order change plans', () => {
+  it('keeps partial shipping quantities unknown and fences started work on their unmatched items', () => {
+    const shipping = source('shipping', {
+      lineCoverage: 'partial',
+      lines: [{ ...source('shipping').lines[0]!, skuId: null }],
+      fulfillments: [work('shipping', 'pending')],
+    });
+    const sources = [source(store), source(erp), shipping];
+    const pending = plan({ sources });
+    expect(pending.safety.state).toBe('safe');
+    expect(
+      pending.acknowledgements.find((item) => item.connectionId === 'shipping'),
+    ).toMatchObject({ state: 'unknown', value: null });
+    for (const status of ['processing', 'unknown', 'shipped']) {
+      const started = plan({
+        sources: [
+          source(store),
+          source(erp),
+          { ...shipping, fulfillments: [work('shipping', status)] },
+        ],
+      });
+      expect(started.safety.state).not.toBe('safe');
+      expect(codes(started)).toContain('unknown_progress');
+      expect(
+        started.steps
+          .filter((step) => step.performer === 'luma')
+          .every((step) => !step.executable),
+      ).toBe(true);
+    }
+  });
   it('offers only authoritative downstream copies through the shipping update capability', () => {
     const shipping = source(
       'shipping',

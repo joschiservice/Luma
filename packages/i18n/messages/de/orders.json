@@ -1,5 +1,6 @@
 {
   "orders_page_title": "Bestellungen",
+  "orders_lines_shipping_view": "Versandansicht. Diese Artikel können nur einen Teil der Bestellung abdecken. Fehlende Artikel werden nicht als null bestellte Einheiten gemeldet.",
   "orders_view_all": "Alle Bestellungen",
   "orders_view_outstanding": "Ausstehend",
   "orders_view_overdue": "Überfällig",

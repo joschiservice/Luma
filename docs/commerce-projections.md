@@ -4,7 +4,7 @@ Commerce ingestion turns validated provider observations into immutable, per-sou
 canonical snapshots of orders, fulfillments, returns, refunds, products and stock
 positions. Every snapshot points to the stored observation it came from, and equivalence
 between source records is established only by explicit, evidenced mappings. These are
-per-source projections, not an authority selection: display consumers choose a source, while the shared Connections authority reader
+per-source projections, not an authority selection: display consumers choose a commercial source over shipping-only order views, while the shared Connections authority reader
 resolves workspace authority for compared order and inventory fact groups.
 
 Code: `@luma/commerce-ingestion`, with the `@luma/orders` and `@luma/inventory` owners,

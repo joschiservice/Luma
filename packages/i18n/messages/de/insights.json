@@ -29,7 +29,7 @@
 
   "insights_fulfillment_title": "Fulfillment-Rückstand",
   "insights_fulfillment_description": "Offene Fulfillment-Aufträge nach der Zeit seit dem letzten gemeldeten Fortschritt in der Quelle. Jeder Auftrag zählt unter dem ersten zutreffenden Signal: angehalten, Fulfill-by-Datum überschritten oder 48 Stunden ohne Fortschritt.",
-  "insights_fulfillment_limit": "Zeigt nur den heutigen Rückstand. Frühere Rückstände hat Luma nicht erfasst. Aufträge, die zwei Systeme melden, zählen in jedem System einmal.",
+  "insights_fulfillment_limit": "Zeigt den heutigen Rückstand aus einer Quellsicht pro verknüpftem Auftrag und Arbeitsart. Teillieferungen bleiben getrennt. Wähle eine Quelle, um ihre Datensätze zu prüfen.",
   "insights_fulfillment_amount": "{count, plural, one {{value} offener Fulfillment-Auftrag} other {{value} offene Fulfillment-Aufträge}}",
   "insights_fulfillment_records": "Offene Fulfillment-Aufträge",
   "insights_fulfillment_unavailable_title": "Noch keine Quelle meldet Fulfillment",

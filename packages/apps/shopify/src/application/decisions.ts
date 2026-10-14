@@ -257,9 +257,11 @@ export function correctionDecision(
     observeOnly: view.observeOnly ?? false,
     kind: 'inventory_correction',
     domain: 'inventory',
-    title: `Correct Shopify stock at ${before.locationName}`,
+    title: `Set Shopify stock for ${before.product?.title ?? 'Product not reported'} (${before.product?.sku ?? 'SKU not reported'}) at ${before.locationName} to ${units(set)}${delta === null ? '' : ` (${delta > 0 ? '+' : ''}${units(delta)})`}`,
     ...state,
     change: [
+      { label: 'Product', value: before.product?.title ?? 'Not reported' },
+      { label: 'SKU', value: before.product?.sku ?? 'Not reported' },
       { label: 'Location', value: before.locationName },
       {
         label: 'Shopify now',
@@ -285,7 +287,7 @@ export function correctionDecision(
     requesterId: view.requesterId,
     evidence: { observedAt: observed, validUntil: view.expiresAt },
     subject: {
-      label: `Shopify stock at ${before.locationName}`,
+      label: `${before.product?.title ?? 'Product not reported'} (${before.product?.sku ?? 'SKU not reported'})`,
       detail: `Authority: ${before.source.label}`,
     },
     record: { kind: 'position', id: target.positionId },

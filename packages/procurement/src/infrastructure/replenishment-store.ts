@@ -8,6 +8,7 @@ import type {
   ReplenishmentStock,
   ReplenishmentStore,
 } from '../application/replenishment.js';
+import type { ReplenishmentApprovalContext } from '../domain/replenishment-review-context.js';
 
 type StockRow = {
   position_id: string;
@@ -53,6 +54,22 @@ export function createReplenishmentStore(
   db: TenantDatabase,
 ): ReplenishmentStore {
   return {
+    reviewContext: (context, runId, input) =>
+      db.transaction(context.tenantId, async (tx) => {
+        if (input)
+          await tx.query(
+            `INSERT INTO replenishment_approval_contexts(tenant_id,run_id,document) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`,
+            [context.tenantId, runId, input],
+          );
+        const row = (
+          await tx.query<{ document: ReplenishmentApprovalContext }>(
+            'SELECT document FROM replenishment_approval_contexts WHERE tenant_id=$1 AND run_id=$2',
+            [context.tenantId, runId],
+          )
+        ).rows[0];
+
+        return row ? row.document : null;
+      }),
     async hasStock(context) {
       return db.transaction(context.tenantId, async (tx) => {
         const result = await tx.query<{ present: boolean }>(

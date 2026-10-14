@@ -66,6 +66,7 @@ test('confirms source order and line identities, reviews the exact shipping corr
   resources: t,
 }) => {
   const f = await browserFixture(t);
+  await f.separateShippingOrder();
   await f.setAuthority();
   const page = await f.page();
   const orderUrl = `/app/${f.tenantId}/orders/${f.shop}`;

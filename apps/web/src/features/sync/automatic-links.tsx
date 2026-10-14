@@ -3,6 +3,7 @@ import type {
   AutoLinkRule,
   SyncConnectionView,
 } from '@luma/api-contract';
+import { formatNumber } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { rich } from '@luma/i18n/rich';
 import { Alert } from '@luma/ui/components/primitives/alert';
@@ -41,10 +42,13 @@ export function AutomaticLinks({
   organizationId,
   connections,
   canManage,
+  coverage,
 }: {
   organizationId: string;
   connections: SyncConnectionView[];
   canManage: boolean;
+  coverage?:
+    Record<'sku' | 'order', { total: number; linked: number }> | undefined;
 }) {
   const query = useQuery(autoLinkOptions(organizationId));
   const client = useQueryClient();
@@ -84,6 +88,7 @@ export function AutomaticLinks({
         loading={query.isPending}
         error={error ?? (query.isError ? m.sync_autolink_load_failed() : null)}
         canManage={canManage}
+        coverage={coverage}
         busy={busy}
         retry={() => void query.refetch()}
         add={() => setEditing({})}
@@ -128,6 +133,7 @@ export function AutomaticLinksView({
   edit,
   disable,
   retry,
+  coverage,
 }: {
   connections: SyncConnectionView[];
   rules?: AutoLinkRule[] | undefined;
@@ -139,6 +145,8 @@ export function AutomaticLinksView({
   edit: (rule: AutoLinkRule) => void;
   disable: (rule: AutoLinkRule) => void;
   retry: () => void;
+  coverage?:
+    Record<'sku' | 'order', { total: number; linked: number }> | undefined;
 }) {
   const label = (id: string) =>
     connections.find((connection) => connection.connectionId === id)?.label ??
@@ -164,6 +172,23 @@ export function AutomaticLinksView({
         ) : null}
       </CardHeader>
       <CardContent>
+        {coverage ? (
+          <div>
+            <p>
+              {m.sync_link_coverage_sku({
+                linked: formatNumber(coverage.sku.linked),
+                total: formatNumber(coverage.sku.total),
+              })}
+            </p>
+            <p>
+              {m.sync_link_coverage_order({
+                linked: formatNumber(coverage.order.linked),
+                total: formatNumber(coverage.order.total),
+              })}
+            </p>
+            <p>{m.sync_link_coverage_monitoring()}</p>
+          </div>
+        ) : null}
         {error ? (
           <Alert tone="danger" role="alert">
             {error}{' '}

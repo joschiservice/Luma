@@ -11,6 +11,7 @@ import type {
   AutoLinkPreview,
   AutoLinkRule,
 } from '../domain/automatic-links.js';
+import { defaultAutoLinkPairs } from '../domain/automatic-links.js';
 import type { SyncConnection } from './ports.js';
 
 /** Tenant-scoped rules and evidence reads; apply rechecks evidence atomically with remapping. */
@@ -103,10 +104,53 @@ export function createAutoLinkRunner(deps: {
     requestId: string,
   ): Promise<TenantContext>;
   log(message: string, error?: unknown): void;
+  /** Disable only when exercising manually configured rules in isolation. */
+  createDefaults?: boolean;
 }) {
   return {
     scopes: () => deps.store.scopes(),
     async tick(tenantId: string) {
+      if (deps.createDefaults !== false) {
+        const connections = await deps.store.connections(tenantId);
+        const rules = await deps.store.list(tenantId);
+        for (const pair of defaultAutoLinkPairs(connections)) {
+          if (
+            rules.some(
+              (rule) =>
+                rule.kind === pair.kind &&
+                ((rule.targetConnectionId === pair.targetConnectionId &&
+                  rule.sourceConnectionId === pair.sourceConnectionId) ||
+                  (pair.kind === 'sku' &&
+                    rule.targetConnectionId === pair.sourceConnectionId &&
+                    rule.sourceConnectionId === pair.targetConnectionId)),
+            )
+          )
+            continue;
+          const principal = connections.find(
+            (connection) => connection.id === pair.sourceConnectionId,
+          )?.installerId;
+          if (!principal) continue;
+          try {
+            const context = await deps.resolveContext(
+              principal,
+              tenantId,
+              'automatic-link:setup',
+            );
+            requirePermission(context, 'sync.manage');
+            await deps.store.save(context, {
+              ...pair,
+              id: crypto.randomUUID(),
+              revision: 0,
+              enabled: true,
+            });
+          } catch (error) {
+            if (error instanceof WorkspaceInactiveError) return;
+            // A concurrent worker may have created the pair. Never replace an operator's rule.
+            if (!(error instanceof IdentityError))
+              deps.log('Automatic linking setup failed; retrying.', error);
+          }
+        }
+      }
       for (const rule of await deps.store.due(tenantId)) {
         try {
           const context = await deps.resolveContext(

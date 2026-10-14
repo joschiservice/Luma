@@ -309,7 +309,9 @@ export function DecisionInspector({
         </CaseNotice>
       ) : null}
       <div className="decision-brief">
-        {item.diff ? <ActionDiff diff={item.diff} /> : null}
+        {item.diff && (item.kind !== 'replenishment' || !review) ? (
+          <ActionDiff diff={item.diff} />
+        ) : null}
         <section className="decision-section" aria-labelledby={`${id}-why`}>
           <h3 id={`${id}-why`}>{m.decisions_why_title()}</h3>
           <p>
@@ -329,33 +331,39 @@ export function DecisionInspector({
             </p>
           ) : null}
         </section>
-        <section className="decision-section" aria-labelledby={`${id}-change`}>
-          <h3 id={`${id}-change`}>
-            {approval
-              ? m.decisions_change_title()
-              : m.decisions_affects_title()}
-          </h3>
-          <dl className="decision-facts">
-            {item.change.map((fact) => (
-              <div key={fact.label}>
-                <dt>
-                  {item.kind === 'human_task'
-                    ? m.authoring_coordination_evidence()
-                    : fact.label}
-                </dt>
-                <dd>
-                  {item.kind === 'human_task'
-                    ? ({
-                        text: m.authoring_coordination_text(),
-                        link: m.authoring_coordination_link(),
-                        record: m.authoring_coordination_record(),
-                      }[fact.value as 'text' | 'link' | 'record'] ?? fact.value)
-                    : fact.value}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </section>
+        {item.kind !== 'replenishment' || !review ? (
+          <section
+            className="decision-section"
+            aria-labelledby={`${id}-change`}
+          >
+            <h3 id={`${id}-change`}>
+              {approval
+                ? m.decisions_change_title()
+                : m.decisions_affects_title()}
+            </h3>
+            <dl className="decision-facts">
+              {item.change.map((fact) => (
+                <div key={fact.label}>
+                  <dt>
+                    {item.kind === 'human_task'
+                      ? m.authoring_coordination_evidence()
+                      : fact.label}
+                  </dt>
+                  <dd>
+                    {item.kind === 'human_task'
+                      ? ({
+                          text: m.authoring_coordination_text(),
+                          link: m.authoring_coordination_link(),
+                          record: m.authoring_coordination_record(),
+                        }[fact.value as 'text' | 'link' | 'record'] ??
+                        fact.value)
+                      : fact.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        ) : null}
         <section className="decision-section" aria-labelledby={`${id}-effect`}>
           <h3 id={`${id}-effect`}>{m.decisions_effect_title()}</h3>
           <dl className="decision-consequences">

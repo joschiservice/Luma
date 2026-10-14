@@ -29,10 +29,10 @@ const wait = `CASE ${fulfillmentWaits
 /*
  * Current open fulfillment work by time since its last reported progress, under its first
  * signal. These are the Fulfillment workspace's own rules and `open` view. Each source's
- * record counts, so work mirrored in two systems counts once per system.
+ * selected view counts once per order and work kind, retaining split records from that source.
  * Parameters: $1 tenant, $2 as-of time, $3 stall window, $4 connection.
  */
-const rows = `${classified('f.open AND ($4::uuid IS NULL OR f.connection_id=$4)')}, rows AS (
+const rows = `${classified('f.open AND (CASE WHEN $4::uuid IS NULL THEN f.selected ELSE f.connection_id=$4 END)')}, rows AS (
  SELECT c.*,${wait} AS point,
   CASE WHEN c.held THEN 'held' WHEN c.overdue THEN 'overdue' WHEN c.stalled THEN 'stalled' ELSE 'none' END AS series
  FROM classified c

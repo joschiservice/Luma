@@ -106,7 +106,7 @@ export function legacyListSql(
       ];
 
   return `WITH ${state.currentOrderSources('order_sources')}, selected AS MATERIALIZED (
- SELECT DISTINCT ON (entity_id) * FROM order_sources WHERE ($3::uuid IS NULL OR connection_id=$3)
+ SELECT DISTINCT ON (entity_id) * FROM order_sources WHERE NOT shipping_view AND ($3::uuid IS NULL OR connection_id=$3)
  ORDER BY entity_id,${state.sourceSelectionOrder}
 )${search ? `, ${hits}` : ''}, matched AS MATERIALIZED (
  SELECT o.* FROM selected o

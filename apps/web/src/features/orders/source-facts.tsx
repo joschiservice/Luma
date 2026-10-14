@@ -174,6 +174,9 @@ export function OrderLines({
         choose={choose}
         label={m.orders_lines_source_switch()}
       />
+      {shown?.lineCoverage === 'partial' ? (
+        <p className="order-note">{m.orders_lines_shipping_view()}</p>
+      ) : null}
       {shown?.lines.some((line) => line.bundleGroup === undefined) ? (
         <p className="order-note">{m.products_bundles_unknown()}</p>
       ) : null}

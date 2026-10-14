@@ -122,6 +122,18 @@ const syncRunSchema = z.object({
 });
 
 export const syncOverviewSchema = z.object({
+  linkCoverage: z
+    .object({
+      sku: z.object({
+        total: z.number().int().nonnegative(),
+        linked: z.number().int().nonnegative(),
+      }),
+      order: z.object({
+        total: z.number().int().nonnegative(),
+        linked: z.number().int().nonnegative(),
+      }),
+    })
+    .optional(),
   connections: z.array(syncConnectionSchema),
   runs: z.array(syncRunSchema),
   canManage: z.boolean(),

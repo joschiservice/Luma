@@ -6,6 +6,7 @@ import {
 } from '@luma/ui/components/issues/case-investigation';
 import { CaseTimeline } from '@luma/ui/components/issues/case-timeline';
 import { Button } from '@luma/ui/components/primitives/button';
+import { Link } from '@tanstack/react-router';
 
 import type { CaseObservation } from './observation';
 import { CaseOwnerControl } from './owner';
@@ -58,6 +59,7 @@ export function LiveCaseDetail({
       <CaseInvestigation
         item={data.detail}
         review={data.review}
+        lifecycle={data.progress}
         embedded
         expanded={expanded}
         unconfirmed={!confirmed}
@@ -78,6 +80,18 @@ export function LiveCaseDetail({
               connection={connection}
               confirmed={confirmed}
               onRefresh={refresh}
+              workflowLink={(run) => (
+                <Link
+                  to="/app/$organizationId/workflows/$definitionId"
+                  params={{
+                    organizationId: observation.organizationId,
+                    definitionId: run.definitionId,
+                  }}
+                  hash={`run-${run.id}`}
+                >
+                  {run.name}
+                </Link>
+              )}
             >
               {history.isError ? (
                 <CaseNotice error title={m.exceptions_history_failed_title()}>

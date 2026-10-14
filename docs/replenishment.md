@@ -52,6 +52,12 @@ approval lasts as long as the proposal. Right before the order is created, stock
 through the installed capabilities, so a late approval acts on current stock: a different
 quantity stops the run, and the next check proposes again.
 
+## Approval context
+
+A proposal retains product identity, known current supplier terms or reviewed overrides, recent source-backed sales, stock cover estimates and existing draft/open orders. Missing prices, lead time and incomplete demand stay unknown. Unit cost and quantity produce an exact estimated value; stock cover is an estimate from recorded sales, not a demand forecast or confirmed incoming stock.
+
+The context is immutable across approvals and restarts. A later terms change does not rewrite what the person reviewed. Known unit prices and product descriptions carry into the internal draft; the purchasing system determines final supplier prices and tax at submission. These facts are informational and never replace stock, permission, policy, existing-order or dispatch checks. Quantity approval thresholds are labeled as quantity controls, not financial impact.
+
 ## Durability and outcomes
 
 Runs use the shared process queue (see [Process runtime](workflows.md#process-runtime)).

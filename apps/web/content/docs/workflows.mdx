@@ -63,7 +63,9 @@ Open **Replenish low stock** and select **Add stock rules** under **Rules**, or 
 3. Review each position. Luma shows current stock, whether the first check would propose an order and who approves it. You can adjust each position’s quantities; select **Update preview** after a change.
 4. Select **Activate**, which shows how many rules it creates, such as **Activate 3 rules**. Each position gets its own rule and its own result.
 
-When available stock falls below the minimum, Luma drafts a purchase order that brings stock up to the target and waits for approval. Every draft needs approval; the high-risk quantity only marks larger drafts as high risk. Luma doesn’t draft a new order while a draft or open purchase order for the same SKU exists. If a result shows **Unconfirmed**, select **Retry 1 unconfirmed**; retrying never creates a second rule.
+When available stock falls below the minimum, Luma drafts a purchase order that brings stock up to the target and waits for approval. Every draft needs approval. The quantity threshold identifies larger drafts; it does not measure financial impact. Luma doesn’t draft a new order while a draft or open purchase order for the same SKU exists. If a result shows **Unconfirmed**, select **Retry 1 unconfirmed**; retrying never creates a second rule.
+
+The approval names the product and SKU and shows recorded supplier cost, estimated total value, lead time, recent sales rate, days of cover and existing draft or open orders. Missing or incomplete data stays unknown. These facts are saved with the proposal, so changes to supplier terms during review do not silently change the draft you approve. Stock and authority are checked again before acting. Days of cover are estimates, not a forecast or a confirmed delivery date.
 
 A stock position’s page shows the same readiness, including a waiting decision and the latest purchase order.
 

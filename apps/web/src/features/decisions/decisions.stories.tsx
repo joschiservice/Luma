@@ -415,8 +415,8 @@ export const Selected: Story = {
       await canvas.findByRole('heading', { name: 'Why you’re needed' }),
     ).toBeVisible();
     await expect(
-      canvas.getByText('Purchase-order draft, not sent'),
-    ).toBeVisible();
+      canvas.queryByText('Purchase-order draft, not sent'),
+    ).not.toBeInTheDocument();
     await expect(canvas.getByRole('button', { name: 'Take it' })).toBeEnabled();
     await userEvent.click(canvas.getByRole('combobox', { name: 'Assign to…' }));
     const people = await within(document.body).findByRole('listbox', {

@@ -29,7 +29,7 @@
 
   "insights_fulfillment_title": "Fulfillment backlog",
   "insights_fulfillment_description": "Open fulfillment work by time since its source last reported progress. Each item counts under its first matching signal: on hold, past its fulfill-by date, or no progress for 48 hours.",
-  "insights_fulfillment_limit": "Shows today’s backlog only. Luma didn’t record earlier backlogs. Work reported by two systems counts once in each.",
+  "insights_fulfillment_limit": "Shows today’s backlog from one source view per linked order and work type. Split shipments stay separate. Choose a source to inspect its own records.",
   "insights_fulfillment_amount": "{count, plural, one {{value} open fulfillment} other {{value} open fulfillments}}",
   "insights_fulfillment_records": "Open fulfillments",
   "insights_fulfillment_unavailable_title": "No source reports fulfillment yet",

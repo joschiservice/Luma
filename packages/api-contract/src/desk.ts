@@ -12,7 +12,7 @@ const ref = z.string().min(1).max(512);
 
 // People referenced by user ID in a case response, named as in Activity. A listed ID that
 // names nobody in the workspace reads as a former member.
-const casePeople = z.array(activityActorSchema).max(10);
+const casePeople = z.array(activityActorSchema).max(100);
 
 const fields = z.record(
   z.string(),
@@ -130,38 +130,82 @@ export const caseReviewSchema = z.object({
     .nullable(),
 });
 
+const caseExecutionSchema = z
+  .object({
+    id,
+    proposalId: id,
+    state: z.enum(['prepared', 'unknown', 'succeeded', 'failed']),
+    attemptId: id,
+    attempt: z.number().int().positive(),
+    requestedBy: ref,
+    executor: z.object({
+      kind: z.enum(['service', 'agent', 'connector', 'user']),
+      id: ref,
+    }),
+    startedAt: at,
+    finishedAt: at.nullable(),
+    effectEvidenceRefs: z.array(ref).max(100),
+    verification: z
+      .object({
+        outcome: z.enum(['passed', 'failed', 'inconclusive']),
+        observationRefs: z.array(ref).max(100),
+        observedAt: at,
+        evaluatorVersion: ref,
+      })
+      .nullable(),
+  })
+  .nullable();
+
 export const caseProgressSchema = z.object({
+  workflowRuns: z
+    .array(
+      z.object({
+        id,
+        definitionId: ref,
+        name: ref,
+        version: ref,
+        truncated: z.boolean(),
+        steps: z
+          .array(
+            z.object({
+              stepId: ref,
+              kind: ref,
+              state: ref,
+              recordedAt: at,
+              observedAt: at.nullable(),
+              evidenceRefs: z.array(ref).max(100),
+            }),
+          )
+          .max(100),
+        actions: z
+          .array(
+            z.object({
+              proposalId: id,
+              capability: ref,
+              diff: actionDiffSchema.nullable(),
+              approval: z
+                .object({
+                  actorId: ref,
+                  outcome: z.enum(['approved', 'rejected']),
+                  createdAt: at,
+                })
+                .nullable(),
+              execution: caseExecutionSchema,
+            }),
+          )
+          .max(100),
+      }),
+    )
+    .max(10)
+    .optional(),
+  workflowRunsTruncated: z.boolean().optional(),
   schemaVersion: z.literal(1),
   /** The people behind `execution.requestedBy` and `resolution.actorId`. */
   people: casePeople,
   caseRevision: z.number().int().positive(),
   state: z.enum(caseStates),
   diagnosisRevision: z.number().int().nonnegative(),
-  execution: z
-    .object({
-      id,
-      proposalId: id,
-      state: z.enum(['prepared', 'unknown', 'succeeded', 'failed']),
-      attemptId: id,
-      attempt: z.number().int().positive(),
-      requestedBy: ref,
-      executor: z.object({
-        kind: z.enum(['service', 'agent', 'connector', 'user']),
-        id: ref,
-      }),
-      startedAt: at,
-      finishedAt: at.nullable(),
-      effectEvidenceRefs: z.array(ref).max(100),
-      verification: z
-        .object({
-          outcome: z.enum(['passed', 'failed', 'inconclusive']),
-          observationRefs: z.array(ref).max(100),
-          observedAt: at,
-          evaluatorVersion: ref,
-        })
-        .nullable(),
-    })
-    .nullable(),
+  execution: caseExecutionSchema,
   resolution: z
     .object({
       kind: z.enum(['verification', 'human_disposition']),

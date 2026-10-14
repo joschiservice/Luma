@@ -85,8 +85,7 @@ export async function inboxFixture(t, origin = 'http://127.0.0.1:3000') {
 
   await f.pilot.observe({ check: false });
   await f.pilot.link();
-  // The merchant confirms the two seeded integration pairs before Inbox reads references.
-  // Separate shipping records must otherwise remain ambiguous, even with the same number.
+  // Wait for the default exact-reference rules before Inbox reads ambiguous source references.
   for (const [shopOrder, shippingOrder] of [
     ['1', '1'],
     ['10', '2'],
@@ -110,27 +109,17 @@ export async function inboxFixture(t, origin = 'http://127.0.0.1:3000') {
       entityId && otherId,
       'The merchant can identify both exact seeded source orders',
     );
-    const link = await request(
-      '/identities/links',
-      {
-        operation: 'link',
-        kind: 'order',
-        entityId,
-        otherId,
-        reason:
-          'Merchant confirmed these exact seeded Shopify and Starshipit source orders from the integration.',
-      },
-      { status: 202 },
-    );
+    if (entityId === otherId) continue;
     await until(
       async () => {
         await f.pilot.observe({ refresh: false, check: false });
-        const current = await request(`/identities/links/${link.id}`);
-        assert.notEqual(current.state, 'failed', current.message);
 
-        return current.state === 'completed';
+        return (
+          (await mapped(f.manifest.connections.starshipit, shippingOrder)) ===
+          entityId
+        );
       },
-      'merchant-confirmed order identity',
+      'automatic order identity',
       30_000,
     );
   }

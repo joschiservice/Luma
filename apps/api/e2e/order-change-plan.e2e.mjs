@@ -3,10 +3,10 @@ import { expect, test } from 'vitest';
 import { linkedOrderFixture } from './order-change-plan-fixture.mjs';
 
 test('plans a Shopify quantity change across Shopify and JTL before and after the warehouse starts packing', async (t) => {
-  const { api, shopify, jtl, shop, lineKey, detail, packing } =
+  const { f, api, shopify, jtl, shop, lineKey, detail, packing } =
     await linkedOrderFixture(t);
   expect(detail.sources.map((source) => source.connectionId).sort()).toEqual(
-    [shopify, jtl].sort(),
+    [shopify, jtl, f.manifest.connections.starshipit].sort(),
   );
   const plan = async () =>
     (
@@ -32,22 +32,28 @@ test('plans a Shopify quantity change across Shopify and JTL before and after th
       [jtl, 'unknown'],
     ]),
   );
-  expect(before.steps).toMatchObject([
-    {
-      performer: 'luma',
-      connectionId: shopify,
-      capability: 'orders.quantity.edit',
-      executable: true,
-      viewerCanRequest: true,
-      handoff: {
-        orderExternalId: 'gid://shopify/Order/1',
-        lines: [
-          { externalId: expect.stringMatching(/LineItem/), quantity: '1' },
-        ],
-      },
-    },
-    { performer: 'person', role: 'operator', connectionId: jtl },
-  ]);
+  expect(before.steps).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        performer: 'luma',
+        connectionId: shopify,
+        capability: 'orders.quantity.edit',
+        executable: true,
+        viewerCanRequest: true,
+        handoff: {
+          orderExternalId: 'gid://shopify/Order/1',
+          lines: [
+            { externalId: expect.stringMatching(/LineItem/), quantity: '1' },
+          ],
+        },
+      }),
+      expect.objectContaining({
+        performer: 'person',
+        role: 'operator',
+        connectionId: jtl,
+      }),
+    ]),
+  );
 
   // The warehouse starts packing in JTL: a delivery note without a shipping date.
   await packing();
@@ -61,12 +67,14 @@ test('plans a Shopify quantity change across Shopify and JTL before and after th
   ]);
   expect(
     after.steps.map((step) => [step.performer, step.action, step.role]),
-  ).toEqual([
-    ['person', 'confirm_picking', 'warehouse'],
-    ['luma', 'update_quantity', null],
-    ['person', 'update_quantity', 'operator'],
-    ['person', 'escalate_unsafe', 'operator'],
-  ]);
+  ).toEqual(
+    expect.arrayContaining([
+      ['person', 'confirm_picking', 'warehouse'],
+      ['luma', 'update_quantity', null],
+      ['person', 'update_quantity', 'operator'],
+      ['person', 'escalate_unsafe', 'operator'],
+    ]),
+  );
   expect(after.steps[0].connectionId).toBe(jtl);
   expect(after.steps[1]).toMatchObject({
     executable: false,

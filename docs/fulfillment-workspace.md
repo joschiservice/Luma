@@ -1,7 +1,6 @@
 # Fulfillment workspace
 
-Fulfillment lists every fulfillment order and shipment that a connected source currently
-reports, shows what blocks each one, and hosts governed source actions. It reads the
+Fulfillment lists fulfillment orders and shipments from a selected source view, shows what blocks each one, and hosts governed source actions. It reads the
 fulfillment projections described in [canonical commerce projections](commerce-projections.md)
 and never writes commerce data.
 
@@ -10,8 +9,7 @@ Code: `@luma/read-models` (rules and reads), `@luma/orders` (`orders_fulfillment
 ## Model
 
 A row is one source's current fulfillment projection. Fulfillment reconciliation keys include
-the connection, so mirrored work in a store and an ERP stays separate and is never added
-together. `kind` separates **fulfillment orders** (work a location must pick and pack, such as
+the connection, so mirrored work retains separate evidence. Lists select one view per linked order and work kind instead of adding provider copies together. `kind` separates **fulfillment orders** (work a location must pick and pack, such as
 a Shopify FulfillmentOrder) from **shipments** (a Shopify Fulfillment or a JTL delivery note).
 
 **Open** work is pending or processing, not removed at the source, and its order is not
@@ -108,3 +106,5 @@ Grouped reads seek each group's first rows in the evaluated set, so they cost mo
 Tenants well beyond 100,000 current fulfillments need maintained view counts or archiving of
 finished work. Re-measure with `LUMA_FULFILLMENT_BENCHMARK=<row count>` on
 `fulfillment.e2e.mjs`.
+
+Without a source filter, lists and charts select one source view per linked order and work kind: Starshipit for shipments, otherwise Shopify, then another source. Split shipments within that view remain separate. This is display selection, not identity merging or authority for an action. Choose a source to inspect its own records; detail retains the other views. Unlinked orders remain distinct until evidence establishes their identity.

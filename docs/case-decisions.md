@@ -25,6 +25,10 @@ they never evaluate models or connector preconditions.
   [Activity](workspace-activity.md#attribution); review and progress keep user IDs and list
   the people they reference in `people`.
 
+Case progress also reads workflow runs explicitly bound by their recorded case input, including capability proposals, policy approvals, execution receipts and independent verification evidence. It reads at most ten runs and one hundred steps per run, marks omitted history and links to the owning run. This history never gives the case desk authority to decide an app’s proposal. Live workflow availability stays distinct from these persisted records. Repeated detections retain observation events instead of presenting another initial detection.
+
+Resolved cases suppress pending-investigation and active-recommendation copy even when no separate diagnosis was recorded. Missing execution history means no receipt is linked, not proof that no provider change happened.
+
 ## Shared action review
 
 The `action-review-diffs` release adds one review contract to case detail, Needs you and

@@ -37,6 +37,17 @@ const correctionChoice = z
 export type CorrectionChoice = z.infer<typeof correctionChoice>;
 
 export const correctionSnapshot = z.object({
+  /** Product identity from the canonical catalog at preview time, retained with its source read. */
+  product: z
+    .object({
+      skuId: z.string().uuid(),
+      sku: z.string().nullable(),
+      title: z.string().nullable(),
+      observationId: z.string().uuid().nullable(),
+      observedAt: z.string().datetime().nullable(),
+    })
+    .nullable()
+    .optional(),
   id: z.string().uuid(),
   observedAt: z.string().datetime(),
   revision: z.string(),

@@ -127,7 +127,8 @@ test('physical downstream parcels use exact approval, partial Shopify fulfillmen
     ),
   );
   assert.ok(inspected.snapshot.dispatch);
-}, 120_000);
+  // Two parcels and their tracking are verified through rate-limited provider reads.
+}, 180_000);
 
 test('an applied fulfillment with a lost response reconciles by read and cannot create a second remote shipment', async (t) => {
   const f = await shipmentPublishingFixture(t),

@@ -58,6 +58,8 @@ export type FulfillmentFacts = Omit<
 
 /** The business facts of one source report that comparisons read. */
 export interface SourceFacts {
+  /** Partial views report only matched items; missing lines never establish zero ordered units. */
+  lineCoverage?: 'complete' | 'partial';
   status: string;
   paymentStatus: string;
   total?: { amount: string; currency: string } | null;
@@ -66,6 +68,8 @@ export interface SourceFacts {
 }
 
 export interface ComparisonSource extends ComparisonEvidence {
+  /** Absent means a complete order report. Partial views do not constrain unmatched line identity. */
+  lineCoverage?: 'complete' | 'partial';
   connectionId: string;
   status: string;
   paymentStatus: string;
@@ -245,8 +249,9 @@ export function comparisonFacts(
   const lines = source.lines
     .map((line) => {
       const key = keys.get(line.id) ?? null;
-      if (!key) incomplete = true;
+      if (!key && source.lineCoverage !== 'partial') incomplete = true;
       if (
+        (key || source.lineCoverage !== 'partial') &&
         source.fulfillments.some(
           (item) =>
             !item.deleted &&
@@ -273,12 +278,13 @@ export function comparisonFacts(
 
 /**
  * Finds line IDs explicitly shared by different source reports of the same linked order, and
- * the SKUs that identify one of them: a SKU every source holding the shared line reports on it,
+ * the SKUs that identify one of them: complete sources holding the shared line report that SKU,
+ * while a partial view can leave it unreported. Known SKU values must agree,
  * that occurs once in every source and on no other shared line. A source that reports that line
  * under its own ID, such as an ERP import, then matches it by SKU.
  */
 export function sharedComparisonLines(
-  sources: Pick<ComparisonSource, 'connectionId' | 'lines'>[],
+  sources: Pick<ComparisonSource, 'connectionId' | 'lines' | 'lineCoverage'>[],
 ): ComparisonLines {
   const connections = new Map<string, Set<string>>();
   for (const source of sources)
@@ -294,10 +300,19 @@ export function sharedComparisonLines(
   const ambiguous = new Set<string>();
   for (const id of shared) {
     const holders = sources.flatMap((source) =>
-      source.lines.filter((line) => line.id === id),
+      source.lines
+        .filter((line) => line.id === id)
+        .map((line) => ({ line, partial: source.lineCoverage === 'partial' })),
     );
-    const sku = holders[0]?.skuId;
-    if (!sku || holders.some((line) => line.skuId !== sku)) continue;
+    const sku = holders.find(({ line }) => line.skuId !== null)?.line.skuId;
+    if (
+      !sku ||
+      holders.some(
+        ({ line, partial }) =>
+          line.skuId !== sku && !(partial && line.skuId === null),
+      )
+    )
+      continue;
     if (
       skus.has(sku) ||
       sources.some(
@@ -380,8 +395,13 @@ export function compareOrderSources(sources: ComparisonSource[]) {
       add(
         field,
         key,
-        lines.map((line) =>
-          line ? line[field] : field === 'currentQuantity' ? '0' : null,
+        lines.map((line, index) =>
+          line
+            ? line[field]
+            : field === 'currentQuantity' &&
+                sources[index]?.lineCoverage !== 'partial'
+              ? '0'
+              : null,
         ),
       );
     }

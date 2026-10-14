@@ -83,7 +83,9 @@ export function ExecutionSummary({
         <p>
           {progress.state === 'awaiting_approval' && !progress.resolution
             ? m.issues_execution_none_awaiting_approval()
-            : m.issues_execution_none()}
+            : progress.resolution
+              ? m.issues_execution_no_record()
+              : m.issues_execution_none()}
         </p>
       ) : (
         <>
@@ -158,7 +160,11 @@ export function ExecutionMetadata({ progress }: { progress: CaseProgress }) {
       <dt>{m.issues_meta_investigation_version()}</dt>
       <dd>{progress.diagnosisRevision}</dd>
       <dt>{m.issues_meta_workflow()}</dt>
-      <dd>{workflowStatusLabel(progress.workflow)}</dd>
+      <dd>
+        {progress.workflowRuns?.length
+          ? m.issues_workflow_recorded_status()
+          : workflowStatusLabel(progress.workflow)}
+      </dd>
       {progress.workflow.progress?.reason ? (
         <>
           <dt>{m.issues_meta_workflow_reason()}</dt>

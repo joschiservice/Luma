@@ -68,6 +68,13 @@ export async function starshipitOperationsFixture(
       30000,
     );
   const link = async (kind, entityId, otherId) => {
+    if (
+      kind === 'order' &&
+      (await api(`/orders/${shop}`)).sources.some(
+        (source) => source.connectionId === f.manifest.connections.starshipit,
+      )
+    )
+      return null;
     const request = await api('/identities/links', {
       method: 'POST',
       status: 202,
@@ -108,6 +115,30 @@ export async function starshipitOperationsFixture(
     shipping,
     complete,
     link,
+    /** Separates the fixture shipping view through the governed API for explicit-link journeys. */
+    async separateShippingOrder() {
+      if (
+        (await api(`/orders/${shop}`)).sources.some(
+          (source) => source.connectionId === f.manifest.connections.starshipit,
+        )
+      ) {
+        const request = await api('/identities/links', {
+          method: 'POST',
+          status: 202,
+          body: {
+            operation: 'unlink',
+            kind: 'order',
+            entityId: shop,
+            connectionId: f.manifest.connections.starshipit,
+            reason: 'Review this shipping order identity explicitly',
+          },
+        });
+        await complete(request);
+        await f.pilot.observe({ check: false });
+      }
+
+      return mapped(f.manifest.connections.starshipit, '1');
+    },
     setAuthority,
     detail: () => api(`/orders/${shop}`),
     async setShopQuantity(quantity) {
