@@ -24,6 +24,7 @@ test('finds a replenishment approval in Needs you, decides it once and updates e
     const context = await t.newContext({
       baseURL: origin,
       viewport: { width: 1440, height: 1000 },
+      timezoneId: 'Asia/Tokyo',
     });
     await context.addCookies(
       cookie.split('; ').map((value) => {
@@ -96,9 +97,10 @@ test('finds a replenishment approval in Needs you, decides it once and updates e
     await inspector.getByText(/available, below the minimum of/).count(),
   ).toBe(0);
   await inspector
-    .getByText('Nothing is sent to the supplier.', {
+    .getByText('Nothing is sent now.', {
       exact: false,
     })
+    .first()
     .waitFor();
   await inspector.getByRole('button', { name: 'Take it' }).click();
   await inspector.getByRole('button', { name: 'Unassign me' }).waitFor();
@@ -113,15 +115,38 @@ test('finds a replenishment approval in Needs you, decides it once and updates e
 
   // The owner's review takes the one decision; Needs you and the run follow it.
   await inspector.getByRole('button', { name: 'Approve 50 units' }).click();
-  await inspector.getByText('Decision recorded.', { exact: false }).waitFor();
+  await expect(inspector.getByText('You answered this at')).toBeVisible();
+  await expect(
+    inspector.getByText('Needs your approval', { exact: true }),
+  ).toHaveCount(0);
+  await expect(inspector.getByRole('button', { name: 'Take it' })).toHaveCount(
+    0,
+  );
   await f.temporal.client.workflow
     .getHandle(processWorkflowId(f.manifest.organizationId, run.id))
     .signal('processDecisionChanged');
-  await inspector
-    .getByText('This decision has left the queue')
-    .waitFor({ timeout: 45000 });
+  await expect(inspector.getByText('You answered this at')).toBeVisible();
   await requested.waitFor({ state: 'detached', timeout: 45000 });
   await f.waitFor(run.id, 'verified');
+  await expect(
+    inspector.getByText('A fresh independent check confirmed the result.'),
+  ).toBeVisible({ timeout: 45000 });
+  await approver.reload();
+  await expect(inspector.getByText('You answered this at')).toBeVisible();
+  await expect(
+    inspector.getByRole('link', { name: 'Open purchase order' }),
+  ).toHaveAttribute('href', /procurement\//);
+  await expect(
+    inspector.getByRole('link', { name: 'Open workflow run' }),
+  ).toHaveAttribute('href', new RegExp(`run-${run.id}`));
+  expect(
+    (await inspector.locator('time').allTextContents()).every((time) =>
+      time.includes('UTC'),
+    ),
+  ).toBe(true);
+  await expect(
+    inspector.getByRole('button', { name: 'Approve 50 units' }),
+  ).toHaveCount(0);
   expect(
     (
       await f.request(`/replenishment/runs/${run.id}`, undefined, {

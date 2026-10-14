@@ -6,6 +6,25 @@ import { expect, it } from 'vitest';
 import { inventoryFixture } from './inventory-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
+it('reads recorded detection limits with the restricted case reader and rejects another workspace', async (t) => {
+  const f = await settingsFixture(t);
+  const stock = await inventoryFixture(t, f);
+  const issueId = await stock.issue();
+  const issue = await f.request(f.member, `${f.base}/exceptions/${issueId}`);
+  expect(issue.subject.label).toBe('SKU-100');
+  expect(issue.detectionLimits).toMatchObject({
+    inventoryTolerance: '0',
+    oversellPropagationSeconds: 120,
+  });
+  await f.request(
+    f.outsider,
+    `${f.base}/exceptions/${issueId}`,
+    'GET',
+    undefined,
+    404,
+  );
+});
+
 it('compares mapped stock without summing sources and follows scoped related records', async (t) => {
   const f = await settingsFixture(t);
   const stock = await inventoryFixture(t, f);

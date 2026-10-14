@@ -524,7 +524,7 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
   await context.grantPermissions(['clipboard-read', 'clipboard-write'], {
     origin,
   });
-  await expandSection('Issue details');
+  await expandSection('Technical details');
   await page
     .getByRole('button', { name: 'Copy issue ID', exact: true })
     .click();
@@ -533,11 +533,11 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
     ids[0],
   );
   expect(
-    await issueSection('Issue details')
+    await issueSection('Technical details')
       .getByText(ids[0], { exact: true })
       .isVisible(),
   ).toBe(true);
-  await issueSection('Issue details').locator('summary').first().click();
+  await issueSection('Technical details').locator('summary').first().click();
   await detailPane.evaluate((el) => {
     el.scrollTop = 0;
   });

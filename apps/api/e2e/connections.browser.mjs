@@ -92,7 +92,7 @@ async function save(page, label) {
     .getByRole('button', { name: 'Save connection', exact: true })
     .click();
   const card = page.getByRole('article', { name: label, exact: true });
-  await card.getByText('Awaiting validation', { exact: true }).waitFor();
+  await card.getByText('Importing', { exact: true }).waitFor();
 
   return card;
 }
@@ -111,7 +111,7 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
     .fill('22222222-2222-4222-8222-222222222222');
   const shop = await save(page, 'Main shop');
   await shop.getByRole('button', { name: 'Validate access' }).click();
-  await shop.getByText('Needs attention', { exact: true }).waitFor();
+  await shop.getByText('Read failing', { exact: true }).waitFor();
   expect(await shop.getByText('Permitted', { exact: true }).count()).toBe(0);
   await shop.getByRole('button', { name: 'Connection settings' }).click();
   expect(
@@ -121,10 +121,10 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
     .getByLabel('Access token', { exact: true })
     .fill('valid-test-token');
   await page.getByRole('button', { name: 'Confirm replacement' }).click();
-  await shop.getByText('Awaiting validation', { exact: true }).waitFor();
+  await shop.getByText('Importing', { exact: true }).waitFor();
   await shop.getByRole('button', { name: 'Validate access' }).click();
-  await shop.getByText('Validated', { exact: true }).waitFor();
-  expect(await shop.getByText('Permitted', { exact: true }).count()).toBe(4);
+  await shop.getByText('Importing', { exact: true }).waitFor();
+  await expect(shop.getByText('Permitted', { exact: true })).toHaveCount(4);
   await shop.getByText('Read-only access', { exact: true }).waitFor();
   await setup(page, 'JTL Cloud', 'Warehouse');
   await page
@@ -166,7 +166,8 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
   await page.getByLabel('Challenge code').fill('test-challenge');
   const onprem = await save(page, 'Local ERP');
   await onprem.getByRole('button', { name: 'Validate access' }).click();
-  await onprem.getByText('Validated', { exact: true }).waitFor();
+  await onprem.getByText('Importing', { exact: true }).waitFor();
+  await expect(onprem.getByText('Permitted', { exact: true })).toHaveCount(4);
   await page.goto(`/app/${organizationId}/apps/jtl/settings`);
   await page.getByRole('heading', { name: 'JTL', exact: true }).waitFor();
   expect(
@@ -175,7 +176,7 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
       .getByRole('link', { name: 'Apps', exact: true })
       .getAttribute('aria-current'),
   ).toBe('page');
-  await shop.getByText('Validated', { exact: true }).waitFor();
+  await shop.getByText('Importing', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Refresh list' }).focus();
   await page.screenshot({
     path: '/tmp/luma-34-desktop.png',
@@ -200,7 +201,7 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
   await page.setViewportSize({ width: 390, height: 844 });
   await shop.getByRole('button', { name: 'Disconnect', exact: true }).click();
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await shop.getByText('Validated', { exact: true }).waitFor();
+  await shop.getByText('Importing', { exact: true }).waitFor();
   await shop.getByRole('button', { name: 'Disconnect', exact: true }).click();
   await page.getByRole('dialog').waitFor({ state: 'visible' });
   await expect
@@ -244,7 +245,10 @@ test('connects JTL targets, validates, replaces invalid credentials and disconne
     has: page.getByRole('heading', { name: 'Reconnected shop', exact: true }),
   });
   await reconnected.getByRole('button', { name: 'Validate access' }).click();
-  await reconnected.getByText('Validated', { exact: true }).waitFor();
+  await reconnected.getByText('Importing', { exact: true }).waitFor();
+  await expect(reconnected.getByText('Permitted', { exact: true })).toHaveCount(
+    4,
+  );
   await shop.getByText('Disconnected', { exact: true }).waitFor();
   await page
     .getByRole('button', { name: 'Uninstall app', exact: true })
@@ -370,7 +374,7 @@ test('preserves non-secret input on errors, handles stale versions and unavailab
   await card
     .getByText('This connection changed. Refresh the list before trying again.')
     .waitFor();
-  await card.getByText('Validated', { exact: true }).waitFor();
+  await card.getByText('Importing', { exact: true }).waitFor();
   await page.route('**/api/v1/organizations/*/connections', (route) =>
     route.fulfill({
       status: 503,
@@ -479,9 +483,7 @@ test('keeps basic Wawi access independent of an explicitly requested exchange re
   );
   await card.getByRole('button', { name: 'Validate access' }).click();
   // This provider fixture supports basic reads only. Opt-in must never manufacture a grant.
-  await expect(
-    card.getByText('Needs attention', { exact: true }),
-  ).toBeVisible();
+  await expect(card.getByText('Read failing', { exact: true })).toBeVisible();
   await expect(
     card.getByText('Replacement order and reservation evidence', {
       exact: true,
