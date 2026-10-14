@@ -18,7 +18,7 @@ Sections a role cannot change say which permission they need. Team and role muta
 Workspace settings control stock tolerance, the ordinary stock confirmation window, the
 shorter oversell window and the fulfillment progress limit. Oversell risk defaults to two
 minutes; other stock gaps default to thirty minutes. Zero confirms stock gaps immediately.
-Only current, complete, comparable evidence can raise an issue. Each evaluation records its
+Stock mismatches require current, complete, comparable evidence. Each evaluation records its
 configuration, and issue details show the limits used. A setting change requires fresh
 detection and review before a stock correction can run.
 
