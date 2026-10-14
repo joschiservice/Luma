@@ -32,6 +32,17 @@ export const ApprovalRequired: Story = {
     const c = within(canvasElement);
     await expect(c.getByText('Approval needed')).toBeVisible();
     await expect(
+      c.getByRole('heading', { name: 'Correct shipping method' }),
+    ).toBeVisible();
+    await expect(
+      c.getByText(resolutionReview.proposal!.target.id),
+    ).not.toBeVisible();
+    await userEvent.click(c.getByText('Technical details'));
+    await expect(
+      c.getByText(resolutionReview.proposal!.target.id),
+    ).toBeVisible();
+    await userEvent.click(c.getByText('Technical details'));
+    await expect(
       c.getByRole('button', { name: 'Approve change' }),
     ).toBeDisabled();
     await userEvent.type(

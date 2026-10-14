@@ -4,6 +4,7 @@ import { installedConnectionSchema } from '@luma/api-contract';
 import { expect, it } from 'vitest';
 
 import { inventoryCase } from '../components/issues/case-fixtures';
+import { resolutionReview } from '../components/issues/resolution-fixtures';
 import { operatorCodeMessages } from './operator-code';
 
 it('labels every installed capability and golden detector outcome', () => {
@@ -17,6 +18,7 @@ it('labels every installed capability and golden detector outcome', () => {
     ),
   );
   const codes = [
+    resolutionReview.proposal!.capability,
     ...installedConnectionSchema.shape.permissions.element.options,
     ...inventoryCase.diagnosis!.provenance.evidence.flatMap((item) =>
       item.source ? [item.source.resource.toLowerCase()] : [],

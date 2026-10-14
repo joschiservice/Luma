@@ -9,7 +9,6 @@ import {
 import { m } from '@luma/i18n/messages';
 import { rich } from '@luma/i18n/rich';
 import {
-  caseLabel,
   CaseLoading,
   CaseNotice,
 } from '@luma/ui/components/issues/case-investigation';
@@ -688,7 +687,7 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
                           connection.id,
                           m.exceptions_connection_label({
                             connection: connection.label,
-                            system: caseLabel(connection.target.kind),
+                            system: sourceLabel(connection.target.kind),
                           }),
                         ]),
                       )}

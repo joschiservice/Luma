@@ -2,6 +2,8 @@ import { m } from '@luma/i18n/messages';
 
 /** Operator labels for provider capabilities, detector results and evidence kinds. */
 export const operatorCodeMessages: Record<string, () => string> = {
+  'order.shipping_method.update':
+    m.vocabulary_operator_orders_shipping_method_write,
   inventory: m.vocabulary_operator_inventory,
   order_line: m.vocabulary_operator_order_line,
   product: m.vocabulary_operator_product,
