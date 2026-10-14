@@ -50,7 +50,7 @@ it('generates concrete response, parameter and error schemas with unique operati
 });
 
 it('preserves organization and reserved region transport conventions', () => {
-  expect(dataRegionSchema.options).toEqual(['EU', 'US', 'APAC']);
+  expect(dataRegionSchema.options).toEqual(['EU', 'AU', 'US']);
   expect(
     organizationParamsSchema.safeParse({ organizationId: 'invalid' }).success,
   ).toBe(false);

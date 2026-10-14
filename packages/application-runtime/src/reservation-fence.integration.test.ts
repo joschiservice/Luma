@@ -24,7 +24,7 @@ describe.skipIf(!databaseUrl)('execution reservation fence', () => {
   async function workspace(members: number) {
     const tenantId = randomUUID();
     await owner.query(
-      "INSERT INTO organizations(id,name,slug,status,write_mode,created_at) VALUES($1,'Fence',$2,'active','writes_enabled',now())",
+      "INSERT INTO organizations(data_region,id,name,slug,status,write_mode,created_at) VALUES('AU',$1,'Fence',$2,'active','writes_enabled',now())",
       [tenantId, `fence-${tenantId}`],
     );
     for (let index = 0; index < members; index++) {

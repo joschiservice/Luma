@@ -33,13 +33,19 @@ export function createStaffAuth(
   const db = drizzle(pool, { schema });
   const identityScope = new AsyncLocalStorage<{ subject?: string }>();
 
+  const regionalOrigin = settings.regionalApiOrigins?.[settings.region ?? 'AU'];
   const auth = betterAuth({
     secret: settings.secret,
-    baseURL: settings.publicOrigin + '/api/auth',
+    baseURL: regionalOrigin
+      ? regionalOrigin + '/auth'
+      : settings.publicOrigin + '/api/auth',
     basePath: '/auth',
     appName: 'Luma staff',
     logger: { disabled: true },
-    trustedOrigins: [settings.publicOrigin],
+    trustedOrigins: [
+      settings.publicOrigin,
+      ...(regionalOrigin ? [regionalOrigin] : []),
+    ],
     database: drizzleAdapter(db, { provider: 'pg', schema, transaction: true }),
     emailAndPassword: {
       enabled: settings.mode === 'local',
@@ -67,6 +73,7 @@ export function createStaffAuth(
     },
     advanced: {
       cookiePrefix: settings.cookiePrefix,
+      crossSubDomainCookies: { enabled: false },
       ipAddress: { ipAddressHeaders: ['x-luma-staff-client-ip'] },
       useSecureCookies: settings.mode === 'google',
       database: { generateId: () => randomUUID() },

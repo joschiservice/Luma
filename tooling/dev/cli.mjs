@@ -149,7 +149,7 @@ try {
         'luma',
       ]);
     }
-    await provision(saved, migrationUrl);
+    await provision(saved, migrationUrl, generated.LUMA_REGION);
     await saveEnvironment(generated);
     if (['setup', 'seed', 'reset'].includes(command)) {
       await run('pnpm', [

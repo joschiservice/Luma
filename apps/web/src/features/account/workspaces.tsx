@@ -13,8 +13,10 @@ import {
   createOrganization,
   IdentityError,
   organizationsOptions,
+  regionOptions,
   workspaceName,
 } from '../../kit/identity/data';
+import { regionLabel } from './region-choice';
 
 /**
  * Lists the person's workspaces, marking those where their access is suspended. Entry mode
@@ -88,6 +90,7 @@ export function WorkspaceList({ entry = false }: { entry?: boolean }) {
  */
 export function NewWorkspace() {
   const client = useQueryClient();
+  const region = useQuery(regionOptions());
   const navigate = useNavigate();
   const [message, setMessage] = useState('');
   const [pending, setPending] = useState(false);
@@ -107,12 +110,12 @@ export function NewWorkspace() {
     },
     defaultValues: { name: '' },
     onSubmit: async ({ value }) => {
-      if (lock.current || uncertain) return;
+      if (lock.current || uncertain || !region.data) return;
       lock.current = true;
       setPending(true);
       setMessage('');
       try {
-        const org = await createOrganization(value.name);
+        const org = await createOrganization(value.name, region.data!.region);
         await client.invalidateQueries({
           queryKey: ['private', 'organizations'],
         });
@@ -152,6 +155,9 @@ export function NewWorkspace() {
       }
     },
   });
+  if (region.isPending) return <Pending />;
+  if (region.isError)
+    return <Failure error={region.error} retry={() => void region.refetch()} />;
   if (failureStatus)
     return (
       <Failure
@@ -167,6 +173,11 @@ export function NewWorkspace() {
       <section className="entry-panel" aria-labelledby="new-workspace-title">
         <h1 id="new-workspace-title">{m.identity_new_workspace_title()}</h1>
         <p>{m.identity_new_workspace_lead()}</p>
+        <p>
+          {m.identity_region_workspace({
+            region: regionLabel(region.data.region),
+          })}
+        </p>
         <form
           ref={formElement}
           noValidate

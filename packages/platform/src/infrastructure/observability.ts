@@ -27,6 +27,7 @@ import { PostHog } from 'posthog-node';
 
 import type { ErrorDetails } from '../application/error-details.js';
 import { describeError } from '../application/error-details.js';
+import type { DataRegion } from '../application/model-gateway.js';
 import type {
   ActivityFailureContext,
   FeatureFlag,
@@ -40,6 +41,7 @@ import { redactHttpFailure } from './redaction.js';
 
 // This adapter accepts only deployment settings; it does not read ambient environment.
 export interface TelemetrySettings {
+  dataRegion?: DataRegion;
   environment: 'development' | 'test' | 'staging' | 'production';
   release: string;
   sampleRate: number;
@@ -268,7 +270,7 @@ export function createObservability(
     return {
       environment: settings.environment,
       release: settings.release,
-      data_region: 'EU',
+      data_region: settings.dataRegion ?? 'AU',
       request_id: context.requestId,
       trace_id: context.traceId,
       ...(context.actionId ? { action_id: context.actionId } : {}),
@@ -391,11 +393,10 @@ export function createObservability(
         work,
       );
     },
+    dataRegion: settings.dataRegion ?? 'AU',
     forTenant(context, tenantId, dataRegion) {
-      if (dataRegion !== 'EU')
-        throw new Error(
-          'Tenant telemetry requires EU placement and a hash key',
-        );
+      if (dataRegion !== (settings.dataRegion ?? 'AU'))
+        throw new Error('Tenant telemetry requires matching cell placement');
       if (!settings.tenantHashKey) {
         if (settings.sentryDsn || settings.langfuse || settings.posthog)
           throw new Error('Tenant telemetry requires a hash key');

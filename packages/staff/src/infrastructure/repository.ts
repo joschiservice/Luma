@@ -164,6 +164,31 @@ export function createStaffRepository(pool: Pool): StaffRepository {
   }
 
   return {
+    workspacePlacement(context, workspaceId) {
+      return transaction(context, null, 'staff.directory.read', async (tx) => {
+        const result = await tx.query<{
+          id: string;
+          region: StaffContext['region'];
+          status: string;
+        }>(
+          'SELECT id,data_region AS region,status FROM organizations WHERE id=$1 AND data_region=(SELECT region FROM luma_cell_region)',
+          [workspaceId],
+        );
+        const placement = result.rows[0];
+        if (!placement)
+          throw new StaffError(404, 'Workspace is unavailable in this region.');
+        await audit(
+          tx,
+          context,
+          'directory.placement-resolved',
+          workspaceId,
+          null,
+          { region: placement.region },
+        );
+
+        return placement;
+      });
+    },
     directory(context, query) {
       return transaction(context, null, 'staff.directory.read', async (tx) => {
         const pattern = '%' + query.replace(/[\\%_]/g, '\\$&') + '%';
@@ -200,7 +225,7 @@ export function createStaffRepository(pool: Pool): StaffRepository {
         'staff.workspace.inspect',
         async (tx) => {
           const workspace = await tx.query(
-            "SELECT id FROM organizations WHERE id=$1 AND data_region='EU'",
+            'SELECT id FROM organizations WHERE id=$1 AND data_region=(SELECT region FROM luma_cell_region)',
             [workspaceId],
           );
           if (!workspace.rowCount)
@@ -239,7 +264,7 @@ export function createStaffRepository(pool: Pool): StaffRepository {
         async (tx) => {
           await validateGrant(tx, workspaceId);
           const workspace = await tx.query<DirectoryWorkspace>(
-            'SELECT id,name,slug,status,data_region AS "dataRegion" FROM organizations WHERE id=$1 AND data_region=\'EU\'',
+            'SELECT id,name,slug,status,data_region AS "dataRegion" FROM organizations WHERE id=$1 AND data_region=(SELECT region FROM luma_cell_region)',
             [workspaceId],
           );
           if (!workspace.rows[0])

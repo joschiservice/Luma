@@ -27,7 +27,7 @@ function fixture() {
         id: tenant,
         name: 'Shop',
         slug: 'shop',
-        dataRegion: 'EU',
+        dataRegion: 'AU',
         status: 'active',
       },
       builtInMembership(

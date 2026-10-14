@@ -133,7 +133,12 @@ seconds; unknown mailboxes and malformed payloads get 204 so Pub/Sub stops redel
    Publisher role on it, and create a push subscription to `https://<public-host>/api/v1/gmail/push`
    with authentication enabled, a service account and an audience. Set
    `GMAIL_PUBSUB_TOPIC` (`projects/<project>/topics/<topic>`), `GMAIL_PUSH_AUDIENCE` and
-   `GMAIL_PUSH_SERVICE_ACCOUNT` together.
+   `GMAIL_PUSH_SERVICE_ACCOUNT` and `GMAIL_PUBSUB_STORAGE_REGIONS` together. Configure
+   the topic's message-storage policy to the cell's jurisdiction and inspect its exported
+   configuration before enabling push. AU permits only `australia-southeast1`. The setting
+   is a deployment assertion checked at startup; it does not change Google's topic policy.
+   An unset or foreign storage policy disables push configuration rather than falling back
+   to another jurisdiction. Register OAuth and webhook URLs on the regional web origin.
 
 Simulated connections (labels starting with `SIMULATED`, or `.invalid` mailboxes) route every
 request, including token refresh, to the [simulator](simulator.md) and never reach Google.

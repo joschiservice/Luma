@@ -42,3 +42,5 @@ export type {
 } from './domain/metric.js';
 
 export type { AtomicStore } from './application/atomic-store.js';
+
+export type { DataRegion } from './application/model-gateway.js';

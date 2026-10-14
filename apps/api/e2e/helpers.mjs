@@ -38,6 +38,8 @@ export function startProcess(t, script, env = {}, ipc = false) {
       PATH: process.env.PATH,
       NODE_ENV: 'test',
       SHOPIFY_ADMISSION_URL: process.env.SHOPIFY_ADMISSION_URL,
+      LUMA_REGION: process.env.LUMA_REGION ?? 'AU',
+      LUMA_ENABLED_REGIONS: process.env.LUMA_REGION ?? 'AU',
       ...env,
     },
     stdio: ['ignore', 'pipe', 'pipe', ...(ipc ? ['ipc'] : [])],
@@ -145,6 +147,11 @@ export async function database(t) {
           migration.output,
         );
 
+        if (expectedCode === 0)
+          await owner.query('SELECT luma_provision_cell_region($1)', [
+            process.env.LUMA_REGION ?? 'AU',
+          ]);
+
         return migration.output;
       } finally {
         await lock.query(
@@ -234,6 +241,7 @@ export async function signup(api, name) {
       name,
       email: `${name}@example.test`,
       password: 'long-e2e-test-password',
+      dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
     },
   });
   const cookie = response.headers

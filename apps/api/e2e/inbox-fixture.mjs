@@ -67,6 +67,7 @@ export async function inboxFixture(t, origin = 'http://127.0.0.1:3000') {
       payload: {
         name,
         email: `${name.toLowerCase()}@example.test`,
+        dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
         password: 'inbox-e2e-password-123',
       },
     });

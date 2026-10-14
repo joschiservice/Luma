@@ -1,5 +1,7 @@
 import type { Observability, TraceContext } from './observability.js';
 
+export type DataRegion = 'EU' | 'AU' | 'US';
+
 export type JsonValue =
   null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 
@@ -38,7 +40,7 @@ export type ModelMessage =
 /** Set from trusted application policy after authorization, not from user input. */
 export interface ModelDataPolicy {
   readonly classification: 'public' | 'sensitive';
-  readonly region: 'EU' | 'unrestricted';
+  readonly region: DataRegion | 'unrestricted';
   readonly zeroDataRetention: boolean;
 }
 
@@ -77,12 +79,12 @@ export interface ModelGateway {
   ): Promise<ModelResult<T>>;
 }
 
-export type ModelAdapterId = 'vercel' | 'bedrock-eu';
+export type ModelAdapterId = 'vercel' | 'bedrock';
 
 /**
  * Profile for natural-language workflow authoring. Authoring prompts contain tenant data, so
- * send them as `sensitive` with `region: 'EU'` and route this profile to an EU zero-retention
- * route such as `bedrock-eu`.
+ * send them as `sensitive` with the authorized tenant region and route this profile to a regional zero-retention
+ * route such as `bedrock`.
  */
 export const authoringModelProfile = 'authoring';
 
@@ -101,7 +103,7 @@ export type ModelRoutingPolicy = (
 
 export interface ModelAdapter {
   /** Covers gateway ingress, processing and provider inference. */
-  readonly region: 'EU' | 'unrestricted';
+  readonly region: DataRegion | 'unrestricted';
   readonly supportsZeroDataRetention: boolean;
   generate(
     route: ModelRoute,
@@ -188,10 +190,12 @@ export function createRoutedModelGateway(
           const data = request.dataPolicy;
           if (
             !['public', 'sensitive'].includes(data.classification) ||
-            !['EU', 'unrestricted'].includes(data.region) ||
+            !['EU', 'AU', 'US', 'unrestricted'].includes(data.region) ||
             typeof data.zeroDataRetention !== 'boolean' ||
-            (data.classification === 'sensitive' && data.region !== 'EU') ||
-            (data.region === 'EU' && adapter.region !== 'EU') ||
+            (data.classification === 'sensitive' &&
+              data.region === 'unrestricted') ||
+            (data.region !== 'unrestricted' &&
+              adapter.region !== data.region) ||
             ((data.zeroDataRetention || data.classification === 'sensitive') &&
               !route.zeroDataRetention) ||
             (route.zeroDataRetention && !adapter.supportsZeroDataRetention)

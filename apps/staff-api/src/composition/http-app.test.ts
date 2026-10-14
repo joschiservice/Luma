@@ -14,11 +14,13 @@ function fixture(trustedProxy: string[] = []) {
   };
   const staff: StaffRuntime = {
     settings: { publicOrigin: origin, mode: 'local' },
+    regionalDirectoryEnabled: async () => false,
     authHandler,
     resolveSession: unused,
     checkReadiness: async () => true,
     close: async () => {},
     service: {
+      workspacePlacement: unused,
       directory: unused,
       grant: unused,
       workspace: unused,

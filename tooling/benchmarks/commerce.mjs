@@ -40,7 +40,7 @@ const tenant = makeTenantContext(
     name: 'Benchmark',
     slug: 'benchmark',
     status: 'active',
-    dataRegion: 'EU',
+    dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
   },
   builtInMembership(
     { id: 'member', organizationId: tenantId, userId: 'owner' },

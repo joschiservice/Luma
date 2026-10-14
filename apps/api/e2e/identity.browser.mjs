@@ -45,6 +45,8 @@ async function heading(page, name) {
 
 async function register(page, email = 'ada@example.test') {
   await page.goto('/sign-up');
+  await page.getByRole('radio', { name: /Australia/ }).check();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByLabel('Name', { exact: true }).fill('Ada');
   await page.getByLabel('Email', { exact: true }).fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
@@ -71,7 +73,7 @@ async function signIn(page, email = 'ada@example.test') {
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 }
 
-test('registers, creates EU workspaces, restores links, switches tabs and revokes sessions', async ({
+test('registers, creates AU workspaces, restores links, switches tabs and revokes sessions', async ({
   resources: t,
 }) => {
   const { db, page, context, errors } = await fixture(t);
@@ -84,7 +86,7 @@ test('registers, creates EU workspaces, restores links, switches tabs and revoke
     'SELECT data_region FROM organizations WHERE id = $1',
     [first],
   );
-  expect(row.rows[0].data_region).toBe('EU');
+  expect(row.rows[0].data_region).toBe('AU');
   await page.screenshot({ path: '/tmp/luma-30-desktop.png', fullPage: true });
   await page.goto('/app');
   await page.waitForURL(`**/app/${first}/home*`);
@@ -194,6 +196,8 @@ test('keeps failures recoverable and hides inaccessible tenant content', async (
 }) => {
   const { db, page, errors } = await fixture(t);
   await page.goto('/sign-up');
+  await page.getByRole('radio', { name: /Australia/ }).check();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page
     .getByRole('button', { name: 'Create account', exact: true })
     .click();
@@ -300,6 +304,8 @@ test('handles missing sessions, uncertain registration, conflicts and permission
     await route.abort('failed');
   });
   await page.goto('/sign-up');
+  await page.getByRole('radio', { name: /Australia/ }).check();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByLabel('Name', { exact: true }).fill('Ada');
   await page.getByLabel('Email', { exact: true }).fill('ada@example.test');
   await page.getByLabel('Password', { exact: true }).fill(password);
@@ -332,7 +338,7 @@ test('handles missing sessions, uncertain registration, conflicts and permission
   // The proxy must preserve an untrusted Origin, not replace it with the public host.
   const rejected = await context.request.post('/api/v1/organizations', {
     headers: { origin: 'https://untrusted.example' },
-    data: { name: 'Rejected', slug: 'rejected', dataRegion: 'EU' },
+    data: { name: 'Rejected', slug: 'rejected', dataRegion: 'AU' },
   });
   expect(rejected.status()).toBe(403);
   for (const [status, code, message] of [
@@ -408,6 +414,8 @@ test('handles missing sessions, uncertain registration, conflicts and permission
     }),
   );
   await page.goto('/sign-up');
+  await page.getByRole('radio', { name: /Australia/ }).check();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByLabel('Name', { exact: true }).fill('Grace');
   await page.getByLabel('Email', { exact: true }).fill('grace@example.test');
   await page.getByLabel('Password', { exact: true }).fill(password);
@@ -507,5 +515,67 @@ test('shows a suspended membership as Access suspended until it is reactivated',
   await page.goto(`/app/${suspended}/settings/team`);
   await expect(page.getByText('Owner', { exact: true }).first()).toBeVisible();
   await expect(page.locator('body')).not.toContainText('Access suspended');
+  expect(errors).toEqual([]);
+});
+
+test('requires regional confirmation before account creation and keeps it visible in onboarding', async ({
+  resources: t,
+}) => {
+  const { page, db, errors } = await fixture(t);
+  await page.goto('/sign-up');
+  await heading(page, 'Choose your data region');
+  await expect(page.getByLabel('Name', { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByRole('radio', { name: /Australia/ }),
+  ).not.toBeChecked();
+  await expect(page.getByRole('radio', { name: /Europe/ })).toBeDisabled();
+  await expect(
+    page.getByRole('radio', { name: /United States/ }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole('button', { name: 'Continue', exact: true }),
+  ).toBeDisabled();
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.getByRole('radio', { name: /Australia/ }).focus();
+  await page.keyboard.press('Space');
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Enter');
+  await heading(page, 'Create your account');
+  await expect(
+    page.getByText('Account region: Australia', { exact: true }),
+  ).toBeVisible();
+  await page.getByLabel('Name', { exact: true }).fill('Regional owner');
+  await page
+    .getByLabel('Email', { exact: true })
+    .fill('regional-owner@example.test');
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page
+    .getByRole('button', { name: 'Create account', exact: true })
+    .click();
+  await heading(page, 'Create a workspace');
+  await expect(
+    page.getByText(
+      'This workspace will be created in Australia. Its region cannot be changed here.',
+      { exact: true },
+    ),
+  ).toBeVisible();
+  const workspaceId = await createWorkspace(page, 'Regional studio');
+  const persisted = await db.owner.query(
+    'SELECT data_region FROM organizations WHERE id=$1',
+    [workspaceId],
+  );
+  expect(persisted.rows[0].data_region).toBe('AU');
+  const account = await db.owner.query(
+    'SELECT confirmed_data_region,region_confirmed_at FROM users WHERE email=$1',
+    ['regional-owner@example.test'],
+  );
+  expect(account.rows[0].confirmed_data_region).toBe('AU');
+  expect(account.rows[0].region_confirmed_at).toBeTruthy();
   expect(errors).toEqual([]);
 });

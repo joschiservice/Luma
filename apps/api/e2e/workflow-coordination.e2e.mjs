@@ -41,7 +41,11 @@ it('persists supplier acknowledgment and human handoffs across a durable worker 
       cookie: user.cookie,
       method: 'POST',
       status: 201,
-      body: { name: 'Coordination', slug: 'coordination', dataRegion: 'EU' },
+      body: {
+        name: 'Coordination',
+        slug: 'coordination',
+        dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
+      },
     })
   ).body;
   await db.owner.query(
@@ -319,7 +323,7 @@ it('persists supplier acknowledgment and human handoffs across a durable worker 
   const settings = {
     address: env.address,
     namespace: 'default',
-    dataRegion: 'EU',
+    dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
     taskQueue: randomUUID(),
   };
   const unavailable = async () => {
@@ -340,7 +344,10 @@ it('persists supplier acknowledgment and human handoffs across a durable worker 
   const handle = await env.client.workflow.start('processWorkflow', {
     workflowId: processWorkflowId(org.id, run.id),
     taskQueue: settings.taskQueue,
-    args: [run, version],
+    args: [
+      { ...run, dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU' },
+      version,
+    ],
   });
   await expect
     .poll(async () => (await handle.query('processProgress')).state, {
@@ -480,7 +487,10 @@ it('persists supplier acknowledgment and human handoffs across a durable worker 
   const timedHandle = await env.client.workflow.start('processWorkflow', {
     workflowId: processWorkflowId(org.id, timedRun.id),
     taskQueue: settings.taskQueue,
-    args: [timedRun, timeoutVersion],
+    args: [
+      { ...timedRun, dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU' },
+      timeoutVersion,
+    ],
   });
   expect(await timedHandle.result()).toMatchObject({
     state: 'escalated',
@@ -563,7 +573,10 @@ it('persists supplier acknowledgment and human handoffs across a durable worker 
   const accessHandle = await env.client.workflow.start('processWorkflow', {
     workflowId: processWorkflowId(org.id, accessRun.id),
     taskQueue: settings.taskQueue,
-    args: [accessRun, accessVersion],
+    args: [
+      { ...accessRun, dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU' },
+      accessVersion,
+    ],
   });
   await expect
     .poll(async () => (await accessHandle.query('processProgress')).state, {
@@ -641,7 +654,11 @@ it('persists supplier acknowledgment and human handoffs across a durable worker 
       cookie: other.cookie,
       method: 'POST',
       status: 201,
-      body: { name: 'Other', slug: 'other-coordination', dataRegion: 'EU' },
+      body: {
+        name: 'Other',
+        slug: 'other-coordination',
+        dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
+      },
     })
   ).body;
   await api.request(

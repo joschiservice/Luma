@@ -39,7 +39,7 @@ function reader(permissions: string[]) {
       name: 'Fixture',
       slug: 'fixture',
       status: 'active',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
     },
     {
       ...builtInMembership(

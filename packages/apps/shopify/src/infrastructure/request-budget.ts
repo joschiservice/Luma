@@ -17,7 +17,7 @@ export function shopifyRequestBudget(
   },
   connection: Pick<InstalledConnection, 'tenantId' | 'target'>,
   purpose: RequestPurpose = 'foreground',
-  region = 'EU',
+  region = options.env?.LUMA_REGION ?? 'AU',
 ): ReadBudget {
   if (!options.requestBudgetStore) return createReadBudget();
   const binding = createHash('sha256')

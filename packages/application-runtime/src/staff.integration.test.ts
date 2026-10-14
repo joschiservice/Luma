@@ -59,6 +59,7 @@ describe.skipIf(!databaseUrl)(
         );
         setup.release();
       }
+      await owner.query('SELECT luma_provision_cell_region($1)', ['AU']);
       await admin.query(
         `CREATE ROLE "${login}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
       );
@@ -99,7 +100,7 @@ describe.skipIf(!databaseUrl)(
         [customer],
       );
       await owner.query(
-        "INSERT INTO organizations(id,name,slug,status,data_region,created_at) VALUES($1,'Workspace Alpha','alpha','active','EU',now()),($2,'Workspace Beta','beta','suspended','EU',now())",
+        "INSERT INTO organizations(id,name,slug,status,data_region,created_at) VALUES($1,'Workspace Alpha','alpha','active','AU',now()),($2,'Workspace Beta','beta','suspended','AU',now())",
         [tenantA, tenantB],
       );
       await owner.query(
@@ -155,6 +156,7 @@ describe.skipIf(!databaseUrl)(
             'content-type': 'application/json',
           },
           body: JSON.stringify({
+            dataRegion: 'AU',
             name: 'Customer Bob',
             email: 'bob@example.test',
             password: 'customer-test-password-long-enough',
@@ -186,6 +188,89 @@ describe.skipIf(!databaseUrl)(
       await admin.query(`DROP ROLE IF EXISTS "${login}"`);
       await admin.query(`DROP ROLE IF EXISTS "${customerLogin}"`);
       await admin.end();
+    });
+    it('denies and audits staff outside this cell before directory, grants or commands', async () => {
+      await owner.query(
+        "UPDATE staff_access SET regions=ARRAY['EU'] WHERE email='support@example.test'",
+      );
+      try {
+        for (const request of [
+          { url: '/v1/staff/directory?query=alice', headers: { cookie } },
+          {
+            method: 'POST' as const,
+            url: `/v1/staff/workspaces/${tenantA}/access`,
+            headers: { cookie, origin },
+            payload: { reason: 'Customer requested investigation' },
+          },
+          {
+            method: 'POST' as const,
+            url: `/v1/staff/accounts/${customer}/access`,
+            headers: { cookie, origin },
+            payload: { reason: 'Customer requested investigation' },
+          },
+        ])
+          expect((await app.inject(request)).statusCode).toBe(403);
+        expect(
+          (
+            await owner.query(
+              "SELECT event FROM staff_audit WHERE event='staff.region.denied'",
+            )
+          ).rowCount,
+        ).toBe(3);
+      } finally {
+        await owner.query(
+          "UPDATE staff_access SET regions=ARRAY['AU'] WHERE email='support@example.test'",
+        );
+      }
+    });
+    it('rechecks target placement inside privileged support SQL even with a retained grant', async () => {
+      const target = randomUUID();
+      const grant = randomUUID();
+      const session = (
+        await owner.query<{ id: string; user_id: string }>(
+          "SELECT s.id,s.user_id FROM staff_sessions s JOIN staff_users u ON u.id=s.user_id WHERE u.email='support@example.test' ORDER BY s.created_at DESC LIMIT 1",
+        )
+      ).rows[0]!;
+      await owner.query(
+        "INSERT INTO organizations(id,name,slug,data_region,status,created_at) VALUES($1::uuid,'Other cell',$1::uuid::text,'EU','active',now())",
+        [target],
+      );
+      await owner.query(
+        "INSERT INTO staff_support_grants(id,staff_user_id,staff_session_id,tenant_id,reason,expires_at) VALUES($1,$2,$3,$4,'Retained regional support grant',now()+interval '30 minutes')",
+        [grant, session.user_id, session.id, target],
+      );
+      const tx = await runtime.connect();
+      try {
+        await tx.query('BEGIN');
+        await tx.query(
+          "SELECT set_config('staff.user_id',$1,true),set_config('staff.session_id',$2,true),set_config('staff.grant_id',$3,true)",
+          [session.user_id, session.id, grant],
+        );
+        expect(
+          (
+            await tx.query<{ allowed: boolean }>(
+              'SELECT staff_has_workspace_access($1) AS allowed',
+              [target],
+            )
+          ).rows[0]!.allowed,
+        ).toBe(false);
+        await expect(
+          tx.query('SELECT identity_support_revoke_sessions($1,$2,$3,$4,$5)', [
+            randomUUID(),
+            target,
+            customer,
+            'Customer requested investigation',
+            'regional-sql-test',
+          ]),
+        ).rejects.toMatchObject({ code: '42501' });
+      } finally {
+        await tx.query('ROLLBACK');
+        tx.release();
+        await owner.query('DELETE FROM staff_support_grants WHERE id=$1', [
+          grant,
+        ]);
+        await owner.query('DELETE FROM organizations WHERE id=$1', [target]);
+      }
     });
     it('checks role restrictions and rejects raw customer/session/registry mutations', async () => {
       expect(await staff.checkReadiness()).toBe(true);
@@ -384,7 +469,7 @@ describe.skipIf(!databaseUrl)(
       const tenantC = randomUUID();
       const roleId = randomUUID();
       await owner.query(
-        "INSERT INTO organizations(id,name,slug,status,data_region,created_at) VALUES($1,'Workspace Gamma','gamma','active','EU',now())",
+        "INSERT INTO organizations(id,name,slug,status,data_region,created_at) VALUES($1,'Workspace Gamma','gamma','active','AU',now())",
         [tenantC],
       );
       await owner.query(
@@ -1196,6 +1281,9 @@ describe.skipIf(!databaseUrl)(
       expect(
         columns.rows.map((row) => `${row.relname}.${row.attname}`),
       ).toEqual([
+        'luma_cell_region.provisioned_at',
+        'luma_cell_region.region',
+        'luma_cell_region.singleton',
         'memberships.id',
         'memberships.role',
         'memberships.status',

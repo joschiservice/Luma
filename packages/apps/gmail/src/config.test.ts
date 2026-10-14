@@ -11,6 +11,7 @@ const settings = {
 };
 
 const push = {
+  GMAIL_PUBSUB_STORAGE_REGIONS: 'australia-southeast1',
   GMAIL_PUBSUB_TOPIC: 'projects/luma-test/topics/gmail-push',
   GMAIL_PUSH_AUDIENCE: 'https://luma.test/api/v1/gmail/push',
   GMAIL_PUSH_SERVICE_ACCOUNT: 'Push@luma-test.iam.gserviceaccount.com',
@@ -54,6 +55,7 @@ it('reads optional push settings only together and with OAuth settings', () => {
   expect(() =>
     readGmailConfig({
       ...settings,
+      GMAIL_PUBSUB_STORAGE_REGIONS: 'australia-southeast1',
       GMAIL_PUBSUB_TOPIC: push.GMAIL_PUBSUB_TOPIC,
     }),
   ).toThrow();

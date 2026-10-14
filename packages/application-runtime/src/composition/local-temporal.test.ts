@@ -32,7 +32,7 @@ it('propagates an API span through a real Temporal client, workflow and activity
     address: env.address,
     namespace: 'default',
     taskQueue: randomUUID(),
-    dataRegion: 'EU' as const,
+    dataRegion: 'AU' as const,
     telemetry: { resource, spanProcessor },
   };
   const tenant = makeTenantContext(
@@ -41,7 +41,7 @@ it('propagates an API span through a real Temporal client, workflow and activity
       id: 'tenant',
       name: 'Fixture',
       slug: 'fixture',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
       status: 'active',
     },
     builtInMembership(

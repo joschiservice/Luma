@@ -56,7 +56,11 @@ export function createIdentity(
       ? { passwordMail: createPasswordMail(pool, settings.secret) }
       : {}),
   });
-  const service = createIdentityService(repository);
+  const region = settings.region ?? 'AU';
+  const service = createIdentityService(repository, {
+    region,
+    enabledRegions: settings.enabledRegions ?? [region],
+  });
   const token = (tenantId: string, id: string, generation: number) =>
     createHmac('sha256', settings.secret)
       .update(`invitation:${tenantId}:${id}:${generation}`)
@@ -121,6 +125,11 @@ export function createIdentity(
      */
     eraseDueAccounts: () => eraseDueAccounts(pool, !!provider),
     trustedOrigins: settings.trustedOrigins,
+    regionConfig: {
+      region,
+      enabledRegions: settings.enabledRegions ?? [region],
+      regionalOrigins: settings.regionalOrigins ?? {},
+    },
     handler: auth.handler,
     baseURL: settings.baseURL,
     /** Registers an idle database connection error handler without coupling identity to HTTP. */
@@ -135,7 +144,15 @@ export function createIdentity(
         FROM pg_roles r WHERE r.rolname = current_user`);
       await pool.query('SELECT id FROM sessions LIMIT 0');
 
-      return result.rows[0]?.safe === true;
+      const cell = await pool.query<{ region: string }>(
+        'SELECT region FROM luma_cell_region',
+      );
+
+      return (
+        result.rows[0]?.safe === true &&
+        cell.rows.length === 1 &&
+        cell.rows[0]?.region === region
+      );
     },
     async close() {
       await pool.end();

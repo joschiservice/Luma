@@ -32,7 +32,11 @@ function fixture(
   });
   const staff: StaffRuntime = {
     settings: { publicOrigin: origin, mode },
+    regionalDirectoryEnabled: async () => false,
     service: {
+      workspacePlacement: async () => {
+        throw new Error('Unused');
+      },
       directory,
       grant: async () => {
         throw new Error('Unused');
@@ -90,6 +94,8 @@ function fixture(
 
       return {
         context: {
+          region: 'AU',
+          regions: ['AU'],
           userId: 'staff',
           sessionId: 'session',
           sessionCreatedAt: new Date(),

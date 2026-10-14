@@ -41,6 +41,8 @@ test('evaluates, retries, reloads and reviews a Shadow case through the real API
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/sign-up');
+  await page.getByRole('radio', { name: /Australia/ }).check();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByLabel('Name', { exact: true }).fill('Ada');
   await page.getByLabel('Email', { exact: true }).fill('shadow@example.test');
   await page
@@ -67,7 +69,7 @@ test('evaluates, retries, reloads and reviews a Shadow case through the real API
       id: tenantId,
       name: 'Shadow studio',
       slug: 'shadow',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
       status: 'active',
     },
     builtInMembership(

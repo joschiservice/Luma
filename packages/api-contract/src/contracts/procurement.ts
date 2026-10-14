@@ -363,7 +363,7 @@ export const procurementContract = {
       path: `${path}/purchase-orders/{purchaseOrderId}/messages`,
       summary: 'Record a supplier message',
       description:
-        'Requires `procurement.manage`. Records a supplier message for this order. When an EU model route is configured, Luma lists the commitments it states, each with the exact words it came from; changes, uncertain readings and conditions wait for review. The same message, by message ID or content, is recorded once. Text is removed after the retention period.',
+        'Requires `procurement.manage`. Records a supplier message for this order. When a regional model route is configured, Luma lists the commitments it states, each with the exact words it came from; changes, uncertain readings and conditions wait for review. The same message, by message ID or content, is recorded once. Text is removed after the retention period.',
     })
     .meta({
       access: requires('procurement.manage'),

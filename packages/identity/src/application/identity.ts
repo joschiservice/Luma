@@ -1,4 +1,5 @@
 import type {
+  DataRegion,
   Membership,
   MembershipStatus,
   Organization,
@@ -74,6 +75,7 @@ export interface IdentityTransaction {
   createOrganization(input: {
     name: string;
     slug: string;
+    dataRegion: DataRegion;
   }): Promise<Organization>;
   selectTenant(organizationId: string): Promise<void>;
   lockOrganization(organizationId: string): Promise<void>;
@@ -136,7 +138,14 @@ function memberDto(member: Membership): MemberDto {
   };
 }
 
+/** Resolves placement metadata before opening any tenant data transaction. */
+interface PlacementDirectory {
+  regionForTenant(tenantId: string): Promise<DataRegion | null>;
+}
+
 export interface IdentityRepository {
+  /** Local placement metadata; no customer names or operational data are returned. */
+  placement?: PlacementDirectory;
   getSession(credentials: Credentials): Promise<SessionIdentity | null>;
   /** Support view credentials; see ADR-011. */
   supportViews: SupportViewCredentials;
@@ -158,7 +167,25 @@ export interface IdentityRepository {
  * Creates session and tenant resolution plus organization and membership commands backed by
  * the supplied repository.
  */
-export function createIdentityService(repository: IdentityRepository) {
+export function createIdentityService(
+  repository: IdentityRepository,
+  settings: { region: DataRegion; enabledRegions: readonly DataRegion[] } = {
+    region: 'AU',
+    enabledRegions: ['AU'],
+  },
+) {
+  // Placement uses the same pool as tenant transactions. Resolve it before acquiring a
+  // transaction connection so simultaneous requests cannot each hold one and wait for another.
+  async function requirePlacement(tenantId: string) {
+    const region = await repository.placement?.regionForTenant(tenantId);
+    if (region && region !== settings.region)
+      throw new IdentityError(
+        503,
+        'REGION_UNAVAILABLE',
+        'Organization region is unavailable',
+      );
+  }
+
   async function authenticate(
     credentials: Credentials,
   ): Promise<SessionIdentity> {
@@ -189,6 +216,7 @@ export function createIdentityService(repository: IdentityRepository) {
       member,
       requestId,
       supportView,
+      settings.region,
     );
   }
 
@@ -220,6 +248,7 @@ export function createIdentityService(repository: IdentityRepository) {
     operation: (tx: IdentityTransaction) => Promise<T>,
   ) {
     requireTenant(context, context.tenantId);
+    await requirePlacement(context.tenantId);
 
     return repository.withUser(context.actor.id, async (tx) => {
       await tx.selectTenant(context.tenantId);
@@ -236,6 +265,8 @@ export function createIdentityService(repository: IdentityRepository) {
       tenantId: string,
       requestId: string,
     ) {
+      await requirePlacement(tenantId);
+
       return repository.withUser(userId, (tx) =>
         resolve(
           tx,
@@ -248,6 +279,7 @@ export function createIdentityService(repository: IdentityRepository) {
     /** Resolves the actor's current membership again; a support view stays a support view. */
     async refreshContext(context: TenantContext) {
       requireTenant(context, context.tenantId);
+      await requirePlacement(context.tenantId);
 
       return repository.withUser(context.actor.id, (tx) =>
         resolve(
@@ -391,11 +423,14 @@ export function createIdentityService(repository: IdentityRepository) {
       input: {
         name: string;
         slug: string;
-        dataRegion?: 'EU' | 'US' | 'APAC' | undefined;
+        dataRegion?: DataRegion | undefined;
       },
     ) {
       const session = await authenticate(credentials);
-      if (input.dataRegion && input.dataRegion !== 'EU')
+      if (
+        (input.dataRegion && input.dataRegion !== settings.region) ||
+        !settings.enabledRegions.includes(settings.region)
+      )
         throw new IdentityError(
           422,
           'REGION_UNAVAILABLE',
@@ -403,7 +438,11 @@ export function createIdentityService(repository: IdentityRepository) {
         );
 
       return repository.withUser(session.userId, (tx) =>
-        tx.createOrganization({ name: input.name, slug: input.slug }),
+        tx.createOrganization({
+          name: input.name,
+          slug: input.slug,
+          dataRegion: settings.region,
+        }),
       );
     },
     /**
@@ -421,6 +460,7 @@ export function createIdentityService(repository: IdentityRepository) {
       const support = options.supportView;
       const token = support ? repository.supportViews.token(credentials) : null;
       if (support && token) {
+        await requirePlacement(organizationId);
         const view = await activeSupportView(
           token,
           organizationId,
@@ -443,6 +483,7 @@ export function createIdentityService(repository: IdentityRepository) {
         );
       }
       const session = await authenticate(credentials);
+      await requirePlacement(organizationId);
 
       return repository.withUser(session.userId, (tx) =>
         resolve(tx, session, organizationId, requestId),

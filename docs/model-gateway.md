@@ -2,26 +2,43 @@
 
 The `ModelGateway` port in `@luma/platform` is the only way application services call a
 model. Provider protocols stay in infrastructure, model calls are denied until routes are
-configured, and tenant or personal data may only go to an EU, zero-retention route.
+configured, and tenant or personal data may only go to a route in the tenant’s jurisdiction with zero retention.
 There is no public generation endpoint: callers reach a model only through their own
 authorized application services.
 
+## Regional processing
+
+Every request carries the authorized tenant’s `EU`, `AU` or `US` region. The gateway
+requires a matching adapter and zero retention for sensitive input. An `unrestricted`
+request may carry public input only. AU configuration rejects Vercel routes entirely.
+
+AU production uses Sydney (`ap-southeast-2`). EU destinations are limited to EU member
+states; London and Zurich remain excluded. US destinations remain within the US.
+A bare model runs at the configured endpoint. An `au.`, `eu.` or `us.` profile must match
+the cell, and every destination returned by the control plane must remain in its
+jurisdiction. Global, APAC, other-geography and ARN profiles are denied before inference.
+There are no automatic retries or fallback destinations.
+
+Regional availability is distinct from approval to process customer data. Complete the
+[processing-path review](architecture/003-model-processing-path-review.md), including
+retention and invocation logging in each profile destination, before enabling tenant traffic.
+
 ## Configuration
 
-| Variable                                  | Behavior                                                                                                               |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `MODEL_GATEWAY_ROUTES`                    | JSON object mapping application profiles to routes; defaults to `{}` (calls denied)                                    |
-| `AI_GATEWAY_API_KEY`                      | Required for Vercel routes; server-only secret                                                                         |
-| `MODEL_GATEWAY_BEDROCK_REGION`            | Required for `bedrock-eu` routes: `eu-central-1`, `eu-west-1`, `eu-west-3`, `eu-north-1`, `eu-south-1` or `eu-south-2` |
-| `MODEL_GATEWAY_BEDROCK_ACCESS_KEY_ID`     | Required for `bedrock-eu` routes; server-only                                                                          |
-| `MODEL_GATEWAY_BEDROCK_SECRET_ACCESS_KEY` | Required for `bedrock-eu` routes; server-only secret                                                                   |
-| `MODEL_GATEWAY_BEDROCK_SESSION_TOKEN`     | Set only with temporary AWS credentials; server-only secret                                                            |
-| `MODEL_GATEWAY_TIMEOUT_MS`                | Request timeout, including Bedrock account checks and reading the response; 1–120000 ms, default 30000                 |
+| Variable                                  | Behavior                                                                                               |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `MODEL_GATEWAY_ROUTES`                    | JSON object mapping application profiles to routes; defaults to `{}` (calls denied)                    |
+| `AI_GATEWAY_API_KEY`                      | Required for Vercel routes; server-only secret                                                         |
+| `MODEL_GATEWAY_BEDROCK_REGION`            | Required for `bedrock` routes; must match the configured cell jurisdiction                             |
+| `MODEL_GATEWAY_BEDROCK_ACCESS_KEY_ID`     | Required for `bedrock` routes; server-only                                                             |
+| `MODEL_GATEWAY_BEDROCK_SECRET_ACCESS_KEY` | Required for `bedrock` routes; server-only secret                                                      |
+| `MODEL_GATEWAY_BEDROCK_SESSION_TOKEN`     | Set only with temporary AWS credentials; server-only secret                                            |
+| `MODEL_GATEWAY_TIMEOUT_MS`                | Request timeout, including Bedrock account checks and reading the response; 1–120000 ms, default 30000 |
 
 `apps/api/.env.example` has route examples for every profile. Unknown profiles, empty
 provider lists, partial credentials and invalid route settings fail closed, and route
-errors never include configuration values or secrets. Startup fails when a `bedrock-eu`
-route has no or partial Bedrock settings, or a region outside the list; London
+errors never include configuration values or secrets. Startup fails when a `bedrock`
+route has no or partial Bedrock settings, or a region outside the cell’s list; London
 (`eu-west-2`) and Zurich (`eu-central-2`) are outside the EU.
 
 `ModelRoutingPolicy` may pick another configured profile or return `null` to deny. It sees
@@ -32,12 +49,12 @@ provider options are never request parameters.
 ### Local setup
 
 Managed commands do not generate model settings; put them in `apps/api/.env`. Until a
-`bedrock-eu` route exists, describing workflows, reading supplier messages and documents,
+`bedrock` route exists, describing workflows, reading supplier messages and documents,
 and Ask Luma report why they are unavailable and call no model. Seeded and simulator data is
 synthetic, so the processing-path review does not block local use.
 
 To enable them, create a dedicated IAM principal with the permissions under
-[Bedrock EU adapter](#bedrock-eu-adapter), set the account's retention mode to `none` in the
+[Bedrock regional adapter](#bedrock-regional-adapter), set the account's retention mode to `none` in the
 configured region, copy the Bedrock variables and routes from `apps/api/.env.example`, and
 restart `pnpm dev`. `pnpm evaluate:authoring` reads the same file and makes synthetic calls
 through the `authoring` route.
@@ -46,11 +63,11 @@ through the `authoring` route.
 
 Applications assign `dataPolicy` after authorization and classify the whole input,
 including system messages, retrieved context, tool definitions and tool results. Any tenant
-or personal data is `sensitive`, requires `region: 'EU'` and a zero-retention route. Never
+or personal data is `sensitive`, requires the trusted tenant’s region and a zero-retention route. Never
 take the classification or profile from an HTTP body. Trace context is correlation
 metadata, not authorization.
 
-The Vercel adapter accepts only `public` input with `region: 'unrestricted'`; EU requests
+The Vercel adapter accepts only `public` input with `region: 'unrestricted'`; Regional requests
 fail before network I/O. Vercel's
 [regional inference](https://vercel.com/docs/ai-gateway/security-and-compliance/regional-inference)
 pins provider inference but not gateway TLS termination and processing, so it does not meet
@@ -58,8 +75,8 @@ pins provider inference but not gateway TLS termination and processing, so it do
 prompts, even with zero data retention. It sends the provider allowlist and retention flag
 to the gateway, so providers outside the list cannot be fallbacks.
 
-Use `bedrock-eu` for tenant data. Without Bedrock settings it returns `adapter_unavailable`
-and never falls back to Vercel or a global route. Its EU declaration is not evidence of
+Use `bedrock` for tenant data. Without Bedrock settings it returns `adapter_unavailable`
+and never falls back to Vercel or a global route. Its regional declaration is not evidence of
 provider compliance: complete the
 [processing-path review](architecture/003-model-processing-path-review.md) before sending
 tenant data.
@@ -71,17 +88,17 @@ retry explicitly under the same policy. Redirects are rejected.
 ## Profiles
 
 The tenant-data profiles share one rule: the feature is available only when its
-profile routes to `bedrock-eu` with `zeroDataRetention: true` and Bedrock settings exist.
-Otherwise the feature reports the reason and calls no model. Each sends `sensitive`, EU,
+profile routes to `bedrock` with `zeroDataRetention: true` and Bedrock settings exist.
+Otherwise the feature reports the reason and calls no model. Each sends `sensitive`, tenant-region,
 zero-retention requests.
 
 | Situation                                                                                    | Result                                                                 |
 | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | No route for the profile                                                                     | `route_denied`                                                         |
-| `bedrock-eu` route without Bedrock settings, or a region outside the EU                      | Startup error                                                          |
+| `bedrock` route without Bedrock settings, or a region outside the cell jurisdiction          | Startup error                                                          |
 | Route with `zeroDataRetention: false`                                                        | `route_denied`                                                         |
 | Route to Vercel                                                                              | `route_denied`, or `adapter_unavailable` when Vercel is not configured |
-| Global, non-EU or ARN model ID, or an `eu.` profile that can route outside the EU            | `route_denied`, before the prompt is sent                              |
+| Global, foreign-geography or ARN model ID, or a profile with foreign destinations            | `route_denied`, before the prompt is sent                              |
 | Account retention mode is not `none`, invocation logging delivers payloads, or a check fails | `adapter_unavailable`, before the prompt is sent                       |
 | Throttled by Bedrock                                                                         | `rate_limited`                                                         |
 | Other Bedrock errors                                                                         | `provider_error`                                                       |
@@ -124,27 +141,25 @@ their table facts.
 `assistant` ([Ask Luma](assistant.md)) sends questions, earlier turns and read results. The
 model must support tool use.
 
-## Bedrock EU adapter
+## Bedrock regional adapter
 
 The adapter calls the Bedrock
 [Converse API](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_Converse.html)
 in the configured region with Signature Version 4. It rejects redirects, does not retry, and
 never switches region, route or adapter.
 
-Use an `eu.` cross-region inference profile, such as
-`eu.anthropic.claude-sonnet-4-5-20250929-v1:0`, or a foundation model that runs in the
-configured region. Global (`global.`) and other geographic profiles (`us.`, `us-gov.`,
-`apac.`, `jp.`, `au.`, `ca.`) and ARNs, including application inference profiles and
-provisioned throughput, fail with `route_denied` before any network call.
+Use a jurisdiction-specific profile matching the cell (`au.`, `eu.` or `us.`), or a
+foundation model available in its configured region. Profile destinations are checked before
+sending the prompt; a destination outside the cell jurisdiction denies the request.
 
 Before the first request, and again after five minutes, the adapter checks the account in
 the configured region. Only successful checks are reused; no prompt is sent until all pass.
 
-| Check                                 | Control plane request           | Passes when                                                                                 | Otherwise             |
-| ------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------- | --------------------- |
-| Data retention                        | `GET /data-retention`           | `mode` is `none`                                                                            | `adapter_unavailable` |
-| Invocation logging                    | `GET /logging/modelinvocations` | Logging is off, or `textDataDeliveryEnabled` is `false` and no other data type is delivered | `adapter_unavailable` |
-| Profile destinations (`eu.` profiles) | `GET /inference-profiles/<id>`  | Every destination region is in the EU region list                                           | `route_denied`        |
+| Check                                    | Control plane request           | Passes when                                                                                 | Otherwise             |
+| ---------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------- | --------------------- |
+| Data retention                           | `GET /data-retention`           | `mode` is `none`                                                                            | `adapter_unavailable` |
+| Invocation logging                       | `GET /logging/modelinvocations` | Logging is off, or `textDataDeliveryEnabled` is `false` and no other data type is delivered | `adapter_unavailable` |
+| Profile destinations (regional profiles) | `GET /inference-profiles/<id>`  | Every destination region is in the cell’s AWS region list                                   | `route_denied`        |
 
 With retention mode `none`, Bedrock stores no inputs or outputs and rejects models that
 require retention, such as those retained for
@@ -152,8 +167,8 @@ require retention, such as those retained for
 Set it in the configured region with `PUT /data-retention` and `{"mode":"none"}`; see
 [data retention](https://docs.aws.amazon.com/bedrock/latest/userguide/data-retention.html).
 
-Grant the IAM principal `bedrock:InvokeModel` on the `eu.` profile in the configured region
-and on the foundation model in every destination region, plus
+Grant the IAM principal `bedrock:InvokeModel` on the regional profile in the configured region
+and on the foundation model in every approved destination region, plus
 `bedrock:GetAccountDataRetention`, `bedrock:GetModelInvocationLoggingConfiguration` and
 `bedrock:GetInferenceProfile`, and nothing else. The adapter does not refresh temporary
 credentials; restart with new values before a session token expires.

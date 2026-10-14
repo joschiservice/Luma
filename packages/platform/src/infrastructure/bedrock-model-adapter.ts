@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import type {
+  DataRegion,
   JsonValue,
   ModelAdapter,
   ModelMessage,
@@ -10,18 +11,25 @@ import { ModelGatewayError } from '../application/model-gateway.js';
 import type { AwsCredentials } from './aws-signature.js';
 import { signAwsRequest } from './aws-signature.js';
 
-/** AWS regions located in EU member states. London and Zurich are outside the EU. */
-export const bedrockEuRegions: readonly string[] = [
-  'eu-central-1', // Frankfurt, Germany
-  'eu-north-1', // Stockholm, Sweden
-  'eu-south-1', // Milan, Italy
-  'eu-south-2', // Aragón, Spain
-  'eu-west-1', // Ireland
-  'eu-west-3', // Paris, France
-];
+/** Allowed AWS destinations for each jurisdiction; a profile must stay entirely within it. */
+export const bedrockRegionalAwsRegions: Readonly<
+  Record<DataRegion, readonly string[]>
+> = {
+  EU: [
+    'eu-central-1',
+    'eu-north-1',
+    'eu-south-1',
+    'eu-south-2',
+    'eu-west-1',
+    'eu-west-3',
+  ],
+  AU: ['ap-southeast-2', 'ap-southeast-4'],
+  US: ['us-east-1', 'us-east-2', 'us-west-1', 'us-west-2'],
+};
 
-export interface BedrockEuSettings {
+export interface BedrockSettings {
   readonly region: string;
+  readonly dataRegion?: DataRegion;
   readonly credentials: AwsCredentials;
   /** Bounds the whole call, including retention checks and reading the response. */
   readonly timeoutMs: number;
@@ -29,7 +37,7 @@ export interface BedrockEuSettings {
   readonly verificationIntervalMs?: number;
 }
 
-// Leading segments of cross-region inference profiles that can leave the EU.
+// Leading segments of cross-region inference profiles that can leave the cell jurisdiction.
 const geographies = new Set([
   'global',
   'us',
@@ -44,7 +52,8 @@ const geographies = new Set([
 // A bare foundation model ID (`provider.model`) runs in the configured region. An `eu.`
 // system inference profile routes within its listed destination regions. ARNs, application
 // inference profiles and other geographies are rejected.
-const modelPattern = /^(?:(eu)\.)?([a-z0-9-]+)\.[a-z0-9-]+(?::[a-z0-9-]+)*$/;
+const modelPattern =
+  /^(?:(eu|au|us)\.)?([a-z0-9-]+)\.[a-z0-9-]+(?::[a-z0-9-]+)*$/;
 
 // Only `none` guarantees that AWS stores no inputs or outputs; AWS then rejects models that
 // require retention. `inherit` and `default` fall back to each model's own policy.
@@ -90,22 +99,31 @@ const responseSchema = z.object({
 });
 
 /**
- * Creates the Amazon Bedrock adapter for EU processing with zero data retention. Calls use
- * the Converse API on the configured EU regional endpoint and never fall back to another
+ * Creates the Amazon Bedrock adapter for regional processing with zero data retention. Calls use
+ * the Converse API on the configured regional regional endpoint and never fall back to another
  * region. Before inference, and again after each verification interval, the adapter reads
  * the account's data retention mode, its model invocation logging configuration and the
  * destination regions of `eu.` inference profiles. It fails closed with
  * `adapter_unavailable` unless retention is `none` and invocation logging excludes payloads,
  * or when a check fails. It fails with `route_denied` when a model ID or profile destination
- * could leave the EU. Throws at construction for a non-EU region or missing credentials.
+ * could leave the cell jurisdiction. Throws at construction for a mismatched region or missing credentials.
  */
-export function createBedrockEuModelAdapter(
-  settings: BedrockEuSettings,
+export function createBedrockModelAdapter(
+  settings: BedrockSettings,
   transport: typeof fetch = fetch,
   now: () => number = () => Date.now(),
 ): ModelAdapter {
-  if (!bedrockEuRegions.includes(settings.region))
-    throw new Error('Bedrock region must be an AWS region in the EU');
+  const dataRegion =
+    settings.dataRegion ??
+    (Object.entries(bedrockRegionalAwsRegions).find(([, regions]) =>
+      regions.includes(settings.region),
+    )?.[0] as DataRegion | undefined);
+  if (
+    !dataRegion ||
+    !bedrockRegionalAwsRegions[dataRegion].includes(settings.region)
+  )
+    throw new Error('Bedrock region must match the cell jurisdiction');
+  const allowedRegions = bedrockRegionalAwsRegions[dataRegion];
   if (
     !settings.credentials.accessKeyId ||
     !settings.credentials.secretAccessKey
@@ -184,7 +202,7 @@ export function createBedrockEuModelAdapter(
           throw new ModelGatewayError('adapter_unavailable');
         if (
           !destinations.data.models.every(({ modelArn }) =>
-            bedrockEuRegions.includes(
+            allowedRegions.includes(
               /^arn:aws:bedrock:([a-z0-9-]+):/.exec(modelArn)?.[1] ?? '',
             ),
           )
@@ -199,11 +217,15 @@ export function createBedrockEuModelAdapter(
   }
 
   return {
-    region: 'EU',
+    region: dataRegion,
     supportsZeroDataRetention: true,
     async generate(route, request) {
       const model = modelPattern.exec(route.model);
-      if (!model || geographies.has(model[2]!))
+      if (
+        !model ||
+        geographies.has(model[2]!) ||
+        (model[1] && model[1] !== dataRegion.toLowerCase())
+      )
         throw new ModelGatewayError('route_denied');
       const outputName = request.output?.name;
       if (request.tools?.some((tool) => tool.name === outputName))
@@ -214,7 +236,7 @@ export function createBedrockEuModelAdapter(
         ? AbortSignal.any([timeout, request.signal])
         : timeout;
       try {
-        await verify(route.model, model[1] === 'eu', signal);
+        await verify(route.model, !!model[1], signal);
         const response = await send(
           `${runtimeOrigin}/model/${encodeURIComponent(route.model)}/converse`,
           signal,

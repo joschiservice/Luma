@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import type { IdentityService, TenantContext } from '@luma/identity';
 import { requirePermission, requireTenant } from '@luma/identity';
 import type {
@@ -14,6 +16,7 @@ import {
 import { WorkflowIdReusePolicy } from '@temporalio/common';
 import { NativeConnection, Worker } from '@temporalio/worker';
 
+import { temporalDataConverter } from './payload-codec.js';
 import {
   temporalActivities,
   type TemporalSettings,
@@ -23,13 +26,16 @@ import {
 
 /** Uses one stable Temporal ID for every process run, including uncertain start retries. */
 export const processWorkflowId = (tenantId: string, runId: string) =>
-  `process-v2:${tenantId}:${runId}`;
+  `process-v2:${createHash('sha256')
+    .update(JSON.stringify([tenantId, runId]))
+    .digest('hex')}`;
 
 /** Starts and queries exact published versions; callers must persist the run before starting it. */
 function createProcessCommands(
   client: Client,
   taskQueue: string,
   identity: Pick<IdentityService, 'refreshContext'>,
+  dataRegion: TemporalSettings['dataRegion'],
 ) {
   async function scope(context: TenantContext, run: ProcessRun) {
     // Process runs prepare actions as their principal; admission checks execution separately.
@@ -38,6 +44,8 @@ function createProcessCommands(
     const fresh = await identity.refreshContext(context);
     requireTenant(fresh, run.tenantId);
     requirePermission(fresh, 'actions.propose');
+    if (fresh.dataRegion !== dataRegion)
+      throw new Error('Workflow region rejected');
     if (fresh.actor.id !== context.actor.id || fresh.actor.id !== run.actor.id)
       throw new Error('Workflow principal changed');
 
@@ -69,7 +77,7 @@ function createProcessCommands(
           client.workflow.start('processWorkflow', {
             workflowId: id,
             taskQueue,
-            args: [run, version],
+            args: [{ ...run, dataRegion: context.dataRegion }, version],
             workflowIdReusePolicy: WorkflowIdReusePolicy.REJECT_DUPLICATE,
           });
         await (timeoutMs === undefined
@@ -121,6 +129,7 @@ export async function createProcessWorker(
   activities: ProcessActivities,
 ) {
   validateSettings(settings);
+  const data = temporalDataConverter(settings);
   const connection = await NativeConnection.connect({
     address: settings.address,
     ...(settings.tls === undefined ? {} : { tls: settings.tls }),
@@ -132,14 +141,22 @@ export async function createProcessWorker(
       namespace: settings.namespace,
       taskQueue: settings.taskQueue,
       workflowsPath: workflowPath(),
-      activities: temporalActivities(activities, settings.captureActivityError),
+      dataConverter: data.converter,
+      activities: temporalActivities(
+        activities,
+        settings.captureActivityError,
+        settings.dataRegion,
+      ),
       shutdownGraceTime: '30 seconds',
     });
 
     return {
       run: () => worker.run(),
       shutdown: () => worker.shutdown(),
-      close: () => connection.close(),
+      close: async () => {
+        data.close();
+        await connection.close();
+      },
     };
   } catch (error) {
     await connection.close();
@@ -153,16 +170,29 @@ export async function createProcessClient(
   identity: Pick<IdentityService, 'refreshContext'>,
 ) {
   validateSettings(settings);
+  const data = temporalDataConverter(settings);
   const connection = await Connection.connect({
     connectTimeout: '2 seconds',
     address: settings.address,
     ...(settings.tls === undefined ? {} : { tls: settings.tls }),
     ...(settings.apiKey ? { apiKey: settings.apiKey } : {}),
   });
-  const client = new Client({ connection, namespace: settings.namespace });
+  const client = new Client({
+    connection,
+    namespace: settings.namespace,
+    dataConverter: data.converter,
+  });
 
   return {
-    ...createProcessCommands(client, settings.taskQueue, identity),
-    close: () => connection.close(),
+    ...createProcessCommands(
+      client,
+      settings.taskQueue,
+      identity,
+      settings.dataRegion,
+    ),
+    close: async () => {
+      data.close();
+      await connection.close();
+    },
   };
 }

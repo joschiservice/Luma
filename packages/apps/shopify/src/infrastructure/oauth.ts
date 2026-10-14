@@ -78,6 +78,7 @@ export function createShopifyOAuth(
     'cipher' | 'refreshContext' | 'verify'
   > & {
     requestBudgetStore?: BudgetStore | undefined;
+    env?: Readonly<Record<string, string | undefined>>;
     fetch?: typeof globalThis.fetch;
     now?: () => Date;
     requireInstalled?: (context: TenantContext) => Promise<number>;
@@ -189,6 +190,7 @@ export function createShopifyOAuth(
         {
           requestBudgetStore: deps.requestBudgetStore,
           env: {
+            ...deps.env,
             SHOPIFY_APP_ENVIRONMENT: config.environment,
             SHOPIFY_CLIENT_ID: config.clientId,
           },
@@ -380,6 +382,7 @@ export function createShopifyOAuth(
                 {
                   requestBudgetStore: deps.requestBudgetStore,
                   env: {
+                    ...deps.env,
                     SHOPIFY_APP_ENVIRONMENT: config.environment,
                     SHOPIFY_CLIENT_ID: config.clientId,
                   },
@@ -844,6 +847,7 @@ export function createShopifyOAuth(
                 {
                   requestBudgetStore: deps.requestBudgetStore,
                   env: {
+                    ...deps.env,
                     SHOPIFY_APP_ENVIRONMENT: config.environment,
                     SHOPIFY_CLIENT_ID: config.clientId,
                   },

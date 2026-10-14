@@ -49,7 +49,7 @@ export async function workspaceTransaction<T>(
         `exceptions:${tenantId}`,
       ]);
     const org = await tx.query(
-      `SELECT id FROM organizations WHERE id=$1 AND status='active' AND data_region='EU'${readOnly ? '' : ' FOR UPDATE'}`,
+      `SELECT id FROM organizations WHERE id=$1 AND status='active' AND data_region=(SELECT region FROM luma_cell_region)${readOnly ? '' : ' FOR UPDATE'}`,
       [tenantId],
     );
     if (!org.rowCount)

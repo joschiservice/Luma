@@ -129,7 +129,11 @@ export async function seedPilot(
       payload,
     });
     if (response.statusCode === 401)
-      response = await request('/auth/sign-up/email', { ...payload, name });
+      response = await request('/auth/sign-up/email', {
+        ...payload,
+        name,
+        dataRegion: env.LUMA_REGION ?? 'AU',
+      });
     if (response.statusCode !== 200) throw new Error('Pilot sign-in failed');
     const cookies = response.headers['set-cookie'];
     cookie = (Array.isArray(cookies) ? cookies : [cookies])
@@ -154,7 +158,7 @@ export async function seedPilot(
       await request('/v1/organizations', {
         name: `Synthetic pilot · ${scenario}`,
         slug: `pilot-${manifest.runId}`,
-        dataRegion: 'EU',
+        dataRegion: settings.region,
       })
     ).json();
     manifest.organizationId = organization.id;

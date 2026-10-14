@@ -1,8 +1,12 @@
+import type { DataRegion } from './regions.js';
+import { readRegionConfig, regionalAwsRegions } from './regions.js';
+
 export interface ModelGatewayConfig {
+  dataRegion: DataRegion;
   routes: Record<
     string,
     {
-      adapter: 'vercel' | 'bedrock-eu';
+      adapter: 'vercel' | 'bedrock';
       model: string;
       providers: string[];
       zeroDataRetention: boolean;
@@ -20,25 +24,16 @@ export interface ModelGatewayConfig {
   timeoutMs: number;
 }
 
-// AWS regions located in EU member states. Keep in sync with the platform Bedrock adapter.
-const bedrockEuRegions = [
-  'eu-central-1',
-  'eu-north-1',
-  'eu-south-1',
-  'eu-south-2',
-  'eu-west-1',
-  'eu-west-3',
-];
-
 /**
  * Reads model routes and provider credentials. Profiles and provider allowlists are
  * deployment policy, never request parameters. Throws when a configured route lacks its
- * credentials, when Bedrock settings are partial or outside the EU, or when any value is
+ * credentials, when Bedrock settings are partial or outside the cell jurisdiction, or when any value is
  * invalid; error messages never include configured values.
  */
 export function readModelGatewayConfig(
   env: Readonly<Record<string, string | undefined>>,
 ): ModelGatewayConfig {
+  const { region: dataRegion } = readRegionConfig(env);
   const timeout = env.MODEL_GATEWAY_TIMEOUT_MS ?? '30000';
   if (!/^\d+$/.test(timeout) || Number(timeout) < 1 || Number(timeout) > 120000)
     throw new Error('MODEL_GATEWAY_TIMEOUT_MS must be between 1 and 120000');
@@ -65,7 +60,7 @@ export function readModelGatewayConfig(
         (key) =>
           !['adapter', 'model', 'providers', 'zeroDataRetention'].includes(key),
       ) ||
-      !['vercel', 'bedrock-eu'].includes(String(route.adapter)) ||
+      !['vercel', 'bedrock'].includes(String(route.adapter)) ||
       typeof route.model !== 'string' ||
       !/^[a-z0-9][a-z0-9._:/-]{0,159}$/.test(route.model) ||
       !Array.isArray(route.providers) ||
@@ -79,12 +74,17 @@ export function readModelGatewayConfig(
     )
       throw new Error('Invalid model route');
     routes[profile] = {
-      adapter: route.adapter as 'vercel' | 'bedrock-eu',
+      adapter: route.adapter as 'vercel' | 'bedrock',
       model: route.model,
       providers: [...new Set(route.providers as string[])],
       zeroDataRetention: route.zeroDataRetention,
     };
   }
+  if (
+    dataRegion === 'AU' &&
+    Object.values(routes).some((route) => route.adapter === 'vercel')
+  )
+    throw new Error('Vercel AI Gateway is unavailable in the AU cell');
   const apiKey = env.AI_GATEWAY_API_KEY;
   if (
     Object.values(routes).some((route) => route.adapter === 'vercel') &&
@@ -93,7 +93,7 @@ export function readModelGatewayConfig(
     throw new Error('AI_GATEWAY_API_KEY is required for Vercel routes');
   const bedrock = readBedrockConfig(env);
   if (
-    Object.values(routes).some((route) => route.adapter === 'bedrock-eu') &&
+    Object.values(routes).some((route) => route.adapter === 'bedrock') &&
     !bedrock
   )
     throw new Error(
@@ -101,6 +101,7 @@ export function readModelGatewayConfig(
     );
 
   return {
+    dataRegion,
     routes,
     timeoutMs: Number(timeout),
     ...(apiKey ? { apiKey } : {}),
@@ -122,9 +123,9 @@ function readBedrockConfig(
     throw new Error(
       'Configure MODEL_GATEWAY_BEDROCK_REGION, MODEL_GATEWAY_BEDROCK_ACCESS_KEY_ID and MODEL_GATEWAY_BEDROCK_SECRET_ACCESS_KEY together',
     );
-  if (!bedrockEuRegions.includes(region))
+  if (!regionalAwsRegions[readRegionConfig(env).region].includes(region))
     throw new Error(
-      'MODEL_GATEWAY_BEDROCK_REGION must be an AWS region in the EU',
+      'MODEL_GATEWAY_BEDROCK_REGION must be an AWS region in the cell jurisdiction',
     );
   if (
     !/^[A-Z0-9]{16,128}$/.test(accessKeyId) ||

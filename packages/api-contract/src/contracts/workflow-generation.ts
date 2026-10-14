@@ -43,7 +43,7 @@ export const workflowGenerationContract = {
       path: `${authoring}/generation`,
       summary: 'Check whether workflows can be described here',
       description:
-        'Requires `workflows.read`. Describing workflows needs an EU model route with zero data retention. When none is configured, `reason` explains what an administrator must set up.',
+        'Requires `workflows.read`. Describing workflows needs a regional model route with zero data retention. When none is configured, `reason` explains what an administrator must set up.',
     })
     .meta({
       access: requires('workflows.read'),

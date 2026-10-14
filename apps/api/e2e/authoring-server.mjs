@@ -56,7 +56,7 @@ globalThis.fetch = async (input, init) => {
       models: [
         {
           modelArn:
-            'arn:aws:bedrock:eu-central-1::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0',
+            'arn:aws:bedrock:ap-southeast-2::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0',
         },
       ],
     });
@@ -81,13 +81,13 @@ Object.assign(process.env, {
   LOG_LEVEL: 'info',
   MODEL_GATEWAY_ROUTES: JSON.stringify({
     authoring: {
-      adapter: 'bedrock-eu',
+      adapter: 'bedrock',
       model: authoringModel,
       providers: ['bedrock'],
       zeroDataRetention: true,
     },
   }),
-  MODEL_GATEWAY_BEDROCK_REGION: 'eu-central-1',
+  MODEL_GATEWAY_BEDROCK_REGION: 'ap-southeast-2',
   MODEL_GATEWAY_BEDROCK_ACCESS_KEY_ID: 'AKIAEXAMPLEE2E00001',
   MODEL_GATEWAY_BEDROCK_SECRET_ACCESS_KEY: 'e2e-secret-access-key',
 });

@@ -38,6 +38,7 @@ test('opens contextual issue guides and preserves the investigation across help 
   const signup = await context.request.post('/api/auth/sign-up/email', {
     headers: { origin },
     data: {
+      dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
       name: 'Ada',
       email: 'help@example.test',
       password: 'help-browser-password-123',
@@ -50,7 +51,7 @@ test('opens contextual issue guides and preserves the investigation across help 
     data: {
       name: 'North Studio',
       slug: `help-${randomUUID()}`,
-      dataRegion: 'EU',
+      dataRegion: 'AU',
     },
   });
   expect(creation.status()).toBe(201);

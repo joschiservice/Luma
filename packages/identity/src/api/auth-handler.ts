@@ -1,5 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 
+import type { DataRegion } from '../domain/context.js';
+
 // Organization endpoints go through the typed API and scoped identity transactions.
 const endpoints = new Set([
   'POST /sign-up/email',
@@ -34,7 +36,16 @@ export function registerAuthHandler(
   app: FastifyInstance,
   handler: (request: Request) => Promise<Response>,
   baseURL: string,
+  regionConfig?: {
+    region: DataRegion;
+    enabledRegions: readonly DataRegion[];
+    regionalOrigins: Partial<Record<DataRegion, string>>;
+  },
 ) {
+  if (regionConfig)
+    app.get('/auth/region-config', async (_request, reply) =>
+      reply.header('cache-control', 'no-store').send(regionConfig),
+    );
   app.route({
     method: ['GET', 'POST'],
     url: '/auth/*',

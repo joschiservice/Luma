@@ -38,7 +38,7 @@ const organizationAccessSchema = organizationSchema.extend({
 
 const tenantContextSchema = z.object({
   tenantId: z.string().uuid(),
-  dataRegion: z.literal('EU'),
+  dataRegion: dataRegionSchema,
   requestId: z.string(),
   actor: z.object({
     type: z.literal('user'),
@@ -231,7 +231,7 @@ export const identityContract = {
       successStatus: 201,
       summary: 'Create an organization',
       description:
-        'Creates an EU organization with you as its owner. Other regions are unavailable.',
+        'Creates a workspace in this cell’s confirmed data region with you as its owner. Other regions are rejected.',
     })
     .meta({ errors: [...errors, 422] })
     .input(

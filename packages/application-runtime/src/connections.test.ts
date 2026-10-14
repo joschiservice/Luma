@@ -69,7 +69,7 @@ const context = (
       id: tenantId,
       name: 'Store',
       slug: 'store',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
       status: 'active',
     },
     builtInMembership(

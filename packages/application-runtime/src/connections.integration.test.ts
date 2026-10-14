@@ -21,7 +21,7 @@ describe.skipIf(!databaseUrl)('installed connections on PostgreSQL', () => {
   const context = (id = randomUUID()) =>
     makeTenantContext(
       { userId: 'admin', sessionId: 'session' },
-      { id, name: 'Store', slug: 'store', dataRegion: 'EU', status: 'active' },
+      { id, name: 'Store', slug: 'store', dataRegion: 'AU', status: 'active' },
       builtInMembership(
         { id: 'membership', organizationId: id, userId: 'admin' },
         'admin',

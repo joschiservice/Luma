@@ -2,6 +2,7 @@ import type {
   AccountDeletionCategory,
   AccountDeletionCommand,
   AccountDisableCategory,
+  DataRegion,
   SecurityEventType,
   SupportAccountChange,
   SupportAccountDeletion,
@@ -193,6 +194,11 @@ export type AccountDeletionInput = {
 } & AccountDeletionCommand;
 
 export interface StaffRepository {
+  /** Resolves opaque workspace placement under directory admission, with an audit entry. */
+  workspacePlacement(
+    context: StaffContext,
+    workspaceId: string,
+  ): Promise<{ id: string; region: DataRegion; status: string }>;
   directory(
     context: StaffContext,
     query: string,
@@ -292,6 +298,12 @@ export function createStaffService(
   options: { customerOrigin?: string | undefined } = {},
 ) {
   return {
+    /** Resolves a workspace ID without exposing a customer name or email. */
+    workspacePlacement(context: StaffContext, workspaceId: string) {
+      requireStaffPermission(context, 'staff.directory.read');
+
+      return repository.workspacePlacement(context, workspaceId);
+    },
     /** Searches minimal directory metadata; every successful search is audited. */
     directory(context: StaffContext, query: string) {
       requireStaffPermission(context, 'staff.directory.read');
@@ -453,8 +465,15 @@ type StaffService = ReturnType<typeof createStaffService>;
 
 /** Staff HTTP composition port; callers receive operations without database handles. */
 export interface StaffRuntime {
-  settings: { publicOrigin: string; mode: 'local' | 'google' };
+  settings: {
+    publicOrigin: string;
+    mode: 'local' | 'google';
+    region?: DataRegion | undefined;
+    regionalApiOrigins?: Partial<Record<DataRegion, string>> | undefined;
+  };
   service: StaffService;
+  /** Evaluates the remote directory rollout; cell isolation always applies. */
+  regionalDirectoryEnabled(): Promise<boolean>;
   /** Handles only the separately namespaced staff authentication exchange. */
   authHandler(request: Request): Promise<Response>;
   /** Rechecks identity admission and session lifetime before returning current staff privileges. */

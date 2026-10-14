@@ -68,6 +68,7 @@ describe.skipIf(!databaseUrl)(
         payload: {
           name,
           email: `${name}@example.test`,
+          dataRegion: 'AU',
           password: 'test-password-long-enough',
         },
       });
@@ -91,7 +92,7 @@ describe.skipIf(!databaseUrl)(
       });
       expect(response.statusCode, response.body).toBe(201);
       expect(response.json()).toMatchObject({
-        dataRegion: 'EU',
+        dataRegion: 'AU',
         status: 'active',
       });
 
@@ -126,6 +127,7 @@ describe.skipIf(!databaseUrl)(
         );
         roleSetup.release();
       }
+      await owner.query('SELECT luma_provision_cell_region($1)', ['AU']);
       await admin.query(
         `CREATE ROLE "${login}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
       );
@@ -182,6 +184,7 @@ describe.skipIf(!databaseUrl)(
             headers: { origin },
             payload: {
               email: `${index === 0 ? 'alice' : 'bob'}@example.test`,
+              dataRegion: 'AU',
               password: 'test-password-long-enough',
             },
           });
@@ -233,7 +236,7 @@ describe.skipIf(!databaseUrl)(
       expect(context.statusCode, context.body).toBe(200);
       expect(context.json()).toMatchObject({
         tenantId: orgA,
-        dataRegion: 'EU',
+        dataRegion: 'AU',
         actor: {
           type: 'user',
           id: alice.id,
@@ -315,7 +318,7 @@ describe.skipIf(!databaseUrl)(
           headers: {
             ...headers(alice.cookie),
             'x-organization-id': orgA,
-            'x-data-region': 'EU',
+            'x-data-region': 'AU',
           },
         });
         expect(response.statusCode, response.body).toBe(404);
@@ -323,7 +326,7 @@ describe.skipIf(!databaseUrl)(
       }
     });
     it('rejects region overrides, identity injection and cross-origin mutations', async () => {
-      for (const dataRegion of ['US', 'APAC']) {
+      for (const dataRegion of ['US', 'EU']) {
         const response = await app.inject({
           method: 'POST',
           url: '/v1/organizations',
@@ -482,7 +485,7 @@ describe.skipIf(!databaseUrl)(
         ).statusCode,
       ).toBe(503);
       await owner.query(
-        "UPDATE organizations SET data_region = 'EU' WHERE id = $1",
+        "UPDATE organizations SET data_region = 'AU' WHERE id = $1",
         [orgA],
       );
     });
@@ -871,6 +874,7 @@ describe.skipIf(!databaseUrl)(
         headers: { origin },
         payload: {
           email: 'alice@example.test',
+          dataRegion: 'AU',
           password: 'test-password-long-enough',
         },
       });
@@ -1168,6 +1172,7 @@ describe.skipIf(!databaseUrl)(
             headers: { origin },
             payload: {
               email: `${name}@example.test`,
+              dataRegion: 'AU',
               password: 'test-password-long-enough',
             },
           });

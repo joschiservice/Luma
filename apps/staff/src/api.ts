@@ -20,10 +20,18 @@ import {
   staffSupportViewSchema,
   staffWorkspaceDetailSchema,
   staffWorkspaceHealthSchema,
+  staffWorkspacePlacementSchema,
 } from '@luma/api-contract/staff';
+import { useSearch } from '@tanstack/react-router';
 import type { z } from 'zod';
 
 import { staffActivity } from './activity';
+import {
+  regionalFetch,
+  staffPath,
+  type StaffRegion,
+  staffRegion,
+} from './regions';
 
 /** A rejected staff request. Status zero means no response arrived. */
 export class StaffApiError extends Error {
@@ -77,12 +85,13 @@ async function conflictMessage(response: Response) {
 }
 
 /**
- * Creates the same-origin staff API client. Cookies stay HTTP-only and all responses bypass
+ * Creates an isolated staff API client with an injectable regional fetcher. Cookies stay HTTP-only and responses bypass
  * the browser cache; successful business responses are validated against shared contracts.
  */
 export function createStaffApi(
   fetcher: typeof fetch = fetch,
   activity: Pick<typeof staffActivity, 'consume'> = staffActivity,
+  activityScope: string | (() => string) = 'default',
 ) {
   async function request(
     path: string,
@@ -90,7 +99,11 @@ export function createStaffApi(
     signal?: AbortSignal,
   ): Promise<unknown> {
     const active =
-      path !== 'config' && !path.startsWith('auth/') && activity.consume();
+      path !== 'config' &&
+      !path.startsWith('auth/') &&
+      activity.consume(
+        typeof activityScope === 'string' ? activityScope : activityScope(),
+      );
     let response: Response;
     try {
       response = await fetcher(
@@ -152,6 +165,10 @@ export function createStaffApi(
           undefined,
           signal,
         ),
+      ),
+    placement: async (workspaceId: string, signal?: AbortSignal) =>
+      staffWorkspacePlacementSchema.parse(
+        await request(`${workspace(workspaceId)}/placement`, undefined, signal),
       ),
     grant: async (workspaceId: string, reason: string) =>
       staffAccessGrantSchema.parse(
@@ -359,8 +376,8 @@ export function createStaffApi(
     google: async () => {
       const response = await request('auth/sign-in/social', {
         provider: 'google',
-        callbackURL: `${window.location.origin}/`,
-        errorCallbackURL: `${window.location.origin}/login?signInFailed=true`,
+        callbackURL: `${window.location.origin}${staffPath('/')}`,
+        errorCallbackURL: `${window.location.origin}${staffPath('/login?signInFailed=true')}`,
       });
       if (
         !response ||
@@ -383,4 +400,17 @@ export function createStaffApi(
   };
 }
 
-export const staffApi = createStaffApi();
+/** Binds private requests to one region for the lifetime of the caller's query or command. */
+export function staffApiForRegion(region: StaffRegion = staffRegion()) {
+  return createStaffApi(regionalFetch(region), staffActivity, region);
+}
+
+/** Uses the rendered route's owning region even while a different regional navigation is pending. */
+export function useRegionalStaffApi() {
+  const region = useSearch({
+    strict: false,
+    select: (search) => search.region,
+  });
+
+  return staffApiForRegion(region ?? staffRegion());
+}

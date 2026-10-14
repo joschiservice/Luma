@@ -19,7 +19,7 @@ function operator(role: 'owner' | 'admin' | 'member') {
       id: tenantId,
       name: 'Tenant',
       slug: 'tenant',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
       status: 'active',
     },
     builtInMembership(

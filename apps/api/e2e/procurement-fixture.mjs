@@ -20,7 +20,7 @@ export async function procurementFixture(t, origin, env = {}) {
       body: {
         name: 'Northstar Operations',
         slug: 'procurement',
-        dataRegion: 'EU',
+        dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
       },
     })
   ).body;

@@ -30,7 +30,11 @@ it('evaluates published code in Wasmtime, persists replay and isolates actors an
       cookie: user.cookie,
       method: 'POST',
       status: 201,
-      body: { name: 'Code studio', slug: 'code-studio', dataRegion: 'EU' },
+      body: {
+        name: 'Code studio',
+        slug: 'code-studio',
+        dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
+      },
     })
   ).body;
   const { version, context } = await seedCodeSteps(db, org.id);

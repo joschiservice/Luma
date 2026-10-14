@@ -190,7 +190,7 @@ export function createDiagnosisService(
               profile: options.model!.profile,
               dataPolicy: {
                 classification: 'sensitive',
-                region: 'EU',
+                region: context.dataRegion,
                 zeroDataRetention: true,
               },
               messages: [

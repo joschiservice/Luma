@@ -92,6 +92,8 @@ test('protects sign-in with an authenticator app and signs in with a passkey', a
 }) => {
   const { db, page, errors, cdp, authenticatorId } = await fixture(t);
   await page.goto('/sign-up');
+  await page.getByRole('radio', { name: /Australia/ }).check();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByLabel('Name', { exact: true }).fill('Grace');
   await page.getByLabel('Email', { exact: true }).fill('grace@example.test');
   await page.getByLabel('Password', { exact: true }).fill(password);

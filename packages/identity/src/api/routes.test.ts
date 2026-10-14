@@ -13,6 +13,7 @@ import type { Membership, Organization } from '../domain/context.js';
 import { IdentityError } from '../domain/context.js';
 import type { BuiltInRoleKey } from '../domain/roles.js';
 import { builtInReference, PermissionSet } from '../domain/roles.js';
+import { registerAuthHandler } from './auth-handler.js';
 import { registerContractRoutes } from './contract-routes.js';
 import { identityRoutes, registerIdentityGuards } from './routes.js';
 
@@ -21,7 +22,7 @@ const organization: Organization = {
   name: 'Organization',
   slug: 'organization',
   status: 'active',
-  dataRegion: 'EU',
+  dataRegion: 'AU',
 };
 
 const withRole = (membership: Membership, key: BuiltInRoleKey): Membership => {
@@ -144,7 +145,11 @@ function fixture() {
     end: vi.fn<SupportViewCredentials['end']>(),
     sweep: vi.fn<SupportViewCredentials['sweep']>(),
   } satisfies SupportViewCredentials;
+  const regionForTenant = vi
+    .fn<NonNullable<IdentityRepository['placement']>['regionForTenant']>()
+    .mockResolvedValue('AU');
   const service = createIdentityService({
+    placement: { regionForTenant },
     getSession,
     supportViews,
     listSecurityEvents: async () => [],
@@ -161,7 +166,7 @@ function fixture() {
   });
   registerContractRoutes(app, apiContract.identity, identityRoutes(service));
 
-  return { app, tx, getSession, service, supportViews };
+  return { app, tx, getSession, service, supportViews, regionForTenant };
 }
 
 const viewId = '77777777-7777-4777-8777-777777777777';
@@ -546,4 +551,58 @@ it('rejects assigning a custom role with permissions the actor lacks', async () 
   });
   expect(response.statusCode).toBe(403);
   expect(tx.updateMember).not.toHaveBeenCalled();
+});
+
+it('rejects another cell before reading membership or workspace state', async () => {
+  const { app, tx, regionForTenant } = fixture();
+  regionForTenant.mockResolvedValue('EU');
+  const response = await app.inject({ url: `${base}/context`, headers });
+  expect(response.statusCode).toBe(503);
+  expect(response.json()).toMatchObject({ code: 'REGION_UNAVAILABLE' });
+  expect(tx.findMembership).not.toHaveBeenCalled();
+  expect(tx.findOrganization).not.toHaveBeenCalled();
+});
+
+it('creates workspaces only in the cell and rejects a different or disabled choice', async () => {
+  const { service, tx } = fixture();
+  await expect(
+    service.createOrganization(headers, {
+      name: 'Workspace',
+      slug: 'workspace',
+      dataRegion: 'EU',
+    }),
+  ).rejects.toMatchObject({ statusCode: 422, code: 'REGION_UNAVAILABLE' });
+  expect(tx.createOrganization).not.toHaveBeenCalled();
+  tx.createOrganization.mockResolvedValue(organization);
+  await service.createOrganization(headers, {
+    name: 'Workspace',
+    slug: 'workspace',
+    dataRegion: 'AU',
+  });
+  expect(tx.createOrganization).toHaveBeenCalledWith({
+    name: 'Workspace',
+    slug: 'workspace',
+    dataRegion: 'AU',
+  });
+});
+
+it('serves the exact public region configuration route before authentication with no session', async () => {
+  const { app, getSession } = fixture();
+  const handler = vi.fn(async () => new Response('unused'));
+  const regionConfig = {
+    region: 'AU' as const,
+    enabledRegions: ['AU' as const],
+    regionalOrigins: { AU: 'https://au.app.example.test' },
+  };
+  registerAuthHandler(app, handler, origin, regionConfig);
+  const response = await app.inject({ url: '/auth/region-config' });
+  expect(response.statusCode).toBe(200);
+  expect(response.json()).toEqual(regionConfig);
+  expect(response.headers['cache-control']).toBe('no-store');
+  expect(response.headers['set-cookie']).toBeUndefined();
+  expect(getSession).not.toHaveBeenCalled();
+  expect(handler).not.toHaveBeenCalled();
+  expect((await app.inject({ url: '/auth/region-private' })).statusCode).toBe(
+    404,
+  );
 });

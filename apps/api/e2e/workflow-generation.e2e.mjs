@@ -39,7 +39,11 @@ async function workspace(api, name) {
       cookie: owner.cookie,
       method: 'POST',
       status: 201,
-      body: { name, slug: name, dataRegion: 'EU' },
+      body: {
+        name,
+        slug: name,
+        dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
+      },
     })
   ).body;
   await api.request(`/v1/organizations/${org.id}/members`, {
@@ -52,7 +56,7 @@ async function workspace(api, name) {
   return { org, owner, member, base: `/v1/organizations/${org.id}` };
 }
 
-it('explains why describing is unavailable without an EU route and keeps tenants apart', async (t) => {
+it('explains why describing is unavailable without a regional route and keeps tenants apart', async (t) => {
   const db = await database(t);
   await db.migrate();
   await db.grantRuntime();
@@ -69,7 +73,7 @@ it('explains why describing is unavailable without an EU route and keeps tenants
     improvements: false,
     improvementDiscovery: false,
     reason: expect.stringMatching(
-      /^Describing workflows needs an EU model route with zero data retention\. Whoever runs this Luma server/,
+      /^Describing workflows needs a regional model route with zero data retention\. Whoever runs this Luma server/,
     ),
   });
 
@@ -201,7 +205,7 @@ it('explains why describing is unavailable without an EU route and keeps tenants
   expect(identifiers(corpus.vocabulary)).toEqual(identifiers(vocabulary));
 });
 
-it('describes, refines and records a draft through the EU route without logging tenant text', async (t) => {
+it('describes, refines and records a draft through the regional route without logging tenant text', async (t) => {
   const db = await database(t);
   await db.migrate();
   await db.grantRuntime();
@@ -246,7 +250,7 @@ it('describes, refines and records a draft through the EU route without logging 
       usage: { inputTokens: 120, outputTokens: 80, costUsd: null },
       route: {
         profile: 'authoring',
-        adapter: 'bedrock-eu',
+        adapter: 'bedrock',
         model: authoringModel,
       },
       questions: [

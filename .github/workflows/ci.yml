@@ -30,6 +30,9 @@ jobs:
             cache: tests
             # Forward --filter to our database runner, not pnpm's recursive test shortcut.
             command: pnpm run test --filter=!@luma/ui $AFFECTED
+          - name: EU cell boundary tests
+            cache: region-eu
+            command: pnpm test:region-eu
           - name: UI component tests
             cache: ui
             browser: '@luma/ui'

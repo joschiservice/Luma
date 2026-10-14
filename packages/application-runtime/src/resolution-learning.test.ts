@@ -30,7 +30,7 @@ function context(
       id: tenant,
       name: 'Fixture',
       slug: 'fixture',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
       status: 'active',
     },
     builtInMembership(

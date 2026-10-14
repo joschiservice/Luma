@@ -2,7 +2,10 @@ import { passkeyClient } from '@better-auth/passkey/client';
 import { m } from '@luma/i18n/messages';
 import { type QueryClient, queryOptions } from '@tanstack/react-query';
 import { createAuthClient } from 'better-auth/client';
-import { twoFactorClient } from 'better-auth/client/plugins';
+import {
+  inferAdditionalFields,
+  twoFactorClient,
+} from 'better-auth/client/plugins';
 import { useSyncExternalStore } from 'react';
 import { z } from 'zod';
 
@@ -17,7 +20,13 @@ export const auth = createAuthClient({
     retry: 0,
     customFetchImpl: (input, init) => globalThis.fetch(input, init),
   },
-  plugins: [twoFactorClient(), passkeyClient()],
+  plugins: [
+    twoFactorClient(),
+    passkeyClient(),
+    inferAdditionalFields({
+      user: { dataRegion: { type: 'string', required: false, input: true } },
+    }),
+  ],
 });
 
 const api = createWebApiClient();
@@ -196,15 +205,50 @@ export const contextOptions = (organizationId: string) =>
   });
 
 /**
- * Creates an EU workspace with a validated name and generated slug; rejects unsuccessful API
+ * Creates a workspace in this cell with a validated name and generated slug; rejects unsuccessful API
  * responses.
  */
-export async function createOrganization(name: string) {
+export async function createOrganization(name: string, dataRegion: DataRegion) {
   return api.identity.createOrganization({
     body: {
       name: workspaceName.parse(name),
       slug: organizationSlug(name),
-      dataRegion: 'EU',
+      dataRegion,
     },
   });
+}
+
+/** Regions supported by Luma, including cells not yet available for sign-up. */
+export const dataRegions = ['AU', 'EU', 'US'] as const;
+
+export type DataRegion = (typeof dataRegions)[number];
+const regionConfigSchema = z.object({
+  region: z.enum(dataRegions),
+  enabledRegions: z.array(z.enum(dataRegions)),
+  regionalOrigins: z.partialRecord(z.enum(dataRegions), z.url()),
+});
+
+/** Reads the cell's public placement settings, failing closed when the service is unavailable. */
+export const regionOptions = () =>
+  queryOptions({
+    queryKey: ['public', 'region-config'],
+    queryFn: async ({ signal }) => {
+      const response = await fetch('/api/auth/region-config', {
+        signal,
+        cache: 'no-store',
+      });
+      if (!response.ok) throw new IdentityError(response.status);
+
+      return regionConfigSchema.parse(await response.json());
+    },
+    retry: false,
+    staleTime: 0,
+  });
+
+/** Creates an account only after an explicit region confirmation. */
+export function signUpInRegion(
+  value: { name: string; email: string; password: string },
+  dataRegion: DataRegion,
+) {
+  return auth.signUp.email({ ...value, dataRegion });
 }

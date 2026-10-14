@@ -256,7 +256,7 @@ it('keeps native pending refunds overdue, verifies late actual payment and prese
       payload: {
         name: 'Deadline isolation',
         slug: `deadlines-${randomUUID()}`,
-        dataRegion: 'EU',
+        dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
       },
     });
     expect(other.statusCode, other.body).toBe(201);

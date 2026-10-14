@@ -20,7 +20,7 @@ const context = (tenantId: string) =>
       id: tenantId,
       name: 'Store',
       slug: 'store',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
       status: 'active',
     },
     builtInMembership(

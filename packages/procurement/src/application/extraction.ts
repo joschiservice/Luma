@@ -15,7 +15,6 @@ export const supplierExtractionProfile = 'supplier-extraction';
 // Supplier messages contain tenant and personal data. The policy is fixed after authorization.
 const dataPolicy = {
   classification: 'sensitive',
-  region: 'EU',
   zeroDataRetention: true,
 } as const;
 
@@ -88,11 +87,12 @@ Rules:
 Return no facts when the message states none.`;
 
 /**
- * Asks the configured EU model to list supplier statements with exact quotes. Facts whose quote
+ * Asks the configured regional model to list supplier statements with exact quotes. Facts whose quote
  * is not found in the message are dropped, so every kept fact cites the message it came from.
  * Model failures are returned, never thrown, and contain no model text.
  */
 export async function extractFacts(input: {
+  dataRegion: import('@luma/platform').DataRegion;
   gateway: ModelGateway | null;
   /** Validates the model's structured answer. */
   output: ModelSchema<ExtractionOutput>;
@@ -115,7 +115,7 @@ export async function extractFacts(input: {
   try {
     result = await input.gateway.generate(input.trace, {
       profile: supplierExtractionProfile,
-      dataPolicy,
+      dataPolicy: { ...dataPolicy, region: input.dataRegion },
       maxOutputTokens: 2000,
       output: input.output,
       ...(input.signal ? { signal: input.signal } : {}),

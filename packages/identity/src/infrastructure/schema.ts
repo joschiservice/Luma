@@ -16,6 +16,8 @@ export const user = pgTable('users', {
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').notNull().default(false),
   image: text('image'),
+  dataRegion: text('confirmed_data_region'),
+  regionConfirmedAt: time('region_confirmed_at'),
   twoFactorEnabled: boolean('two_factor_enabled').notNull().default(false),
   createdAt: time('created_at').notNull(),
   updatedAt: time('updated_at').notNull(),
@@ -70,7 +72,7 @@ export const organization = pgTable('organizations', {
   logo: text('logo'),
   metadata: text('metadata'),
   createdAt: time('created_at').notNull(),
-  dataRegion: text('data_region').notNull().default('EU'),
+  dataRegion: text('data_region').notNull(),
   status: text('status').notNull().default('active'),
 });
 

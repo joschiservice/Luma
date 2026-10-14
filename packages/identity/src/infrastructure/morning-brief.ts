@@ -4,6 +4,7 @@ import type { Pool } from 'pg';
 
 import type { MorningBriefSource } from '../application/morning-brief.js';
 import { morningBriefClock } from '../application/morning-brief.js';
+import type { DataRegion } from '../domain/context.js';
 import { makeTenantContext } from '../domain/context.js';
 import {
   membershipFromRow,
@@ -45,8 +46,13 @@ export function createMorningBriefScheduler(
         '',
         async (tx) => {
           const workspace = (
-            await tx.query<{ name: string; slug: string; timeZone: string }>(
-              `SELECT o.name,o.slug,COALESCE(s.timezone,'UTC') AS "timeZone" FROM organizations o
+            await tx.query<{
+              name: string;
+              slug: string;
+              timeZone: string;
+              dataRegion: DataRegion;
+            }>(
+              `SELECT o.name,o.slug,o.data_region AS "dataRegion",COALESCE(s.timezone,'UTC') AS "timeZone" FROM organizations o
            LEFT JOIN workspace_settings s ON s.tenant_id=o.id WHERE o.id=$1`,
               [tenantId],
             )
@@ -101,7 +107,7 @@ export function createMorningBriefScheduler(
             name: candidates.workspace.name,
             slug: candidates.workspace.slug,
             status: 'active',
-            dataRegion: 'EU',
+            dataRegion: candidates.workspace.dataRegion,
           },
           membershipFromRow(member),
           randomUUID(),

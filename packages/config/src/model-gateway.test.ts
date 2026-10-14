@@ -10,7 +10,7 @@ const route = {
 };
 
 const authoring = {
-  adapter: 'bedrock-eu',
+  adapter: 'bedrock',
   model: 'eu.anthropic.claude-sonnet-4-5-20250929-v1:0',
   providers: ['bedrock'],
   zeroDataRetention: true,
@@ -24,13 +24,17 @@ const bedrockEnv = {
 };
 
 it('disables model calls by default', () => {
-  expect(readModelGatewayConfig({})).toEqual({ routes: {}, timeoutMs: 30000 });
+  expect(
+    readModelGatewayConfig({ LUMA_REGION: 'EU', LUMA_ENABLED_REGIONS: 'EU' }),
+  ).toEqual({ dataRegion: 'EU', routes: {}, timeoutMs: 30000 });
 });
 
 it('loads a provider-independent profile next to a Bedrock authoring route', () => {
   const routes = { reasoning: route, authoring };
   expect(
     readModelGatewayConfig({
+      LUMA_REGION: 'EU',
+      LUMA_ENABLED_REGIONS: 'EU',
       ...bedrockEnv,
       AI_GATEWAY_API_KEY: 'test',
       MODEL_GATEWAY_ROUTES: JSON.stringify(routes),
@@ -41,10 +45,13 @@ it('loads a provider-independent profile next to a Bedrock authoring route', () 
 it('loads Bedrock credentials for an EU region', () => {
   expect(
     readModelGatewayConfig({
+      LUMA_REGION: 'EU',
+      LUMA_ENABLED_REGIONS: 'EU',
       ...bedrockEnv,
       MODEL_GATEWAY_BEDROCK_SESSION_TOKEN: 'session/token+value==',
     }),
   ).toEqual({
+    dataRegion: 'EU',
     routes: { authoring },
     timeoutMs: 30000,
     bedrock: {
@@ -86,14 +93,24 @@ it.each([
     { MODEL_GATEWAY_BEDROCK_SESSION_TOKEN: 'secret value' },
   ],
 ])('fails closed for a Bedrock route with %s', (_name, override) => {
-  const read = () => readModelGatewayConfig({ ...bedrockEnv, ...override });
+  const read = () =>
+    readModelGatewayConfig({
+      LUMA_REGION: 'EU',
+      LUMA_ENABLED_REGIONS: 'EU',
+      ...bedrockEnv,
+      ...override,
+    });
   expect(read).toThrow();
   expect(read).not.toThrow(/secret|AKIA|eu-west-2|eu-central-2|us-east-1/);
 });
 
 it('rejects partial Bedrock credentials even without a Bedrock route', () => {
   expect(() =>
-    readModelGatewayConfig({ MODEL_GATEWAY_BEDROCK_SESSION_TOKEN: 'token' }),
+    readModelGatewayConfig({
+      LUMA_REGION: 'EU',
+      LUMA_ENABLED_REGIONS: 'EU',
+      MODEL_GATEWAY_BEDROCK_SESSION_TOKEN: 'token',
+    }),
   ).toThrow('together');
 });
 
@@ -119,6 +136,8 @@ it.each([
 ])('rejects unsafe route fields: %j', (override) => {
   expect(() =>
     readModelGatewayConfig({
+      LUMA_REGION: 'EU',
+      LUMA_ENABLED_REGIONS: 'EU',
       AI_GATEWAY_API_KEY: 'test',
       MODEL_GATEWAY_ROUTES: JSON.stringify({
         reasoning: { ...route, ...override },

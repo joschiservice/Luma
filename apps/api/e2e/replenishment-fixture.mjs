@@ -21,7 +21,7 @@ export async function replenishmentFixture(
     address: temporal.address,
     namespace: 'default',
     taskQueue: randomUUID(),
-    dataRegion: 'EU',
+    dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
   };
   const f = await setupSimulator(t, { temporal: settings, origin });
   await f.pilot.observe();

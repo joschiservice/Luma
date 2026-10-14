@@ -48,7 +48,7 @@ export function contextFixture(
 
   return {
     tenantId: organizationId,
-    dataRegion: 'EU',
+    dataRegion: 'AU',
     requestId: 'fixture',
     actor: {
       type: 'user',

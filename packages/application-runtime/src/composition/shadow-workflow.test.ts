@@ -18,7 +18,7 @@ it('reuses exact Shadow starts and rejects conflicting principal, source or Play
         id: tenantId,
         name: 'Shadow',
         slug: 'shadow',
-        dataRegion: 'EU',
+        dataRegion: 'AU',
         status: 'active',
       },
       builtInMembership(
@@ -31,11 +31,19 @@ it('reuses exact Shadow starts and rejects conflicting principal, source or Play
       env.client,
       `shadow-${randomUUID()}`,
       { refreshContext: async (value) => value },
+      'AU',
     );
     const source = { kind: 'incident' as const, id: randomUUID() };
     const shadow = { id: randomUUID(), workflow: 'shipping' };
     const started = await commands.startShadow(context, source, shadow);
     try {
+      expect(started.workflowId).not.toContain(tenantId);
+      expect(started.workflowId).not.toContain(shadow.id);
+      const details = await env.client.workflow
+        .getHandle(started.workflowId)
+        .describe();
+      expect(details.memo?.shadowRequest).toMatch(/^[a-f0-9]{64}$/);
+      expect(JSON.stringify(details.memo)).not.toContain(tenantId);
       expect(
         await commands.startShadow(
           { ...context, requestId: 'retry' },

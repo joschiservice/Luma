@@ -1,3 +1,4 @@
+import { m } from '@luma/i18n/messages';
 import { Alert, AlertDescription } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
@@ -13,38 +14,20 @@ import { useState } from 'react';
 
 import { AccessDialog } from './access';
 import { Failure, Loading } from './feedback';
-import { directoryOptions, sessionOptions } from './queries';
+import { directoryOptions } from './queries';
+import { staffPath, type StaffRegion, staffRegion } from './regions';
 import { directoryRoute } from './router';
 
 /** Searches the minimal customer directory and opens an explicit support access request. */
 export function DirectoryPage() {
   const { query = '' } = directoryRoute.useSearch();
   const navigate = directoryRoute.useNavigate();
-  const session = useQuery(sessionOptions());
-  const [target, setTarget] = useState<{ id: string; name: string } | null>(
-    null,
-  );
-  const canRead =
-    session.data?.permissions.includes('staff.directory.read') ?? false;
-  const canInspect =
-    session.data?.permissions.includes('staff.workspace.inspect') ?? false;
-  const canInspectAccounts =
-    session.data?.permissions.includes('staff.accounts.inspect') ?? false;
-  const directory = useQuery({
-    ...directoryOptions(query),
-    enabled: canRead && query.length >= 3,
-  });
-  if (!canRead)
-    return (
-      <>
-        <PageHeader title="Support directory" />
-        <Alert tone="warning">
-          <AlertDescription>
-            Your staff role does not allow directory searches.
-          </AlertDescription>
-        </Alert>
-      </>
-    );
+  const [target, setTarget] = useState<{
+    id: string;
+    name: string;
+    region: StaffRegion;
+  } | null>(null);
+  const directory = useQuery(directoryOptions(query));
 
   return (
     <>
@@ -56,7 +39,9 @@ export function DirectoryPage() {
         key={query}
         query={query}
         pending={directory.isFetching}
-        onSearch={(query) => navigate({ search: { query } })}
+        onSearch={(query) =>
+          navigate({ search: { region: staffRegion(), query } })
+        }
       />
       {query.length < 3 ? (
         <Empty>
@@ -77,6 +62,37 @@ export function DirectoryPage() {
           {directory.isFetching ? (
             <Loading>Refreshing directory…</Loading>
           ) : null}
+          <div role="status" className="staff-badges">
+            {directory.data.regions.map((result) => (
+              <span key={result.region}>
+                <Badge
+                  tone={result.status === 'answered' ? 'neutral' : 'warning'}
+                >
+                  {result.region}:{' '}
+                  {result.status === 'answered'
+                    ? m.identity_staff_region_answered()
+                    : result.status === 'rollout-disabled'
+                      ? m.identity_staff_region_paused()
+                      : m.identity_staff_region_incomplete()}
+                </Badge>
+                {result.status === 'access-required' ? (
+                  <a
+                    className="staff-link"
+                    href={staffPath('/login', result.region)}
+                  >
+                    {m.identity_staff_region_sign_in({ region: result.region })}
+                  </a>
+                ) : null}
+              </span>
+            ))}
+          </div>
+          {directory.data.incomplete ? (
+            <Alert tone="warning">
+              <AlertDescription>
+                {m.identity_staff_results_incomplete()}
+              </AlertDescription>
+            </Alert>
+          ) : null}
           <section
             className="staff-section"
             aria-labelledby="workspace-results"
@@ -93,9 +109,21 @@ export function DirectoryPage() {
             <DataTable
               caption="Matching workspaces"
               rows={directory.data.workspaces}
-              rowKey={(row) => row.id}
+              rowKey={(row) => `${row.region}:${row.id}`}
               columns={[
-                { key: 'name', header: 'Workspace', cell: (row) => row.name },
+                {
+                  key: 'name',
+                  header: 'Workspace',
+                  cell: (row) => (
+                    <div>
+                      {row.name}
+                      <div className="staff-directory-narrow">
+                        <Badge>{row.region}</Badge>
+                        <Badge>{row.status}</Badge>
+                      </div>
+                    </div>
+                  ),
+                },
                 {
                   key: 'slug',
                   header: 'Slug',
@@ -105,19 +133,20 @@ export function DirectoryPage() {
                 {
                   key: 'status',
                   header: 'Status',
+                  hideOnNarrow: true,
                   cell: (row) => <Badge>{row.status}</Badge>,
                 },
                 {
                   key: 'region',
                   header: 'Data region',
                   hideOnNarrow: true,
-                  cell: (row) => row.dataRegion,
+                  cell: (row) => row.region,
                 },
                 {
                   key: 'inspect',
                   header: 'Support access',
                   cell: (row) =>
-                    canInspect ? (
+                    row.permissions.includes('staff.workspace.inspect') ? (
                       <Button
                         variant="outline"
                         size="sm"
@@ -133,7 +162,7 @@ export function DirectoryPage() {
               ]}
               empty={
                 <Empty>
-                  <h3>No matching workspaces</h3>
+                  <h3>{m.identity_staff_workspaces_empty()}</h3>
                   <p>Try a different name or slug.</p>
                 </Empty>
               }
@@ -152,18 +181,42 @@ export function DirectoryPage() {
             <DataTable
               caption="Matching customer accounts"
               rows={directory.data.users}
-              rowKey={(row) => row.id}
+              rowKey={(row) => `${row.region}:${row.id}`}
               columns={[
-                { key: 'name', header: 'Name', cell: (row) => row.name },
-                { key: 'email', header: 'Email', cell: (row) => row.email },
+                {
+                  key: 'name',
+                  header: 'Name',
+                  cell: (row) => (
+                    <div>
+                      {row.name}
+                      <div className="staff-directory-narrow">
+                        <p className="staff-muted">{row.email}</p>
+                        <Badge>{row.region}</Badge>
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'email',
+                  header: 'Email',
+                  hideOnNarrow: true,
+                  cell: (row) => row.email,
+                },
+                {
+                  key: 'region',
+                  header: m.identity_staff_region_column(),
+                  hideOnNarrow: true,
+                  cell: (row) => <Badge>{row.region}</Badge>,
+                },
                 {
                   key: 'account',
                   header: 'Account',
                   cell: (row) =>
-                    canInspectAccounts ? (
+                    row.permissions.includes('staff.accounts.inspect') ? (
                       <Link
                         to="/accounts/$userId"
                         params={{ userId: row.id }}
+                        search={{ region: row.region }}
                         className={buttonVariants({
                           variant: 'outline',
                           size: 'sm',
@@ -179,7 +232,7 @@ export function DirectoryPage() {
               ]}
               empty={
                 <Empty>
-                  <h3>No matching users</h3>
+                  <h3>{m.identity_staff_users_empty()}</h3>
                   <p>Try a different name or email address.</p>
                 </Empty>
               }
@@ -191,6 +244,7 @@ export function DirectoryPage() {
         <AccessDialog
           key={target.id}
           workspaceId={target.id}
+          region={target.region}
           name={target.name}
           onClose={() => setTarget(null)}
         />

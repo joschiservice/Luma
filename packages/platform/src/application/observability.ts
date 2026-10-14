@@ -1,3 +1,5 @@
+import type { DataRegion } from './model-gateway.js';
+
 export type Operation =
   | 'api.request'
   | 'workflow.run'
@@ -11,6 +13,7 @@ type ProductEvent =
 /** Flag keys that may be evaluated; add a key here before creating it in PostHog. */
 export const featureFlags = [
   'observability-test',
+  'staff-regional-directory',
   'contextual-record-assistance',
   'operational-morning-brief',
   'action-review-diffs',
@@ -93,6 +96,8 @@ interface FailureContext {
 }
 
 export interface Observability {
+  /** Configured processing cell; absent only on test doubles. */
+  readonly dataRegion?: DataRegion;
   request(
     requestId: string,
     actionId?: string,
@@ -104,7 +109,7 @@ export interface Observability {
   forTenant(
     context: TraceContext,
     tenantId: string,
-    dataRegion: 'EU',
+    dataRegion: DataRegion,
   ): TraceContext;
   run<T>(
     parent: TraceContext,

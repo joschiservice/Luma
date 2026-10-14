@@ -20,8 +20,10 @@ import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { z } from 'zod';
 
-import { staffApi } from './api';
+import { staffActivity } from './activity';
+import { createStaffApi, useRegionalStaffApi } from './api';
 import { Failure } from './feedback';
+import { regionalFetch, type StaffRegion, staffRegion } from './regions';
 
 export const reasonSchema = z
   .string()
@@ -32,24 +34,33 @@ export const reasonSchema = z
 /** Requests auditable, workspace-scoped access before displaying customer details. */
 export function AccessDialog({
   workspaceId,
+  region = staffRegion(),
   name,
   onClose,
 }: {
   workspaceId: string;
+  region?: StaffRegion;
   name: string;
   onClose: () => void;
 }) {
   const navigate = useNavigate();
   const client = useQueryClient();
   const access = useMutation({
-    mutationFn: (reason: string) => staffApi.grant(workspaceId, reason),
+    mutationFn: (reason: string) =>
+      createStaffApi(regionalFetch(region), staffActivity, region).grant(
+        workspaceId,
+        reason,
+      ),
     onSuccess: async (grant) => {
-      client.setQueryData(['staff', 'grant', workspaceId, grant.id], grant);
+      client.setQueryData(
+        ['staff', region, 'grant', workspaceId, grant.id],
+        grant,
+      );
       onClose();
       await navigate({
         to: '/workspaces/$workspaceId',
         params: { workspaceId },
-        search: { grantId: grant.id },
+        search: { region, grantId: grant.id },
       });
     },
   });
@@ -144,6 +155,7 @@ export function RevokeSessionsDialog({
   email: string;
   onClose: () => void;
 }) {
+  const staffApi = useRegionalStaffApi();
   const [commandId] = useState(() => crypto.randomUUID());
   const revoke = useMutation({
     mutationFn: (reason: string) =>
@@ -313,6 +325,7 @@ export function MembershipDialog({
   soleOwner: boolean;
   onClose: () => void;
 }) {
+  const staffApi = useRegionalStaffApi();
   const client = useQueryClient();
   const [commandId] = useState(() => crypto.randomUUID());
   const suspend = action === 'suspend';
@@ -327,7 +340,7 @@ export function MembershipDialog({
       }),
     onSuccess: () =>
       client.invalidateQueries({
-        queryKey: ['staff', 'workspace', workspaceId, grantId],
+        queryKey: ['staff', staffRegion(), 'workspace', workspaceId, grantId],
       }),
   });
   const form = useForm({

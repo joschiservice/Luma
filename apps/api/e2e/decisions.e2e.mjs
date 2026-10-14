@@ -205,7 +205,7 @@ it('projects a case approval for each reader and drops it once the case desk dec
     address: temporal.address,
     namespace: 'default',
     taskQueue: `decisions-${manifest.runId}`,
-    dataRegion: 'EU',
+    dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
   });
   const client = await pilot.runtime.createClient();
   const worker = await pilot.runtime.createWorker();

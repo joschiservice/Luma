@@ -55,7 +55,7 @@ async function setup(t, scenario, options) {
     address: temporal.address,
     namespace: 'default',
     taskQueue: `luma-pilot-${manifest.runId}`,
-    dataRegion: 'EU',
+    dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
   };
   const pilot = await createPilot(env, directory, manifest, settings, options);
   const client = await pilot.runtime.createClient();
@@ -198,7 +198,7 @@ test.each([false, true])(
           address: temporal.address,
           namespace: 'default',
           taskQueue: `luma-pilot-${f.manifest.runId}`,
-          dataRegion: 'EU',
+          dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
         })
       : f.pilot;
     if (restart) t.onTestFinished(() => pilot.close());

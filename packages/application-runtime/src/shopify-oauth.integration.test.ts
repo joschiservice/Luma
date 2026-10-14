@@ -60,7 +60,7 @@ const context = (
 ) =>
   makeTenantContext(
     { userId, sessionId },
-    { id, name: 'Store', slug: 'store', dataRegion: 'EU', status: 'active' },
+    { id, name: 'Store', slug: 'store', dataRegion: 'AU', status: 'active' },
     builtInMembership({ id: 'membership', organizationId: id, userId }, role),
     randomUUID(),
   );
@@ -98,6 +98,7 @@ describe.skipIf(!databaseUrl)('Shopify OAuth on PostgreSQL', () => {
       );
       lock.release();
     }
+    await owner.query('SELECT luma_provision_cell_region($1)', ['AU']);
     const password = randomUUID();
     await admin.query(
       `CREATE ROLE "${name}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,

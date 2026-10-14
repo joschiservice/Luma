@@ -59,6 +59,7 @@ describe.skipIf(!databaseUrl)(
         );
         setup.release();
       }
+      await owner.query('SELECT luma_provision_cell_region($1)', ['AU']);
       // Discovery runs with the workers' restricted logins, never the owner's.
       const password = randomUUID();
       await admin.query(
@@ -73,7 +74,7 @@ describe.skipIf(!databaseUrl)(
 
       for (const [status, id] of Object.entries(workspaces))
         await owner.query(
-          'INSERT INTO organizations(id,name,slug,status,created_at) VALUES($1,$2,$3,$4,now())',
+          "INSERT INTO organizations(data_region,id,name,slug,status,created_at) VALUES('AU',$1,$2,$3,$4,now())",
           [id, status, `${status}-${id}`, status],
         );
       const client = await owner.connect();

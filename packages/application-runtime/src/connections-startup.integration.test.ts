@@ -147,6 +147,7 @@ describe.skipIf(!databaseUrl)('connections through the API CLI', () => {
       );
       lock.release();
     }
+    await owner.query('SELECT luma_provision_cell_region($1)', ['AU']);
     const password = randomUUID();
     await admin.query(
       `CREATE ROLE "${name}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
@@ -158,6 +159,7 @@ describe.skipIf(!databaseUrl)('connections through the API CLI', () => {
     await start();
     const signup = await call('/auth/sign-up/email', {
       name: 'Operator',
+      dataRegion: 'AU',
       email: 'operator@example.test',
       password: 'test-password-long-enough',
     });

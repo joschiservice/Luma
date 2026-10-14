@@ -4,6 +4,8 @@ import type { StaffContext } from './access.js';
 import { requireRecentStaffSession, requireStaffPermission } from './access.js';
 
 const context: StaffContext = {
+  region: 'AU',
+  regions: ['AU'],
   userId: 'staff',
   sessionId: 'session',
   sessionCreatedAt: new Date('2026-01-01T00:00:00Z'),
@@ -27,4 +29,13 @@ describe('staff authorization', () => {
       requireRecentStaffSession(context, new Date('2026-01-01T00:14:00Z')),
     ).not.toThrow();
   });
+});
+
+it('requires admission for the serving cell even with the requested permission', () => {
+  expect(() =>
+    requireStaffPermission(
+      { ...context, regions: ['EU'] },
+      'staff.workspace.inspect',
+    ),
+  ).toThrow('Staff permission required');
 });

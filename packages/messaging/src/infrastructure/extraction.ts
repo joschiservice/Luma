@@ -19,7 +19,6 @@ export const documentExtractionProfile = 'document-extraction';
 // Documents contain tenant and personal data. The policy is fixed, never taken from a request.
 const dataPolicy = {
   classification: 'sensitive',
-  region: 'EU',
   zeroDataRetention: true,
 } as const;
 
@@ -269,7 +268,7 @@ export function createFactExtractor(options: {
           },
           {
             profile: documentExtractionProfile,
-            dataPolicy,
+            dataPolicy: { ...dataPolicy, region: context.dataRegion },
             maxOutputTokens: 8000,
             output: documentExtractionOutput,
             messages: [

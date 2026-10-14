@@ -144,6 +144,7 @@ const publicRoutes = new Set([
   'GET /openapi.json',
   'GET /v1/connector-providers',
   'GET /v1/connector-providers/:providerId',
+  'GET /auth/region-config',
   'GET /auth/*',
   'POST /auth/*',
 ]);

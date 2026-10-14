@@ -170,7 +170,11 @@ it('persists authoritative orders with atomic audit, exact retries, tenant isola
       cookie: outsider.cookie,
       method: 'POST',
       status: 201,
-      body: { name: 'Other', slug: 'other', dataRegion: 'EU' },
+      body: {
+        name: 'Other',
+        slug: 'other',
+        dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
+      },
     })
   ).body;
   await api.request(
@@ -521,7 +525,11 @@ it('filters, sorts and pages purchase orders and suppliers on the server within 
       cookie: outsider.cookie,
       method: 'POST',
       status: 201,
-      body: { name: 'Other', slug: 'other-list', dataRegion: 'EU' },
+      body: {
+        name: 'Other',
+        slug: 'other-list',
+        dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
+      },
     })
   ).body;
   const otherRoot = `/v1/organizations/${other.id}/procurement`;
@@ -1017,7 +1025,11 @@ it('filters, groups and pages purchase orders and suppliers by catalog condition
       cookie: outsider.cookie,
       method: 'POST',
       status: 201,
-      body: { name: 'Other', slug: 'other-conditions', dataRegion: 'EU' },
+      body: {
+        name: 'Other',
+        slug: 'other-conditions',
+        dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
+      },
     })
   ).body;
   const otherRoot = `/v1/organizations/${other.id}/procurement`;

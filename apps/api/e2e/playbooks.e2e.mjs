@@ -24,7 +24,7 @@ for (const transport of ['playbooks', 'workflows']) {
       body: {
         name: 'Playbook workspace',
         slug: 'playbook-workspace',
-        dataRegion: 'EU',
+        dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
       },
       status: 201,
     });

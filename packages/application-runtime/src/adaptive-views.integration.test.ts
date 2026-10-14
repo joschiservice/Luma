@@ -44,7 +44,7 @@ describe.skipIf(!databaseUrl)('saved views and remembered list state', () => {
         id: tenantId,
         name: 'Views',
         slug: 'views',
-        dataRegion: 'EU',
+        dataRegion: 'AU',
         status: 'active',
       },
       builtInMembership(
@@ -86,7 +86,7 @@ describe.skipIf(!databaseUrl)('saved views and remembered list state', () => {
     runtime = new Pool({ connectionString: url.toString() });
     for (const id of [tenant, otherTenant])
       await owner.query(
-        "INSERT INTO organizations(id,name,slug,status,data_region,created_at) VALUES($1,'Views',$2,'active','EU',now())",
+        "INSERT INTO organizations(id,name,slug,status,data_region,created_at) VALUES($1,'Views',$2,'active','AU',now())",
         [id, `views-${id}`],
       );
     for (const id of people)

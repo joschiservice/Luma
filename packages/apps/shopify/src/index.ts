@@ -201,6 +201,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
   const oauth = config
     ? createShopifyOAuth(context.database, config, {
         requestBudgetStore: context.requestBudgetStore,
+        env: context.env,
         cipher: context.cipher,
         refreshContext: context.refreshContext,
         verify: createInstallationVerifier({

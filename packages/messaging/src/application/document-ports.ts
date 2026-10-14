@@ -61,7 +61,7 @@ type ExtractionResult =
   | { ok: false; reason: string };
 
 /**
- * Proposes facts from a document with a model. Implementations send the document only to an EU
+ * Proposes facts from a document with a model. Implementations send the document only to a regional
  * zero-retention route and never log it. `available` is false without such a route.
  */
 export interface FactExtractor {

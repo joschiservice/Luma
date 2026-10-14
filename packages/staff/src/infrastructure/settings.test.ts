@@ -55,6 +55,7 @@ describe('staff configuration safety', () => {
       NODE_ENV: 'production',
       STAFF_AUTH_MODE: 'google',
       STAFF_PUBLIC_ORIGIN: 'https://staff.example.com',
+      STAFF_REGIONAL_API_ORIGINS: '{"AU":"https://au.staff-api.example.com"}',
       STAFF_GOOGLE_CLIENT_ID: 'google-client',
       STAFF_GOOGLE_CLIENT_SECRET: 'google-secret',
       STAFF_GOOGLE_HOSTED_DOMAIN: 'example.com',
@@ -66,6 +67,13 @@ describe('staff configuration safety', () => {
       readStaffSettings({ ...google, STAFF_TRUSTED_PROXY: '127.0.0.1' })
         .trustedProxy,
     ).toEqual(['127.0.0.1']);
+    expect(() =>
+      readStaffSettings({
+        ...google,
+        STAFF_TRUSTED_PROXY: '127.0.0.1',
+        STAFF_REGIONAL_API_ORIGINS: '{}',
+      }),
+    ).toThrow('regional API origin');
   });
   it('allows a bounded loopback development login', () => {
     expect(readStaffSettings(env).mode).toBe('local');

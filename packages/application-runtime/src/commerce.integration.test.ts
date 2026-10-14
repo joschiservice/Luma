@@ -62,7 +62,7 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
         name: 'Fixture',
         slug: 'fixture',
         status: 'active',
-        dataRegion: 'EU',
+        dataRegion: 'AU',
       },
       builtInMembership(
         { id: 'membership', organizationId: tenantId, userId: 'operator' },
@@ -164,6 +164,7 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
       );
       setup.release();
     }
+    await owner.query('SELECT luma_provision_cell_region($1)', ['AU']);
     const password = randomUUID();
     await admin.query(
       `CREATE ROLE "${name}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
@@ -298,7 +299,7 @@ describe.skipIf(!databaseUrl)('canonical commerce on PostgreSQL', () => {
         name: 'Fixture',
         slug: 'fixture',
         status: 'active',
-        dataRegion: 'EU',
+        dataRegion: 'AU',
       },
       builtInMembership(
         { id: 'reader', organizationId: tenant, userId: 'reader' },

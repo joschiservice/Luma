@@ -29,6 +29,7 @@ import {
 } from '@luma/workflow-temporal';
 import { Pool } from 'pg';
 
+import { assertCellRegion } from '../cell-region.js';
 import {
   type ApplicationServices,
   createApplicationServices,
@@ -43,6 +44,7 @@ import { createReplenishmentWorker } from './replenishment-worker.js';
 import { createResourceScope } from './resources.js';
 import { createSalesReadSource, createSalesTenantRelease } from './sales.js';
 import { createDetectionServices, createSafetyServices } from './services.js';
+import { createRegionalTemporalSettings } from './temporal-settings.js';
 
 /** Wire durable activities to the same tenant-scoped services used by commands. */
 export function createExceptionWorkflowRuntime(
@@ -198,8 +200,13 @@ export function createExceptionWorkflowRuntime(
 
   return {
     activities,
-    createClient: () => createExceptionClient(settings, identity),
-    createWorker: () => createExceptionWorker(settings, activities),
+    createClient: () =>
+      createExceptionClient(createRegionalTemporalSettings(settings), identity),
+    createWorker: () =>
+      createExceptionWorker(
+        createRegionalTemporalSettings(settings),
+        activities,
+      ),
   };
 }
 
@@ -215,12 +222,19 @@ export async function createDefaultExceptionWorker(
   env?: Readonly<Record<string, string | undefined>>,
   observability?: Observability,
 ) {
+  settings = {
+    ...settings,
+    temporal: createRegionalTemporalSettings(settings.temporal),
+  };
+  if ((identitySettings.region ?? 'AU') !== settings.temporal.dataRegion)
+    throw new Error('Workflow placement differs from the identity cell');
   const resources = createResourceScope();
   try {
     const identity = createIdentity(identitySettings);
     resources.add(identity.close);
     const pool = new Pool({ connectionString: settings.databaseUrl, max: 10 });
     resources.add(() => pool.end());
+    await assertCellRegion(pool, identitySettings.region ?? 'AU');
     const processClient = await createProcessClient(
       {
         ...settings.temporal,

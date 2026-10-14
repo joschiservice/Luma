@@ -63,7 +63,7 @@ describe.skipIf(!databaseUrl)('workflows acting as a suspended member', () => {
       cookiePrefix: 'suspension-test',
     });
     await owner.query(
-      "INSERT INTO organizations(id,name,slug,status,data_region,created_at) VALUES($1,'Suspension test','suspension-test','active','EU',now())",
+      "INSERT INTO organizations(id,name,slug,status,data_region,created_at) VALUES($1,'Suspension test','suspension-test','active','AU',now())",
       [tenantId],
     );
     await owner.query(
@@ -234,7 +234,7 @@ describe.skipIf(!databaseUrl)('workflows acting as a suspended member', () => {
         address: env.address,
         namespace: 'default',
         taskQueue,
-        dataRegion: 'EU',
+        dataRegion: 'AU',
       },
       activities,
     );
@@ -244,7 +244,7 @@ describe.skipIf(!databaseUrl)('workflows acting as a suspended member', () => {
       const handle = await env.client.workflow.start('processWorkflow', {
         workflowId: randomUUID(),
         taskQueue,
-        args: [run, version],
+        args: [{ ...run, dataRegion: 'AU' }, version],
       });
       // The first step is rejected without effect, and the run waits instead of failing.
       await expect.poll(() => rejected.length, { timeout: 20_000 }).toBe(1);

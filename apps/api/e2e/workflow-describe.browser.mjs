@@ -35,6 +35,8 @@ test('drafts a workflow from a description and applies a reviewed change', async
   await mkdir(screenshots, { recursive: true });
 
   await page.goto('/sign-up');
+  await page.getByRole('radio', { name: /Australia/ }).check();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByLabel('Name', { exact: true }).fill('Grace');
   await page
     .getByLabel('Email', { exact: true })

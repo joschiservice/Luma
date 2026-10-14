@@ -212,7 +212,13 @@ describe('staff authentication and activity boundaries', () => {
 
   it('does not consume activity or attach activity reports to public configuration or auth', async () => {
     const tracker = createStaffActivityTracker();
-    const fetcher = fetchResult({ mode: 'local', providerId: null });
+    const fetcher = fetchResult({
+      mode: 'local',
+      providerId: null,
+      regionalDirectoryEnabled: true,
+      region: 'AU',
+      regionalApiOrigins: {},
+    });
     const api = createStaffApi(fetcher, tracker);
     tracker.record({ isTrusted: true });
     await api.config();
@@ -246,9 +252,9 @@ describe('staff authentication and activity boundaries', () => {
       expect.objectContaining({
         body: JSON.stringify({
           provider: 'google',
-          callbackURL: 'https://staff.example.test/',
+          callbackURL: 'https://staff.example.test/?region=AU',
           errorCallbackURL:
-            'https://staff.example.test/login?signInFailed=true',
+            'https://staff.example.test/login?signInFailed=true&region=AU',
         }),
       }),
     );

@@ -29,7 +29,7 @@ const context = makeTenantContext(
     name: 'Rebuild',
     slug: 'rebuild',
     status: 'active',
-    dataRegion: 'EU',
+    dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
   },
   builtInMembership(
     { id: 'operator', organizationId: tenantId, userId: 'orders-list-rebuild' },

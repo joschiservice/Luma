@@ -44,6 +44,8 @@ test('reviews decisions, recovers ambiguous commands and escalates through the c
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/sign-up');
+  await page.getByRole('radio', { name: /Australia/ }).check();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByLabel('Name', { exact: true }).fill('Ada');
   await page
     .getByLabel('Email', { exact: true })
@@ -70,7 +72,7 @@ test('reviews decisions, recovers ambiguous commands and escalates through the c
       id: organizationId,
       name: 'North Studio',
       slug: 'north',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
       status: 'active',
     },
     builtInMembership(

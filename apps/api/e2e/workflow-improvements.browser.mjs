@@ -136,6 +136,8 @@ test('discovers evidence explicitly, compares an immutable candidate and rejects
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/sign-up');
+  await page.getByRole('radio', { name: /Australia/ }).check();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByLabel('Name', { exact: true }).fill('Improver');
   await page.getByLabel('Email', { exact: true }).fill('improver@example.test');
   await page

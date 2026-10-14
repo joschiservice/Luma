@@ -61,7 +61,7 @@ describe.skipIf(!databaseUrl)(
           name: 'Fixture',
           slug: 'fixture',
           status: 'active',
-          dataRegion: 'EU',
+          dataRegion: 'AU',
         },
         permissions
           ? { ...membership, permissions: new PermissionSet(permissions) }
@@ -700,7 +700,7 @@ describe.skipIf(!databaseUrl)(
       const { owner } = database;
       const at = new Date().toISOString();
       await owner.query(
-        "INSERT INTO organizations(id,name,slug,status,created_at) VALUES($1,'Catalog',$2,'active',now()) ON CONFLICT DO NOTHING",
+        "INSERT INTO organizations(data_region,id,name,slug,status,created_at) VALUES('AU',$1,'Catalog',$2,'active',now()) ON CONFLICT DO NOTHING",
         [tenant, `catalog-${tenant}`],
       );
       const field = async (

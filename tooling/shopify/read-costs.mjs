@@ -4,6 +4,7 @@ import {
   createInstallationVerifier,
   createShopifyConnector,
 } from '@luma/app-shopify';
+import { readRegionConfig } from '@luma/config';
 import { createCapabilityRuntime } from '@luma/connections/adapters';
 import {
   builtInMembership,
@@ -117,7 +118,7 @@ export async function checkReadCosts({
       name: 'Cost check',
       slug: 'cost-check',
       status: 'active',
-      dataRegion: 'EU',
+      dataRegion: readRegionConfig(process.env).region,
     },
     builtInMembership(
       { id: 'cost-check', organizationId: tenantId, userId: 'cost-check' },

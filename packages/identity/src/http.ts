@@ -27,7 +27,12 @@ export function registerIdentityHttp(
   identity.onDatabaseError(() =>
     app.log.error('Identity database connection failed'),
   );
-  registerAuthHandler(app, identity.handler, identity.baseURL);
+  registerAuthHandler(
+    app,
+    identity.handler,
+    identity.baseURL,
+    identity.regionConfig,
+  );
   if (identity.mailEvents)
     registerMailEvents(app, (payload, headers) =>
       identity.mailEvents!.receive(payload, headers),

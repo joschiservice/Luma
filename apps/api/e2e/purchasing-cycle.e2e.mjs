@@ -72,7 +72,7 @@ async function fixture(
           }),
           toolCalls: [],
           metadata: {
-            adapter: 'bedrock-eu',
+            adapter: 'bedrock',
             model: 'synthetic-purchasing-extraction',
             latencyMs: 1,
             inputTokens: 1,

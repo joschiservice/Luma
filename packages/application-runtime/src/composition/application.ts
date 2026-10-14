@@ -317,7 +317,7 @@ export interface ApplicationOptions {
   desk?: Parameters<typeof createDeskServices>[3];
   /** Generates workflow drafts from descriptions. Without it, describing workflows is unavailable. */
   modelGateway?: ModelGateway;
-  /** Whether the gateway has an EU zero-retention route for authoring, and why not. */
+  /** Whether the gateway has a regional zero-retention route for authoring, and why not. */
   authoring?: { available: boolean; reason: string | null };
   /** Trusted isolated admission and committed recovery evaluation; absent means unavailable. */
   workflowImprovementControls?: WorkflowImprovementControls;
@@ -353,13 +353,13 @@ export interface ApplicationOptions {
     runtime: InstalledReturnRuntime;
     installations: Pick<ConnectionManagement, 'list'>;
   };
-  /** Whether the gateway has an EU zero-retention route for reading supplier messages. */
+  /** Whether the gateway has a regional zero-retention route for reading supplier messages. */
   supplierExtraction?: { available: boolean; reason: string | null };
   /** Days supplier message text is kept; defaults to 365. */
   supplierMessageRetentionDays?: number;
-  /** Whether the gateway has an EU zero-retention route for the workspace assistant. */
+  /** Whether the gateway has a regional zero-retention route for the workspace assistant. */
   assistant?: { available: boolean; reason: string | null };
-  /** Whether the gateway has an EU zero-retention route for reading message attachments. */
+  /** Whether the gateway has a regional zero-retention route for reading message attachments. */
   documentExtraction?: { available: boolean; reason: string | null };
   /** Records assistant and tool spans. Without it, the assistant runs untraced. */
   observability?: Observability;
@@ -411,7 +411,7 @@ export function createApplicationServices(
       const trace = options.observability.forTenant(
         observation.context,
         tenantId,
-        'EU',
+        options.observability.dataRegion ?? 'AU',
       );
 
       return await options.observability.flag(trace, 'luma-erp-orders', false);

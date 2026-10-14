@@ -1,3 +1,5 @@
+import { readRegionConfig } from '@luma/config';
+
 export interface GmailPushConfig {
   /** Pub/Sub topic Gmail publishes mailbox changes to, `projects/<project>/topics/<topic>`. */
   topic: string;
@@ -26,6 +28,7 @@ const names = [
 
 const pushNames = [
   'GMAIL_PUBSUB_TOPIC',
+  'GMAIL_PUBSUB_STORAGE_REGIONS',
   'GMAIL_PUSH_AUDIENCE',
   'GMAIL_PUSH_SERVICE_ACCOUNT',
 ] as const;
@@ -81,6 +84,10 @@ export function readGmailConfig(
     callbackUrl: callback.href,
     webOrigin: web.origin,
   };
+  if (env.BETTER_AUTH_URL && new URL(env.BETTER_AUTH_URL).origin !== web.origin)
+    throw new Error(
+      'Gmail callback must use the configured regional web origin',
+    );
   if (!anyPush) return config;
   if (pushNames.some((name) => !env[name]?.trim()))
     throw new Error('Configure all GMAIL push settings');
@@ -91,6 +98,24 @@ export function readGmailConfig(
   )
     throw new Error(
       'GMAIL_PUBSUB_TOPIC must be projects/<project>/topics/<topic>',
+    );
+  const { region } = readRegionConfig(env);
+  const allowedStorageRegions = {
+    AU: ['australia-southeast1'],
+    EU: ['europe-west1', 'europe-west3', 'europe-west4', 'europe-north1'],
+    US: ['us-central1', 'us-east1', 'us-east4', 'us-west1'],
+  };
+  const storageRegions = (env.GMAIL_PUBSUB_STORAGE_REGIONS ?? '')
+    .split(',')
+    .map((value) => value.trim());
+  if (
+    !storageRegions.length ||
+    storageRegions.some(
+      (value) => !allowedStorageRegions[region].includes(value),
+    )
+  )
+    throw new Error(
+      'GMAIL_PUBSUB_STORAGE_REGIONS must stay in the cell jurisdiction',
     );
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(env.GMAIL_PUSH_SERVICE_ACCOUNT!))
     throw new Error('GMAIL_PUSH_SERVICE_ACCOUNT must be an email address');

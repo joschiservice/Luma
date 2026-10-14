@@ -95,7 +95,11 @@ it('tests drafts with example data, keeps saved cases and never reaches connecte
       cookie: owner.cookie,
       method: 'POST',
       status: 201,
-      body: { name: 'Testing', slug: 'draft-testing', dataRegion: 'EU' },
+      body: {
+        name: 'Testing',
+        slug: 'draft-testing',
+        dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
+      },
     })
   ).body;
   for (const [user, role] of [
@@ -514,7 +518,11 @@ it('tests drafts with example data, keeps saved cases and never reaches connecte
       cookie: outsider.cookie,
       method: 'POST',
       status: 201,
-      body: { name: 'Other', slug: 'other-testing', dataRegion: 'EU' },
+      body: {
+        name: 'Other',
+        slug: 'other-testing',
+        dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
+      },
     })
   ).body;
   const otherBase = `/v1/organizations/${other.id}${path}`;

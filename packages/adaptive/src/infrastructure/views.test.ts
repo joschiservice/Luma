@@ -36,7 +36,7 @@ function context(
       id: tenantId,
       name: 'Fixture',
       slug: 'fixture',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
       status: 'active',
     },
     permissions
@@ -375,7 +375,7 @@ describe('reviewed saved views', () => {
     ).rejects.toMatchObject({ statusCode: 422 });
     expect(input().query.version).toBe(2);
   });
-  it('routes prompts through sensitive EU policy and returns unsaved clarification', async () => {
+  it('routes prompts through sensitive tenant-region policy and returns unsaved clarification', async () => {
     let calls = 0;
     const model: ModelGateway = {
       generate: async (_ctx, request) => {
@@ -383,7 +383,7 @@ describe('reviewed saved views', () => {
         expect(request.profile).toBe('authoring');
         expect(request.dataPolicy).toEqual({
           classification: 'sensitive',
-          region: 'EU',
+          region: 'AU',
           zeroDataRetention: true,
         });
         const output =
@@ -398,7 +398,7 @@ describe('reviewed saved views', () => {
           output,
           toolCalls: [],
           metadata: {
-            adapter: 'bedrock-eu',
+            adapter: 'bedrock',
             model: 'fixture',
             inputTokens: 1,
             outputTokens: 1,
@@ -444,7 +444,7 @@ describe('reviewed saved views', () => {
           output,
           toolCalls: [],
           metadata: {
-            adapter: 'bedrock-eu',
+            adapter: 'bedrock',
             model: 'fixture',
             inputTokens: 1,
             outputTokens: 1,

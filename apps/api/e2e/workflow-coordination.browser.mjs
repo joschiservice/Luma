@@ -40,6 +40,8 @@ test('answers a human handoff in Needs you with keyboard use and narrow light an
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/sign-up');
+  await page.getByRole('radio', { name: /Australia/ }).check();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.getByLabel('Name', { exact: true }).fill('Ada');
   await page.getByLabel('Email', { exact: true }).fill('handoff@example.test');
   await page
@@ -67,7 +69,7 @@ test('answers a human handoff in Needs you with keyboard use and narrow light an
       name: 'Human handoffs',
       slug: 'human-handoffs',
       status: 'active',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
     },
     builtInMembership(
       { id: user.membership_id, organizationId: tenantId, userId: user.id },

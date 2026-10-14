@@ -30,7 +30,7 @@ function context(role: 'owner' | 'admin' | 'member', userId = `${role}-id`) {
       id: tenantId,
       name: 'Tenant',
       slug: 'tenant',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
       status: 'active',
     },
     builtInMembership(

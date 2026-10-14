@@ -3,6 +3,39 @@ import { describe, expect, it } from 'vitest';
 import { shopifyRequestBudget } from './request-budget.js';
 
 describe('trusted Shopify admission scopes', () => {
+  it('shares the configured cell scope with explicit tenant context for OAuth, probes and live requests', async () => {
+    const keys: string[] = [];
+    const requestBudgetStore = {
+      async run(_script: string, key: string) {
+        keys.push(key);
+
+        return [1, 0, Date.now() + 1000];
+      },
+    };
+    const connection = {
+      tenantId: 'tenant-one',
+      target: { kind: 'shopify' as const, shop: 'example.myshopify.com' },
+    };
+    for (const region of ['AU', 'EU', 'US']) {
+      const options = { requestBudgetStore, env: { LUMA_REGION: region } };
+      await shopifyRequestBudget(options, connection).run(
+        'query',
+        async () => undefined,
+      );
+      await shopifyRequestBudget(options, connection, 'foreground', region).run(
+        'query',
+        async () => undefined,
+      );
+      expect(keys.at(-1)).toBe(keys.at(-2));
+    }
+    expect(new Set(keys).size).toBe(3);
+    await shopifyRequestBudget({ requestBudgetStore }, connection).run(
+      'query',
+      async () => undefined,
+    );
+    expect(keys.at(-1)).toBe(keys[0]);
+  });
+
   it('retains scope through reconnects and separates tenant, region, app and shop bindings without storing secrets', async () => {
     const keys: string[] = [];
     const requestBudgetStore = {

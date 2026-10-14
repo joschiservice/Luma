@@ -32,7 +32,7 @@ export async function caseWorkflowFixture(
     address: temporal.address,
     namespace: 'default',
     taskQueue: randomUUID(),
-    dataRegion: 'EU',
+    dataRegion: globalThis.process.env.LUMA_REGION ?? 'AU',
   };
   const f = await setupSimulator(t, {
     temporal: settings,

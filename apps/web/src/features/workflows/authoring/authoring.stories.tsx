@@ -115,7 +115,7 @@ const proposal = {
   outcome: 'valid',
   attempts: 1,
   usage: { inputTokens: 1200, outputTokens: 300, costUsd: null },
-  route: { profile: 'authoring', adapter: 'bedrock-eu', model: 'eu.model' },
+  route: { profile: 'authoring', adapter: 'bedrock', model: 'au.model' },
   explanations: [],
   assumptions: ['One hour is long enough for the supplier to respond.'],
   questions: [],

@@ -15,7 +15,7 @@ it('evaluates supplier lookup, open orders, creation, transition, retries and ve
       id: tenantId,
       name: 'Scenario',
       slug: 'scenario',
-      dataRegion: 'EU',
+      dataRegion: 'AU',
       status: 'active',
     },
     builtInMembership(
@@ -124,7 +124,7 @@ it('lets procurement readers browse but requires procurement.manage to change re
     id: tenantId,
     name: 'Scenario',
     slug: 'scenario',
-    dataRegion: 'EU',
+    dataRegion: 'AU',
     status: 'active',
   } as const;
   const contextFor = (role: 'admin' | 'member') => {

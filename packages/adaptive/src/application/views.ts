@@ -730,7 +730,7 @@ export function createViewsService(deps: ViewsDependencies) {
           profile: authoringModelProfile,
           dataPolicy: {
             classification: 'sensitive',
-            region: 'EU',
+            region: fresh.dataRegion,
             zeroDataRetention: true,
           },
           maxOutputTokens: 3000,

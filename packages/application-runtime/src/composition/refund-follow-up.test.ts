@@ -12,7 +12,7 @@ const context = makeTenantContext(
     id: 'tenant',
     name: 'Test',
     slug: 'test',
-    dataRegion: 'EU',
+    dataRegion: 'AU',
     status: 'active',
   },
   builtInMembership(

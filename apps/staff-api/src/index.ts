@@ -1,10 +1,29 @@
+import { randomUUID } from 'node:crypto';
+
+import { readObservabilityConfig } from '@luma/config';
+import { createObservability } from '@luma/platform/composition';
 import { createStaff, readStaffSettings } from '@luma/staff/composition';
 
 import { createStaffHttpApp } from './composition/http-app.js';
 
 const settings = readStaffSettings();
-const staff = createStaff(settings);
+const observability = createObservability(readObservabilityConfig(process.env));
+const staff = createStaff(settings, {
+  release: async () => {
+    const observation = observability.request(randomUUID());
+    try {
+      return await observability.flag(
+        observation.context,
+        'staff-regional-directory',
+        false,
+      );
+    } finally {
+      observation.end();
+    }
+  },
+});
 const app = createStaffHttpApp(staff, settings.trustedProxy ?? []);
+app.addHook('onClose', () => observability.shutdown());
 for (const signal of ['SIGINT', 'SIGTERM'] as const)
   process.once(signal, () => {
     void app.close();

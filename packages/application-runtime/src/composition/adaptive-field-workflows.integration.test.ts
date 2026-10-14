@@ -55,7 +55,7 @@ describe.skipIf(!databaseUrl)('custom fields in admitted workflows', () => {
         requesterId = randomUUID(),
         reviewerId = randomUUID();
       await db.owner.query(
-        "INSERT INTO organizations(id,name,slug,created_at,write_mode) VALUES($1::uuid,'Shop',$1::text,now(),'writes_enabled')",
+        "INSERT INTO organizations(data_region,id,name,slug,created_at,write_mode) VALUES('AU',$1::uuid,'Shop',$1::text,now(),'writes_enabled')",
         [tenantId],
       );
       await db.owner.query(
@@ -79,7 +79,7 @@ describe.skipIf(!databaseUrl)('custom fields in admitted workflows', () => {
             id: tenantId,
             name: 'Shop',
             slug: tenantId,
-            dataRegion: 'EU',
+            dataRegion: 'AU',
             status: 'active',
           },
           builtInMembership(
