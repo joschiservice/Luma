@@ -141,6 +141,13 @@ test('reviews replenishment scope, recovers a lost response, approves and opens 
     fullPage: true,
   });
   await review.setViewportSize({ width: 375, height: 812 });
+  expect(
+    await review
+      .locator('.replenishment-metrics dd')
+      .evaluateAll((values) =>
+        values.every((value) => value.scrollWidth <= value.clientWidth),
+      ),
+  ).toBe(true);
   await review
     .getByText('Draft verified', { exact: true })
     .scrollIntoViewIfNeeded();

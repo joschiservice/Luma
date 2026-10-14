@@ -428,7 +428,7 @@ export function DecisionInspector({
             <div>
               <dt>{m.decisions_impact_label()}</dt>
               <dd>
-                {item.impact.text
+                {item.impact.text && (item.kind !== 'replenishment' || !review)
                   ? m.decisions_impact_detail({
                       impact: impactLabels[item.impact.level](),
                       detail: item.impact.text,

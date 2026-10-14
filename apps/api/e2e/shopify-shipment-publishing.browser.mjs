@@ -96,6 +96,8 @@ test('publishes an exact downstream parcel from the shared fulfillment view with
     (response) =>
       response.url().endsWith('/shipment-publishing-preview') &&
       response.request().method() === 'POST',
+    // The preview rereads linked providers through their rate-limited adapters.
+    { timeout: 45_000 },
   );
   await panel
     .getByRole('button', { name: 'Save exact preview', exact: true })
@@ -196,6 +198,7 @@ test('publishes an exact downstream parcel from the shared fulfillment view with
     (response) =>
       response.url().endsWith('/shipment-publishing-preview') &&
       response.request().method() === 'POST',
+    { timeout: 45_000 },
   );
   await panel
     .getByRole('button', { name: 'Save exact preview', exact: true })

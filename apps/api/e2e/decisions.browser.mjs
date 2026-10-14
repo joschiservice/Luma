@@ -41,7 +41,9 @@ test('finds a replenishment approval in Needs you, decides it once and updates e
     activationId: rule.id,
   });
   await f.waitFor(run.id, 'awaiting_decision');
-  const title = `Approve purchase-order draft for 50 × ${f.position.sku}`;
+  const review = await f.request(`/replenishment/runs/${run.id}`);
+  expect(review.context.productTitle).toBe('Canvas tote');
+  const title = `Approve purchase-order draft for 50 × ${review.context.productTitle} (${f.position.sku})`;
   const path = `/app/${f.manifest.organizationId}/needs-you`;
 
   // The requester sees the decision, but it waits for a different approver.
@@ -58,7 +60,7 @@ test('finds a replenishment approval in Needs you, decides it once and updates e
     .getByRole('link', { name: 'View all: Needs your attention' })
     .click();
   await requester.waitForURL(`**${path}`);
-  const requested = requester.getByRole('link', { name: new RegExp(title) });
+  const requested = requester.getByRole('link', { name: title });
   await requested.getByText('Waiting for another approver').waitFor();
   await requester
     .getByRole('navigation', { name: 'Workspace navigation' })
@@ -72,7 +74,7 @@ test('finds a replenishment approval in Needs you, decides it once and updates e
   approver.on('pageerror', (error) => errors.push(error.message));
   await approver.goto(path);
   await approver
-    .getByRole('link', { name: new RegExp(title) })
+    .getByRole('link', { name: title })
     .getByText('Needs your approval')
     .waitFor();
   // J focuses the first decision and Space opens it beside the queue.
@@ -80,13 +82,19 @@ test('finds a replenishment approval in Needs you, decides it once and updates e
   await approver.keyboard.press('Space');
   await approver.waitForURL(/item=/);
   if (!(await approver.getByRole('heading', { name: title }).isVisible()))
-    await approver.getByRole('link', { name: new RegExp(title) }).click();
+    await approver.getByRole('link', { name: title }).click();
   const inspector = approver.getByRole('region', {
     name: 'Selected decision',
   });
   await inspector.getByRole('heading', { name: title }).waitFor();
   await inspector.getByText('Needs your approval').first().waitFor();
-  await inspector.getByText('Purchase-order draft, not sent').waitFor();
+  await inspector.getByLabel('Recorded stock context').waitFor();
+  await inspector
+    .getByRole('region', { name: 'Cost and demand at proposal time' })
+    .waitFor();
+  expect(
+    await inspector.getByText(/available, below the minimum of/).count(),
+  ).toBe(0);
   await inspector
     .getByText('Nothing is sent to the supplier.', {
       exact: false,

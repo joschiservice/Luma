@@ -64,7 +64,7 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.015em;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .replenishment-metrics small {

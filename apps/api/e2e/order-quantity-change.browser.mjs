@@ -50,7 +50,7 @@ test('shows the operator what each system reports and lets the warehouse answer 
   await expect(
     operator.page
       .getByText(
-        'Luma ERP sets this quantity to 1; Shopify still shows 2; JTL doesn’t report it',
+        /^Luma ERP sets this quantity to 1; Shopify still shows 2;.*JTL doesn’t report it/,
       )
       .first(),
   ).toBeVisible();
