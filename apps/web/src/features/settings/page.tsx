@@ -35,6 +35,7 @@ import {
   usePermissionLabel,
   usePermissions,
 } from '../../kit/identity/permissions';
+import { regionLabel } from '../../kit/identity/region';
 import { settingsApi, settingsOptions } from '../../kit/settings/data';
 import {
   CommandFeedback,
@@ -432,9 +433,7 @@ function WorkspaceForm({
             <div>
               <span>{m.settings_workspace_region_label()}</span>
               <strong>
-                {current.dataRegion === 'EU'
-                  ? m.settings_workspace_region_eu()
-                  : current.dataRegion}
+                {regionLabel(current.dataRegion)}
               </strong>
             </div>
             <LockKeyhole

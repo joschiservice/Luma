@@ -9,15 +9,7 @@ import {
   regionOptions,
   returnPath,
 } from '../../kit/identity/data';
-
-/** Names a data region in the current interface language. */
-export function regionLabel(region: DataRegion) {
-  return region === 'AU'
-    ? m.identity_region_au()
-    : region === 'EU'
-      ? m.identity_region_eu()
-      : m.identity_region_us();
-}
+import { regionLabel } from '../../kit/identity/region';
 
 /** Suggests placement from non-sensitive browser settings without confirming it for the person. */
 function suggestedRegion(
