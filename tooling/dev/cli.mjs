@@ -111,6 +111,7 @@ try {
       '--wait-timeout',
       '120',
       'postgres',
+      'valkey',
       ...(workflows ? ['temporal'] : []),
       ...(observing ? ['grafana'] : []),
     ]);

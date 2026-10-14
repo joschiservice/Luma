@@ -35,13 +35,18 @@ export function createRecordService(options: {
     /** Enable only when Shopify approves name, email and phone access for this deployment. */
     protectedCustomerContactApproved?: boolean;
     accessToken(): Promise<string>;
+    signal?: AbortSignal;
   }): (
     kind: ShopifyRecordKind,
     id?: string,
     cursor?: string,
   ) => Promise<ShopifyRecordDetail>;
 }) {
-  return async (context: TenantContext, input: unknown) => {
+  return async (
+    context: TenantContext,
+    input: unknown,
+    signal?: AbortSignal,
+  ) => {
     const parsed = recordInput.safeParse(input);
     if (!parsed.success)
       throw new IdentityError(
@@ -77,6 +82,7 @@ export function createRecordService(options: {
     if (current.connection.target.kind !== 'shopify' || !shop)
       throw new IdentityError(404, 'NOT_FOUND', 'Shopify connection not found');
     const reader = options.reader({
+      ...(signal ? { signal } : {}),
       tenantId: context.tenantId,
       connectionId,
       connection: current.connection,

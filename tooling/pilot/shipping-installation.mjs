@@ -30,8 +30,9 @@ export async function ensureShippingInstallation(
     return manifest;
   const identity = createIdentity(identitySettings(env));
   const pool = new Pool({ connectionString: env.WORKFLOW_DATABASE_URL });
+  let connections;
   try {
-    const connections = createInstalledConnections(createTenantDatabase(pool), {
+    connections = createInstalledConnections(createTenantDatabase(pool), {
       featureEnabled,
       refreshContext: identity.service.refreshContext,
       activeKeyId: env.CONNECTIONS_ACTIVE_KEY_ID,
@@ -103,6 +104,7 @@ export async function ensureShippingInstallation(
 
     return manifest;
   } finally {
+    await connections?.close();
     await identity.close();
     await pool.end();
   }

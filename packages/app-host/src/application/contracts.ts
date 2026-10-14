@@ -6,7 +6,11 @@ import type {
   SecretCipher,
 } from '@luma/connections';
 import type { IdentityService, TenantContext } from '@luma/identity';
-import type { SqlTransaction, TenantDatabase } from '@luma/platform';
+import type {
+  AtomicStore,
+  SqlTransaction,
+  TenantDatabase,
+} from '@luma/platform';
 import type { CaseWorkflowAdapter } from '@luma/workflows';
 import type { FastifyInstance } from 'fastify';
 
@@ -163,6 +167,8 @@ export interface AppOperation {
 
 export interface AppFactoryContext {
   database: TenantDatabase;
+  /** Region-local provider admission storage. It is unavailable when deployment configuration is missing. */
+  requestBudgetStore?: AtomicStore;
   /** Server-side release checks for a trusted tenant; absent checks withhold unreleased features. */
   featureEnabled?(
     tenantId: string,

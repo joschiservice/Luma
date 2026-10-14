@@ -17,7 +17,7 @@
       "dependsOn": ["^build"],
       "outputs": [],
       "env": ["LUMA_TEST_CAPABILITIES"],
-      "passThroughEnv": ["TEST_DATABASE_URL"]
+      "passThroughEnv": ["TEST_DATABASE_URL", "SHOPIFY_ADMISSION_URL"]
     },
     "dev": {
       "dependsOn": ["^build"],
@@ -100,7 +100,9 @@
         "STAFF_GOOGLE_CLIENT_ID",
         "STAFF_GOOGLE_CLIENT_SECRET",
         "STAFF_GOOGLE_HOSTED_DOMAIN",
-        "STAFF_TRUSTED_PROXY"
+        "STAFF_TRUSTED_PROXY",
+        "SHOPIFY_ADMISSION_URL",
+        "SHOPIFY_ADMISSION_CLUSTER"
       ]
     },
     "build:storybook": {
@@ -175,7 +177,9 @@
         "GMAIL_PUSH_SERVICE_ACCOUNT",
         "LUMA_LOCAL_OTLP_ENDPOINT",
         "LUMA_LOCAL_PROFILES_ENDPOINT",
-        "LUMA_CODE_RUNTIME_DIR"
+        "LUMA_CODE_RUNTIME_DIR",
+        "SHOPIFY_ADMISSION_URL",
+        "SHOPIFY_ADMISSION_CLUSTER"
       ]
     },
     "@luma/web#build": {

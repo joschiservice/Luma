@@ -32,6 +32,7 @@ import {
   publishingCapabilities,
   verifiedPublishingFulfillment,
 } from './domain/shipment-publishing.js';
+import { shopifyRequestBudget } from './infrastructure/request-budget.js';
 import { createPublishingProvider } from './infrastructure/shipment-publishing-provider.js';
 import { createPublishingStore } from './infrastructure/shipment-publishing-store.js';
 
@@ -117,6 +118,12 @@ export function createShopifyPublishing(
       simulationTransport(current.connection, context.simulation) ?? fetch;
 
     return createPublishingProvider({
+      budget: shopifyRequestBudget(
+        context,
+        current.connection,
+        'foreground',
+        tenant.dataRegion,
+      ),
       tenantId: tenant.tenantId,
       connectionId,
       shop,

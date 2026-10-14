@@ -1,6 +1,6 @@
 # Local development
 
-Each checkout runs its own PostgreSQL, Temporal, ports, credentials and cookie prefix, so
+Each checkout runs its own PostgreSQL, Valkey, Temporal, ports, credentials and cookie prefix, so
 worktrees never share state. Tests always use disposable databases.
 
 Install mise and a Docker-compatible runtime with Compose v2, then:
@@ -19,20 +19,20 @@ updating them.
 
 ## Commands
 
-| Command                   | Behavior                                                                                                                 |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `pnpm run setup`          | Install dependencies and Chromium, start PostgreSQL, migrate, provision roles and seed demo data. Safe to repeat.        |
-| `pnpm dev`                | Start PostgreSQL if needed, apply migrations, and watch the API, web app, commerce sync process, config and contracts.   |
-| `pnpm dev:workflows`      | Also start Temporal and its UI, and watch the workflow worker.                                                           |
-| `pnpm dev:observe`        | Also start the local Grafana stack; see [observability](observability.md).                                               |
-| `pnpm dev:doctor`         | Check tool versions, containers, database logins and API readiness. Run while the app is running.                        |
-| `pnpm dev:down`           | Stop this checkout's containers; keep volumes and credentials.                                                           |
-| `pnpm dev:manual`         | Watch app processes using your own `.env` files and services.                                                            |
-| `pnpm db:seed`            | Create or reuse the demo user, workspace and synthetic exceptions.                                                       |
-| `pnpm db:reset`           | Erase this checkout's database, migrate, provision roles and reseed. Stop app and worker processes first.                |
-| `pnpm db:studio`          | Open Drizzle Studio on this checkout's database as the administrator, across all workspaces. Edits are written directly. |
-| `pnpm pilot`, `simulator` | Synthetic provider environments; see the [pilot](pilot-environment.md) and [simulator](simulator.md) guides.             |
-| `pnpm storybook`          | Component workshop; needs no API.                                                                                        |
+| Command                   | Behavior                                                                                                                          |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm run setup`          | Install dependencies and Chromium, start PostgreSQL and Valkey, migrate, provision roles and seed demo data. Safe to repeat.      |
+| `pnpm dev`                | Start PostgreSQL and Valkey if needed, apply migrations, and watch the API, web app, commerce sync process, config and contracts. |
+| `pnpm dev:workflows`      | Also start Temporal and its UI, and watch the workflow worker.                                                                    |
+| `pnpm dev:observe`        | Also start the local Grafana stack; see [observability](observability.md).                                                        |
+| `pnpm dev:doctor`         | Check tool versions, containers, database logins and API readiness. Run while the app is running.                                 |
+| `pnpm dev:down`           | Stop this checkout's containers; keep volumes and credentials.                                                                    |
+| `pnpm dev:manual`         | Watch app processes using your own `.env` files and services.                                                                     |
+| `pnpm db:seed`            | Create or reuse the demo user, workspace and synthetic exceptions.                                                                |
+| `pnpm db:reset`           | Erase this checkout's database, migrate, provision roles and reseed. Stop app and worker processes first.                         |
+| `pnpm db:studio`          | Open Drizzle Studio on this checkout's database as the administrator, across all workspaces. Edits are written directly.          |
+| `pnpm pilot`, `simulator` | Synthetic provider environments; see the [pilot](pilot-environment.md) and [simulator](simulator.md) guides.                      |
+| `pnpm storybook`          | Component workshop; needs no API.                                                                                                 |
 
 Setup creates `demo@example.test` with a generated password in `.luma/demo.json`, one EU
 workspace and two synthetic exceptions taken from the golden corpus. Seeding uses the real
@@ -113,7 +113,12 @@ runtime logins. To use a separate cluster, set `TEST_DATABASE_URL` to an adminis
 connection that can create databases and roles. Never point it at a development or
 production database.
 
-`pnpm test:local` runs without containers; database integration suites skip and E2E
+The test runner provisions a disposable Valkey instance alongside PostgreSQL and overrides
+`SHOPIFY_ADMISSION_URL` for the run. Tests never use the checkout's admission service.
+Local Compose starts an authenticated Valkey instance with persistence and `noeviction`;
+its URL is generated in the checkout's ignored environment for API and worker processes.
+
+`pnpm test:local` runs without containers; database and Valkey integration suites skip and E2E
 suites cannot run. Report that limitation when relying on it.
 
 - The test container disables `fsync`, `full_page_writes` and `synchronous_commit`.
@@ -150,9 +155,9 @@ expire its heartbeat automatically. Direct package tests and Turbo commands bypa
 Turbo caches each package's `test` result. The hash covers the package's files, the builds
 of its workspace dependencies, extra inputs declared in the package's `turbo.json`, and
 `LUMA_TEST_CAPABILITIES`. The test runner sets that variable to the optional dependencies
-present: PostgreSQL and the Code Step runtime. A run that skipped database suites is
+present: PostgreSQL, Valkey and the Code Step runtime. A run that skipped database suites is
 therefore never reused for a run that can execute them. The database URL is not hashed,
-because each run gets a new container. Run tests through the `pnpm test*` scripts.
+because each run gets new disposable containers. Run tests through the `pnpm test*` scripts.
 Running `turbo run test` directly with `TEST_DATABASE_URL` set bypasses the marker. Add
 `--force` to rerun cached results.
 

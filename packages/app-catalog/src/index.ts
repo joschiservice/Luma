@@ -7,6 +7,7 @@ import {
   createAppRegistry,
   createAppService,
 } from '@luma/app-host';
+import { readRequestAdmissionConfig } from '@luma/config';
 import type {
   ConnectionProvider,
   InstallationDependencies,
@@ -26,7 +27,8 @@ import {
   createSourceEnvironmentService,
 } from '@luma/connections/composition';
 import { IdentityError, type TenantContext } from '@luma/identity';
-import type { TenantDatabase } from '@luma/platform';
+import type { AtomicStore, TenantDatabase } from '@luma/platform';
+import { createValkeyStore } from '@luma/platform/composition';
 
 import { factories } from './generated.js';
 
@@ -38,6 +40,7 @@ export function createAppHost(
     keys?: ReadonlyMap<string, Uint8Array>;
     refreshContext: InstallationDependencies['refreshContext'];
     env?: Readonly<Record<string, string | undefined>>;
+    requestBudgetStore?: AtomicStore;
     factories?: readonly AppFactory[];
     featureEnabled?: AppFactoryContext['featureEnabled'];
     simulation?: AppFactoryContext['simulation'];
@@ -55,6 +58,8 @@ export function createAppHost(
   },
 ): {
   registry: AppRegistry;
+  /** Releases this host's provider admission connection. Injected stores belong to their caller. */
+  close(): Promise<void>;
   apps: AppService;
   connections: InstallationService;
   providerCatalog: ProviderCatalog;
@@ -67,6 +72,23 @@ export function createAppHost(
   /** Lists installed apps' decisions, filtered by each decision kind's declared permissions. */
   decisionSources(): ReturnType<AppRegistry['decisionSources']>;
 } {
+  const admissionConfig = readRequestAdmissionConfig({
+    ...process.env,
+    ...options.env,
+  });
+  const ownedStore = options.requestBudgetStore
+    ? undefined
+    : admissionConfig
+      ? createValkeyStore(admissionConfig.url, admissionConfig.cluster)
+      : undefined;
+  const requestBudgetStore = options.requestBudgetStore ??
+    ownedStore ?? {
+      run: async () => {
+        throw new Error('Shopify request admission is not configured');
+      },
+      ready: async () => false,
+      close: async () => undefined,
+    };
   const unavailable = () => {
     throw new IdentityError(
       503,
@@ -82,6 +104,7 @@ export function createAppHost(
     (options.factories ?? factories).map((factory) =>
       factory({
         database,
+        requestBudgetStore,
         ...(options.featureEnabled
           ? { featureEnabled: options.featureEnabled }
           : {}),
@@ -269,6 +292,9 @@ export function createAppHost(
   });
 
   return {
+    close: async () => {
+      await ownedStore?.close();
+    },
     sourceEnvironments,
     connectionEnvironment: sourceEnvironments.classify,
     registry,

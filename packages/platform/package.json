@@ -39,6 +39,7 @@
     "@pyroscope/nodejs": "0.6.3",
     "@sentry/node": "10.75.0",
     "@sentry/opentelemetry": "10.75.0",
+    "@valkey/valkey-glide": "2.5.3",
     "pg": "catalog:pg-8-20-0",
     "posthog-node": "5.52.4",
     "zod": "catalog:"

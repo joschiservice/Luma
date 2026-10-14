@@ -17,6 +17,7 @@ import {
   createInstallationVerifier,
   createInstalledConnections,
 } from '../apps/providers.mjs';
+import { simulatorShopifyEnv } from '../simulator/shopify-app.mjs';
 import { syntheticFeatureRelease } from './feature-release.mjs';
 import { detectionRequest, jtl, newManifest, readJson } from './fixtures.mjs';
 import { identitySettings } from './settings.mjs';
@@ -73,6 +74,18 @@ export async function seedPilot(
   const detection = createDetectionServices(env.WORKFLOW_DATABASE_URL);
   const connections = createInstalledConnections(createTenantDatabase(pool), {
     featureEnabled,
+    env: {
+      ...env,
+      ...(manifest.simulator
+        ? simulatorShopifyEnv(manifest.simulator.webhookSecret)
+        : {}),
+    },
+    ...(manifest.simulator
+      ? {
+          simulation: (connection) =>
+            createSimulationTransport(manifest.simulator)(connection),
+        }
+      : {}),
     refreshContext: identity.service.refreshContext,
     activeKeyId: env.CONNECTIONS_ACTIVE_KEY_ID,
     keys: new Map(
@@ -424,6 +437,7 @@ export async function seedPilot(
     return manifest;
   } finally {
     await Promise.all([
+      connections.close(),
       app.close(),
       identity.close(),
       detection.close(),

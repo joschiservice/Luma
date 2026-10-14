@@ -156,6 +156,8 @@ export function violation(from, to) {
         'apps/api/src/exceptions.integration.test.ts',
         'apps/api/src/commerce.integration.test.ts',
         'apps/api/src/commerce-sync.integration.test.ts',
+        'apps/api/src/shopify-admission.integration.test.ts',
+        'apps/api/src/test-support/shopify-admission-child.ts',
         'apps/api/src/orders.integration.test.ts',
         'apps/api/src/catalog-lists.integration.test.ts',
         'apps/api/src/procurement-lists.integration.test.ts',
@@ -237,8 +239,20 @@ export function violation(from, to) {
       return null;
     if (source.name === 'connectors') {
       if (to === 'packages/connectors/core/') return null;
+      // Capability invocation carries an authority callback without importing provider transport.
+      if (
+        to === 'packages/connectors/core/dispatch' &&
+        from.endsWith('/application/capabilities.ts')
+      )
+        return null;
       if (['infrastructure', 'composition.ts'].includes(source.layer)) {
-        if (to === 'packages/connectors/core/transport') return null;
+        if (
+          [
+            'packages/connectors/core/transport',
+            'packages/connectors/core/dispatch',
+          ].includes(to)
+        )
+          return null;
         for (const [name, exports] of Object.entries(connectorPackages)) {
           if (
             exports.some(

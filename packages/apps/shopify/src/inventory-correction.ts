@@ -38,6 +38,7 @@ import { createInventoryCorrectionProvider } from './infrastructure/inventory-co
 import { createCorrectionQuery } from './infrastructure/inventory-correction-query.js';
 import { createCorrectionStore } from './infrastructure/inventory-correction-store.js';
 import { readInventoryWriteReceipts } from './infrastructure/inventory-write-store.js';
+import { shopifyRequestBudget } from './infrastructure/request-budget.js';
 
 /** Composes Shopify correction with the platform's persistent Action Admission, policy and audit services. */
 export function createShopifyInventoryCorrection(
@@ -146,6 +147,12 @@ export function createShopifyInventoryCorrection(
       simulationTransport(current.connection, context.simulation) ?? fetch;
 
     return createInventoryCorrectionProvider({
+      budget: shopifyRequestBudget(
+        context,
+        current.connection,
+        'foreground',
+        tenant.dataRegion,
+      ),
       tenantId: tenant.tenantId,
       connectionId,
       shop,

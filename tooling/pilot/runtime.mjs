@@ -179,6 +179,7 @@ export async function createPilot(
             );
           },
     });
+    resources.add(installations.close);
     const connections = {
       ...installations,
       async check(actor, connectionId, version) {
@@ -973,13 +974,22 @@ export async function createPilot(
         for (let pass = 0; pass < passes; pass++) {
           const scopes = await syncRunner.scopes();
           if (!scopes.includes(manifest.organizationId)) {
-            // Bulk exports finish asynchronously; wait for them instead of stopping.
+            // Export preparation and admission can leave a healthy scan waiting for its next due page.
             const waiting = (await syncStore.streams(manifest.organizationId))
               .filter(
                 (item) =>
-                  item.scan?.waitingForExport && !item.paused && !item.blocked,
+                  item.scan &&
+                  item.attempts === 0 &&
+                  !item.error &&
+                  !item.paused &&
+                  !item.blocked,
               )
-              .map((item) => Date.parse(item.dueAt));
+              .map((item) =>
+                Math.max(
+                  Date.parse(item.dueAt),
+                  item.providerDueAt ? Date.parse(item.providerDueAt) : 0,
+                ),
+              );
             if (!waiting.length) break;
             await delay(
               Math.min(5000, Math.max(100, Math.min(...waiting) - Date.now())),

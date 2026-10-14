@@ -957,7 +957,11 @@ describe.skipIf(!databaseUrl)(
         ]);
         expect(results.some((r) => r.state === 'verified')).toBe(true);
         expect(execute).toHaveBeenCalledTimes(1);
-        expect(execute).toHaveBeenCalledWith(f.run.action, `v0:${f.run.id}`);
+        expect(execute).toHaveBeenCalledWith(
+          f.run.action,
+          `v0:${f.run.id}`,
+          expect.any(Function),
+        );
         const restarted = createResolutionPlaybooks(
           createTenantDatabase(runtime),
           { refreshContext },
@@ -1783,6 +1787,37 @@ describe.skipIf(!databaseUrl)(
         await env.teardown();
       }
     }, 30_000);
+    it('withholds a mutation when authority changes during transport preparation and never redispatches it', async () => {
+      const proposal = action({
+        proposedBy: { kind: 'user', id: bob.actor.id },
+      });
+      let writes = 0;
+      execute.mockImplementationOnce(async (_intent, _key, beforeDispatch) => {
+        await owner.query("UPDATE memberships SET role='member' WHERE id=$1", [
+          bobMembership,
+        ]);
+        await beforeDispatch?.();
+        writes++;
+
+        return { evidenceRefs: [observationId] };
+      });
+      try {
+        const result = await safety.execution.execute(bob, proposal);
+        expect(result).toMatchObject({
+          state: 'failed',
+          record: { attempt: { dispatch: 'not_dispatched' } },
+        });
+        expect(writes).toBe(0);
+        expect(verify).not.toHaveBeenCalled();
+      } finally {
+        await owner.query("UPDATE memberships SET role='admin' WHERE id=$1", [
+          bobMembership,
+        ]);
+      }
+      await safety.execution.execute(bob, proposal);
+      expect(execute).toHaveBeenCalledTimes(1);
+      expect(writes).toBe(0);
+    });
     it('rechecks revoked roles instead of trusting the original context', async () => {
       await owner.query("UPDATE memberships SET role='member' WHERE id=$1", [
         bobMembership,

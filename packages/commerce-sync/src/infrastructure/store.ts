@@ -500,7 +500,7 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
           return false;
         if (page.deferred) {
           await tx.query(
-            `UPDATE commerce_sync_streams SET cursor=$4,due_at=$5,scan_waiting=true,lease_token=NULL,lease_until=NULL
+            `UPDATE commerce_sync_streams SET cursor=$4,due_at=$5,scan_waiting=CASE WHEN $6='admission' THEN scan_waiting ELSE true END,lease_token=NULL,lease_until=NULL
             WHERE tenant_id=$1 AND id=$2 AND lease_token=$3`,
             [
               tenantId,
@@ -508,6 +508,7 @@ export function createSyncStore(db: TenantDatabase): SyncStore {
               token,
               page.nextCursor,
               page.dueAt ?? page.now,
+              page.deferReason ?? 'export',
             ],
           );
 

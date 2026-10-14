@@ -37,6 +37,7 @@ import {
   createOrderEditProvider,
 } from './infrastructure/order-edit-provider.js';
 import { createOrderEditStore } from './infrastructure/order-edit-store.js';
+import { shopifyRequestBudget } from './infrastructure/request-budget.js';
 
 /** Stored authoritative reads older than this are reread before an edit judges them. */
 const refreshAfterMs = 60_000;
@@ -120,6 +121,12 @@ export function createShopifyOrderEdits(
       simulationTransport(current.connection, context.simulation) ?? fetch;
 
     return createOrderEditProvider({
+      budget: shopifyRequestBudget(
+        context,
+        current.connection,
+        'foreground',
+        tenant.dataRegion,
+      ),
       tenantId: tenant.tenantId,
       connectionId,
       shop,

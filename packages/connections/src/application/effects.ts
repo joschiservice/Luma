@@ -48,6 +48,8 @@ export interface EffectAdapter {
   execute(
     intent: EffectIntent,
     idempotencyKey: string,
+    /** Execution reasserts current authority immediately before provider dispatch. */
+    beforeDispatch?: (firstDispatch?: boolean) => Promise<void>,
   ): Promise<{ evidenceRefs: string[]; providerRequestId?: string | null }>;
   /** Read authoritative state; never perform a write during verification. */
   verify(intent: EffectIntent): Promise<VerificationResult>;

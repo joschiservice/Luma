@@ -99,6 +99,7 @@ export function createMailboxSyncWorker(options: {
   }
 
   return {
+    close: host.close,
     pass,
     async run() {
       while (!stop.signal.aborted) {

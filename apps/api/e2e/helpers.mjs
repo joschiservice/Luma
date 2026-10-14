@@ -34,7 +34,12 @@ export function startProcess(t, script, env = {}, ipc = false) {
   const child = spawn(process.execPath, [script], {
     cwd: apiDirectory,
     // Do not inherit developer credentials, telemetry exporters, or NODE_OPTIONS.
-    env: { PATH: process.env.PATH, NODE_ENV: 'test', ...env },
+    env: {
+      PATH: process.env.PATH,
+      NODE_ENV: 'test',
+      SHOPIFY_ADMISSION_URL: process.env.SHOPIFY_ADMISSION_URL,
+      ...env,
+    },
     stdio: ['ignore', 'pipe', 'pipe', ...(ipc ? ['ipc'] : [])],
   });
   let output = '';

@@ -619,6 +619,16 @@ const webAuthRecovery = [
 
 /** Source areas each journey exercises beyond the shared paths; `**` marks boot smoke tests. */
 export const journeyAreas = {
+  'shopify-admission.e2e.mjs': [
+    ...shopify,
+    'packages/commerce-sync/**',
+    'packages/platform/src/{application/atomic-store,infrastructure/valkey}.ts',
+    'packages/config/src/request-admission.ts',
+    'packages/connections/src/{application/capabilities,application/provider,infrastructure/installations/runtime}.ts',
+    'packages/execution/**',
+    'packages/simulator/{core,shopify}/**',
+    'apps/simulator/**',
+  ],
   'activity.browser.mjs': [
     ...appHost,
     ...activity,

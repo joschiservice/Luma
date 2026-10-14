@@ -1,3 +1,4 @@
+import { withDispatchGuard } from '@luma/connector-core/dispatch';
 import type { TenantContext } from '@luma/identity';
 import { requireTenant } from '@luma/identity';
 
@@ -50,6 +51,8 @@ export interface InvocationContext {
   provider: string;
   /** Present for writes; adapters namespace the key by tenant and connection. */
   idempotencyKey?: string;
+  /** Internal scheduling intent supplied by a service, outside capability input. */
+  readPurpose?: 'foreground' | 'incremental' | 'history';
 }
 
 export interface CapabilityHandler<K extends Capability> {
@@ -103,6 +106,8 @@ export interface CapabilityRequest<K extends Capability> {
   capability: K;
   version: '0';
   input: CapabilityInput<K>;
+  /** Trusted scheduling metadata, never accepted from a capability's public input schema. */
+  readPurpose?: 'foreground' | 'incremental' | 'history';
 }
 
 export type WriteRequest<K extends WriteCapability> = CapabilityRequest<K> & {
@@ -148,6 +153,7 @@ export function createCapabilityRuntime(deps: CapabilityDependencies) {
     write: boolean,
     idempotencyKey?: string,
     expectedDispatchIdentity?: string,
+    beforeDispatch?: (firstDispatch?: boolean) => Promise<void>,
   ): Promise<CapabilityResult<K>> {
     const connection = await resolve(context, request.connectionId);
     if (!connection) return { ok: false, error: failure('unavailable') };
@@ -189,14 +195,19 @@ export function createCapabilityRuntime(deps: CapabilityDependencies) {
     await deps.record({ ...event, phase: 'started' });
     let result: CapabilityResult<K>;
     try {
-      const output = await handler.run(
-        {
-          tenant: context,
-          connectionId: connection.id,
-          provider: connection.provider,
-          ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
-        },
-        input,
+      const output = await withDispatchGuard(beforeDispatch, () =>
+        handler.run(
+          {
+            tenant: context,
+            connectionId: connection.id,
+            provider: connection.provider,
+            ...(request.readPurpose
+              ? { readPurpose: request.readPurpose }
+              : {}),
+            ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
+          },
+          input,
+        ),
       );
       try {
         const value = handler.parseOutput(output);
@@ -334,7 +345,7 @@ export function createCapabilityRuntime(deps: CapabilityDependencies) {
             executor: connection.executor,
             checkPreconditions: (action) =>
               binding.checkPreconditions(context, action),
-            async execute(action, idempotencyKey) {
+            async execute(action, idempotencyKey, beforeDispatch) {
               if (!equalJson(action, boundIntent))
                 throw new ConnectorError(failure('conflict'));
               const result = await invoke(
@@ -348,6 +359,7 @@ export function createCapabilityRuntime(deps: CapabilityDependencies) {
                 true,
                 idempotencyKey,
                 expectedIdentity,
+                beforeDispatch,
               );
               if (!result.ok) throw new ConnectorError(result.error);
 

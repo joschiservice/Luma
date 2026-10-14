@@ -5,23 +5,28 @@ import {
 import { simulationTransport } from '@luma/connections/adapters';
 import type { SimulationTransport } from '@luma/connections/composition';
 import {
+  type BudgetStore,
   createClient as shopifyClient,
   parse as shopifyParse,
 } from '@luma/connector-shopify';
 import { z } from 'zod';
 
 import { installationTarget } from './installation-validation.js';
+import { shopifyRequestBudget } from './request-budget.js';
 
 /** Verifies account identity and grants using app-owned provider probes. */
 export function createInstallationVerifier(options: {
   fetch?: typeof globalThis.fetch;
   simulation?: SimulationTransport | undefined;
+  requestBudgetStore?: BudgetStore | undefined;
+  env?: Readonly<Record<string, string | undefined>>;
 }): InstallationDependencies['verify'] {
   return async (connection, credentials) => {
     const target = installationTarget.parse(connection.target);
     const simulated = simulationTransport(connection, options.simulation);
 
     const client = shopifyClient({
+      budget: shopifyRequestBudget(options, connection),
       shop: target.shop,
       accessToken: async () => credentials.token,
       ...((simulated ?? options.fetch)

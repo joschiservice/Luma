@@ -7,6 +7,22 @@ import { settingsFixture } from './settings-fixture.mjs';
 const gid = (kind, value = 1) => `gid://shopify/${kind}/${value}`;
 
 /** Creates an isolated, installed Shopify store with real recovery services and deterministic provider responses. */
+const response = (body) =>
+  Response.json({
+    ...body,
+    extensions: {
+      cost: {
+        requestedQueryCost: 1,
+        actualQueryCost: 1,
+        throttleStatus: {
+          maximumAvailable: 2000,
+          currentlyAvailable: 1999,
+          restoreRate: 100,
+        },
+      },
+    },
+  });
+
 export async function recoveryFixture(t, origin = 'http://localhost:3000') {
   const originalFetch = globalThis.fetch;
   const fulfillment = {
@@ -40,7 +56,7 @@ export async function recoveryFixture(t, origin = 'http://localhost:3000') {
       return originalFetch(url, init);
     const { query, variables } = JSON.parse(init.body);
     if (query.includes('VerifyInstallation'))
-      return Response.json({
+      return response({
         data: {
           shop: { myshopifyDomain: 'recovery.myshopify.com' },
           currentAppInstallation: {
@@ -61,7 +77,7 @@ export async function recoveryFixture(t, origin = 'http://localhost:3000') {
       );
       fulfillment.updatedAt = '2026-09-29T00:01:00Z';
 
-      return Response.json({
+      return response({
         data: {
           result: {
             resultOrder: { id: fulfillment.id, order: fulfillment.order },
@@ -71,7 +87,7 @@ export async function recoveryFixture(t, origin = 'http://localhost:3000') {
       });
     }
 
-    return Response.json({ data: { node: fulfillment } });
+    return response({ data: { node: fulfillment } });
   };
   t.onTestFinished(() => {
     globalThis.fetch = originalFetch;

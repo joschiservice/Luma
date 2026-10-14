@@ -12,7 +12,11 @@ import {
   createInstallationRepository,
   createInstallationService,
 } from '@luma/connections/composition';
-import { createReadBudget, type ReadBudget } from '@luma/connector-shopify';
+import {
+  type BudgetStore,
+  createReadBudget,
+  type ReadBudget,
+} from '@luma/connector-shopify';
 import { IdentityError } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 import { z } from 'zod';
@@ -44,6 +48,7 @@ import { readInventoryWriteReceipts } from './infrastructure/inventory-write-sto
 import { createShopifyOAuth } from './infrastructure/oauth.js';
 import { createPrivacyIntake } from './infrastructure/privacy.js';
 import { createShopifyRecordReader } from './infrastructure/records.js';
+import { shopifyRequestBudget } from './infrastructure/request-budget.js';
 import { createInstallationVerifier } from './infrastructure/verifier.js';
 import { createShopifyInventoryCorrection } from './inventory-correction.js';
 import { createShopifyOrderEdits } from './order-edits.js';
@@ -71,6 +76,8 @@ export function createShopifyProvider(
     customerAccess?: { contact: boolean; address: boolean };
     /** Connects tenant-scoped correction receipts to independent commerce reads. */
     database?: TenantDatabase;
+    requestBudgetStore?: BudgetStore | undefined;
+    env?: Readonly<Record<string, string | undefined>>;
   } = {},
 ): ConnectionProvider {
   const budgets = new Map<string, ReadBudget>();
@@ -118,16 +125,26 @@ export function createShopifyProvider(
           runtime.readBounds,
         );
       }
-      const budgetKey = `${context.tenantId}:${id}`;
-      let budget = budgets.get(budgetKey);
-      if (!budget) {
-        budget = createReadBudget();
-        budgets.set(budgetKey, budget);
+      let budget: ReadBudget;
+      if (options.requestBudgetStore) {
+        budget = shopifyRequestBudget(
+          options,
+          current.connection,
+          runtime.readPurpose,
+          context.dataRegion,
+        );
+      } else {
+        const budgetKey = `${context.tenantId}:${id}`;
+        const previous = budgets.get(budgetKey);
+        budget = previous ?? createReadBudget();
+        if (!previous) budgets.set(budgetKey, budget);
       }
       const database = options.database;
 
       return createShopifyConnector({
         budget,
+        ...(runtime.readPurpose ? { purpose: runtime.readPurpose } : {}),
+        ...(runtime.readBounds ? { signal: runtime.readBounds.signal } : {}),
         tenantId: context.tenantId,
         connectionId: id,
         shop: target.shop,
@@ -183,9 +200,14 @@ export function createApp(context: AppFactoryContext): AppDefinition {
   const config = readShopifyConfig(context.env);
   const oauth = config
     ? createShopifyOAuth(context.database, config, {
+        requestBudgetStore: context.requestBudgetStore,
         cipher: context.cipher,
         refreshContext: context.refreshContext,
-        verify: createInstallationVerifier({ simulation: context.simulation }),
+        verify: createInstallationVerifier({
+          simulation: context.simulation,
+          requestBudgetStore: context.requestBudgetStore,
+          env: context.env,
+        }),
         requireInstalled: (ctx) => context.requireInstalled(ctx, 'shopify'),
         authorize: (ctx) =>
           context.requirePermission(ctx, {
@@ -199,7 +221,11 @@ export function createApp(context: AppFactoryContext): AppDefinition {
     repository: createInstallationRepository(context.database),
     cipher: context.cipher,
     refreshContext: context.refreshContext,
-    verify: createInstallationVerifier({ simulation: context.simulation }),
+    verify: createInstallationVerifier({
+      simulation: context.simulation,
+      requestBudgetStore: context.requestBudgetStore,
+      env: context.env,
+    }),
     ...(oauth ? { refreshCredential: oauth.credential } : {}),
     id: randomUUID,
     now: () => new Date(),
@@ -212,6 +238,7 @@ export function createApp(context: AppFactoryContext): AppDefinition {
 
       return createShopifyRecordReader({
         ...reader,
+        budget: shopifyRequestBudget(context, connection),
         ...(fetch ? { fetch } : {}),
       });
     },
@@ -332,6 +359,8 @@ export function createApp(context: AppFactoryContext): AppDefinition {
     },
     connector: createShopifyProvider({
       database: context.database,
+      requestBudgetStore: context.requestBudgetStore,
+      env: context.env,
       ...(oauth ? { oauth } : {}),
       ...(context.simulation ? { simulation: context.simulation } : {}),
       ...(context.env.SHOPIFY_PROTECTED_CUSTOMER_DATA_APPROVED === 'true'
@@ -373,6 +402,11 @@ export function createApp(context: AppFactoryContext): AppDefinition {
         );
     },
     async ready() {
+      if (
+        context.requestBudgetStore &&
+        !(await context.requestBudgetStore.ready())
+      )
+        return false;
       if (!config) return true;
 
       return context.database.transaction(

@@ -586,7 +586,37 @@ export function createExecutionService(deps: ExecutionDependencies) {
       }
       let phase: ExecutionFailure['phase'] = 'dispatch';
       try {
-        const effect = await adapter.execute(action, record.idempotencyKey);
+        const effect = await adapter.execute(
+          action,
+          record.idempotencyKey,
+          async (firstDispatch = true) => {
+            const preconditionsStillCurrent =
+              !firstDispatch ||
+              (await adapter.checkPreconditions(action).catch(() => false));
+            const current = await deps
+              .refreshContext(context)
+              .catch(() => null);
+            if (
+              !current?.permissions.has(permission) ||
+              (await deps.writeControl?.mode(
+                context.tenantId,
+                action.connectionId,
+              )) === 'observe_only' ||
+              (admissionGuard && !(await admissionGuard())) ||
+              (await deps.policies.currentVersion(context.tenantId)) !==
+                decision.policyVersion ||
+              deps.now().getTime() >= Date.parse(decision.validUntil) ||
+              !preconditionsStillCurrent
+            ) {
+              throw new ConnectorError({
+                code: 'conflict',
+                effect: 'none',
+                retry: 'never',
+                dispatch: 'not_dispatched',
+              });
+            }
+          },
+        );
         record.attempt.dispatch = 'dispatched';
         if (effect.providerRequestId != null) {
           if (
@@ -628,7 +658,8 @@ export function createExecutionService(deps: ExecutionDependencies) {
         )
           record.attempt.dispatch = error.failure.dispatch;
         // A thrown request or invalid response cannot establish whether the effect committed.
-        record.state = 'unknown';
+        record.state =
+          record.attempt.dispatch === 'not_dispatched' ? 'failed' : 'unknown';
       }
       record.attempt.businessOutcome =
         record.attempt.verification?.outcome === 'passed'

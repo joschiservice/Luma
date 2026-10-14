@@ -1,10 +1,91 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
+import {
+  assertDispatchAllowed,
+  markDispatchStarted,
+  withDispatchGuard,
+} from './dispatch.js';
 import { ConnectorError } from './index.js';
 import { fail, parse, retryAfterMs, retryRead } from './transport.js';
 
 describe('connector transport helpers', () => {
+  it('preserves uncertain effects from transports that do not participate in dispatch tracking', async () => {
+    await expect(
+      withDispatchGuard(
+        async () => undefined,
+        async () => {
+          throw new ConnectorError({
+            code: 'timeout',
+            effect: 'unknown',
+            dispatch: 'uncertain',
+            retry: 'reconcile',
+          });
+        },
+      ),
+    ).rejects.toMatchObject({
+      failure: { effect: 'unknown', dispatch: 'uncertain', retry: 'reconcile' },
+    });
+  });
+
+  it('preserves a definitive no-effect rejection from the first mutation', async () => {
+    await expect(
+      withDispatchGuard(
+        async () => undefined,
+        async () => {
+          await assertDispatchAllowed();
+          markDispatchStarted();
+          throw new ConnectorError({
+            code: 'conflict',
+            effect: 'none',
+            dispatch: 'not_dispatched',
+            retry: 'never',
+          });
+        },
+      ),
+    ).rejects.toMatchObject({
+      failure: { effect: 'none', dispatch: 'not_dispatched' },
+    });
+  });
+
+  it('retains uncertainty when an earlier mutation was attempted before a later authority denial', async () => {
+    let allowed = true;
+    const guard = async () => {
+      if (!allowed)
+        throw new ConnectorError({
+          code: 'conflict',
+          effect: 'none',
+          dispatch: 'not_dispatched',
+          retry: 'never',
+        });
+    };
+    await expect(
+      withDispatchGuard(guard, async () => {
+        await assertDispatchAllowed();
+        markDispatchStarted();
+        allowed = false;
+        await assertDispatchAllowed();
+      }),
+    ).rejects.toMatchObject({
+      failure: { effect: 'unknown', dispatch: 'uncertain', retry: 'reconcile' },
+    });
+  });
+  it('keeps concurrent transport authority scopes isolated', async () => {
+    const denied = async () => {
+      fail('permission_denied');
+    };
+    const result = await Promise.allSettled([
+      withDispatchGuard(denied, () => assertDispatchAllowed()),
+      withDispatchGuard(
+        async () => undefined,
+        () => assertDispatchAllowed(),
+      ),
+    ]);
+    expect(result.map((entry) => entry.status)).toEqual([
+      'rejected',
+      'fulfilled',
+    ]);
+  });
   it.each([
     ['2', 2000],
     ['0.0011', 2],

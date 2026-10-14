@@ -296,6 +296,7 @@ export function createDetectionWorker(options: {
     close: async () => {
       await monitor.close();
       await detection.close();
+      await host.close();
     },
   };
 }

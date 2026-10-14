@@ -31,6 +31,7 @@ import {
 } from './domain/fulfillment-recovery.js';
 import { createFulfillmentProvider } from './infrastructure/fulfillment-recovery-provider.js';
 import { createRecoveryStore } from './infrastructure/fulfillment-recovery-store.js';
+import { shopifyRequestBudget } from './infrastructure/request-budget.js';
 
 /** Composes Shopify recovery with the platform's persistent Action Admission, policy and audit services. */
 export function createShopifyRecovery(
@@ -111,6 +112,12 @@ export function createShopifyRecovery(
       simulationTransport(current.connection, context.simulation) ?? fetch;
 
     return createFulfillmentProvider({
+      budget: shopifyRequestBudget(
+        context,
+        current.connection,
+        'foreground',
+        tenant.dataRegion,
+      ),
       tenantId: tenant.tenantId,
       connectionId,
       shop,

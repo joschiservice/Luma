@@ -465,6 +465,7 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
       }
       const scan = stream.scan!;
       const result = await deps.reader.read(tenant, {
+        readPurpose: scan.kind === 'incremental' ? 'incremental' : 'history',
         connectionId: claimed.connectionId,
         capability,
         version: '0',
@@ -480,6 +481,31 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
             : {}),
         },
       });
+      if (!result.ok && result.error.providerCode === 'ADMISSION_DEFERRED') {
+        await deps.store.commitPage(tenantId, claimed.id, token, {
+          entries: [],
+          unchanged: [],
+          counts: {
+            records: 0,
+            changed: 0,
+            unchanged: 0,
+            pending: 0,
+            failed: 0,
+          },
+          nextCursor: scan.cursor,
+          total: null,
+          history: undefined,
+          complete: null,
+          now: now().toISOString(),
+          deferred: true,
+          deferReason: 'admission',
+          dueAt: new Date(
+            +now() + Math.max(50, result.error.retryAfterMs ?? 1000),
+          ).toISOString(),
+        });
+
+        return true;
+      }
       if (!result.ok || !result.value.deferred)
         await deps
           .recordRead(
@@ -724,15 +750,19 @@ export function createSyncRunner(deps: SyncRunnerDependencies) {
 
       return [...new Set([...sync, ...automatic])];
     },
-    /** Advances one tenant for up to `budgetMs` of page work. */
-    async tick(tenantId: string, budgetMs = 20_000) {
+    /** Advances one tenant for up to `budgetMs` of page work; cancellation stops new pages after the current page. */
+    async tick(tenantId: string, budgetMs = 20_000, signal?: AbortSignal) {
       const deadline = Date.now() + budgetMs;
       await prepare(tenantId);
       await deps.store.applyHints(tenantId, syncPolicy.hintDelayMs);
       await processLinks(tenantId);
       await Promise.all(
         Array.from({ length: deps.workspaceConcurrency ?? 4 }, async () => {
-          while (Date.now() < deadline && (await runPage(tenantId)));
+          while (
+            !signal?.aborted &&
+            Date.now() < deadline &&
+            (await runPage(tenantId))
+          );
         }),
       );
       await deps.automaticLinks?.tick(tenantId);

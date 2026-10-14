@@ -73,10 +73,18 @@ export function createInstalledConnections(db, options) {
         return {
           ...definition,
           connector: {
-            ...(factory === starshipit
-              ? definition.connector
-              : providers[index]),
-            ...(options.verify ? { verify: options.verify } : {}),
+            ...(factory === shopify
+              ? createShopifyProvider({
+                  ...options,
+                  requestBudgetStore: context.requestBudgetStore,
+                  env: context.env,
+                })
+              : factory === starshipit
+                ? definition.connector
+                : providers[index]),
+            ...(options.verify && factory !== shopify
+              ? { verify: options.verify }
+              : {}),
           },
         };
       },
@@ -85,6 +93,7 @@ export function createInstalledConnections(db, options) {
 
   return {
     ...host.connections,
+    close: host.close,
     apps: host.apps,
     registry: host.registry,
     decisionSources: host.decisionSources,

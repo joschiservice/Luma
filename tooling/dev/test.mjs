@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
+import { GenericContainer } from 'testcontainers';
 
 import { affectedJourneys } from './affected.mjs';
 import { fail, root, run } from './process.mjs';
@@ -9,6 +10,7 @@ import { testCommands } from './test-plan.mjs';
 import { acquireValidation } from './validation-lock.mjs';
 
 let container;
+let admissionContainer;
 let validation;
 
 /**
@@ -18,6 +20,7 @@ let validation;
 function capabilities(env) {
   return [
     env.TEST_DATABASE_URL && 'database',
+    env.SHOPIFY_ADMISSION_URL && 'valkey',
     existsSync(join(root, '.luma/code-runtime/wasmtime')) && 'code-runtime',
   ]
     .filter(Boolean)
@@ -70,6 +73,19 @@ try {
     url = container.getConnectionUri();
   }
   const env = { ...process.env, ...(url ? { TEST_DATABASE_URL: url } : {}) };
+  if (!['local', 'ui'].includes(suite) && commands.length) {
+    console.log('Starting disposable Valkey for provider admission…');
+    admissionContainer = await new GenericContainer(
+      'valkey/valkey:9.1.2-alpine',
+    )
+      .withExposedPorts(6379)
+      .start();
+    env.SHOPIFY_ADMISSION_URL = `redis://${admissionContainer.getHost()}:${admissionContainer.getMappedPort(6379)}`;
+  }
+  if (suite === 'local' && !process.env.LUMA_VALIDATION_OWNER) {
+    delete env.SHOPIFY_ADMISSION_URL;
+    delete env.SHOPIFY_ADMISSION_CLUSTER;
+  }
   env.LUMA_TEST_CAPABILITIES = capabilities(env);
   env.LUMA_VALIDATION_OWNER = validation.owner;
   for (const args of commands) await run('pnpm', args, { env });
@@ -77,7 +93,11 @@ try {
   fail(error);
 } finally {
   try {
-    await container?.stop();
+    try {
+      await admissionContainer?.stop();
+    } finally {
+      await container?.stop();
+    }
   } finally {
     await validation?.release();
   }

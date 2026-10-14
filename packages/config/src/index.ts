@@ -162,3 +162,5 @@ export type { ConnectionsConfig } from './connections.js';
 export { readCommerceSyncConfig } from './sync.js';
 
 export type { CommerceSyncConfig } from './sync.js';
+
+export { readRequestAdmissionConfig } from './request-admission.js';

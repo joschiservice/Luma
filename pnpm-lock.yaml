@@ -335,6 +335,9 @@ importers:
       prettier:
         specifier: ^3.6.2
         version: 3.9.7
+      testcontainers:
+        specifier: 12.1.0
+        version: 12.1.0(supports-color@8.1.1)
       turbo:
         specifier: 2.11.7
         version: 2.11.7
@@ -812,6 +815,9 @@ importers:
       '@luma/app-starshipit':
         specifier: workspace:*
         version: link:../apps/starshipit
+      '@luma/config':
+        specifier: workspace:*
+        version: link:../config
       '@luma/connections':
         specifier: workspace:*
         version: link:../connections
@@ -965,6 +971,9 @@ importers:
       '@luma/app-shopify':
         specifier: workspace:*
         version: link:../apps/shopify
+      '@luma/connector-shopify':
+        specifier: workspace:*
+        version: link:../connectors/shopify
       '@luma/simulator-core':
         specifier: workspace:*
         version: link:../simulator/core
@@ -998,6 +1007,9 @@ importers:
       graphql:
         specifier: 'catalog:'
         version: 16.14.2
+      testcontainers:
+        specifier: 12.1.0
+        version: 12.1.0(supports-color@8.1.1)
       tsx:
         specifier: 'catalog:'
         version: 4.23.13
@@ -1912,6 +1924,9 @@ importers:
       '@sentry/opentelemetry':
         specifier: 10.75.0
         version: 10.75.0(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))
+      '@valkey/valkey-glide':
+        specifier: 2.5.3
+        version: 2.5.3
       pg:
         specifier: catalog:pg-8-20-0
         version: 8.20.0
@@ -5963,6 +5978,44 @@ packages:
 
   '@ungap/structured-clone@1.4.0':
     resolution: {integrity: sha512-1mEZtMKPM09vDmQt5y7YvmN2+DFTP7Tg0EWXdic8/C6VRnpb33e4ghisCIE3WZjsE2N8mf+QV1Zqh7ZFYLWInQ==}
+
+  '@valkey/valkey-glide-darwin-arm64@2.5.3':
+    resolution: {integrity: sha512-DB2dooH/OLhN6v2/rHbg5L+cynkYx/HhXSG/Iqs18+xaKvWlQZwdbfj5x2AXK0XObQVQaJKLMnc6+EYbv5+Img==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@valkey/valkey-glide-darwin-x64@2.5.3':
+    resolution: {integrity: sha512-Sxw+2uA2K445FCdIr78T7XirwKHMDP1rdliqRzRWgx87PYQOfkp8Qz/LXyri3la+YZ6/rnGezwkyuNlDT75kBw==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@valkey/valkey-glide-linux-arm64-gnu@2.5.3':
+    resolution: {integrity: sha512-/hpjvDQGarJe1KJFSYcUfPB1KrnhqUBkiFbK3Yq9wyv8CA/Jh5QiADDXYjDjVwpY+Ocy+znm6E7Od8tNTrmdiw==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@valkey/valkey-glide-linux-arm64-musl@2.5.3':
+    resolution: {integrity: sha512-aKqkDMEewlQvEjdCa+rSWKwL41nLxEshqJ8otMtvpgtRyU2fjRH5yDuJ4JXsCz+4Y/Zi5xQVspUawU37XgIf0A==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
+  '@valkey/valkey-glide-linux-x64-gnu@2.5.3':
+    resolution: {integrity: sha512-65JCnAj0IlQqiIzVCNzWo8v1N5c58Hoi2jP+fmtf78+1Uw4JInPAgicGI6GronlaLrfXZRTLqNNnjVez0QeMUg==}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@valkey/valkey-glide-linux-x64-musl@2.5.3':
+    resolution: {integrity: sha512-kBsS6nLjhcIcecM+iEUdVdTl/WzkJH8YNSKeKeUPZJUfK3zQqiyw6dbC/w6aYmOB/UrtJOQkuSbRZqfNWyf+Dw==}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
+  '@valkey/valkey-glide@2.5.3':
+    resolution: {integrity: sha512-VvT7oOr1ZyvPDFUEEovYqVKNaCicUHJPmrfDyflCEi8hzH+YEdxEikYDheHGeclgFW0MlLkJ2rky6pa7tT6iqg==}
+    engines: {node: '>=16'}
 
   '@vitejs/plugin-react@6.1.1':
     resolution: {integrity: sha512-yxLaQV9gkhS8ezJqCM6+ndU7mDY6gqAg75NQ+0IjwEI8IYOmQCgkRwHKVSfWXW076DsqMo0Dk+0FK1U+M5RgFw==}
@@ -12536,13 +12589,13 @@ snapshots:
 
   '@types/docker-modem@3.0.6':
     dependencies:
-      '@types/node': 24.13.5
+      '@types/node': 26.6.2
       '@types/ssh2': 1.15.6
 
   '@types/dockerode@4.0.1':
     dependencies:
       '@types/docker-modem': 3.0.6
-      '@types/node': 24.13.5
+      '@types/node': 26.6.2
       '@types/ssh2': 1.15.6
 
   '@types/doctrine@0.0.9': {}
@@ -12615,11 +12668,11 @@ snapshots:
 
   '@types/ssh2-streams@0.1.13':
     dependencies:
-      '@types/node': 24.13.5
+      '@types/node': 26.6.2
 
   '@types/ssh2@0.5.52':
     dependencies:
-      '@types/node': 24.13.5
+      '@types/node': 26.6.2
       '@types/ssh2-streams': 0.1.13
 
   '@types/ssh2@1.15.6':
@@ -12726,6 +12779,36 @@ snapshots:
       eslint-visitor-keys: 5.0.1
 
   '@ungap/structured-clone@1.4.0': {}
+
+  '@valkey/valkey-glide-darwin-arm64@2.5.3':
+    optional: true
+
+  '@valkey/valkey-glide-darwin-x64@2.5.3':
+    optional: true
+
+  '@valkey/valkey-glide-linux-arm64-gnu@2.5.3':
+    optional: true
+
+  '@valkey/valkey-glide-linux-arm64-musl@2.5.3':
+    optional: true
+
+  '@valkey/valkey-glide-linux-x64-gnu@2.5.3':
+    optional: true
+
+  '@valkey/valkey-glide-linux-x64-musl@2.5.3':
+    optional: true
+
+  '@valkey/valkey-glide@2.5.3':
+    dependencies:
+      long: 5.3.2
+      protobufjs: 7.6.6
+    optionalDependencies:
+      '@valkey/valkey-glide-darwin-arm64': 2.5.3
+      '@valkey/valkey-glide-darwin-x64': 2.5.3
+      '@valkey/valkey-glide-linux-arm64-gnu': 2.5.3
+      '@valkey/valkey-glide-linux-arm64-musl': 2.5.3
+      '@valkey/valkey-glide-linux-x64-gnu': 2.5.3
+      '@valkey/valkey-glide-linux-x64-musl': 2.5.3
 
   '@vitejs/plugin-react@6.1.1(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.0))':
     dependencies:
@@ -13440,7 +13523,7 @@ snapshots:
 
   docker-compose@1.5.0:
     dependencies:
-      yaml: 2.9.1
+      yaml: 2.9.0
 
   docker-modem@5.0.7(supports-color@8.1.1):
     dependencies:

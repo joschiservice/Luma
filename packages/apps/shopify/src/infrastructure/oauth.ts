@@ -11,6 +11,7 @@ import {
 } from '@luma/connections';
 import { createInstallationRepository } from '@luma/connections/composition';
 import {
+  type BudgetStore,
   callbackParams,
   createClient,
   createOAuthClient,
@@ -26,6 +27,7 @@ import { z } from 'zod';
 
 import type { ShopifyAppConfig as ShopifyConfig } from '../application/oauth.js';
 import { storedCredentials } from './installation-validation.js';
+import { shopifyRequestBudget } from './request-budget.js';
 import {
   canSubscribe,
   mapShopifyWebhook,
@@ -75,6 +77,7 @@ export function createShopifyOAuth(
     InstallationDependencies,
     'cipher' | 'refreshContext' | 'verify'
   > & {
+    requestBudgetStore?: BudgetStore | undefined;
     fetch?: typeof globalThis.fetch;
     now?: () => Date;
     requireInstalled?: (context: TenantContext) => Promise<number>;
@@ -182,6 +185,16 @@ export function createShopifyOAuth(
   ) {
     if (connection.target.kind !== 'shopify') throw invalid();
     const request = createClient({
+      budget: shopifyRequestBudget(
+        {
+          requestBudgetStore: deps.requestBudgetStore,
+          env: {
+            SHOPIFY_APP_ENVIRONMENT: config.environment,
+            SHOPIFY_CLIENT_ID: config.clientId,
+          },
+        },
+        connection,
+      ),
       shop: connection.target.shop!,
       accessToken: async () => credentials.token,
       ...(deps.fetch ? { fetch: deps.fetch } : {}),
@@ -363,6 +376,16 @@ export function createShopifyOAuth(
           try {
             const credentials = await this.credential(fresh, connectionId);
             const request = createClient({
+              budget: shopifyRequestBudget(
+                {
+                  requestBudgetStore: deps.requestBudgetStore,
+                  env: {
+                    SHOPIFY_APP_ENVIRONMENT: config.environment,
+                    SHOPIFY_CLIENT_ID: config.clientId,
+                  },
+                },
+                record.connection,
+              ),
               shop: record.connection.target.shop!,
               accessToken: async () => credentials.token,
               ...(deps.fetch ? { fetch: deps.fetch } : {}),
@@ -817,6 +840,16 @@ export function createShopifyOAuth(
               rotated = true;
             }
             const request = createClient({
+              budget: shopifyRequestBudget(
+                {
+                  requestBudgetStore: deps.requestBudgetStore,
+                  env: {
+                    SHOPIFY_APP_ENVIRONMENT: config.environment,
+                    SHOPIFY_CLIENT_ID: config.clientId,
+                  },
+                },
+                { tenantId, target: { kind: 'shopify', shop } },
+              ),
               shop,
               accessToken: async () => credentials.token,
               ...(deps.fetch ? { fetch: deps.fetch } : {}),

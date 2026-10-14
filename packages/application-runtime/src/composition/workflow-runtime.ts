@@ -265,6 +265,7 @@ export async function createDefaultExceptionWorker(
           ...(env ? { env } : {}),
         })
       : undefined;
+    if (host) resources.add(host.close);
     if (host) {
       const capabilities = createInstalledRuntime({
         internalSource: createSalesReadSource(database, observability),

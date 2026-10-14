@@ -66,3 +66,5 @@ export function createModelGateway(
 }
 
 export { startLocalTelemetry } from './infrastructure/local-telemetry.js';
+
+export { createValkeyStore } from './infrastructure/valkey.js';

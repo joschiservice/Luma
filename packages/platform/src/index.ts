@@ -40,3 +40,5 @@ export type {
   OperationalMetricDefinition,
   OperationalMetricRead,
 } from './domain/metric.js';
+
+export type { AtomicStore } from './application/atomic-store.js';

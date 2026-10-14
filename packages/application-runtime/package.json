@@ -58,6 +58,8 @@
     "@luma/adaptive": "workspace:*"
   },
   "devDependencies": {
+    "@luma/connector-shopify": "workspace:*",
+    "testcontainers": "12.1.0",
     "@luma/typescript-config": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "@opentelemetry/resources": "catalog:",

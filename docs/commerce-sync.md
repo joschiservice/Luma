@@ -215,8 +215,11 @@ active scan, only its due time makes the next page eligible; a hint cannot bypas
 backoff. At a page boundary a due live read can suspend a filterable history scan; its
 cursor, counters and export state are persisted and restored afterwards, so live reads
 still run every five minutes during long imports. A provider cooldown defers the entire
-connection, including hinted work. Shopify clients share a query-cost budget per tenant
-and connection.
+connection, including hinted work. Shopify clients share the region-local app/shop
+[request admission budget](shopify.md) across API and worker processes. Admission deferral
+also covers an unavailable coordinator. It releases the page lease without advancing its
+cursor, recording a failed provider read,
+or consuming a retry attempt. It preserves export checkpoints and retries when due.
 
 Full Shopify backfills of orders, products, inventory and permitted customers use Bulk
 Operations; recent windows, incremental reads and full checks stay paged.

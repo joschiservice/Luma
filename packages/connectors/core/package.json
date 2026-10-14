@@ -20,6 +20,10 @@
     "./transport": {
       "types": "./dist/transport.d.ts",
       "import": "./dist/transport.js"
+    },
+    "./dispatch": {
+      "types": "./dist/dispatch.d.ts",
+      "import": "./dist/dispatch.js"
     }
   },
   "dependencies": {

@@ -28,6 +28,8 @@ export interface ProviderRuntimeOptions {
   /** Persists a normalized observation batch before a provider read resolves. */
   recordObservations(evidence: ConnectorEvidence): Promise<void>;
   fetch?: typeof globalThis.fetch;
+  /** Trusted service classification forwarded to provider request admission. */
+  readPurpose?: 'foreground' | 'incremental' | 'history';
   /** Applies a caller's read-only total deadline and payload budget to the provider's selected transport. */
   readBounds?: {
     signal: AbortSignal;

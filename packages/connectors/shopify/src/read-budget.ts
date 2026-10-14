@@ -1,15 +1,37 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
-/** One shop's observed GraphQL budget. Shared clients serialize request admission. */
-export interface ReadBudget {
-  run<T>(shape: string, send: () => Promise<T>): Promise<T>;
+/** Trusted callers classify work; document text never determines its scheduling priority. */
+export type RequestPurpose = 'foreground' | 'incremental' | 'history';
+
+/** Feedback for one request, including refunded points and provider-wide cooldown. */
+export interface BudgetFeedback {
+  /** Confirms a reservation is still valid after credential refresh, before transport dispatch. */
+  beforeSend?(): Promise<void>;
+  /** Marks transport dispatch; unused reservations can otherwise be safely returned. */
+  dispatched?(): void;
   observe(
     shape: string,
     cost: number,
     available: number,
     restoreRate: number,
-  ): void;
-  cooldown(milliseconds: number): void;
+    actualCost?: number,
+    maximumAvailable?: number,
+  ): void | Promise<void>;
+  cooldown(milliseconds: number): void | Promise<void>;
+}
+
+/** One shop's observed GraphQL budget. Scheduling does not authorize provider effects. */
+export interface ReadBudget extends BudgetFeedback {
+  run<T>(
+    shape: string,
+    send: (feedback: BudgetFeedback) => Promise<T>,
+    admission?: {
+      purpose?: RequestPurpose;
+      /** Serializes mutation admission while preserving capacity for fresh precondition reads. */
+      mutation?: boolean;
+      signal?: AbortSignal;
+    },
+  ): Promise<T>;
   nextDelay(): number;
 }
 
@@ -51,7 +73,7 @@ export function createReadBudget(
         const wait = waitFor(costs.get(shape) ?? 1000);
         if (wait) await sleep(wait);
 
-        return await send();
+        return await send(this);
       } finally {
         release();
       }

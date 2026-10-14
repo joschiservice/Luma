@@ -114,7 +114,8 @@ idempotency support. Unclassified exceptions and malformed write responses are u
 Provider exception text is discarded.
 
 The Shopify, JTL and Cin7 transports make up to three attempts at a read that fails with no
-effect and delay advice of at most two seconds. Shopify retries only query documents;
+effect and delay advice of at most two seconds. Shared admission deferral returns to the
+caller or durable scheduler without a transport retry. Shopify retries only query documents;
 writes and mutations are sent once. Longer advice and other failures reach the caller
 unchanged.
 

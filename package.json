@@ -71,6 +71,7 @@
     "@eslint/js": "^10.0.1",
     "@stylistic/eslint-plugin": "5.10.0",
     "@testcontainers/postgresql": "12.1.0",
+    "testcontainers": "12.1.0",
     "@types/node": "catalog:",
     "eslint": "^10.10.0",
     "eslint-config-prettier": "^10.1.8",

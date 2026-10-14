@@ -197,6 +197,14 @@ export function compose(saved, args, capture = false) {
 export async function environment(saved, workflows = false, observing = false) {
   const binding = await compose(saved, ['port', 'postgres', '5432'], true);
   const dbPort = Number(binding.split(':').at(-1));
+  const admissionBinding = await compose(
+    saved,
+    ['port', 'valkey', '6379'],
+    true,
+  );
+  const admissionPort = Number(admissionBinding.split(':').at(-1));
+  if (!admissionPort)
+    throw new Error('Valkey has no published port. Run pnpm run setup.');
   if (!dbPort)
     throw new Error('PostgreSQL has no published port. Run pnpm run setup.');
   /** Builds a connection to this worktree database.
@@ -228,6 +236,7 @@ export async function environment(saved, workflows = false, observing = false) {
     throw new Error('The configured web URL must be an exact HTTP origin');
   /** @type {Record<string, string>} */
   const generated = {
+    SHOPIFY_ADMISSION_URL: `redis://:${encodeURIComponent(saved.databasePassword)}@127.0.0.1:${admissionPort}`,
     CONNECTIONS_ACTIVE_KEY_ID: 'local',
     CONNECTIONS_KEYS: JSON.stringify({ local: await connectionKey() }),
     HOST: '127.0.0.1',

@@ -48,10 +48,15 @@ function installedRuntime(options: InstalledRuntimeOptions) {
       let descriptor: ConnectorConnection | undefined;
       for (const capability of connection.permissions) {
         if (!connection.granted.includes(capability)) continue;
-        const build = async () => {
+        const build = async (
+          readPurpose?: ProviderRuntimeOptions['readPurpose'],
+        ) => {
           await options.installations.credential(context, id, capability);
 
-          return provider.build(context, id, capability, options);
+          return provider.build(context, id, capability, {
+            ...options,
+            ...(readPurpose ? { readPurpose } : {}),
+          });
         };
         let adapter: ConnectorConnection;
         try {
@@ -80,7 +85,7 @@ function installedRuntime(options: InstalledRuntimeOptions) {
               invocation: Parameters<typeof handler.run>[0],
               input: Parameters<typeof handler.run>[1],
             ) => {
-              const fresh = await build();
+              const fresh = await build(invocation.readPurpose);
               const current = fresh.capabilities[capability] as typeof handler;
               if (!current)
                 throw new ConnectorError({

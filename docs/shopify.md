@@ -122,6 +122,41 @@ disabled. GraphQL errors reject partial data, and an unexpected `X-Shopify-API-V
 rejects silent version fallback. Token-store failures return `transient`; empty
 credentials return `authentication`.
 
+Every installed Shopify client uses one region-local Valkey admission scope for the
+trusted tenant, app identity and shop. Reconnecting or rotating a token retains the
+scope. API reads, health checks, OAuth setup, background pages, nested reads, Bulk
+Operation control and governed actions all use it; download URLs are outside Shopify's
+GraphQL cost bucket. Keys contain opaque hashes, query-shape hashes, costs and expiring
+reservations. Credentials and provider records never enter Valkey.
+
+Foreground work has two reserved transport slots and up to 1,000 cost points of
+headroom; incremental reads precede history work. A first background query may borrow
+one second of restore capacity so it can learn its cost without waiting for a completely
+full bucket. Unknown query shapes reserve the
+single-query maximum. Requested and actual costs reconcile atomically against the
+provider balance, including refunds and a shared throttle cooldown. Foreground admission
+waits at most two seconds; background pages release their durable lease and resume later
+when capacity is unavailable. A compound background read that already fetched parent
+records waits up to ten seconds per continuation request, preserving that progress while
+foreground work keeps priority. Caller cancellation returns an unused reservation. An
+expired reservation only frees a transport slot: it cannot prove the provider did no work.
+
+Mutations obtain capacity before execution's dispatch guard rechecks authorization,
+policy, approval expiry and fresh preconditions. Multi-stage actions recheck authority
+before each mutation, without comparing later stages to the original preconditions.
+Admission never authorizes an action or makes a mutation retryable. A bookkeeping failure
+after a provider response preserves that response; independent verification still decides
+the outcome.
+
+Configure `SHOPIFY_ADMISSION_URL` on every API and worker, with `SHOPIFY_ADMISSION_CLUSTER`
+when connecting to a cluster. Use TLS and a region-local primary, authenticated access,
+persistence and `noeviction`. The admission role needs hash, expiry, server time, script
+execution and `INFO server` access. Missing or unavailable admission fails conservatively;
+the Shopify app's readiness check fails. Server epochs invalidate outstanding permits
+following a restart and rebuild cost knowledge conservatively. Valkey's asynchronous
+replication cannot guarantee lossless admission state across failover; provider throttles
+remain the final limit, and execution claims and audits remain durable in PostgreSQL.
+
 Webhooks are verified with HMAC-SHA256 over the original request bytes and the expected
 shop, and deduplicated by tenant, connection, topic and event ID. They only produce
 refresh hints for [commerce sync](commerce-sync.md#change-notifications); partial webhook

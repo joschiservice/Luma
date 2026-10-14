@@ -73,6 +73,7 @@ function provider(tenantId: string, erpId: string) {
     connectionId: string;
     capability: string;
     cursor?: string;
+    admission?: boolean;
   }[] = [];
   const requests: {
     connectionId: string;
@@ -130,11 +131,19 @@ function provider(tenantId: string, erpId: string) {
           item.cursor === input.cursor,
       );
       if (failure >= 0) {
-        failures.splice(failure, 1);
+        const [failed] = failures.splice(failure, 1);
 
         return {
           ok: false,
-          error: { code: 'transient', effect: 'none', retry: 'after_delay' },
+          error: failed?.admission
+            ? {
+                code: 'rate_limited',
+                providerCode: 'ADMISSION_DEFERRED',
+                effect: 'none',
+                retry: 'after_delay',
+                retryAfterMs: 60000,
+              }
+            : { code: 'transient', effect: 'none', retry: 'after_delay' },
         } as CapabilityResult<ReadCapability>;
       }
       const all = (
@@ -191,6 +200,14 @@ function provider(tenantId: string, erpId: string) {
       failures.push({
         connectionId,
         capability,
+        ...(cursor ? { cursor } : {}),
+      });
+    },
+    defer(connectionId: string, capability: string, cursor?: string) {
+      failures.push({
+        connectionId,
+        capability,
+        admission: true,
         ...(cursor ? { cursor } : {}),
       });
     },
@@ -1167,6 +1184,44 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
         (r) => r.capability === 'orders.read' && r.updatedSince,
       ).length,
     ).toBeGreaterThan(0);
+  });
+
+  it('defers admission without recording a failure or advancing the history checkpoint', async () => {
+    source.set(shop, 'orders.read', [
+      order(shop, '1'),
+      order(shop, '2'),
+      order(shop, '3'),
+    ]);
+    source.defer(shop, 'orders.read', '2');
+    await drain();
+    expect(await stream('orders')).toMatchObject({
+      phase: 'backfill',
+      cursor: '2',
+      attempts: 0,
+      error_code: null,
+    });
+    const current = (await createSyncStore(db).streams(tenant)).find(
+      (item) => item.connectionId === shop && item.recordType === 'orders',
+    );
+    expect(current?.scan).toMatchObject({
+      cursor: '2',
+      pages: 1,
+      waitingForExport: false,
+    });
+    await due();
+    await drain();
+    expect(await stream('orders')).toMatchObject({
+      phase: 'incremental',
+      attempts: 0,
+      error_code: null,
+    });
+    expect(
+      source.requests
+        .filter(
+          (r) => r.connectionId === shop && r.capability === 'orders.read',
+        )
+        .map((r) => r.cursor ?? null),
+    ).toEqual([null, '2', '2']);
   });
 
   it('resumes a failed page from its checkpoint', async () => {

@@ -67,6 +67,8 @@ interface PageCommit {
   now: string;
   /** Provider export is still preparing; keep its checkpoint without claiming coverage. */
   deferred?: boolean;
+  /** Admission waiting preserves the current checkpoint and does not claim an export is preparing. */
+  deferReason?: 'export' | 'admission';
   dueAt?: string;
   /** Ledger entries to delete when they are still flagged missing. */
   forget?: ItemKey[];

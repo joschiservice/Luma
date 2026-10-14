@@ -19,11 +19,23 @@ export function registerRecordRoutes(
       reply.header('cache-control', 'no-store');
       if (!request.tenantContext)
         throw new IdentityError(401, 'UNAUTHENTICATED', 'Sign in to continue');
+      const stop = new AbortController();
+      const aborted = () => stop.abort();
+      const closed = () => {
+        if (!reply.raw.writableFinished) stop.abort();
+      };
+      request.raw.on('aborted', aborted);
+      reply.raw.on('close', closed);
       try {
-        return await read(request.tenantContext, request.body);
+        return await read(request.tenantContext, request.body, stop.signal);
       } catch (error) {
         if (!(error instanceof ConnectorError)) throw error;
         const code = error.failure.code;
+        if (error.failure.retryAfterMs !== undefined)
+          reply.header(
+            'retry-after',
+            String(Math.ceil(error.failure.retryAfterMs / 1000)),
+          );
         if (code === 'not_found')
           throw new IdentityError(
             404,
@@ -41,6 +53,9 @@ export function registerRecordRoutes(
           'SERVICE_UNAVAILABLE',
           'Shopify could not load this record. Check the connection and try again.',
         );
+      } finally {
+        request.raw.off('aborted', aborted);
+        reply.raw.off('close', closed);
       }
     },
   );

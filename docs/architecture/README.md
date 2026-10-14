@@ -25,6 +25,8 @@ decisions.
 | [013](013-stock-ledger.md) | Quantity ledger and stock ownership | Accepted |
 | [014](014-adaptive-workspaces.md) | Adaptive workspaces and operational packages | Accepted |
 
+| [015](015-shared-provider-admission.md) | Shared Shopify request admission | Accepted |
+
 ## Baseline
 
 - TypeScript and Node.js; Fastify; contract-first REST and OpenAPI through oRPC.

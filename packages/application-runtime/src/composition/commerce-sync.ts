@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { createAppHost } from '@luma/app-catalog';
+import type { AppFactoryContext } from '@luma/app-host';
 import { createAuditLog } from '@luma/audit/composition';
 import {
   autoLinkEvidence,
@@ -61,6 +62,8 @@ export function createCommerceSyncWorker(options: {
   identity: Pick<IdentityService, 'resolveWorkflowContext' | 'refreshContext'>;
   connections: ConnectionsConfig;
   env?: Readonly<Record<string, string | undefined>>;
+  /** Trusted synthetic provider transport; production callers omit it. */
+  simulation?: AppFactoryContext['simulation'];
   /** Tenants processed in parallel. */
   concurrency?: number;
   workspaceConcurrency?: number;
@@ -73,6 +76,7 @@ export function createCommerceSyncWorker(options: {
     ...options.connections,
     refreshContext: options.identity.refreshContext,
     featureEnabled: createTenantFeatureRelease(options.observability),
+    ...(options.simulation ? { simulation: options.simulation } : {}),
     ...(options.env ? { env: options.env } : {}),
   });
   const commerce = createCommerceServices(options.database);
@@ -130,7 +134,7 @@ export function createCommerceSyncWorker(options: {
         for (let tenant = queue.shift(); tenant; tenant = queue.shift()) {
           if (stop.signal.aborted) return;
           await runner
-            .tick(tenant)
+            .tick(tenant, undefined, stop.signal)
             .catch((error: unknown) =>
               log('Sync pass failed; retrying.', error),
             );
@@ -158,7 +162,10 @@ export function createCommerceSyncWorker(options: {
       }
     },
     shutdown: () => stop.abort(),
-    close: commerce.close,
+    close: async () => {
+      await commerce.close();
+      await host.close();
+    },
   };
 }
 
@@ -258,6 +265,9 @@ export async function createDefaultCommerceSyncWorker(
       ...(model ? { model } : {}),
       log,
     });
+
+    resources.add(followUp.close);
+    resources.add(mailboxes.close);
 
     const detection = createDetectionWorker({
       ...(observability ? { observability } : {}),

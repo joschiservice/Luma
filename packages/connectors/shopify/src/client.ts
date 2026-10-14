@@ -1,5 +1,10 @@
 import { ConnectorError } from '@luma/connector-core';
 import {
+  assertDispatchAllowed,
+  markDispatchPreparing,
+  markDispatchStarted,
+} from '@luma/connector-core/dispatch';
+import {
   fail,
   parse,
   type ReadRetry,
@@ -9,7 +14,12 @@ import {
 import { createAdminApiClient } from '@shopify/admin-api-client';
 import { z } from 'zod';
 
-import { createReadBudget, type ReadBudget } from './read-budget.js';
+import {
+  type BudgetFeedback,
+  createReadBudget,
+  type ReadBudget,
+  type RequestPurpose,
+} from './read-budget.js';
 
 export const API_VERSION = '2026-07';
 
@@ -21,8 +31,12 @@ export interface ShopifyTransportOptions {
   timeoutMs?: number;
   /** Repetition of queries after transient failures; defaults to three attempts. */
   readRetry?: ReadRetry;
-  /** Shared read budget for clients on the same tenant connection. */
+  /** Shared request budget for clients on the same trusted app/shop scope. */
   budget?: ReadBudget;
+  /** Scheduling classification supplied by the owning service, never by request input. */
+  purpose?: RequestPurpose;
+  /** Stops admission waits and cancels an in-flight provider read when its caller goes away. */
+  signal?: AbortSignal;
 }
 
 // Only documents that are plainly queries are repeated; mutations and anything unrecognized are not.
@@ -53,6 +67,7 @@ export function createClient(options: ShopifyTransportOptions): {
   const send = async (
     query: string,
     variables: Record<string, unknown>,
+    feedback: BudgetFeedback,
   ): Promise<Record<string, unknown>> => {
     let token: string;
     try {
@@ -62,7 +77,11 @@ export function createClient(options: ShopifyTransportOptions): {
       fail('transient', 1000);
     }
     if (!token || /[\r\n]/.test(token)) fail('authentication');
-    const signal = AbortSignal.timeout(timeoutMs);
+    if (!queryDocument.test(query)) await assertDispatchAllowed();
+    await feedback.beforeSend?.();
+    const signal = options.signal
+      ? AbortSignal.any([options.signal, AbortSignal.timeout(timeoutMs)])
+      : AbortSignal.timeout(timeoutMs);
     let transportTimedOut = false;
     let response: Response;
     let body: unknown;
@@ -77,6 +96,10 @@ export function createClient(options: ShopifyTransportOptions): {
         },
         customFetchApi: async (url, init) => {
           try {
+            signal.throwIfAborted();
+            feedback.dispatched?.();
+            if (!queryDocument.test(query)) markDispatchStarted();
+
             return await (options.fetch ?? globalThis.fetch)(url, {
               ...init,
               redirect: 'error',
@@ -100,7 +123,7 @@ export function createClient(options: ShopifyTransportOptions): {
         if (response.status === 404) fail('not_found');
         if (response.status === 429) {
           const advised = retryAfterMs(response.headers.get('retry-after'));
-          budget.cooldown(advised ?? 1000);
+          await feedback.cooldown(advised ?? 1000);
           fail('rate_limited', advised);
         }
         if (response.status >= 500) fail('transient', 1000);
@@ -137,9 +160,11 @@ export function createClient(options: ShopifyTransportOptions): {
             cost: z
               .object({
                 requestedQueryCost: z.number().nonnegative(),
+                actualQueryCost: z.number().nonnegative().optional(),
                 throttleStatus: z.object({
                   currentlyAvailable: z.number().nonnegative(),
                   restoreRate: z.number().positive(),
+                  maximumAvailable: z.number().positive().optional(),
                 }),
               })
               .optional(),
@@ -150,17 +175,31 @@ export function createClient(options: ShopifyTransportOptions): {
     );
     const cost = envelope.extensions?.cost;
     if (cost)
-      budget.observe(
+      await feedback.observe(
         JSON.stringify([query, variables.first ?? null]),
         cost.requestedQueryCost,
         cost.throttleStatus.currentlyAvailable,
         cost.throttleStatus.restoreRate,
+        cost.actualQueryCost,
+        cost.throttleStatus.maximumAvailable,
       );
     if (envelope.errors?.length) {
       const codes = envelope.errors.map((error) => error.extensions?.code);
       if (codes.includes('ACCESS_DENIED')) fail('permission_denied');
       if (codes.includes('THROTTLED')) {
         const cost = envelope.extensions?.cost;
+        const advised = cost
+          ? Math.max(
+              1000,
+              Math.ceil(
+                ((cost.requestedQueryCost -
+                  cost.throttleStatus.currentlyAvailable) /
+                  cost.throttleStatus.restoreRate) *
+                  1000,
+              ),
+            )
+          : 1000;
+        await feedback.cooldown(advised);
         fail(
           'rate_limited',
           cost
@@ -191,10 +230,19 @@ export function createClient(options: ShopifyTransportOptions): {
 
   return Object.assign(
     (query: string, variables: Record<string, unknown>) => {
-      const attempt = () =>
-        budget.run(JSON.stringify([query, variables.first ?? null]), () =>
-          send(query, variables),
+      const attempt = () => {
+        if (!queryDocument.test(query)) markDispatchPreparing();
+
+        return budget.run(
+          JSON.stringify([query, variables.first ?? null]),
+          (feedback) => send(query, variables, feedback),
+          {
+            ...(options.purpose ? { purpose: options.purpose } : {}),
+            mutation: !queryDocument.test(query),
+            ...(options.signal ? { signal: options.signal } : {}),
+          },
         );
+      };
 
       return queryDocument.test(query)
         ? retryRead(attempt, readRetry)

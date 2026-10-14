@@ -143,6 +143,7 @@ export async function buildRuntimeApp(
               return composed.orders.changePlan(context, orderId, request);
             },
           });
+    resources.add(installedConnections.close);
     if (connections && typeof connections !== 'function') {
       const capabilities = createInstalledRuntime({
         internalSource: createSalesReadSource(tenantDatabase(), observability),

@@ -77,6 +77,7 @@ export async function retryRead<T>(
         attempt >= retry.attempts ||
         failure?.retry !== 'after_delay' ||
         failure.effect !== 'none' ||
+        failure.providerCode === 'ADMISSION_DEFERRED' ||
         delayMs > retry.maxDelayMs
       )
         throw error;

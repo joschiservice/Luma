@@ -13,6 +13,10 @@ job summary. Reports are written before a budget failure is raised. Current ceil
 - Metric SSE frames: 4 KiB; the five measured subscribers: 128 KiB in total.
 - Cross-domain operational summary: 12 SELECT/WITH statements for its six readers.
 - Live metrics: p95 commit-to-visible below one second.
+- Shopify contention: p95 live reads below two seconds, an approved action below five
+  seconds, and import progress averaging below ten seconds per imported record. The
+  synthetic workload offers one live read per second alongside two sync processes and
+  simulated provider throttling. These ceilings cover the whole foreground request.
 
 These are regression ceilings, not production latency guarantees. Review the scenario and
 its report before changing a budget; never raise one just to silence a failure.
