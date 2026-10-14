@@ -10,7 +10,6 @@ import { simulatorShopifyEnv } from '../../../tooling/simulator/shopify-app.mjs'
 process.once('message', async ({ env, manifest }) => {
   const settings = {
     ...env,
-    ...simulatorShopifyEnv(manifest.simulator.webhookSecret),
     SHOPIFY_ADMISSION_URL: process.env.SHOPIFY_ADMISSION_URL,
   };
   const identity = createIdentity(readIdentityConfig(settings));
@@ -22,7 +21,10 @@ process.once('message', async ({ env, manifest }) => {
     database: createTenantDatabase(pool),
     identity: identity.service,
     connections: readConnectionsConfig(settings),
-    env: settings,
+    env: {
+      ...simulatorShopifyEnv(manifest.simulator.webhookSecret, settings),
+      FEATURE_FLAG_OVERRIDES: settings.FEATURE_FLAG_OVERRIDES,
+    },
     simulation: createSimulationTransport(manifest.simulator),
     concurrency: 1,
     workspaceConcurrency: 4,

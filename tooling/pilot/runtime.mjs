@@ -159,7 +159,7 @@ export async function createPilot(
         ? {
             simulation,
             // Signed simulator webhooks reach the real Shopify change route.
-            env: simulatorShopifyEnv(manifest.simulator.webhookSecret),
+            env: simulatorShopifyEnv(manifest.simulator.webhookSecret, env),
             customerAccess: { contact: true, address: true },
           }
         : {}),

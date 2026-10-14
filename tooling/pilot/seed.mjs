@@ -74,12 +74,9 @@ export async function seedPilot(
   const detection = createDetectionServices(env.WORKFLOW_DATABASE_URL);
   const connections = createInstalledConnections(createTenantDatabase(pool), {
     featureEnabled,
-    env: {
-      ...env,
-      ...(manifest.simulator
-        ? simulatorShopifyEnv(manifest.simulator.webhookSecret)
-        : {}),
-    },
+    env: manifest.simulator
+      ? simulatorShopifyEnv(manifest.simulator.webhookSecret, env)
+      : env,
     ...(manifest.simulator
       ? {
           simulation: (connection) =>

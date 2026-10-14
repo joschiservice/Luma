@@ -3,9 +3,17 @@
  * webhook route so the simulator can deliver signed webhooks; the HTTPS origin is never
  * contacted and the secret is the run's local webhook secret, not a real app credential.
  * @param {string} secret
+ * @param {Record<string, string | undefined>} env Trusted cell and admission settings.
  */
-export function simulatorShopifyEnv(secret) {
+export function simulatorShopifyEnv(secret, env = {}) {
   return {
+    LUMA_REGION: env.LUMA_REGION ?? process.env.LUMA_REGION ?? 'AU',
+    ...(env.SHOPIFY_ADMISSION_URL
+      ? { SHOPIFY_ADMISSION_URL: env.SHOPIFY_ADMISSION_URL }
+      : {}),
+    ...(env.SHOPIFY_ADMISSION_CLUSTER
+      ? { SHOPIFY_ADMISSION_CLUSTER: env.SHOPIFY_ADMISSION_CLUSTER }
+      : {}),
     SHOPIFY_CLIENT_ID: 'luma-simulator',
     SHOPIFY_CLIENT_SECRET: secret,
     SHOPIFY_APP_ENVIRONMENT: 'simulator',
