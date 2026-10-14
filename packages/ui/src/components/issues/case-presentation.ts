@@ -33,6 +33,9 @@ const kinds: Record<string, { label: Label; domain: Domain }> = {
 const sources: Record<string, string> = {
   'luma-erp': 'Luma ERP',
   shopify: 'Shopify',
+  cin7: 'Cin7 Core',
+  starshipit: 'Starshipit',
+  gmail: 'Gmail',
   jtl: 'JTL',
   'jtl-onprem': 'JTL-Wawi',
   'jtl-cloud': 'JTL Cloud',

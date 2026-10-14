@@ -95,7 +95,7 @@ the same conditions and grouping.
 
 Reading the queue must not write to a `decisions` table unless state changes; otherwise each
 read wakes the next one. Shopify claim settlement therefore updates only unsettled claims. An opened item that leaves the queue stays visible, labeled
-as departed, so the outcome remains readable. Home's attention module and the sidebar count
+as departed, so the outcome remains readable. Replenishment, stock correction, supplier-send and issue approval links also read persisted responses after they leave the queue, including the deciding person, time, execution outcome and record or run links. These historical views grant no response authority. Home's attention module and the sidebar count
 read the same API.
 
 ## Adding a source

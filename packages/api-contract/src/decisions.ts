@@ -135,8 +135,26 @@ const decisionAssignmentSchema = z.object({
   revision: z.number().int().nonnegative(),
 });
 
-const decisionItemSchema = z.object({
+export const decisionItemSchema = z.object({
   diff: actionDiffSchema.nullable().optional(),
+  outcome: z
+    .object({
+      state: z.enum(['approved', 'rejected', 'expired', 'resolved']),
+      at: timestamp.nullable(),
+      actorId: z.string().nullable(),
+      actorName: z.string().nullable(),
+      actorEmail: z.string().nullable(),
+      next: z.enum(['pending', 'running', 'verified', 'failed', 'uncertain']),
+      workflow: z.boolean(),
+      purchaseOrderId: z.string().uuid().optional(),
+      runId: z.string().uuid().optional(),
+      definitionId: z.string().optional(),
+    })
+    .optional(),
+  previousChange: z
+    .array(z.object({ label: z.string(), value: z.string() }))
+    .optional(),
+  automatic: z.boolean().optional(),
   observeOnly: z.boolean().optional(),
   /** Stable queue ID, such as `case:<uuid>`. Assignments and links use it. */
   id: z.string().min(1).max(200),

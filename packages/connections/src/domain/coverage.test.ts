@@ -25,6 +25,7 @@ describe('connection coverage', () => {
       id: connection.id,
       label: connection.label,
       status: 'degraded',
+      health: 'failing',
       lastObservedAt: null,
       nextRefreshAt: null,
       freshness: 'unobserved',

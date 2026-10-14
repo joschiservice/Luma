@@ -34,6 +34,8 @@ export interface CorrectionRun {
   choice: CorrectionChoice;
   before: CorrectionSnapshot;
   action: ProposedAction;
+  configurationKey?: string | undefined;
+  workflowRunId?: string | undefined;
   decisionId: string | null;
 }
 
@@ -62,6 +64,8 @@ export interface CorrectionStore {
 }
 
 export interface CorrectionDependencies {
+  /** Reads the current tenant detection settings without provider I/O. */
+  configurationKey?(context: TenantContext): Promise<string>;
   store: CorrectionStore;
   /**
    * The person's access to this app feature, checked by the app host with installation, the
@@ -158,6 +162,8 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
       }
     }
     const changed =
+      (!!deps.configurationKey &&
+        run.configurationKey !== (await deps.configurationKey(context))) ||
       sourceChanged ||
       (current !== null &&
         (current.revision !== run.before.revision ||
@@ -222,7 +228,9 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
                     ? 'This action is no longer eligible. Refresh inventory details.'
                     : state === 'approval_required'
                       ? decision?.approval?.outcome === 'approved'
-                        ? 'Approved. The requester can run the action after a fresh eligibility check.'
+                        ? run.workflowRunId
+                          ? 'Approved. Luma will run this now through the workflow, then check the result independently.'
+                          : 'Approved. The requester can run the action after a fresh eligibility check.'
                         : decision?.requireIndependentApproval === false
                           ? 'Review and approve this exact action before running it.'
                           : 'Someone else who can approve changes must approve this exact action.'
@@ -238,6 +246,7 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
       expiresAt: run.action.expiresAt,
       decisionId: run.decisionId,
       state,
+      workflowRunId: run.workflowRunId,
       approved: decision?.approval?.outcome === 'approved',
       denial:
         state !== 'denied'
@@ -449,6 +458,12 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
         choice,
         before,
         action,
+        ...(context.actor.sessionId.startsWith('workflow:')
+          ? { workflowRunId: context.requestId }
+          : {}),
+        ...(deps.configurationKey
+          ? { configurationKey: await deps.configurationKey(context) }
+          : {}),
         decisionId: null,
       });
 
@@ -583,7 +598,9 @@ export function createInventoryCorrection(deps: CorrectionDependencies) {
         step.stepId !== 'correct' ||
         step.actionHash !== deps.hash(run.action) ||
         step.principalId !== run.action.proposedBy.id ||
-        deps.now().getTime() >= Date.parse(run.action.expiresAt)
+        deps.now().getTime() >= Date.parse(run.action.expiresAt) ||
+        (!!deps.configurationKey &&
+          run.configurationKey !== (await deps.configurationKey(context)))
       )
         return false;
       const granted = await deps.authorize(context, run.target.connectionId);

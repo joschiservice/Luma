@@ -8,7 +8,8 @@
         "$TURBO_ROOT$/apps/web/src/**",
         "$TURBO_ROOT$/apps/web/package.json",
         "$TURBO_ROOT$/packages/apps/*/src/**",
-        "$TURBO_ROOT$/packages/apps/*/package.json"
+        "$TURBO_ROOT$/packages/apps/*/package.json",
+        "$TURBO_ROOT$/packages/exceptions/fixtures/exceptions-v0.json"
       ]
     }
   }

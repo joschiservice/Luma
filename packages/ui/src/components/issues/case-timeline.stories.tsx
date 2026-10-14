@@ -143,7 +143,9 @@ export const ApprovalWait: Story = {
     await expect(canvas.getByText('Not sent yet')).toBeVisible();
     await userEvent.click(canvas.getByText('Change and expected outcome'));
     await expect(canvas.getByText('Quantity')).toBeVisible();
-    await expect(canvas.getByText('By Mia Keller')).toBeVisible();
+    await expect(
+      canvas.getByText('By Mia Keller · mia@example.test'),
+    ).toBeVisible();
     await expect(
       canvas.queryByText('never-render-parameters'),
     ).not.toBeInTheDocument();
@@ -560,7 +562,7 @@ export const PageAuditHistory: Story = {
     await expect(events).toHaveLength(3);
     const newest = within(events[0]!);
     await expect(newest.getByText('Issue observed again')).toBeVisible();
-    await expect(newest.getByText(/^24 Sept? 2026 06:50$/)).toBeVisible();
+    await expect(newest.getByText(/^24 Sept? 2026 06:50 UTC$/)).toBeVisible();
     await expect(newest.getByText('By Luma')).toBeVisible();
     await expect(newest.getByText('Luma', { exact: true })).not.toBeVisible();
     await userEvent.click(newest.getByText('Event details'));

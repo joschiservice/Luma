@@ -62,7 +62,7 @@
   "common_actor_former_member": "Former member",
   "common_actor_former_member_named": "{name} (former member)",
   "common_actor_service": "Service {name}",
-  "common_actor_via_workflow": "{actor} via {workflow}",
+  "common_actor_via_workflow": "Luma, via {workflow} (runs as {actor})",
   "common_actor_workflow_unnamed": "a Workflow",
   "common_actor_with_email": "{actor} · {email}"
 }

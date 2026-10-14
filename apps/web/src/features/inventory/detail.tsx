@@ -10,12 +10,15 @@ import { Card } from '@luma/ui/components/primitives/card';
 import { DataTable } from '@luma/ui/components/primitives/data-table';
 import { Disclosure } from '@luma/ui/components/primitives/disclosure';
 import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
-import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
+import {
+  WorkspaceDate,
+  WorkspaceTimezone,
+} from '@luma/ui/components/primitives/workspace-date';
 import { RecordHeader } from '@luma/ui/components/workspace/record-header';
 import { quantityUnit, unitOfMeasure } from '@luma/ui/lib/units';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams, useSearch } from '@tanstack/react-router';
-import type { ReactNode } from 'react';
+import { type ReactNode, useContext } from 'react';
 
 import { appsOptions } from '../../kit/apps/data';
 import { SignInRedirect } from '../../kit/identity/common';
@@ -161,6 +164,7 @@ export function StockDetailView({
   /** Workflow coverage and readiness for this stock position. */
   replenishment?: ReactNode;
 }) {
+  const timeZone = useContext(WorkspaceTimezone);
   const position = detail?.position;
   const { from: returnTo, ...listSearch } = search;
   const back = recordReturnPath(organizationId, returnTo);
@@ -253,13 +257,18 @@ export function StockDetailView({
               {!position.differences.length
                 ? m.inventory_explanation_agree_body()
                 : position.sync
-                  ? syncExplanation(position.sync, position.differences)
+                  ? syncExplanation(
+                      position.sync,
+                      position.differences,
+                      timeZone,
+                    )
                   : m.inventory_explanation_differs_body({
                       fields: differingQuantities(position.differences),
                     })}
             </p>
             <p>{m.inventory_explanation_separate()}</p>
           </section>
+          {correction}
           <DataTable
             className="inventory-comparison"
             caption={m.inventory_comparison_caption()}
@@ -410,7 +419,6 @@ export function StockDetailView({
           </Disclosure>
           {incoming}
           {nativeStock}
-          {correction}
           {replenishment}
           <div className="inventory-context-grid">
             <Card className="inventory-section">

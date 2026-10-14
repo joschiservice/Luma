@@ -585,5 +585,19 @@
   "settings_approvals_read_only_notice": "Diese Freigaberegeln sind für deine Rolle schreibgeschützt. Zum Ändern brauchst du {permission}.",
   "settings_source_inactive": "Diese Verbindung ist nicht aktiv. Stelle ihren Zugriff wieder her, bevor du aktuelle Quellnachweise liest.",
   "settings_source_missing_capability": "Diese Verbindung kann keine Lieferantenbestellungen lesen. Verwende eine Verbindung mit dieser Fähigkeit und erteile ihr Lesezugriff.",
-  "settings_source_app_unavailable": "Die verbundene App ist nicht verfügbar. Stelle ihre Installation wieder her, bevor du aktuelle Quellnachweise liest."
+  "settings_source_app_unavailable": "Die verbundene App ist nicht verfügbar. Stelle ihre Installation wieder her, bevor du aktuelle Quellnachweise liest.",
+  "settings_detection_title": "Problemerkennung",
+  "settings_detection_help": "Diese Grenzen gelten ab der nächsten Prüfung. Neue Einstellungen erfordern eine neue Prüfung bestehender Bestandskorrekturen. Zeiten sind in Sekunden; null meldet Bestandslücken sofort.",
+  "settings_detection_tolerance": "Toleranz der Bestandsmenge",
+  "settings_detection_propagation": "Bestandsbestätigung (Sekunden)",
+  "settings_detection_oversell": "Bestätigung bei Überverkaufsrisiko (Sekunden)",
+  "settings_detection_stuck": "Grenze für Erfüllungsverzögerungen (Sekunden)",
+  "settings_replenishment_approval_title": "Nachbestellungen",
+  "settings_replenishment_approval_help": "Eine Genehmigung kann den Entwurf und den Versand der unveränderten Bestellung an die geprüfte Lieferantenverbindung abdecken. Der Anfragende wählt beim Versand das Lieferdatum. Geänderte Entwürfe, Ziele, abgelaufene Genehmigungen und geänderte Regeln erfordern eine neue Prüfung.",
+  "settings_replenishment_separate_send": "Versand immer separat prüfen",
+  "settings_replenishment_separate_help": "Nach dem Nachbestellungsentwurf eine weitere Genehmigung verlangen.",
+  "settings_replenishment_threshold": "Separate Versandgenehmigung ab diesem Betrag (leer für keine Grenze)",
+  "settings_replenishment_currency": "Währung der Grenze",
+  "settings_display_timezone": "Anzeigezeitzone auf diesem Gerät",
+  "settings_display_timezone_workspace": "Workspace-Zeitzone verwenden"
 }

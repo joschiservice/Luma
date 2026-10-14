@@ -209,10 +209,7 @@ export function issueProperty(item: CaseSummary, key: string): ReactNode {
     case 'class':
       return issueKind(item).label;
     case 'subject': {
-      const subject =
-        item.subject.id.length > 24
-          ? `…${item.subject.id.slice(-8)}`
-          : item.subject.id;
+      const subject = item.subject.label ?? m.common_not_reported();
 
       return (
         <span title={item.subject.id}>

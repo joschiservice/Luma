@@ -1,5 +1,4 @@
 import type { OrderDetail } from '@luma/api-contract';
-import { formatTime } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { rich } from '@luma/i18n/rich';
 import { issueKind } from '@luma/ui/components/issues/case-presentation';
@@ -11,7 +10,11 @@ import {
   CardTitle,
 } from '@luma/ui/components/primitives/card';
 import { StatePill } from '@luma/ui/components/primitives/state';
-import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
+import {
+  formatWorkspaceTime,
+  WorkspaceDate,
+  WorkspaceTimezone,
+} from '@luma/ui/components/primitives/workspace-date';
 import { Link } from '@tanstack/react-router';
 import {
   ArrowRight,
@@ -21,7 +24,7 @@ import {
   type LucideIcon,
   Workflow,
 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useContext } from 'react';
 
 import {
   connectionStatusLabel,
@@ -72,6 +75,7 @@ function StockSync({
   detail: OrderDetail;
   organizationId: string;
 }) {
+  const timeZone = useContext(WorkspaceTimezone);
   if (!detail.stockSync.length) return null;
 
   return (
@@ -88,7 +92,7 @@ function StockSync({
               <strong>{skuLabel(detail, wait.skuId)}</strong>
               <small>
                 {m.orders_inspector_stock_syncing({
-                  until: formatTime(wait.until),
+                  until: formatWorkspaceTime(wait.until, timeZone),
                 })}
               </small>
             </span>

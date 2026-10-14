@@ -12,6 +12,7 @@ import type {
 } from '../application/cases.js';
 import type { Incident } from '../application/detection.js';
 import type { Diagnosis, DiagnosisInput } from '../domain/diagnosis.js';
+import type { Configuration } from '../domain/facts.js';
 import { inventorySources } from '../domain/inventory-sources.js';
 import {
   type CaseMetricItem,
@@ -34,6 +35,7 @@ import {
 } from './case-list.js';
 
 type Row = {
+  subject_label?: string | null;
   document: Incident;
   owner: import('../application/owners.js').CaseOwner | null;
   version: number;
@@ -50,7 +52,10 @@ type Row = {
 // select-list entries, such as the current policy decision `pa.document` and `pa.proposal`.
 function caseQuery(filter = 'true', columns = '') {
   return `cases AS (
- SELECT e.document,e.version,owner.document || jsonb_build_object('name',person.name) AS owner,d.document AS diagnosis${columns},
+ SELECT COALESCE(
+ (SELECT c.document->>'label' FROM connector_installations c WHERE c.tenant_id=e.tenant_id AND c.id::text=e.document->'subject'->>'subjectId'),
+ (SELECT COALESCE((SELECT code FROM inventory_product_skus sku WHERE sku.tenant_id=k.tenant_id AND sku.sku_id=k.id AND sku.code_key IS NOT NULL ORDER BY sku.connection_id LIMIT 1),CASE WHEN left(k.reconciliation_key,10)='["source",' THEN k.reconciliation_key::jsonb->>4 ELSE k.reconciliation_key END) FROM inventory_entities k WHERE k.tenant_id=e.tenant_id AND k.id::text=e.document->'subject'->>'subjectId'),
+ CASE WHEN e.document->'subject'->>'subjectId' !~* '^[0-9a-f-]{36}$' THEN e.document->'subject'->>'subjectId' END) AS subject_label,e.document,e.version,owner.document || jsonb_build_object('name',person.name) AS owner,d.document AS diagnosis${columns},
  CASE WHEN e.state='resolved' THEN NULL
  WHEN e.state='escalated' OR u.review_required THEN 'uncertainty'
  WHEN pa.observe_only THEN 'manual_intervention'
@@ -131,7 +136,7 @@ export const orderAttentionQuery = attentionQuery();
 export const caseDecisionQuery = `WITH ${caseQuery("e.state<>'resolved'", ',pa.document AS policy,pa.proposal,pa.observe_only')}
  SELECT o.owner,(o.document->>'id')::uuid AS exception_id,o.attention_reason AS reason,
   o.attention_at::timestamptz AS requested_at,o.document->>'severity' AS severity,
-  o.document->>'exceptionClass' AS class,o.document->>'state' AS state,o.document->'subject' AS subject,
+  o.document->>'exceptionClass' AS class,o.document->>'state' AS state,o.document->'subject' || jsonb_build_object('label',o.subject_label) AS subject,
   o.diagnosis->>'status' AS diagnosis_status,o.diagnosis->>'summary' AS summary,
   (o.diagnosis->'provenance'->>'validUntil')::timestamptz AS valid_until,
   (SELECT min((ev->>'observedAt')::timestamptz) FROM jsonb_array_elements(o.diagnosis->'provenance'->'evidence') ev) AS observed_at,
@@ -335,6 +340,7 @@ function project(row: Row, now: Date): CaseDetail {
         ? diagnosis.summary
         : (fallbackSummaries[incident.exceptionClass] ?? fallbackSummary),
     subject: {
+      label: row.subject_label ?? undefined,
       kind: incident.subject.subjectKind,
       id: incident.subject.subjectId,
       scope: incident.subject.scope,
@@ -695,9 +701,12 @@ export function createCaseReader(
       db.transaction(tenantId, async (tx) => {
         const clock = now();
         const result = await tx.query<
-          Row & { diagnosis_snapshot: DiagnosisInput | null }
+          Row & {
+            configuration: Configuration | null;
+            diagnosis_snapshot: DiagnosisInput | null;
+          }
         >(
-          `${projection} SELECT ordered.*, (SELECT d.snapshot FROM exception_diagnoses d
+          `${projection} SELECT ordered.*, (SELECT document FROM exception_configurations WHERE tenant_id=$1 AND version=ordered.document->>'configVersion') AS configuration, (SELECT d.snapshot FROM exception_diagnoses d
             WHERE d.tenant_id=$1 AND d.exception_id=$3::text::uuid AND d.revision=(ordered.diagnosis->>'revision')::integer) AS diagnosis_snapshot
             FROM ordered WHERE document->>'id'=$3`,
           [tenantId, clock.toISOString(), id],
@@ -709,6 +718,20 @@ export function createCaseReader(
           ? {
               ...project(row, clock),
               inventorySources: inventorySources(row.diagnosis_snapshot),
+              ...(row.configuration
+                ? {
+                    detectionLimits: {
+                      inventoryTolerance: row.configuration.inventoryTolerance,
+                      propagationSeconds:
+                        row.configuration.thresholds.propagationSeconds,
+                      oversellPropagationSeconds:
+                        row.configuration.thresholds
+                          .oversellPropagationSeconds ??
+                        row.configuration.thresholds.propagationSeconds,
+                      stuckSeconds: row.configuration.thresholds.stuckSeconds,
+                    },
+                  }
+                : {}),
             }
           : null;
       }),

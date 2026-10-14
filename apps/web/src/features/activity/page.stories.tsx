@@ -168,9 +168,9 @@ export const History: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(
-      await canvas.findByText('Ben Ortiz (former member) · jtl-cloud'),
+      await canvas.findByText('Ben Ortiz (former member) · JTL Cloud'),
     ).toBeVisible();
-    await expect(canvas.getByText('Luma · jtl-cloud')).toBeVisible();
+    await expect(canvas.getByText('Luma · JTL Cloud')).toBeVisible();
     await userEvent.click(
       await canvas.findByRole('button', { name: /Change attempt finished/ }),
     );
@@ -179,7 +179,7 @@ export const History: Story = {
     ).toBeVisible();
     await expect(
       canvas.getByText(
-        'Ada Lovelace · ada@example.test via Correct shipping methods',
+        'Luma, via Correct shipping methods (runs as Ada Lovelace · ada@example.test)',
       ),
     ).toBeVisible();
     await expect(

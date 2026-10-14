@@ -118,5 +118,7 @@
   "home_returns_not_shared_description": "Returns appear once a connected store shares returns and refunds with Luma.",
   "home_returns_review_connections": "Review connections",
   "home_window_brief": "Morning brief",
-  "home_brief_window": "Verified results from {start} to {end}. Decisions and ongoing work show the current state."
+  "home_brief_window": "Verified results from {start} to {end}. Decisions and ongoing work show the current state.",
+  "home_pending_stock": "{count, plural, one {{count, number} possible stock mismatch} other {{count, number} possible stock mismatches}}",
+  "home_pending_stock_until": "Confirming until"
 }

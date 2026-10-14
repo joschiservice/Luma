@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { caseSummarySchema } from './cases.js';
+import { connectionHealthSchema } from './connections.js';
 
 export const overviewQuerySchema = z
   .object({
@@ -29,6 +30,12 @@ export const overviewQuerySchema = z
 const count = z.number().int().nonnegative();
 
 export const operationsOverviewSchema = z.object({
+  pendingStock: z
+    .object({
+      count: z.number().int().nonnegative(),
+      until: z.string().datetime().nullable(),
+    })
+    .optional(),
   generatedAt: z.string().datetime(),
   window: z.object({
     start: z.string().datetime(),
@@ -46,6 +53,7 @@ export const operationsOverviewSchema = z.object({
         'disconnected',
         'revoked',
       ]),
+      health: connectionHealthSchema.optional(),
       lastObservedAt: z.string().datetime().nullable(),
       freshness: z.enum(['fresh', 'stale', 'unobserved']),
     }),

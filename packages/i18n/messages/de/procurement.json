@@ -607,7 +607,7 @@
   "procurement_timeline_purchasing_system": "Einkaufssystem",
   "procurement_timeline_email": "E-Mail",
   "procurement_timeline_inventory": "Bestandsführendes System",
-  "procurement_timeline_actor": "Person: {actor}",
+  "procurement_timeline_actor": "Erfasst von: {actor}",
   "procurement_timeline_evidence": "Nachweise ({count})",
   "procurement_list_view_all": "Alle Lieferantenbestellungen",
   "procurement_list_view_all_suppliers": "Alle Lieferanten",

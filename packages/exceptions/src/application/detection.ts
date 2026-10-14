@@ -112,7 +112,12 @@ export interface Incident {
   previousExceptionId: string | null;
   ruleVersion: string;
   configVersion: string;
-  resolution?: Resolution & { actorId: string; at: string; auditId: string };
+  resolution?: Resolution & {
+    actorId: string;
+    at: string;
+    auditId: string;
+    automation?: { id: string; name: string | null };
+  };
 }
 
 /** @public Declaration emit names it in the inferred type of `createExceptions`. */
@@ -130,6 +135,7 @@ interface Evaluation {
 }
 
 export interface IncidentVerificationAttempt {
+  automation?: { id: string; name: string | null };
   attemptId?: string;
   phase: 'pending' | 'completed';
   actorId: string;
@@ -162,6 +168,7 @@ export interface DetectionRepository {
     disposition: Resolution,
     actorId: string,
     now: string,
+    automationId?: string,
   ): Promise<boolean>;
 }
 
@@ -280,6 +287,9 @@ export function createDetectionService(
         throw new Error('Exception already resolved');
       const started = {
         phase: 'pending' as const,
+        ...(context.actor.sessionId.startsWith('workflow:')
+          ? { automation: { id: context.requestId, name: null } }
+          : {}),
         actorId: context.actor.id,
         occurredAt: now().toISOString(),
         evaluatorVersion: verifier.version,
@@ -336,6 +346,9 @@ export function createDetectionService(
           proof,
           context.actor.id,
           now().toISOString(),
+          context.actor.sessionId.startsWith('workflow:')
+            ? context.requestId
+            : undefined,
         );
       } catch (error) {
         await repository.verification(context.tenantId, id, {

@@ -42,6 +42,7 @@ import {
 } from '../kit/record-messages';
 import { settingsOptions } from '../kit/settings/data';
 import { useAssistantOpen } from '../lib/assistant-panel';
+import { useDisplayTimezonePreference } from '../lib/display-timezone';
 import { isTypingTarget } from '../lib/keyboard';
 import { setThemePreference, useThemePreference } from '../lib/theme';
 import { PinCurrentPage, PinnedNavigation } from './pins';
@@ -217,6 +218,7 @@ function TenantShell({ organizationId }: { organizationId: string }) {
   const access = useQuery(contextOptions(organizationId));
   const permissions = usePermissions(organizationId);
   const organizations = useQuery(organizationsOptions());
+  const personalTimezone = useDisplayTimezonePreference();
   const settings = useQuery({
     ...settingsOptions(organizationId),
     refetchInterval: false,
@@ -270,7 +272,11 @@ function TenantShell({ organizationId }: { organizationId: string }) {
       }
       banner={
         supportView ? (
-          <WorkspaceTimezone value={settings.data?.workspace.timezone ?? 'UTC'}>
+          <WorkspaceTimezone
+            value={
+              personalTimezone ?? settings.data?.workspace.timezone ?? 'UTC'
+            }
+          >
             <SupportViewBanner view={supportView} />
           </WorkspaceTimezone>
         ) : null
@@ -302,7 +308,9 @@ function TenantShell({ organizationId }: { organizationId: string }) {
       }
       assistantOpen={assistantOpen}
       assistant={
-        <WorkspaceTimezone value={settings.data?.workspace.timezone ?? 'UTC'}>
+        <WorkspaceTimezone
+          value={personalTimezone ?? settings.data?.workspace.timezone ?? 'UTC'}
+        >
           <AssistantPanel
             organizationId={organizationId}
             open={assistantOpen}
@@ -333,7 +341,9 @@ function TenantShell({ organizationId }: { organizationId: string }) {
         />
       }
     >
-      <WorkspaceTimezone value={settings.data?.workspace.timezone ?? 'UTC'}>
+      <WorkspaceTimezone
+        value={personalTimezone ?? settings.data?.workspace.timezone ?? 'UTC'}
+      >
         {settings.isError ? (
           <Alert tone="warning" role="status" className="desk-alert">
             {settings.data

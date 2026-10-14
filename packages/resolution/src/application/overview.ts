@@ -15,6 +15,9 @@ export function createOperationsOverview(
   coverage: CoverageReader,
   now = () => new Date(),
   measurementReader?: ResolutionMetricReader,
+  pendingStock?: (
+    context: TenantContext,
+  ) => Promise<{ count: number; until: string | null } | undefined>,
 ): OperationsOverviewService {
   return async (
     context: TenantContext,
@@ -28,7 +31,7 @@ export function createOperationsOverview(
     const start = (
       since ?? new Date(Date.parse(end) - (window === '7d' ? 7 : 1) * 86400000)
     ).toISOString();
-    const [summary, connections, metrics] = await Promise.all([
+    const [summary, connections, metrics, pending] = await Promise.all([
       cases.overview(context, start, end, readAt),
       coverage(context, readAt),
       since
@@ -37,6 +40,7 @@ export function createOperationsOverview(
             environment: 'live',
             window,
           }),
+      pendingStock?.(context),
     ]);
 
     const autonomous = metrics?.find(
@@ -76,6 +80,7 @@ export function createOperationsOverview(
     return {
       ...summary,
       connections,
+      ...(pending ? { pendingStock: pending } : {}),
       generatedAt: readAt,
       window: { start, end },
       freshnessThresholdHours: 24 as const,
@@ -101,6 +106,7 @@ export type OperationsOverviewService = (
   since?: Date,
 ) => Promise<
   Awaited<ReturnType<CaseService['overview']>> & {
+    pendingStock?: { count: number; until: string | null };
     connections: Awaited<ReturnType<CoverageReader>>;
     generatedAt: string;
     window: { start: string; end: string };

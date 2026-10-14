@@ -366,7 +366,9 @@ export function diagnose(snapshot: DiagnosisInput, now: string): Diagnosis {
       result.facts.push(
         finding(
           'scan_result',
-          `The ${f.capability} scan reported ${f.status}; completeness is ${f.scanComplete ? 'complete' : 'incomplete'}${f.errorCode ? `; error code is ${f.errorCode}` : ''}.`,
+          f.status === 'success' && f.scanComplete
+            ? 'Luma completed a full read from this connection.'
+            : `Luma could not finish reading ${f.capability === 'orders.read' ? 'orders' : f.capability === 'inventory.read' ? 'stock' : f.capability === 'products.read' ? 'products' : 'fulfillments'} from this connection. The latest data may be incomplete.`,
         ),
       );
       result.constraints.push(
@@ -403,7 +405,7 @@ export function diagnose(snapshot: DiagnosisInput, now: string): Diagnosis {
         immediate
           ? 'Ask the connection owner to inspect grants, credentials or adapter compatibility.'
           : 'Request a read-only refresh after provider retry-after and backoff.',
-        'A new complete scan of the same capability and scope advances the checkpoint.',
+        'Luma will check again. A successful full read confirms that this connection has recovered.',
         [
           'Do not repeatedly retry authorization errors.',
           'Respect provider retry-after and read limits.',

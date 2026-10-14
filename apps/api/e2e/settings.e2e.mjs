@@ -21,6 +21,12 @@ it('persists settings, reconciles commands, enforces tenant roles and serializes
   const write = command({
     name: 'Northstar Japan',
     timezone: 'Asia/Tokyo',
+    detection: {
+      inventoryTolerance: '2.5',
+      propagationSeconds: 900,
+      oversellPropagationSeconds: 30,
+      stuckSeconds: 3600,
+    },
     revision: 0,
   });
   await request(member, `${base}/settings/workspace`, 'PATCH', write, 403);
@@ -32,6 +38,16 @@ it('persists settings, reconciles commands, enforces tenant roles and serializes
     { ...write, timezone: 'not/a-zone' },
     400,
   );
+  await request(
+    owner,
+    `${base}/settings/workspace`,
+    'PATCH',
+    {
+      ...write,
+      detection: { ...write.detection, oversellPropagationSeconds: -1 },
+    },
+    400,
+  );
   const saved = await request(
     owner,
     `${base}/settings/workspace`,
@@ -41,6 +57,7 @@ it('persists settings, reconciles commands, enforces tenant roles and serializes
   expect(saved.workspace).toMatchObject({
     name: 'Northstar Japan',
     timezone: 'Asia/Tokyo',
+    detection: write.detection,
     revision: 1,
   });
   expect(
@@ -72,6 +89,38 @@ it('persists settings, reconciles commands, enforces tenant roles and serializes
     'PATCH',
     command({ revision: 0, alwaysRequireApproval: true }),
     403,
+  );
+  const approvalRule = command({
+    revision: 0,
+    alwaysRequireApproval: false,
+    replenishmentApproval: {
+      separateSend: false,
+      threshold: { amount: '5000', currency: 'AUD' },
+    },
+  });
+  await request(
+    member,
+    `${base}/settings/approvals`,
+    'PATCH',
+    approvalRule,
+    403,
+  );
+  const policy = await request(
+    owner,
+    `${base}/settings/approvals`,
+    'PATCH',
+    approvalRule,
+  );
+  expect(policy.workspace).toMatchObject({
+    policyRevision: 1,
+    replenishmentApproval: approvalRule.replenishmentApproval,
+    detection: write.detection,
+  });
+  expect(
+    await request(owner, `${base}/settings/approvals`, 'PATCH', approvalRule),
+  ).toEqual(policy);
+  expect((await request(owner, `${base}/settings`)).workspace).toMatchObject(
+    policy.workspace,
   );
   await request(owner, `${base}/members/${f.membership.id}`, 'PATCH', {
     roleId: 'owner',
@@ -691,11 +740,13 @@ it('lets solo owners approve, preserves team preferences and invalidates reviews
       before_value: {
         required: false,
         requireIndependentApproval: true,
+        replenishmentApproval: { separateSend: false, threshold: null },
         version: 0,
       },
       after_value: {
         required: false,
         requireIndependentApproval: false,
+        replenishmentApproval: { separateSend: false, threshold: null },
         version: 1,
       },
     },

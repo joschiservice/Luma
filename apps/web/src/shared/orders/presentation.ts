@@ -4,7 +4,11 @@ import type {
   OrderSort,
   OrderView,
 } from '@luma/api-contract';
-import { formatCurrency, formatList, formatNumber } from '@luma/i18n/format';
+import {
+  formatCurrency,
+  formatExactQuantity,
+  formatList,
+} from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { isPieceUnit, quantityWithUnit } from '@luma/ui/lib/units';
 
@@ -207,10 +211,10 @@ export function formatMoney(
  * rounding. Values that are not numbers show as reported.
  */
 export function formatSourceNumber(value: string) {
-  const number = Number(value);
+  const quantity = value.trim();
 
-  return value.trim() && Number.isFinite(number)
-    ? formatNumber(number, { maximumFractionDigits: 20 })
+  return /^-?\d+(?:\.\d+)?$/.test(quantity)
+    ? formatExactQuantity(quantity)
     : value;
 }
 

@@ -116,6 +116,7 @@ export function createSupplierCommitmentService(
     | 'shortfallAvailable'
     | 'incomingChanged'
     | 'additionalTimeline'
+    | 'timelineActors'
   > & {
     model: Omit<CommitmentDependencies['model'], 'output'>;
     retentionDays?: number;

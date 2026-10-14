@@ -83,11 +83,13 @@ export const evidenceLabels: Record<
  */
 export function decisionStatus(
   item: Pick<DecisionItem, 'reason' | 'response'> &
-    Partial<Pick<DecisionItem, 'kind'>>,
+    Partial<Pick<DecisionItem, 'kind' | 'automatic'>>,
 ): {
   state: OperationalState;
   label: string;
 } {
+  if (item.automatic && item.reason === 'run')
+    return { state: 'running', label: m.decisions_automatic_running() };
   switch (item.response) {
     case 'decide':
       return { state: 'approval', label: m.decisions_status_decide() };
@@ -156,7 +158,7 @@ export function emptyCopy(view: DecisionView, filtered: boolean) {
   };
 }
 
-/** Names a workspace member for display, falling back to a short ID for former members. */
+/** Names a workspace member with email so approval identities remain distinguishable. */
 export function memberName(
   id: string | null | undefined,
   members: readonly {
@@ -167,10 +169,15 @@ export function memberName(
   self: string | undefined,
 ) {
   if (!id) return null;
-  if (id === self) return m.decisions_member_you();
   const member = members.find((entry) => entry.userId === id);
 
-  return member?.name || member?.email || m.decisions_member_former();
+  const name =
+    member?.name ||
+    (id === self ? m.decisions_member_you() : m.decisions_member_former());
+
+  return member?.email
+    ? m.common_actor_with_email({ actor: name, email: member.email })
+    : name;
 }
 
 /**

@@ -177,7 +177,8 @@ const thresholdsSchema = z
     syncFailureSeconds: z.number().int().positive(),
     stuckSeconds: z.number().int().positive(),
     uncertaintySeconds: z.number().int().positive(),
-    propagationSeconds: z.number().int().positive(),
+    propagationSeconds: z.number().int().nonnegative(),
+    oversellPropagationSeconds: z.number().int().nonnegative().optional(),
     oversellGuardPercent: z.number().int().min(0).max(100),
   })
   .strict();

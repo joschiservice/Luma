@@ -24,6 +24,7 @@ import {
 } from '../../domain/decisions.js';
 import { createActionDiffReader } from '../action-diffs.js';
 import { collectionQueryError } from '../collection/parameters.js';
+import { readDecisionHistory } from './history.js';
 import {
   compareKeys,
   decisionGroupKey,
@@ -536,7 +537,13 @@ export function createDecisionQueue(
     async find(context, id) {
       const result = await read(context, { view: 'all', limit: 1 }, id);
 
-      return result.items[0] ?? null;
+      if (result.items[0]) return result.items[0];
+      const fresh = await deps.refreshContext(context);
+      requireTenant(fresh, context.tenantId);
+      if (fresh.actor.id !== context.actor.id)
+        throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
+
+      return readDecisionHistory(db, fresh, id);
     },
   };
 }

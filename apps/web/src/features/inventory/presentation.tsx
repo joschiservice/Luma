@@ -1,7 +1,12 @@
 import type { StockPosition, StockSource } from '@luma/api-contract';
-import { formatList, formatRelativeTime, formatTime } from '@luma/i18n/format';
+import { formatList, formatRelativeTime } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { StatePill } from '@luma/ui/components/primitives/state';
+import {
+  formatWorkspaceTime,
+  WorkspaceTimezone,
+} from '@luma/ui/components/primitives/workspace-date';
+import { useContext } from 'react';
 
 import { formatSourceNumber } from '../../shared/orders/presentation';
 
@@ -73,23 +78,29 @@ export function stockQuantity(value: string | null | undefined) {
 export function syncExplanation(
   sync: NonNullable<StockPosition['sync']>,
   fields: StockPosition['differences'],
+  timeZone: string,
 ) {
   return m.inventory_explanation_syncing_body({
     fields: differingQuantities(fields),
-    since: formatTime(sync.since),
-    until: formatTime(sync.until),
+    since: formatWorkspaceTime(sync.since, timeZone),
+    until: formatWorkspaceTime(sync.until, timeZone),
   });
 }
 
 /** Explains whether the same linked position has known conflicting quantities. */
 export function StockState({ position }: { position: StockPosition }) {
+  const timeZone = useContext(WorkspaceTimezone);
   if (position.differences.length)
     return position.sync ? (
       <StatePill
         state="waiting"
-        title={syncExplanation(position.sync, position.differences)}
+        title={syncExplanation(position.sync, position.differences, timeZone)}
       >
-        {m.inventory_state_syncing()}
+        {m.inventory_confirming_until({
+          time: position.sync
+            ? formatWorkspaceTime(position.sync.until, timeZone)
+            : '',
+        })}
       </StatePill>
     ) : (
       <StatePill state="attention">{m.inventory_state_differs()}</StatePill>
@@ -128,4 +139,21 @@ export function stockFreshness(source: StockSource, asOf: string) {
   return m.inventory_read_ago({
     time: formatRelativeTime(source.observedAt, asOf),
   });
+}
+
+/** Displays the confirmation window in the workspace zone, including in collection cells. */
+export function StockSyncWindow({ position }: { position: StockPosition }) {
+  const timeZone = useContext(WorkspaceTimezone);
+
+  return position.sync ? (
+    <span
+      title={syncExplanation(position.sync, position.differences, timeZone)}
+    >
+      {m.inventory_confirming_until({
+        time: position.sync
+          ? formatWorkspaceTime(position.sync.until, timeZone)
+          : '',
+      })}
+    </span>
+  ) : null;
 }

@@ -23,6 +23,7 @@ import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { Select } from '@luma/ui/components/primitives/select';
 import {
   formatWorkspaceDateTime,
+  WorkspaceDate,
   WorkspaceTimezone,
 } from '@luma/ui/components/primitives/workspace-date';
 import { useSlowRequest } from '@luma/ui/lib/use-slow-request';
@@ -101,7 +102,7 @@ function setupNotice(data: OperationsOverview) {
       tone: 'warning' as const,
       description: m.home_notice_inactive_description(),
     };
-  if (monitored.some((c) => c.freshness === 'unobserved'))
+  if (monitored.every((c) => !c.lastObservedAt))
     return {
       title: m.home_notice_waiting_title(),
       tone: 'info' as const,
@@ -453,6 +454,25 @@ export function HomePage() {
           </Button>
         </div>
       </header>
+
+      {data?.pendingStock?.count ? (
+        <Alert
+          tone="warning"
+          role="region"
+          aria-label={m.home_pending_stock({ count: data.pendingStock.count })}
+        >
+          <p>{m.home_pending_stock({ count: data.pendingStock.count })}</p>
+          {data.pendingStock.until ? (
+            <p>
+              {m.home_pending_stock_until()}{' '}
+              <WorkspaceDate value={data.pendingStock.until} />
+            </p>
+          ) : null}
+          <Link to="/app/$organizationId/inventory" params={{ organizationId }}>
+            {m.inventory_page_title()}
+          </Link>
+        </Alert>
+      ) : null}
 
       {overview.isPaused ? (
         <CaseNotice title={m.home_paused_title()}>

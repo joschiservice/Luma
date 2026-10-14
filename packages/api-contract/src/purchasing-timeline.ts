@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { activityActorSchema } from './activity.js';
+
 /** Purchasing facts and action history preserve separate recording, observation and verification states. */
 export const purchasingTimelineSchema = z.object({
   entries: z
@@ -30,6 +32,7 @@ export const purchasingTimelineSchema = z.object({
         ]),
         at: z.string().datetime(),
         actorId: z.string().nullable(),
+        actor: activityActorSchema.optional(),
         reason: z.string().nullable(),
         evidenceRefs: z.array(z.string()),
         quantity: z.number().nullable(),

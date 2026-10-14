@@ -554,5 +554,6 @@
   "workflows_review_terms_recorded": "Lieferkonditionen aufgezeichnet am",
   "workflows_review_demand_recorded": "Bedarfsdaten gelesen am",
   "workflows_review_context_recorded": "Prüfdaten aufgezeichnet am",
-  "workflows_review_context_note": "Die Reichweite ist eine Schätzung aus aufgezeichneten Verkäufen, keine Bedarfsprognose. Der vorgeschlagene Eingang ist kein bestätigter Zulauf. Vor der Erstellung werden Bestand, vorhandene Bestellungen und Berechtigung erneut geprüft."
+  "workflows_review_context_note": "Die Reichweite ist eine Schätzung aus aufgezeichneten Verkäufen, keine Bedarfsprognose. Der vorgeschlagene Eingang ist kein bestätigter Zulauf. Vor der Erstellung werden Bestand, vorhandene Bestellungen und Berechtigung erneut geprüft. Jetzt wird nichts versendet. Nach den Workspace-Regeln kann diese Genehmigung auch den Versand des unveränderten Entwurfs an die geprüfte Lieferantenverbindung vor Ablauf der Genehmigung abdecken. Der Anfragende wählt beim Versand das Lieferdatum.",
+  "workflows_review_allowed": "Erlaubt"
 }

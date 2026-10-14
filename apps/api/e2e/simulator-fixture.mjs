@@ -16,7 +16,11 @@ import { database, secret } from './helpers.mjs';
 const journeyConfiguration = {
   ...defaultConfiguration,
   version: `${defaultConfiguration.version}-journey`,
-  thresholds: { ...defaultConfiguration.thresholds, propagationSeconds: 1 },
+  thresholds: {
+    ...defaultConfiguration.thresholds,
+    propagationSeconds: 1,
+    oversellPropagationSeconds: 1,
+  },
 };
 
 /** Provisions and cleans an isolated database-backed simulator workspace for platform tests. */

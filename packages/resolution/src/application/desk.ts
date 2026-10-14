@@ -650,6 +650,16 @@ export function createDeskService(deps: DeskDependencies) {
                   kind: s.incident.resolution.kind,
                   at: s.incident.resolution.at,
                   actorId: s.incident.resolution.actorId,
+                  automation: s.incident.resolution.automation
+                    ? {
+                        ...s.incident.resolution.automation,
+                        name:
+                          s.workflowRuns?.find(
+                            (run) =>
+                              run.id === s.incident.resolution?.automation?.id,
+                          )?.name ?? s.incident.resolution.automation.name,
+                      }
+                    : undefined,
                   reason: s.incident.resolution.reason,
                   evidenceRefs: s.incident.resolution.evidenceRefs.slice(
                     0,

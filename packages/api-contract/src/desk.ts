@@ -211,6 +211,9 @@ export const caseProgressSchema = z.object({
       kind: z.enum(['verification', 'human_disposition']),
       at,
       actorId: ref,
+      automation: z
+        .object({ id: z.string(), name: z.string().nullable() })
+        .optional(),
       reason: z.string().max(1000).optional(),
       evidenceRefs: z.array(ref).max(100),
     })

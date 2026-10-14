@@ -138,7 +138,12 @@ export const recordTypes: Record<
 const providers: Record<string, string> = {
   shopify: 'Shopify',
   jtl: 'JTL',
-  cin7: 'Cin7',
+  cin7: 'Cin7 Core',
+  'jtl-onprem': 'JTL-Wawi',
+  'jtl-cloud': 'JTL Cloud',
+  starshipit: 'Starshipit',
+  gmail: 'Gmail',
+  'luma-erp': 'Luma ERP',
 };
 
 /** The display name of a provider ID, such as Shopify. */

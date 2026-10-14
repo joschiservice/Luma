@@ -222,6 +222,17 @@ it('places an approved order once, follows supplier confirmation and receipt, an
     { cookie: approver },
   );
   expect(approved.state).toBe('submitted');
+  const historical = await request(
+    `/v1/organizations/${org}/decisions/${encodeURIComponent(`supplier:submission_approval:${requested.id}`)}`,
+    undefined,
+    { cookie: approver },
+  );
+  expect(historical.outcome).toMatchObject({
+    state: 'approved',
+    next: 'verified',
+    purchaseOrderId: order.id,
+  });
+
   expect(approved.externalOrder?.externalId).toBeTruthy();
   const purchaseOrders = (
     await f.call('runs/operations/records/jtl?kind=purchase-order&limit=100')

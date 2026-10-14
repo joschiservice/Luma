@@ -2,6 +2,7 @@ import type { ActivityEvent } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import type { CollectionFilterOption } from '@luma/ui/components/primitives/collection-toolbar';
 import type { OperationalState } from '@luma/ui/components/primitives/state';
+import { operatorCodeMessages } from '@luma/ui/lib/operator-code';
 
 import { providerName } from '../sync/presentation';
 
@@ -150,7 +151,7 @@ export function activityLabel(value: string, system?: string | null) {
     return m.activity_outcome_provider_accepted_by({
       system: providerName(system),
     });
-  const known = activityLabels[value];
+  const known = activityLabels[value] ?? operatorCodeMessages[value];
 
   return known ? known() : humanize(value);
 }
@@ -160,7 +161,7 @@ export function activityLabel(value: string, system?: string | null) {
  * method". Unknown codes are shown with separators replaced by spaces.
  */
 export function activityChangeLabel(value: string) {
-  const known = changeLabels[value];
+  const known = changeLabels[value] ?? operatorCodeMessages[value];
 
   return known ? known() : humanize(value);
 }

@@ -110,6 +110,7 @@ export const caseSummarySchema = z.object({
   severity: z.enum(['high', 'medium']),
   summary: z.string().max(2000),
   subject: z.object({
+    label: z.string().optional(),
     kind: z.string(),
     id: z.string(),
     scope: z.array(z.string()).max(100),
@@ -156,6 +157,14 @@ export const caseListSchema = z.object({
 });
 
 export const caseDetailSchema = caseSummarySchema.extend({
+  detectionLimits: z
+    .object({
+      inventoryTolerance: z.string(),
+      propagationSeconds: z.number(),
+      oversellPropagationSeconds: z.number(),
+      stuckSeconds: z.number(),
+    })
+    .optional(),
   diagnosis: diagnosisSchema.nullable(),
   productIdentities: z
     .array(

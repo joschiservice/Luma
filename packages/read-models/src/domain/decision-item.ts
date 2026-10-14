@@ -61,6 +61,21 @@ export interface DecisionAssignment {
 
 /** One decision waiting on a person, as the Needs you queue presents it. */
 export interface DecisionItem {
+  outcome?: {
+    state: 'approved' | 'rejected' | 'expired' | 'resolved';
+    at: string | null;
+    actorId: string | null;
+    actorName: string | null;
+    actorEmail: string | null;
+    next: 'pending' | 'running' | 'verified' | 'failed' | 'uncertain';
+    workflow: boolean;
+    purchaseOrderId?: string | undefined;
+    runId?: string | undefined;
+    definitionId?: string | undefined;
+  };
+
+  previousChange?: { label: string; value: string }[] | undefined;
+  automatic?: boolean | undefined;
   observeOnly?: boolean;
   id: string;
   kind: DecisionKind;

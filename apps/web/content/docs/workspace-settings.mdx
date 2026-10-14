@@ -9,11 +9,13 @@ Everyone can view the workspace sections. If your role can’t change one, it sa
 
 ## Workspace
 
-Change the **Workspace name** and **Time zone**, then select **Save changes**. You need **Edit workspace settings**. The name appears in navigation and the workspace switcher. Luma shows dates and times in this workspace in its time zone, for everyone. Times don’t repeat the zone; point to a time to see the exact moment with its zone.
+Change the **Workspace name** and **Time zone**, then select **Save changes**. You need **Edit workspace settings**. The name appears in navigation and the workspace switcher. Luma shows dates and times in this workspace in its time zone by default. Under **Language & appearance**, you can choose a display time zone for this device or restore **Use workspace time zone**. Times include the zone; point to a time to see the exact moment.
 
 The **Workspace identifier** and **Data region** can’t be changed. Workspace data is stored in the region shown here. Australian workspaces use Australia (Sydney). Luma processes workspace data in its region; connected providers and services you authorize may process it elsewhere.
 
 If Luma couldn’t confirm whether a change was saved, select **Check status and retry** before you change anything else.
+
+Under **Issue detection**, set stock tolerance and confirmation windows in seconds. Oversell risk has its own shorter window. You can also set how long fulfillment can go without progress. Existing issue details show the limits used to detect them.
 
 ## Team
 
@@ -57,6 +59,8 @@ If every owner’s access is suspended, **Team** says that the workspace has no 
 **Roles** shows what each role allows and lets you create custom roles. See [Roles and permissions](/docs/roles-and-permissions).
 
 ## Approvals
+
+For **Replenishment purchase orders**, one approval can cover creating the draft and sending it unchanged to the reviewed supplier connection. The requester chooses the delivery date when sending. Turn on **Always review sending separately** to require two approvals. You can instead set an amount and currency for separate send review at or above that amount. Orders with unknown prices or another currency need separate review when this threshold is set.
 
 **Approvals** decides when changes need review and who may approve them. Changing these settings needs **Manage approval rules**.
 

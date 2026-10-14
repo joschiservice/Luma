@@ -22,6 +22,11 @@ import {
   formatWorkspaceInstant,
   WorkspaceTimezone,
 } from '@luma/ui/components/primitives/workspace-date';
+import { connectionHealthLabel } from '@luma/ui/lib/connection-health';
+import {
+  operatorCodeLabel,
+  operatorCodeMessages,
+} from '@luma/ui/lib/operator-code';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import {
@@ -310,6 +315,7 @@ function connectionState(connection: Connection): {
   state: OperationalState;
   label: string;
 } {
+  if (connection.health) return connectionHealthLabel(connection.health);
   if (connection.status === 'disconnected' || connection.status === 'revoked')
     return { state: 'error', label: m.home_connection_disconnected() };
   if (connection.status === 'pending')
@@ -318,6 +324,8 @@ function connectionState(connection: Connection): {
     return { state: 'attention', label: m.home_connection_degraded() };
   if (connection.freshness === 'stale')
     return { state: 'attention', label: m.home_connection_stale() };
+  if (connection.freshness === 'unobserved' && connection.lastObservedAt)
+    return connectionHealthLabel('importing');
   if (connection.freshness === 'unobserved')
     return { state: 'waiting', label: m.home_connection_unobserved() };
 
@@ -430,7 +438,11 @@ export function ActivityModule({ organizationId }: { organizationId: string }) {
               </time>
               <StateDot state={activityState(event.outcome)} />
               <span className="home-timeline-text">
-                {event.summary ?? activityLabel(event.action)}
+                {event.summary
+                  ? operatorCodeMessages[event.summary]
+                    ? operatorCodeLabel(event.summary)
+                    : event.summary
+                  : activityLabel(event.action)}
                 <small>
                   {event.system
                     ? m.home_activity_outcome_system({

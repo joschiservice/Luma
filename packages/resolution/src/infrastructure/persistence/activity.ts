@@ -48,7 +48,7 @@ END`;
  */
 const actorMatchSql = (item: string) =>
   `($16::text[] IS NULL OR (${item}->'actor'->>'kind' IN ('member','former_member') AND ${item}->'actor'->>'id'=ANY($16::text[]))
-    OR ($17::boolean AND ${item}->'actor'->>'kind' IN ('luma','support'))
+    OR ($17::boolean AND (${item}->'actor'->>'kind' IN ('luma','support') OR jsonb_typeof(${item}->'actor'->'workflow')='object'))
     OR ($18::boolean AND jsonb_typeof(${item}->'actor'->'workflow')='object'))`;
 
 /**
@@ -212,7 +212,7 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
         const result = await tx.query<{ item: ActivityEvent; at: string }>(
           `
       WITH enriched AS (
-        SELECT s.*,COALESCE(s.exception_id,p.exception_id,(r.document->>'incidentId')::uuid) AS issue_id,
+        SELECT s.*,COALESCE(eo.document->'automation',eo.document->'resolution'->'automation') AS actor_automation,COALESCE(s.exception_id,p.exception_id,(r.document->>'incidentId')::uuid) AS issue_id,
         COALESCE(s.connection_id,(s.doc->>'connectionId')::uuid,(p.document->>'connectionId')::uuid,(r.document->'action'->>'connectionId')::uuid) AS conn_id,
         COALESCE(s.doc->'details'->>'purchaseOrderId',CASE WHEN a.subject_kind='order' THEN a.subject_id END,p.document->'target'->>'id',r.document->'action'->'target'->>'id',a.document->'action'->'target'->>'id',e.document->'subject'->>'subjectId') AS resource,
         COALESCE(CASE WHEN s.doc->'details'->>'purchaseOrderId' IS NOT NULL THEN 'purchase_order' END,CASE WHEN a.subject_kind='order' THEN 'order' END,p.document->'target'->>'kind',r.document->'action'->'target'->>'kind',a.document->'action'->'target'->>'kind',e.document->'subject'->>'subjectKind') AS resource_kind,
@@ -225,12 +225,13 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
         COALESCE(v.document->'definition'->>'name',wv.document->'definition'->>'name') AS workflow_name,
         s.doc->'details' AS details
         FROM ${linked ? linkedSources : 'workspace_activity_sources'} s
+        LEFT JOIN exception_outbox eo ON eo.tenant_id=s.tenant_id AND eo.id::text=s.id AND s.doc->>'eventType' LIKE 'exception.%'
         LEFT JOIN case_proposals p ON p.tenant_id=s.tenant_id AND p.id=s.proposal_id
         LEFT JOIN exceptions e ON e.tenant_id=s.tenant_id AND e.id=COALESCE(s.exception_id,p.exception_id)
         LEFT JOIN playbook_runs r ON r.tenant_id=s.tenant_id AND r.id=s.proposal_id
         LEFT JOIN playbook_versions v ON v.tenant_id=r.tenant_id AND v.definition_id=r.definition_id AND v.version=r.version
         LEFT JOIN action_admission_steps a ON a.tenant_id=s.tenant_id AND a.proposal_id=s.proposal_id
-        LEFT JOIN workflow_trigger_runs w ON w.tenant_id=s.tenant_id AND w.id::text=COALESCE(a.run_id::text,s.doc->>'correlationId')
+        LEFT JOIN workflow_trigger_runs w ON w.tenant_id=s.tenant_id AND w.id::text=COALESCE(a.run_id::text,s.doc->>'correlationId',COALESCE(eo.document->'automation'->>'id',eo.document->'resolution'->'automation'->>'id'))
         LEFT JOIN playbook_versions wv ON wv.tenant_id=w.tenant_id AND wv.definition_id=w.definition_id AND wv.version=w.version
         WHERE s.tenant_id=$1 AND s.recorded_at >= $2::timestamptz AND s.recorded_at < $3::timestamptz
         AND (NOT s.restricted OR $4::boolean)
@@ -273,7 +274,7 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
           kind: "doc->'actor'->>'kind'",
           id: "doc->'actor'->>'id'",
           luma: "action LIKE 'exception.%'",
-          workflow: `CASE WHEN workflow_id IS NOT NULL THEN jsonb_build_object('id',left(workflow_id,200),'name',left(workflow_name,200)) END`,
+          workflow: `CASE WHEN action IN ('approval.responded','case.approve','case.reject','workflow.human_task_answered') THEN NULL WHEN workflow_id IS NOT NULL THEN jsonb_build_object('id',left(workflow_id,200),'name',left(workflow_name,200)) ELSE actor_automation END`,
         },
       )},
       'action',left(action,160),'type',type,'outcome',outcome,'exceptionId',issue_id,'proposalId',proposal_id,

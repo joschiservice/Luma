@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { connectionHealthSchema } from './connections.js';
 import {
   measurementEnvironmentSchema,
   resolutionMetricItemSchema,
@@ -195,6 +196,7 @@ const operationalMetricItemSchema = z.discriminatedUnion('kind', [
   }),
   z.object({
     kind: z.literal('connection'),
+    health: connectionHealthSchema.optional(),
     id: z.string().uuid(),
     label: z.string(),
     status: z.enum([

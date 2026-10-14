@@ -9,11 +9,29 @@ import {
 import {
   decisionAssignInputSchema,
   decisionAssignResultSchema,
+  decisionItemSchema,
   decisionListSchema,
   decisionQuerySchema,
 } from '../decisions.js';
 
 export const decisionsContract = {
+  get: endpoint
+    .route({
+      method: 'GET',
+      path: '/v1/organizations/{organizationId}/decisions/{decisionId}',
+      summary: 'Read a decision and its retained outcome',
+      description:
+        'Reads active work or an authorized retained issue, replenishment, supplier-send or stock-correction outcome, with who answered, when and what happened next. Reading a historical outcome grants no authority to respond or assign. Returns null when the owner or decision is inaccessible.',
+    })
+    .meta({ access: anyMember, errors: [401, 403, 404, 503] })
+    .input(
+      z.object({
+        params: organizationParamsSchema.extend({
+          decisionId: z.string().min(1).max(200),
+        }),
+      }),
+    )
+    .output(decisionItemSchema.nullable()),
   list: endpoint
     .route({
       method: 'GET',

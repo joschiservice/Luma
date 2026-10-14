@@ -252,6 +252,7 @@ export interface ApplicationServices {
   library: ReturnType<typeof createPersistentPlaybookLibrary>;
   messaging: ReturnType<typeof createMessaging>;
   http: {
+    connectionCoverage: import('@luma/connections').CoverageReader;
     adaptive: ReturnType<typeof createAdaptiveWorkspaceRuntime>;
     fieldWorkflows: ReturnType<typeof createAdaptiveFieldWorkflows>;
     shadow: ReturnType<typeof createShadowEvaluations>;
@@ -650,6 +651,100 @@ export function createApplicationServices(
     database,
     createAuditLog,
     {
+      timelineActors: async (context, entries, workflowRunId) =>
+        database.transaction(context.tenantId, async (tx) => {
+          const automated = new Map(
+            (
+              await tx.query<{
+                key: string;
+                id: string;
+                name: string | null;
+                principalId: string;
+              }>(
+                `WITH sources AS (
+               SELECT 'execution:'||x.id AS key,a.run_id FROM executed_actions x
+               JOIN action_admission_steps a ON a.tenant_id=x.tenant_id AND a.proposal_id=x.proposal_id
+               WHERE x.tenant_id=$1 AND x.id::text=ANY($2::text[])
+               UNION ALL
+               SELECT 'submission:'||s.id AS key,a.run_id FROM procurement_submissions s
+               JOIN action_admission_steps a ON a.tenant_id=s.tenant_id AND a.proposal_id::text=s.document->>'actionId'
+               WHERE s.tenant_id=$1 AND s.id::text=ANY($3::text[])
+              ) SELECT s.key,r.id,r.document->'actor'->>'id' AS "principalId",v.document->'definition'->>'name' AS name
+              FROM sources s JOIN workflow_trigger_runs r ON r.tenant_id=$1 AND r.id=s.run_id
+              LEFT JOIN playbook_versions v ON v.tenant_id=r.tenant_id AND v.definition_id=r.definition_id AND v.version=r.version`,
+                [
+                  context.tenantId,
+                  entries
+                    .filter((entry) => entry.id.startsWith('execution:'))
+                    .map((entry) => entry.id.slice('execution:'.length)),
+                  entries
+                    .filter((entry) => entry.id.startsWith('submission:'))
+                    .map((entry) => entry.id.split(':')[1]),
+                ],
+              )
+            ).rows.map((run) => [run.key, run]),
+          );
+          const ids = [
+            ...new Set([
+              ...entries.flatMap((entry) =>
+                entry.actorId ? [entry.actorId] : [],
+              ),
+              ...[...automated.values()].map((run) => run.principalId),
+            ]),
+          ];
+          const people = new Map(
+            (
+              await tx.query<{
+                id: string;
+                name: string | null;
+                email: string | null;
+                member: boolean;
+              }>(
+                'SELECT user_id::text AS id,name,email,is_member AS member FROM workspace_people WHERE tenant_id=$1 AND user_id::text=ANY($2::text[])',
+                [context.tenantId, ids],
+              )
+            ).rows.map((person) => [person.id, person]),
+          );
+          const workflow = workflowRunId
+            ? (
+                await tx.query<{ id: string; name: string | null }>(
+                  `SELECT r.id,v.document->'definition'->>'name' AS name FROM workflow_trigger_runs r LEFT JOIN playbook_versions v ON v.tenant_id=r.tenant_id AND v.definition_id=r.definition_id AND v.version=r.version WHERE r.tenant_id=$1 AND r.id::text=$2`,
+                  [context.tenantId, workflowRunId],
+                )
+              ).rows[0]
+            : undefined;
+
+          return entries.map((entry) => {
+            const provenance = ['approved', 'rejected'].includes(entry.stage)
+              ? undefined
+              : automated.get(
+                  entry.id.startsWith('submission:')
+                    ? entry.id.split(':').slice(0, 2).join(':')
+                    : entry.id,
+                );
+            const actorId = entry.actorId ?? provenance?.principalId;
+            const person = actorId ? people.get(actorId) : undefined;
+
+            return {
+              ...entry,
+              actor: {
+                kind: person?.member
+                  ? ('member' as const)
+                  : actorId
+                    ? ('former_member' as const)
+                    : ('unrecorded' as const),
+                id: actorId ?? null,
+                name: person?.name ?? null,
+                email: person?.email ?? null,
+                workflow: provenance
+                  ? { id: provenance.id, name: provenance.name }
+                  : entry.detail === 'created' && workflow
+                    ? workflow
+                    : null,
+              },
+            };
+          });
+        }),
       incomingChanged: projectIncoming,
       additionalTimeline: createPurchaseReceiptTimeline(
         () => nativeStock.ledger,
@@ -1371,6 +1466,7 @@ export function createApplicationServices(
       (await identity.listMembers(context)).map((member) => member.userId),
     pending: async (context, id) => {
       const item = await decisions.find(context, id);
+      if (item?.outcome) return false;
 
       // Return case assignments belong to the case's revision-checked command.
       return !!item && item.owner.kind !== 'return_case';
@@ -1502,6 +1598,7 @@ export function createApplicationServices(
     library,
     messaging,
     http: {
+      connectionCoverage: createConnectionCoverage(database),
       adaptive,
       fieldWorkflows: adaptiveFieldWorkflows,
       supplierEmail,
@@ -1551,6 +1648,20 @@ export function createApplicationServices(
         createConnectionCoverage(database),
         () => new Date(),
         createResolutionMetricReader(database),
+        async (context) => {
+          if (!hasPermission(context, 'inventory.read')) return undefined;
+
+          return database.transaction(
+            context.tenantId,
+            async (tx) =>
+              (
+                await tx.query<{ count: number; until: string | null }>(
+                  `SELECT count(*)::int AS count,to_char(min(wait_until) AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS until FROM exception_pending_sync WHERE tenant_id=$1 AND subject_kind='sku'`,
+                  [context.tenantId],
+                )
+              ).rows[0]!,
+          );
+        },
       ),
       inventory,
       products,

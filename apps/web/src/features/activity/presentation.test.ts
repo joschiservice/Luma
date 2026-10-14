@@ -53,7 +53,7 @@ const sources = [
 it('offers each connected system once and keeps an applied unknown system', () => {
   expect(activitySystemOptions(sources, undefined)).toEqual([
     { value: 'shopify', label: 'Shopify' },
-    { value: 'jtl-cloud', label: 'jtl-cloud' },
+    { value: 'jtl-cloud', label: 'JTL Cloud' },
   ]);
   expect(activitySystemOptions([], 'legacy').map((o) => o.value)).toEqual([
     'legacy',

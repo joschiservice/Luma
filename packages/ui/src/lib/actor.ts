@@ -3,13 +3,14 @@ import { m } from '@luma/i18n/messages';
 
 /**
  * Names who recorded an event: a person's name, a former member, Luma, Luma support or a service. A workflow
- * run is named together with the person it acted for. Email is added only with `email`, and
+ * run is credited to Luma and names the person it runs as. Email is included by default, and
  * only current members have one.
  */
 export function actorLabel(
   actor: ActivityActor,
-  { email = false }: { email?: boolean } = {},
+  { email = true }: { email?: boolean } = {},
 ) {
+  if (actor.workflow?.id === 'detection-monitor') return m.common_actor_luma();
   let label: string;
   switch (actor.kind) {
     case 'member':
@@ -32,7 +33,7 @@ export function actorLabel(
     default:
       return m.common_actor_not_recorded();
   }
-  if (email && actor.email)
+  if (email && actor.kind === 'member' && actor.email)
     label = m.common_actor_with_email({ actor: label, email: actor.email });
 
   return actor.workflow

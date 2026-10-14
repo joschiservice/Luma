@@ -363,8 +363,15 @@ function WorkspaceForm({
     name: string;
     timezone: string;
     revision: number;
+    detection?: SettingsSnapshot['workspace']['detection'];
   } | null>(null);
   const value = draft ?? current;
+  const detection = value.detection ?? {
+    inventoryTolerance: '0',
+    propagationSeconds: 1800,
+    oversellPropagationSeconds: 120,
+    stuckSeconds: 7200,
+  };
   const command = useSettingsCommand(organizationId);
   const zones = Array.from(
     new Set(['UTC', current.timezone, ...Intl.supportedValuesOf('timeZone')]),
@@ -382,6 +389,7 @@ function WorkspaceForm({
           const input = {
             name: value.name,
             timezone: value.timezone,
+            detection,
             revision: value.revision,
           };
           void command.run(async (commandId) => {
@@ -425,6 +433,55 @@ function WorkspaceForm({
               }}
             />
           </div>
+          <fieldset disabled={disabled || command.locked}>
+            <legend>{m.settings_detection_title()}</legend>
+            <p>{m.settings_detection_help()}</p>
+            {(
+              [
+                'inventoryTolerance',
+                'propagationSeconds',
+                'oversellPropagationSeconds',
+                'stuckSeconds',
+              ] as const
+            ).map((key) => (
+              <div className="settings-field" key={key}>
+                <label htmlFor={`detection-${key}`}>
+                  {{
+                    inventoryTolerance: m.settings_detection_tolerance,
+                    propagationSeconds: m.settings_detection_propagation,
+                    oversellPropagationSeconds: m.settings_detection_oversell,
+                    stuckSeconds: m.settings_detection_stuck,
+                  }[key]()}
+                </label>
+                <Input
+                  id={`detection-${key}`}
+                  type={key === 'inventoryTolerance' ? 'text' : 'number'}
+                  min={key === 'stuckSeconds' ? 60 : 0}
+                  max={
+                    key === 'stuckSeconds'
+                      ? 604800
+                      : key === 'oversellPropagationSeconds'
+                        ? 3600
+                        : 86400
+                  }
+                  required
+                  value={detection[key]}
+                  onChange={(event) =>
+                    setDraft({
+                      ...value,
+                      detection: {
+                        ...detection,
+                        [key]:
+                          key === 'inventoryTolerance'
+                            ? event.target.value
+                            : Number(event.target.value),
+                      },
+                    })
+                  }
+                />
+              </div>
+            ))}
+          </fieldset>
           <div className="settings-readonly">
             <div>
               <span>{m.settings_workspace_identifier_label()}</span>
@@ -432,9 +489,7 @@ function WorkspaceForm({
             </div>
             <div>
               <span>{m.settings_workspace_region_label()}</span>
-              <strong>
-                {regionLabel(current.dataRegion)}
-              </strong>
+              <strong>{regionLabel(current.dataRegion)}</strong>
             </div>
             <LockKeyhole
               size={15}
@@ -448,7 +503,10 @@ function WorkspaceForm({
             disabled ||
             command.locked ||
             !value.name.trim() ||
-            (value.name === current.name && value.timezone === current.timezone)
+            (value.name === current.name &&
+              value.timezone === current.timezone &&
+              JSON.stringify(value.detection) ===
+                JSON.stringify(current.detection))
           }
           pending={command.pending}
         />
@@ -629,11 +687,17 @@ function ApprovalsForm({
     required: boolean;
     independent: boolean;
     revision: number;
+    replenishmentApproval?: SettingsSnapshot['workspace']['replenishmentApproval'];
   } | null>(null);
   const required = draft?.required ?? data.workspace.alwaysRequireApproval;
   const multipleMembers = data.workspace.activeMemberCount > 1;
   const independent =
     draft?.independent ?? data.workspace.requireIndependentApproval;
+  const replenishmentApproval = draft?.replenishmentApproval ??
+    data.workspace.replenishmentApproval ?? {
+      separateSend: false,
+      threshold: null,
+    };
   const command = useSettingsCommand(organizationId);
   const approverPermission = usePermissionLabel(
     organizationId,
@@ -674,6 +738,7 @@ function ApprovalsForm({
               params: { organizationId },
               body: {
                 commandId,
+                replenishmentApproval,
                 revision: draft?.revision ?? data.workspace.policyRevision,
                 alwaysRequireApproval: required,
                 requireIndependentApproval: independent,
@@ -693,6 +758,7 @@ function ApprovalsForm({
               setDraft({
                 required: value,
                 independent,
+                replenishmentApproval,
                 revision: draft?.revision ?? data.workspace.policyRevision,
               })
             }
@@ -710,11 +776,83 @@ function ApprovalsForm({
               setDraft({
                 required,
                 independent: value,
+                replenishmentApproval,
                 revision: draft?.revision ?? data.workspace.policyRevision,
               })
             }
           />
         </div>
+        <fieldset disabled={disabled || command.locked}>
+          <legend>{m.settings_replenishment_approval_title()}</legend>
+          <p>{m.settings_replenishment_approval_help()}</p>
+          <PreferenceRow
+            title={m.settings_replenishment_separate_send()}
+            description={m.settings_replenishment_separate_help()}
+            checked={replenishmentApproval.separateSend}
+            disabled={disabled || command.locked}
+            change={(separateSend) =>
+              setDraft({
+                required,
+                independent,
+                revision: draft?.revision ?? data.workspace.policyRevision,
+                replenishmentApproval: {
+                  ...replenishmentApproval,
+                  separateSend,
+                },
+              })
+            }
+          />
+          <label htmlFor="send-threshold">
+            {m.settings_replenishment_threshold()}
+          </label>
+          <Input
+            id="send-threshold"
+            value={replenishmentApproval.threshold?.amount ?? ''}
+            placeholder="5000"
+            onChange={(event) =>
+              setDraft({
+                required,
+                independent,
+                revision: draft?.revision ?? data.workspace.policyRevision,
+                replenishmentApproval: {
+                  ...replenishmentApproval,
+                  threshold: event.target.value
+                    ? {
+                        amount: event.target.value,
+                        currency:
+                          replenishmentApproval.threshold?.currency ?? 'AUD',
+                      }
+                    : null,
+                },
+              })
+            }
+          />
+          <label htmlFor="send-currency">
+            {m.settings_replenishment_currency()}
+          </label>
+          <Input
+            id="send-currency"
+            value={replenishmentApproval.threshold?.currency ?? 'AUD'}
+            maxLength={3}
+            disabled={!replenishmentApproval.threshold}
+            onChange={(event) =>
+              setDraft({
+                required,
+                independent,
+                revision: draft?.revision ?? data.workspace.policyRevision,
+                replenishmentApproval: {
+                  ...replenishmentApproval,
+                  threshold: replenishmentApproval.threshold
+                    ? {
+                        ...replenishmentApproval.threshold,
+                        currency: event.target.value.toUpperCase(),
+                      }
+                    : null,
+                },
+              })
+            }
+          />
+        </fieldset>
         <div className="settings-guardrails">
           <h3>{m.settings_approvals_guardrails_title()}</h3>
           <p>
@@ -737,7 +875,14 @@ function ApprovalsForm({
             disabled ||
             command.locked ||
             (required === data.workspace.alwaysRequireApproval &&
-              independent === data.workspace.requireIndependentApproval)
+              independent === data.workspace.requireIndependentApproval &&
+              JSON.stringify(replenishmentApproval) ===
+                JSON.stringify(
+                  data.workspace.replenishmentApproval ?? {
+                    separateSend: false,
+                    threshold: null,
+                  },
+                ))
           }
           pending={command.pending}
         />

@@ -269,7 +269,7 @@ function Content({
   const shown =
     state === 'loading' || state === 'error'
       ? undefined
-      : state === 'empty'
+      : state === 'empty' || state === 'answered'
         ? {
             ...list,
             items: [],
@@ -289,7 +289,26 @@ function Content({
               ),
             }
           : list;
-  const item = shown?.items.find((entry) => entry.id === search.item);
+  const item: DecisionItem | undefined =
+    state === 'answered' && search.item
+      ? {
+          ...replenishment,
+          response: 'view_only',
+          assignment: null,
+          outcome: {
+            state: 'approved',
+            at: '2026-09-30T08:59:00.000Z',
+            actorId: alex,
+            actorName: 'Alex Morgan',
+            actorEmail: 'alex@example.test',
+            next: 'verified',
+            workflow: true,
+            purchaseOrderId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            runId: '0b8c4e0a-5f7a-4d53-a2b5-5c6d7e8f9a0b',
+            definitionId: 'inventory-replenishment',
+          },
+        }
+      : shown?.items.find((entry) => entry.id === search.item);
   // Grouped by cause, as the queue's server groups would return them.
   const causes = [...new Set(list.items.map((entry) => entry.group.key))];
   const grouped: NeedsYouGrouping | undefined =
@@ -351,7 +370,7 @@ function Content({
             now={now}
             onClose={() => setSearch({ ...search, item: undefined })}
             onAssign={() => {}}
-            review={review}
+            review={item.outcome ? null : review}
           />
         ) : null
       }
@@ -481,3 +500,35 @@ export const Loading: Story = { args: { state: 'loading' } };
 export const Error: Story = { args: { state: 'error' } };
 
 export const Offline: Story = { args: { state: 'offline' } };
+
+export const Answered: Story = {
+  args: { state: 'answered', initial: { item: replenishment.id } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect((await canvas.findAllByText('Approved'))[0]!).toBeVisible();
+    await expect(canvas.getByText('You answered this at')).toBeVisible();
+    await expect(canvas.getByText('30 Sept 2026 08:59 UTC')).toBeVisible();
+    await expect(
+      canvas.getByRole('link', { name: /Open purchase order/ }),
+    ).toHaveAttribute(
+      'href',
+      expect.stringContaining('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+    );
+    await expect(
+      canvas.getByRole('link', { name: /Open workflow run/ }),
+    ).toHaveAttribute('href', expect.stringContaining('run-0b8c4e0a'));
+    await expect(
+      canvas.queryByRole('button', { name: 'Take it' }),
+    ).not.toBeInTheDocument();
+    await expect(
+      canvas.queryByRole('button', { name: 'Approve 50 units' }),
+    ).not.toBeInTheDocument();
+  },
+};
+
+export const AnsweredDark: Story = { ...Answered, globals: { theme: 'dark' } };
+
+export const AnsweredNarrow: Story = {
+  ...Answered,
+  globals: { viewport: { value: 'mobile1', isRotated: false } },
+};

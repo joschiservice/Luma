@@ -2,17 +2,42 @@ import { z } from 'zod';
 
 import { roleReferenceSchema } from './roles.js';
 
+/** Workspace detection windows; oversell risk has a shorter independent confirmation window. */
+export const detectionSettingsSchema = z
+  .object({
+    inventoryTolerance: z.string().regex(/^\d{1,14}(?:\.\d{1,6})?$/),
+    propagationSeconds: z.number().int().min(0).max(86400),
+    oversellPropagationSeconds: z.number().int().min(0).max(3600),
+    stuckSeconds: z.number().int().min(60).max(604800),
+  })
+  .strict();
+
+/** Additional supplier-send review for replenishment orders; unknown values require review when a threshold is set. */
+export const replenishmentApprovalSchema = z
+  .object({
+    separateSend: z.boolean(),
+    threshold: z
+      .object({
+        amount: z.string().regex(/^\d{1,14}(?:\.\d{1,6})?$/),
+        currency: z.string().regex(/^[A-Z]{3}$/),
+      })
+      .nullable(),
+  })
+  .strict();
+
 const workspaceSettingsSchema = z.object({
   name: z.string(),
   slug: z.string(),
   dataRegion: z.string(),
   timezone: z.string(),
+  detection: detectionSettingsSchema.optional(),
   revision: z.number().int(),
   alwaysRequireApproval: z.boolean(),
   /** Team preference; ignored while fewer than two members have access. */
   requireIndependentApproval: z.boolean(),
   activeMemberCount: z.number().int().nonnegative(),
   policyRevision: z.number().int(),
+  replenishmentApproval: replenishmentApprovalSchema.optional(),
   writeMode: z.enum(['observe_only', 'writes_enabled']),
 });
 

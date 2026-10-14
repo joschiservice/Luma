@@ -152,7 +152,9 @@ describe.skipIf(!databaseUrl)('connections through the API CLI', () => {
     await admin.query(
       `CREATE ROLE "${name}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
     );
-    await admin.query(`GRANT luma_identity,luma_connectors TO "${name}"`);
+    await admin.query(
+      `GRANT luma_identity,luma_connectors,luma_case_reader TO "${name}"`,
+    );
     url.username = name;
     url.password = password;
     runtimeUrl = url.toString();
@@ -219,7 +221,9 @@ describe.skipIf(!databaseUrl)('connections through the API CLI', () => {
     expect(JSON.stringify(stored.rows)).not.toContain('startup-private-token');
     await stop();
     await start();
-    expect(await (await call(path)).json()).toEqual({ items: [connection] });
+    expect(await (await call(path)).json()).toMatchObject({
+      items: [{ ...connection, coverage: { health: 'importing' } }],
+    });
     const checked = await call(`${path}/${connection.id}/check`, {
       version: 1,
     });

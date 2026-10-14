@@ -547,12 +547,14 @@ export const DetailDark: Story = {
   globals: { theme: 'dark' },
 };
 
-/** A gap that provider sync is expected to close is shown as syncing, not as a difference. */
+/** A tentative gap names its confirmation deadline before an issue is raised. */
 export const Syncing: Story = {
   args: { state: 'syncing' },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(await canvas.findByText('Syncing')).toBeVisible();
+    await expect(
+      await canvas.findByText(/^Possible mismatch — confirming until .* UTC$/),
+    ).toBeVisible();
     await expect(canvas.queryByText('Differs by source')).toBeNull();
   },
 };
@@ -563,7 +565,7 @@ export const SyncingDetail: Story = {
     const canvas = within(canvasElement);
     await expect(
       await canvas.findByRole('heading', {
-        name: 'Same position. Waiting for sync.',
+        name: 'Possible stock mismatch',
       }),
     ).toBeVisible();
     await expect(

@@ -77,7 +77,12 @@ export interface CaseSummary {
   state: Incident['state'];
   severity: Incident['severity'];
   summary: string;
-  subject: { kind: string; id: string; scope: string[] };
+  subject: {
+    label?: string | undefined;
+    kind: string;
+    id: string;
+    scope: string[];
+  };
   sources: string[];
   detectedAt: string;
   lastActivityAt: string;
@@ -93,6 +98,14 @@ export interface CaseSummary {
 }
 
 export interface CaseDetail extends CaseSummary {
+  detectionLimits?:
+    | {
+        inventoryTolerance: string;
+        propagationSeconds: number;
+        oversellPropagationSeconds: number;
+        stuckSeconds: number;
+      }
+    | undefined;
   inventorySources?: { left: string | null; right: string | null } | null;
   productIdentities?: {
     source: string;

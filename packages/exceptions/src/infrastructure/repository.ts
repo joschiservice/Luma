@@ -11,7 +11,11 @@ import type {
 import { verificationPostconditions } from '../application/detection.js';
 import { identity } from '../domain/evaluate.js';
 import type { Configuration } from '../domain/facts.js';
-import { decimalString, decimalUnits } from '../domain/facts.js';
+import {
+  decimalString,
+  decimalUnits,
+  inventoryPropagationSeconds,
+} from '../domain/facts.js';
 import { queueDiagnosis } from './diagnosis-repository.js';
 
 async function lock(tx: SqlTransaction, tenantId: string) {
@@ -188,7 +192,12 @@ export function createDetectionRepository(
               subject.subjectId,
               JSON.stringify(subject.scope),
               waiting,
-              configuration.thresholds.propagationSeconds,
+              input.exceptionClass === 'inventory_mismatch'
+                ? inventoryPropagationSeconds(
+                    input.facts,
+                    configuration.thresholds,
+                  )
+                : configuration.thresholds.propagationSeconds,
               now,
             ],
           );
@@ -344,7 +353,7 @@ export function createDetectionRepository(
           )
         ).rows.map((row) => row.document),
       ),
-    resolve: (tenantId, incidentId, disposition, actorId, now) =>
+    resolve: (tenantId, incidentId, disposition, actorId, now, automationId) =>
       db.transaction(tenantId, async (tx) => {
         await lock(tx, tenantId);
         const found = await tx.query<{ document: Incident; version: number }>(
@@ -469,7 +478,16 @@ export function createDetectionRepository(
             'Resolution evidence not found',
           );
         const auditId = randomUUID();
-        const resolution = { ...disposition, actorId, at: now, auditId };
+        const automation = automationId
+          ? { id: automationId, name: null }
+          : undefined;
+        const resolution = {
+          ...disposition,
+          actorId,
+          at: now,
+          auditId,
+          ...(automation ? { automation } : {}),
+        };
         await save(tx, {
           ...incident,
           state: 'resolved',

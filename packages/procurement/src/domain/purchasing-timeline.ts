@@ -31,6 +31,15 @@ export interface PurchasingTimelineEntry {
     | 'verified';
   at: string;
   actorId: string | null;
+  actor?:
+    | {
+        kind: 'member' | 'former_member' | 'luma' | 'unrecorded';
+        id: string | null;
+        name: string | null;
+        email: string | null;
+        workflow: { id: string; name: string | null } | null;
+      }
+    | undefined;
   reason: string | null;
   evidenceRefs: string[];
   quantity: number | null;

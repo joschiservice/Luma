@@ -12,6 +12,7 @@ import { z } from 'zod';
 
 const createParameters = z
   .object({
+    submissionScope: z.string().optional(),
     supplierId: z.string().uuid(),
     reference: z.string().trim().min(1).max(200),
     lines: z.string(),

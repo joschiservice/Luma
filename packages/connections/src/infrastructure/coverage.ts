@@ -1,4 +1,4 @@
-import { requireTenant } from '@luma/identity';
+import { hasPermission, requireTenant } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 
 import type { CoverageReader } from '../application/coverage.js';
@@ -18,8 +18,12 @@ export function createConnectionCoverage(db: TenantDatabase): CoverageReader {
         document: InstalledConnection;
         observations: { capability: string; observed_at: string }[];
         failed: boolean;
+        streams: NonNullable<
+          import('../domain/coverage.js').ConnectionCoverage['streams']
+        >;
       }>(
-        `SELECT i.document, COALESCE(o.observations, '[]'::jsonb) AS observations, COALESCE(checks.failed, false) AS failed
+        `SELECT i.document, COALESCE(o.observations, '[]'::jsonb) AS observations, (COALESCE(checks.failed, false) OR EXISTS (SELECT 1 FROM commerce_sync_streams s WHERE s.tenant_id=i.tenant_id AND s.connection_id=i.id AND s.error_code IS NOT NULL) OR EXISTS(SELECT 1 FROM exceptions e WHERE e.tenant_id=i.tenant_id AND e.state<>'resolved' AND e.document->>'exceptionClass'='sync_failure' AND e.document->'subject'->>'subjectId'=i.id::text)) AS failed,
+        COALESCE((SELECT jsonb_agg(jsonb_build_object('recordType',s.record_type,'lastSuccessfulAt',to_char(s.last_complete_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),'lastError',s.error_code,'issueIds',${hasPermission(context, 'issues.read') ? `(SELECT COALESCE(jsonb_agg(e.id),'[]'::jsonb) FROM exceptions e WHERE e.tenant_id=s.tenant_id AND e.state<>'resolved' AND e.document->'subject'->>'subjectId'=i.id::text AND e.document->'subject'->'scope' ? (CASE s.record_type WHEN 'fulfillments' THEN 'fulfillment.read' ELSE s.record_type||'.read' END))` : "'[]'::jsonb"})) FROM commerce_sync_streams s WHERE s.tenant_id=i.tenant_id AND s.connection_id=i.id),'[]'::jsonb) AS streams
         FROM connector_installations i
         LEFT JOIN LATERAL (
           SELECT jsonb_agg(latest) AS observations FROM (
@@ -33,6 +37,9 @@ export function createConnectionCoverage(db: TenantDatabase): CoverageReader {
               SELECT capability, observed_at
               FROM connector_read_checks
               WHERE tenant_id = $1 AND connection_id = i.id AND succeeded
+              UNION ALL
+              SELECT CASE record_type WHEN 'fulfillments' THEN 'fulfillment.read' ELSE record_type||'.read' END AS capability,last_success_at AS observed_at
+              FROM commerce_sync_streams WHERE tenant_id=$1 AND connection_id=i.id AND last_success_at IS NOT NULL
             ) evidence
             WHERE observed_at <= $2::timestamptz
             GROUP BY capability
@@ -52,8 +59,8 @@ export function createConnectionCoverage(db: TenantDatabase): CoverageReader {
         [context.tenantId, asOf],
       );
 
-      return result.rows.map(({ document, observations, failed }) =>
-        summarizeConnectionCoverage(
+      return result.rows.map(({ document, observations, failed, streams }) => ({
+        ...summarizeConnectionCoverage(
           failed && document.status === 'active'
             ? { ...document, status: 'degraded' }
             : document,
@@ -63,7 +70,8 @@ export function createConnectionCoverage(db: TenantDatabase): CoverageReader {
           })),
           asOf,
         ),
-      );
+        streams: streams ?? [],
+      }));
     });
   };
 }

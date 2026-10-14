@@ -447,16 +447,24 @@ function decisionLabel(outcome: string) {
   if (outcome === 'approved') return m.workflows_review_decision_approved();
   if (outcome === 'rejected') return m.workflows_review_decision_rejected();
 
-  return outcome.replaceAll('_', ' ');
+  if (outcome === 'approval_required')
+    return m.issues_policy_approval_required();
+  if (outcome === 'allowed') return m.workflows_review_allowed();
+  if (outcome === 'denied') return m.issues_policy_denied();
+
+  return m.common_not_reported();
 }
 
 /** Keeps the human decision next to its quantity and exposes only independently verified orders as success. */
 export function ReplenishmentRunReview({
   organizationId,
   run,
+  onChange,
 }: {
   organizationId: string;
   run: WorkflowRunView;
+  /** Refreshes the owning queue immediately after a response. */
+  onChange?: (() => Promise<void>) | undefined;
 }) {
   const query = useQuery({
     ...replenishmentReviewOptions(organizationId, run.id),
@@ -468,8 +476,12 @@ export function ReplenishmentRunReview({
       decisionId: string;
       outcome: 'approved' | 'rejected';
     }) => decideReplenishment(organizationId, run.id, body),
-    onSuccess: () =>
-      client.invalidateQueries({ queryKey: workflowsKey(organizationId) }),
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: workflowsKey(organizationId) }),
+        onChange?.(),
+      ]);
+    },
   });
   const accessLost =
     query.error instanceof IdentityError &&

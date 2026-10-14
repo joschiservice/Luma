@@ -85,6 +85,32 @@ function RecordLinks({
 
   return (
     <div className="decision-links">
+      {item.outcome?.purchaseOrderId ? (
+        <Link
+          className={link}
+          to="/app/$organizationId/procurement/$purchaseOrderId"
+          params={{
+            organizationId,
+            purchaseOrderId: item.outcome.purchaseOrderId,
+          }}
+        >
+          {m.decisions_open_purchase_order()}{' '}
+          <ArrowUpRight aria-hidden="true" />
+        </Link>
+      ) : null}
+      {item.outcome?.definitionId &&
+      item.outcome.runId &&
+      owner.kind !== 'workflow_run' ? (
+        <Link
+          className={link}
+          to="/app/$organizationId/workflows/$definitionId"
+          params={{ organizationId, definitionId: item.outcome.definitionId }}
+          hash={`run-${item.outcome.runId}`}
+        >
+          {m.decisions_open_run()} <ArrowUpRight aria-hidden="true" />
+        </Link>
+      ) : null}
+
       {record?.kind === 'order' ? (
         <Link
           className={link}
@@ -140,6 +166,7 @@ function RecordLinks({
           className={link}
           to="/app/$organizationId/workflows/$definitionId"
           params={{ organizationId, definitionId: owner.definitionId }}
+          hash={`run-${owner.runId}`}
         >
           {m.decisions_open_run()} <ArrowUpRight aria-hidden="true" />
         </Link>
@@ -233,6 +260,7 @@ export function DecisionInspector({
   organizationId,
   item: rawItem,
   departed = false,
+  previousChange,
   members,
   self,
   assignmentAccess,
@@ -248,6 +276,7 @@ export function DecisionInspector({
   item: DecisionItem;
   /** The item has left the queue since it was opened. */
   departed?: boolean;
+  previousChange?: DecisionItem['change'] | undefined;
   members: readonly Member[];
   self: string | undefined;
   assignmentAccess: AssignmentAccess;
@@ -259,9 +288,25 @@ export function DecisionInspector({
   assignError?: string | undefined;
   review: ReactNode;
 }) {
+  previousChange ??= rawItem.previousChange;
   const item = localizeReturnDecision(rawItem);
   const id = useId();
-  const status = decisionStatus(item);
+  const status = item.outcome
+    ? {
+        state:
+          item.outcome.next === 'verified'
+            ? ('verified' as const)
+            : ('idle' as const),
+        label: {
+          approved: m.decisions_answer_approved,
+          rejected: m.decisions_answer_rejected,
+          expired: m.decisions_answer_expired,
+          resolved: m.decisions_answer_resolved,
+        }[item.outcome.state](),
+      }
+    : departed
+      ? { state: 'idle' as const, label: m.decisions_departed_title() }
+      : decisionStatus(item);
   const requester = memberName(item.requesterId, members, self);
   const approval = item.reason === 'approval' || item.reason === 'run';
 
@@ -286,7 +331,9 @@ export function DecisionInspector({
             </div>
             <div className="issue-panel-status">
               <StatePill state={status.state}>{status.label}</StatePill>
-              <DecisionDeadline deadline={item.deadline} now={now} />
+              {!departed && !item.outcome ? (
+                <DecisionDeadline deadline={item.deadline} now={now} />
+              ) : null}
               <span
                 className="issue-severity"
                 data-severity={
@@ -303,7 +350,58 @@ export function DecisionInspector({
           </div>
         </header>
       </div>
-      {departed ? (
+      {previousChange ? (
+        <CaseNotice title={m.decisions_proposal_changed()}>
+          <p>{m.decisions_proposal_changed_help()}</p>
+          <dl>
+            {item.change
+              .filter((field) =>
+                previousChange.some(
+                  (old) =>
+                    old.label === field.label && old.value !== field.value,
+                ),
+              )
+              .map((field) => (
+                <div key={field.label}>
+                  <dt>{field.label}</dt>
+                  <dd>
+                    {previousChange.find((old) => old.label === field.label)
+                      ?.value ?? m.common_not_reported()}{' '}
+                    → {field.value}
+                  </dd>
+                </div>
+              ))}
+          </dl>
+        </CaseNotice>
+      ) : null}
+      {item.outcome ? (
+        <CaseNotice title={status.label}>
+          <p>
+            {item.outcome.actorId === self
+              ? m.decisions_answer_you()
+              : [item.outcome.actorName, item.outcome.actorEmail]
+                  .filter(Boolean)
+                  .join(' · ') ||
+                (item.outcome.actorId
+                  ? m.common_actor_former_member()
+                  : m.decisions_answer_expired())}{' '}
+            {item.outcome.at ? <WorkspaceDate value={item.outcome.at} /> : null}
+          </p>
+          {item.outcome.state === 'approved' ? (
+            <p>
+              {{
+                pending: item.outcome.workflow
+                  ? m.decisions_answer_luma_runs
+                  : m.decisions_answer_requester_runs,
+                running: m.decisions_answer_running,
+                verified: m.decisions_answer_verified,
+                failed: m.decisions_answer_failed,
+                uncertain: m.decisions_answer_uncertain,
+              }[item.outcome.next]()}
+            </p>
+          ) : null}
+        </CaseNotice>
+      ) : departed ? (
         <CaseNotice title={m.decisions_departed_title()}>
           {m.decisions_departed_text()}
         </CaseNotice>
@@ -450,7 +548,7 @@ export function DecisionInspector({
                   item={item}
                   members={members}
                   self={self}
-                  access={assignmentAccess}
+                  access={departed || item.outcome ? 'none' : assignmentAccess}
                   pending={assigning}
                   onAssign={onAssign}
                 />

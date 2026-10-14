@@ -114,3 +114,12 @@ response-size limit. The approval check runs before each credential read; a miss
 removed approval denies the request, and an empty array denies all on-premise
 destinations. Update the pins when the destination changes. Cloud requests use the fixed
 JTL host and the installation's `X-Tenant-ID`.
+
+## Operational health
+
+Installation validation is separate from operational health. Home, Apps and connection metrics
+use the same tenant-scoped read of permitted capabilities and sync streams. Current failed
+reads take precedence over import or freshness status; missing record types mean importing,
+even when other data has arrived. “No data yet” requires no successful observations. Connection
+settings show each stream's last successful full read, failed-read status and accessible open
+issues. Point reads of individual rows can be newer than a completed full import.
