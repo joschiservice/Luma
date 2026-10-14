@@ -22,13 +22,38 @@ Issues only cover data Luma can read. If a system isn’t connected, or hasn’t
 - **All open** shows every unresolved issue, including those Luma is still investigating or fixing.
 - **History** shows closed issues. Each one says whether a fresh check confirmed the fix or a person closed it.
 
+The view menu before the tabs also lists the views you and your team saved. Opening **Issues** from the sidebar returns to the view you used last.
+
 The numbers above the list show how many issues need review, how many are open and how many were verified in the last 24 hours. They cover the whole workspace and don’t change with your filters.
 
-## Filter the list
+## Find issues
 
-Select **Filters**, or a filter name above the list, to narrow it by **Severity**, **Issue type** or **Status**. An issue appears only if it matches every filter you set. Each filter you set appears above the list: select it to change the value, select its **×** to remove it, or select **Clear** to remove them all.
+Search by summary or by the record an issue is about, such as an order number or SKU. Your search text stays on the page: it isn’t saved in the page address or in views, and it’s cleared when you leave or reload the page. Summaries are matched in English.
 
-Your view and filters are part of the page address, so you can bookmark them or select **Pin this page to the sidebar** in the top bar. If the list seems out of date, select **Refresh issues**. Refreshing returns you to the first page.
+**Owner**, **Issue type**, **Status** and **Severity** above the list narrow it in one click. **Owner** finds issues you own, issues nobody owns or the issues of one person; a view saved with **Me** shows each person their own issues. For anything else, choose **Filter** and pick a field, then a condition and a value:
+
+- **Source**: the system the evidence comes from, such as Shopify.
+- **Why it needs review**: approval, manual step or unclear evidence.
+- **Evidence freshness**: **Current** only while the evidence behind the investigation is still valid. Evidence that is out of date, or whose validity Luma doesn’t know, is never shown as current.
+- **Investigation**, **Resolution** and **Record type**.
+- **Detected**, **Last activity** and **Waiting since**, as a date range or the last few days.
+
+An issue appears only if it matches every filter, unless you choose to match any of them. **Clear** removes every filter and the search.
+
+Issues start with the most urgent: high severity first, then the issue that has waited longest. The sort menu after **Display** names the current order. Choose it to sort by when issues were detected, their last activity or how long they have waited on a person, or to flip the direction. Issues that don't wait on anyone come last when you sort by waiting time.
+
+Your view, filters and sort are part of the page address, so you can bookmark them or select **Pin this page to the sidebar** in the top bar. Links from before views, such as one issue type in Insights, open the same filters. If the list seems out of date, select **Refresh issues**. Refreshing returns you to the first page.
+
+## Arrange the list
+
+Select **Display** to change how the list looks:
+
+- **Layout**: **List** shows one row per issue, and **Board** shows a column per group, by status unless you choose another grouping. You can’t move issues between columns: an issue's status changes only when a fresh check confirms a fix or a person makes a decision.
+- **Properties**: choose what each issue shows, such as **Severity**, **Status**, **Source**, **Evidence freshness** or **Last activity**, and drag them into order. Type, record and owner appear under the issue's summary; the others line up in columns.
+- **Group by**: group issues by type, owner, severity, status or source. Each group shows how many issues it has; **Show more** loads the rest. An issue with evidence from several systems appears in each source's group.
+- **Density**: **Compact** fits more issues on screen and leaves out the second line.
+
+Changed filters, sorting, grouping or display mark the view **Modified**. Select **Save as new view** to keep them, **Save** to update a saved view you can edit, or **Reset** to undo them. Density and collapsed groups are your own settings and don't change the view for others. Sharing a view never gives anyone access to issues they can't see; see [Saved views](/docs/saved-views).
 
 ## Open an issue
 
@@ -38,6 +63,16 @@ Select an issue to read it beside the list. On a narrow screen, the issue replac
 - **Open full page** gives the issue more room and a link you can share with people in your workspace.
 - **Close panel**, or Esc, returns to the list. Your view and filters stay as they were.
 
+You can also work the list from the keyboard:
+
+- **J** and **K**, or the arrow keys, move through the list.
+- **Space** opens the issue you're on beside the list, or closes it. While it's open, **J** and **K** open the next and previous issue.
+- **Enter** opens the issue you're on.
+- **Esc** closes the issue and returns you to its row.
+- **/** goes to search, **F** adds a filter and **?** lists these shortcuts.
+
+Shortcuts don't work while you type in a field.
+
 If an issue changes while you read it, for example because someone approved its change, it can leave your view. Luma says so and keeps it open until you’re done.
 
 Learn how to read an issue in [Investigate an issue](/docs/issues/investigate).
@@ -45,7 +80,7 @@ Learn how to read an issue in [Investigate an issue](/docs/issues/investigate).
 ## When the list is empty
 
 - **No issues need your review**: nothing in this view needs a person right now. Issues Luma is still working on are under **All open**.
-- **No matching issues**: your filters exclude every issue. Change or clear them.
+- **No matching issues**: your search or filters exclude every issue. Change or clear them.
 - **No open issues in this view** or **No closed issues yet**: this view has nothing to show.
 - **No data received yet**: Luma hasn’t read any data from a connected system, so it can’t have found problems yet.
 - **No active connections**: connect a system in [Apps](/docs/apps-and-connections) so Luma can start checking.
@@ -54,7 +89,8 @@ An empty list doesn’t mean your operations are healthy. It means Luma found no
 
 ## When something couldn’t load
 
-- **Issues couldn’t be refreshed**: Luma couldn’t load the latest list. The issues you still see may be out of date. Select **Refresh issues** to try again.
+- **The list couldn’t be refreshed**: Luma couldn’t load the latest list. The issues you still see may be out of date. Select **Retry** to try again.
+- **This view uses filters or a grouping you can’t use here**: a saved view asks for something you can no longer use. Select **Remove unsupported conditions** to keep the rest of the view.
 - **Summary unavailable**: the numbers above the list couldn’t load. The list itself still works.
 - **Connections couldn’t be checked**: Luma couldn’t check your connections. Your issues are still shown.
 - **Issue unavailable**: the issue no longer exists, or you no longer have access to it.

@@ -41,6 +41,7 @@ import {
 } from '../../shared/orders/presentation';
 import { signalLabels } from '../fulfillment/presentation';
 import { orderStatuses } from '../orders/data';
+import { withoutLegacyProcurementKeys } from '../procurement/data';
 import { stages } from '../procurement/presentation';
 import type { Selection } from './chart-card';
 import {
@@ -416,12 +417,9 @@ function WorkspaceLink({
           className={className}
           to="/app/$organizationId/procurement"
           params={{ organizationId }}
-          search={{
-            view: 'orders',
-            q: '',
-            status: '',
-            ...(stage ? { stage } : {}),
-          }}
+          search={
+            stage ? withoutLegacyProcurementKeys({ stage }) : { view: 'all' }
+          }
         >
           {stage
             ? m.insights_link_procurement_stage()

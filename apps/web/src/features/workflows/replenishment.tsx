@@ -230,7 +230,7 @@ export function ReplenishmentPanel({
             <Link
               to="/app/$organizationId/procurement"
               params={{ organizationId }}
-              search={{ view: 'suppliers', q: '', status: '' }}
+              search={{ tab: 'suppliers' }}
             >
               {m.workflows_rules_add_supplier()} <ArrowRight size={14} />
             </Link>
@@ -568,7 +568,7 @@ export function ReplenishmentRunReview({
                 <Link
                   to="/app/$organizationId/procurement"
                   params={{ organizationId }}
-                  search={{ view: 'suppliers', q: review.supplier, status: '' }}
+                  search={{ tab: 'suppliers', q: review.supplier }}
                 >
                   {review.supplier}
                 </Link>

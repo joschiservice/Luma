@@ -1,7 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 
-import { caseDetailSchema, caseQuerySchema } from '@luma/api-contract';
+import {
+  caseDetailSchema,
+  caseQuerySchema,
+  decisionQuerySchema,
+} from '@luma/api-contract';
 import { createApiClient } from '@luma/api-contract/client';
 import {
   buildApp,
@@ -20,7 +24,11 @@ import type {
   VerificationResult,
 } from '@luma/exceptions';
 import { defaultConfiguration } from '@luma/exceptions';
-import { createCases, parseInput } from '@luma/exceptions/composition';
+import {
+  caseDecisionQuery,
+  createCases,
+  parseInput,
+} from '@luma/exceptions/composition';
 import type { IdentityService } from '@luma/identity';
 import { IdentityError } from '@luma/identity';
 import {
@@ -29,6 +37,7 @@ import {
 } from '@luma/identity/composition';
 import type { ModelGateway } from '@luma/platform';
 import { createTenantDatabase } from '@luma/platform/composition';
+import { createDecisionQueue } from '@luma/read-models/composition';
 import { shippingMethodPlaybook } from '@luma/resolution';
 import {
   createOperationsOverview,
@@ -2585,6 +2594,601 @@ describe.skipIf(!databaseUrl)('exception detection on PostgreSQL', () => {
     );
     expect(needs.items.map((x) => x.id)).toEqual([ids[0]]);
     expect(needs.items[0]?.attention.reason).toBe('uncertainty');
+  });
+  it('filters, sorts, groups and searches issues by catalog conditions', async () => {
+    const people = (
+      await owner.query<{ user_id: string }>(
+        'SELECT user_id FROM workspace_people WHERE tenant_id=$1 ORDER BY user_id',
+        [tenantId],
+      )
+    ).rows.map((row) => row.user_id);
+    const reader = (userId: string, id = tenantId) =>
+      makeTenantContext(
+        { userId, sessionId: 'session' },
+        {
+          id,
+          name: 'Fixture',
+          slug: 'fixture',
+          dataRegion: 'EU',
+          status: 'active',
+        },
+        builtInMembership(
+          { id: 'membership', organizationId: id, userId },
+          'owner',
+        ),
+        randomUUID(),
+      );
+    const me = reader(people[0]!);
+    const providers = ['shopify', 'jtl', 'shopify', null] as const;
+    const ids: string[] = [];
+    const subjects: string[] = [];
+    for (const [i, provider] of providers.entries()) {
+      const value = request(`list-${i}`);
+      if (value.input.exceptionClass !== 'sync_failure')
+        throw new Error('fixture');
+      value.input.facts.connectionId = randomUUID();
+      value.input.facts.subjectId = value.input.facts.connectionId;
+      value.evidence[0]!.connectionId = value.input.facts.connectionId;
+      value.evidence[0]!.source = provider
+        ? {
+            provider,
+            resource: 'orders',
+            externalId: `order-${i}`,
+            scopeKey: '',
+          }
+        : null;
+      subjects.push(value.input.facts.connectionId);
+      // Each issue is detected a day after the previous one.
+      now = new Date(`2026-09-1${i}T08:00:00.000Z`);
+      ids.push(
+        (await services.exceptions.ingest(context(), value)).incident!.id,
+      );
+    }
+    now = new Date(corpus.now);
+    // The first issue escalates with high severity; the second belongs to the reader.
+    await owner.query(
+      `UPDATE exceptions SET state='escalated',document=document||'{"state":"escalated","severity":"high"}'::jsonb WHERE id=$1`,
+      [ids[0]],
+    );
+    await owner.query(
+      `INSERT INTO case_owners(tenant_id,exception_id,user_id,document)
+       VALUES($1,$2,$3::uuid,jsonb_build_object('userId',$3::text,'revision',1,'assignedBy',$3::text,'assignedAt','2026-09-17T08:00:00.000Z'))`,
+      [tenantId, ids[1], people[0]],
+    );
+    const list = (query: Record<string, unknown>, as = me) =>
+      services.cases.list(
+        as,
+        caseQuerySchema.parse({ view: 'active', ...query }),
+      );
+    const where = (...conditions: unknown[]) =>
+      JSON.stringify({ match: 'all', conditions });
+    const found = async (query: Record<string, unknown>, as = me) =>
+      (await list(query, as)).items.map((item) => item.id).sort();
+    const sorted = (...values: (string | undefined)[]) =>
+      values.filter((value): value is string => !!value).sort();
+
+    expect(
+      await found({
+        where: where({ field: 'source', op: 'any_of', value: ['shopify'] }),
+      }),
+    ).toEqual(sorted(ids[0], ids[2]));
+    expect(
+      await found({ where: where({ field: 'source', op: 'empty' }) }),
+    ).toEqual([ids[3]]);
+    expect(
+      await found({
+        where: where({ field: 'source', op: 'none_of', value: ['shopify'] }),
+      }),
+    ).toEqual(sorted(ids[1], ids[3]));
+    expect(
+      await found({
+        where: where({
+          field: 'owner',
+          op: 'any_of',
+          value: [{ dynamic: 'me' }],
+        }),
+      }),
+    ).toEqual([ids[1]]);
+    expect(
+      await found(
+        {
+          where: where({
+            field: 'owner',
+            op: 'any_of',
+            value: [{ dynamic: 'me' }],
+          }),
+        },
+        reader(people[1]!),
+      ),
+    ).toEqual([]);
+    expect(
+      await found({ where: where({ field: 'owner', op: 'empty' }) }),
+    ).toEqual(sorted(ids[0], ids[2], ids[3]));
+    expect(
+      await found({
+        where: where(
+          { field: 'attention', op: 'any_of', value: ['uncertainty'] },
+          { field: 'severity', op: 'any_of', value: ['high'] },
+        ),
+      }),
+    ).toEqual([ids[0]]);
+    expect(
+      await found({
+        where: JSON.stringify({
+          match: 'any',
+          conditions: [
+            { field: 'state', op: 'any_of', value: ['escalated'] },
+            { field: 'owner', op: 'not_empty' },
+          ],
+        }),
+      }),
+    ).toEqual(sorted(ids[0], ids[1]));
+    expect(
+      await found({
+        where: where({
+          field: 'detected',
+          op: 'between',
+          value: { from: '2026-09-11', to: '2026-09-12' },
+        }),
+        timeZone: 'Europe/Berlin',
+      }),
+    ).toEqual(sorted(ids[1], ids[2]));
+    expect(
+      await found({
+        where: where({
+          field: 'subjectType',
+          op: 'any_of',
+          value: ['connection'],
+        }),
+      }),
+    ).toEqual(sorted(...ids));
+
+    // Freshness follows the investigation's validity: without one it is unknown, with one it
+    // is fresh until the validity ends and stale afterwards, never fresh.
+    await services.diagnoses.run(context(), ids[2]!);
+    const validUntil = new Date(now.getTime() + 3_600_000).toISOString();
+    await owner.query(
+      `UPDATE exception_diagnoses SET document=jsonb_set(document,'{provenance,validUntil}',to_jsonb($2::text))
+       WHERE exception_id=$1 AND document->>'status'='ready'`,
+      [ids[2], validUntil],
+    );
+    const freshness = async (value: string) =>
+      found({
+        where: where({ field: 'freshness', op: 'any_of', value: [value] }),
+      });
+    const byId = async () =>
+      new Map(
+        (await list({ limit: 25 })).items.map((item) => [
+          item.id,
+          item.freshness,
+        ]),
+      );
+    for (const value of ['fresh', 'stale', 'unknown'])
+      expect(await freshness(value)).toEqual(
+        [...(await byId()).entries()]
+          .filter(([, state]) => state === value)
+          .map(([id]) => id)
+          .sort(),
+      );
+    expect(await freshness('fresh')).toEqual([ids[2]]);
+    {
+      const read = now;
+      now = new Date(Date.parse(validUntil) + 1000);
+      try {
+        expect(await freshness('fresh')).toEqual([]);
+        expect(await freshness('stale')).toEqual([ids[2]]);
+        expect((await byId()).get(ids[2]!)).toBe('stale');
+        expect(
+          await found({
+            where: where({
+              field: 'diagnosis',
+              op: 'any_of',
+              value: ['insufficient_evidence'],
+            }),
+          }),
+        ).toEqual([ids[2]]);
+      } finally {
+        now = read;
+      }
+    }
+
+    // Sorting: detection either way; waiting time puts issues that wait on nobody last.
+    const order = async (query: Record<string, unknown>) =>
+      (await list(query)).items.map((item) => item.id);
+    expect(await order({ sort: 'detected' })).toEqual([...ids].reverse());
+    expect(await order({ sort: 'detected', direction: 'asc' })).toEqual(ids);
+    for (const direction of ['asc', 'desc'] as const) {
+      const waiting = (
+        await list({ sort: 'waitingSince', direction })
+      ).items.map((item) => item.attention.requestedAt);
+      const since = waiting.filter((at): at is string => at !== null);
+      expect(since.length).toBeGreaterThan(0);
+      expect(waiting).toEqual([
+        ...since.sort((a, b) =>
+          direction === 'asc' ? a.localeCompare(b) : b.localeCompare(a),
+        ),
+        ...waiting.filter((at) => at === null),
+      ]);
+    }
+    expect((await order({}))[0]).toBe(ids[0]);
+
+    // Search matches summaries and records, with wildcards taken literally.
+    expect(await found({ q: subjects[1]!.slice(4, 20) })).toEqual([ids[1]]);
+    expect(await found({ q: 'CONNECTION READ' })).toEqual(sorted(...ids));
+    expect(await found({ q: '%' })).toEqual([]);
+
+    // Groups carry exact counts, their first rows and a cursor for the rest.
+    const grouped = await list({ group: 'source', groupLimit: 1 });
+    expect(grouped.groups?.map((group) => [group.key, group.count])).toEqual([
+      ['jtl', 1],
+      ['shopify', 2],
+      [null, 1],
+    ]);
+    expect(grouped.totalCount).toBe(4);
+    const shopify = grouped.groups![1]!;
+    expect(shopify.itemIds).toHaveLength(1);
+    const rest = await list({
+      group: 'source',
+      groupKey: '"shopify"',
+      cursor: shopify.nextCursor!,
+      limit: 10,
+    });
+    expect(
+      sorted(...shopify.itemIds, ...rest.items.map((item) => item.id)),
+    ).toEqual(sorted(ids[0], ids[2]));
+    expect(rest.nextCursor).toBeNull();
+    expect(
+      (await list({ group: 'owner' })).groups?.map((group) => group.key),
+    ).toEqual([people[0], null]);
+    expect(
+      (await list({ group: 'state' })).groups?.map((group) => group.key),
+    ).toEqual(['detected', 'escalated']);
+
+    // Cursors continue only the same query of the same reader in the same workspace.
+    const pages: string[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await list({ sort: 'detected', limit: 1, cursor });
+      pages.push(...page.items.map((item) => item.id));
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor);
+    expect(pages).toEqual([...ids].reverse());
+    const first = await list({ sort: 'detected', limit: 1 });
+    for (const [query, as] of [
+      [{ sort: 'lastActivity', limit: 1 }, me],
+      [{ sort: 'detected', limit: 1, q: 'connection' }, me],
+      [
+        {
+          sort: 'detected',
+          limit: 1,
+          where: where({ field: 'owner', op: 'empty' }),
+        },
+        me,
+      ],
+      [{ sort: 'detected', limit: 1 }, reader(people[1]!)],
+      [{ sort: 'detected', limit: 1 }, reader(people[0]!, otherTenant)],
+    ] as const)
+      await expect(
+        list({ ...query, cursor: first.nextCursor! }, as),
+      ).rejects.toThrow('Invalid cursor');
+    expect(
+      await found(
+        { where: where({ field: 'source', op: 'any_of', value: ['shopify'] }) },
+        reader(people[0]!, otherTenant),
+      ),
+    ).toEqual([]);
+
+    const app = buildApp(
+      {},
+      {
+        cases: services.cases,
+        identity: {
+          hasSupportView: () => false,
+          resolveTenant: async () => me,
+        } as unknown as IdentityService,
+      },
+    );
+    try {
+      const refused = await app.inject(
+        `/v1/organizations/${tenantId}/exceptions?view=active&where=${encodeURIComponent(where({ field: 'summary', op: 'contains', value: 'x' }))}`,
+      );
+      expect(refused.statusCode).toBe(400);
+      expect(refused.json().message).toMatch(/^Condition 1: /);
+      const ungroupable = await app.inject(
+        `/v1/organizations/${tenantId}/exceptions?view=active&group=detected`,
+      );
+      expect(ungroupable.statusCode).toBe(400);
+      const accepted = await app.inject(
+        `/v1/organizations/${tenantId}/exceptions?view=active&group=class&where=${encodeURIComponent(where({ field: 'class', op: 'any_of', value: ['sync_failure'] }))}`,
+      );
+      expect(accepted.statusCode).toBe(200);
+      expect(accepted.json().groups[0]).toMatchObject({
+        key: 'sync_failure',
+        count: 4,
+      });
+    } finally {
+      await app.close();
+    }
+  });
+  it('filters, sorts, groups and searches Needs you while counts keep matching the queue', async () => {
+    const people = (
+      await owner.query<{ user_id: string }>(
+        'SELECT user_id FROM workspace_people WHERE tenant_id=$1 ORDER BY user_id',
+        [tenantId],
+      )
+    ).rows.map((row) => row.user_id);
+    const reader = (userId: string, id = tenantId) =>
+      makeTenantContext(
+        { userId, sessionId: 'session' },
+        {
+          id,
+          name: 'Fixture',
+          slug: 'fixture',
+          dataRegion: 'EU',
+          status: 'active',
+        },
+        builtInMembership(
+          { id: 'membership', organizationId: id, userId },
+          'owner',
+        ),
+        randomUUID(),
+      );
+    const me = reader(people[0]!);
+    // One escalated issue needs review; the owners present three more decisions.
+    const value = request('needs-you-case');
+    const incident = (await services.exceptions.ingest(context(), value))
+      .incident!;
+    await owner.query(
+      `UPDATE exceptions SET state='escalated',document=document||'{"state":"escalated"}'::jsonb WHERE id=$1`,
+      [incident.id],
+    );
+    const at = (hours: number) =>
+      new Date(Date.parse(corpus.now) + hours * 3_600_000).toISOString();
+    const decision = (
+      id: string,
+      input: {
+        title: string;
+        domain: 'procurement' | 'operations' | 'inventory';
+        reason: 'approval' | 'manual_intervention';
+        impact: 'high' | 'low' | 'unknown';
+        requestedAt: string;
+        deadline: string | null;
+        cause: string;
+      },
+    ) => ({
+      id,
+      kind: 'human_task' as const,
+      reason: input.reason,
+      domain: input.domain,
+      title: input.title,
+      why: 'Fixture',
+      consequences: [],
+      change: [],
+      impact: { level: input.impact, text: null },
+      requestedAt: input.requestedAt,
+      deadline: input.deadline,
+      requesterId: null,
+      evidence: { observedAt: null, validUntil: null },
+      response: 'investigate' as const,
+      subject: { label: 'Fixture', detail: null },
+      record: null,
+      owner: {
+        kind: 'human_task' as const,
+        definitionId: 'fixture',
+        runId: randomUUID(),
+        stepId: id,
+      },
+      group: { key: input.cause, label: input.cause },
+    });
+
+    type DecisionProvider = Parameters<
+      typeof createDecisionQueue
+    >[1]['providers'][number];
+
+    const owned: DecisionProvider = {
+      id: 'tasks',
+      label: 'Tasks',
+      pending: async () => [
+        decision('task:a', {
+          title: 'Approve draft for Acme',
+          domain: 'procurement',
+          reason: 'approval',
+          impact: 'high',
+          requestedAt: at(-5),
+          deadline: at(10),
+          cause: 'drafts',
+        }),
+        decision('task:b', {
+          title: 'Count stock in Berlin',
+          domain: 'inventory',
+          reason: 'manual_intervention',
+          impact: 'low',
+          requestedAt: at(-30),
+          deadline: null,
+          cause: 'counts',
+        }),
+        decision('task:c', {
+          title: 'Approve draft for Beta 100%',
+          domain: 'procurement',
+          reason: 'approval',
+          impact: 'unknown',
+          requestedAt: at(-1),
+          deadline: at(2),
+          cause: 'drafts',
+        }),
+      ],
+    };
+    const failing: DecisionProvider = {
+      id: 'broken',
+      label: 'Broken owner',
+      pending: async () => {
+        throw new Error('unavailable');
+      },
+    };
+    const queue = createDecisionQueue(createTenantDatabase(runtime), {
+      cases: caseDecisionQuery,
+      providers: [owned, failing],
+      refreshContext: async (actor) => actor,
+      now: () => new Date(corpus.now),
+    });
+    await owner.query(
+      `INSERT INTO decision_assignments(tenant_id,decision_id,assignee_id,assigned_by,assigned_at,revision)
+       VALUES($1,'task:b',$2,$2,now(),1)`,
+      [tenantId, people[0]],
+    );
+    const list = (query: Record<string, unknown>, as = me) =>
+      queue.list(as, decisionQuerySchema.parse(query));
+    const where = (...conditions: unknown[]) =>
+      JSON.stringify({ match: 'all', conditions });
+    const ids = async (query: Record<string, unknown>, as = me) =>
+      (await list(query, as)).items.map((item) => item.id);
+    const caseId = `case:${incident.id}`;
+
+    const all = await list({});
+    expect(all.items.map((item) => item.id).sort()).toEqual(
+      [caseId, 'task:a', 'task:b', 'task:c'].sort(),
+    );
+    expect(all.sources.find((source) => source.id === 'broken')?.state).toBe(
+      'unavailable',
+    );
+    const filtered = await list({
+      where: where({ field: 'domain', op: 'any_of', value: ['procurement'] }),
+    });
+    expect(filtered.items.map((item) => item.id).sort()).toEqual([
+      'task:a',
+      'task:c',
+    ]);
+    expect(filtered.totalCount).toBe(2);
+    // Counts describe the whole queue, as Home and the sidebar show it.
+    expect(filtered.counts).toEqual(all.counts);
+    expect(all.counts.views.all).toBe(4);
+    expect(
+      await ids({
+        where: where({
+          field: 'owner',
+          op: 'any_of',
+          value: [{ dynamic: 'me' }],
+        }),
+      }),
+    ).toEqual(['task:b']);
+    expect(
+      await ids(
+        {
+          where: where({
+            field: 'owner',
+            op: 'any_of',
+            value: [{ dynamic: 'me' }],
+          }),
+        },
+        reader(people[1]!),
+      ),
+    ).toEqual([]);
+    expect(
+      (await ids({ where: where({ field: 'owner', op: 'empty' }) })).sort(),
+    ).toEqual([caseId, 'task:a', 'task:c'].sort());
+    expect(
+      await ids({
+        where: where({
+          field: 'deadline',
+          op: 'between',
+          value: { from: null, to: at(5) },
+        }),
+      }),
+    ).toEqual(['task:c']);
+    expect(
+      (await ids({ where: where({ field: 'deadline', op: 'empty' }) })).sort(),
+    ).toEqual([caseId, 'task:b'].sort());
+    expect(
+      await ids({
+        where: where({ field: 'impact', op: 'any_of', value: ['unknown'] }),
+      }),
+    ).toEqual(['task:c']);
+    expect(
+      await ids({
+        where: where({
+          field: 'requested',
+          op: 'within_last',
+          value: { amount: 0, unit: 'day' },
+        }),
+        timeZone: 'UTC',
+      }),
+    ).toEqual(expect.arrayContaining(['task:c']));
+    // High impact ranks before an unknown impact whose deadline is hours away.
+    expect(await ids({ q: 'APPROVE DRAFT' })).toEqual(['task:a', 'task:c']);
+    expect(await ids({ q: '100%' })).toEqual(['task:c']);
+    expect(await ids({ q: '%' })).toEqual(['task:c']);
+
+    // Sorting: a deadline sort keeps decisions without one last in both directions.
+    const deadlines = await ids({ sort: 'deadline' });
+    expect(deadlines.slice(0, 2)).toEqual(['task:c', 'task:a']);
+    const latest = await ids({ sort: 'deadline', direction: 'desc' });
+    expect(latest.slice(0, 2)).toEqual(['task:a', 'task:c']);
+    expect(latest.slice(2).sort()).toEqual([caseId, 'task:b'].sort());
+    expect((await ids({ sort: 'requested' }))[0]).toBe('task:b');
+
+    // Groups by cause: exact counts, first rows and a page link within the group.
+    const causes = await list({ group: 'cause', groupLimit: 1 });
+    const drafts = causes.groups?.find((group) => group.key === 'drafts');
+    expect(drafts).toMatchObject({ count: 2, complete: false });
+    expect(drafts?.itemIds).toEqual(['task:a']);
+    const more = await list({
+      group: 'cause',
+      groupKey: '"drafts"',
+      cursor: drafts!.nextCursor!,
+    });
+    expect(more.items.map((item) => item.id)).toEqual(['task:c']);
+    expect(more.nextCursor).toBeNull();
+    expect(
+      (await list({ group: 'reason' })).groups?.map((group) => group.key),
+    ).toEqual(['approval', 'manual_intervention', 'uncertainty']);
+    expect(
+      (await list({ group: 'owner' })).groups?.map((group) => [
+        group.key,
+        group.count,
+      ]),
+    ).toEqual([
+      [people[0], 1],
+      [null, 3],
+    ]);
+
+    // Page links continue only the same query of the same reader.
+    const first = await list({ limit: 1 });
+    expect(first.nextCursor).not.toBeNull();
+    const second = await list({ limit: 1, cursor: first.nextCursor! });
+    expect(second.offset).toBe(1);
+    expect(second.items[0]?.id).not.toBe(first.items[0]?.id);
+    for (const [query, as] of [
+      [{ limit: 1, q: 'draft' }, me],
+      [{ limit: 1, sort: 'deadline' }, me],
+      [{ limit: 1, where: where({ field: 'owner', op: 'empty' }) }, me],
+      [{ limit: 1 }, reader(people[1]!)],
+    ] as const)
+      await expect(
+        list({ ...query, cursor: first.nextCursor! }, as),
+      ).rejects.toThrow('no longer matches');
+    await expect(
+      list({ where: where({ field: 'title', op: 'contains', value: 'x' }) }),
+    ).rejects.toThrow('cannot be filtered');
+    await expect(list({ group: 'title' })).rejects.toThrow('cannot be grouped');
+
+    // Another workspace never sees this workspace's issues or assignments.
+    const other = await list({}, reader(people[0]!, otherTenant));
+    expect(other.items.map((item) => item.id)).not.toContain(caseId);
+    expect(
+      await ids(
+        {
+          where: where({
+            field: 'owner',
+            op: 'any_of',
+            value: [{ dynamic: 'me' }],
+          }),
+        },
+        reader(people[0]!, otherTenant),
+      ),
+    ).toEqual([]);
+    await owner.query('DELETE FROM decision_assignments WHERE tenant_id=$1', [
+      tenantId,
+    ]);
   });
   it('limits the case reader role to scoped reads', async () => {
     const incident = (await services.exceptions.ingest(context(), request()))

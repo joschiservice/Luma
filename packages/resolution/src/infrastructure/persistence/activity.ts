@@ -41,11 +41,22 @@ const accessSummarySql = `CASE
 END`;
 
 /**
+ * Keeps events whose built actor matches the actor filter: a person by user ID ($16, null
+ * without a filter), Luma and Luma support ($17) or any workflow run ($18). It reads the
+ * response actor, so it agrees with what the row shows, and it only narrows rows that the
+ * visibility rules already admitted.
+ */
+const actorMatchSql = (item: string) =>
+  `($16::text[] IS NULL OR (${item}->'actor'->>'kind' IN ('member','former_member') AND ${item}->'actor'->>'id'=ANY($16::text[]))
+    OR ($17::boolean AND ${item}->'actor'->>'kind' IN ('luma','support'))
+    OR ($18::boolean AND jsonb_typeof(${item}->'actor'->'workflow')='object'))`;
+
+/**
  * Restricted access events from `workspace_access_events`, read through the index on
  * (tenant_id, created_at DESC, id DESC). They have no issue, connection or order subject, so
  * system, connection and subject filters exclude them.
  */
-const accessEventsSql = `SELECT x.created_at AS sort_at,x.sort_id,
+const accessEventsSql = `SELECT * FROM (SELECT x.created_at AS sort_at,x.sort_id,
       to_char(x.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS at,
       jsonb_build_object('id',x.sort_id,'recordedAt',to_char(x.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
       'occurredAt',to_char(x.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
@@ -68,7 +79,8 @@ const accessEventsSql = `SELECT x.created_at AS sort_at,x.sort_id,
         AND ($5::timestamptz IS NULL OR (e.created_at<=$5::timestamptz AND (e.created_at,'access:'||e.id::text)<($5::timestamptz,$6::text)))
       ) x
       WHERE ($11::text='' OR position(lower($11) in lower(concat_ws(' ',x.event_type,x.target_id,x.actor_id::text,x.actor_name,x.actor_email,x.summary)))>0)
-      ORDER BY x.created_at DESC,x.sort_id DESC LIMIT $12`;
+      ) a WHERE ${actorMatchSql('a.item')}
+      ORDER BY a.sort_at DESC,a.sort_id DESC LIMIT $12`;
 
 // The subject filter compares against uuid::text, which is always lowercase and hyphenated,
 // so only canonical UUID strings can match an issue, run or proposal ID.
@@ -80,9 +92,9 @@ const uuids = (values: string[]) =>
 // Subject reads scan only source rows whose exception or proposal can pass the final subject
 // filter. Plain columns keep both arms index-backed under row-level security; the second arm
 // skips rows the first arm already returned.
-const linkedSources = `(SELECT * FROM workspace_activity_sources WHERE exception_id=ANY($16::uuid[])
+const linkedSources = `(SELECT * FROM workspace_activity_sources WHERE exception_id=ANY($19::uuid[])
   UNION ALL SELECT * FROM workspace_activity_sources
-  WHERE proposal_id=ANY($17::uuid[]) AND (exception_id=ANY($16::uuid[])) IS NOT TRUE)`;
+  WHERE proposal_id=ANY($20::uuid[]) AND (exception_id=ANY($19::uuid[])) IS NOT TRUE)`;
 
 /**
  * Lists every exception and proposal ID through which a source row can reach the subject
@@ -144,7 +156,7 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
         const key = createHash('sha256')
           .update(
             JSON.stringify([
-              'activity-v5',
+              'activity-v6',
               context.tenantId,
               restricted,
               query.from,
@@ -154,6 +166,7 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
               query.connectionId ?? '',
               query.type ?? '',
               query.outcome ?? '',
+              query.actor ?? null,
               query.limit,
               query.subjects ?? null,
             ]),
@@ -186,6 +199,15 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
         }
         const linked = query.subjects
           ? await readLinkedKeys(tx, context.tenantId, query, query.subjects)
+          : null;
+        const actors = query.actor
+          ? {
+              people: query.actor.filter(
+                (value) => value !== 'luma' && value !== 'workflow',
+              ),
+              luma: query.actor.includes('luma'),
+              workflows: query.actor.includes('workflow'),
+            }
           : null;
         const result = await tx.query<{ item: ActivityEvent; at: string }>(
           `
@@ -243,7 +265,7 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
         ) connections ON true
         ${personSql('person', 'e.tenant_id', "CASE WHEN e.doc->'actor'->>'kind'='user' THEN e.doc->'actor'->>'id' END")}
       ), operational AS (
-      SELECT recorded_at AS sort_at,id AS sort_id,to_char(recorded_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS at,
+      SELECT * FROM (SELECT recorded_at AS sort_at,id AS sort_id,to_char(recorded_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS at,
       jsonb_build_object('id',id,'recordedAt',to_char(recorded_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
       'occurredAt',to_char((doc->>'occurredAt')::timestamptz AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),'actor',${actorSql(
         {
@@ -264,7 +286,8 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
       AND ($11::text='' OR position(lower($11) in lower(concat_ws(' ',issue_id::text,resource,action,doc->'actor'->>'id',actor_name,actor_email,workflow_name,workflow_run_id)))>0)
       AND ($13::text[] IS NULL OR issue_id::text=ANY($13) OR workflow_run_id=ANY($14) OR proposal_id::text=ANY($14)
         OR (resource_kind='order' AND resource=ANY($15)))
-      ORDER BY recorded_at DESC,id DESC LIMIT $12
+      ) o WHERE ${actorMatchSql('o.item')}
+      ORDER BY o.sort_at DESC,o.sort_id DESC LIMIT $12
       ), access AS (${accessEventsSql})
       SELECT at,item FROM (SELECT * FROM operational UNION ALL SELECT * FROM access) events
       ORDER BY sort_at DESC,sort_id DESC LIMIT $12`,
@@ -284,6 +307,9 @@ export function createActivityStore(db: TenantDatabase): ActivityStore {
             query.subjects?.issueIds ?? null,
             query.subjects?.runIds ?? [],
             query.subjects?.orderRefs ?? [],
+            actors ? actors.people : null,
+            actors?.luma ?? false,
+            actors?.workflows ?? false,
             ...(linked ? [linked.issueIds, linked.proposalIds] : []),
           ],
         );

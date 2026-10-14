@@ -112,6 +112,13 @@ export function fieldsRoutes(
         return s.service.archive(s.context, params.fieldId, body.revision);
       },
     ),
+    readMany: os.readMany.handler(
+      async ({ context: { request }, input: { params, body } }) => {
+        const s = use(request);
+
+        return s.service.readMany(s.context, params.recordType, body.recordIds);
+      },
+    ),
     readValues: os.readValues.handler(
       async ({ context: { request }, input: { params } }) => {
         const s = use(request);

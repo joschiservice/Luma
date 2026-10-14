@@ -156,5 +156,11 @@
   "activity_action_support_access_requested": "Support access requested",
   "activity_action_support_access_request_approved": "Support access request approved",
   "activity_action_support_access_request_declined": "Support access request declined",
-  "activity_action_issue_closed": "Issue closed manually"
+  "activity_action_issue_closed": "Issue closed manually",
+  "activity_view_all": "All activity",
+  "activity_filter_actor": "Recorded by",
+  "activity_actor_me": "Me",
+  "activity_actor_luma": "Luma",
+  "activity_actor_workflows": "Workflows",
+  "activity_actor_unknown_person": "Unknown person"
 }

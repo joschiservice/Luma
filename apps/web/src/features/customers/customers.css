@@ -79,3 +79,26 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+.customers-results {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.customers-preview {
+  min-height: min(720px, calc(100vh - 220px));
+}
+.customers-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.customer-preview-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+}
+.customer-preview-tags > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}

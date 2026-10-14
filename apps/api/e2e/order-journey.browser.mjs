@@ -50,10 +50,16 @@ test('journey checks and evidence remain readable in both themes, narrow layouts
   const page = await context.newPage(),
     errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
+  // The view menu names the open view; the link's search is adopted and leaves the address.
   await page.goto(`/app/${f.org.id}/orders?view=stuck&q=JOURNEY`);
+  await page.waitForURL((url) => !url.searchParams.has('q'));
+  expect(new URL(page.url()).searchParams.get('view')).toBe('stuck');
   await expect(
-    page.getByRole('tab', { name: 'Journey checks', exact: true }),
-  ).toHaveAttribute('aria-selected', 'true');
+    page.getByRole('button', { name: 'Journey checks', exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('searchbox', { name: 'Search orders' }),
+  ).toHaveValue('JOURNEY');
   await page.getByRole('link', { name: '#JOURNEY', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/orders/${order}`));
   const journey = page.getByRole('region', {

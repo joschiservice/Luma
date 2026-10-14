@@ -1,12 +1,14 @@
 import './decisions.css';
 import '../workflows/workflows.css';
 
-import type {
-  DecisionDomain,
-  DecisionItem,
-  DecisionList,
-  DecisionReason,
-  DecisionView,
+import {
+  type CollectionGroup,
+  type CollectionGrouping,
+  collectionWhereIssues,
+  type DecisionItem,
+  type DecisionList,
+  decisionsCatalog,
+  type DecisionView,
 } from '@luma/api-contract';
 import { formatList, formatNumber } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
@@ -15,12 +17,25 @@ import { elapsed } from '@luma/ui/components/issues/case-presentation';
 import { IssueSplitView } from '@luma/ui/components/issues/issue-split-view';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
-import { CollectionToolbar } from '@luma/ui/components/primitives/collection-toolbar';
+import { CollectionGroups } from '@luma/ui/components/primitives/collection-groups';
+import {
+  CollectionList,
+  type CollectionListDensity,
+} from '@luma/ui/components/primitives/collection-list';
+import {
+  type CollectionConditions,
+  type CollectionFilter,
+  type CollectionSort,
+  CollectionToolbar,
+} from '@luma/ui/components/primitives/collection-toolbar';
 import { DomainIcon } from '@luma/ui/components/primitives/domain-icon';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { Pagination } from '@luma/ui/components/primitives/pagination';
+import {
+  listShortcutGroup,
+  ShortcutHelp,
+} from '@luma/ui/components/primitives/shortcut-help';
 import { StatePill } from '@luma/ui/components/primitives/state';
-import { Switch } from '@luma/ui/components/primitives/switch';
 import {
   Tabs,
   TabsList,
@@ -30,40 +45,62 @@ import {
   formatWorkspaceInstant,
   WorkspaceTimezone,
 } from '@luma/ui/components/primitives/workspace-date';
-import {
-  onlineManager,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query';
+import { useListKeyboard } from '@luma/ui/lib/list-keyboard';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Link,
   useNavigate,
   useParams,
   useSearch,
 } from '@tanstack/react-router';
-import { ChevronDown, ChevronUp, CircleHelp, LayoutGrid } from 'lucide-react';
-import {
-  type ReactNode,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
+import { type ReactNode, useContext, useRef, useState } from 'react';
 
+import { useCollectionControls } from '../../kit/collections/controls';
+import { DescribedFilter } from '../../kit/collections/described-filter';
+import type { CatalogPresentation } from '../../kit/collections/fields';
+import {
+  collectionGroupLabel,
+  groupMoreButton,
+  type ShownGroup,
+  shownGroups,
+  useGroupPages,
+} from '../../kit/collections/groups';
+import { CollectionNotices } from '../../kit/collections/notices';
+import {
+  type CollectionError,
+  collectionError,
+  collectionServerIssue,
+  useCursorPaging,
+  useOnline,
+} from '../../kit/collections/paging';
+import { usePrivateSearch } from '../../kit/collections/private-search';
+import { repairedState } from '../../kit/collections/repair';
+import {
+  type CollectionSearch,
+  groupOf,
+  viewParam,
+} from '../../kit/collections/state';
+import {
+  type CollectionView,
+  useCollectionView,
+} from '../../kit/collections/use-collection-view';
+import { CollectionViewBar } from '../../kit/collections/view-bar';
 import { SignInRedirect } from '../../kit/identity/common';
 import { contextOptions, IdentityError } from '../../kit/identity/data';
 import { usePermissions } from '../../kit/identity/permissions';
 import { useNow } from '../../kit/live/now';
 import { membersOptions } from '../../kit/settings/data';
-import { isTypingTarget } from '../../lib/keyboard';
 import {
   assignDecision,
+  decisionFilters,
+  decisionListQuery,
   decisionOptions,
+  decisionPageSize,
   decisionsKey,
   decisionsOptions,
-  needsYouFilters,
+  decisionView,
+  defaultDecisionSort,
   type NeedsYouSearch,
 } from './data';
 import { DecisionDeadline, DecisionInspector, type Member } from './inspector';
@@ -75,7 +112,6 @@ import {
   domainIcons,
   domainLabels,
   emptyCopy,
-  groupDecisions,
   impactLabels,
   kindLabels,
   localizeReturnDecision,
@@ -85,101 +121,211 @@ import {
 } from './presentation';
 
 const views: DecisionView[] = ['all', 'mine', 'unassigned'];
-const domains: DecisionDomain[] = [
-  'orders',
-  'fulfillment',
-  'inventory',
-  'procurement',
-  'operations',
-];
-const reasons: DecisionReason[] = [
-  'approval',
-  'run',
-  'recovery',
-  'manual_intervention',
-  'uncertainty',
-];
 
-/** Names a filter option with its waiting count; the applied option reads without one. */
-const facetLabel = (label: string, count: number | undefined) =>
-  count === undefined
-    ? label
-    : m.decisions_filter_option_count({ label, count });
+/** Row properties a view without its own shows. */
+const decisionProperties = [
+  'kind',
+  'owner',
+  'impact',
+  'deadline',
+  'requested',
+] as const;
 
-function DecisionRow({
-  item,
-  now,
-  members,
-  self,
-}: {
-  item: DecisionItem;
-  now: number;
-  members: readonly Member[];
-  self: string | undefined;
-}) {
-  const status = decisionStatus(item);
-  const assignee = memberName(item.assignment?.assigneeId, members, self);
+/** Properties shown in the row's second line rather than in columns. */
+const inlineProperties = new Set(['kind', 'domain', 'reason', 'owner']);
+
+const option =
+  (labels: Readonly<Record<string, () => string>>) => (value: string) =>
+    labels[value]?.() ?? value;
+
+/** Names the queue's catalog fields and options in filters, sorts, groups and Display. */
+const decisionPresentation: CatalogPresentation = {
+  title: { label: m.decisions_field_title },
+  urgency: { label: m.decisions_field_urgency },
+  kind: { label: m.decisions_field_kind, option: option(kindLabels) },
+  domain: { label: m.decisions_filter_area, option: option(domainLabels) },
+  reason: { label: m.decisions_filter_reason, option: option(reasonLabels) },
+  owner: { label: m.decisions_owner_label },
+  cause: { label: m.decisions_field_cause },
+  requested: { label: m.decisions_field_waiting_since },
+  deadline: { label: m.decisions_deadline_label },
+  impact: { label: m.decisions_impact_label, option: option(impactLabels) },
+};
+
+/** The list commands Needs you handles, for shortcut help. */
+const shortcuts = [
+  'next',
+  'previous',
+  'open',
+  'preview',
+  'escape',
+  'search',
+  'filter',
+  'help',
+] as const;
+
+const sameSort = (left: unknown, right: unknown) =>
+  JSON.stringify(left) === JSON.stringify(right);
+
+/**
+ * The view as Needs you shows it: a view without its own sort uses the queue's urgency, and
+ * choosing urgency again keeps the view unchanged rather than marking it Modified.
+ */
+function queueView(view: CollectionView): CollectionView {
+  return {
+    ...view,
+    state: {
+      ...view.state,
+      sort: view.state.sort ?? defaultDecisionSort,
+      layout: 'list',
+    },
+    change: (next) =>
+      view.change({
+        ...next,
+        layout: 'list',
+        sort:
+          !view.base.sort && sameSort(next.sort, defaultDecisionSort)
+            ? null
+            : next.sort,
+      }),
+  };
+}
+
+/**
+ * Names one group of Needs you: an area, reason or owner, or a cause by the label its decisions
+ * carry. Decisions without an owner form the Unassigned group.
+ */
+export function decisionGroupLabel(
+  field: string,
+  key: CollectionGroup['key'],
+  context: {
+    items: readonly DecisionItem[];
+    members: readonly Member[];
+    self: string | undefined;
+  },
+) {
+  if (field === 'owner')
+    return typeof key === 'string'
+      ? (memberName(key, context.members, context.self) ?? key)
+      : m.decisions_owner_none();
+  if (field === 'cause' && typeof key === 'string')
+    return (
+      context.items.find((item) => item.group.key === key)?.group.label ?? key
+    );
+
+  return collectionGroupLabel({
+    presentation: decisionPresentation,
+    field,
+    granularity: undefined,
+    key,
+  });
+}
+
+function DecisionTime({ item, now }: { item: DecisionItem; now: number }) {
   const timeZone = useContext(WorkspaceTimezone);
 
   return (
-    <div
-      className="issue-row decision-row"
-      data-state={status.state}
-      data-actionable={actionable(item) || undefined}
+    <span
+      className="case-row-time"
+      title={formatWorkspaceInstant(item.requestedAt, timeZone)}
     >
-      <DomainIcon
-        domain={domainIcons[item.domain]}
-        size="sm"
-        className="issue-row-icon"
-      />
-      <div className="issue-row-copy">
-        <strong className="case-row-summary">
-          {item.observeOnly ? m.issues_observe_only_title() : item.title}
-        </strong>
-        <span className="case-row-subject">
-          <span>{kindLabels[item.kind]()}</span>
-          <span>{item.subject.label}</span>
-          <span>
-            {assignee
-              ? m.decisions_owner_row({ name: assignee })
-              : m.decisions_owner_none()}
-          </span>
-        </span>
-      </div>
-      <div className="issue-row-meta">
-        <StatePill state={status.state}>{status.label}</StatePill>
+      <time dateTime={item.requestedAt}>{elapsed(item.requestedAt, now)}</time>
+    </span>
+  );
+}
+
+/** Renders one decision property; the row's second line takes kind, area, reason and owner. */
+function decisionProperty(
+  item: DecisionItem,
+  key: string,
+  context: {
+    now: number;
+    members: readonly Member[];
+    self: string | undefined;
+  },
+): ReactNode {
+  switch (key) {
+    case 'kind':
+      return kindLabels[item.kind]();
+    case 'domain':
+      return domainLabels[item.domain]();
+    case 'reason':
+      return reasonLabels[item.reason]();
+    case 'owner': {
+      const assignee = memberName(
+        item.assignment?.assigneeId,
+        context.members,
+        context.self,
+      );
+
+      return assignee
+        ? m.decisions_owner_row({ name: assignee })
+        : m.decisions_owner_none();
+    }
+    case 'impact':
+      return (
         <span
           className="issue-severity"
           data-severity={item.impact.level === 'high' ? 'high' : undefined}
         >
           {impactLabels[item.impact.level]()}
         </span>
-        {item.urgency === 'expiring' ? (
-          <span className="case-row-time">
-            <DecisionDeadline deadline={item.deadline} now={now} />
-          </span>
-        ) : (
-          <span
-            className="case-row-time"
-            title={formatWorkspaceInstant(item.requestedAt, timeZone)}
-          >
-            <time dateTime={item.requestedAt}>
-              {elapsed(item.requestedAt, now)}
-            </time>
-          </span>
-        )}
-      </div>
-    </div>
-  );
+      );
+    case 'deadline':
+      return item.deadline ? (
+        <span className="case-row-time">
+          <DecisionDeadline deadline={item.deadline} now={context.now} />
+        </span>
+      ) : null;
+    case 'requested':
+      return <DecisionTime item={item} now={context.now} />;
+    default:
+      return null;
+  }
+}
+
+/** The toolbar controls Needs you shows beside its views; stories may leave them out. */
+export interface NeedsYouControls {
+  /** Search text, which stays in page state because titles can name people. */
+  query?: { value: string; onChange: (text: string) => void } | undefined;
+  filters?: readonly CollectionFilter[] | undefined;
+  conditions?: CollectionConditions | undefined;
+  sort?: CollectionSort | undefined;
+  /** Page actions, such as describing a filter. */
+  actions?: ReactNode;
+  /** Clears search and every condition. */
+  onClear?: (() => void) | undefined;
+}
+
+/** The queue's grouping and the groups the page shows. */
+export interface NeedsYouGrouping {
+  grouping: CollectionGrouping;
+  groups: readonly ShownGroup<DecisionItem>[];
+  label: (key: CollectionGroup['key']) => string;
+  collapsed: readonly string[];
+  onCollapsedChange: (id: string, collapsed: boolean) => void;
 }
 
 /**
- * Presents the Needs you queue: views, filters, grouped rows, pagination and the selected
+ * Presents the Needs you queue: views, search, filters, conditions, sort, grouped rows,
+ * pagination and the selected decision. J and K move through the rows, Space opens or closes the
+ * focused decision, / focuses search, F opens the condition builder and Escape closes the
  * decision. It owns no fetching, so stories and the page share the same states.
  */
 export function NeedsYouView({
   organizationId,
   search,
+  segment = decisionView(search.view),
+  savedView = false,
+  viewBar,
+  display,
+  controls = {},
+  filtered = false,
+  notices,
+  grouped,
+  properties = decisionProperties,
+  density = 'comfortable',
+  onOpenView,
   list,
   loading = false,
   refreshing = false,
@@ -188,6 +334,7 @@ export function NeedsYouView({
   page,
   onPrevious,
   onNext,
+  onFirst,
   onChange,
   onRefresh,
   now,
@@ -198,6 +345,26 @@ export function NeedsYouView({
 }: {
   organizationId: string;
   search: NeedsYouSearch;
+  /** The queue the list shows; a saved view reads its own. */
+  segment?: DecisionView | undefined;
+  /** A saved view is open, so no built-in view tab is current. */
+  savedView?: boolean | undefined;
+  /** The view menu with saved views. */
+  viewBar?: ReactNode;
+  /** The Display menu. */
+  display?: ReactNode;
+  controls?: NeedsYouControls | undefined;
+  /** Search or conditions narrow the queue, so an empty list says nothing matches. */
+  filtered?: boolean | undefined;
+  /** Paging, repair and similar notices above the rows. */
+  notices?: ReactNode;
+  /** Groups to show instead of a flat list. */
+  grouped?: NeedsYouGrouping | undefined;
+  /** Row properties in display order. */
+  properties?: readonly string[] | undefined;
+  density?: CollectionListDensity | undefined;
+  /** Opens a built-in view; without it the view tabs are plain links. */
+  onOpenView?: ((view: DecisionView) => void) | undefined;
   /** The current page, or the last page read before a failed refresh. */
   list?: DecisionList | undefined;
   loading?: boolean;
@@ -207,7 +374,9 @@ export function NeedsYouView({
   page?: number | undefined;
   onPrevious?: (() => void) | undefined;
   onNext: () => void;
-  /** Applies new filters or selection; filters return to the first page. */
+  /** Returns to the first page when the way back to the previous one is unknown. */
+  onFirst?: (() => void) | undefined;
+  /** Opens or closes a decision. */
   onChange: (search: NeedsYouSearch) => void;
   onRefresh: () => void;
   now: number;
@@ -218,35 +387,94 @@ export function NeedsYouView({
   inspector?: ReactNode;
 }) {
   const listPane = useRef<HTMLDivElement>(null);
-  const view = search.view ?? 'all';
-  const filters = needsYouFilters(search);
-  const update = (patch: Partial<NeedsYouSearch>) =>
-    onChange({
-      ...filters,
-      item: search.item,
-      grouped: search.grouped,
-      ...patch,
-      cursor: undefined,
-    });
-  const filtered = !!(search.domain || search.reason);
+  const searchInput = useRef<HTMLInputElement>(null);
+  const [help, setHelp] = useState(false);
   const items = (list?.items ?? []).map(localizeReturnDecision);
+  const localized = new Map(items.map((item) => [item.id, item]));
+  const groups = grouped?.groups.map((group) => ({
+    ...group,
+    rows: group.rows.map((row) => localized.get(row.id) ?? row),
+  }));
+  // Keys follow the order rows appear in, which grouping changes.
+  const ordered = groups
+    ? groups
+        .filter((group) => !grouped?.collapsed.includes(group.id))
+        .flatMap((group) => group.rows)
+    : items;
   const unavailable = list?.sources.filter((s) => s.state === 'unavailable');
   const open = (id: string | undefined) => onChange({ ...search, item: id });
-  const empty = emptyCopy(view, filtered);
-  const row = (item: DecisionItem) => (
-    <li key={item.id}>
-      <Link
-        id={`decision-${item.id}`}
-        to="/app/$organizationId/needs-you"
-        params={{ organizationId }}
-        search={{ ...search, item: item.id }}
-        resetScroll={false}
-        aria-current={item.id === search.item ? 'page' : undefined}
-      >
-        <DecisionRow item={item} now={now} members={members} self={self} />
-      </Link>
-    </li>
+  const empty = unavailable?.length
+    ? {
+        title: m.decisions_empty_partial_title(),
+        text: m.decisions_empty_partial_text(),
+      }
+    : emptyCopy(segment, filtered);
+  const keyboard = useListKeyboard({
+    rows: listPane,
+    count: ordered.length,
+    keys: ordered.map((item) => item.id),
+    preview: { open: search.item, onOpenChange: open },
+    onFocusSearch: controls.query
+      ? () => searchInput.current?.focus()
+      : undefined,
+    onOpenFilter: controls.conditions
+      ? () => controls.conditions?.onOpenChange?.(true)
+      : undefined,
+    onShowHelp: () => setHelp(true),
+  });
+  const columns = properties.filter((key) => !inlineProperties.has(key));
+  const inline = properties.filter((key) => inlineProperties.has(key));
+  const context = { now, members, self };
+  const rows = (label: string, shown: readonly DecisionItem[]) => (
+    <CollectionList
+      label={label}
+      variant="plain"
+      density={density}
+      items={shown}
+      itemKey={(item) => item.id}
+      current={search.item}
+      focusedKey={keyboard.focusedKey}
+      link={(item) => (
+        <Link
+          id={`decision-${item.id}`}
+          to="/app/$organizationId/needs-you"
+          params={{ organizationId }}
+          search={{ ...search, item: item.id }}
+          resetScroll={false}
+        />
+      )}
+      leading={(item) => (
+        <DomainIcon domain={domainIcons[item.domain]} size="sm" />
+      )}
+      title={(item) => (
+        <span
+          className="decision-title"
+          data-actionable={actionable(item) || undefined}
+        >
+          {item.observeOnly ? m.issues_observe_only_title() : item.title}
+        </span>
+      )}
+      description={(item) => (
+        <span className="case-row-subject">
+          {inline.slice(0, 1).map((key) => (
+            <span key={key}>{decisionProperty(item, key, context)}</span>
+          ))}
+          <span>{item.subject.label}</span>
+          {inline.slice(1).map((key) => (
+            <span key={key}>{decisionProperty(item, key, context)}</span>
+          ))}
+        </span>
+      )}
+      status={(item) => {
+        const status = decisionStatus(item);
+
+        return <StatePill state={status.state}>{status.label}</StatePill>;
+      }}
+      properties={columns}
+      property={(item, key) => decisionProperty(item, key, context)}
+    />
   );
+  const clear = controls.onClear;
 
   return (
     <div
@@ -264,92 +492,65 @@ export function NeedsYouView({
           refreshing={refreshing}
           onRefresh={onRefresh}
           views={
-            <Tabs value={view} className="decisions-views">
-              <TabsList
-                aria-label={m.decisions_views_label()}
-                activateOnFocus={false}
+            <>
+              {viewBar}
+              <Tabs
+                value={savedView ? null : segment}
+                className="decisions-views"
               >
-                {views.map((option) => (
-                  <TabsTrigger
-                    key={option}
-                    value={option}
-                    nativeButton={false}
-                    render={
-                      <Link
-                        to="/app/$organizationId/needs-you"
-                        params={{ organizationId }}
-                        search={{
-                          ...filters,
-                          view: option,
-                          item: search.item,
-                          grouped: search.grouped,
-                          cursor: undefined,
-                        }}
-                        resetScroll={false}
-                      />
-                    }
-                  >
-                    {viewLabels[option]()}
-                    {list ? (
-                      <Badge>
-                        {formatNumber(list.counts.views[option] ?? 0)}
-                      </Badge>
-                    ) : null}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
+                <TabsList
+                  aria-label={m.decisions_views_label()}
+                  activateOnFocus={false}
+                >
+                  {views.map((option) => (
+                    <TabsTrigger
+                      key={option}
+                      value={option}
+                      nativeButton={false}
+                      render={
+                        <Link
+                          to="/app/$organizationId/needs-you"
+                          params={{ organizationId }}
+                          search={{ view: option, item: search.item }}
+                          resetScroll={false}
+                          onClick={(event) => {
+                            if (!onOpenView || event.metaKey || event.ctrlKey)
+                              return;
+                            event.preventDefault();
+                            onOpenView(option);
+                          }}
+                        />
+                      }
+                    >
+                      {viewLabels[option]()}
+                      {list ? (
+                        <Badge>
+                          {formatNumber(list.counts.views[option] ?? 0)}
+                        </Badge>
+                      ) : null}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+            </>
           }
-          filters={[
-            {
-              kind: 'choice',
-              key: 'domain',
-              label: m.decisions_filter_area(),
-              icon: LayoutGrid,
-              value: search.domain,
-              options: domains.map((domain) => ({
-                value: domain,
-                label: facetLabel(
-                  domainLabels[domain](),
-                  domain !== search.domain && list
-                    ? list.counts.domains[domain]
-                    : undefined,
-                ),
-              })),
-              onChange: (value) =>
-                update({ domain: domains.find((domain) => domain === value) }),
-            },
-            {
-              kind: 'choice',
-              key: 'reason',
-              label: m.decisions_filter_reason(),
-              icon: CircleHelp,
-              value: search.reason,
-              options: reasons.map((reason) => ({
-                value: reason,
-                label: facetLabel(
-                  reasonLabels[reason](),
-                  reason !== search.reason && list
-                    ? list.counts.reasons[reason]
-                    : undefined,
-                ),
-              })),
-              onChange: (value) =>
-                update({ reason: reasons.find((reason) => reason === value) }),
-            },
-          ]}
-          actions={
-            <label className="decisions-grouping">
-              <Switch
-                checked={!!search.grouped}
-                onCheckedChange={(checked) =>
-                  update({ grouped: checked ? true : undefined })
+          search={
+            controls.query
+              ? {
+                  value: controls.query.value || undefined,
+                  onChange: (text) => controls.query?.onChange(text ?? ''),
+                  label: m.decisions_search_label(),
+                  placeholder: m.decisions_search_placeholder(),
+                  inputRef: searchInput,
                 }
-              />
-              {m.decisions_group_by_cause()}
-            </label>
+              : undefined
           }
-          onClear={() => update({ domain: undefined, reason: undefined })}
+          filters={controls.filters ?? []}
+          conditions={controls.conditions}
+          actions={controls.actions}
+          display={display}
+          sort={controls.sort}
+          onClear={clear}
         />
       </div>
       {offline ? (
@@ -374,12 +575,13 @@ export function NeedsYouView({
             tabIndex={-1}
             aria-label={m.decisions_list_label()}
           >
+            {notices}
             {error ? (
               <CaseNotice error title={m.decisions_error_title()}>
                 {list ? `${m.decisions_error_stale()} ` : ''}
                 {error}
-                {search.cursor ? (
-                  <Button variant="outline" onClick={() => update({})}>
+                {search.cursor && onFirst ? (
+                  <Button variant="outline" onClick={onFirst}>
                     {m.decisions_first_page()}
                   </Button>
                 ) : null}
@@ -399,56 +601,65 @@ export function NeedsYouView({
                     <span aria-hidden="true">○</span>
                     <h2>{empty.title}</h2>
                     <p>{empty.text}</p>
-                    {filtered ? (
-                      <Button
-                        variant="outline"
-                        onClick={() =>
-                          update({ domain: undefined, reason: undefined })
-                        }
-                      >
+                    {filtered && clear ? (
+                      <Button variant="outline" onClick={clear}>
                         {m.common_clear_filters()}
                       </Button>
                     ) : null}
                   </Empty>
-                ) : search.grouped ? (
-                  <div className="decisions-groups">
-                    {groupDecisions(items).map((group) => (
-                      <section
-                        key={group.key}
-                        aria-labelledby={`group-${group.key}`}
-                      >
-                        <h2
-                          className="decisions-group-heading"
-                          id={`group-${group.key}`}
-                        >
-                          {group.label}
-                          <span className="lu-numeric">
-                            {formatNumber(group.items.length)}
-                          </span>
-                        </h2>
-                        <ul className="inbox-rows">{group.items.map(row)}</ul>
-                      </section>
-                    ))}
+                ) : grouped && groups ? (
+                  <>
+                    <CollectionGroups
+                      label={m.decisions_groups_label({
+                        field:
+                          decisionPresentation[
+                            grouped.grouping.field
+                          ]?.label() ?? grouped.grouping.field,
+                      })}
+                      collapsed={grouped.collapsed}
+                      onCollapsedChange={grouped.onCollapsedChange}
+                      groups={groups.map((group) => {
+                        const label = grouped.label(group.group.key);
+
+                        return {
+                          key: group.id,
+                          label,
+                          count: group.group.count,
+                          complete: group.group.complete,
+                          content: group.rows.length ? (
+                            rows(label, group.rows)
+                          ) : (
+                            <p className="decisions-group-note">
+                              {m.decisions_group_empty()}
+                            </p>
+                          ),
+                          more: groupMoreButton(group.more),
+                        };
+                      })}
+                    />
                     <p className="decisions-group-note">
                       {m.decisions_group_note()}
                     </p>
-                  </div>
+                  </>
                 ) : (
-                  <ul className="inbox-rows">{items.map(row)}</ul>
+                  <>
+                    {rows(m.decisions_list_label(), items)}
+                    <Pagination
+                      count={items.length}
+                      totalCount={list.totalCount}
+                      offset={list.offset}
+                      page={page}
+                      pageSize={decisionPageSize}
+                      hasNext={!!list.nextCursor}
+                      onPrevious={onPrevious}
+                      onNext={onNext}
+                      formatTotal={(count) =>
+                        m.decisions_pagination_total({ count })
+                      }
+                      label={m.decisions_pagination_label()}
+                    />
+                  </>
                 )}
-                <Pagination
-                  count={items.length}
-                  totalCount={list.totalCount}
-                  offset={list.offset}
-                  page={page}
-                  hasNext={!!list.nextCursor}
-                  onPrevious={onPrevious}
-                  onNext={onNext}
-                  formatTotal={(count) =>
-                    m.decisions_pagination_total({ count })
-                  }
-                  label={m.decisions_pagination_label()}
-                />
               </>
             ) : null}
           </div>
@@ -506,6 +717,19 @@ export function NeedsYouView({
           </section>
         }
       />
+      <ShortcutHelp
+        open={help}
+        onOpenChange={setHelp}
+        groups={[
+          listShortcutGroup(
+            shortcuts.filter(
+              (command) =>
+                (command !== 'search' || !!controls.query) &&
+                (command !== 'filter' || !!controls.conditions),
+            ),
+          ),
+        ]}
+      />
     </div>
   );
 }
@@ -525,26 +749,128 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
   const client = useQueryClient();
   useDecisionUpdates(organizationId);
   const now = useNow();
-  const online = useSyncExternalStore(
-    (listener) => onlineManager.subscribe(listener),
-    () => onlineManager.isOnline(),
-    () => true,
+  const online = useOnline();
+  const timeZone = useContext(WorkspaceTimezone);
+  const permissions = usePermissions(organizationId);
+  const can = permissions.can;
+  const change = (next: NeedsYouSearch) =>
+    void navigate({ search: next, resetScroll: false });
+  const view = useCollectionView({
+    catalog: decisionsCatalog,
+    organizationId,
+    search,
+    // Changing the view keeps the open decision and starts at page one.
+    navigate: (next: Partial<CollectionSearch>) =>
+      change({ ...(search.item ? { item: search.item } : {}), ...next }),
+  });
+  const listView = queueView(view);
+  const state = listView.state;
+  const segment = decisionView(state.segment);
+  // Naming the view keeps the remembered view from replacing the one the link opened.
+  const [q, setQ] = usePrivateSearch(
+    search.q,
+    () =>
+      void navigate({
+        search: (current) => ({
+          ...current,
+          q: undefined,
+          view: current.view ?? viewParam(view.key),
+        }),
+        replace: true,
+        resetScroll: false,
+      }),
   );
-  const list = useQuery(decisionsOptions(organizationId, search));
   const context = useQuery(contextOptions(organizationId));
   const members = useQuery(membersOptions(organizationId));
   const self = context.data?.actor.id;
-  const permissions = usePermissions(organizationId);
-  const assignmentAccess = permissions.can('decisions.assign')
-    ? 'anyone'
-    : permissions.can('decisions.self_assign')
-      ? 'self'
-      : 'none';
-  const denied =
-    list.error instanceof IdentityError &&
-    [403, 404].includes(list.error.status);
-  const data = denied ? undefined : list.data;
-  const onPage = data?.items.find((item) => item.id === search.item);
+  const memberList: Member[] = (members.data ?? []).map((member) => ({
+    userId: member.userId,
+    name: member.name,
+    email: member.email,
+  }));
+  const options = {
+    members: memberList.map((member) => ({
+      value: member.userId,
+      label: memberName(member.userId, memberList, self) ?? member.userId,
+    })),
+  };
+  const ready = permissions.ready;
+  const clientIssues = ready
+    ? collectionWhereIssues(decisionsCatalog, state.where)
+    : [];
+  const query = decisionListQuery(
+    state,
+    { q, cursor: search.cursor },
+    timeZone,
+  );
+  const list = useQuery({
+    ...decisionsOptions(organizationId, query),
+    enabled: ready && !clientIssues.length,
+  });
+  // With a page cursor, a refused request means the page link is stale, not the view.
+  const serverIssue = search.cursor
+    ? undefined
+    : collectionServerIssue(list.error);
+  const controls = useCollectionControls({
+    view: listView,
+    catalog: decisionsCatalog,
+    presentation: decisionPresentation,
+    can,
+    options,
+    title: 'title',
+    defaultProperties: decisionProperties,
+    serverIssues: serverIssue ? [serverIssue] : [],
+    owner: { field: 'owner', members: options.members, unassigned: true },
+  });
+  const issues = [...clientIssues, ...(serverIssue ? [serverIssue] : [])];
+  const repair = issues.length
+    ? () =>
+        view.change(repairedState(decisionsCatalog, view.state, issues, can))
+    : undefined;
+  const failure: CollectionError | undefined = clientIssues.length
+    ? { kind: 'invalid', message: m.collections_needs_repair() }
+    : collectionError(list.error, search.cursor);
+  const denied = failure?.kind === 'access';
+  const data =
+    denied || failure?.kind === 'invalid' || failure?.kind === 'page'
+      ? undefined
+      : list.data;
+
+  const grouping = state.group;
+  const groupPrefix = `${groupOf(state) ?? ''}=`;
+  const collapsed = view.display.collapsedGroups
+    .filter((id) => id.startsWith(groupPrefix))
+    .map((id) => id.slice(groupPrefix.length));
+  const more = useGroupPages<DecisionItem>({
+    resetKey: JSON.stringify([organizationId, query]),
+    load: (key: CollectionGroup['key'], cursor: string) =>
+      client
+        .fetchQuery(
+          decisionsOptions(
+            organizationId,
+            decisionListQuery(state, { q }, timeZone, { key, cursor }),
+          ),
+        )
+        .then((page) => ({
+          rows: page.items,
+          nextCursor: page.groups?.[0]?.nextCursor ?? page.nextCursor,
+        })),
+  });
+  const groups =
+    data && grouping && data.groups
+      ? shownGroups({
+          items: data.items,
+          groups: data.groups,
+          rowKey: (item) => item.id,
+          field: decisionsCatalog.fields.find(
+            (field) => field.id === grouping.field,
+          ),
+          showEmpty: grouping.showEmpty,
+          more,
+        })
+      : undefined;
+  const shown = groups ? groups.flatMap((group) => group.rows) : data?.items;
+  const onPage = shown?.find((item) => item.id === search.item);
   const direct = useQuery({
     ...decisionOptions(organizationId, search.item ?? ''),
     enabled: !!search.item && !!data && !onPage,
@@ -564,33 +890,33 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
         fallback ??
         (!data || direct.isPending ? 'loading' : 'missing'));
 
-  const filterKey = JSON.stringify(needsYouFilters(search));
-  const [trail, setTrail] = useState<Record<string, (string | undefined)[]>>(
-    {},
-  );
-  const cursors = trail[filterKey] ?? [undefined];
-  const pageIndex = cursors.indexOf(search.cursor);
-  const change = (next: NeedsYouSearch) =>
-    void navigate({ search: next, resetScroll: false });
-  const goNext = () => {
-    const nextCursor = data?.nextCursor;
-    if (!nextCursor) return;
-    if (pageIndex >= 0)
-      setTrail((previous) => ({
-        ...previous,
-        [filterKey]: [...cursors.slice(0, pageIndex + 1), nextCursor],
-      }));
-    change({ ...search, cursor: nextCursor });
-  };
-  const goPrevious =
-    pageIndex > 0
-      ? () => change({ ...search, cursor: cursors[pageIndex - 1] })
-      : undefined;
+  const paging = useCursorPaging({
+    // Search text never enters browser storage; a new search starts on the first page.
+    key: JSON.stringify([
+      organizationId,
+      view.key,
+      query.view,
+      query.where,
+      query.sort,
+      query.direction,
+      !!query.q,
+    ]),
+    cursor: search.cursor,
+    page: search.page,
+    nextCursor: grouping ? null : data?.nextCursor,
+    go: ({ cursor, page }) => change({ ...search, cursor, page }),
+  });
   const refresh = () => {
-    if (search.cursor) change({ ...search, cursor: undefined });
+    if (search.cursor)
+      change({ ...search, cursor: undefined, page: undefined });
     void client.invalidateQueries({ queryKey: decisionsKey(organizationId) });
   };
 
+  const assignmentAccess = permissions.can('decisions.assign')
+    ? 'anyone'
+    : permissions.can('decisions.self_assign')
+      ? 'self'
+      : 'none';
   const [assignError, setAssignError] = useState<string>();
   const assignment = useMutation({
     mutationFn: (input: { item: DecisionItem; assigneeId: string | null }) =>
@@ -610,8 +936,8 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
       client.invalidateQueries({ queryKey: decisionsKey(organizationId) }),
   });
 
-  // J and K move through the visible decisions, as in other Luma queues.
-  const items = data?.items ?? [];
+  // The inspector's previous and next buttons step through the visible decisions.
+  const items = shown ?? [];
   const position = items.findIndex((item) => item.id === search.item);
   const step = (offset: number) => {
     const target = items[position < 0 ? 0 : position + offset];
@@ -623,59 +949,122 @@ function TenantQueue({ organizationId }: { organizationId: string }) {
         ?.scrollIntoView({ block: 'nearest' }),
     );
   };
-  const stepRef = useRef(step);
-  useEffect(() => {
-    stepRef.current = step;
-  });
-  useEffect(() => {
-    const listener = (event: KeyboardEvent) => {
-      if (
-        event.defaultPrevented ||
-        event.metaKey ||
-        event.ctrlKey ||
-        event.altKey ||
-        isTypingTarget(event.target)
-      )
-        return;
-      if (event.key === 'j') stepRef.current(1);
-      else if (event.key === 'k') stepRef.current(-1);
-      else return;
-      event.preventDefault();
-    };
-    window.addEventListener('keydown', listener);
-
-    return () => window.removeEventListener('keydown', listener);
-  }, []);
 
   if (list.error instanceof IdentityError && list.error.status === 401)
     return <SignInRedirect />;
-  const memberList: Member[] = (members.data ?? []).map((member) => ({
-    userId: member.userId,
-    name: member.name,
-    email: member.email,
-  }));
   const item = typeof selected === 'object' ? selected : undefined;
   const previousItem = position > 0 ? items[position - 1] : undefined;
   const nextItem = position >= 0 ? items[position + 1] : undefined;
+  const clear = () => {
+    setQ('');
+    controls.clearConditions();
+  };
 
   return (
     <NeedsYouView
       organizationId={organizationId}
       search={search}
+      segment={segment}
+      savedView={view.ref.kind === 'saved'}
+      viewBar={
+        <CollectionViewBar
+          organizationId={organizationId}
+          view={view}
+          path="needs-you"
+          segmentLabel={(value) => viewLabels[decisionView(value)]()}
+        />
+      }
+      display={controls.display}
+      controls={{
+        query: {
+          value: q,
+          onChange: (text) => {
+            setQ(text);
+            change(decisionFilters(search));
+          },
+        },
+        filters: controls.filters,
+        conditions: controls.conditions,
+        sort: controls.sort,
+        actions: (
+          <DescribedFilter
+            organizationId={organizationId}
+            domain="decisions"
+            listName={m.decisions_page_title()}
+            fields={controls.conditions.fields}
+            apply={(conditions) =>
+              listView.change({
+                ...state,
+                where: {
+                  match: state.where.match,
+                  conditions: [...state.where.conditions, ...conditions],
+                },
+              })
+            }
+          />
+        ),
+        onClear: clear,
+      }}
+      filtered={!!q.trim() || state.where.conditions.length > 0}
+      notices={
+        failure && failure.kind !== 'unavailable' ? (
+          <CollectionNotices
+            offline={false}
+            error={failure}
+            hasRows={!!data}
+            retry={() => void list.refetch()}
+            firstPage={() =>
+              change({ ...search, cursor: undefined, page: undefined })
+            }
+            repair={repair}
+          />
+        ) : data?.groupsTruncated ? (
+          <CaseNotice title={m.collections_groups_truncated()} />
+        ) : null
+      }
+      grouped={
+        grouping && groups
+          ? {
+              grouping,
+              groups,
+              label: (key) =>
+                decisionGroupLabel(grouping.field, key, {
+                  items,
+                  members: memberList,
+                  self,
+                }),
+              collapsed,
+              onCollapsedChange: (id, closed) =>
+                view.setDisplay({
+                  ...view.display,
+                  collapsedGroups: [
+                    ...view.display.collapsedGroups.filter(
+                      (entry) => entry !== `${groupPrefix}${id}`,
+                    ),
+                    ...(closed ? [`${groupPrefix}${id}`] : []),
+                  ].slice(-100),
+                }),
+            }
+          : undefined
+      }
+      properties={controls.properties}
+      density={state.density}
+      onOpenView={(option) => view.open(`builtin:${option}`)}
       list={data}
-      loading={list.isPending}
+      loading={list.isPending && !failure}
       refreshing={list.isFetching}
       error={
         denied
           ? m.decisions_error_no_access()
-          : list.isError
+          : failure?.kind === 'unavailable' && list.error
             ? list.error.message
             : undefined
       }
       offline={!online}
-      page={pageIndex >= 0 ? pageIndex + 1 : undefined}
-      onPrevious={goPrevious}
-      onNext={goNext}
+      page={paging.page}
+      onPrevious={paging.previous}
+      onNext={() => paging.next?.()}
+      onFirst={paging.first}
       onChange={change}
       onRefresh={refresh}
       now={now}

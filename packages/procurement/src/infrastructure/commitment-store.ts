@@ -2,6 +2,10 @@ import type { AuditLog } from '@luma/audit';
 import type { TenantDatabase } from '@luma/platform';
 
 import type { CommitmentStore } from '../application/commitments.js';
+import type {
+  PurchaseOrderFilter,
+  StoredPurchaseOrderSort,
+} from '../application/lists.js';
 import type { ProcurementEvent } from '../application/procurement.js';
 import type {
   Commitment,
@@ -12,9 +16,115 @@ import type {
   Submission,
 } from '../domain/commitments.js';
 import type { PurchaseOrder, Supplier } from '../domain/procurement.js';
+import {
+  customFieldSql,
+  customSortSql,
+  readCustomFieldDefinitions,
+} from './custom-fields.js';
+import {
+  type BindParameter,
+  likePattern,
+  type StoredFieldSql,
+  storedWhereSql,
+} from './list-sql.js';
 import { readPurchasingActionTimeline } from './purchasing-timeline.js';
 
 const live = ['approved', 'submitting', 'uncertain', 'submitted'];
+
+/** Search, supplier, status and ID predicates over `o`; binds `$2` to `$6`. */
+const orderFilterSql = `($2='' OR o.document->>'reference' ILIKE $3 OR o.document->>'supplierName' ILIKE $3
+ OR EXISTS(SELECT 1 FROM jsonb_array_elements(o.document->'lines') l WHERE l->>'sku' ILIKE $3))
+ AND ($4::uuid IS NULL OR o.supplier_id=$4) AND ($5::text IS NULL OR o.document->>'status'=$5)
+ AND ($6::uuid[] IS NULL OR o.id=ANY($6::uuid[]))`;
+
+const orderFilterValues = (filter: PurchaseOrderFilter) => [
+  filter.q,
+  likePattern(filter.q),
+  filter.supplierId ?? null,
+  filter.status ?? null,
+  filter.ids ?? null,
+];
+
+const lines = "o.document->'lines'";
+
+/** Stored purchase-order list fields of `o`, for catalog conditions. */
+const orderFields: Readonly<Record<string, StoredFieldSql>> = {
+  reference: { kind: 'value', sql: "o.document->>'reference'", cast: 'text' },
+  supplier: { kind: 'value', sql: 'o.supplier_id', cast: 'uuid' },
+  status: { kind: 'value', sql: "o.document->>'status'", cast: 'text' },
+  authority: { kind: 'value', sql: "o.document->>'authority'", cast: 'text' },
+  created: { kind: 'value', sql: 'o.created_at', cast: 'timestamptz' },
+  updated: {
+    kind: 'value',
+    sql: "(o.document->>'updatedAt')::timestamptz",
+    cast: 'timestamptz',
+  },
+  sku: { kind: 'lines', from: lines, sql: "l->>'sku'" },
+  location: { kind: 'lines', from: lines, sql: "lower(l->>'locationId')" },
+};
+
+/** Binds parameters after the ones already in `values`. */
+const binder =
+  (values: unknown[]): BindParameter =>
+  (value, cast) => {
+    values.push(value);
+
+    return `$${values.length}::${cast}`;
+  };
+
+/** Sort values of `o`; every order has one. */
+const orderSorts = {
+  created: { sql: 'o.created_at', type: 'timestamptz' },
+  updated: {
+    sql: "(o.document->>'updatedAt')::timestamptz",
+    type: 'timestamptz',
+  },
+  reference: { sql: "lower(o.document->>'reference')", type: 'text' },
+  supplier: { sql: "lower(o.document->>'supplierName')", type: 'text' },
+} as const;
+
+function isNativeSort(sort: string): sort is keyof typeof orderSorts {
+  return Object.hasOwn(orderSorts, sort);
+}
+
+/** Catalog and custom list fields of `o` for `filter`, binding custom field IDs. */
+function orderFieldsFor(
+  filter: PurchaseOrderFilter,
+  bind: BindParameter,
+): Readonly<Record<string, StoredFieldSql>> {
+  return filter.customFields?.length
+    ? {
+        ...orderFields,
+        ...customFieldSql(
+          { type: 'purchase_order', id: 'o.id' },
+          filter.customFields,
+          filter.conditions,
+          bind,
+        ),
+      }
+    : orderFields;
+}
+
+/**
+ * The sort value of `o` and its type. Custom fields come from `filter` and may be unset
+ * (NULL); every order has a value for the other sorts.
+ */
+function orderSort(
+  sort: StoredPurchaseOrderSort,
+  filter: PurchaseOrderFilter,
+  bind: BindParameter,
+): { sql: string; type: string; optional: boolean } {
+  if (isNativeSort(sort)) return { ...orderSorts[sort], optional: false };
+  const field = filter.customFields?.find(
+    (item) => `custom:${item.id}` === sort,
+  );
+  if (!field) throw new Error('The sorted custom field was not loaded');
+
+  return {
+    ...customSortSql({ type: 'purchase_order', id: 'o.id' }, field, bind),
+    optional: true,
+  };
+}
 
 /** Persists supplier commitments with procurement records and audit in one tenant transaction. */
 export function createCommitmentStore(
@@ -54,6 +164,79 @@ export function createCommitmentStore(
               'SELECT document FROM procurement_purchase_orders WHERE tenant_id=$1 ORDER BY created_at DESC,id',
               [tenantId],
             ),
+          purchaseOrders: async (filter, order, limit) => {
+            const values: unknown[] = [tenantId, ...orderFilterValues(filter)];
+            const bind = binder(values);
+            const conditions = storedWhereSql(
+              filter.conditions,
+              orderFieldsFor(filter, bind),
+              bind,
+            );
+            let sort = 'o.created_at DESC,o.id';
+            let after = 'true';
+            let key = 'NULL::text';
+            if (order) {
+              const { sql, type, optional } = orderSort(
+                order.sort,
+                filter,
+                bind,
+              );
+              const direction = order.direction === 'asc' ? 'ASC' : 'DESC';
+              const op = order.direction === 'asc' ? '>' : '<';
+              // Orders without a value follow all others in both directions, by ID.
+              const missing = `(${sql}) IS NULL`;
+              sort = `${optional ? `${missing},` : ''}${sql} ${direction},o.id ${direction}`;
+              key = `(${sql})::text`;
+              if (order.after) {
+                const id = bind(order.after.id, 'uuid');
+                after =
+                  order.after.rank === 1
+                    ? `(${missing} AND o.id ${op} ${id})`
+                    : `${optional ? `(${missing} OR ` : '('}(${sql},o.id) ${op} (${bind(order.after.keys?.[0] ?? null, type)},${id}))`;
+              }
+            }
+            if (limit !== null) values.push(limit);
+            const rows = await tx.query<{
+              document: PurchaseOrder;
+              key: string | null;
+            }>(
+              `SELECT o.document,${key} AS key FROM procurement_purchase_orders o
+               WHERE o.tenant_id=$1 AND ${orderFilterSql} AND ${conditions} AND ${after}
+               ORDER BY ${sort}${limit === null ? '' : ` LIMIT $${values.length}`}`,
+              values,
+            );
+
+            return rows.rows.map((row) => ({
+              record: row.document,
+              position:
+                order && row.key === null
+                  ? { rank: 1, keys: null, id: row.document.id }
+                  : {
+                      rank: 0,
+                      keys: row.key === null ? null : [row.key],
+                      id: row.document.id,
+                    },
+            }));
+          },
+          customFields: (recordType, ids) =>
+            readCustomFieldDefinitions(tx, tenantId, recordType, ids),
+          countPurchaseOrders: async (filter) => {
+            const values: unknown[] = [tenantId, ...orderFilterValues(filter)];
+            const bind = binder(values);
+            const conditions = storedWhereSql(
+              filter.conditions,
+              orderFieldsFor(filter, bind),
+              bind,
+            );
+
+            return (
+              await tx.query<{ count: number }>(
+                `SELECT count(*)::int AS count FROM procurement_purchase_orders o
+                 WHERE o.tenant_id=$1 AND ${orderFilterSql} AND ${conditions}`,
+                values,
+              )
+            ).rows[0]!.count;
+          },
           supplier: async (id) =>
             (
               await documents<Supplier>(

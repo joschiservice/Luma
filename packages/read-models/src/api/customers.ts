@@ -4,12 +4,14 @@ import {
   apiContract,
   customerDetailSchema,
   customerListSchema,
+  customersCatalog,
 } from '@luma/api-contract';
 import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
 import { implement } from '@orpc/server';
 
 import type { CustomerWorkspace } from '../application/customers.js';
+import { validateCollectionQuery } from './collection-validation.js';
 
 /** Exposes the tenant's imported customer profiles to readers with `customers.read`. */
 export function customerRoutes(service?: CustomerWorkspace) {
@@ -30,6 +32,9 @@ export function customerRoutes(service?: CustomerWorkspace) {
             'SERVICE_UNAVAILABLE',
             'Customers are unavailable',
           );
+        validateCollectionQuery(customersCatalog, query, {
+          customFields: true,
+        });
 
         return customerListSchema.parse(
           await service.list(request.tenantContext, query),

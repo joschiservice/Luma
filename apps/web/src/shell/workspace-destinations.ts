@@ -225,7 +225,7 @@ export const workspaceDestinations: readonly WorkspaceDestination[] = [
     description: m.identity_nav_inventory_description,
     group: 'operations',
     domain: 'inventory',
-    shortcut: 'v',
+    shortcut: 'y',
     permission: 'inventory.read',
     area: m.identity_nav_inventory_area,
   }),

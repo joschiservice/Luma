@@ -278,6 +278,22 @@ test('transfer lists bound payloads and bind pagination to exact workspace filte
     new Set([...first.items, ...second.items].map((item) => item.id)).size,
     52,
   );
+  // Name order pages without gaps or duplicates in both directions.
+  for (const direction of ['asc', 'desc']) {
+    const names = [];
+    let cursor;
+    do {
+      const page = await f.request(
+        f.owner,
+        `${f.base}/inventory/transfers?connectionId=${installed.id}&sort=name&direction=${direction}&limit=20&count=exact${cursor ? `&cursor=${cursor}` : ''}`,
+      );
+      assert.equal(page.totalCount, 52);
+      names.push(...page.items.map((item) => item.name.toLowerCase()));
+      cursor = page.nextCursor;
+    } while (cursor);
+    const sorted = [...names].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    assert.deepEqual(names, direction === 'asc' ? sorted : sorted.reverse());
+  }
   await f.request(
     f.owner,
     `${f.base}/inventory/transfers?cursor=${first.nextCursor}`,
@@ -292,4 +308,89 @@ test('transfer lists bound payloads and bind pagination to exact workspace filte
     undefined,
     400,
   );
+
+  // Catalog conditions narrow the list and its count; unknown quantities never match.
+  const where = (conditions, match = 'all') =>
+    `where=${encodeURIComponent(JSON.stringify({ match, conditions }))}`;
+  const all = [...first.items, ...second.items];
+  const ids = (items) => items.map((item) => item.id).sort();
+  const count = async (conditions, match) =>
+    (
+      await f.request(
+        f.owner,
+        `${f.base}/inventory/transfers?count=exact&limit=1&${where(conditions, match)}`,
+      )
+    ).totalCount;
+  assert.equal(
+    await count([{ field: 'source', op: 'any_of', value: [installed.id] }]),
+    52,
+  );
+  assert.equal(
+    await count([{ field: 'source', op: 'none_of', value: [installed.id] }]),
+    0,
+  );
+  assert.equal(
+    await count([
+      {
+        field: 'requestedAt',
+        op: 'within_last',
+        value: { amount: 1, unit: 'day' },
+      },
+    ]),
+    52,
+  );
+  assert.equal(
+    await count([
+      {
+        field: 'requestedAt',
+        op: 'before',
+        value: new Date(Date.now() - 7_200_000).toISOString(),
+      },
+    ]),
+    0,
+  );
+  assert.equal(await count([{ field: 'updated', op: 'empty' }]), all.length);
+  const unreceived = await f.request(
+    f.owner,
+    `${f.base}/inventory/transfers?${where([{ field: 'unreceived', op: 'gt', value: 0 }])}`,
+  );
+  assert.deepEqual(
+    ids(unreceived.items),
+    ids(
+      all.filter(
+        (item) =>
+          item.facts.unreceived !== null && Number(item.facts.unreceived) > 0,
+      ),
+    ),
+  );
+  assert.equal(
+    await count(
+      [
+        { field: 'requested', op: 'gte', value: 10 },
+        { field: 'source', op: 'none_of', value: [installed.id] },
+      ],
+      'any',
+    ),
+    all.filter(
+      (item) =>
+        item.facts.requested !== null && Number(item.facts.requested) >= 10,
+    ).length,
+  );
+  const narrowed = await f.request(
+    f.owner,
+    `${f.base}/inventory/transfers?limit=1&${where([{ field: 'requested', op: 'gte', value: 0 }])}`,
+  );
+  for (const query of [
+    `limit=1&${where([{ field: 'requested', op: 'gte', value: 1 }])}&cursor=${narrowed.nextCursor}`,
+    where([{ field: 'unreceived', op: 'gt', value: 0, source: 'lowest' }]),
+    where([{ field: 'name', op: 'contains', value: 'Move' }]),
+    'group=source',
+  ])
+    await f.request(
+      f.owner,
+      `${f.base}/inventory/transfers?${query}`,
+      'GET',
+      undefined,
+      400,
+    );
 });

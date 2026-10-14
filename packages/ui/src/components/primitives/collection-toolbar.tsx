@@ -1,7 +1,7 @@
 import { formatNumber } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { ArrowDownUp, ListFilter, Plus, Search, X } from 'lucide-react';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, type Ref, useEffect, useRef, useState } from 'react';
 
 import { cn } from '../../lib/utils';
 import { Badge } from './badge';
@@ -17,6 +17,10 @@ import {
   filterValueLabel,
   FocusFirst,
 } from './collection-filters';
+import {
+  type CollectionConditions,
+  ConditionFilters,
+} from './condition-builder';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,6 +41,8 @@ export type {
   CollectionFilterOption,
 } from './collection-filters';
 
+export type { CollectionConditions } from './condition-builder';
+
 /** Free-text search committed to the caller after typing pauses, or at once on Enter. */
 export interface CollectionSearch {
   value: string | undefined;
@@ -45,6 +51,8 @@ export interface CollectionSearch {
   label: string;
   placeholder: string;
   maxLength?: number | undefined;
+  /** Receives the search input, so a `/` shortcut can focus it. */
+  inputRef?: Ref<HTMLInputElement> | undefined;
 }
 
 /** A sort order, optionally with a direction the reader can flip. */
@@ -69,7 +77,8 @@ export interface CollectionView<Value extends string> {
 
 /**
  * Switches between a collection's saved views as segmented tabs with optional counts. Arrow keys
- * move focus; Enter or Space selects, so moving through views does not refetch each one.
+ * move focus; Enter or Space selects, so moving through views does not refetch each one. A null
+ * value marks no tab as current, as while a saved view is open.
  */
 export function CollectionViews<Value extends string>({
   label,
@@ -78,7 +87,7 @@ export function CollectionViews<Value extends string>({
   onChange,
 }: {
   label: string;
-  value: Value;
+  value: Value | null;
   views: readonly CollectionView<Value>[];
   onChange: (value: Value) => void;
 }) {
@@ -129,16 +138,21 @@ function chipped(filter: CollectionFilter) {
  * filter is visible: unset filters are quiet pills that open their values in one click, applied
  * filters are chips that edit the value and remove it. On small screens unset pills give way to
  * one Filters button that lists every filter in a sheet. With `panel`, the collection sits in a
- * `CollectionFilterPanel`; on wide screens the toolbar then shows only applied chips. The toolbar
- * owns no filter state: every change is reported to the caller, which owns the URL and fetching.
+ * `CollectionFilterPanel`; on wide screens the toolbar then shows only applied chips. With
+ * `conditions`, advanced conditions follow the quick filters as chips, and "+ Filter" opens the
+ * condition builder on every screen size. `display` holds the display menu, placed before Sort.
+ * The toolbar owns no filter state: every change is reported to the caller, which owns the URL
+ * and fetching.
  */
 export function CollectionToolbar({
   className,
   views,
   search,
   filters = [],
+  conditions,
   sort,
   actions,
+  display,
   panel = false,
   onClear,
   onRefresh,
@@ -149,9 +163,13 @@ export function CollectionToolbar({
   views?: ReactNode;
   search?: CollectionSearch | undefined;
   filters?: readonly CollectionFilter[];
+  /** Advanced filter conditions, shown as chips with a "+ Filter" builder. */
+  conditions?: CollectionConditions | undefined;
   sort?: CollectionSort | undefined;
   /** Display controls for the collection, such as grouping. */
   actions?: ReactNode;
+  /** The display menu, such as `CollectionDisplay`; placed before Sort. */
+  display?: ReactNode;
   /** The filters are also listed in a docked `CollectionFilterPanel`. */
   panel?: boolean;
   /** Clears search and every removable filter; shown while any is applied. */
@@ -168,7 +186,10 @@ export function CollectionToolbar({
     (filter) => chipped(filter) || filterOffered(filter),
   );
   const appliedCount = filters.filter(filterApplied).length;
-  const clearable = !!search?.value || appliedCount > 0;
+  const clearable =
+    !!search?.value ||
+    appliedCount > 0 ||
+    !!conditions?.where.conditions.length;
   const openChange = (key: string) => (next: boolean) =>
     setOpen(next ? key : null);
   const refresh = (
@@ -212,14 +233,29 @@ export function CollectionToolbar({
       ) : null}
       <div className="collection-toolbar-controls">
         {search ? <SearchField {...search} /> : null}
-        {shown.length || clearable ? (
+        {shown.length || clearable || conditions ? (
           <div
             className="collection-toolbar-filters"
             role="group"
             aria-label={m.common_filters()}
           >
             {shown.map((filter) =>
-              chipped(filter) ? (
+              filter.kind === 'multi-choice' ? (
+                <MultiChoiceFilter
+                  key={filter.key}
+                  filter={filter}
+                  open={open === filter.key}
+                  onOpenChange={openChange(filter.key)}
+                  onRemove={() => {
+                    clearFilter(filter);
+                    restoreFocus(filter.key);
+                  }}
+                  done={() => {
+                    setOpen(null);
+                    restoreFocus(filter.key);
+                  }}
+                />
+              ) : chipped(filter) ? (
                 <FilterChip
                   key={filter.key}
                   filter={filter}
@@ -243,6 +279,7 @@ export function CollectionToolbar({
                 />
               ),
             )}
+            {conditions ? <ConditionFilters {...conditions} /> : null}
             {offered.length ? (
               <ResponsivePopover
                 title={m.common_filters()}
@@ -291,9 +328,10 @@ export function CollectionToolbar({
             ) : null}
           </div>
         ) : null}
-        {actions || sort || !views ? (
+        {actions || display || sort || !views ? (
           <div className="collection-toolbar-display">
             {actions}
+            {display}
             {sort ? <SortMenu sort={sort} /> : null}
             {views ? null : refresh}
           </div>
@@ -309,6 +347,7 @@ function SearchField({
   label,
   placeholder,
   maxLength = 120,
+  inputRef,
 }: CollectionSearch) {
   const [draft, setDraft] = useState(value ?? '');
   const [shownValue, setShownValue] = useState(value);
@@ -342,6 +381,7 @@ function SearchField({
     >
       <Search aria-hidden="true" />
       <Input
+        ref={inputRef}
         type="search"
         aria-label={label}
         placeholder={placeholder}
@@ -448,6 +488,77 @@ function FilterChip({
         </ResponsivePopover>
       )}
       {filterApplied(filter) ? (
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={m.ui_filter_remove({ filter: filter.label, value })}
+          onClick={onRemove}
+        >
+          <X aria-hidden="true" />
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * A multi-choice filter stays one element whether unset (a pill) or applied (a chip), so its
+ * picker stays open while options are toggled.
+ */
+function MultiChoiceFilter({
+  filter,
+  open,
+  onOpenChange,
+  onRemove,
+  done,
+}: {
+  filter: Extract<CollectionFilter, { kind: 'multi-choice' }>;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onRemove: () => void;
+  done: () => void;
+}) {
+  const applied = filterApplied(filter);
+  const value = filterValueLabel(filter);
+
+  return (
+    <div
+      className={applied ? 'collection-filter-chip' : 'collection-filter-pill'}
+      data-kind={filter.kind}
+      data-filter={filter.key}
+    >
+      <ResponsivePopover
+        title={filter.label}
+        open={open}
+        onOpenChange={onOpenChange}
+        trigger={
+          <Button
+            variant="ghost"
+            aria-label={
+              applied
+                ? m.ui_filter_edit({ filter: filter.label, value })
+                : m.ui_filter_add({ filter: filter.label })
+            }
+          >
+            {applied ? (
+              <>
+                <span className="collection-filter-label">{filter.label}:</span>{' '}
+                {value}
+              </>
+            ) : (
+              <>
+                <Plus aria-hidden="true" />
+                {filter.label}
+              </>
+            )}
+          </Button>
+        }
+      >
+        <FocusFirst>
+          <FilterEditor filter={filter} done={done} />
+        </FocusFirst>
+      </ResponsivePopover>
+      {applied ? (
         <Button
           variant="ghost"
           size="icon"

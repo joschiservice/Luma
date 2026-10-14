@@ -31,15 +31,6 @@ export const viewLabels: Record<OrderView, string> = localizedLabels({
   differs: m.orders_view_differs,
 });
 
-export const viewDescriptions: Record<OrderView, string> = localizedLabels({
-  stuck: m.orders_view_stuck_description,
-  all: m.orders_view_all_description,
-  outstanding: m.orders_view_outstanding_description,
-  overdue: m.orders_view_overdue_description,
-  needs_you: m.orders_view_needs_you_description,
-  differs: m.orders_view_differs_description,
-});
-
 export const statusLabels: Record<string, string> = localizedLabels({
   open: m.orders_status_open,
   completed: m.orders_status_completed,
@@ -161,6 +152,11 @@ export const sortLabels: Record<OrderSort, string> = localizedLabels({
   placed: m.orders_sort_placed,
   number: m.orders_sort_number,
   due: m.orders_sort_due,
+  total: m.orders_sort_total,
+  status: m.orders_sort_status,
+  paymentStatus: m.orders_sort_payment_status,
+  fulfillment: m.orders_sort_fulfillment,
+  lineCount: m.orders_sort_line_count,
 });
 
 /**

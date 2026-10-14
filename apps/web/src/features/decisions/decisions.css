@@ -60,76 +60,9 @@
 }
 
 /* Rows: the reader's own next steps carry a stronger title than items waiting on others. */
-.decision-row:not([data-actionable]) .case-row-summary {
+.decision-title:not([data-actionable]) {
   color: var(--foreground-muted);
   font-weight: 450;
-}
-
-/*
- * Rows share status, impact and time columns, so labels of different lengths line up. Grouped
- * rows share one grid across groups. Columns are `auto` so row padding stays outside the icon.
- */
-.decisions .inbox-rows,
-.decisions .decisions-groups {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
-  align-content: start;
-  column-gap: 12px;
-}
-
-.decisions .decisions-groups > section,
-.decisions .decisions-groups .inbox-rows,
-.decisions .inbox-rows > li,
-.decisions .inbox-rows > li > a,
-.decisions .decision-row {
-  display: grid;
-  grid-column: 1 / -1;
-  grid-template-columns: subgrid;
-}
-
-.decision-row .issue-row-meta {
-  display: contents;
-}
-
-.decision-row .lu-state-pill,
-.decision-row .issue-severity {
-  justify-self: start;
-}
-
-.decision-row .case-row-time {
-  justify-self: end;
-}
-
-.decisions-group-heading,
-.decisions-group-note {
-  grid-column: 1 / -1;
-}
-
-/* Narrow rows put status, impact and time on a second line, still in shared columns. */
-@container (max-width: 620px) {
-  .decisions .inbox-rows,
-  .decisions .decisions-groups {
-    grid-template-columns: auto auto auto minmax(0, 1fr) auto;
-  }
-
-  .decision-row .issue-row-copy {
-    grid-column: 2 / -1;
-  }
-
-  .decision-row .lu-state-pill {
-    grid-row: 2;
-    grid-column: 2;
-  }
-
-  .decision-row .issue-severity {
-    grid-row: 2;
-    grid-column: 3;
-  }
-
-  .decision-row .case-row-time {
-    grid-row: 2;
-    grid-column: 5;
-  }
 }
 
 .decision-deadline {

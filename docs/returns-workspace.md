@@ -66,9 +66,44 @@ are listed with a reconnect prompt. JTL-Wawi does not share returns.
 ## Reads
 
 The list and detail each read one read-only snapshot. The list returns counts per view and
-stage plus every commerce connection with its returns access and sync state, so the page can
-explain missing coverage. Its keyset cursor is bound to the filters. A refund ID that settles a
-return resolves to that return.
+stage under the search, filters and conditions, plus every commerce connection with its returns
+access and sync state, so the page can explain missing coverage. Its keyset cursor is bound to
+the tenant, filters, conditions, grouping and sort. A refund ID that settles a return resolves
+to that return.
+
+Search also matches the name and email address of the order's customer, through the order
+links of the customer's own connection, when the reader can read customers and the source
+shares contact details. Without customer access the same text matches only return fields.
+
+### Conditions and grouping
+
+The list accepts conditions and groups from the Returns catalog in `@luma/api-contract`, with the
+shared rules for values, dates, groups and cursors described for
+[Orders](orders-workspace.md#conditions-and-grouping).
+
+- Value, refunded and pending amounts compare only within their currency; a refund state
+  without a single currency has no amounts and matches no amount condition.
+- Partially received means some but not all requested units arrived. It is unknown when the
+  source does not report receipt or the requested units, as for refunds without a return.
+- Groups: stage in lifecycle order (the stage sort's order), refund state, kind, reason, source,
+  and request date by day, week or month. A return counts in the group of each of its reasons.
+  Groups sum values per currency.
+- Group counts are `complete: false` while a source still imports its returns.
+
+### List page
+
+Search can match customer names and email addresses, so the page keeps search text in page
+state only, as [Orders](orders-workspace.md#list-page) does: never in the URL, saved views,
+remembered list state or browser storage. A link's `q` is adopted on load and removed with a
+replace. Links from before views (`stage`, `connectionId`, and the `oldest` and `newest` sorts)
+become conditions and the request-date sort.
+
+A view without a sort uses its segment's: oldest request first for Needs action and Waiting,
+newest first otherwise. The stage cards set one "Stage is" condition, and the page sends that
+condition as the `stage` parameter, so stage counts, which follow the search and the other
+conditions, keep counting the other stages. A card for a stage outside the current segment
+opens All returns. The board groups by stage without a move affordance, because the stage
+derives from the store's records.
 
 ## Return cases
 
@@ -134,10 +169,13 @@ inspection or financial decision.
 
 ## Limits
 
-Views, stages, sorting and paging use the `orders_returns` indexes and stayed under 20 ms at
-20,000 returns. Search matches names, order numbers, reasons and source IDs as substrings, so it
+Views, stages, request and activity order and paging use the `orders_returns` indexes and
+stayed under 20 ms at 20,000 returns. Value, pending-refund and stage order sort every matching
+return; value and pending refund order by currency, then amount, and returns without a value
+come last in both directions. Search matches names, order numbers, reasons and source IDs as substrings, so it
 scans the tenant's returns (about 150 ms at 20,000); much larger volumes need a maintained
-search index like the order list's. Re-measure with `LUMA_RETURN_BENCHMARK=<return count>` on
+search index like the order list's. Customer matches scan the tenant's customer profiles once
+per search. Re-measure with `LUMA_RETURN_BENCHMARK=<return count>` on
 `returns.e2e.mjs`. The benchmark copies one return, so its detail reads are larger than for a
 real order.
 

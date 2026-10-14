@@ -79,13 +79,6 @@ export const viewLabels = localized({
   all: m.returns_view_all,
 } satisfies Record<ReturnView, () => string>);
 
-export const viewDescriptions = localized({
-  action: m.returns_view_action_description,
-  waiting: m.returns_view_waiting_description,
-  done: m.returns_view_done_description,
-  all: m.returns_view_all_description,
-} satisfies Record<ReturnView, () => string>);
-
 export const stageStates: Record<ReturnStage, OperationalState> = {
   requested: 'approval',
   awaiting_items: 'waiting',

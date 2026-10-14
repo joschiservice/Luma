@@ -7,8 +7,6 @@
 .products-page a {
   color: var(--signal-text);
 }
-.products-pagination,
-.products-pagination > div,
 .products-flags,
 .products-gap-actions {
   display: flex;
@@ -31,7 +29,6 @@
 .products-source-header small,
 .products-note,
 .products-muted,
-.products-pagination,
 .products-related small {
   color: var(--muted-foreground);
   font-size: 12px;
@@ -56,8 +53,13 @@
   margin: 0;
   line-height: 1.6;
 }
-.products-pagination {
-  justify-content: space-between;
+.products-results {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.products-preview {
+  min-height: min(720px, calc(100vh - 220px));
 }
 .products-loading {
   display: grid;

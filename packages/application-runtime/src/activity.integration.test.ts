@@ -692,6 +692,63 @@ describe.skipIf(!databaseUrl)('Workspace activity on PostgreSQL', () => {
     expect(await search('dora original')).toEqual([]);
     expect(await search('replenish low')).toEqual([events.workflow]);
 
+    // The actor filter matches the attribution the row shows and never widens visibility.
+    const byActor = async (actor: string[], reader = scoped) =>
+      (await store.list(reader, { ...range, limit: 100, actor })).items.map(
+        (item) => item.id,
+      );
+    expect(await byActor([people.ada])).toEqual([events.workflow, events.ada]);
+    expect(await byActor([people.ben])).toEqual([events.access, events.ben]);
+    expect(await byActor([people.dora])).toEqual([events.dora]);
+    expect(await byActor(['luma'])).toEqual([events.detected]);
+    expect(await byActor(['workflow'])).toEqual([events.workflow]);
+    expect(await byActor(['luma', people.ben])).toEqual([
+      events.access,
+      events.detected,
+      events.ben,
+    ]);
+    expect(await byActor([randomUUID()])).toEqual([]);
+    // Service identifiers are not people, even when a filter names them.
+    expect(await byActor(['luma.procurement'])).toEqual([]);
+    const member = {
+      ...makeTenantContext(
+        { userId: people.ada, sessionId: 'member-session' },
+        {
+          id: workspace,
+          name: 'People',
+          slug: `people-${workspace}`,
+          status: 'active',
+          dataRegion: 'EU',
+        },
+        builtInMembership(
+          {
+            id: 'member-membership',
+            organizationId: workspace,
+            userId: people.ada,
+          },
+          'member',
+        ),
+        randomUUID(),
+      ),
+      tenantId: workspace,
+    };
+    expect(await byActor([people.ben], member)).toEqual([events.ben]);
+    // A page link belongs to the actor filter it was read with.
+    const firstOfAda = await store.list(scoped, {
+      ...range,
+      limit: 1,
+      actor: [people.ada],
+    });
+    expect(firstOfAda.nextCursor).toBeTruthy();
+    await expect(
+      store.list(scoped, {
+        ...range,
+        limit: 1,
+        actor: [people.ben],
+        cursor: firstOfAda.nextCursor!,
+      }),
+    ).rejects.toThrow(/no longer matches/);
+
     queries = 0;
     await store.list(scoped, { ...range, limit: 1 });
     const small = queries;

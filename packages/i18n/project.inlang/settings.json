@@ -12,6 +12,7 @@
       "./messages/{locale}/authoring.json",
       "./messages/{locale}/catalog.json",
       "./messages/{locale}/cin7.json",
+      "./messages/{locale}/collections.json",
       "./messages/{locale}/common.json",
       "./messages/{locale}/connections.json",
       "./messages/{locale}/customers.json",

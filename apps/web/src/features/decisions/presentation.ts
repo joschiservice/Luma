@@ -132,27 +132,6 @@ export function timeLeft(deadline: string, now: number) {
   return m.decisions_time_days({ days: Math.floor(hours / 24) });
 }
 
-/**
- * Groups items with the same cause while keeping the queue's ranking: groups appear in the
- * order of their most urgent item.
- */
-export function groupDecisions(items: readonly DecisionItem[]) {
-  const groups = new Map<
-    string,
-    { key: string; label: string; items: DecisionItem[] }
-  >();
-  for (const item of items) {
-    const group = groups.get(item.group.key) ?? {
-      ...item.group,
-      items: [],
-    };
-    group.items.push(item);
-    groups.set(item.group.key, group);
-  }
-
-  return [...groups.values()];
-}
-
 /** Explains an empty queue for this view without implying operations are healthy. */
 export function emptyCopy(view: DecisionView, filtered: boolean) {
   if (filtered)

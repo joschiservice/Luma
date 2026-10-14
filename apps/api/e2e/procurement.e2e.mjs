@@ -331,3 +331,717 @@ it('persists authoritative orders with atomic audit, exact retries, tenant isola
   );
   await get(path, 404);
 });
+
+it('filters, sorts and pages purchase orders and suppliers on the server within the workspace', async (t) => {
+  const { api, owner, root } = await procurementFixture(t);
+  const post = async (path, body, status = 200) =>
+    (
+      await api.request(`${root}${path}`, {
+        cookie: owner.cookie,
+        method: 'POST',
+        body,
+        status,
+      })
+    ).body;
+  const get = async (path, query = {}, status = 200) =>
+    (
+      await api.request(`${root}${path}?${new URLSearchParams(query)}`, {
+        cookie: owner.cookie,
+        status,
+      })
+    ).body;
+  const suppliers = [];
+  for (const [name, system] of [
+    ['Zephyr Textiles', 'JTL'],
+    ['alpine Packaging', 'Xentral'],
+    ['Meridian Goods', 'JTL'],
+  ])
+    suppliers.push(
+      await post('/suppliers', {
+        id: randomUUID(),
+        name,
+        externalReferences: [{ system, externalId: `${name.slice(0, 3)}-1` }],
+      }),
+    );
+  const order = (reference, supplier, sku) =>
+    post('/purchase-orders', {
+      id: randomUUID(),
+      supplierId: supplier.id,
+      reference,
+      lines: [
+        {
+          id: randomUUID(),
+          sku,
+          description: 'Tote',
+          quantity: 5,
+          unit: 'each',
+        },
+      ],
+    });
+  const orders = [];
+  for (const [reference, supplier, sku] of [
+    ['PO-003', suppliers[0], 'TOTE-NAT'],
+    ['po-001', suppliers[1], 'TOTE-BLK'],
+    ['PO-002', suppliers[0], 'BAG-100%'],
+    ['PO-004', suppliers[2], 'TOTE-NAT'],
+  ])
+    orders.push(await order(reference, supplier, sku));
+  const transition = (target, status, expectedRevision = 1) =>
+    post(`/purchase-orders/${target.id}/transitions`, {
+      id: randomUUID(),
+      expectedRevision,
+      status,
+      reason: 'List review',
+    });
+  await transition(orders[2], 'cancelled');
+  await transition(orders[3], 'open');
+  await transition(orders[3], 'closed', 2);
+
+  // Without query parameters the list returns the newest first page with workspace counts.
+  const first = await get('/purchase-orders');
+  expect(first.items).toHaveLength(4);
+  const created = first.items.map((item) => item.createdAt);
+  expect(created).toEqual([...created].sort().reverse());
+  expect(
+    first.items.find((item) => item.id === orders[3].id).summary,
+  ).toMatchObject({ id: orders[3].id, stage: 'closed' });
+  expect(first.counts).toEqual({
+    all: 4,
+    attention: 0,
+    stages: { draft: 2, cancelled: 1, closed: 1 },
+  });
+  expect(first.totalCount).toBeNull();
+  expect(first.nextCursor).toBeNull();
+
+  // Search matches references, supplier names and line SKUs literally, ignoring case.
+  const search = async (q) =>
+    (await get('/purchase-orders', { q })).items.map((item) => item.reference);
+  expect(await search('tote-nat')).toEqual(['PO-004', 'PO-003']);
+  expect(await search('ALPINE')).toEqual(['po-001']);
+  expect(await search('100%')).toEqual(['PO-002']);
+  expect(await search('%')).toEqual(['PO-002']);
+  const filtered = await get('/purchase-orders', {
+    supplierId: suppliers[0].id,
+    status: 'draft',
+    count: 'exact',
+  });
+  expect(filtered.items.map((item) => item.reference)).toEqual(['PO-003']);
+  expect(filtered).toMatchObject({ totalCount: 1, counts: null });
+  // Stages come from the same progress rules as the order record.
+  const stage = await get('/purchase-orders', {
+    stage: 'draft',
+    sort: 'reference',
+    count: 'exact',
+  });
+  expect(stage.items.map((item) => item.reference)).toEqual([
+    'po-001',
+    'PO-003',
+  ]);
+  expect(stage.totalCount).toBe(2);
+  expect((await get('/purchase-orders', { stage: 'attention' })).items).toEqual(
+    [],
+  );
+
+  // Keyset pages follow the requested order and stay bound to their filters.
+  const pages = [];
+  let cursor;
+  do {
+    const page = await get('/purchase-orders', {
+      sort: 'supplier',
+      direction: 'desc',
+      limit: '1',
+      count: 'exact',
+      ...(cursor ? { cursor } : {}),
+    });
+    expect(page.totalCount).toBe(4);
+    pages.push(page.items[0].supplierName);
+    cursor = page.nextCursor;
+  } while (cursor);
+  expect(pages).toEqual([
+    'Zephyr Textiles',
+    'Zephyr Textiles',
+    'Meridian Goods',
+    'alpine Packaging',
+  ]);
+  const staged = await get('/purchase-orders', {
+    stage: 'draft',
+    sort: 'expected',
+    limit: '1',
+    count: 'exact',
+  });
+  expect(staged.totalCount).toBe(2);
+  const next = await get('/purchase-orders', {
+    stage: 'draft',
+    sort: 'expected',
+    limit: '1',
+    count: 'exact',
+    cursor: staged.nextCursor,
+  });
+  expect(next.totalCount).toBe(2);
+  expect(next.nextCursor).toBeNull();
+  expect(new Set([staged.items[0].id, next.items[0].id])).toEqual(
+    new Set([orders[0].id, orders[1].id]),
+  );
+  const mismatched = await get(
+    '/purchase-orders',
+    { stage: 'cancelled', sort: 'expected', cursor: staged.nextCursor },
+    400,
+  );
+  expect(mismatched.message).toMatch(/first page/);
+  await get('/purchase-orders', { cursor: 'not-a-cursor' }, 400);
+  await get('/purchase-orders', { limit: '51' }, 400);
+  await get('/purchase-orders', { stage: 'unknown' }, 400);
+
+  // Suppliers sort by name, creation or order count and include their order counts.
+  const directory = await get('/suppliers', { count: 'exact' });
+  expect(directory.items.map((item) => [item.name, item.orderCount])).toEqual([
+    ['alpine Packaging', 1],
+    ['Meridian Goods', 1],
+    ['Zephyr Textiles', 2],
+  ]);
+  expect(directory.totalCount).toBe(3);
+  const busiest = await get('/suppliers', { sort: 'orders', limit: '1' });
+  expect(busiest.items.map((item) => item.name)).toEqual(['Zephyr Textiles']);
+  const rest = await get('/suppliers', {
+    sort: 'orders',
+    limit: '2',
+    cursor: busiest.nextCursor,
+  });
+  expect(rest.items.map((item) => item.orderCount)).toEqual([1, 1]);
+  expect(rest.nextCursor).toBeNull();
+  expect(
+    (await get('/suppliers', { q: 'xentral' })).items.map((item) => item.name),
+  ).toEqual(['alpine Packaging']);
+  await get('/suppliers', { sort: 'name', cursor: busiest.nextCursor }, 400);
+
+  // Another workspace's members see neither its records nor a usable cursor.
+  const outsider = await signup(api, 'procurement-list-outsider');
+  const other = (
+    await api.request('/v1/organizations', {
+      cookie: outsider.cookie,
+      method: 'POST',
+      status: 201,
+      body: { name: 'Other', slug: 'other-list', dataRegion: 'EU' },
+    })
+  ).body;
+  const otherRoot = `/v1/organizations/${other.id}/procurement`;
+  const empty = (
+    await api.request(`${otherRoot}/purchase-orders`, {
+      cookie: outsider.cookie,
+    })
+  ).body;
+  expect(empty).toMatchObject({
+    items: [],
+    counts: { all: 0, attention: 0, stages: {} },
+  });
+  expect(
+    (await api.request(`${otherRoot}/suppliers`, { cookie: outsider.cookie }))
+      .body.items,
+  ).toEqual([]);
+  await api.request(
+    `${otherRoot}/suppliers?${new URLSearchParams({ sort: 'orders', cursor: busiest.nextCursor })}`,
+    { cookie: outsider.cookie, status: 400 },
+  );
+  await api.request(`${root}/purchase-orders`, {
+    cookie: outsider.cookie,
+    status: 404,
+  });
+});
+
+it('filters, groups and pages purchase orders and suppliers by catalog conditions', async (t) => {
+  const { db, api, owner, org, root } = await procurementFixture(t);
+  const post = async (path, body, status = 200) =>
+    (
+      await api.request(`${root}${path}`, {
+        cookie: owner.cookie,
+        method: 'POST',
+        body,
+        status,
+      })
+    ).body;
+  const encode = (query) =>
+    new URLSearchParams(
+      Object.entries(query).map(([key, value]) => [
+        key,
+        typeof value === 'object' ? JSON.stringify(value) : String(value),
+      ]),
+    );
+  const get = async (path, query = {}, status = 200) =>
+    (
+      await api.request(`${root}${path}?${encode(query)}`, {
+        cookie: owner.cookie,
+        status,
+      })
+    ).body;
+  const orders = (query, status) => get('/purchase-orders', query, status);
+  const all = (...conditions) => ({ match: 'all', conditions });
+  const any = (...conditions) => ({ match: 'any', conditions });
+  const refs = (page) => page.items.map((item) => item.reference).sort();
+  const day = 86_400_000;
+  const iso = (offset) => new Date(Date.now() + offset).toISOString();
+
+  const supplier = async (name) =>
+    post('/suppliers', { id: randomUUID(), name, externalReferences: [] });
+  const [acme, birch, cobalt, delta] = [
+    await supplier('Acme Bags'),
+    await supplier('birch Goods'),
+    await supplier('Cobalt Supply'),
+    await supplier('Delta Idle'),
+  ];
+  const warehouse = randomUUID();
+  const line = (sku, quantity, unitPrice, locationId) => ({
+    id: randomUUID(),
+    sku,
+    description: sku,
+    quantity,
+    unit: 'each',
+    ...(unitPrice ? { unitPrice } : {}),
+    ...(locationId ? { locationId } : {}),
+  });
+  const order = (reference, by, lines, extra = {}) =>
+    post('/purchase-orders', {
+      id: randomUUID(),
+      supplierId: by.id,
+      reference,
+      lines,
+      ...extra,
+    });
+  const transition = (target, status, expectedRevision = 1) =>
+    post(`/purchase-orders/${target.id}/transitions`, {
+      id: randomUUID(),
+      expectedRevision,
+      status,
+      reason: 'List review',
+    });
+  // A verified submission, as the purchasing system path records it.
+  const submit = async (target, submittedAt) => {
+    const id = randomUUID();
+    const document = {
+      id,
+      tenantId: org.id,
+      purchaseOrderId: target.id,
+      connectionId: randomUUID(),
+      supplier: { externalId: '1', scopeKey: '' },
+      requestedDeliveryDate: iso(30 * day).slice(0, 10),
+      lines: [],
+      actionId: 'action',
+      decisionId: randomUUID(),
+      requestedBy: owner.userId,
+      requestedAt: submittedAt,
+      expiresAt: submittedAt,
+      state: 'submitted',
+      externalOrder: { externalId: target.id, orderNumber: target.reference },
+      submittedAt,
+      decidedBy: owner.userId,
+      decidedAt: submittedAt,
+      failure: null,
+      updatedAt: submittedAt,
+    };
+    await db.owner.query(
+      'INSERT INTO procurement_submissions(tenant_id,id,purchase_order_id,connection_id,state,principal_id,document,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',
+      [
+        org.id,
+        id,
+        target.id,
+        document.connectionId,
+        'submitted',
+        owner.userId,
+        document,
+        submittedAt,
+      ],
+    );
+  };
+
+  const eur = (amount) => ({ amount, currency: 'EUR' });
+  const draft = await order('PO-DRAFT', acme, [
+    line('TOTE-NAT', 10, eur('2.50'), warehouse),
+  ]);
+  const overdue = await order('PO-OVERDUE', acme, [
+    line('BAG-1', 1, eur('100')),
+  ]);
+  const waiting = await order('PO-WAITING', birch, [line('TOTE-BLK', 4)]);
+  const cancelled = await order('PO-CANCELLED', birch, [
+    line('CUP-1', 1, eur('3')),
+    line('CUP-2', 1),
+  ]);
+  await order(
+    'PO-EXTERNAL',
+    cobalt,
+    [line('LID-1', 8, { amount: '5', currency: 'USD' })],
+    {
+      authority: 'external',
+      externalReferences: [{ system: 'ERP', externalId: 'E-1' }],
+    },
+  );
+  const followed = await order('PO-FOLLOWED', birch, [line('BOX-1', 2)]);
+  for (const target of [overdue, waiting, followed])
+    await transition(target, 'open');
+  await transition(cancelled, 'cancelled');
+  await submit(overdue, iso(-5 * day));
+  await submit(waiting, iso(-3_600_000));
+  await submit(followed, iso(-5 * day));
+  // The draft is older than a week.
+  const tenDaysAgo = iso(-10 * day);
+  await db.owner.query(
+    `UPDATE procurement_purchase_orders SET created_at=$3,document=jsonb_set(document,'{createdAt}',to_jsonb($4::text))
+     WHERE tenant_id=$1 AND id=$2`,
+    [org.id, draft.id, tenDaysAgo, tenDaysAgo],
+  );
+  await db.owner.query(
+    `UPDATE procurement_suppliers SET document=jsonb_set(document,'{createdAt}',to_jsonb($3::text))
+     WHERE tenant_id=$1 AND id=$2`,
+    [org.id, delta.id, tenDaysAgo],
+  );
+  // Following up on the missed confirmation hides it until the next check.
+  const nextCheck = iso(day);
+  const [followedSummary] = (
+    await orders({
+      where: all({ field: 'reference', op: 'is', value: 'PO-FOLLOWED' }),
+    })
+  ).items.map((item) => item.summary);
+  expect(followedSummary.attentionKinds).toEqual(['confirmation_overdue']);
+  await post(`/purchase-orders/${followed.id}/follow-ups`, {
+    id: randomUUID(),
+    key: `confirmation_overdue:${followed.id}:${followedSummary.confirmationDueAt}`,
+    response: 'following_up',
+    note: 'Called the supplier',
+    nextCheckAt: nextCheck,
+  });
+
+  // Stored and derived conditions combine; counts are exact.
+  const mixed = await orders({
+    where: all(
+      { field: 'supplier', op: 'any_of', value: [acme.id, birch.id] },
+      {
+        field: 'stage',
+        op: 'any_of',
+        value: ['draft', 'awaiting_confirmation'],
+      },
+    ),
+    count: 'exact',
+  });
+  expect(refs(mixed)).toEqual([
+    'PO-DRAFT',
+    'PO-FOLLOWED',
+    'PO-OVERDUE',
+    'PO-WAITING',
+  ]);
+  expect(mixed).toMatchObject({ totalCount: 4, counts: null });
+  const attention = await orders({
+    where: all({
+      field: 'attention',
+      op: 'any_of',
+      value: ['confirmation_overdue'],
+    }),
+  });
+  expect(refs(attention)).toEqual(['PO-OVERDUE']);
+  expect(attention.items[0].summary).toMatchObject({
+    stage: 'awaiting_confirmation',
+    nextOwner: 'buyer',
+    attentionKinds: ['confirmation_overdue'],
+    value: { amount: '100', currency: 'EUR' },
+  });
+  // `not_empty` is the legacy attention stage.
+  expect(
+    refs(await orders({ where: all({ field: 'attention', op: 'not_empty' }) })),
+  ).toEqual(refs(await orders({ stage: 'attention' })));
+  expect(
+    refs(
+      await orders({
+        where: all({ field: 'nextOwner', op: 'any_of', value: ['supplier'] }),
+      }),
+    ),
+  ).toEqual(['PO-FOLLOWED', 'PO-WAITING']);
+  const checks = await orders({
+    where: all({
+      field: 'nextCheck',
+      op: 'within_next',
+      value: { amount: 2, unit: 'day' },
+    }),
+  });
+  expect(refs(checks)).toEqual(['PO-FOLLOWED']);
+  expect(Date.parse(checks.items[0].summary.nextCheckAt)).toBe(
+    Date.parse(nextCheck),
+  );
+  expect(
+    refs(
+      await orders({
+        where: all({
+          field: 'created',
+          op: 'within_last',
+          value: { amount: 7, unit: 'day' },
+        }),
+        timeZone: 'Europe/Berlin',
+      }),
+    ),
+  ).toEqual([
+    'PO-CANCELLED',
+    'PO-EXTERNAL',
+    'PO-FOLLOWED',
+    'PO-OVERDUE',
+    'PO-WAITING',
+  ]);
+  expect(
+    refs(
+      await orders({
+        where: all({
+          field: 'created',
+          op: 'between',
+          value: { from: null, to: iso(-7 * day) },
+        }),
+      }),
+    ),
+  ).toEqual(['PO-DRAFT']);
+  expect(
+    refs(
+      await orders({
+        where: all({
+          field: 'value',
+          op: 'between',
+          value: { from: eur('20'), to: eur('50') },
+        }),
+      }),
+    ),
+  ).toEqual(['PO-DRAFT']);
+  expect(
+    refs(await orders({ where: all({ field: 'value', op: 'unknown' }) })),
+  ).toEqual(['PO-CANCELLED']);
+  expect(
+    refs(await orders({ where: all({ field: 'value', op: 'empty' }) })),
+  ).toEqual(['PO-FOLLOWED', 'PO-WAITING']);
+  expect(
+    refs(
+      await orders({
+        where: all({ field: 'sku', op: 'contains', value: 'tote' }),
+      }),
+    ),
+  ).toEqual(['PO-DRAFT', 'PO-WAITING']);
+  expect(
+    refs(
+      await orders({
+        where: all({ field: 'location', op: 'any_of', value: [warehouse] }),
+      }),
+    ),
+  ).toEqual(['PO-DRAFT']);
+  expect(
+    refs(
+      await orders({
+        where: all({ field: 'authority', op: 'any_of', value: ['external'] }),
+      }),
+    ),
+  ).toEqual(['PO-EXTERNAL']);
+  // Match any, with stored conditions only and mixed with derived ones.
+  expect(
+    refs(
+      await orders({
+        where: any(
+          { field: 'supplier', op: 'any_of', value: [cobalt.id] },
+          { field: 'sku', op: 'contains', value: 'BAG' },
+        ),
+      }),
+    ),
+  ).toEqual(['PO-EXTERNAL', 'PO-OVERDUE']);
+  expect(
+    refs(
+      await orders({
+        where: any(
+          { field: 'stage', op: 'any_of', value: ['cancelled'] },
+          { field: 'sku', op: 'contains', value: 'BAG' },
+        ),
+        count: 'exact',
+      }),
+    ),
+  ).toEqual(['PO-CANCELLED', 'PO-OVERDUE']);
+
+  // Derived sorts compare typed values; orders without a value come last.
+  const byValue = await orders({ sort: 'value', limit: 2 });
+  expect(byValue.items.map((item) => item.reference)).toEqual([
+    'PO-DRAFT',
+    'PO-OVERDUE',
+  ]);
+  const valuePages = [byValue.items];
+  for (let cursor = byValue.nextCursor; cursor;) {
+    const page = await orders({ sort: 'value', limit: 2, cursor });
+    valuePages.push(page.items);
+    cursor = page.nextCursor;
+  }
+  expect(
+    valuePages
+      .flat()
+      .map((item) => item.reference)
+      .slice(0, 3),
+  ).toEqual(['PO-DRAFT', 'PO-OVERDUE', 'PO-EXTERNAL']);
+  expect(valuePages.flat()).toHaveLength(6);
+  expect(
+    (await orders({ sort: 'nextCheck', limit: 1 })).items[0].reference,
+  ).toBe('PO-FOLLOWED');
+
+  // Groups count every match and page within one group through its cursor.
+  const bySupplier = await orders({ group: 'supplier', groupLimit: 1 });
+  expect(
+    bySupplier.groups.map((group) => [group.key, group.count, group.complete]),
+  ).toEqual([
+    [acme.id, 2, true],
+    [birch.id, 3, true],
+    [cobalt.id, 1, true],
+  ]);
+  expect(bySupplier).toMatchObject({
+    nextCursor: null,
+    groupsTruncated: false,
+    counts: null,
+  });
+  expect(bySupplier.items).toHaveLength(3);
+  const birchGroup = bySupplier.groups[1];
+  expect(birchGroup.nextCursor).toEqual(expect.any(String));
+  const birchRest = await orders({
+    group: 'supplier',
+    groupKey: JSON.stringify(birch.id),
+    limit: 5,
+    cursor: birchGroup.nextCursor,
+  });
+  expect(birchRest.items).toHaveLength(2);
+  expect(birchRest.groups).toEqual([
+    expect.objectContaining({
+      key: birch.id,
+      count: 3,
+      nextCursor: null,
+      itemIds: birchRest.items.map((item) => item.id),
+    }),
+  ]);
+  expect(
+    new Set([...birchGroup.itemIds, ...birchRest.groups[0].itemIds]),
+  ).toEqual(new Set([waiting.id, cancelled.id, followed.id]));
+  const byStage = await orders({ group: 'stage' });
+  expect(byStage.groups.map((group) => [group.key, group.count])).toEqual([
+    ['draft', 2],
+    ['awaiting_confirmation', 3],
+    ['cancelled', 1],
+  ]);
+  expect(byStage.groups[0].sums).toEqual([
+    { field: 'value', currency: 'EUR', amount: '25' },
+    { field: 'value', currency: 'USD', amount: '40' },
+  ]);
+  const byOwner = await orders({
+    group: 'nextOwner',
+    where: all({ field: 'status', op: 'none_of', value: ['cancelled'] }),
+  });
+  expect(byOwner.groups.map((group) => [group.key, group.count])).toEqual([
+    ['buyer', 3],
+    ['supplier', 2],
+  ]);
+
+  // Invalid requests and cursors from another query are refused.
+  const refused = async (query, message) =>
+    expect((await orders(query, 400)).message).toMatch(message);
+  await refused(
+    { where: all({ field: 'stage', op: 'contains', value: 'draft' }) },
+    'Condition 1: This field does not support this operator.',
+  );
+  await refused(
+    { where: all({ field: 'supplier', op: 'any_of', value: ['nope'] }) },
+    'Condition 1: This value is not a valid record ID.',
+  );
+  await refused({ group: 'expected' }, 'This field cannot be grouped.');
+  await refused(
+    { groupKey: JSON.stringify('draft') },
+    'Choose a grouping to read one group.',
+  );
+  await refused(
+    { group: 'supplier', cursor: birchGroup.nextCursor },
+    'group key',
+  );
+  const narrow = all({
+    field: 'stage',
+    op: 'any_of',
+    value: ['awaiting_confirmation'],
+  });
+  const firstPage = await orders({ where: narrow, limit: 1 });
+  expect(firstPage.nextCursor).toEqual(expect.any(String));
+  await refused(
+    {
+      where: all({ field: 'stage', op: 'any_of', value: ['draft'] }),
+      limit: 1,
+      cursor: firstPage.nextCursor,
+    },
+    'first page',
+  );
+  await refused(
+    {
+      group: 'supplier',
+      groupKey: JSON.stringify(acme.id),
+      cursor: birchGroup.nextCursor,
+    },
+    'first page',
+  );
+
+  // Supplier conditions: open orders, overdue confirmations and creation dates.
+  const suppliers = (where) =>
+    get('/suppliers', { where }).then((page) =>
+      page.items.map((item) => item.name),
+    );
+  expect(
+    await suppliers(all({ field: 'hasOpenOrders', op: 'is', value: true })),
+  ).toEqual(['Acme Bags', 'birch Goods']);
+  expect(
+    await suppliers(
+      all({ field: 'confirmationOverdue', op: 'is', value: true }),
+    ),
+  ).toEqual(['Acme Bags']);
+  expect(
+    await suppliers(
+      any(
+        { field: 'hasOpenOrders', op: 'is', value: false },
+        { field: 'confirmationOverdue', op: 'is', value: true },
+      ),
+    ),
+  ).toEqual(['Acme Bags', 'Cobalt Supply', 'Delta Idle']);
+  expect(
+    await suppliers(
+      all({ field: 'created', op: 'before', value: { dynamic: 'today' } }),
+    ),
+  ).toEqual(['Delta Idle']);
+  expect(
+    (
+      await get(
+        '/suppliers',
+        { where: all({ field: 'name', op: 'contains', value: 'a' }) },
+        400,
+      )
+    ).message,
+  ).toBe('Condition 1: This field cannot be filtered.');
+
+  // Another workspace sees none of these records and cannot continue their groups.
+  const outsider = await signup(api, 'procurement-conditions-outsider');
+  const other = (
+    await api.request('/v1/organizations', {
+      cookie: outsider.cookie,
+      method: 'POST',
+      status: 201,
+      body: { name: 'Other', slug: 'other-conditions', dataRegion: 'EU' },
+    })
+  ).body;
+  const otherRoot = `/v1/organizations/${other.id}/procurement`;
+  const otherOrders = (query, status = 200) =>
+    api
+      .request(`${otherRoot}/purchase-orders?${encode(query)}`, {
+        cookie: outsider.cookie,
+        status,
+      })
+      .then((response) => response.body);
+  expect(
+    (
+      await otherOrders({
+        where: all({ field: 'supplier', op: 'any_of', value: [acme.id] }),
+      })
+    ).items,
+  ).toEqual([]);
+  expect((await otherOrders({ group: 'supplier' })).groups).toEqual([]);
+  await otherOrders(
+    {
+      group: 'supplier',
+      groupKey: JSON.stringify(birch.id),
+      cursor: birchGroup.nextCursor,
+    },
+    400,
+  );
+});

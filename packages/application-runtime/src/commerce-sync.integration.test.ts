@@ -1411,6 +1411,16 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
           [tenant, connectionId, externalId],
         )
       ).rows[0]?.id;
+    const lastOrder = async (connectionId: string, externalId: string) =>
+      (
+        await owner.query<{ last_order_at: Date | null }>(
+          'SELECT last_order_at FROM customer_profiles WHERE tenant_id=$1 AND connection_id=$2 AND external_id=$3',
+          [tenant, connectionId, externalId],
+        )
+      ).rows[0]?.last_order_at?.toISOString() ?? null;
+    // Each profile keeps the latest placed date of the orders its source attributes to it.
+    expect(await lastOrder(shop, ada)).toBe('2026-08-02T10:00:00.000Z');
+    expect(await lastOrder(shop, grace)).toBe('2026-08-15T10:00:00.000Z');
     const ordersOf = async (customerId: string) =>
       (
         await workspace().list(context('viewer'), {
@@ -1493,6 +1503,9 @@ describe.skipIf(!databaseUrl)('commerce sync on PostgreSQL', () => {
     expect((await ordersOf((await profile(shop, grace))!)).sort()).toEqual(
       [two, await canonical(shop, 'order', '4')].sort(),
     );
+    // Moving an order recomputes both customers' last order dates.
+    expect(await lastOrder(shop, ada)).toBe('2026-08-01T10:00:00.000Z');
+    expect(await lastOrder(shop, grace)).toBe('2026-08-15T10:00:00.000Z');
 
     await owner.query(
       'INSERT INTO shopify_installation_bindings(tenant_id,app,shop,connection_id) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING',

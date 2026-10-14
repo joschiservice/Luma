@@ -32,6 +32,7 @@ import { usePermissions } from '../../kit/identity/permissions';
 import { createWebApiClient } from '../../lib/api-client';
 import { IdentityError } from '../../lib/api-error';
 import { privateQueryDefaults } from '../../lib/private-query';
+import { allSuppliersOptions } from '../../shared/procurement/suppliers';
 import { SectionHeading } from './section-heading';
 
 const reasons = {
@@ -130,18 +131,18 @@ function PolicyEditor({
   const id = useId();
   const { can } = usePermissions(organizationId);
   const suppliers = useQuery({
-    queryKey: [...key(organizationId), 'suppliers'],
-    ...privateQueryDefaults,
+    ...allSuppliersOptions(organizationId),
     enabled: can('procurement.read'),
-    queryFn: ({ signal }) =>
-      api.procurement.suppliers({ params: { organizationId } }, { signal }),
   });
   const orders = useQuery({
     queryKey: [...key(organizationId), 'orders'],
     ...privateQueryDefaults,
     enabled: can('procurement.read'),
     queryFn: ({ signal }) =>
-      api.procurement.orders({ params: { organizationId } }, { signal }),
+      api.procurement.orders(
+        { params: { organizationId }, query: { limit: 50 } },
+        { signal },
+      ),
   });
   const inventory = useQuery({
     queryKey: [...key(organizationId), 'locations'],
@@ -292,6 +293,16 @@ function PolicyEditor({
             {inventory.data?.nextCursor ? (
               <Alert tone="neutral">
                 {m.settings_autonomy_locations_partial()}
+              </Alert>
+            ) : null}
+            {suppliers.data?.truncated ? (
+              <Alert tone="neutral">
+                {m.settings_autonomy_suppliers_partial()}
+              </Alert>
+            ) : null}
+            {orders.data?.nextCursor ? (
+              <Alert tone="neutral">
+                {m.settings_autonomy_records_partial()}
               </Alert>
             ) : null}
             {(['supplierIds', 'locationIds', 'recordIds'] as const).map(

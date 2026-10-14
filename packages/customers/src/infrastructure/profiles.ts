@@ -89,6 +89,7 @@ const orderSchema = z
       })
       .strict(),
     customerExternalId: z.string().min(1).max(1024).nullable(),
+    placedAt: timestamp.nullable().optional(),
     observedAt: timestamp,
   })
   .strict();
@@ -262,8 +263,9 @@ export function createCustomerProfiles(db: TenantDatabase): CustomerProfiles {
         await tx.query(
           `INSERT INTO customer_profiles(tenant_id,connection_id,external_id,id,display_name,email,phone,address,state,
             source_created_at,order_count,amount_spent,currency,tags,contact_shared,address_shared,source_updated_at,
-            observed_at,observation_id)
-          VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+            observed_at,observation_id,last_order_at)
+          VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,
+            (SELECT max(placed_at) FROM customer_orders WHERE tenant_id=$1 AND connection_id=$2 AND customer_external_id=$3))
           ON CONFLICT(tenant_id,connection_id,external_id) DO UPDATE SET display_name=EXCLUDED.display_name,
             email=EXCLUDED.email,phone=EXCLUDED.phone,address=EXCLUDED.address,state=EXCLUDED.state,
             source_created_at=EXCLUDED.source_created_at,order_count=EXCLUDED.order_count,
@@ -309,13 +311,22 @@ export function createCustomerProfiles(db: TenantDatabase): CustomerProfiles {
         values.map((item) => item.order.externalId),
         values.map((item) => item.customerExternalId),
         values.map((item) => item.observedAt),
+        values.map((item) => item.placedAt ?? null),
       ];
-      const rows = `unnest($3::text[],$4::text[],$5::text[],$6::timestamptz[]) AS v(scope_key,external_id,customer,observed_at)`;
+      const rows = `unnest($3::text[],$4::text[],$5::text[],$6::timestamptz[],$7::timestamptz[])
+        AS v(scope_key,external_id,customer,observed_at,placed_at)`;
       const erased = `EXISTS (SELECT 1 FROM customer_erasures x WHERE x.tenant_id=$1 AND x.connection_id=$2
         AND x.external_digest=sha256(convert_to(v.customer,'UTF8')))`;
 
       await db.transaction(context.tenantId, async (tx) => {
         await lockConnection(tx, context.tenantId, connectionId);
+        // Customers whose last order date may change: earlier and newly reported buyers.
+        const previous = await tx.query<{ customer: string }>(
+          `SELECT DISTINCT o.customer_external_id AS customer FROM customer_orders o JOIN ${rows}
+          ON o.order_scope_key=v.scope_key AND o.order_external_id=v.external_id
+          WHERE o.tenant_id=$1 AND o.connection_id=$2`,
+          [context.tenantId, connectionId, ...columns],
+        );
         await tx.query(
           `DELETE FROM customer_orders o USING ${rows}
           WHERE o.tenant_id=$1 AND o.connection_id=$2 AND o.order_scope_key=v.scope_key
@@ -324,13 +335,29 @@ export function createCustomerProfiles(db: TenantDatabase): CustomerProfiles {
           [context.tenantId, connectionId, ...columns],
         );
         await tx.query(
-          `INSERT INTO customer_orders(tenant_id,connection_id,order_scope_key,order_external_id,customer_external_id,observed_at)
-          SELECT $1,$2,v.scope_key,v.external_id,v.customer,v.observed_at FROM ${rows}
+          `INSERT INTO customer_orders(tenant_id,connection_id,order_scope_key,order_external_id,customer_external_id,
+            observed_at,placed_at)
+          SELECT $1,$2,v.scope_key,v.external_id,v.customer,v.observed_at,v.placed_at FROM ${rows}
           WHERE v.customer IS NOT NULL AND NOT ${erased}
           ON CONFLICT(tenant_id,connection_id,order_scope_key,order_external_id) DO UPDATE
-          SET customer_external_id=EXCLUDED.customer_external_id,observed_at=EXCLUDED.observed_at
+          SET customer_external_id=EXCLUDED.customer_external_id,observed_at=EXCLUDED.observed_at,
+            placed_at=EXCLUDED.placed_at
           WHERE customer_orders.observed_at<=EXCLUDED.observed_at`,
           [context.tenantId, connectionId, ...columns],
+        );
+        const customers = [
+          ...new Set([
+            ...previous.rows.map((row) => row.customer),
+            ...values.flatMap((item) =>
+              item.customerExternalId ? [item.customerExternalId] : [],
+            ),
+          ]),
+        ];
+        await tx.query(
+          `UPDATE customer_profiles p SET last_order_at=(SELECT max(o.placed_at) FROM customer_orders o
+            WHERE o.tenant_id=p.tenant_id AND o.connection_id=p.connection_id AND o.customer_external_id=p.external_id)
+          WHERE p.tenant_id=$1 AND p.connection_id=$2 AND p.external_id=ANY($3::text[])`,
+          [context.tenantId, connectionId, customers],
         );
       });
     },

@@ -417,3 +417,79 @@
   gap: var(--content-gap);
   min-width: 0;
 }
+
+.orders-results {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.orders-preview {
+  min-height: min(720px, calc(100vh - 220px));
+}
+
+.order-preview {
+  display: grid;
+  gap: 16px;
+}
+
+.order-preview-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px 16px;
+  margin: 0;
+}
+
+.order-preview-fact dt {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.order-preview-fact dd {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  margin: 2px 0 0;
+  font-size: 13px;
+}
+
+.order-preview-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+}
+
+.order-preview-sources > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.order-preview-heading {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.order-preview-lines {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.order-preview-lines li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.order-preview-lines li > :first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

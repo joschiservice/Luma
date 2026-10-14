@@ -23,6 +23,24 @@ Search is a case-insensitive literal substring over issue ID, persisted target r
 action label, actor ID, the actor's name and current email, workflow name and workflow run ID.
 It does not search raw payloads or free-form audit details.
 
+`actor` keeps events recorded by any of up to 20 actors: user IDs, `luma` (actor kinds Luma
+and Luma support), `workflow` (events with a workflow) and `me`. The service resolves `me` to the
+reader before the store reads, so one shared view names each reader's own events. The filter
+compares against the attribution the row shows, so a person also matches workflow runs that act
+for them, and service identifiers are never people. It only narrows rows the visibility rules
+already admitted: restricted events still need `activity.read_restricted`.
+
+## Saved views
+
+The Activity page keeps its filters as view conditions on `activityCatalog`, so they can be
+saved, shared and remembered; search text, the page cursor and the open event stay in the URL
+only. The API takes one value per filter except actors, so a condition with several values, a
+repeated field or "match any" of several conditions needs repair rather than a broader read.
+Recorded-time presets are stored as `within_last` and resolved to calendar days in the
+workspace time zone on each read; custom ranges are stored as `between` days. Saved Activity
+views have no metrics, charts, actions or export, because the view engine has no Activity
+reader.
+
 ## Attribution
 
 Each event names its actor in the same page query, so cost does not grow with page size.

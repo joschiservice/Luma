@@ -187,7 +187,7 @@ test('reviews grouped purchasing evidence and independently approved drafts acro
     },
     { times: 1 },
   );
-  const url = `/app/${org}/procurement?view=purchasing&q=&status=`;
+  const url = `/app/${org}/procurement?tab=purchasing`;
   await page.goto(url);
   await expect(
     page.getByRole('status').filter({ hasText: 'Reading purchasing evidence' }),

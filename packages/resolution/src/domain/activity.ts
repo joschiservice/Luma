@@ -29,6 +29,12 @@ export interface ActivityQuery {
   connectionId?: string | undefined;
   type?: ActivityType | undefined;
   outcome?: ActivityOutcome | undefined;
+  /**
+   * Keeps events recorded by any of these actors: user IDs, `luma` for Luma itself and Luma
+   * support, `workflow` for events a workflow run recorded. The service resolves `me` to the
+   * reader's user ID before the store reads.
+   */
+  actor?: readonly string[] | undefined;
   limit: number;
   cursor?: string | undefined;
   /** Keeps only events for these linked issues, workflow runs or order references. */

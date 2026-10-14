@@ -12,6 +12,8 @@ import {
   orderSummarySchema,
   purchaseOrderDetailSchema,
   purchaseOrderInputSchema,
+  purchaseOrderListQuerySchema,
+  purchaseOrderListSchema,
   purchaseOrderRecordSchema,
   purchaseOrderSchema,
   purchasingConnectionSchema,
@@ -23,6 +25,8 @@ import {
   submissionViewSchema,
   supplierInputSchema,
   supplierLinkInputSchema,
+  supplierListQuerySchema,
+  supplierListSchema,
   supplierRecordSchema,
   supplierSchema,
   transitionInputSchema,
@@ -107,18 +111,20 @@ export const procurementContract = {
       method: 'GET',
       path: `${path}/suppliers`,
       summary: 'List workspace suppliers',
+      description:
+        'Returns one page of suppliers with their purchase-order count. `nextCursor` continues the same search and sort.',
     })
     .meta({
       access: requires('procurement.read'),
       errors: [401, 403, 404, 409, 503],
     })
-    .input(z.object({ params: organizationParamsSchema }))
-    .output(
+    .input(
       z.object({
-        items: z.array(supplierSchema),
-        canManage: z.boolean(),
+        params: organizationParamsSchema,
+        query: supplierListQuerySchema,
       }),
-    ),
+    )
+    .output(supplierListSchema),
   createSupplier: endpoint
     .route({
       method: 'POST',
@@ -140,18 +146,20 @@ export const procurementContract = {
       method: 'GET',
       path: `${path}/purchase-orders`,
       summary: 'List workspace purchase orders',
+      description:
+        'Returns one page of purchase orders with their stage, expected date and attention, filtered and sorted on the server. Stage and attention depend on the evaluation time; later pages keep the time of the first page. `nextCursor` continues the same filters and sort; a cursor from other filters returns 400.',
     })
     .meta({
       access: requires('procurement.read'),
       errors: [401, 403, 404, 409, 503],
     })
-    .input(z.object({ params: organizationParamsSchema }))
-    .output(
+    .input(
       z.object({
-        items: z.array(purchaseOrderSchema),
-        canManage: z.boolean(),
+        params: organizationParamsSchema,
+        query: purchaseOrderListQuerySchema,
       }),
-    ),
+    )
+    .output(purchaseOrderListSchema),
   createOrder: endpoint
     .route({
       method: 'POST',

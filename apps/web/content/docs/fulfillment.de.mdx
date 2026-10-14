@@ -16,9 +16,28 @@ Die Seite öffnet mit **Braucht Aufmerksamkeit**: zurückgehaltene, verzögerte 
 - **Verspätete Zustellung**: Eine Sendung hat ihr voraussichtliches Lieferdatum überschritten und ist nicht zugestellt.
 - **Fehlgeschlagen**: Die Quelle meldet, dass das Fulfillment fehlgeschlagen ist.
 
-Die weiteren Ansichten sind **Zurückgehalten**, **Verzögert**, **Offene Arbeit**, **Unterwegs** und **Alle**. Suche nach Bestellnummer, Sendungsnummer, Standort oder Quell-ID. Grenze die Liste mit **Quelle**, **Standort** und **Typ** ein, und sortiere nach **Längste Wartezeit**, **Letzter Fortschritt** oder **Termin**. Ansicht und Filter sind Teil der Seitenadresse. So kannst du sie teilen oder an die Seitenleiste anheften.
+Die weiteren festen Ansichten sind **Zurückgehalten**, **Verzögert**, **Offene Arbeit**, **Unterwegs** und **Alle**. Die Reiter über der Liste zeigen, wie viele Fulfillments jede Ansicht bei deiner Suche und deinen Filtern enthält; das Ansichtsmenü listet auch die Ansichten, die du und dein Team gespeichert haben. Öffnest du **Fulfillment** über die Seitenleiste, kehrst du zur zuletzt genutzten Ansicht zurück, mit allen noch nicht gespeicherten Änderungen.
 
-Eine leere Ansicht, etwa **Keine Fulfillments brauchen Aufmerksamkeit**, gilt nur für diese Ansicht. **Keine Fulfillments entsprechen diesen Filtern** bedeutet, dass Suche oder Filter alles ausschließen. **Noch keine Fulfillments** bedeutet, dass noch kein verbundenes System Fulfillment-Arbeit gemeldet hat. Siehe [Datenabgleich](/docs/data-sync).
+Suche nach Bestellnummer, Sendungsnummer, Standort oder Quell-ID. **Quelle**, **Status**, **Signale**, **Standort** und **Versandphase** über der Liste grenzen sie mit einem Klick ein. Für alles andere wähle **Filter** und ein Feld, etwa **Typ**, **Zurückhaltungen**, **Versanddienstleister**, **Status beim Versanddienstleister**, **Art der Zustellung**, **Mit Sendungsverfolgung**, **Fulfillment bis**, **Voraussichtliche Zustellung** oder **Bestellt am**, dann eine Bedingung und einen Wert. Zurückhaltungen, die eine Quelle nicht meldet, etwa JTL-Wawi, sind unbekannt: Sie passen zu **ist unbekannt**, nie zu einem Grund oder zu **ist leer**. Das Sortiermenü nennt die aktuelle Reihenfolge, etwa **Letzter Fortschritt**; wähle es, um nach **Termin**, **Bestellnummer**, **Standort** oder einem Datum zu sortieren oder die Richtung umzukehren. Arbeit ohne den sortierten Wert steht immer am Ende. **Leeren** entfernt alle Filter und die Suche.
+
+Eine leere Ansicht, etwa **Keine Fulfillments brauchen Aufmerksamkeit**, gilt nur für diese Ansicht. **Keine Fulfillments entsprechen diesen Filtern** bedeutet, dass Suche oder Filter alles ausschließen. **Noch keine Fulfillments** bedeutet, dass noch kein verbundenes System Fulfillment-Arbeit gemeldet hat. Siehe [Datenabgleich](/docs/data-sync). Nutzt eine Ansicht einen Filter, den du nicht verwenden darfst, sagt Luma das, statt mehr Arbeit zu zeigen, als die Ansicht meint; wähle **Nicht unterstützte Bedingungen entfernen**.
+
+## Liste anordnen [#arrange-the-list]
+
+Unter **Darstellung** änderst du, wie die Liste aussieht:
+
+- **Layout**: **Tabelle** zeigt Spalten, **Liste** zeigt eine Zeile pro Fulfillment mit den Eigenschaften deiner Wahl, und **Board** zeigt eine Spalte pro Gruppe, etwa eine pro Versandphase. Arbeit lässt sich nicht zwischen Spalten verschieben, weil die Phase aus deinen verbundenen Systemen stammt.
+- **Spalten** oder **Eigenschaften**: Wähle, was jedes Fulfillment zeigt und in welcher Reihenfolge.
+- **Gruppieren nach**: Gruppiere nach Status, Signal, Versandphase, Status beim Versanddienstleister, Typ, Quelle, Standort, Versanddienstleister oder Zustellart und Daten nach Tag, Woche oder Monat. Arbeit mit zwei Signalen erscheint in beiden Gruppen. **Unvollständig** bedeutet, dass eine Quelle ihren Fulfillment-Verlauf noch importiert.
+- **Datensätze in einer Vorschau öffnen**: Ein gewähltes Fulfillment zeigt neben der Liste, was es blockiert, den nächsten sicheren Schritt und seine Artikel. In der Vorschau kannst du die Liste auf Status, Typ, Quelle, Standort oder Versanddienstleister eingrenzen oder diese ausblenden.
+
+## Ansichten speichern und teilen [#save-and-share-views]
+
+Änderst du Filter, Sortierung, Gruppierung oder Darstellung, ist die Ansicht **Geändert**. Wähle **Als neue Ansicht speichern**, um deine Änderungen zu behalten, **Speichern**, um eine gespeicherte Ansicht zu aktualisieren, die du bearbeiten darfst, oder **Zurücksetzen**, um sie zu verwerfen. Siehe [Gespeicherte Ansichten](/docs/saved-views). Eine gespeicherte Ansicht kann über der Liste auch Kennzahlen und Diagramme zeigen.
+
+## Mit der Tastatur arbeiten [#work-from-the-keyboard]
+
+**J** und **K** bewegen dich durch die Arbeit, **Enter** öffnet sie, die **Leertaste** öffnet sie in der Vorschau, **X** wählt sie aus, **/** springt zur Suche, **F** fügt einen Filter hinzu und **?** listet alle Tastenkürzel.
 
 ## Fulfillment lesen [#read-a-fulfillment]
 

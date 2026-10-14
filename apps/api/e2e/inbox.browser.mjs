@@ -89,8 +89,9 @@ test('works supplier and customer threads, documents, replies and mailbox rules'
     .filter({ has: page.locator('#thread-' + supplierThread.id) });
   await expect(rows.getByRole('link')).toHaveCount(2);
 
-  // J and K move through the list.
+  // J focuses the first thread, Space opens it, and J and K move the open thread.
   await page.keyboard.press('j');
+  await page.keyboard.press('Space');
   await expect(page).toHaveURL(/thread=/);
   const first = new URL(page.url()).searchParams.get('thread');
   await page.keyboard.press('j');

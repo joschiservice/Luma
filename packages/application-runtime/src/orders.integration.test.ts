@@ -6,7 +6,7 @@ import {
   createAdaptiveViews,
 } from '@luma/adaptive/composition';
 import {
-  adaptiveViewQuerySchema,
+  adaptiveViewQueryV1Schema,
   orderListQuerySchema,
 } from '@luma/api-contract';
 import { buildApp, createCommerceServices } from '@luma/application-runtime';
@@ -41,6 +41,7 @@ import {
   createTenantDatabase,
 } from '@luma/platform/composition';
 import {
+  createCustomerWorkspace,
   createOperationalMetrics,
   createOrderWorkspace,
   createSourceOrderLines,
@@ -346,7 +347,10 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     // The writer mirrors the ingestion worker; the reader mirrors the API login.
     for (const [role, grants] of [
       [`${name}_w`, 'luma_connectors,luma_orders,luma_inventory'],
-      [`${name}_r`, 'luma_connectors,luma_case_reader,luma_desk,luma_adaptive'],
+      [
+        `${name}_r`,
+        'luma_connectors,luma_case_reader,luma_desk,luma_adaptive,luma_commerce_sync',
+      ],
     ] as const) {
       await admin.query(
         `CREATE ROLE "${role}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,
@@ -817,6 +821,381 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     expect(await orders.get(context(otherTenant), a)).toBeNull();
   }, 60000);
 
+  it('filters and groups orders by projected commercial facts', async () => {
+    const { a, b, c } = await seedWorkspace();
+    const tagged = await seedOrder({
+      connectionId: shopify,
+      external: 'gid://shopify/Order/1009',
+      key: 'order-tagged',
+      updatedAt: '2026-09-20T09:00:00Z',
+      data: {
+        displayNumber: '#1009',
+        placedAt: '2026-09-12T08:00:00Z',
+        total: { amount: '20.00', currency: 'EUR' },
+        currencies: { shop: 'EUR', presentment: 'EUR' },
+        tags: ['wholesale', 'priority'],
+        discounts: [
+          {
+            index: 0,
+            kind: 'code',
+            label: 'WELCOME10',
+            target: 'line_item',
+            allocation: 'across',
+            value: null,
+          },
+        ],
+        shippingLines: [
+          {
+            id: null,
+            title: 'Express',
+            code: null,
+            source: null,
+            carrier: null,
+            removed: null,
+            original: null,
+            discounted: null,
+            current: null,
+          },
+        ],
+        attributes: {
+          edited: null,
+          requiresShipping: true,
+          test: true,
+          cancelReason: null,
+          cancelledAt: null,
+          closedAt: null,
+          processedAt: null,
+          channel: 'Online Store',
+          fulfillmentStatus: null,
+        },
+      },
+      lines: [
+        {
+          external: 'gid://shopify/LineItem/19',
+          key: 'order-tagged-line',
+          quantity: '1',
+          sku: { external: 'gid://shopify/InventoryItem/31', key: 'tote' },
+          skuCode: 'TOTE-RED',
+        },
+      ],
+    });
+    const orders = workspace();
+
+    type Query = Parameters<typeof orders.list>[1];
+
+    const list = (query: Partial<Query> = {}) =>
+      orders.list(context(), {
+        q: '',
+        view: 'all',
+        sort: 'updated',
+        direction: 'desc',
+        limit: 50,
+        ...query,
+      });
+    const ids = async (conditions: NonNullable<Query['where']>['conditions']) =>
+      (await list({ where: { match: 'all', conditions } })).items.map(
+        (item) => item.id,
+      );
+
+    expect(
+      await ids([{ field: 'tags', op: 'any_of', value: ['wholesale'] }]),
+    ).toEqual([tagged]);
+    expect(
+      await ids([
+        { field: 'tags', op: 'all_of', value: ['wholesale', 'missing'] },
+      ]),
+    ).toEqual([]);
+    expect((await ids([{ field: 'tags', op: 'empty' }])).sort()).toEqual(
+      [a, b, c].sort(),
+    );
+    expect(
+      await ids([
+        { field: 'discountCode', op: 'any_of', value: ['WELCOME10'] },
+        { field: 'shippingMethod', op: 'any_of', value: ['Express'] },
+        { field: 'channel', op: 'is', value: 'Online Store' },
+        { field: 'test', op: 'is', value: true },
+        { field: 'currency', op: 'is', value: 'EUR' },
+      ]),
+    ).toEqual([tagged]);
+    // Orders that report no test flag are unknown, not false.
+    expect(await ids([{ field: 'test', op: 'is', value: false }])).toEqual([]);
+    const item = (await list()).items.find((order) => order.id === tagged);
+    expect(item).toMatchObject({
+      channel: 'Online Store',
+      tags: ['priority', 'wholesale'],
+      test: true,
+    });
+    const grouped = await list({ group: { field: 'tags' }, groupLimit: 5 });
+    expect(grouped.groups?.map((group) => [group.key, group.count])).toEqual(
+      expect.arrayContaining([
+        ['priority', 1],
+        ['wholesale', 1],
+      ]),
+    );
+  }, 60000);
+
+  it('filters, sorts, groups and pages orders by catalog conditions', async () => {
+    const { a, b, c } = await seedWorkspace();
+    const orders = workspace();
+
+    type Query = Parameters<typeof orders.list>[1];
+
+    const list = (query: Partial<Query> = {}, actor = context()) =>
+      orders.list(actor, {
+        q: '',
+        count: 'exact',
+        view: 'all',
+        sort: 'updated',
+        direction: 'desc',
+        limit: 50,
+        ...query,
+      });
+    const where = (
+      conditions: NonNullable<Query['where']>['conditions'],
+      match: 'all' | 'any' = 'all',
+    ) => ({ where: { match, conditions } });
+    const ids = async (query: Partial<Query>) =>
+      (await list(query)).items.map((item) => item.id);
+    const sorted = (values: string[]) => [...values].sort();
+
+    expect(
+      await ids(
+        where([{ field: 'status', op: 'any_of', value: ['completed'] }]),
+      ),
+    ).toEqual([b]);
+    expect(
+      await ids(
+        where([
+          {
+            field: 'total',
+            op: 'gte',
+            value: { amount: '40', currency: 'EUR' },
+          },
+        ]),
+      ),
+    ).toEqual([a]);
+    // Amounts never match another currency, and missing totals never match a comparison.
+    expect(
+      await ids(
+        where([
+          { field: 'total', op: 'gt', value: { amount: '1', currency: 'USD' } },
+        ]),
+      ),
+    ).toEqual([]);
+    expect(
+      await ids(
+        where([
+          {
+            field: 'total',
+            op: 'lt',
+            value: { amount: '1000', currency: 'EUR' },
+          },
+        ]),
+      ),
+    ).toEqual([a]);
+    expect(sorted(await ids(where([{ field: 'total', op: 'empty' }])))).toEqual(
+      sorted([b, c]),
+    );
+    expect(
+      await ids(where([{ field: 'lineCount', op: 'eq', value: 0 }])),
+    ).toEqual([]);
+    // Unknown overdue state matches neither true nor false.
+    expect(
+      await ids(where([{ field: 'overdue', op: 'is', value: true }])),
+    ).toEqual([c]);
+    expect(
+      await ids(where([{ field: 'overdue', op: 'is', value: false }])),
+    ).toEqual([b]);
+    expect(
+      sorted(
+        await ids(
+          where(
+            [
+              { field: 'status', op: 'any_of', value: ['completed'] },
+              { field: 'overdue', op: 'is', value: true },
+            ],
+            'any',
+          ),
+        ),
+      ),
+    ).toEqual(sorted([b, c]));
+    expect(
+      await ids(where([{ field: 'needsYou', op: 'is', value: true }])),
+    ).toEqual([a]);
+    expect(
+      await ids(where([{ field: 'hasIssue', op: 'is', value: true }])),
+    ).toEqual([a]);
+    expect(
+      sorted(await ids(where([{ field: 'needsYou', op: 'is', value: false }]))),
+    ).toEqual(sorted([b, c]));
+    expect(
+      await ids(where([{ field: 'source', op: 'any_of', value: [jtl] }])),
+    ).toEqual([a]);
+    expect(
+      sorted(
+        await ids(where([{ field: 'source', op: 'none_of', value: [jtl] }])),
+      ),
+    ).toEqual(sorted([b, c]));
+    expect(
+      await ids(
+        where([{ field: 'placed', op: 'before', value: '2026-09-11' }]),
+      ),
+    ).toEqual([a]);
+    // The read clock is 2026-09-20T12:00Z: nine local days back starts on 2026-09-11 in UTC,
+    // but on 2026-09-12 in Kiritimati (UTC+14), where it is already 2026-09-21.
+    const lastNineDays = where([
+      { field: 'placed', op: 'within_last', value: { amount: 9, unit: 'day' } },
+    ]);
+    expect(sorted(await ids(lastNineDays))).toEqual(sorted([b, c]));
+    expect(
+      await ids({ ...lastNineDays, timeZone: 'Pacific/Kiritimati' }),
+    ).toEqual([c]);
+    await expect(
+      list(where([{ field: 'number', op: 'contains', value: '1' }])),
+    ).rejects.toMatchObject({ statusCode: 400 });
+
+    // Missing values sort last in both directions; totals sort within their currency.
+    expect((await ids({ sort: 'total', direction: 'desc' }))[0]).toBe(a);
+    expect((await ids({ sort: 'total', direction: 'asc' }))[0]).toBe(a);
+    expect((await ids({ sort: 'status', direction: 'asc' })).at(-1)).toBe(b);
+    expect((await ids({ sort: 'status', direction: 'desc' }))[0]).toBe(b);
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await list({
+        sort: 'total',
+        direction: 'desc',
+        limit: 1,
+        cursor,
+      });
+      seen.push(...page.items.map((item) => item.id));
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor);
+    expect(seen[0]).toBe(a);
+    expect(sorted(seen)).toEqual(sorted([a, b, c]));
+
+    // Groups count every match and list their first rows in sort order.
+    const byStatus = await list({
+      group: { field: 'status' },
+      groupLimit: 1,
+      sort: 'placed',
+      direction: 'asc',
+    });
+    expect(byStatus.nextCursor).toBeNull();
+    expect(
+      byStatus.groups!.map((group) => [group.key, group.count, group.itemIds]),
+    ).toEqual([
+      ['open', 2, [a]],
+      ['completed', 1, [b]],
+    ]);
+    expect(byStatus.groups![0]).toMatchObject({
+      complete: true,
+      sums: [{ field: 'total', currency: 'EUR', amount: '48' }],
+    });
+    expect(sorted(byStatus.items.map((item) => item.id))).toEqual(
+      sorted([a, b]),
+    );
+    const rest = await list({
+      group: { field: 'status' },
+      groupKey: 'open',
+      sort: 'placed',
+      direction: 'asc',
+      limit: 5,
+      cursor: byStatus.groups![0]!.nextCursor!,
+    });
+    expect(rest.items.map((item) => item.id)).toEqual([c]);
+    expect(rest.groups).toMatchObject([
+      { key: 'open', count: 2, itemIds: [c] },
+    ]);
+    // A group's page link belongs to that group only.
+    await expect(
+      list({
+        group: { field: 'status' },
+        groupKey: 'completed',
+        sort: 'placed',
+        direction: 'asc',
+        cursor: byStatus.groups![0]!.nextCursor!,
+      }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+
+    const byDay = await list({
+      group: { field: 'placed', granularity: 'day' },
+      timeZone: 'Pacific/Kiritimati',
+    });
+    expect(byDay.groups!.map((group) => [group.key, group.count])).toEqual([
+      ['2026-09-10', 1],
+      ['2026-09-11', 1],
+      ['2026-09-12', 1],
+    ]);
+    const bySource = await list({ group: { field: 'source' } });
+    expect(bySource.groups!.map((group) => [group.key, group.count])).toEqual(
+      [
+        [jtl, 1],
+        [shopify, 3],
+      ].sort(([x], [y]) => String(x).localeCompare(String(y))),
+    );
+    const byAttention = await list({ group: { field: 'needsYou' } });
+    expect(
+      byAttention.groups!.map((group) => [group.key, group.count]),
+    ).toEqual([
+      [true, 1],
+      [false, 2],
+    ]);
+    const empty = await list({
+      ...where([{ field: 'status', op: 'any_of', value: ['cancelled'] }]),
+      group: { field: 'status' },
+    });
+    expect(empty).toMatchObject({ items: [], groups: [], totalCount: 0 });
+
+    // Warehouse conditions need fulfillment access, like the warehouse filter.
+    const ordersOnly = makeTenantContext(
+      { userId: 'orders', sessionId: 'session' },
+      {
+        id: tenant,
+        name: 'Fixture',
+        slug: 'fixture',
+        status: 'active',
+        dataRegion: 'EU',
+      },
+      {
+        ...builtInMembership(
+          { id: 'm-orders', organizationId: tenant, userId: 'orders' },
+          'member',
+        ),
+        permissions: new PermissionSet(['orders.read']),
+      },
+      randomUUID(),
+    );
+    await expect(
+      list(
+        where([{ field: 'warehouse', op: 'any_of', value: [randomUUID()] }]),
+        ordersOnly,
+      ),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    await expect(
+      list({ group: { field: 'warehouse' } }, ordersOnly),
+    ).rejects.toMatchObject({ statusCode: 403 });
+
+    // Conditions wait for a complete projection instead of filtering the legacy read.
+    await owner.query(
+      'INSERT INTO orders_list_backfill(tenant_id) VALUES($1)',
+      [tenant],
+    );
+    try {
+      await expect(
+        list(where([{ field: 'status', op: 'any_of', value: ['open'] }])),
+      ).rejects.toMatchObject({ statusCode: 503 });
+      await expect(list({ sort: 'total' })).rejects.toMatchObject({
+        statusCode: 503,
+      });
+      expect((await list()).totalCount).toBe(3);
+    } finally {
+      await owner.query('DELETE FROM orders_list_backfill WHERE tenant_id=$1', [
+        tenant,
+      ]);
+    }
+  }, 60000);
+
   it('cites the orders the Orders page lists for the same filters, within one tenant', async () => {
     const { a, foreignOrder } = await seedWorkspace();
     const orders = workspace();
@@ -1222,6 +1601,73 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     ).toEqual([]);
   }, 30000);
 
+  it('matches customer names and emails only for readers who can read customers', async () => {
+    const { a } = await seedWorkspace();
+    const profile = (name: string, external: string) =>
+      owner.query(
+        `INSERT INTO customer_profiles(tenant_id,connection_id,external_id,id,display_name,email,state,
+          contact_shared,address_shared,observed_at,observation_id)
+         VALUES($1,$2,$3,gen_random_uuid(),$4,$5,'enabled',true,false,now(),gen_random_uuid())`,
+        [tenant, shopify, external, name, `${external}@example.test`],
+      );
+    await profile('Mira Sato', 'mira');
+    await owner.query(
+      `INSERT INTO customer_orders(tenant_id,connection_id,order_scope_key,order_external_id,customer_external_id,observed_at)
+       VALUES($1,$2,'','gid://shopify/Order/1001','mira',now())`,
+      [tenant, shopify],
+    );
+    const query = {
+      q: 'mira sato',
+      view: 'all' as const,
+      sort: 'updated' as const,
+      direction: 'desc' as const,
+      limit: 50,
+    };
+    const ordersOnly = {
+      ...context(),
+      permissions: new PermissionSet(['orders.read']),
+    };
+    expect(
+      (await workspace().list(context(), query)).items.map((x) => x.id),
+    ).toEqual([a]);
+    expect(
+      (
+        await workspace().list(context(), { ...query, q: 'MIRA@EXAMPLE' })
+      ).items.map((x) => x.id),
+    ).toEqual([a]);
+    expect(
+      (await workspace().list(context(), { ...query, connectionId: jtl }))
+        .items,
+    ).toEqual([]);
+    expect((await workspace().list(ordersOnly, query)).items).toEqual([]);
+
+    // A customer with more than 1,000 orders switches to the broad plan, which checks rows
+    // in sort order instead of binding every order ID.
+    await profile('Common Buyer', 'common');
+    await owner.query(
+      `INSERT INTO connector_source_mappings(id,tenant_id,connection_id,resource,scope_key,external_id,canonical_id,observation_id,method,actor_id)
+       SELECT gen_random_uuid(),tenant_id,connection_id,'order','','bulk-order-'||n,gen_random_uuid(),observation_id,method,actor_id
+       FROM connector_source_mappings CROSS JOIN generate_series(1,1100) n
+       WHERE tenant_id=$1 AND canonical_id=$2 AND resource='order' AND connection_id=$3`,
+      [tenant, a, shopify],
+    );
+    await owner.query(
+      `INSERT INTO customer_orders(tenant_id,connection_id,order_scope_key,order_external_id,customer_external_id,observed_at)
+       SELECT $1,$2,'','bulk-order-'||n,'common',now() FROM generate_series(1,1100) n`,
+      [tenant, shopify],
+    );
+    // The order Mira placed now belongs to the common buyer.
+    await owner.query(
+      `UPDATE customer_orders SET customer_external_id='common' WHERE tenant_id=$1 AND order_external_id='gid://shopify/Order/1001'`,
+      [tenant],
+    );
+    const broad = { ...query, q: 'common buyer' };
+    expect(
+      (await workspace().list(context(), broad)).items.map((x) => x.id),
+    ).toEqual([a]);
+    expect((await workspace().list(ordersOnly, broad)).items).toEqual([]);
+  }, 30000);
+
   it('publishes search and state atomically, preserves replay and rejects stale snapshots', async () => {
     const { a } = await seedWorkspace();
     const current = (await services.orders.current(context(), a)).find(
@@ -1386,8 +1832,13 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
       }),
     ).toEqual({
       ...expected,
+      // Legacy reads do not project commercial facts; they stay absent rather than empty.
       items: expected.items.map((item) => ({
-        ...item,
+        ...Object.fromEntries(
+          Object.entries(item).filter(
+            ([key]) => !['channel', 'tags', 'test'].includes(key),
+          ),
+        ),
         differs: false,
         comparisonState: 'inconclusive',
       })),
@@ -1498,13 +1949,14 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
         SELECT gen_random_uuid(),$1,s.id,'order',s.connection_id,
           CASE WHEN s.connection_id=$2 THEN $4 ELSE $8 END::uuid,'import/1',$5,
           timestamptz '2024-01-01' + s.n * interval '17 minutes',timestamptz '2026-09-19',
-          jsonb_set(jsonb_set(jsonb_set(jsonb_set(jsonb_set(jsonb_set(jsonb_set($7::jsonb,
+          jsonb_set(jsonb_set(jsonb_set(jsonb_set(jsonb_set(jsonb_set(jsonb_set(jsonb_set($7::jsonb,
             '{entityId}',to_jsonb(s.id::text)),'{connectionId}',to_jsonb(s.connection_id::text)),
             '{observationId}',to_jsonb(CASE WHEN s.connection_id=$2 THEN $4 ELSE $8 END::text)),
             '{sourceUpdatedAt}',to_jsonb(to_char((timestamptz '2024-01-01' + s.n * interval '17 minutes') AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"'))),
             '{data,displayNumber}',to_jsonb('#' || (100000 + s.n))),
             '{data,placedAt}',to_jsonb(to_char((timestamptz '2024-01-01' + s.n * interval '13 minutes' + s.offset_minutes * interval '1 minute') AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"'))),
-            '{data,status}',to_jsonb(CASE WHEN s.n % 4 = 0 THEN 'completed' ELSE 'open' END))
+            '{data,status}',to_jsonb(CASE WHEN s.n % 4 = 0 THEN 'completed' ELSE 'open' END)),
+            '{data,total}',jsonb_build_object('amount',round((s.n * 37) % 100000 / 100.0,2)::text,'currency',CASE WHEN s.n % 5 = 0 THEN 'USD' ELSE 'EUR' END))
         FROM sources s RETURNING entity_id,connection_id,id
       ) INSERT INTO orders_projections(tenant_id,entity_id,connection_id,snapshot_id)
         SELECT $1,entity_id,connection_id,id FROM snapshots`,
@@ -1681,7 +2133,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
     const position = JSON.parse(
       Buffer.from(firstPage.nextCursor!, 'base64url').toString(),
     );
-    position.key = middle.placed_key;
+    position.keys = [middle.placed_key];
     position.id = middle.entity_id;
     const deep = await timed('deep cursor', (workspace) =>
       workspace.list(context(), {
@@ -1690,6 +2142,109 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
       }),
     );
     expect(deep.items).toHaveLength(100);
+    // Catalog conditions, new sorts and groups over the same import.
+    const conditions = (
+      list: NonNullable<
+        Parameters<typeof orders.list>[1]['where']
+      >['conditions'],
+    ) => ({ ...query, where: { match: 'all' as const, conditions: list } });
+    await timed('where status and total', (workspace) =>
+      workspace.list(
+        context(),
+        conditions([
+          { field: 'status', op: 'any_of', value: ['open'] },
+          {
+            field: 'total',
+            op: 'gte',
+            value: { amount: '900', currency: 'EUR' },
+          },
+        ]),
+      ),
+    );
+    await timed('where placed within last 30 days', (workspace) =>
+      workspace.list(
+        context(),
+        conditions([
+          {
+            field: 'placed',
+            op: 'within_last',
+            value: { amount: 30, unit: 'day' },
+          },
+        ]),
+      ),
+    );
+    await timed('needs-you view', (workspace) =>
+      workspace.list(context(), { ...query, view: 'needs_you' }),
+    );
+    await timed('where needs you', (workspace) =>
+      workspace.list(
+        context(),
+        conditions([{ field: 'needsYou', op: 'is', value: true }]),
+      ),
+    );
+    await timed('where needs you or overdue', (workspace) =>
+      workspace.list(context(), {
+        ...query,
+        where: {
+          match: 'any',
+          conditions: [
+            { field: 'needsYou', op: 'is', value: true },
+            { field: 'overdue', op: 'is', value: true },
+          ],
+        },
+      }),
+    );
+    await timed('where source none of', (workspace) =>
+      workspace.list(
+        context(),
+        conditions([{ field: 'source', op: 'none_of', value: [jtl] }]),
+      ),
+    );
+    const byTotal = await timed('total sort', (workspace) =>
+      workspace.list(context(), { ...query, sort: 'total', direction: 'desc' }),
+    );
+    await timed('total sort, second page', (workspace) =>
+      workspace.list(context(), {
+        ...query,
+        sort: 'total',
+        direction: 'desc',
+        cursor: byTotal.nextCursor!,
+      }),
+    );
+    await timed('status sort', (workspace) =>
+      workspace.list(context(), { ...query, sort: 'status' }),
+    );
+    await timed('line count sort', (workspace) =>
+      workspace.list(context(), {
+        ...query,
+        sort: 'lineCount',
+        direction: 'desc',
+      }),
+    );
+    const grouped = await timed('group by status', (workspace) =>
+      workspace.list(context(), { ...query, group: { field: 'status' } }),
+    );
+    expect(grouped.groups!.reduce((sum, group) => sum + group.count, 0)).toBe(
+      count + 3,
+    );
+    await timed('group by placed week', (workspace) =>
+      workspace.list(context(), {
+        ...query,
+        group: { field: 'placed', granularity: 'week' },
+        timeZone: 'Europe/Berlin',
+      }),
+    );
+    await timed('group by source', (workspace) =>
+      workspace.list(context(), { ...query, group: { field: 'source' } }),
+    );
+    await timed('page within status group', (workspace) =>
+      workspace.list(context(), {
+        ...query,
+        group: { field: 'status' },
+        groupKey: 'open',
+        cursor: grouped.groups![0]!.nextCursor!,
+      }),
+    );
     await timed('detail', (workspace) => workspace.get(context(), a));
     if (process.env.LUMA_ORDER_BENCHMARK) {
       const { writeFile } = await import('node:fs/promises');
@@ -2302,6 +2857,289 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
       await grant(grants);
     }
   });
+  it('filters and sorts the list by custom order fields the reader may read', async () => {
+    await owner.query(
+      "INSERT INTO organizations(id,name,slug,status,created_at) VALUES($1,'Adaptive',$2,'active',now()) ON CONFLICT DO NOTHING",
+      [tenant, `adaptive-${tenant}`],
+    );
+    const field = async (type: string, readPermission = 'orders.read') => {
+      const id = randomUUID();
+      await owner.query(
+        'INSERT INTO adaptive_fields(tenant_id,id,record_type,field_key,field_type,archived,source,document,created_at) VALUES($1,$2,$3,$4,$5,false,$6,$7,$8)',
+        [
+          tenant,
+          id,
+          'order',
+          `f_${id.replaceAll('-', '')}`,
+          type,
+          'luma',
+          {
+            id,
+            recordType: 'order',
+            key: `f_${id.replaceAll('-', '')}`,
+            type,
+            label: { en: 'Field', de: 'Feld' },
+            choices: [],
+            readPermission,
+            writePermission: 'sales.manage',
+            revision: 1,
+            archived: false,
+            source: 'luma',
+            createdAt: clock.toISOString(),
+            updatedAt: clock.toISOString(),
+          },
+          clock,
+        ],
+      );
+
+      return id;
+    };
+    const priority = await field('number');
+    const labels = await field('multi_choice');
+    // No role grants this permission, so even an owner cannot read the field.
+    const secret = await field('text', 'restricted.fields.read');
+    const value = (record: string, id: string, stored: unknown) =>
+      owner.query(
+        'INSERT INTO adaptive_field_values(tenant_id,record_type,record_id,field_id,value,document) VALUES($1,$2,$3,$4,$5,$6)',
+        [
+          tenant,
+          'order',
+          record,
+          id,
+          JSON.stringify(stored),
+          { fieldId: id, value: stored },
+        ],
+      );
+    const ids: string[] = [];
+    for (const [number, rank, tags] of [
+      ['P1', 3, ['vip']],
+      ['P2', 1, []],
+      ['P3', null, ['vip', 'rush']],
+    ] as const) {
+      const id = await seedOrder({
+        connectionId: shopify,
+        external: `custom-${number}`,
+        key: `custom-${number}`,
+        updatedAt: '2026-09-19T10:00:00Z',
+        data: { displayNumber: number },
+        lines: [],
+      });
+      ids.push(id);
+      if (rank !== null) await value(id, priority, rank);
+      await value(id, labels, tags);
+    }
+    const [p1, p2, p3] = ids;
+    const orders = workspace();
+
+    type Query = Parameters<typeof orders.list>[1];
+
+    const list = (query: Partial<Query>) =>
+      orders.list(context(), {
+        q: '',
+        view: 'all',
+        sort: 'updated',
+        direction: 'desc',
+        limit: 50,
+        ...query,
+      });
+    const where = (
+      conditions: NonNullable<Query['where']>['conditions'],
+    ): Partial<Query> => ({ where: { match: 'all', conditions } });
+    const numbers = async (query: Partial<Query>) =>
+      (await list(query)).items.map((item) => item.id);
+
+    expect(
+      await numbers(
+        where([{ field: `custom:${priority}`, op: 'gte', value: 2 }]),
+      ),
+    ).toEqual([p1]);
+    // A missing value is empty, never zero.
+    expect(
+      await numbers(
+        where([{ field: `custom:${priority}`, op: 'lte', value: 0 }]),
+      ),
+    ).toEqual([]);
+    expect(
+      (
+        await numbers(
+          where([{ field: `custom:${labels}`, op: 'any_of', value: ['vip'] }]),
+        )
+      ).sort(),
+    ).toEqual([p1, p3].sort());
+    const sorted = await numbers({
+      ...where([{ field: `custom:${labels}`, op: 'not_empty' }]),
+      sort: `custom:${priority}`,
+      direction: 'asc',
+    });
+    // Rows without a value sort last in both directions.
+    expect(sorted).toEqual([p1, p3]);
+    expect(
+      await numbers({
+        sort: `custom:${priority}`,
+        direction: 'desc',
+        ...where([{ field: `custom:${priority}`, op: 'not_empty' }]),
+      }),
+    ).toEqual([p1, p2]);
+    await expect(
+      list(where([{ field: `custom:${secret}`, op: 'is', value: 'x' }])),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    await expect(
+      list(where([{ field: `custom:${randomUUID()}`, op: 'empty' }])),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    await expect(list({ sort: `custom:${labels}` })).rejects.toMatchObject({
+      statusCode: 400,
+    });
+  }, 60000);
+
+  it('filters and sorts customers by custom customer fields the reader may read, within one tenant', async () => {
+    await owner.query(
+      "INSERT INTO organizations(id,name,slug,status,created_at) VALUES($1,'Adaptive',$2,'active',now()) ON CONFLICT DO NOTHING",
+      [tenant, `adaptive-${tenant}`],
+    );
+    await owner.query('DELETE FROM customer_profiles WHERE tenant_id=$1', [
+      tenant,
+    ]);
+    const field = async (
+      type: string,
+      readPermission = 'customers.read',
+      recordType = 'customer',
+    ) => {
+      const id = randomUUID();
+      const key = `f_${id.replaceAll('-', '')}`;
+      await owner.query(
+        'INSERT INTO adaptive_fields(tenant_id,id,record_type,field_key,field_type,archived,source,document,created_at) VALUES($1,$2,$3,$4,$5,false,$6,$7,$8)',
+        [
+          tenant,
+          id,
+          recordType,
+          key,
+          type,
+          'luma',
+          {
+            id,
+            recordType,
+            key,
+            type,
+            label: { en: 'Field', de: 'Feld' },
+            choices: [],
+            readPermission,
+            writePermission: 'customers.read',
+            revision: 1,
+            archived: false,
+            source: 'luma',
+            createdAt: clock.toISOString(),
+            updatedAt: clock.toISOString(),
+          },
+          clock,
+        ],
+      );
+
+      return id;
+    };
+    const tier = await field('single_choice');
+    const visits = await field('number');
+    // No role grants this permission, so even an owner cannot read the field.
+    const secret = await field('text', 'restricted.fields.read');
+    // An order field with the same shape never applies to customers.
+    const orderField = await field('number', 'orders.read', 'order');
+    const value = (record: string, id: string, stored: unknown) =>
+      owner.query(
+        'INSERT INTO adaptive_field_values(tenant_id,record_type,record_id,field_id,value,document) VALUES($1,$2,$3,$4,$5,$6)',
+        [
+          tenant,
+          'customer',
+          record,
+          id,
+          JSON.stringify(stored),
+          { fieldId: id, value: stored },
+        ],
+      );
+    const ids: string[] = [];
+    for (const [name, level, count] of [
+      ['Wholesale Ada', 'wholesale', 3],
+      ['Retail Ben', 'retail', 1],
+      ['Unrated Cy', null, null],
+    ] as const) {
+      const id = randomUUID();
+      await owner.query(
+        `INSERT INTO customer_profiles(tenant_id,connection_id,external_id,id,display_name,state,
+          contact_shared,address_shared,observed_at,observation_id)
+         VALUES($1,$2,$3,$4,$5,'enabled',true,false,now(),gen_random_uuid())`,
+        [tenant, shopify, `custom-${name}`, id, name],
+      );
+      ids.push(id);
+      if (level !== null) await value(id, tier, level);
+      if (count !== null) await value(id, visits, count);
+    }
+    const [ada, ben, cy] = ids;
+    const customers = createCustomerWorkspace(createTenantDatabase(reader));
+
+    type Query = Parameters<typeof customers.list>[1];
+
+    const list = (query: Partial<Query>, tenantId = tenant) =>
+      customers.list(context(tenantId), {
+        q: '',
+        sort: 'created',
+        direction: 'desc',
+        limit: 50,
+        ...query,
+      });
+    const where = (
+      conditions: NonNullable<Query['where']>['conditions'],
+    ): Partial<Query> => ({ where: { match: 'all', conditions } });
+    const found = async (query: Partial<Query>) =>
+      (await list(query)).items.map((item) => item.id);
+
+    expect(
+      await found(
+        where([
+          { field: `custom:${tier}`, op: 'any_of', value: ['wholesale'] },
+        ]),
+      ),
+    ).toEqual([ada]);
+    // A customer without a value is empty, never a match for a value.
+    expect(
+      await found(where([{ field: `custom:${tier}`, op: 'empty' }])),
+    ).toEqual([cy]);
+    expect(
+      await found(where([{ field: `custom:${visits}`, op: 'gte', value: 2 }])),
+    ).toEqual([ada]);
+    // Customers without a value sort last in both directions, and the cursor keeps the sort.
+    expect(await found({ sort: `custom:${visits}`, direction: 'asc' })).toEqual(
+      [ben, ada, cy],
+    );
+    const first = await list({
+      sort: `custom:${visits}`,
+      direction: 'desc',
+      limit: 1,
+    });
+    expect(first.items.map((item) => item.id)).toEqual([ada]);
+    expect(
+      await found({
+        sort: `custom:${visits}`,
+        direction: 'desc',
+        limit: 1,
+        cursor: first.nextCursor ?? undefined,
+      }),
+    ).toEqual([ben]);
+    // The other workspace has no such field.
+    await expect(
+      list(where([{ field: `custom:${tier}`, op: 'empty' }]), otherTenant),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    await expect(
+      list(where([{ field: `custom:${secret}`, op: 'is', value: 'x' }])),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    await expect(
+      list(where([{ field: `custom:${orderField}`, op: 'empty' }])),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    await expect(
+      list(where([{ field: `custom:${randomUUID()}`, op: 'empty' }])),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    await expect(list({ sort: `custom:${secret}` })).rejects.toMatchObject({
+      statusCode: 403,
+    });
+  }, 60000);
+
   it('applies saved-view custom filters and ordering before native pagination and denies unavailable fields', async () => {
     await owner.query(
       "INSERT INTO organizations(id,name,slug,status,created_at) VALUES($1,'Adaptive',$2,'active',now()) ON CONFLICT DO NOTHING",
@@ -2562,7 +3400,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
       },
       { recordType: 'order', columns: ['id', 'displayNumber', 'status'] },
     );
-    const query = adaptiveViewQuerySchema.parse({
+    const query = adaptiveViewQueryV1Schema.parse({
       version: 1,
       domain: 'orders',
       filters: { status: 'open' },
@@ -2742,7 +3580,7 @@ describe.skipIf(!databaseUrl)('Orders workspace on PostgreSQL', () => {
       name: 'Orders requiring review',
       description: '',
       sharing: { scope: 'private' as const, roleIds: [] },
-      query: adaptiveViewQuerySchema.parse({
+      query: adaptiveViewQueryV1Schema.parse({
         version: 1,
         domain: 'orders',
         filters: { status: 'open' },

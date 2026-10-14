@@ -1,5 +1,13 @@
 import { z } from 'zod';
 
+import {
+  collectionGroupKeyParameter,
+  collectionGroupLimitParameter,
+  collectionGroupParameter,
+  collectionTimeZoneParameter,
+  collectionWhereParameter,
+} from './collections.js';
+
 const id = z.string().uuid();
 const instant = z.string().datetime();
 const revision = z.number().int().min(1);
@@ -124,13 +132,16 @@ export const mailboxSchema = z.object({
   revision,
 });
 
-export const linkedRecordKindSchema = z.enum([
+/** Kinds of record a thread can be linked to. */
+export const linkedRecordKinds = [
   'order',
   'customer',
   'supplier',
   'purchase_order',
   'case',
-]);
+] as const;
+
+export const linkedRecordKindSchema = z.enum(linkedRecordKinds);
 
 const recordRefSchema = z.object({
   kind: linkedRecordKindSchema,
@@ -160,7 +171,10 @@ const threadLinkSchema = z.object({
   createdAt: instant,
 });
 
-const threadStatusSchema = z.enum(['open', 'waiting', 'closed']);
+/** Where a thread stands: open, waiting on someone else, or closed. */
+export const threadStatuses = ['open', 'waiting', 'closed'] as const;
+
+const threadStatusSchema = z.enum(threadStatuses);
 
 export const threadSummarySchema = z.object({
   id,
@@ -532,10 +546,39 @@ export const threadViewSchema = z.enum([
   'all',
 ]);
 
+/** Orders the thread list accepts. */
+const threadSorts = ['activity', 'due'] as const;
+
 export const threadQuerySchema = z.object({
   view: threadViewSchema.default('open'),
-  connectionId: id.optional(),
-  q: z.string().trim().max(200).optional(),
+  connectionId: id
+    .optional()
+    .describe(
+      'Threads of one mailbox. Kept for older links; prefer a `mailbox` condition.',
+    ),
+  q: z
+    .string()
+    .trim()
+    .max(200)
+    .optional()
+    .describe('Matches the subject or the correspondent, ignoring case.'),
+  where: collectionWhereParameter.optional(),
+  group: collectionGroupParameter.optional(),
+  groupKey: collectionGroupKeyParameter.optional(),
+  groupLimit: collectionGroupLimitParameter,
+  timeZone: collectionTimeZoneParameter,
+  sort: z
+    .enum(threadSorts)
+    .default('activity')
+    .describe(
+      '`activity` orders by the latest message; `due` by the reply deadline, with threads without one last in both directions.',
+    ),
+  direction: z
+    .enum(['asc', 'desc'])
+    .optional()
+    .describe(
+      'Defaults to newest first for `activity` and earliest first for `due`.',
+    ),
   cursor: z.string().max(2000).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });

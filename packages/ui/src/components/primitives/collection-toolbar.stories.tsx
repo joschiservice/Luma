@@ -3,10 +3,13 @@ import { CalendarDays, CircleDot, Plug } from 'lucide-react';
 import { useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 
+import type { ConditionWhere } from '../../lib/collection-conditions';
+import { CollectionDisplay } from './collection-display';
 import {
   type CollectionFilter,
   CollectionFilterPanel,
 } from './collection-filters';
+import { orderColumns, orderFields } from './collection-story-fixtures';
 import { CollectionToolbar, CollectionViews } from './collection-toolbar';
 
 const today = '2026-10-06';
@@ -19,6 +22,9 @@ interface State {
   from?: string | undefined;
   to?: string | undefined;
   sku?: string | undefined;
+  payment?: string[] | undefined;
+  where?: ConditionWhere | undefined;
+  shown?: string[] | undefined;
   sort: string;
   direction: 'asc' | 'desc';
 }
@@ -26,10 +32,13 @@ interface State {
 function Toolbar({
   initial,
   panel = false,
+  advanced = false,
 }: {
   initial?: Partial<State>;
   /** Also lists the filters in a docked panel, as Activity does. */
   panel?: boolean;
+  /** Adds the condition builder and the display menu. */
+  advanced?: boolean;
 }) {
   const [state, setState] = useState<State>({
     view: 'all',
@@ -76,6 +85,19 @@ function Toolbar({
       onChange: (range) => update({ from: range.from, to: range.to }),
     },
     {
+      kind: 'multi-choice',
+      key: 'payment',
+      label: 'Payment',
+      value: state.payment,
+      options: [
+        { value: 'pending', label: 'Pending' },
+        { value: 'paid', label: 'Paid' },
+        { value: 'refunded', label: 'Refunded' },
+        { value: 'failed', label: 'Failed' },
+      ],
+      onChange: (payment) => update({ payment }),
+    },
+    {
       kind: 'applied',
       key: 'sku',
       label: 'SKU',
@@ -106,6 +128,27 @@ function Toolbar({
           placeholder: 'Order number, source ID or SKU…',
         }}
         filters={filters}
+        conditions={
+          advanced
+            ? {
+                fields: orderFields,
+                where: state.where ?? { match: 'all', conditions: [] },
+                onWhereChange: (where) => update({ where }),
+              }
+            : undefined
+        }
+        display={
+          advanced ? (
+            <CollectionDisplay
+              columns={{
+                options: orderColumns,
+                shown: state.shown ?? ['number', 'status', 'total'],
+                onChange: (shown) => update({ shown }),
+              }}
+              density={{ value: 'comfortable', onChange: () => {} }}
+            />
+          ) : undefined
+        }
         panel={panel}
         sort={{
           value: state.sort,
@@ -125,6 +168,8 @@ function Toolbar({
             from: undefined,
             to: undefined,
             sku: undefined,
+            payment: undefined,
+            where: undefined,
           })
         }
         onRefresh={() => {}}
@@ -357,4 +402,77 @@ export const FilterPanel: Story = {
     );
     await expect(applied(canvasElement)).not.toHaveTextContent('"status"');
   },
+};
+
+/** Several values of one filter apply together; the picker stays open while toggling. */
+export const MultiChoice: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const body = within(document.body);
+
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Add Payment filter' }),
+    );
+    const picker = within(await body.findByRole('dialog', { name: 'Payment' }));
+    await userEvent.click(picker.getByRole('button', { name: 'Paid' }));
+    await userEvent.click(picker.getByRole('button', { name: 'Refunded' }));
+    await expect(applied(canvasElement)).toHaveTextContent(
+      '"payment":["paid","refunded"]',
+    );
+    await userEvent.click(picker.getByRole('button', { name: 'Done' }));
+    await expect(
+      canvas.getByRole('button', {
+        name: 'Edit Payment filter: Paid or Refunded',
+      }),
+    ).toBeVisible();
+    await userEvent.click(
+      canvas.getByRole('button', {
+        name: 'Remove Payment filter: Paid or Refunded',
+      }),
+    );
+    await expect(applied(canvasElement)).not.toHaveTextContent('"payment"');
+  },
+};
+
+/** Advanced conditions follow the quick filters; the display menu sits before Sort. */
+export const ConditionsAndDisplay: Story = {
+  args: {
+    advanced: true,
+    initial: {
+      status: 'open',
+      where: {
+        match: 'all',
+        conditions: [
+          {
+            field: 'total',
+            op: 'gt',
+            value: { amount: '100', currency: 'EUR' },
+          },
+        ],
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const display = canvas.getByRole('button', { name: 'Display' });
+    const sort = canvas.getByRole('button', { name: /^Sort:/ });
+    await expect(
+      display.compareDocumentPosition(sort) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    await expect(
+      canvas.getByRole('button', { name: /^Edit filter: Total is more than/ }),
+    ).toBeVisible();
+    await userEvent.click(canvas.getByRole('button', { name: 'Clear' }));
+    await expect(applied(canvasElement)).not.toHaveTextContent('"where"');
+  },
+};
+
+export const ConditionsNarrow: Story = {
+  args: { ...ConditionsAndDisplay.args },
+  globals: { viewport: { value: 'mobile1' } },
+};
+
+export const ConditionsDark: Story = {
+  args: { ...ConditionsAndDisplay.args },
+  globals: { theme: 'dark' },
 };

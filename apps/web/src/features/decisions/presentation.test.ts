@@ -1,4 +1,3 @@
-import type { DecisionItem } from '@luma/api-contract';
 import { expect, it } from 'vitest';
 
 import {
@@ -6,13 +5,9 @@ import {
   assigneeOptions,
   decisionStatus,
   emptyCopy,
-  groupDecisions,
   memberName,
   timeLeft,
 } from './presentation';
-
-const item = (id: string, group: string): DecisionItem =>
-  ({ id, group: { key: group, label: group } }) as DecisionItem;
 
 it('says who a decision waits for and only asks the reader when they can act', () => {
   expect(decisionStatus({ reason: 'approval', response: 'decide' })).toEqual({
@@ -45,18 +40,6 @@ it('counts down deadlines without claiming time that has passed', () => {
   expect(timeLeft('2026-09-30T09:00:30Z', now)).toBe('<1m left');
   expect(timeLeft('2026-09-30T12:00:00Z', now)).toBe('3h left');
   expect(timeLeft('2026-09-30T08:59:59Z', now)).toBe('Expired');
-});
-
-it('groups common causes in ranking order without merging decisions', () => {
-  const groups = groupDecisions([
-    item('a', 'stock'),
-    item('b', 'fulfillment'),
-    item('c', 'stock'),
-  ]);
-  expect(groups.map((g) => [g.key, g.items.map((i) => i.id)])).toEqual([
-    ['stock', ['a', 'c']],
-    ['fulfillment', ['b']],
-  ]);
 });
 
 it('explains empty views without implying healthy operations', () => {

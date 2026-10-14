@@ -106,6 +106,7 @@ describe('contextual record evidence', () => {
         sourceUpdatedAt: null,
         observedAt,
         missingSince: null,
+        country: null,
       },
       address: null,
       source: null,

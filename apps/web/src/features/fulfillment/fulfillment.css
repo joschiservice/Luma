@@ -7,9 +7,8 @@
 .fulfillment-page a {
   color: var(--signal-text);
 }
-.fulfillment-pagination,
-.fulfillment-pagination > div,
-.fulfillment-flags {
+.fulfillment-flags,
+.fulfillment-preview-carriers {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -27,7 +26,6 @@
 .fulfillment-cell small,
 .fulfillment-note,
 .fulfillment-muted,
-.fulfillment-pagination,
 .fulfillment-fact small,
 .fulfillment-related small {
   color: var(--muted-foreground);
@@ -43,8 +41,13 @@
   margin: 0;
   line-height: 1.6;
 }
-.fulfillment-pagination {
-  justify-content: space-between;
+.fulfillment-results {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.fulfillment-preview {
+  min-height: min(720px, calc(100vh - 220px));
 }
 .fulfillment-loading {
   display: grid;

@@ -123,8 +123,18 @@ export const permissionCatalog = [
     key: 'adaptive.views.manage',
     group: 'workspace',
     label: 'Manage shared views',
-    description: 'Edit and archive views owned by other workspace members.',
+    description:
+      'Share views with the workspace or roles, and edit and archive views other members own.',
     consequential: false,
+    introduced: '2026-10-13',
+  },
+  {
+    key: 'lists.export',
+    group: 'workspace',
+    label: 'Export lists',
+    description:
+      'Download lists as CSV files with the columns you can see. Every export is recorded in the audit log.',
+    consequential: true,
     introduced: '2026-10-13',
   },
   {

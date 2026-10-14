@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+import {
+  collectionTimeZoneParameter,
+  collectionWhereParameter,
+} from './collections.js';
+
 const text = z.string().min(1).max(512);
 const quantity = z.string().regex(/^\d{1,14}(\.\d{1,6})?$/);
 const time = z.string().datetime({ offset: true });
@@ -147,6 +152,22 @@ export const transferQuerySchema = z
     connectionId: z.string().uuid().optional(),
     skuId: z.string().uuid().optional(),
     locationId: z.string().uuid().optional(),
+    sort: z
+      .enum(['requested', 'name', 'updated'])
+      .default('requested')
+      .describe(
+        '`requested`: when the source created the record. `updated`: when the source last changed it. Records without a value come last in both directions.',
+      ),
+    direction: z.enum(['asc', 'desc']).default('desc'),
+    limit: z.coerce.number().int().min(1).max(50).default(50),
+    count: z
+      .literal('exact')
+      .optional()
+      .describe(
+        'Request the exact number of matches. Without this option, totalCount is null.',
+      ),
+    where: collectionWhereParameter.optional(),
+    timeZone: collectionTimeZoneParameter,
     cursor: z.string().min(1).max(1024).optional(),
   })
   .strict();
@@ -187,6 +208,7 @@ const transferSummarySchema = z.object({
 
 export const transferListSchema = z.object({
   items: z.array(transferSummarySchema),
+  totalCount: z.number().int().nonnegative().nullable(),
   nextCursor: z.string().nullable(),
   asOf: time,
 });

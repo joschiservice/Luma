@@ -1,5 +1,13 @@
 import { z } from 'zod';
 
+import {
+  collectionGroupKeyParameter,
+  collectionGroupLimitParameter,
+  collectionGroupParameter,
+  collectionGroupSchema,
+  collectionTimeZoneParameter,
+  collectionWhereParameter,
+} from './collections.js';
 import { stockPositionSchema } from './inventory.js';
 
 const timestamp = z.string().datetime({ offset: true });
@@ -66,12 +74,39 @@ const catalogSourceSchema = z.object({
   failing: z.boolean(),
 });
 
+/** Native product list sorts; `custom:<field ID>` sorts are accepted beside them. */
+export const productSortSchema = z.enum([
+  'rank',
+  'sku',
+  'title',
+  'price',
+  'updated',
+  'differences',
+  'listings',
+]);
+
 export const productQuerySchema = z
   .object({
     q: z.string().trim().max(120).default(''),
     view: catalogViewSchema.default('all'),
     connectionId: z.string().uuid().optional(),
     missingFrom: z.string().uuid().optional(),
+    sort: z
+      .union([productSortSchema, z.templateLiteral(['custom:', z.uuid()])])
+      .default('rank')
+      .describe(
+        '`rank`: SKUs with a code first, then SKUs with only a title, each alphabetically. `price`: the lowest listed price in the alphabetically first currency any listing reports, so amounts compare only within one currency; prices without a currency are ignored. `updated`: the most recent source update of any listing. `differences` and `listings` count the differing fields and current listings. `custom:<field ID>` sorts by a readable custom product field that holds one value. SKUs without a value come last in both directions.',
+      ),
+    direction: z.enum(['asc', 'desc']).default('asc'),
+    count: z
+      .literal('exact')
+      .optional()
+      .describe('Accepted for every list; product counts are always exact.'),
+    where: collectionWhereParameter.optional(),
+    group: collectionGroupParameter.optional(),
+    groupKey: collectionGroupKeyParameter.optional(),
+    groupLimit: collectionGroupLimitParameter,
+    timeZone: collectionTimeZoneParameter,
     cursor: z.string().min(1).max(8192).optional(),
     limit: z.coerce.number().int().min(1).max(50).default(50),
   })
@@ -80,8 +115,24 @@ export const productQuerySchema = z
 export const productListSchema = z.object({
   items: z.array(catalogItemSchema),
   sources: z.array(catalogSourceSchema),
-  counts: z.partialRecord(catalogViewSchema, z.number().int().nonnegative()),
+  counts: z
+    .partialRecord(catalogViewSchema, z.number().int().nonnegative())
+    .describe(
+      'Matching SKUs per built-in view under the current search, source filters and conditions.',
+    ),
   nextCursor: z.string().nullable(),
+  groups: z
+    .array(collectionGroupSchema)
+    .optional()
+    .describe(
+      'With `group`: each group in display order with its exact count and first SKUs, whose items are in `items`. A SKU with several vendors or statuses counts in each of their groups. With `groupKey`: the one group, with this page of its SKUs.',
+    ),
+  groupsTruncated: z
+    .boolean()
+    .optional()
+    .describe(
+      'More than 50 groups match; narrow the conditions to see the rest.',
+    ),
   asOf: timestamp,
 });
 

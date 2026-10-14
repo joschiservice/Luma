@@ -75,7 +75,9 @@ test('finds a replenishment approval in Needs you, decides it once and updates e
     .getByRole('link', { name: new RegExp(title) })
     .getByText('Needs your approval')
     .waitFor();
+  // J focuses the first decision and Space opens it beside the queue.
   await approver.keyboard.press('j');
+  await approver.keyboard.press('Space');
   await approver.waitForURL(/item=/);
   if (!(await approver.getByRole('heading', { name: title }).isVisible()))
     await approver.getByRole('link', { name: new RegExp(title) }).click();

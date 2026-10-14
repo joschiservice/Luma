@@ -1,6 +1,7 @@
 import './adaptive.css';
 
 import type { AdaptiveView, AdaptiveViewQuery } from '@luma/api-contract';
+import { collectionDomainSchema } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
@@ -46,7 +47,8 @@ import {
   viewsOptions,
 } from './data';
 import { ViewEditor } from './editor';
-import { adaptiveLabel, domainOptions } from './presentation';
+import { adaptiveLabel, domainLabel } from './presentation';
+import { previewable } from './query-fields';
 import { AdaptiveRecords } from './records';
 
 /** Browses authorized saved workspaces and starts manual or reviewed built-in authoring. */
@@ -72,10 +74,18 @@ export function ViewsPage() {
   const matching = views.data?.items.filter(
     (view) =>
       !view.archived &&
+      (!search.domain || view.query.domain === search.domain) &&
+      (!search.sharing || view.sharing.scope === search.sharing) &&
       `${view.name} ${view.description}`
         .toLocaleLowerCase()
         .includes((search.q ?? '').toLocaleLowerCase()),
   );
+  const directory = (patch: Partial<typeof search>) =>
+    void navigate({
+      to: '/app/$organizationId/views',
+      params: { organizationId },
+      search: { ...search, ...patch, cursor: undefined },
+    });
 
   return (
     <div className="adaptive-workspace">
@@ -132,13 +142,51 @@ export function ViewsPage() {
               value: search.q,
               label: m.adaptive_search(),
               placeholder: m.adaptive_search(),
-              onChange: (q) =>
-                void navigate({
-                  to: '/app/$organizationId/views',
-                  params: { organizationId },
-                  search: { q },
-                }),
+              onChange: (q) => directory({ q }),
             }}
+            filters={[
+              {
+                kind: 'choice',
+                key: 'domain',
+                label: m.adaptive_directory_list(),
+                value: search.domain,
+                options: [
+                  ...new Set(
+                    views.data?.items.map((view) => view.query.domain),
+                  ),
+                ].map((domain) => ({
+                  value: domain,
+                  label: domainLabel(domain),
+                })),
+                onChange: (value) =>
+                  directory({
+                    domain: collectionDomainSchema.safeParse(value).data,
+                  }),
+              },
+              {
+                kind: 'choice',
+                key: 'sharing',
+                label: m.adaptive_directory_sharing(),
+                value: search.sharing,
+                options: [
+                  { value: 'private', label: m.adaptive_private() },
+                  { value: 'workspace', label: m.adaptive_workspace() },
+                  { value: 'roles', label: m.adaptive_roles() },
+                ],
+                onChange: (value) =>
+                  directory({
+                    sharing:
+                      value === 'private' ||
+                      value === 'workspace' ||
+                      value === 'roles'
+                        ? value
+                        : undefined,
+                  }),
+              },
+            ]}
+            onClear={() =>
+              directory({ q: undefined, domain: undefined, sharing: undefined })
+            }
           />
           {views.isError ? (
             <Alert tone="warning">
@@ -177,12 +225,8 @@ export function ViewsPage() {
                     <div className="adaptive-view-copy">
                       <p>{view.description}</p>
                       <span>
-                        {
-                          domainOptions().find(
-                            (domain) => domain.value === view.query.domain,
-                          )?.label
-                        }{' '}
-                        · {m.adaptive_revision({ revision: view.revision })}
+                        {domainLabel(view.query.domain)} ·{' '}
+                        {m.adaptive_revision({ revision: view.revision })}
                       </span>
                       <WorkspaceDate value={view.updatedAt} />
                     </div>
@@ -246,7 +290,10 @@ export function SavedViewPage() {
       view.data?.query ?? emptyViewQuery('orders'),
       search.cursor,
     ),
-    enabled: !!view.data && !!availability.data?.views,
+    enabled:
+      !!view.data &&
+      previewable(view.data.query.domain) &&
+      !!availability.data?.views,
   });
   const client = useQueryClient();
   const [editing, setEditing] = useState(false);
@@ -285,7 +332,7 @@ export function SavedViewPage() {
         void navigate({
           to: '/app/$organizationId/views/$viewId',
           params: { organizationId, viewId: saved.id },
-          search: {},
+          search: { manage: true },
         });
     },
   });
@@ -393,7 +440,9 @@ export function SavedViewPage() {
               recordIds={selected}
             />
           ) : null}
-          {preview.isError ? (
+          {!previewable(saved.query.domain) ? (
+            <Alert>{m.adaptive_preview_unsupported()}</Alert>
+          ) : preview.isError ? (
             <Alert tone="warning">
               {m.adaptive_load_failed()}
               <Button variant="outline" onClick={() => void preview.refetch()}>
@@ -416,7 +465,7 @@ export function SavedViewPage() {
                       void navigate({
                         to: '/app/$organizationId/views/$viewId',
                         params: { organizationId, viewId },
-                        search: {},
+                        search: { manage: true },
                       });
                     }
                   : undefined
@@ -426,7 +475,10 @@ export function SavedViewPage() {
                 void navigate({
                   to: '/app/$organizationId/views/$viewId',
                   params: { organizationId, viewId },
-                  search: { cursor: preview.data?.nextCursor ?? undefined },
+                  search: {
+                    cursor: preview.data?.nextCursor ?? undefined,
+                    manage: true,
+                  },
                 });
               }}
             />

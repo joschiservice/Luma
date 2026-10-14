@@ -809,6 +809,7 @@ function customerOrder(observation: Observation<unknown>) {
         scopeKey: observation.source.scopeKey,
       },
       customerExternalId: customer?.externalId ?? null,
+      placedAt: (observation.data as Partial<OrderSnapshot>).placedAt ?? null,
       observedAt: observation.observedAt,
     },
   ];

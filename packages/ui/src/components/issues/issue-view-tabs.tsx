@@ -12,12 +12,15 @@ const views = [
 
 type IssueView = (typeof views)[number]['value'];
 
-/** Displays URL-backed issue views with manual keyboard activation and semantic status accents. */
+/**
+ * Displays URL-backed issue views with manual keyboard activation and semantic status accents.
+ * A null value marks no tab as current, as while a saved view is open.
+ */
 export function IssueViewTabs({
   value,
   renderLink,
 }: {
-  value: IssueView;
+  value: IssueView | null;
   renderLink: (view: IssueView) => ReactElement;
 }) {
   return (

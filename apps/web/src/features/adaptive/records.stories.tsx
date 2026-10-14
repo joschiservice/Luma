@@ -12,9 +12,11 @@ import appStyles from '../../styles.css?inline';
 import { AdaptiveRecords } from './records';
 
 const configuration = adaptiveViewQuerySchema.parse({
-  version: 1,
+  version: 2,
   domain: 'orders',
-  columns: ['displayNumber', 'status', 'placedAt'],
+  state: {
+    columns: [{ id: 'number' }, { id: 'status' }, { id: 'placed' }],
+  },
   metrics: [{ id: 'record_count', operation: 'count' }],
   charts: [
     {
@@ -29,22 +31,22 @@ const preview = adaptiveViewPreviewSchema.parse({
   items: [
     {
       id: '11111111-1111-4111-8111-111111111111',
-      displayNumber: '#48213',
+      number: '#48213',
       status: 'open',
-      placedAt: '2026-10-13T09:00:00Z',
+      placed: '2026-10-13T09:00:00Z',
     },
     {
       id: '22222222-2222-4222-8222-222222222222',
-      displayNumber: '#48214',
+      number: '#48214',
       status: 'completed',
-      placedAt: null,
+      placed: null,
     },
   ],
   asOf: '2026-10-13T09:10:00Z',
   totalCount: 2,
   nextCursor: null,
   warnings: [],
-  availableColumns: configuration.columns,
+  availableColumns: ['number', 'status', 'placed'],
   aggregates: [{ metricId: 'record_count', value: 2, complete: true }],
   chartSeries: [
     {
@@ -103,7 +105,14 @@ export const LiveTable: Story = {
 
 export const GroupedBoard: Story = {
   args: {
-    configuration: { ...configuration, groupBy: 'status', layout: 'board' },
+    configuration: {
+      ...configuration,
+      state: {
+        ...configuration.state,
+        group: { field: 'status', showEmpty: false },
+        layout: 'board',
+      },
+    },
   },
 };
 
@@ -112,7 +121,7 @@ export const IncompleteEvidence: Story = {
     preview: {
       ...preview,
       warnings: ['One source could not provide a complete observation.'],
-      availableColumns: ['displayNumber', 'status'],
+      availableColumns: ['number', 'status'],
       aggregates: [{ metricId: 'record_count', value: null, complete: false }],
     },
   },

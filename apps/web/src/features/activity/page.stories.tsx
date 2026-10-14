@@ -94,6 +94,7 @@ function Preview({
     | 'stale'
     | 'offline'
     | 'access'
+    | 'repair'
     | undefined;
 }) {
   const [filters, change] = useState<ActivityFilters>({});
@@ -105,20 +106,26 @@ function Preview({
         organizationId="33333333-3333-4333-8333-333333333333"
         filters={filters}
         sources={sources}
+        people={[
+          { id: '33333333-3333-4333-8333-333333333333', label: 'Ada Lovelace' },
+        ]}
         change={change}
+        repair={state === 'repair' ? () => {} : undefined}
         refresh={() => {}}
         loading={state === 'loading'}
         offline={state === 'offline'}
         newEvents={state === 'ready'}
         error={
-          state === 'unavailable' || state === 'stale'
-            ? 'Activity is unavailable. Loaded events may be outdated.'
-            : state === 'access'
-              ? 'Workspace access changed.'
-              : undefined
+          state === 'repair'
+            ? 'This view uses filters the list can’t apply.'
+            : state === 'unavailable' || state === 'stale'
+              ? 'Activity is unavailable. Loaded events may be outdated.'
+              : state === 'access'
+                ? 'Workspace access changed.'
+                : undefined
         }
         page={
-          ['loading', 'unavailable', 'access'].includes(state)
+          ['loading', 'unavailable', 'access', 'repair'].includes(state)
             ? undefined
             : {
                 visibility: 'admin',
@@ -248,6 +255,26 @@ export const Filtering: Story = {
       }),
     ).toBeVisible();
 
+    // People, Luma and workflows are offered together; several can apply at once.
+    await userEvent.click(
+      section('Recorded by').getByRole('button', { name: 'Me' }),
+    );
+    await userEvent.click(
+      section('Recorded by').getByRole('button', { name: 'Luma' }),
+    );
+    await expect(
+      section('Recorded by').getByRole('button', { name: 'Luma' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    // A preset stays relative: it is named as the preset whatever today is.
+    await userEvent.click(
+      section('Recorded').getByRole('button', { name: 'Last 7 days' }),
+    );
+    await expect(
+      await canvas.findByRole('button', {
+        name: 'Edit Recorded filter: Last 7 days',
+      }),
+    ).toBeVisible();
+
     await userEvent.click(canvas.getByRole('button', { name: 'Clear' }));
     await expect(
       canvas.queryByRole('button', { name: /^Edit System filter/ }),
@@ -269,6 +296,18 @@ export const Stale: Story = { args: { state: 'stale' } };
 export const Offline: Story = { args: { state: 'offline' } };
 
 export const AccessLost: Story = { args: { state: 'access' } };
+
+export const NeedsRepair: Story = {
+  args: { state: 'repair' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByRole('button', {
+        name: 'Remove unsupported conditions',
+      }),
+    ).toBeVisible();
+  },
+};
 
 export const Narrow: Story = {
   globals: { viewport: { value: 'mobile1', isRotated: false } },

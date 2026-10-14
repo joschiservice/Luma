@@ -131,7 +131,7 @@ export function RepairLink({
           className={className}
           to="/app/$organizationId/procurement"
           params={{ organizationId }}
-          search={{ view: 'suppliers', q: '', status: '' }}
+          search={{ tab: 'suppliers' }}
         >
           {content}
         </Link>

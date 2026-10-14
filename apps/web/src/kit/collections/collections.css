@@ -1,0 +1,79 @@
+.collection-loading {
+  display: grid;
+  gap: 8px;
+}
+
+.collection-loading .lu-skeleton {
+  height: 44px;
+}
+
+.collection-view-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.collection-view-trigger {
+  font-weight: 600;
+}
+
+.collection-view-notice {
+  flex-basis: 100%;
+}
+
+.collection-view-sharing {
+  display: grid;
+  gap: 8px;
+  margin: var(--content-gap, 16px) 0;
+  border: 0;
+  padding: 0;
+}
+
+.collection-view-sharing label,
+.collection-view-roles label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.collection-view-roles {
+  display: grid;
+  gap: 6px;
+  padding-inline-start: 24px;
+}
+
+.collection-describe-proposal {
+  display: grid;
+  gap: 8px;
+  border: 0;
+  padding: 0;
+}
+
+.collection-describe-proposal label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.collection-describe-warning {
+  color: var(--foreground-muted);
+}
+
+.collection-view-order {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.collection-view-order li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.collection-view-order li > span {
+  flex: 1;
+}

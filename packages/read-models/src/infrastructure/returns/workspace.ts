@@ -1,86 +1,98 @@
-import { createHash } from 'node:crypto';
-
-import { requirePermission } from '@luma/identity';
+import { hasPermission, requirePermission } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
-import { z } from 'zod';
 
 import { hiddenSections } from '../../application/access.js';
+import type { CollectionGroupKey } from '../../application/collections.js';
 import type { ReturnWorkspace } from '../../application/returns.js';
+import {
+  collectionCursorContext,
+  readCollectionCursor,
+  writeCollectionCursor,
+} from '../collection/cursor.js';
+import { groupResults } from '../collection/group.js';
+import { collectionScope, maxCollectionGroups } from '../collection/request.js';
 import { readReturnDetail } from './detail.js';
-import { readReturns, readReturnSources, type ReturnPosition } from './list.js';
+import { readReturns, readReturnSources } from './list.js';
 
-const cursorSchema = z
-  .object({
-    context: z.string(),
-    key: z.string().datetime({ offset: true }),
-    id: z.string().uuid(),
-  })
-  .strict();
-
-const encode = (context: string, position: ReturnPosition) =>
-  Buffer.from(JSON.stringify({ context, ...position })).toString('base64url');
-
-/** Creates tenant-scoped reads of returns and refunds in a consistent database snapshot. */
+/**
+ * Creates tenant-scoped reads of returns and refunds in a consistent database snapshot. List
+ * cursors are bound to the tenant, search, filters, conditions, grouping and sort.
+ */
 export function createReturnWorkspace(db: TenantDatabase): ReturnWorkspace {
   return {
     async list(context, query) {
       requirePermission(context, 'returns.read');
-      const scope = createHash('sha256')
-        .update(
-          JSON.stringify([
-            'returns-v1',
-            context.tenantId,
-            query.q,
-            query.view,
-            query.stage ?? null,
-            query.connectionId ?? null,
-            query.sort,
-            query.direction,
-          ]),
-        )
-        .digest('hex');
-      let after: ReturnPosition | null = null;
-      if (query.cursor) {
-        try {
-          const bytes = Buffer.from(query.cursor, 'base64url');
-          if (bytes.toString('base64url') !== query.cursor)
-            throw new Error('Encoding');
-          const { context: cursorContext, ...position } = cursorSchema.parse(
-            JSON.parse(bytes.toString()),
-          );
-          if (cursorContext !== scope) throw new Error('Context');
-          after = position;
-        } catch {
-          throw Object.assign(
-            new Error(
-              'This page link no longer matches the return filters. Start from the first page.',
-            ),
-            { statusCode: 400, expose: true },
-          );
-        }
-      }
+      const scope = (key?: CollectionGroupKey) =>
+        collectionCursorContext(
+          'returns-v3',
+          context.tenantId,
+          collectionScope(query, key),
+        );
+      const after = query.cursor
+        ? readCollectionCursor(
+            query.cursor,
+            scope(query.groupKey),
+            'This page link no longer matches the return filters. Start from the first page.',
+          )
+        : null;
+      const asOf = new Date().toISOString();
 
       return db.transaction(
         context.tenantId,
         async (tx) => {
-          const { rows, counts } = await readReturns(
+          const page = await readReturns(
             tx,
             context.tenantId,
+            context.actor.id,
             query,
+            asOf,
             after,
+            hasPermission(context, 'customers.read'),
           );
-          const page = rows.slice(0, query.limit);
-          const last = page.at(-1);
+          const sources = await readReturnSources(tx, context.tenantId);
+          // Group counts may miss returns while a source still imports its history.
+          const complete = !sources.some((source) => source.importing);
+          const grouped =
+            query.group !== undefined && query.groupKey === undefined;
+          const rows = grouped ? page.rows : page.rows.slice(0, query.limit);
+          const last = rows.at(-1);
+          const nextCursor =
+            !grouped && page.rows.length > query.limit && last
+              ? writeCollectionCursor(scope(query.groupKey), last.position)
+              : null;
+          const grouping =
+            grouped && page.groups
+              ? groupResults(
+                  page.groups,
+                  maxCollectionGroups,
+                  complete,
+                  (key, position) =>
+                    writeCollectionCursor(scope(key), position),
+                )
+              : undefined;
 
           return {
-            items: page.map((row) => row.item),
-            sources: await readReturnSources(tx, context.tenantId),
-            counts,
-            nextCursor:
-              rows.length > query.limit && last
-                ? encode(scope, { key: last.position, id: last.item.id })
-                : null,
-            asOf: new Date().toISOString(),
+            items: rows.map((row) => row.item),
+            sources,
+            counts: page.counts,
+            nextCursor,
+            ...(grouping
+              ? { groups: grouping.groups, groupsTruncated: grouping.truncated }
+              : query.groupKey !== undefined
+                ? {
+                    groups: [
+                      {
+                        key: query.groupKey,
+                        count: page.total ?? 0,
+                        complete,
+                        itemIds: rows.map((row) => row.item.id),
+                        nextCursor,
+                        sums: [],
+                      },
+                    ],
+                  }
+                : {}),
+            asOf,
           };
         },
         { readOnlySnapshot: true },

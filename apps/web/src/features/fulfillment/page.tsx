@@ -1,87 +1,107 @@
 import './fulfillment.css';
 
-import type {
-  FulfillmentItem,
-  FulfillmentList,
-  FulfillmentView,
-} from '@luma/api-contract';
-import { formatRelativeTime } from '@luma/i18n/format';
-import { m } from '@luma/i18n/messages';
-import { rich } from '@luma/i18n/rich';
-import { Alert } from '@luma/ui/components/primitives/alert';
-import { Badge } from '@luma/ui/components/primitives/badge';
-import { Button } from '@luma/ui/components/primitives/button';
 import {
-  type CollectionFilterOption,
+  collectionField,
+  type CollectionGroup,
+  collectionWhereIssues,
+  fulfillmentCatalog,
+  type FulfillmentItem,
+  type FulfillmentList,
+  type FulfillmentView as FulfillmentSegment,
+} from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
+import { Alert } from '@luma/ui/components/primitives/alert';
+import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
+import { CollectionPreview } from '@luma/ui/components/primitives/collection-preview';
+import {
   CollectionToolbar,
   CollectionViews,
 } from '@luma/ui/components/primitives/collection-toolbar';
-import {
-  DataTable,
-  type DataTableColumn,
-  DataTableRowLink,
-} from '@luma/ui/components/primitives/data-table';
 import { Empty } from '@luma/ui/components/primitives/empty';
-import { StatePill } from '@luma/ui/components/primitives/state';
-import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
+import { Pagination } from '@luma/ui/components/primitives/pagination';
+import {
+  listShortcutGroup,
+  ShortcutHelp,
+} from '@luma/ui/components/primitives/shortcut-help';
+import { WorkspaceTimezone } from '@luma/ui/components/primitives/workspace-date';
 import { PageTitle } from '@luma/ui/components/workspace/page-header';
-import { onlineManager, useQuery } from '@tanstack/react-query';
+import {
+  type CellFilterValue,
+  type ConditionWhere,
+  whereWithCellValue,
+} from '@luma/ui/lib/collection-conditions';
+import { type ListShortcut, useListKeyboard } from '@luma/ui/lib/list-keyboard';
+import { selectRange } from '@luma/ui/lib/row-selection';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Link,
   useNavigate,
   useParams,
   useSearch,
 } from '@tanstack/react-router';
-import { CircleCheck, MapPin, Plug, Shapes, Truck } from 'lucide-react';
-import { type ReactNode, useState, useSyncExternalStore } from 'react';
+import { CircleCheck, Maximize2, Truck } from 'lucide-react';
+import { type ReactNode, type Ref, useContext, useRef, useState } from 'react';
 
+import { useCollectionControls } from '../../kit/collections/controls';
+import { DescribedFilter } from '../../kit/collections/described-filter';
+import { useGroupPages } from '../../kit/collections/groups';
+import {
+  CollectionLoading,
+  CollectionNotices,
+} from '../../kit/collections/notices';
+import {
+  type CollectionError,
+  collectionError,
+  collectionServerIssue,
+  useCursorPaging,
+  useOnline,
+} from '../../kit/collections/paging';
+import { repairedState } from '../../kit/collections/repair';
+import { type CollectionSearch, groupOf } from '../../kit/collections/state';
+import { useCollectionView } from '../../kit/collections/use-collection-view';
+import { CollectionViewBar } from '../../kit/collections/view-bar';
+import { connectionsOptions } from '../../kit/connections/data';
 import { SignInRedirect } from '../../kit/identity/common';
 import { IdentityError } from '../../kit/identity/data';
+import { usePermissions } from '../../kit/identity/permissions';
+import { CollectionBulkActions } from '../adaptive/bulk-actions';
+import { CollectionSummaryBand } from '../adaptive/summary-band';
 import { recordReturnPath } from '../records/data';
 import { SyncCoverage } from '../sync/coverage';
 import {
-  fulfillmentFilters,
-  type FulfillmentSearch,
-  fulfillmentsOptions,
-} from './data';
+  fulfillmentGroupLabel,
+  fulfillmentPresentation,
+  fulfillmentSegmentLabel,
+} from './collection';
 import {
-  fulfillmentReason,
-  fulfillmentState,
-  kindLabels,
-  methodLabels,
-  orderLabel,
-  otherSignals,
-  quantity,
-  signalLabels,
-  sortLabels,
-  viewDescriptions,
-  viewLabels,
-} from './presentation';
+  fulfillmentFilters,
+  fulfillmentListOptions,
+  fulfillmentListQuery,
+  fulfillmentPageSize,
+  type FulfillmentSearch,
+} from './data';
+import { orderLabel, viewDescriptions } from './presentation';
+import { FulfillmentPreview } from './preview';
+import { fulfillmentGroups, FulfillmentResults } from './results';
 
-const subscribe = (changed: () => void) => onlineManager.subscribe(changed);
-const onlineSnapshot = () => onlineManager.isOnline();
-const serverSnapshot = () => true;
-
-const views: FulfillmentView[] = [
-  'attention',
-  'held',
-  'delayed',
+/** The list commands the Fulfillment page handles, for shortcut help. */
+const shortcuts: readonly ListShortcut[] = [
+  'next',
+  'previous',
   'open',
-  'in_transit',
-  'all',
+  'preview',
+  'toggle-selection',
+  'extend-selection',
+  'escape',
+  'search',
+  'filter',
+  'help',
 ];
 
 // Views that list problems; a non-zero count is highlighted.
-const warningViews = new Set<FulfillmentView>(['attention', 'held', 'delayed']);
+const warningViews = new Set<string>(['attention', 'held', 'delayed']);
 
-const kinds = ['fulfillment_order', 'shipment'] as const;
-
-const kindFilterLabels: Record<(typeof kinds)[number], () => string> = {
-  fulfillment_order: m.fulfillment_filter_kind_fulfillment_order,
-  shipment: m.fulfillment_filter_kind_shipment,
-};
-
-const emptyViewTitles: Record<FulfillmentView, () => string> = {
+const emptyViewTitles: Record<FulfillmentSegment, () => string> = {
   attention: m.fulfillment_empty_attention_title,
   held: m.fulfillment_empty_held_title,
   delayed: m.fulfillment_empty_delayed_title,
@@ -90,210 +110,21 @@ const emptyViewTitles: Record<FulfillmentView, () => string> = {
   all: m.fulfillment_empty_all_title,
 };
 
-const sorts = ['waiting', 'recent', 'deadline'] as const;
-
-/** Keeps a selected filter value that the loaded page does not list, so its chip stays readable. */
-function withSelected(
-  options: CollectionFilterOption[],
-  selected: string | undefined,
-  label: string,
-): CollectionFilterOption[] {
-  return selected && !options.some((option) => option.value === selected)
-    ? [...options, { value: selected, label }]
-    : options;
-}
-
-/** Connects the fulfillment list to workspace-scoped queries and shareable URL filters. */
-export function FulfillmentPage() {
-  const { organizationId } = useParams({
-    from: '/app/$organizationId/fulfillment/',
-  });
-  const search = useSearch({ from: '/app/$organizationId/fulfillment/' });
-  const navigate = useNavigate({ from: '/app/$organizationId/fulfillment/' });
-  const query = useQuery(fulfillmentsOptions(organizationId, search));
-  const online = useSyncExternalStore(
-    subscribe,
-    onlineSnapshot,
-    serverSnapshot,
-  );
-  const [trails, setTrails] = useState<Record<string, (string | undefined)[]>>(
-    {},
-  );
-  const filterKey = JSON.stringify(fulfillmentFilters(search));
-  const trail = trails[filterKey] ?? [undefined];
-  const index = trail.indexOf(search.cursor);
-  if (query.error instanceof IdentityError && query.error.status === 401)
-    return <SignInRedirect />;
-  const change = (next: FulfillmentSearch) =>
-    void navigate({ search: next, resetScroll: false });
-
-  return (
-    <FulfillmentView
-      coverage={<SyncCoverage organizationId={organizationId} type="orders" />}
-      organizationId={organizationId}
-      search={search}
-      list={query.isError ? undefined : query.data}
-      stale={query.isError ? query.data : undefined}
-      loading={query.isPending}
-      error={query.error?.message}
-      offline={!online}
-      refreshing={query.isFetching}
-      change={change}
-      next={
-        query.data?.nextCursor
-          ? () => {
-              const cursor = query.data.nextCursor!;
-              if (index >= 0)
-                setTrails((previous) => ({
-                  ...previous,
-                  [filterKey]: [...trail.slice(0, index + 1), cursor],
-                }));
-              change({ ...search, cursor });
-            }
-          : undefined
-      }
-      previous={
-        index > 0
-          ? () => change({ ...search, cursor: trail[index - 1] })
-          : undefined
-      }
-      refresh={() => void query.refetch()}
-    />
-  );
-}
-
-/** Shows when the fulfillment last moved and the date it is measured against. */
-function ProgressCell({ item, asOf }: { item: FulfillmentItem; asOf: string }) {
-  const now = Date.parse(asOf);
-
-  return (
-    <span className="fulfillment-cell">
-      <span>
-        {(item.lastProgressAt
-          ? m.fulfillment_progress_last
-          : m.fulfillment_progress_updated)({
-          time: formatRelativeTime(item.progressAt, now),
-        })}
-      </span>
-      {item.open && item.fulfillBy ? (
-        <small>
-          {rich(m.fulfillment_progress_fulfill_by, {
-            date: <WorkspaceDate value={item.fulfillBy} />,
-          })}
-        </small>
-      ) : item.status === 'shipped' && item.estimatedDeliveryAt ? (
-        <small>
-          {rich(m.fulfillment_progress_expected, {
-            date: <WorkspaceDate value={item.estimatedDeliveryAt} />,
-          })}
-        </small>
-      ) : null}
-    </span>
-  );
-}
-
-function listColumns(
-  organizationId: string,
-  search: FulfillmentSearch,
-  list: FulfillmentList,
-): DataTableColumn<FulfillmentItem>[] {
-  const sourceLabel = (connectionId: string) =>
-    list.sources.find((source) => source.connectionId === connectionId)
-      ?.label ?? m.fulfillment_source_fallback();
-
-  return [
-    {
-      key: 'fulfillment',
-      header: m.fulfillment_column_fulfillment(),
-      cell: (item) => (
-        <span className="fulfillment-cell">
-          <DataTableRowLink
-            render={
-              <Link
-                to="/app/$organizationId/fulfillment/$fulfillmentId"
-                params={{ organizationId, fulfillmentId: item.id }}
-                search={search}
-              />
-            }
-          >
-            {orderLabel(item)}
-          </DataTableRowLink>
-          <small>
-            {m.fulfillment_row_context({
-              kind: kindLabels[item.kind],
-              source: sourceLabel(item.connectionId),
-            })}
-          </small>
-          <small>{quantity(item.units, item.unit)}</small>
-        </span>
-      ),
-    },
-    {
-      key: 'state',
-      header: m.fulfillment_column_state(),
-      cell: (item) => {
-        const state = fulfillmentState(item);
-
-        return (
-          <span className="fulfillment-flags">
-            <StatePill state={state.state}>{state.label}</StatePill>
-            {otherSignals(item).map((signal) => (
-              <Badge key={signal} tone="warning">
-                {signalLabels[signal]}
-              </Badge>
-            ))}
-          </span>
-        );
-      },
-    },
-    {
-      key: 'reason',
-      header: m.fulfillment_column_reason(),
-      hideOnNarrow: true,
-      cell: (item) => (
-        <span className="fulfillment-reason">
-          {fulfillmentReason(item, list.asOf)}
-        </span>
-      ),
-    },
-    {
-      key: 'location',
-      header: m.fulfillment_column_location(),
-      hideOnNarrow: true,
-      cell: (item) => (
-        <span className="fulfillment-cell">
-          <span>{item.location?.name ?? m.common_not_reported()}</span>
-          {item.method ? (
-            <small>
-              {item.method.name ??
-                methodLabels[item.method.type] ??
-                m.fulfillment_method_unknown()}
-            </small>
-          ) : null}
-        </span>
-      ),
-    },
-    {
-      key: 'progress',
-      header: m.fulfillment_column_progress(),
-      hideOnNarrow: true,
-      cell: (item) => <ProgressCell item={item} asOf={list.asOf} />,
-    },
-  ];
-}
-
 /** Explains an empty list for the current view and filters. */
-function EmptyList({
+export function FulfillmentEmpty({
   organizationId,
-  view,
+  segment,
   filtered,
   clear,
 }: {
   organizationId: string;
-  view: FulfillmentView;
+  segment: string;
   filtered: boolean;
   clear: () => void;
 }) {
+  const view = (
+    segment in emptyViewTitles ? segment : 'all'
+  ) as FulfillmentSegment;
   const calm =
     !filtered &&
     (view === 'attention' || view === 'held' || view === 'delayed');
@@ -332,218 +163,639 @@ function EmptyList({
   );
 }
 
-/** Presents fulfillment work with attention views, search, filters and paging. */
-export function FulfillmentView({
-  organizationId,
-  search,
-  list,
-  stale,
-  loading = false,
-  error,
-  offline = false,
-  refreshing = false,
-  change,
-  refresh,
-  next,
-  previous,
-  coverage,
+/**
+ * The Fulfillment list: the member's view with its conditions, sort, grouping and layout from
+ * the URL and remembered state, built-in views with their counts, the shared toolbar and view
+ * bar, list keys, an optional preview pane and keyset paging. A filter change keeps the previous
+ * rows until the new ones arrive.
+ */
+export function FulfillmentPage() {
+  const { organizationId } = useParams({
+    from: '/app/$organizationId/fulfillment/',
+  });
+  const search = useSearch({ from: '/app/$organizationId/fulfillment/' });
+  const navigate = useNavigate({ from: '/app/$organizationId/fulfillment/' });
+  const queryClient = useQueryClient();
+  const timeZone = useContext(WorkspaceTimezone);
+  const permissions = usePermissions(organizationId);
+  const can = permissions.can;
+  const online = useOnline();
+  const go = (next: FulfillmentSearch) =>
+    void navigate({ search: next, resetScroll: false });
+  // Clearing conditions also clears search text; other view changes keep it.
+  const keepQuery = useRef(true);
+  const view = useCollectionView({
+    catalog: fulfillmentCatalog,
+    organizationId,
+    search,
+    navigate: (next: Partial<CollectionSearch>) =>
+      go({
+        ...(keepQuery.current && search.q ? { q: search.q } : {}),
+        ...(search.from ? { from: search.from } : {}),
+        ...(search.item ? { item: search.item } : {}),
+        ...next,
+      }),
+  });
+  const state = view.state;
+
+  const connections = useQuery(connectionsOptions(organizationId));
+  const ready = permissions.ready;
+  const fieldPermissions = new Set(
+    fulfillmentCatalog.fields.flatMap((field) =>
+      field.permission && can(field.permission) ? [field.permission] : [],
+    ),
+  );
+  const clientIssues = ready
+    ? collectionWhereIssues(fulfillmentCatalog, state.where, {
+        permissions: fieldPermissions,
+      })
+    : [];
+  const query = fulfillmentListQuery(state, search, timeZone);
+  const list = useQuery({
+    ...fulfillmentListOptions(organizationId, query),
+    enabled: ready && !clientIssues.length,
+  });
+  // With a page cursor, a refused request means the page link is stale, not the view.
+  const serverIssue = search.cursor
+    ? undefined
+    : collectionServerIssue(list.error);
+  const data = list.data;
+  const options = {
+    connections:
+      connections.data?.map((item) => ({
+        value: item.id,
+        label: item.label,
+      })) ??
+      data?.sources.map((source) => ({
+        value: source.connectionId,
+        label: source.label,
+      })) ??
+      [],
+    locations: [
+      ...new Map(
+        [
+          ...(data?.locations ?? []).map((location) => ({
+            value: location.id,
+            label: location.name ?? m.fulfillment_unnamed_location(),
+          })),
+          ...(data?.items ?? []).flatMap((item) =>
+            item.location?.id
+              ? [
+                  {
+                    value: item.location.id,
+                    label:
+                      item.location.name ?? m.fulfillment_unnamed_location(),
+                  },
+                ]
+              : [],
+          ),
+        ].map((option) => [option.value, option]),
+      ).values(),
+    ],
+  };
+  const controls = useCollectionControls({
+    view,
+    catalog: fulfillmentCatalog,
+    presentation: fulfillmentPresentation,
+    can,
+    options,
+    required: ['order'],
+    title: 'order',
+    preview: true,
+    serverIssues: serverIssue ? [serverIssue] : [],
+  });
+  // A 403 for a reader who can read fulfillment means a field the view uses is closed to them.
+  const fieldDenied =
+    list.error instanceof IdentityError &&
+    list.error.status === 403 &&
+    can('fulfillment.read');
+  const issues = [
+    ...clientIssues,
+    ...(serverIssue ? [serverIssue] : []),
+    ...(fieldDenied ? [{ index: null }] : []),
+  ];
+  const repair = issues.length
+    ? () => view.change(repairedState(fulfillmentCatalog, state, issues, can))
+    : undefined;
+  const error: CollectionError | undefined =
+    clientIssues.length || fieldDenied
+      ? { kind: 'invalid', message: m.collections_needs_repair() }
+      : collectionError(list.error, search.cursor);
+
+  const grouping = state.group;
+  const groupPrefix = `${groupOf(state) ?? ''}=`;
+  const collapsed = view.display.collapsedGroups
+    .filter((id) => id.startsWith(groupPrefix))
+    .map((id) => id.slice(groupPrefix.length));
+  const resetKey = JSON.stringify([organizationId, query]);
+  const more = useGroupPages<FulfillmentItem>({
+    resetKey,
+    load: (key: CollectionGroup['key'], cursor: string) =>
+      queryClient
+        .fetchQuery(
+          fulfillmentListOptions(
+            organizationId,
+            fulfillmentListQuery(state, search, timeZone, { key, cursor }),
+          ),
+        )
+        .then((page) => ({
+          rows: page.items,
+          nextCursor: page.groups?.[0]?.nextCursor ?? page.nextCursor,
+        })),
+  });
+  const groups =
+    data && grouping && data.groups
+      ? fulfillmentGroups(data, grouping, more)
+      : [];
+  // Keys in the order rows appear on the page, so the list keys follow the screen.
+  const keys = grouping
+    ? groups
+        .filter(
+          (group) => state.layout === 'board' || !collapsed.includes(group.id),
+        )
+        .flatMap((group) => group.rows.map((row) => row.id))
+    : (data?.items ?? []).map((row) => row.id);
+  const rowsById = new Map(
+    [...(data?.items ?? []), ...groups.flatMap((group) => group.rows)].map(
+      (row) => [row.id, row],
+    ),
+  );
+
+  const paging = useCursorPaging({
+    key: JSON.stringify([
+      organizationId,
+      view.key,
+      query.view,
+      query.where,
+      query.sort,
+      query.direction,
+      query.q,
+    ]),
+    cursor: search.cursor,
+    page: search.page,
+    nextCursor: grouping ? null : data?.nextCursor,
+    go: ({ cursor, page }) => go({ ...search, cursor, page }),
+  });
+
+  const searchInput = useRef<HTMLInputElement>(null);
+  const rows = useRef<HTMLDivElement>(null);
+  const [help, setHelp] = useState(false);
+  // Selection belongs to one page of one view; changing either starts empty.
+  const selectionKey = JSON.stringify([query, search.cursor]);
+  const [selection, setSelection] = useState<{ key: string; ids: string[] }>({
+    key: selectionKey,
+    ids: [],
+  });
+  const selected = selection.key === selectionKey ? selection.ids : [];
+  const setSelected = (next: string[] | ((current: string[]) => string[])) =>
+    setSelection((current) => {
+      const ids = current.key === selectionKey ? current.ids : [];
+
+      return {
+        key: selectionKey,
+        ids: typeof next === 'function' ? next(ids) : next,
+      };
+    });
+  const anchor = useRef<number>(-1);
+  const previewOn = state.preview && state.layout !== 'board';
+  const open = previewOn ? search.item : undefined;
+  const setOpen = (item: string | undefined) => go({ ...search, item });
+  const detailSearch = { ...search, item: undefined };
+  const openFulfillment = (fulfillmentId: string) =>
+    void navigate({
+      to: '/app/$organizationId/fulfillment/$fulfillmentId',
+      params: { organizationId, fulfillmentId },
+      search: detailSearch,
+    });
+  const keyboard = useListKeyboard({
+    rows,
+    count: keys.length,
+    keys,
+    preview: previewOn ? { open, onOpenChange: setOpen } : undefined,
+    onOpen: (index) => {
+      const key = keys[index];
+      if (key) openFulfillment(key);
+    },
+    onToggleSelection: (index) => {
+      const key = keys[index];
+      if (!key) return;
+      anchor.current = index;
+      setSelected((current) =>
+        current.includes(key)
+          ? current.filter((item) => item !== key)
+          : [...current, key],
+      );
+    },
+    onExtendSelection: (index) => {
+      const from = anchor.current < 0 ? index : anchor.current;
+      const key = keys[index];
+      if (!key) return;
+      setSelected((current) =>
+        selectRange(keys, current, from, index, !current.includes(key)),
+      );
+      anchor.current = index;
+    },
+    onEscape: () => {
+      if (!selected.length) return false;
+      setSelected([]);
+
+      return true;
+    },
+    onFocusSearch: () => searchInput.current?.focus(),
+    onOpenFilter: () => controls.conditions.onOpenChange?.(true),
+    onShowHelp: () => setHelp(true),
+  });
+
+  if (list.error instanceof IdentityError && list.error.status === 401)
+    return <SignInRedirect />;
+
+  const link = (item: FulfillmentItem) => (
+    <Link
+      id={`fulfillment-${item.id}`}
+      to="/app/$organizationId/fulfillment/$fulfillmentId"
+      params={{ organizationId, fulfillmentId: item.id }}
+      search={detailSearch}
+      onClick={(event) => {
+        if (!previewOn || event.metaKey || event.ctrlKey || event.shiftKey)
+          return;
+        event.preventDefault();
+        setOpen(item.id);
+      }}
+    />
+  );
+  const filterValue = (
+    field: string,
+    value: CellFilterValue,
+    exclude: boolean,
+  ) => {
+    const definition = collectionField(fulfillmentCatalog, field);
+    if (!definition?.filter) return;
+    const where = whereWithCellValue(
+      state.where as ConditionWhere,
+      { id: field, type: definition.type, operators: definition.filter },
+      value,
+      exclude,
+    );
+    if (where) view.change({ ...state, where: where as typeof state.where });
+  };
+  const segment = state.segment ?? 'attention';
+  const filtered = !!search.q || state.where.conditions.length > 0;
+  const viewName = view.saved?.name ?? fulfillmentSegmentLabel(segment);
+  const sortLabel = state.sort
+    ? (fulfillmentPresentation[state.sort.field]?.label() ?? state.sort.field)
+    : '';
+  const shownItem = open ? rowsById.get(open) : undefined;
+  const hasRows = !!data && (data.items.length > 0 || groups.length > 0);
+  const listError = error && error.kind !== 'invalid' ? error : undefined;
+  const clear = () => {
+    keepQuery.current = false;
+    controls.clearConditions();
+    keepQuery.current = true;
+  };
+
+  const results =
+    data && error?.kind !== 'access' && error?.kind !== 'invalid' ? (
+      <FulfillmentResults
+        list={data}
+        layout={state.layout}
+        density={state.density}
+        grouping={grouping}
+        caption={m.fulfillment_list_caption_sorted({
+          view: viewName,
+          sort: sortLabel,
+        })}
+        link={link}
+        empty={
+          <FulfillmentEmpty
+            organizationId={organizationId}
+            segment={segment}
+            filtered={filtered}
+            clear={clear}
+          />
+        }
+        sort={
+          state.sort
+            ? { key: state.sort.field, direction: state.sort.direction }
+            : undefined
+        }
+        onSortChange={(next) =>
+          view.change({
+            ...state,
+            sort: { field: next.key, direction: next.direction },
+          })
+        }
+        columnState={controls.columnState}
+        onColumnStateChange={controls.onColumnStateChange}
+        onColumnFilter={(key) => controls.filterBy(key)}
+        properties={controls.properties}
+        focusedKey={keyboard.focusedKey}
+        current={open}
+        selection={{ selected, onChange: setSelected }}
+        groupLabel={(key) =>
+          fulfillmentGroupLabel(
+            grouping?.field ?? '',
+            grouping?.granularity,
+            key,
+            options,
+          )
+        }
+        collapsed={collapsed}
+        onCollapsedChange={(id, closed) =>
+          view.setDisplay({
+            ...view.display,
+            collapsedGroups: [
+              ...view.display.collapsedGroups.filter(
+                (item) => item !== `${groupPrefix}${id}`,
+              ),
+              ...(closed ? [`${groupPrefix}${id}`] : []),
+            ].slice(-100),
+          })
+        }
+        more={more}
+      />
+    ) : null;
+
+  return (
+    <FulfillmentView
+      back={recordReturnPath(organizationId, search.from)}
+      toolbar={
+        <CollectionToolbar
+          views={
+            <>
+              <CollectionViewBar
+                organizationId={organizationId}
+                view={view}
+                path="fulfillment"
+                segmentLabel={fulfillmentSegmentLabel}
+                exportColumns={controls.columns.map((id) => ({
+                  id,
+                  label: fulfillmentPresentation[id]?.label() ?? id,
+                }))}
+              />
+              <FulfillmentTabs
+                value={view.ref.kind === 'builtin' ? view.ref.segment : null}
+                counts={data?.counts}
+                onChange={(next) => view.open(`builtin:${next}`)}
+              />
+            </>
+          }
+          search={{
+            value: search.q,
+            onChange: (q) =>
+              go({
+                ...fulfillmentFilters(search),
+                q: q || undefined,
+                ...(search.from ? { from: search.from } : {}),
+                ...(search.item ? { item: search.item } : {}),
+              }),
+            label: m.fulfillment_list_search_label(),
+            placeholder: m.fulfillment_list_search_placeholder(),
+            inputRef: searchInput,
+          }}
+          filters={controls.filters}
+          conditions={controls.conditions}
+          actions={
+            <DescribedFilter
+              organizationId={organizationId}
+              domain="fulfillment"
+              listName={m.fulfillment_page_title()}
+              fields={controls.conditions.fields}
+              apply={(conditions) =>
+                view.change({
+                  ...state,
+                  where: {
+                    match: state.where.match,
+                    conditions: [...state.where.conditions, ...conditions],
+                  },
+                })
+              }
+            />
+          }
+          display={controls.display}
+          sort={controls.sort}
+          onClear={clear}
+          onRefresh={() => {
+            void list.refetch();
+            void connections.refetch();
+          }}
+          refreshing={list.isFetching}
+          refreshLabel={m.fulfillment_list_refresh()}
+        />
+      }
+      coverage={<SyncCoverage organizationId={organizationId} type="orders" />}
+      note={m.fulfillment_list_note({ hours: data?.stalledAfterHours ?? 48 })}
+      summary={
+        <CollectionSummaryBand organizationId={organizationId} view={view} />
+      }
+      actions={
+        <CollectionBulkActions
+          organizationId={organizationId}
+          view={view}
+          selected={selected}
+          clear={() => setSelected([])}
+        />
+      }
+      notices={
+        <>
+          <CollectionNotices
+            offline={!online}
+            error={error?.kind === 'invalid' ? error : listError}
+            hasRows={hasRows}
+            retry={() => void list.refetch()}
+            firstPage={() =>
+              go({ ...search, cursor: undefined, page: undefined })
+            }
+            repair={repair}
+          />
+          {data?.groupsTruncated ? (
+            <Alert role="status">{m.collections_groups_truncated()}</Alert>
+          ) : null}
+        </>
+      }
+      loading={!data && list.isPending && !error}
+      results={results}
+      pagination={
+        data && !grouping && data.items.length ? (
+          <>
+            <Pagination
+              count={data.items.length}
+              totalCount={data.counts[query.view ?? 'attention']}
+              page={paging.page}
+              pageSize={fulfillmentPageSize}
+              hasNext={!!paging.next}
+              onPrevious={paging.previous}
+              onNext={() => paging.next?.()}
+              formatTotal={(count) =>
+                m.fulfillment_list_pagination_total({ count })
+              }
+              label={m.fulfillment_list_pagination_label()}
+            />
+            {paging.first && !paging.previous ? (
+              <Button variant="ghost" onClick={paging.first}>
+                {m.fulfillment_go_first_page()}
+              </Button>
+            ) : null}
+          </>
+        ) : null
+      }
+      rowsRef={rows}
+      preview={
+        previewOn
+          ? {
+              open: !!open,
+              title: shownItem ? orderLabel(shownItem) : undefined,
+              actions: open ? (
+                <Link
+                  to="/app/$organizationId/fulfillment/$fulfillmentId"
+                  params={{ organizationId, fulfillmentId: open }}
+                  search={detailSearch}
+                  className={buttonVariants({ variant: 'ghost', size: 'icon' })}
+                  aria-label={m.fulfillment_preview_open()}
+                  title={m.fulfillment_preview_open()}
+                >
+                  <Maximize2 aria-hidden="true" />
+                </Link>
+              ) : null,
+              content: open ? (
+                <FulfillmentPreview
+                  key={open}
+                  organizationId={organizationId}
+                  fulfillmentId={open}
+                  item={shownItem}
+                  sources={data?.sources ?? []}
+                  asOf={data?.asOf ?? ''}
+                  filter={filterValue}
+                />
+              ) : null,
+              onClose: () => setOpen(undefined),
+            }
+          : undefined
+      }
+      help={
+        <ShortcutHelp
+          open={help}
+          onOpenChange={setHelp}
+          groups={[
+            listShortcutGroup(
+              previewOn
+                ? shortcuts
+                : shortcuts.filter((command) => command !== 'preview'),
+            ),
+          ]}
+        />
+      }
+    />
+  );
+}
+
+/**
+ * The built-in views as tabs with their counts under the current search and conditions. A saved
+ * view selects no tab.
+ */
+export function FulfillmentTabs({
+  value,
+  counts,
+  onChange,
 }: {
-  organizationId: string;
-  search: FulfillmentSearch;
-  list?: FulfillmentList | undefined;
-  /** The last loaded page, shown read-only after a failed refresh. */
-  stale?: FulfillmentList | undefined;
-  loading?: boolean;
-  error?: string | undefined;
-  offline?: boolean;
-  refreshing?: boolean;
-  change: (search: FulfillmentSearch) => void;
-  refresh: () => void;
-  next?: (() => void) | undefined;
-  previous?: (() => void) | undefined;
+  value: string | null;
+  counts?: FulfillmentList['counts'] | undefined;
+  onChange: (segment: string) => void;
+}) {
+  return (
+    <CollectionViews
+      label={m.fulfillment_list_views_label()}
+      value={value}
+      views={fulfillmentCatalog.segments.map((segment) => ({
+        value: segment,
+        label: fulfillmentSegmentLabel(segment),
+        description: (viewDescriptions as Record<string, string>)[segment],
+        count: counts?.[segment as FulfillmentSegment],
+        attention: warningViews.has(segment),
+      }))}
+      onChange={onChange}
+    />
+  );
+}
+
+/**
+ * Lays out the Fulfillment page in the shared list order: title, toolbar, coverage, notices,
+ * then the results with pagination, beside an optional preview pane.
+ */
+export function FulfillmentView({
+  back,
+  toolbar,
+  coverage,
+  note,
+  summary,
+  notices,
+  actions,
+  loading = false,
+  results,
+  pagination,
+  preview,
+  rowsRef,
+  help,
+}: {
+  /** Where the reader came from, such as an issue, for a back link. */
+  back?: string | null | undefined;
+  toolbar: ReactNode;
   /** Which sources the list covers. */
   coverage?: ReactNode;
+  /** How the list defines delayed work. */
+  note?: ReactNode;
+  /** A saved view's metrics and charts. */
+  summary?: ReactNode;
+  notices?: ReactNode;
+  /** Actions for the selected fulfillments, shown above the results. */
+  actions?: ReactNode;
+  loading?: boolean;
+  results?: ReactNode;
+  pagination?: ReactNode;
+  preview?:
+    | {
+        open: boolean;
+        title?: ReactNode;
+        actions?: ReactNode;
+        content: ReactNode;
+        onClose: () => void;
+      }
+    | undefined;
+  /** Contains the rows, for list keys. */
+  rowsRef?: Ref<HTMLDivElement>;
+  help?: ReactNode;
 }) {
-  const update = (patch: Partial<FulfillmentSearch>) =>
-    change({ ...fulfillmentFilters(search), from: search.from, ...patch });
-  const clear = () => change({ from: search.from, view: search.view });
-  const from = recordReturnPath(organizationId, search.from);
-  const view = search.view ?? 'attention';
-  const shownList = list ?? stale;
-  const sources = shownList?.sources ?? [];
-  const locations = shownList?.locations ?? [];
-  const filtered = !!(
-    search.q ||
-    search.connectionId ||
-    search.locationId ||
-    search.kind
+  const body = (
+    <div ref={rowsRef} className="fulfillment-results">
+      {actions}
+      {results ?? (loading ? <CollectionLoading /> : null)}
+      {pagination}
+    </div>
   );
 
   return (
     <main className="fulfillment-page">
-      {from ? <Link to={from}>← {m.fulfillment_back_to_context()}</Link> : null}
+      {back ? <Link to={back}>← {m.fulfillment_back_to_context()}</Link> : null}
       <PageTitle title={m.fulfillment_page_title()} />
-      <CollectionToolbar
-        refreshLabel={m.fulfillment_list_refresh()}
-        refreshing={refreshing}
-        onRefresh={refresh}
-        views={
-          <CollectionViews
-            label={m.fulfillment_list_views_label()}
-            value={view}
-            views={views.map((option) => ({
-              value: option,
-              label: viewLabels[option],
-              description: viewDescriptions[option],
-              count: shownList?.counts[option],
-              attention: warningViews.has(option),
-            }))}
-            onChange={(option) => update({ view: option })}
-          />
-        }
-        search={{
-          value: search.q,
-          onChange: (q) => update({ q }),
-          label: m.fulfillment_list_search_label(),
-          placeholder: m.fulfillment_list_search_placeholder(),
-        }}
-        filters={[
-          {
-            kind: 'choice',
-            key: 'connectionId',
-            label: m.fulfillment_filter_source(),
-            icon: Plug,
-            value: search.connectionId,
-            options: withSelected(
-              sources.length > 1 || search.connectionId
-                ? sources.map((source) => ({
-                    value: source.connectionId,
-                    label: source.label,
-                  }))
-                : [],
-              search.connectionId,
-              m.fulfillment_filter_selected_source(),
-            ),
-            onChange: (connectionId) => update({ connectionId }),
-          },
-          {
-            kind: 'choice',
-            key: 'locationId',
-            label: m.fulfillment_filter_location(),
-            icon: MapPin,
-            value: search.locationId,
-            options: withSelected(
-              locations.map((location) => ({
-                value: location.id,
-                label: m.fulfillment_filter_location_option({
-                  location: location.name ?? m.fulfillment_unnamed_location(),
-                  count: location.open,
-                }),
-              })),
-              search.locationId,
-              m.fulfillment_filter_selected_location(),
-            ),
-            onChange: (locationId) => update({ locationId }),
-          },
-          {
-            kind: 'choice',
-            key: 'kind',
-            label: m.fulfillment_filter_type(),
-            icon: Shapes,
-            value: search.kind,
-            options: kinds.map((value) => ({
-              value,
-              label: kindFilterLabels[value](),
-            })),
-            onChange: (value) =>
-              update({ kind: kinds.find((item) => item === value) }),
-          },
-        ]}
-        sort={{
-          value: search.sort ?? 'waiting',
-          options: sorts.map((value) => ({ value, label: sortLabels[value] })),
-          onChange: (value) => {
-            const sort = sorts.find((item) => item === value);
-            update({ sort: sort === 'waiting' ? undefined : sort });
-          },
-        }}
-        onClear={clear}
-      />
+      {toolbar}
       {coverage}
-      <p className="fulfillment-note">
-        {m.fulfillment_list_note({ hours: shownList?.stalledAfterHours ?? 48 })}
-      </p>
-      {offline ? (
-        <Alert role="status">{m.fulfillment_list_offline()}</Alert>
-      ) : null}
-      {error ? (
-        <Alert tone="danger" role="alert">
-          {stale
-            ? m.fulfillment_list_refresh_failed()
-            : `${m.fulfillment_list_load_failed()} ${error}`}{' '}
-          <Button variant="outline" onClick={refresh}>
-            {m.common_retry()}
-          </Button>
-          {search.cursor ? (
-            <Button variant="ghost" onClick={() => update({})}>
-              {m.fulfillment_go_first_page()}
-            </Button>
-          ) : null}
-        </Alert>
-      ) : null}
-      {shownList ? (
-        <>
-          <DataTable
-            className="fulfillment-list-table"
-            caption={m.fulfillment_list_caption({ view: viewLabels[view] })}
-            columns={listColumns(organizationId, search, shownList)}
-            rows={shownList.items}
-            rowKey={(item) => `${item.id}:${item.connectionId}`}
-            empty={
-              <EmptyList
-                organizationId={organizationId}
-                view={view}
-                filtered={filtered}
-                clear={clear}
-              />
-            }
-          />
-          {shownList.items.length ? (
-            <div className="fulfillment-pagination">
-              <span>
-                {(search.cursor
-                  ? m.fulfillment_list_page_count_paged
-                  : m.fulfillment_list_page_count)({
-                  shown: shownList.items.length,
-                  total: shownList.counts[view] ?? 0,
-                })}
-              </span>
-              <div>
-                {previous ? (
-                  <Button variant="outline" onClick={previous}>
-                    {m.fulfillment_previous_page()}
-                  </Button>
-                ) : null}
-                {search.cursor ? (
-                  <Button variant="ghost" onClick={() => update({})}>
-                    {m.fulfillment_first_page()}
-                  </Button>
-                ) : null}
-                <Button variant="outline" disabled={!next} onClick={next}>
-                  {m.fulfillment_next_page()}
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </>
-      ) : loading && !error ? (
-        <div className="fulfillment-loading" role="status">
-          <span className="sr-only">{m.fulfillment_list_loading()}</span>
-          {Array.from({ length: 5 }, (_, i) => (
-            <span className="lu-skeleton" key={i} />
-          ))}
-        </div>
-      ) : null}
+      {note ? <p className="fulfillment-note">{note}</p> : null}
+      {summary}
+      {notices}
+      {preview ? (
+        <CollectionPreview
+          className="fulfillment-preview"
+          open={preview.open}
+          list={body}
+          preview={preview.content}
+          label={m.fulfillment_preview_label()}
+          title={preview.title}
+          actions={preview.actions}
+          onClose={preview.onClose}
+        />
+      ) : (
+        body
+      )}
+      {help}
     </main>
   );
 }

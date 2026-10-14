@@ -3,7 +3,12 @@ import type {
   InventoryList,
   StockPosition,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
+import { CollectionToolbar } from '@luma/ui/components/primitives/collection-toolbar';
+import type { DataTableSort } from '@luma/ui/components/primitives/data-table';
+import { Pagination } from '@luma/ui/components/primitives/pagination';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
   createRootRoute,
@@ -13,11 +18,16 @@ import {
 import { useState } from 'react';
 import { expect, userEvent, within } from 'storybook/test';
 
+import { CollectionNotices } from '../../kit/collections/notices';
+import type { CollectionError } from '../../kit/collections/paging';
 import appStyles from '../../styles.css?inline';
 import { IdentityLinksView } from '../sync/identity-links';
-import type { InventorySearch } from './data';
+import { inventoryGroupLabel } from './collection';
+import { stockOptions } from './data';
 import { StockDetailView } from './detail';
-import { InventoryView } from './page';
+import { InventoryEmpty, InventoryView } from './page';
+import { InventoryPreview } from './preview';
+import { InventoryResults, positionLabel } from './results';
 
 const org = '33333333-3333-4333-8333-333333333333';
 const position: StockPosition = {
@@ -113,6 +123,7 @@ const syncing: StockPosition = {
 };
 const list: InventoryList = {
   items: [position],
+  totalCount: null,
   nextCursor: null,
   asOf: '2026-09-29T09:00:00Z',
 };
@@ -189,7 +200,6 @@ const identity = (
 );
 
 function Content({ state }: { state: string }) {
-  const [search, change] = useState<InventorySearch>({});
   if (
     state === 'detail' ||
     state === 'syncing-detail' ||
@@ -226,29 +236,209 @@ function Content({ state }: { state: string }) {
       />
     );
 
-  return (
-    <InventoryView
-      organizationId={org}
-      search={search}
-      change={change}
-      refresh={() => {}}
-      list={
-        state === 'loading' || state === 'error'
-          ? undefined
-          : state === 'empty'
-            ? { ...list, items: [] }
-            : state === 'syncing'
-              ? { ...list, items: [syncing] }
-              : list
-      }
-      loading={state === 'loading'}
-      offline={state === 'offline'}
-      error={state === 'error' ? 'Inventory could not be loaded.' : undefined}
+  return <ListPreview state={state} />;
+}
+
+// The same SKU at a second location, for grouping by SKU.
+const osaka: StockPosition = {
+  ...position,
+  id: '11111111-1111-4111-8111-111111111112',
+  locationId: '44444444-4444-4444-8444-444444444445',
+  location: 'Osaka store',
+  differences: [],
+  sources: [{ ...position.sources[1]!, available: '4' }],
+};
+
+const groupedList: InventoryList = {
+  ...list,
+  items: [position, osaka],
+  groups: [
+    {
+      key: position.skuId,
+      count: 2,
+      complete: true,
+      itemIds: [position.id, osaka.id],
+      nextCursor: null,
+      sums: [],
+    },
+  ],
+};
+
+/** The list page as the route renders it, with fixed rows and local view state. */
+function ListPreview({ state }: { state: string }) {
+  const [sort, setSort] = useState<DataTableSort>({
+    key: 'sku',
+    direction: 'asc',
+  });
+  const [collapsed, setCollapsed] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [open, setOpen] = useState<string | undefined>(
+    state === 'preview' ? position.id : undefined,
+  );
+  const [client] = useState(() => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(stockOptions(org, position.id).queryKey, detail);
+
+    return queryClient;
+  });
+  const grouping =
+    state === 'grouped' ? { field: 'sku', showEmpty: false } : null;
+  const shown =
+    state === 'empty'
+      ? { ...list, items: [] }
+      : state === 'syncing'
+        ? { ...list, items: [syncing] }
+        : grouping
+          ? groupedList
+          : { ...list, items: [position, osaka], totalCount: 2 };
+  const error: CollectionError | undefined =
+    state === 'error'
+      ? { kind: 'unavailable' }
+      : state === 'repair'
+        ? { kind: 'invalid', message: m.collections_needs_repair() }
+        : undefined;
+  const hidden = ['loading', 'error', 'repair'].includes(state);
+  const link = (row: StockPosition) => (
+    <a
+      href={`#position-${row.id}`}
+      onClick={(event) => {
+        if (state !== 'preview') return;
+        event.preventDefault();
+        setOpen(row.id);
+      }}
     />
+  );
+  const openPosition = shown.items.find((row) => row.id === open);
+
+  return (
+    <QueryClientProvider client={client}>
+      <InventoryView
+        organizationId={org}
+        toolbar={
+          <CollectionToolbar
+            search={{
+              value: undefined,
+              onChange: () => {},
+              label: m.inventory_list_search_label(),
+              placeholder: m.inventory_list_search_placeholder(),
+            }}
+            sort={{
+              value: sort.key,
+              options: [
+                { value: 'sku', label: 'SKU' },
+                { value: 'available', label: 'Available' },
+              ],
+              onChange: (key) => setSort({ ...sort, key }),
+              direction: sort.direction,
+              onDirectionChange: (direction) => setSort({ ...sort, direction }),
+            }}
+            onRefresh={() => {}}
+          />
+        }
+        note={m.inventory_list_note()}
+        notices={
+          <CollectionNotices
+            offline={state === 'offline'}
+            error={error}
+            hasRows={!hidden}
+            retry={() => {}}
+            firstPage={() => {}}
+            repair={state === 'repair' ? () => {} : undefined}
+          />
+        }
+        loading={state === 'loading'}
+        results={
+          hidden ? undefined : (
+            <InventoryResults
+              list={shown}
+              layout={state === 'rows' ? 'list' : 'table'}
+              density="comfortable"
+              grouping={grouping}
+              caption="All stock. Sorted by: SKU"
+              link={link}
+              empty={
+                <InventoryEmpty
+                  organizationId={org}
+                  filtered={false}
+                  clear={() => {}}
+                />
+              }
+              sort={sort}
+              onSortChange={setSort}
+              columnState={{
+                columns: [
+                  'sku',
+                  'sources',
+                  'onHand',
+                  'reserved',
+                  'available',
+                  'incoming',
+                ].map((key) => ({ key })),
+              }}
+              onColumnStateChange={() => {}}
+              properties={['available', 'onHand', 'sources']}
+              current={open}
+              selection={{ selected, onChange: setSelected }}
+              groupLabel={(key) =>
+                inventoryGroupLabel(
+                  'sku',
+                  undefined,
+                  key,
+                  {},
+                  () => position.sku,
+                )
+              }
+              collapsed={collapsed}
+              onCollapsedChange={(id, closed) =>
+                setCollapsed((current) =>
+                  closed
+                    ? [...current, id]
+                    : current.filter((item) => item !== id),
+                )
+              }
+            />
+          )
+        }
+        pagination={
+          !hidden && !grouping && shown.items.length ? (
+            <Pagination
+              count={shown.items.length}
+              totalCount={shown.totalCount ?? undefined}
+              page={1}
+              pageSize={50}
+              hasNext={!!shown.nextCursor}
+              onNext={() => {}}
+              formatTotal={(count) =>
+                m.inventory_list_pagination_total({ count })
+              }
+              label={m.inventory_list_pagination_label()}
+            />
+          ) : null
+        }
+        preview={
+          state === 'preview'
+            ? {
+                open: !!openPosition,
+                title: openPosition ? positionLabel(openPosition) : undefined,
+                content: openPosition ? (
+                  <InventoryPreview
+                    organizationId={org}
+                    positionId={openPosition.id}
+                    position={openPosition}
+                    asOf={list.asOf}
+                    filter={() => {}}
+                  />
+                ) : null,
+                onClose: () => setOpen(undefined),
+              }
+            : undefined
+        }
+      />
+    </QueryClientProvider>
   );
 }
 
-function Preview({ state = 'list' }: { state?: string }) {
+function Preview({ state = 'table' }: { state?: string }) {
   const [router] = useState(() =>
     createRouter({
       history: createMemoryHistory(),
@@ -279,10 +469,63 @@ type Story = StoryObj<typeof meta>;
 export const Browse: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(
-      await canvas.findByRole('link', { name: 'LINEN-SHIRT-M' }),
-    ).toBeVisible();
+    const links = await canvas.findAllByRole('link', { name: 'LINEN-SHIRT-M' });
+    await expect(links).toHaveLength(2);
     await expect(canvas.getByText('Differs by source')).toBeVisible();
+    await expect(canvas.getByText('1–2 of 2 stock positions')).toBeVisible();
+  },
+};
+
+export const Rows: Story = {
+  args: { state: 'rows' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByRole('list', { name: /All stock/ }),
+    ).toBeVisible();
+    await expect(
+      canvas.getAllByText('Available: JTL-Wawi 18 · Shopify · Japan 24')[0],
+    ).toBeVisible();
+  },
+};
+
+/** Grouping by SKU shows one product across warehouses. */
+export const GroupedBySku: Story = {
+  args: { state: 'grouped' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByRole('button', { name: /^LINEN-SHIRT-M/ }),
+    ).toHaveAttribute('aria-expanded', 'true');
+    await expect(
+      canvas.getAllByRole('link', { name: 'LINEN-SHIRT-M' }),
+    ).toHaveLength(2);
+  },
+};
+
+export const OpenPreview: Story = {
+  args: { state: 'preview' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const preview = await canvas.findByRole('region', {
+      name: 'Stock preview',
+    });
+    await expect(within(preview).getByText('#1042')).toBeVisible();
+    await expect(
+      within(preview).getByRole('button', { name: 'Filter by JTL-Wawi' }),
+    ).toBeVisible();
+  },
+};
+
+export const NeedsRepair: Story = {
+  args: { state: 'repair' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByRole('button', {
+        name: 'Remove unsupported conditions',
+      }),
+    ).toBeVisible();
   },
 };
 

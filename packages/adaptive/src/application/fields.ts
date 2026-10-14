@@ -35,7 +35,11 @@ function assertUuid(value: string) {
 }
 
 function assertRecordType(value: string) {
-  if (!['order', 'product', 'supplier', 'purchase_order'].includes(value))
+  if (
+    !['order', 'product', 'supplier', 'purchase_order', 'customer'].includes(
+      value,
+    )
+  )
     invalid();
 }
 
@@ -103,6 +107,11 @@ export interface FieldsTransaction {
     type: AdaptiveRecordType,
     id: string,
   ): Promise<CustomFieldRecordValue[]>;
+  /** Values of several records of one type; records without values are absent. */
+  valuesMany(
+    type: AdaptiveRecordType,
+    ids: readonly string[],
+  ): Promise<(CustomFieldRecordValue & { recordId: string })[]>;
   setValue(
     type: AdaptiveRecordType,
     id: string,
@@ -197,7 +206,9 @@ export function createFieldsService(deps: {
         ? 'orders.read'
         : type === 'product'
           ? 'products.read'
-          : 'procurement.read',
+          : type === 'customer'
+            ? 'customers.read'
+            : 'procurement.read',
     );
   }
 
@@ -433,6 +444,33 @@ export function createFieldsService(deps: {
         await tx.event(event(context, id, 'restored', before, after));
 
         return after;
+      });
+    },
+    /**
+     * Reads the reader's permitted fields and their values for up to 100 records of one type,
+     * as list pages show them in columns. Records the reader cannot see return no values.
+     */
+    async readMany(
+      context: TenantContext,
+      type: AdaptiveRecordType,
+      recordIds: readonly string[],
+    ) {
+      context = await authorize(context, 'adaptive.fields.read');
+      scope(context, type);
+      assertRecordType(type);
+      assertBounded(recordIds.length, 1, 100);
+      for (const id of recordIds) assertUuid(id);
+
+      return deps.store.transaction(context.tenantId, false, async (tx) => {
+        const fields = (await tx.list(type)).filter((f) => canRead(context, f));
+        const ids = new Set(fields.map((f) => f.id));
+
+        return {
+          fields,
+          values: (await tx.valuesMany(type, [...new Set(recordIds)])).filter(
+            (value) => ids.has(value.fieldId),
+          ),
+        };
       });
     },
     async readValues(

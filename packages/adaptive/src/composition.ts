@@ -4,12 +4,16 @@ import type { AuditLog } from '@luma/audit';
 import type { TenantContext } from '@luma/identity';
 import type { TenantDatabase } from '@luma/platform';
 
+import { createCollectionStatesService } from './application/collection-states.js';
+import { createViewExports } from './application/exports.js';
 import { createFieldsService } from './application/fields.js';
 import { createFieldsEffects } from './application/fields-effects.js';
 import type { FieldWorkflowAdapter } from './application/fields-workflows.js';
 import { createFieldsWorkflowAdapter } from './application/fields-workflows.js';
-import type { ViewsDependencies } from './application/views.js';
+import type { AdaptiveViews, ViewsDependencies } from './application/views.js';
 import { createViewsService } from './application/views.js';
+import { createCollectionStatesStore } from './infrastructure/collection-states.js';
+import { collectionsValidation } from './infrastructure/collections-validation.js';
 import { createFieldsStore } from './infrastructure/fields.js';
 import {
   customFieldValueSchema,
@@ -69,6 +73,64 @@ export function createAdaptiveViews(
 }
 
 export { createAdaptiveViewReadAdapter } from './infrastructure/views-query.js';
+
+/**
+ * Composes list exports over the saved-view reads. Each export appends an audit entry with the
+ * list, row count, columns and number of conditions; exported values are never stored.
+ */
+export function createViewExportsService(options: {
+  views: AdaptiveViews;
+  refreshContext(context: TenantContext): Promise<TenantContext>;
+  audit: AuditLog;
+}) {
+  return createViewExports({
+    preview: (context, query, cursor) =>
+      options.views.preview(context, query, cursor),
+    refreshContext: options.refreshContext,
+    record: async (_context, entry) => {
+      const details = {
+        domain: entry.domain,
+        rows: String(entry.rows),
+        truncated: String(entry.truncated),
+        columns: entry.columns.join(','),
+        conditions: String(entry.conditions),
+      };
+      await options.audit.append({
+        id: entry.id,
+        tenantId: entry.tenantId,
+        eventKey: `collection-export:${entry.id}`,
+        eventType: 'collections.exported',
+        schemaVersion: 1,
+        occurredAt: entry.occurredAt,
+        actor: { kind: 'user', id: entry.actorId },
+        correlationId: entry.id,
+        proposalId: entry.id,
+        actionHash: createHash('sha256')
+          .update(JSON.stringify(details))
+          .digest('hex'),
+        evidenceRefs: [],
+        details,
+      });
+    },
+    id: randomUUID,
+    now: () => new Date(),
+  });
+}
+
+/** Composes each member's remembered list state, stored under tenant row security. */
+export function createCollectionStates(
+  db: TenantDatabase,
+  options: {
+    refreshContext(context: TenantContext): Promise<TenantContext>;
+  },
+) {
+  return createCollectionStatesService({
+    store: createCollectionStatesStore(db),
+    refreshContext: options.refreshContext,
+    validation: collectionsValidation,
+    now: () => new Date(),
+  });
+}
 
 export { createActionReceipts } from './infrastructure/action-receipts.js';
 

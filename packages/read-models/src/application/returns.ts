@@ -1,6 +1,11 @@
 import type { TenantContext } from '@luma/identity';
 import type { RefundState, ReturnStage, StageGroup } from '@luma/orders';
 
+import type {
+  CollectionGroupedResult,
+  CollectionListParameters,
+} from './collections.js';
+
 export type { ReturnStage };
 
 /** `action` needs a person; `waiting` is with the customer or payment provider; `done` is final. */
@@ -65,22 +70,58 @@ export type ReturnSource = {
   failing: boolean;
 };
 
-export interface ReturnQuery {
+/** Stages in lifecycle order, as the list sorts and groups them. */
+export const returnLifecycle = [
+  'requested',
+  'awaiting_items',
+  'awaiting_refund',
+  'refund_pending',
+  'refund_failed',
+  'ready_to_close',
+  'refunded',
+  'refund_recorded',
+  'closed',
+  'declined',
+  'cancelled',
+  'unknown',
+] as const satisfies readonly ReturnStage[];
+
+/** Refund states in the order the list groups them. */
+export const returnRefundStates = [
+  'none',
+  'recorded',
+  'pending',
+  'failed',
+  'partial',
+  'refunded',
+] as const satisfies readonly RefundState[];
+
+/**
+ * List parameters. Conditions and groups follow the Returns catalog and also narrow the
+ * per-view and per-stage counts. Search also matches the name and email address of the
+ * order's customer when the reader can read customers.
+ */
+export interface ReturnQuery extends CollectionListParameters {
   q: string;
   view: ReturnView;
   stage?: ReturnStage | undefined;
   connectionId?: string | undefined;
-  sort: 'requested' | 'activity';
+  /**
+   * `value` and `pendingRefund` order by currency, then amount. `stage` follows the lifecycle.
+   * Returns without a value come last in both directions.
+   */
+  sort: 'requested' | 'activity' | 'value' | 'pendingRefund' | 'stage';
   direction: 'asc' | 'desc';
+  count?: 'exact' | undefined;
   cursor?: string | undefined;
   /** Page size, 1 to 50. */
   limit: number;
 }
 
-interface ReturnList {
+interface ReturnList extends CollectionGroupedResult {
   items: ReturnListItem[];
   sources: ReturnSource[];
-  /** Matches per view and per stage for the search and source filters; every key is present. */
+  /** Matches per view and per stage for the search, filters and conditions; every key is present. */
   counts: {
     views: Record<ReturnView, number>;
     stages: Record<ReturnStage, number>;

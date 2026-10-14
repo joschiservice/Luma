@@ -2,6 +2,7 @@ import '@luma/identity/http';
 
 import {
   apiContract,
+  fulfillmentCatalog,
   fulfillmentDetailSchema,
   fulfillmentListSchema,
 } from '@luma/api-contract';
@@ -10,6 +11,7 @@ import type { HttpContext } from '@luma/identity/http';
 import { implement } from '@orpc/server';
 
 import type { FulfillmentWorkspace } from '../application/fulfillment.js';
+import { validateCollectionQuery } from './collection-validation.js';
 
 /** Exposes the tenant's fulfillment work, shipments and their evidence to readers with `fulfillment.read`. */
 export function fulfillmentRoutes(service?: FulfillmentWorkspace) {
@@ -30,6 +32,7 @@ export function fulfillmentRoutes(service?: FulfillmentWorkspace) {
             'SERVICE_UNAVAILABLE',
             'Fulfillment is unavailable',
           );
+        validateCollectionQuery(fulfillmentCatalog, query);
 
         return fulfillmentListSchema.parse(
           await service.list(request.tenantContext, query),

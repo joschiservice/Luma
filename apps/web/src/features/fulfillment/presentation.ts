@@ -54,7 +54,7 @@ export const signalLabels = localized({
   failed: m.fulfillment_signal_failed,
 } satisfies Record<FulfillmentSignal, () => string>);
 
-const holdLabels: Record<string, string> = localized({
+export const holdLabels: Record<string, string> = localized({
   awaiting_payment: m.fulfillment_hold_awaiting_payment,
   high_risk_of_fraud: m.fulfillment_hold_high_risk_of_fraud,
   incorrect_address: m.fulfillment_hold_incorrect_address,
@@ -124,12 +124,6 @@ export function shippingFreshness(item: FulfillmentItem, asOf: string) {
       now - Date.parse(lastUpdate) >= 48 * 60 * 60_000,
   };
 }
-
-export const sortLabels = localized({
-  waiting: m.fulfillment_sort_waiting,
-  recent: m.fulfillment_sort_recent,
-  deadline: m.fulfillment_sort_deadline,
-});
 
 /** Describes a length of time in whole units, such as "3 days" or "20 hours". */
 export function duration(milliseconds: number) {

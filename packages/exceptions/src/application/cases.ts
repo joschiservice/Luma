@@ -5,14 +5,66 @@ import type { Diagnosis } from '../domain/diagnosis.js';
 import type { Incident } from './detection.js';
 import type { CaseOwner, createCaseOwners } from './owners.js';
 
+/** One condition on an issues catalog field, as the API contract parsed it. */
+export interface CaseCondition {
+  field: string;
+  op: string;
+  value?: unknown;
+  source?: string | undefined;
+}
+
+/** Conditions combined with AND (`all`) or OR (`any`). */
+interface CaseWhere {
+  match: 'all' | 'any';
+  conditions: CaseCondition[];
+}
+
+/** A value of the field the list is grouped by; null is the group without a value. */
+export type CaseGroupKey = string | number | boolean | null;
+
 export interface CaseQuery {
   view: 'needs_you' | 'active' | 'history';
   ownerId?: string | undefined;
   class?: Incident['exceptionClass'] | undefined;
   severity?: Incident['severity'] | undefined;
   state?: Incident['state'] | undefined;
+  /** Searches summaries and records; it may hold personal data and is never logged. */
+  q?: string | undefined;
+  where?: CaseWhere | undefined;
+  group?:
+    | { field: string; granularity?: 'day' | 'week' | 'month' | undefined }
+    | undefined;
+  /** Reads one group's rows, paged by `cursor` and `limit`, instead of every group. */
+  groupKey?: CaseGroupKey | undefined;
+  /** Rows per group when reading every group, 1 to 50. */
+  groupLimit?: number | undefined;
+  /** IANA zone for days and relative periods in conditions; UTC by default. */
+  timeZone?: string | undefined;
+  sort?: 'urgency' | 'detected' | 'lastActivity' | 'waitingSince' | undefined;
+  direction?: 'asc' | 'desc' | undefined;
   cursor?: string | undefined;
   limit: number;
+}
+
+/** One group of a grouped issue list. */
+export interface CaseGroup {
+  key: CaseGroupKey;
+  count: number;
+  complete: boolean;
+  itemIds: string[];
+  nextCursor: string | null;
+  sums: { field: string; currency: string | null; amount: string }[];
+}
+
+/** A page of the issue list, or every group's first rows of a grouped read. */
+export interface CaseListPage {
+  totalCount: number;
+  offset: number;
+  items: CaseSummary[];
+  nextCursor: string | null;
+  coverage: 'observed' | 'unobserved';
+  groups?: CaseGroup[];
+  groupsTruncated?: boolean;
 }
 
 /** @public Declaration emit names it in the inferred type of `createCases`. */
@@ -85,16 +137,16 @@ export interface CaseReader {
     end: string,
     readAt?: string,
   ): Promise<CaseOverview>;
+  /**
+   * Reads one page of the list, or every group's first rows. `actorId` is the reader, whom an
+   * owner condition's `me` names. Rejects malformed conditions and cursors from another query
+   * with a 400 error.
+   */
   list(
     tenantId: string,
     query: CaseQuery,
-  ): Promise<{
-    totalCount: number;
-    offset: number;
-    items: CaseSummary[];
-    nextCursor: string | null;
-    coverage: 'observed' | 'unobserved';
-  }>;
+    actorId: string,
+  ): Promise<CaseListPage>;
   get(tenantId: string, id: string): Promise<CaseDetail | null>;
 }
 
@@ -157,7 +209,7 @@ export function createCaseService(
     list(context: TenantContext, query: CaseQuery) {
       requireTenant(context, context.tenantId);
 
-      return reader.list(context.tenantId, query);
+      return reader.list(context.tenantId, query, context.actor.id);
     },
     async get(context: TenantContext, id: string) {
       requireTenant(context, context.tenantId);

@@ -242,6 +242,13 @@ export interface OrderProgress {
   /** Earliest expected date of lines that are still outstanding. */
   expectedDate: string | null;
   confirmationDueAt: string | null;
+  /**
+   * Earliest check time recorded for an item a person is following up: the latest response to
+   * it is `following_up` with a check time, and the item would otherwise need attention. A time
+   * in the past means the check is due and the item is back in attention. Null when nothing is
+   * being followed up.
+   */
+  nextCheckAt: string | null;
   attention: Attention[];
   next: NextAction;
 }
@@ -478,6 +485,8 @@ export function orderProgress(input: {
     ) < now.getTime();
 
   const attention: Attention[] = [];
+  // Check times of items a person is following up, for `nextCheckAt`.
+  const checks: (string | null)[] = [];
   if (submission?.state === 'approval_required')
     attention.push({
       key: `submission_approval:${submission.id}`,
@@ -538,6 +547,8 @@ export function orderProgress(input: {
         const base = `receipt_difference:${c.id}`;
         const due = followUpDate(responded, base, c.recordedAt)!;
         const answer = latestResponse(responded, base);
+        if ((c.quantity ?? 0) > 0)
+          checks.push(scheduledCheck(responded, base, c.recordedAt));
         if (
           (c.quantity ?? 0) > 0 &&
           (!answer ||
@@ -561,12 +572,14 @@ export function orderProgress(input: {
       const key = `commitment_changed:${c.id}`;
       const answer = latestResponse(responded, key);
       const due = followUpDate(responded, key, c.recordedAt)!;
+      const material = isMaterialChange(
+        c,
+        line,
+        line?.requestedDeliveryDate ?? requestedDate,
+      );
+      if (material) checks.push(scheduledCheck(responded, key, c.recordedAt));
       if (
-        !isMaterialChange(
-          c,
-          line,
-          line?.requestedDeliveryDate ?? requestedDate,
-        ) ||
+        !material ||
         (answer &&
           (answer.response !== 'following_up' ||
             Date.parse(due) > now.getTime()))
@@ -587,6 +600,28 @@ export function orderProgress(input: {
               : `Supplier added a condition to ${order.reference}`,
       });
     }
+    if (
+      submitted &&
+      !anyConfirmed &&
+      lines.every((l) => l.received === 0) &&
+      confirmationDueAt
+    )
+      checks.push(
+        scheduledCheck(
+          responded,
+          `confirmation_overdue:${order.id}:${confirmationDueAt}`,
+          confirmationDueAt,
+        ),
+      );
+    for (const line of lines)
+      if (submitted && line.outstanding > 1e-9 && line.expectedDate)
+        checks.push(
+          scheduledCheck(
+            responded,
+            `delivery_overdue:${order.id}:${line.lineId}:${line.expectedDate}`,
+            line.expectedDate,
+          ),
+        );
     if (confirmationOverdue)
       attention.push({
         key: `confirmation_overdue:${order.id}:${followUpDate(responded, `confirmation_overdue:${order.id}:${confirmationDueAt}`, confirmationDueAt)}`,
@@ -762,6 +797,11 @@ export function orderProgress(input: {
     lines,
     expectedDate,
     confirmationDueAt,
+    nextCheckAt:
+      checks
+        .filter((check): check is string => check !== null)
+        .map((check) => new Date(check).toISOString())
+        .sort()[0] ?? null,
     attention: attention.sort(
       (a, b) => a.dueAt.localeCompare(b.dueAt) || a.key.localeCompare(b.key),
     ),
@@ -788,6 +828,29 @@ function latestResponse(responded: Map<string, FollowUp>, key: string) {
   }
 
   return response;
+}
+
+/**
+ * The check time of the latest response to `key` when it is a follow-up, following the same
+ * chain of rescheduled checks as `followUpDate`; null when the item is unanswered or settled.
+ */
+function scheduledCheck(
+  responded: Map<string, FollowUp>,
+  key: string,
+  due: string,
+): string | null {
+  let response = responded.get(key);
+  for (let i = 0; response?.nextCheckAt && i < 20; i++) {
+    const next = responded.get(
+      `${key}:${due.length === 10 ? dateOnly(response.nextCheckAt) : response.nextCheckAt}`,
+    );
+    if (!next) break;
+    response = next;
+  }
+
+  return response?.response === 'following_up' && response.nextCheckAt
+    ? response.nextCheckAt
+    : null;
 }
 
 function followUpDate(

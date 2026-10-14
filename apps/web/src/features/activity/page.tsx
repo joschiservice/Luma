@@ -1,10 +1,12 @@
 import './activity.css';
 
 import {
+  activityCatalog,
   type ActivityEvent,
   activityOutcomes,
   type ActivityPage as Page,
   activityTypes,
+  type CollectionViewState,
 } from '@luma/api-contract';
 import { formatList } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
@@ -24,6 +26,7 @@ import {
 } from '@luma/ui/components/primitives/workspace-date';
 import { PageTitle } from '@luma/ui/components/workspace/page-header';
 import { actorLabel } from '@luma/ui/lib/actor';
+import { calendarPresets } from '@luma/ui/lib/date-range';
 import { workspaceDateValue } from '@luma/ui/lib/timezone';
 import { onlineManager, useQuery } from '@tanstack/react-query';
 import {
@@ -39,14 +42,32 @@ import {
   Plug,
   Server,
   Tag,
+  UserRound,
 } from 'lucide-react';
-import { useContext, useEffect, useSyncExternalStore } from 'react';
+import {
+  type ReactNode,
+  useContext,
+  useEffect,
+  useRef,
+  useSyncExternalStore,
+} from 'react';
 
+import type { CollectionSearch } from '../../kit/collections/state';
+import { useCollectionView } from '../../kit/collections/use-collection-view';
+import { CollectionViewBar } from '../../kit/collections/view-bar';
 import { connectionsOptions } from '../../kit/connections/data';
 import { SignInRedirect } from '../../kit/identity/common';
 import { IdentityError } from '../../kit/identity/data';
+import { membersOptions } from '../../kit/settings/data';
 import { providerName } from '../sync/presentation';
-import { type ActivityFilters, activityOptions } from './data';
+import {
+  activityConditions,
+  type ActivityFilters,
+  activityFiltersOf,
+  activityOptions,
+  activityRange,
+  type ActivitySearch,
+} from './data';
 import {
   activityChangeLabel,
   activityConnectionOptions,
@@ -92,19 +113,54 @@ const subscribe = (changed: () => void) => onlineManager.subscribe(changed);
 const snapshot = () => onlineManager.isOnline();
 const serverSnapshot = () => true;
 
-/** Connects workspace history to validated URL filters and private tenant-scoped reads. */
+/**
+ * Connects workspace history to the member's view: filters live in the view's conditions, so
+ * combinations can be saved, shared and remembered, while search text, the page position and
+ * the open event stay in the URL. Every read runs with the reader's own visibility, so a shared
+ * view never shows events the reader couldn't see otherwise.
+ */
 export function ActivityPage() {
   const { organizationId } = useParams({ from: '/app/$organizationId' });
-  const filters = useSearch({ from: '/app/$organizationId/activity' });
+  const search = useSearch({ from: '/app/$organizationId/activity' });
   const navigate = useNavigate({ from: '/app/$organizationId/activity' });
   const timeZone = useContext(WorkspaceTimezone);
-  const page = useQuery(
-    activityOptions(organizationId, filters, false, timeZone),
+  // A filter change carries the search text of the filters it came with; other view changes
+  // keep the current search.
+  const changing = useRef<{ q: string | undefined } | null>(null);
+  const go = (next: ActivitySearch) =>
+    void navigate({ search: next, resetScroll: false });
+  const view = useCollectionView({
+    catalog: activityCatalog,
+    organizationId,
+    search,
+    navigate: (next: Partial<CollectionSearch>) => {
+      const q = changing.current ? changing.current.q : search.q;
+      go({ ...(q ? { q } : {}), ...next } as ActivitySearch);
+    },
+  });
+  const today = workspaceDateValue(new Date(), timeZone);
+  const { filters: conditions, issues } = activityFiltersOf(
+    view.state.where,
+    today,
   );
-  const head = useQuery(
-    activityOptions(organizationId, filters, true, timeZone),
-  );
+  const filters: ActivityFilters = {
+    ...conditions,
+    q: search.q,
+    cursor: search.cursor,
+    event: search.event,
+    latest: search.latest,
+  };
+  const invalid = issues.length > 0;
+  const page = useQuery({
+    ...activityOptions(organizationId, filters, false, timeZone),
+    enabled: !invalid,
+  });
+  const head = useQuery({
+    ...activityOptions(organizationId, filters, true, timeZone),
+    enabled: !invalid,
+  });
   const connections = useQuery(connectionsOptions(organizationId));
+  const members = useQuery(membersOptions(organizationId));
   const refreshPage = page.refetch;
   const visibilityChanged =
     !!page.data && !!head.data && page.data.visibility !== head.data.visibility;
@@ -112,7 +168,7 @@ export function ActivityPage() {
     if (visibilityChanged) {
       void navigate({
         search: {
-          ...filters,
+          ...search,
           cursor: undefined,
           latest: undefined,
           event: undefined,
@@ -120,9 +176,9 @@ export function ActivityPage() {
         replace: true,
         resetScroll: false,
       });
-      if (!filters.cursor) void refreshPage();
+      if (!search.cursor) void refreshPage();
     }
-  }, [visibilityChanged, filters, navigate, refreshPage]);
+  }, [visibilityChanged, search, navigate, refreshPage]);
   const online = useSyncExternalStore(subscribe, snapshot, serverSnapshot);
   const error = page.error ?? head.error;
   const accessLost =
@@ -131,7 +187,7 @@ export function ActivityPage() {
   const staleMessage =
     page.error instanceof IdentityError &&
     page.error.code === 'VALIDATION_ERROR' &&
-    filters.cursor
+    search.cursor
       ? page.error.message
       : undefined;
   if (error instanceof IdentityError && error.status === 401)
@@ -139,7 +195,26 @@ export function ActivityPage() {
   const newEvents =
     !!page.data &&
     !!head.data?.items.length &&
-    head.data.items[0]!.id !== (filters.latest ?? page.data.items[0]?.id);
+    head.data.items[0]!.id !== (search.latest ?? page.data.items[0]?.id);
+  // The URL's view keys, kept when only the search, page or open event changes.
+  const viewKeys: ActivitySearch = { ...search };
+  delete viewKeys.q;
+  delete viewKeys.cursor;
+  delete viewKeys.latest;
+  delete viewKeys.event;
+  // Removes what Activity can't apply; "match any" of several filters narrows to all of them.
+  const repair = () => {
+    const broken = new Set(issues.map((issue) => issue.index));
+    view.change({
+      ...view.state,
+      where: {
+        match: 'all',
+        conditions: view.state.where.conditions.filter(
+          (_, index) => !broken.has(index),
+        ),
+      },
+    } satisfies CollectionViewState);
+  };
 
   return (
     <ActivityView
@@ -150,21 +225,55 @@ export function ActivityPage() {
         label: connection.label,
         system: connection.target.kind,
       }))}
-      page={accessLost || visibilityChanged ? undefined : page.data}
-      loading={page.isPending}
+      people={members.data?.map((member) => ({
+        id: member.userId,
+        label: member.name || member.email || m.activity_actor_unknown_person(),
+      }))}
+      views={
+        <CollectionViewBar
+          organizationId={organizationId}
+          view={view}
+          path="activity"
+          segmentLabel={() => m.activity_view_all()}
+        />
+      }
+      page={accessLost || visibilityChanged || invalid ? undefined : page.data}
+      loading={page.isPending && !invalid}
       refreshing={page.isFetching || head.isFetching}
       offline={!online}
-      newEvents={newEvents}
+      newEvents={newEvents && !invalid}
       error={
-        accessLost
-          ? m.activity_error_access_lost()
-          : (staleMessage ??
-            (error ? m.activity_error_unavailable() : undefined))
+        invalid
+          ? m.collections_needs_repair()
+          : accessLost
+            ? m.activity_error_access_lost()
+            : (staleMessage ??
+              (error ? m.activity_error_unavailable() : undefined))
       }
+      repair={invalid ? repair : undefined}
       stalePage={!!staleMessage}
-      change={(next) => void navigate({ search: next, resetScroll: false })}
+      change={(next) => {
+        const where = activityConditions(next);
+        const position = {
+          ...(next.q ? { q: next.q } : {}),
+          ...(next.cursor ? { cursor: next.cursor } : {}),
+          ...(next.latest ? { latest: next.latest } : {}),
+          ...(next.event ? { event: next.event } : {}),
+        };
+        if (
+          JSON.stringify(where) ===
+          JSON.stringify(activityConditions(conditions))
+        )
+          return go({ ...viewKeys, ...position });
+        changing.current = { q: next.q };
+        view.change({
+          ...view.state,
+          where: { match: 'all', conditions: where },
+        });
+        changing.current = null;
+      }}
       refresh={() => {
-        if (filters.cursor) {
+        if (search.cursor) {
           void head.refetch();
           if (page.isError) void page.refetch();
         } else {
@@ -181,21 +290,33 @@ export function ActivityView({
   organizationId,
   filters,
   sources = [],
+  people = [],
+  views,
   page,
   loading,
   refreshing,
   offline,
   newEvents,
   error,
+  repair,
   stalePage = false,
   change,
   refresh,
 }: {
   organizationId: string;
-  /** The URL filters. Dates are set only when chosen; otherwise the last 30 days apply. */
+  /**
+   * The view's filters with search and page position. Dates are set only when chosen;
+   * otherwise the last 30 days apply.
+   */
   filters: ActivityFilters;
   /** Workspace connections offered as connection and system filters. */
   sources?: readonly ActivitySource[] | undefined;
+  /** Workspace members offered in the actor filter after Me, Luma and Workflows. */
+  people?: readonly { id: string; label: string }[] | undefined;
+  /** The view menu, shown before Refresh. */
+  views?: ReactNode;
+  /** Removes the view's filters Activity can't apply; offered with the error. */
+  repair?: (() => void) | undefined;
   page?: Page | undefined;
   loading?: boolean;
   refreshing?: boolean;
@@ -208,6 +329,7 @@ export function ActivityView({
   refresh: () => void;
 }) {
   const timeZone = useContext(WorkspaceTimezone);
+  const today = workspaceDateValue(new Date(), timeZone);
   // Any filter change returns to the latest events and closes the open event.
   const update = (patch: Partial<ActivityFilters>) =>
     change({
@@ -217,18 +339,66 @@ export function ActivityView({
       latest: undefined,
       event: undefined,
     });
+  // A relative period shows as the range it covers today, so its preset stays selected.
+  const shown = filters.last
+    ? activityRange(filters, new Date(), timeZone)
+    : filters;
   const toolbarFilters: CollectionFilter[] = [
     {
       kind: 'date-range',
       key: 'recorded',
       label: m.activity_filter_recorded(),
       icon: CalendarDays,
-      from: filters.from,
-      to: filters.to,
-      today: workspaceDateValue(new Date(), timeZone),
+      from: shown.from,
+      to: shown.to,
+      today,
       maxDays: 366,
       fallback: m.activity_filter_last_30_days(),
-      onChange: (range) => update({ from: range.from, to: range.to }),
+      // Presets that end today stay relative, so a saved view keeps showing recent events.
+      onChange: (range) => {
+        const preset = calendarPresets(today).find(
+          (item) => item.from === range.from && item.to === range.to,
+        );
+        update(
+          preset
+            ? {
+                from: undefined,
+                to: undefined,
+                last: {
+                  amount: Math.round(
+                    (Date.parse(preset.to) - Date.parse(preset.from)) /
+                      86400000,
+                  ),
+                  unit: 'day',
+                },
+              }
+            : { from: range.from, to: range.to, last: undefined },
+        );
+      },
+    },
+    {
+      kind: 'multi-choice',
+      key: 'actor',
+      label: m.activity_filter_actor(),
+      icon: UserRound,
+      value: filters.actor,
+      options: [
+        { value: 'me', label: m.activity_actor_me() },
+        { value: 'luma', label: m.activity_actor_luma() },
+        { value: 'workflow', label: m.activity_actor_workflows() },
+        ...people.map((person) => ({ value: person.id, label: person.label })),
+        ...(filters.actor ?? [])
+          .filter(
+            (value) =>
+              !['me', 'luma', 'workflow'].includes(value) &&
+              !people.some((person) => person.id === value),
+          )
+          .map((value) => ({
+            value,
+            label: m.activity_actor_unknown_person(),
+          })),
+      ],
+      onChange: (actor) => update({ actor: actor?.length ? actor : undefined }),
     },
     {
       kind: 'choice',
@@ -274,7 +444,9 @@ export function ActivityView({
   ];
   // Paging and the open event aren't filters; an empty page without filters gets its own copy.
   const filtered = Object.entries(filters).some(
-    ([key, value]) => !!value && !['cursor', 'event', 'latest'].includes(key),
+    ([key, value]) =>
+      (Array.isArray(value) ? value.length > 0 : !!value) &&
+      !['cursor', 'event', 'latest'].includes(key),
   );
 
   return (
@@ -283,6 +455,7 @@ export function ActivityView({
       <CollectionFilterPanel filters={toolbarFilters}>
         <CollectionToolbar
           panel
+          views={views}
           search={{
             value: filters.q,
             onChange: (q) => update({ q }),
@@ -308,7 +481,11 @@ export function ActivityView({
         {error ? (
           <Alert tone="danger" role="alert" className="activity-notice">
             {error}{' '}
-            {stalePage ? (
+            {repair ? (
+              <Button variant="outline" onClick={repair}>
+                {m.collections_remove_unsupported()}
+              </Button>
+            ) : stalePage ? (
               <Button
                 variant="outline"
                 onClick={() =>

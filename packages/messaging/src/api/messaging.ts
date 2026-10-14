@@ -1,6 +1,10 @@
 import '@luma/identity/http';
 
-import { apiContract } from '@luma/api-contract';
+import {
+  apiContract,
+  collectionQueryIssue,
+  inboxCatalog,
+} from '@luma/api-contract';
 import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
 import { implement } from '@orpc/server';
@@ -9,6 +13,19 @@ import type { FastifyRequest } from 'fastify';
 import type { DocumentService } from '../application/documents.js';
 import type { MessagingService } from '../application/messaging.js';
 import type { Replies } from '../application/replies.js';
+
+/**
+ * Checks conditions and grouping against the inbox catalog, which offers structured thread
+ * properties only. Throws a 400 error naming the first invalid
+ * condition ("Condition 2: …") or the grouping.
+ */
+function validateThreadQuery(
+  query: Parameters<typeof collectionQueryIssue>[1],
+) {
+  const message = collectionQueryIssue(inboxCatalog, query);
+  if (message)
+    throw Object.assign(new Error(message), { statusCode: 400, expose: true });
+}
 
 /**
  * Registers tenant-authenticated inbox reads and permission-gated thread work. Replies and
@@ -104,6 +121,7 @@ export function messagingRoutes(
     threads: os.threads.handler(
       async ({ context: { request }, input: { query } }) => {
         const s = use(request);
+        validateThreadQuery(query);
 
         return await s.service.threads(s.context, query);
       },

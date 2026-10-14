@@ -148,7 +148,7 @@ function RecordLinks({
           className={link}
           to="/app/$organizationId/procurement"
           params={{ organizationId }}
-          search={{ view: 'purchasing', q: '', status: '' }}
+          search={{ tab: 'purchasing' }}
         >
           {m.purchasing_title()} <ArrowUpRight aria-hidden="true" />
         </Link>

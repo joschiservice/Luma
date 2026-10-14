@@ -1,6 +1,14 @@
 import './inbox.css';
 
-import type { Mailbox, ThreadSummary, ThreadView } from '@luma/api-contract';
+import {
+  type CollectionGroup,
+  type CollectionGrouping,
+  collectionWhereIssues,
+  inboxCatalog,
+  type Mailbox,
+  type ThreadSummary,
+  type ThreadView,
+} from '@luma/api-contract';
 import {
   formatList,
   formatNumber,
@@ -12,8 +20,22 @@ import { elapsed } from '@luma/ui/components/issues/case-presentation';
 import { IssueSplitView } from '@luma/ui/components/issues/issue-split-view';
 import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button, buttonVariants } from '@luma/ui/components/primitives/button';
-import { CollectionToolbar } from '@luma/ui/components/primitives/collection-toolbar';
+import { CollectionGroups } from '@luma/ui/components/primitives/collection-groups';
+import {
+  CollectionList,
+  type CollectionListDensity,
+} from '@luma/ui/components/primitives/collection-list';
+import {
+  type CollectionConditions,
+  type CollectionFilter,
+  type CollectionSort,
+  CollectionToolbar,
+} from '@luma/ui/components/primitives/collection-toolbar';
 import { Empty } from '@luma/ui/components/primitives/empty';
+import {
+  listShortcutGroup,
+  ShortcutHelp,
+} from '@luma/ui/components/primitives/shortcut-help';
 import {
   Tabs,
   TabsList,
@@ -21,11 +43,12 @@ import {
 } from '@luma/ui/components/primitives/tabs';
 import {
   formatWorkspaceInstant,
+  WorkspaceDate,
   WorkspaceTimezone,
 } from '@luma/ui/components/primitives/workspace-date';
 import { PageTitle } from '@luma/ui/components/workspace/page-header';
+import { useListKeyboard } from '@luma/ui/lib/list-keyboard';
 import {
-  onlineManager,
   useInfiniteQuery,
   useQuery,
   useQueryClient,
@@ -46,24 +69,43 @@ import {
   Reply,
   Settings2,
 } from 'lucide-react';
-import {
-  type ReactNode,
-  useContext,
-  useEffect,
-  useRef,
-  useSyncExternalStore,
-} from 'react';
+import { type ReactNode, useContext, useRef, useState } from 'react';
 
-import { SignInRedirect } from '../../kit/identity/common';
-import { useNow } from '../../kit/live/now';
-import { isTypingTarget } from '../../lib/keyboard';
+import { useCollectionControls } from '../../kit/collections/controls';
+import type { CatalogPresentation } from '../../kit/collections/fields';
 import {
-  inboxFilters,
+  collectionGroupLabel,
+  groupMoreButton,
+  type ShownGroup,
+  shownGroups,
+  useGroupPages,
+} from '../../kit/collections/groups';
+import { CollectionNotices } from '../../kit/collections/notices';
+import {
+  collectionError,
+  collectionServerIssue,
+  useOnline,
+} from '../../kit/collections/paging';
+import { repairedState } from '../../kit/collections/repair';
+import { type CollectionSearch, groupOf } from '../../kit/collections/state';
+import {
+  type CollectionView,
+  useCollectionView,
+} from '../../kit/collections/use-collection-view';
+import { CollectionViewBar } from '../../kit/collections/view-bar';
+import { SignInRedirect } from '../../kit/identity/common';
+import { usePermissions } from '../../kit/identity/permissions';
+import { useNow } from '../../kit/live/now';
+import {
+  defaultThreadSort,
   type InboxSearch,
   mailboxesOptions,
   messagingKey,
   readFailure,
+  threadGroupOptions,
+  threadListQuery,
   threadsOptions,
+  threadView,
 } from './data';
 import { useInboxUpdates } from './live';
 import { type Member, memberName, useMembers } from './people';
@@ -71,6 +113,7 @@ import {
   correspondentLabel,
   dueState,
   emptyCopy,
+  recordKindLabels,
   statusLabels,
   syncStateLabels,
   threadViews,
@@ -88,149 +131,334 @@ const troubledMailboxes = (mailboxes: readonly Mailbox[]) =>
     ['needs_rules', 'retrying', 'blocked', 'paused'].includes(mailbox.state),
   );
 
-/** One thread in the list: who wrote, about what, linked records, owner and reply state. */
-export function ThreadRow({
-  thread,
+/** Row properties a view without its own shows. */
+const threadProperties = [
+  'subject',
+  'owner',
+  'status',
+  'mailbox',
+  'activity',
+] as const;
+
+const thread = () => m.messaging_area_thread();
+const work = () => m.messaging_area_work();
+const option =
+  (labels: Readonly<Record<string, () => string>>) => (value: string) =>
+    labels[value]?.() ?? value;
+
+/** Names the inbox's catalog fields and options in filters, sorts, groups and Display. */
+const threadPresentation: CatalogPresentation = {
+  correspondent: { label: m.messaging_field_correspondent, group: thread },
+  subject: { label: m.messaging_field_subject, group: thread },
+  owner: { label: m.messaging_field_owner, group: work },
+  status: {
+    label: m.messaging_field_status,
+    group: work,
+    option: option(statusLabels),
+  },
+  mailbox: { label: m.messaging_field_mailbox, group: thread },
+  due: { label: m.messaging_field_due, group: work },
+  activity: { label: m.messaging_field_activity, group: thread },
+  linkedRecord: {
+    label: m.messaging_field_linked_record,
+    group: thread,
+    option: option(recordKindLabels),
+  },
+  hasAttachments: { label: m.messaging_field_has_attachments, group: thread },
+  awaitingReply: { label: m.messaging_field_awaiting_reply, group: work },
+  factsToReview: { label: m.messaging_field_facts_to_review, group: work },
+};
+
+const sameSort = (left: unknown, right: unknown) =>
+  JSON.stringify(left) === JSON.stringify(right);
+
+/**
+ * The view as the inbox shows it: a view without its own sort shows the newest activity first,
+ * and choosing that again keeps the view unchanged rather than marking it Modified.
+ */
+function inboxView(view: CollectionView): CollectionView {
+  return {
+    ...view,
+    state: {
+      ...view.state,
+      sort: view.state.sort ?? defaultThreadSort,
+      layout: 'list',
+    },
+    change: (next) =>
+      view.change({
+        ...next,
+        layout: 'list',
+        sort:
+          !view.base.sort && sameSort(next.sort, defaultThreadSort)
+            ? null
+            : next.sort,
+      }),
+  };
+}
+
+/** The toolbar controls the inbox shows beside search; stories may leave them out. */
+export interface InboxControls {
+  filters?: readonly CollectionFilter[] | undefined;
+  conditions?: CollectionConditions | undefined;
+  sort?: CollectionSort | undefined;
+  /** Clears every condition; the view clears search itself. */
+  clearConditions?: (() => void) | undefined;
+}
+
+/** The inbox's grouping and the groups the page shows. */
+export interface InboxGrouping {
+  grouping: CollectionGrouping;
+  groups: readonly ShownGroup<ThreadSummary>[];
+  label: (key: CollectionGroup['key']) => string;
+  collapsed: readonly string[];
+  onCollapsedChange: (id: string, collapsed: boolean) => void;
+}
+
+/** The list commands the inbox handles, for shortcut help. */
+const shortcuts = [
+  'next',
+  'previous',
+  'open',
+  'preview',
+  'escape',
+  'search',
+  'filter',
+  'help',
+] as const;
+
+function ThreadDue({ thread, now }: { thread: ThreadSummary; now: number }) {
+  const timeZone = useContext(WorkspaceTimezone);
+  const due = dueState(thread);
+
+  return due === 'overdue' ? (
+    <span className="messaging-flag" data-tone="danger">
+      <Clock aria-hidden="true" />
+      {m.messaging_due_overdue()}
+    </span>
+  ) : due === 'due' && thread.replyDueAt ? (
+    <span
+      className="messaging-flag"
+      title={formatWorkspaceInstant(thread.replyDueAt, timeZone)}
+    >
+      <Clock aria-hidden="true" />
+      {m.messaging_due_in({
+        time: formatRelativeTime(thread.replyDueAt, now),
+      })}
+    </span>
+  ) : null;
+}
+
+function ThreadTime({ at, now }: { at: string; now: number }) {
+  const timeZone = useContext(WorkspaceTimezone);
+
+  return (
+    <span
+      className="case-row-time"
+      title={formatWorkspaceInstant(at, timeZone)}
+    >
+      <time dateTime={at}>{elapsed(at, now)}</time>
+    </span>
+  );
+}
+
+/**
+ * The thread list: who wrote, about what, linked records, owner and reply state, with the
+ * properties chosen in Display. Reply deadlines, awaiting replies, facts to review and
+ * attachments always show, so attention never depends on a hidden property.
+ */
+export function ThreadList({
+  label,
   organizationId,
+  search,
+  threads,
   members,
   self,
   now,
   showMailbox,
+  properties = threadProperties,
+  density = 'comfortable',
+  focusedKey,
 }: {
-  thread: ThreadSummary;
+  /** Names the list, such as a group's name; the inbox's list name by default. */
+  label?: string | undefined;
   organizationId: string;
+  search: InboxSearch;
+  threads: readonly ThreadSummary[];
   members: readonly Member[];
   self: string | undefined;
   now: number;
+  /** More than one mailbox is connected, so rows name theirs. */
   showMailbox: boolean;
+  properties?: readonly string[] | undefined;
+  density?: CollectionListDensity | undefined;
+  focusedKey?: string | undefined;
 }) {
-  const timeZone = useContext(WorkspaceTimezone);
-  const due = dueState(thread);
+  const shown = new Set(properties);
+  const line = (thread: ThreadSummary) =>
+    properties.flatMap((key) => {
+      if (key === 'owner')
+        return [
+          <span key={key}>
+            {thread.ownerId
+              ? m.messaging_row_owner({
+                  name: memberName(thread.ownerId, members, self),
+                })
+              : m.messaging_row_unassigned()}
+          </span>,
+        ];
+      if (key === 'status' && thread.status !== 'open')
+        return [<span key={key}>{statusLabels[thread.status]()}</span>];
+      if (key === 'mailbox' && showMailbox)
+        return [<span key={key}>{thread.mailboxLabel}</span>];
+
+      return [];
+    });
 
   return (
-    <div
-      className="issue-row messaging-row"
-      data-awaiting={thread.awaitingReply || undefined}
-      data-closed={thread.status === 'closed' || undefined}
-    >
-      <span className="messaging-row-icon" aria-hidden="true">
-        {thread.awaitingReply ? <Reply /> : <Mail />}
-      </span>
-      <div className="issue-row-copy">
+    <CollectionList
+      label={label ?? m.messaging_list_label()}
+      variant="plain"
+      density={density}
+      items={threads}
+      itemKey={(thread) => thread.id}
+      current={search.thread}
+      focusedKey={focusedKey}
+      link={(thread) => (
+        <Link
+          id={`thread-${thread.id}`}
+          to="/app/$organizationId/inbox"
+          params={{ organizationId }}
+          search={{ ...search, thread: thread.id }}
+          resetScroll={false}
+          className="messaging-row"
+          data-awaiting={thread.awaitingReply || undefined}
+          data-closed={thread.status === 'closed' || undefined}
+        />
+      )}
+      leading={(thread) => (
+        <span className="messaging-row-icon" aria-hidden="true">
+          {thread.awaitingReply ? <Reply /> : <Mail />}
+        </span>
+      )}
+      title={(thread) => (
         <span className="messaging-row-head">
-          <strong className="case-row-summary">
+          <span className="messaging-row-name">
             {correspondentLabel(thread)}
-          </strong>
+          </span>
           {thread.messageCount > 1 ? (
             <span className="messaging-row-count">
               {m.messaging_row_messages({ count: thread.messageCount })}
             </span>
           ) : null}
         </span>
-        <span className="messaging-row-subject">
-          {thread.subject || m.messaging_subject_none()}
-        </span>
-        {thread.snippet ? (
-          <span className="messaging-row-snippet">{thread.snippet}</span>
-        ) : null}
-        <span className="case-row-subject">
-          <span>
-            {thread.ownerId
-              ? m.messaging_row_owner({
-                  name: memberName(thread.ownerId, members, self),
-                })
-              : m.messaging_row_unassigned()}
-          </span>
-          {thread.status !== 'open' ? (
-            <span>{statusLabels[thread.status]()}</span>
-          ) : null}
-          {showMailbox ? <span>{thread.mailboxLabel}</span> : null}
-        </span>
-        {thread.links.length ? (
-          <span className="messaging-row-records">
-            {thread.links.slice(0, 3).map((record) => (
-              <RecordLink
-                key={`${record.kind}:${record.id}`}
-                organizationId={organizationId}
-                record={record}
-                compact
-                plain
-              />
-            ))}
-            {thread.links.length > 3 ? (
-              <span>
-                {m.messaging_row_more_records({
-                  count: thread.links.length - 3,
-                })}
+      )}
+      description={(thread) => {
+        const facts = line(thread);
+
+        return (
+          <>
+            {shown.has('subject') ? (
+              <span className="messaging-row-subject">
+                {thread.subject || m.messaging_subject_none()}
               </span>
             ) : null}
-          </span>
-        ) : null}
-      </div>
-      <div className="issue-row-meta messaging-row-meta">
-        {due === 'overdue' ? (
-          <span className="messaging-flag" data-tone="danger">
-            <Clock aria-hidden="true" />
-            {m.messaging_due_overdue()}
-          </span>
-        ) : due === 'due' && thread.replyDueAt ? (
-          <span
-            className="messaging-flag"
-            title={formatWorkspaceInstant(thread.replyDueAt, timeZone)}
-          >
-            <Clock aria-hidden="true" />
-            {m.messaging_due_in({
-              time: formatRelativeTime(thread.replyDueAt, now),
-            })}
-          </span>
-        ) : null}
-        {thread.awaitingReply ? (
-          <span className="messaging-flag" data-tone="info">
-            {m.messaging_row_awaiting_reply()}
-          </span>
-        ) : null}
-        {thread.factsToReview > 0 ? (
-          <span className="messaging-flag" data-tone="warning">
-            <FileSearch aria-hidden="true" />
-            {m.messaging_row_facts({ count: thread.factsToReview })}
-          </span>
-        ) : null}
-        {thread.attachmentCount > 0 ? (
-          <span
-            className="messaging-row-attachments"
-            title={m.messaging_row_attachments({
-              count: thread.attachmentCount,
-            })}
-          >
-            <Paperclip aria-hidden="true" />
-            <span className="sr-only">
-              {m.messaging_row_attachments({ count: thread.attachmentCount })}
+            {thread.snippet ? (
+              <span className="messaging-row-snippet">{thread.snippet}</span>
+            ) : null}
+            {facts.length ? (
+              <span className="case-row-subject">{facts}</span>
+            ) : null}
+            {thread.links.length ? (
+              <span className="messaging-row-records">
+                {thread.links.slice(0, 3).map((record) => (
+                  <RecordLink
+                    key={`${record.kind}:${record.id}`}
+                    organizationId={organizationId}
+                    record={record}
+                    compact
+                    plain
+                  />
+                ))}
+                {thread.links.length > 3 ? (
+                  <span>
+                    {m.messaging_row_more_records({
+                      count: thread.links.length - 3,
+                    })}
+                  </span>
+                ) : null}
+              </span>
+            ) : null}
+          </>
+        );
+      }}
+      status={(thread) => (
+        <>
+          <ThreadDue thread={thread} now={now} />
+          {thread.awaitingReply ? (
+            <span className="messaging-flag" data-tone="info">
+              {m.messaging_row_awaiting_reply()}
             </span>
-            <span aria-hidden="true">
-              {formatNumber(thread.attachmentCount)}
+          ) : null}
+          {thread.factsToReview > 0 ? (
+            <span className="messaging-flag" data-tone="warning">
+              <FileSearch aria-hidden="true" />
+              {m.messaging_row_facts({ count: thread.factsToReview })}
             </span>
-          </span>
-        ) : null}
-        <span
-          className="case-row-time"
-          title={formatWorkspaceInstant(thread.lastMessageAt, timeZone)}
-        >
-          <time dateTime={thread.lastMessageAt}>
-            {elapsed(thread.lastMessageAt, now)}
-          </time>
-        </span>
-      </div>
-    </div>
+          ) : null}
+          {thread.attachmentCount > 0 ? (
+            <span
+              className="messaging-row-attachments"
+              title={m.messaging_row_attachments({
+                count: thread.attachmentCount,
+              })}
+            >
+              <Paperclip aria-hidden="true" />
+              <span className="sr-only">
+                {m.messaging_row_attachments({
+                  count: thread.attachmentCount,
+                })}
+              </span>
+              <span aria-hidden="true">
+                {formatNumber(thread.attachmentCount)}
+              </span>
+            </span>
+          ) : null}
+        </>
+      )}
+      properties={properties.filter(
+        (key) => key === 'due' || key === 'activity',
+      )}
+      property={(thread, key) =>
+        key === 'activity' ? (
+          <ThreadTime at={thread.lastMessageAt} now={now} />
+        ) : key === 'due' && thread.replyDueAt ? (
+          <WorkspaceDate value={thread.replyDueAt} />
+        ) : null
+      }
+    />
   );
 }
 
 /**
- * Presents the inbox: views with counts, search, mailbox filter, the thread list and the open
+ * Presents the inbox: views with counts, search, filters, conditions and sort, the thread list
+ * or its groups, and the open thread. J and K move through the threads, Space opens or closes
+ * the focused thread, / focuses search, F opens the condition builder and Escape closes the
  * thread. It owns no fetching, so stories and the page share the same states.
  */
 export function InboxView({
   organizationId,
   search,
+  segment = threadView(search.view),
+  savedView = false,
+  viewBar,
+  display,
+  controls = {},
+  conditionsApplied = false,
+  notices,
+  grouped,
+  properties = threadProperties,
+  density = 'comfortable',
+  onOpenView,
   threads,
   counts,
   mailboxes,
@@ -252,6 +480,26 @@ export function InboxView({
 }: {
   organizationId: string;
   search: InboxSearch;
+  /** The thread view the list shows; a saved view reads its own. */
+  segment?: ThreadView | undefined;
+  /** A saved view is open, so no built-in view tab is current. */
+  savedView?: boolean | undefined;
+  /** The view menu with saved views. */
+  viewBar?: ReactNode;
+  /** The Display menu. */
+  display?: ReactNode;
+  controls?: InboxControls | undefined;
+  /** The view has conditions, so an empty list says nothing matches. */
+  conditionsApplied?: boolean | undefined;
+  /** Repair and similar notices above the threads. */
+  notices?: ReactNode;
+  /** Groups to show instead of a flat list. */
+  grouped?: InboxGrouping | undefined;
+  /** Row properties in display order. */
+  properties?: readonly string[] | undefined;
+  density?: CollectionListDensity | undefined;
+  /** Opens a built-in view; without it the view tabs are plain links. */
+  onOpenView?: ((view: ThreadView) => void) | undefined;
   threads: readonly ThreadSummary[] | undefined;
   counts?: Counts | undefined;
   mailboxes?: readonly Mailbox[] | undefined;
@@ -274,15 +522,51 @@ export function InboxView({
   detail?: ReactNode;
 }) {
   const listPane = useRef<HTMLDivElement>(null);
-  const filters = inboxFilters(search);
-  const view = filters.view;
-  const filtered = !!(filters.connectionId || filters.q);
+  const searchInput = useRef<HTMLInputElement>(null);
+  const [help, setHelp] = useState(false);
+  const filtered = conditionsApplied || !!search.q?.trim();
   const update = (patch: Partial<InboxSearch>) =>
     onChange({ ...search, ...patch });
   const open = (thread: string | undefined) => update({ thread });
-  const empty = emptyCopy(view, filtered);
+  const clear = () => {
+    controls.clearConditions?.();
+    update({ q: undefined });
+  };
+  const empty = emptyCopy(segment, filtered);
   const troubled = troubledMailboxes(mailboxes ?? []);
   const noMailbox = mailboxes?.length === 0;
+  // Keys follow the order rows appear in, which grouping changes.
+  const ordered = grouped
+    ? grouped.groups
+        .filter((group) => !grouped.collapsed.includes(group.id))
+        .flatMap((group) => group.rows)
+    : (threads ?? []);
+  const keyboard = useListKeyboard({
+    rows: listPane,
+    count: ordered.length,
+    keys: ordered.map((thread) => thread.id),
+    preview: { open: search.thread, onOpenChange: open },
+    onFocusSearch: () => searchInput.current?.focus(),
+    onOpenFilter: controls.conditions
+      ? () => controls.conditions?.onOpenChange?.(true)
+      : undefined,
+    onShowHelp: () => setHelp(true),
+  });
+  const list = (label: string | undefined, shown: readonly ThreadSummary[]) => (
+    <ThreadList
+      label={label}
+      organizationId={organizationId}
+      search={search}
+      threads={shown}
+      members={members}
+      self={self}
+      now={now}
+      showMailbox={(mailboxes?.length ?? 0) > 1}
+      properties={properties}
+      density={density}
+      focusedKey={keyboard.focusedKey}
+    />
+  );
 
   return (
     <div
@@ -307,34 +591,50 @@ export function InboxView({
           refreshing={refreshing}
           onRefresh={onRefresh}
           views={
-            <Tabs value={view} className="messaging-views">
-              <TabsList
-                aria-label={m.messaging_views_label()}
-                activateOnFocus={false}
+            <>
+              {viewBar}
+              <Tabs
+                value={savedView ? null : segment}
+                className="messaging-views"
               >
-                {threadViews.map((option) => (
-                  <TabsTrigger
-                    key={option}
-                    value={option}
-                    nativeButton={false}
-                    title={viewDescriptions[option]()}
-                    render={
-                      <Link
-                        to="/app/$organizationId/inbox"
-                        params={{ organizationId }}
-                        search={{ ...search, view: option }}
-                        resetScroll={false}
-                      />
-                    }
-                  >
-                    {viewLabels[option]()}
-                    {counts?.[option] !== undefined ? (
-                      <Badge>{formatNumber(counts[option] ?? 0)}</Badge>
-                    ) : null}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
+                <TabsList
+                  aria-label={m.messaging_views_label()}
+                  activateOnFocus={false}
+                >
+                  {threadViews.map((option) => (
+                    <TabsTrigger
+                      key={option}
+                      value={option}
+                      nativeButton={false}
+                      title={viewDescriptions[option]()}
+                      render={
+                        <Link
+                          to="/app/$organizationId/inbox"
+                          params={{ organizationId }}
+                          search={{
+                            q: search.q,
+                            thread: search.thread,
+                            view: option,
+                          }}
+                          resetScroll={false}
+                          onClick={(event) => {
+                            if (!onOpenView || event.metaKey || event.ctrlKey)
+                              return;
+                            event.preventDefault();
+                            onOpenView(option);
+                          }}
+                        />
+                      }
+                    >
+                      {viewLabels[option]()}
+                      {counts?.[option] !== undefined ? (
+                        <Badge>{formatNumber(counts[option] ?? 0)}</Badge>
+                      ) : null}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+            </>
           }
           search={{
             value: search.q,
@@ -342,26 +642,13 @@ export function InboxView({
             label: m.messaging_search_label(),
             placeholder: m.messaging_search_placeholder(),
             maxLength: 200,
+            inputRef: searchInput,
           }}
-          filters={
-            (mailboxes?.length ?? 0) > 1
-              ? [
-                  {
-                    kind: 'choice',
-                    key: 'mailbox',
-                    label: m.messaging_filter_mailbox(),
-                    icon: Mail,
-                    value: search.connectionId,
-                    options: (mailboxes ?? []).map((mailbox) => ({
-                      value: mailbox.connectionId,
-                      label: mailbox.address ?? mailbox.label,
-                    })),
-                    onChange: (connectionId) => update({ connectionId }),
-                  },
-                ]
-              : []
-          }
-          onClear={() => update({ connectionId: undefined, q: undefined })}
+          filters={controls.filters ?? []}
+          conditions={controls.conditions}
+          display={display}
+          sort={controls.sort}
+          onClear={clear}
         />
       </div>
       {offline ? (
@@ -402,6 +689,7 @@ export function InboxView({
             tabIndex={-1}
             aria-label={m.messaging_list_label()}
           >
+            {notices}
             {error ? (
               <CaseNotice error title={m.messaging_list_error_title()}>
                 {stale ? `${m.messaging_list_stale()} ` : ''}
@@ -436,44 +724,43 @@ export function InboxView({
                     <h2>{empty.title}</h2>
                     <p>{empty.text}</p>
                     {filtered ? (
-                      <Button
-                        variant="outline"
-                        onClick={() =>
-                          update({ connectionId: undefined, q: undefined })
-                        }
-                      >
+                      <Button variant="outline" onClick={clear}>
                         {m.common_clear_filters()}
                       </Button>
                     ) : null}
                   </Empty>
                 )
+              ) : grouped ? (
+                <CollectionGroups
+                  label={m.messaging_groups_label({
+                    field:
+                      threadPresentation[grouped.grouping.field]?.label() ??
+                      grouped.grouping.field,
+                  })}
+                  collapsed={grouped.collapsed}
+                  onCollapsedChange={grouped.onCollapsedChange}
+                  groups={grouped.groups.map((group) => {
+                    const label = grouped.label(group.group.key);
+
+                    return {
+                      key: group.id,
+                      label,
+                      count: group.group.count,
+                      complete: group.group.complete,
+                      content: group.rows.length ? (
+                        list(label, group.rows)
+                      ) : (
+                        <p className="messaging-group-empty">
+                          {m.messaging_group_empty()}
+                        </p>
+                      ),
+                      more: groupMoreButton(group.more),
+                    };
+                  })}
+                />
               ) : (
                 <>
-                  <ul className="inbox-rows">
-                    {threads.map((thread) => (
-                      <li key={thread.id}>
-                        <Link
-                          id={`thread-${thread.id}`}
-                          to="/app/$organizationId/inbox"
-                          params={{ organizationId }}
-                          search={{ ...search, thread: thread.id }}
-                          resetScroll={false}
-                          aria-current={
-                            thread.id === search.thread ? 'page' : undefined
-                          }
-                        >
-                          <ThreadRow
-                            thread={thread}
-                            organizationId={organizationId}
-                            members={members}
-                            self={self}
-                            now={now}
-                            showMailbox={(mailboxes?.length ?? 0) > 1}
-                          />
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
+                  {list(undefined, threads)}
                   {hasMore ? (
                     <div className="messaging-more">
                       <Button
@@ -530,6 +817,11 @@ export function InboxView({
           </section>
         }
       />
+      <ShortcutHelp
+        open={help}
+        onOpenChange={setHelp}
+        groups={[listShortcutGroup(shortcuts)]}
+      />
     </div>
   );
 }
@@ -549,26 +841,129 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
   const client = useQueryClient();
   const live = useInboxUpdates(organizationId);
   const now = useNow();
-  const online = useSyncExternalStore(
-    (listener) => onlineManager.subscribe(listener),
-    () => onlineManager.isOnline(),
-    () => true,
-  );
-  const filters = inboxFilters(search);
-  const list = useInfiniteQuery(threadsOptions(organizationId, filters));
-  const mailboxes = useQuery(mailboxesOptions(organizationId));
-  const people = useMembers(organizationId);
-  const failure = readFailure(list.error);
-  const threads =
-    failure === 'access'
-      ? undefined
-      : list.data?.pages.flatMap((page) => page.items);
-  const counts = list.data?.pages[0]?.counts;
+  const online = useOnline();
+  const timeZone = useContext(WorkspaceTimezone);
+  const permissions = usePermissions(organizationId);
+  const can = permissions.can;
   const change = (next: InboxSearch) =>
     void navigate({ search: next, resetScroll: false });
+  const view = useCollectionView({
+    catalog: inboxCatalog,
+    organizationId,
+    search,
+    // Changing the view keeps the search and the open thread.
+    navigate: (next: Partial<CollectionSearch>) =>
+      change({
+        ...(search.q ? { q: search.q } : {}),
+        ...(search.thread ? { thread: search.thread } : {}),
+        ...next,
+      }),
+  });
+  const listView = inboxView(view);
+  const state = listView.state;
+  const segment = threadView(state.segment);
+  const mailboxes = useQuery(mailboxesOptions(organizationId));
+  const people = useMembers(organizationId);
+  const options = {
+    members: people.members.map((member) => ({
+      value: member.userId,
+      label: memberName(member.userId, people.members, people.self),
+    })),
+    mailboxes: (mailboxes.data?.items ?? []).map((mailbox) => ({
+      value: mailbox.connectionId,
+      label: mailbox.address ?? mailbox.label,
+    })),
+  };
+  const ready = permissions.ready;
+  const clientIssues = ready
+    ? collectionWhereIssues(inboxCatalog, state.where)
+    : [];
+  const query = threadListQuery(state, search.q, timeZone);
+  const list = useInfiniteQuery({
+    ...threadsOptions(organizationId, query),
+    enabled: ready && !clientIssues.length,
+  });
+  const serverIssue = collectionServerIssue(list.error);
+  const controls = useCollectionControls({
+    view: listView,
+    catalog: inboxCatalog,
+    presentation: threadPresentation,
+    can,
+    options,
+    title: 'correspondent',
+    defaultProperties: threadProperties,
+    serverIssues: serverIssue ? [serverIssue] : [],
+    owner: { field: 'owner', members: options.members, unassigned: true },
+  });
+  const issues = [...clientIssues, ...(serverIssue ? [serverIssue] : [])];
+  const repair = issues.length
+    ? () => view.change(repairedState(inboxCatalog, view.state, issues, can))
+    : undefined;
+  const invalid = clientIssues.length
+    ? { kind: 'invalid' as const, message: m.collections_needs_repair() }
+    : collectionError(list.error, undefined);
+  const failure =
+    invalid?.kind === 'invalid' ? undefined : readFailure(list.error);
+  const threads =
+    failure === 'access' || invalid?.kind === 'invalid'
+      ? undefined
+      : list.data?.pages.flatMap((page) => page.items);
+  const first = list.data?.pages[0];
+  const counts = first?.counts;
 
-  // J and K move through the visible threads, as in other Luma queues.
-  const items = threads ?? [];
+  const grouping = state.group;
+  const groupPrefix = `${groupOf(state) ?? ''}=`;
+  const collapsed = view.display.collapsedGroups
+    .filter((id) => id.startsWith(groupPrefix))
+    .map((id) => id.slice(groupPrefix.length));
+  const more = useGroupPages<ThreadSummary>({
+    resetKey: JSON.stringify([organizationId, query]),
+    load: (key: CollectionGroup['key'], cursor: string) =>
+      client
+        .fetchQuery(
+          threadGroupOptions(
+            organizationId,
+            threadListQuery(state, search.q, timeZone, { key, cursor }),
+          ),
+        )
+        .then((page) => ({
+          rows: page.items,
+          nextCursor: page.groups?.[0]?.nextCursor ?? page.nextCursor,
+        })),
+  });
+  const groups =
+    threads && grouping && first?.groups
+      ? shownGroups({
+          items: threads,
+          groups: first.groups,
+          rowKey: (thread) => thread.id,
+          field: inboxCatalog.fields.find(
+            (field) => field.id === grouping.field,
+          ),
+          showEmpty: grouping.showEmpty,
+          more,
+        })
+      : undefined;
+  const groupLabel = (key: CollectionGroup['key']) =>
+    grouping?.field === 'owner'
+      ? typeof key === 'string'
+        ? memberName(key, people.members, people.self)
+        : m.messaging_row_unassigned()
+      : collectionGroupLabel({
+          presentation: threadPresentation,
+          field: grouping?.field ?? '',
+          granularity: undefined,
+          key,
+          options,
+          runtime: { mailbox: 'mailboxes' },
+          name: (id) =>
+            threads?.find((thread) => thread.connectionId === id)?.mailboxLabel,
+        });
+
+  // The thread's previous and next buttons step through the visible threads.
+  const items = groups
+    ? groups.flatMap((group) => group.rows)
+    : (threads ?? []);
   const position = items.findIndex((item) => item.id === search.thread);
   const step = (offset: number) => {
     const target = items[position < 0 ? 0 : position + offset];
@@ -580,29 +975,6 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
         ?.scrollIntoView({ block: 'nearest' }),
     );
   };
-  const stepRef = useRef(step);
-  useEffect(() => {
-    stepRef.current = step;
-  });
-  useEffect(() => {
-    const listener = (event: KeyboardEvent) => {
-      if (
-        event.defaultPrevented ||
-        event.metaKey ||
-        event.ctrlKey ||
-        event.altKey ||
-        isTypingTarget(event.target)
-      )
-        return;
-      if (event.key === 'j') stepRef.current(1);
-      else if (event.key === 'k') stepRef.current(-1);
-      else return;
-      event.preventDefault();
-    };
-    window.addEventListener('keydown', listener);
-
-    return () => window.removeEventListener('keydown', listener);
-  }, []);
 
   if (failure === 'signin') return <SignInRedirect />;
   const previous = position > 0 ? items[position - 1] : undefined;
@@ -612,6 +984,61 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
     <InboxView
       organizationId={organizationId}
       search={search}
+      segment={segment}
+      savedView={view.ref.kind === 'saved'}
+      viewBar={
+        <CollectionViewBar
+          organizationId={organizationId}
+          view={view}
+          path="inbox"
+          segmentLabel={(value) => viewLabels[threadView(value)]()}
+        />
+      }
+      display={controls.display}
+      controls={{
+        filters: controls.filters,
+        conditions: controls.conditions,
+        sort: controls.sort,
+        clearConditions: controls.clearConditions,
+      }}
+      conditionsApplied={state.where.conditions.length > 0}
+      notices={
+        invalid?.kind === 'invalid' || invalid?.kind === 'page' ? (
+          <CollectionNotices
+            offline={false}
+            error={invalid}
+            hasRows={!!threads}
+            retry={() => void list.refetch()}
+            firstPage={() => void list.refetch()}
+            repair={repair}
+          />
+        ) : first?.groupsTruncated ? (
+          <CaseNotice title={m.collections_groups_truncated()} />
+        ) : null
+      }
+      grouped={
+        grouping && groups
+          ? {
+              grouping,
+              groups,
+              label: groupLabel,
+              collapsed,
+              onCollapsedChange: (id, closed) =>
+                view.setDisplay({
+                  ...view.display,
+                  collapsedGroups: [
+                    ...view.display.collapsedGroups.filter(
+                      (entry) => entry !== `${groupPrefix}${id}`,
+                    ),
+                    ...(closed ? [`${groupPrefix}${id}`] : []),
+                  ].slice(-100),
+                }),
+            }
+          : undefined
+      }
+      properties={controls.properties}
+      density={state.density}
+      onOpenView={(option) => view.open(`builtin:${option}`)}
       threads={threads}
       counts={
         counts
@@ -625,19 +1052,19 @@ function TenantInbox({ organizationId }: { organizationId: string }) {
           : undefined
       }
       mailboxes={mailboxes.data?.items}
-      loading={list.isPending}
+      loading={list.isPending && !invalid}
       refreshing={list.isFetching && !list.isFetchingNextPage}
       error={
         failure === 'access'
           ? m.messaging_error_access()
-          : failure
+          : failure && invalid?.kind !== 'page'
             ? m.messaging_error_unavailable()
             : undefined
       }
       stale={!!list.error && !!threads}
       offline={!online}
       live={live}
-      hasMore={list.hasNextPage}
+      hasMore={!grouping && list.hasNextPage}
       loadingMore={list.isFetchingNextPage}
       onMore={() => void list.fetchNextPage()}
       onChange={change}

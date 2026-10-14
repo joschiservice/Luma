@@ -126,9 +126,7 @@ export function ShortfallDialog({
               to="/app/$organizationId/procurement"
               params={{ organizationId }}
               search={{
-                view: 'purchasing',
-                q: '',
-                status: '',
+                tab: 'purchasing',
                 demandPeriodDays: query.data.settings.demandPeriodDays,
               }}
             >

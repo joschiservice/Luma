@@ -43,9 +43,9 @@ export const exceptionsContract = {
       path: '/v1/organizations/{organizationId}/exceptions',
       summary: 'List cases in your organization',
       description:
-        'Filter attention, active work or history by class, severity and state. Results sort by severity, oldest attention request or detection, then ID. Use the returned cursor with the same filters. Refresh from the first page as cases change.',
+        'List issues that need a person, active work or history. `where` takes conditions on the issues catalog fields, such as class, state, owner, source, attention reason, freshness, diagnosis, resolution, record type and dates; `q` searches summaries and records. Results sort by urgency by default: severity, then the oldest attention request or detection, then ID. `group` returns each group’s count and first rows. Freshness is fresh only while the investigation’s evidence is still valid; stale and unknown evidence are never reported as fresh. Use the returned cursor with the same query. Refresh from the first page as cases change.',
     })
-    .meta({ access: requires('issues.read'), errors: [401, 404, 503] })
+    .meta({ access: requires('issues.read'), errors: [400, 401, 404, 503] })
     .input(
       z.object({ params: organizationParamsSchema, query: caseQuerySchema }),
     )

@@ -1,70 +1,168 @@
 import {
+  type CollectionGroup,
+  type CollectionViewState,
+  customerQuerySchema,
   customerSortSchema,
   customerStateSchema,
   type OrderSort,
 } from '@luma/api-contract';
-import { queryOptions } from '@tanstack/react-query';
+import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 import { z } from 'zod';
 
+import { withLegacyConditions } from '../../kit/collections/legacy';
+import { collectionSearchShape, groupOf } from '../../kit/collections/state';
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
+import { legacyCustomerConditions } from './collection';
 
 const api = createWebApiClient();
 
+/** The list request as the API client accepts it. */
+export type CustomerListQueryInput = z.input<typeof customerQuerySchema>;
+
+/** Page context the Customers pages carry besides the view. */
+const contextShape = {
+  /** The customer open in the preview pane. */
+  item: z.uuid().optional().catch(undefined),
+  /**
+   * A source customer link, for example from an order's source panel, with its `connectionId`;
+   * the page resolves it to the imported profile.
+   */
+  customerId: z.string().max(1024).optional().catch(undefined),
+};
+
 /**
- * URL state of the customer list. Search text is personal data, so it stays in page state and
- * never enters the URL. `customerId` with `connectionId` is a source customer link, for example
- * from an order's source panel, that the page resolves to the imported profile.
+ * URL state of the Customers list and customer pages: the shared list keys (view, conditions,
+ * sort, grouping, display and paging), filters of older links and page context. Search text is
+ * personal data: `q` only arrives with links, and the page moves it into page state. A
+ * `connectionId` names the source of a linked `customerId`; without one it is an older link's
+ * source filter.
  */
 export const customersSearch = z.object({
+  ...collectionSearchShape,
   state: z.enum(customerStateSchema.options).optional().catch(undefined),
-  connectionId: z.string().uuid().optional().catch(undefined),
-  sort: z.enum(customerSortSchema.options).optional().catch(undefined),
-  direction: z.enum(['asc', 'desc']).optional().catch(undefined),
-  cursor: z.string().max(4096).optional().catch(undefined),
-  customerId: z.string().max(1024).optional().catch(undefined),
+  connectionId: z.uuid().optional().catch(undefined),
+  ...contextShape,
 });
 
 export type CustomersSearch = z.infer<typeof customersSearch>;
 
 export const customerPageSize = 50;
 
-/** The list filters without paging or a source link; a change of these starts at page one. */
+/** Rows each group shows before "Show more", and the size of each further page. */
+const customerGroupPageSize = 10;
+
+/** Whether the URL still uses filters or sort names of older links. */
+export function hasLegacyFilters(search: CustomersSearch) {
+  return (
+    search.state !== undefined ||
+    (search.connectionId !== undefined && !search.customerId) ||
+    search.sort === 'amountSpent'
+  );
+}
+
+/**
+ * Rewrites older filter keys into conditions, merged with the URL's own conditions, and the
+ * older `amountSpent` sort into the catalog's `spent`, starting from the first page.
+ */
+export function withoutLegacyFilters(search: CustomersSearch): CustomersSearch {
+  const conditions = legacyCustomerConditions(search);
+  const next: CustomersSearch = { ...search };
+  delete next.state;
+  if (!next.customerId) delete next.connectionId;
+  if (next.sort === 'amountSpent') next.sort = 'spent';
+  delete next.cursor;
+  delete next.page;
+
+  return conditions.length
+    ? { ...next, where: withLegacyConditions(search.where, conditions) }
+    : next;
+}
+
+/** Whether the URL says what to show, so the page must not restore the remembered view. */
+export function namesListState(search: CustomersSearch) {
+  return Boolean(
+    search.q ||
+    search.cursor ||
+    search.page ||
+    search.item ||
+    search.customerId,
+  );
+}
+
+/** The list state without paging and page context, so the list starts on page one. */
 export function customerFilters(search: CustomersSearch): CustomersSearch {
   const filters = { ...search };
+  delete filters.q;
   delete filters.cursor;
+  delete filters.page;
+  delete filters.item;
   delete filters.customerId;
+  delete filters.connectionId;
 
   return filters;
 }
 
-/** Builds the API query for validated URL filters and the current search text. */
-export function customerListQuery(search: CustomersSearch, q = '') {
-  const sort = search.sort ?? 'created';
+const sorts = new Set<string>(customerSortSchema.options);
+
+/** The API's sort for a catalog sort field; the catalog's `spent` is the API's `amountSpent`. */
+function apiSort(field: string | undefined): CustomerListQueryInput['sort'] {
+  if (field === 'spent') return 'amountSpent';
+  if (field && sorts.has(field))
+    return field as NonNullable<CustomerListQueryInput['sort']>;
+  // The server checks that a custom field exists and is readable.
+  if (field && /^custom:[0-9a-f-]{36}$/.test(field))
+    return field as `custom:${string}`;
+
+  return 'created';
+}
+
+/**
+ * Builds the list request for a view: conditions (sent only when there are any), sort (a
+ * catalog or custom field) and grouping, with the private search text and the page cursor.
+ * Grouped reads return each group's first rows and take no page cursor; `group` reads one
+ * group's next page instead. Calendar conditions and date groups follow `timeZone`.
+ */
+export function customerListQuery(
+  state: CollectionViewState,
+  search: { q: string; cursor?: string | undefined },
+  timeZone: string,
+  group?: { key: CollectionGroup['key']; cursor: string },
+): CustomerListQueryInput {
+  const grouping = groupOf(state);
 
   return {
-    q: q.trim(),
-    state: search.state,
-    connectionId: search.connectionId,
-    sort,
-    direction: search.direction ?? (sort === 'name' ? 'asc' : 'desc'),
-    cursor: search.cursor,
-    limit: customerPageSize,
+    q: search.q.trim(),
+    ...(state.where.conditions.length
+      ? { where: JSON.stringify(state.where) }
+      : {}),
+    sort: apiSort(state.sort?.field),
+    direction: state.sort?.direction ?? 'desc',
+    timeZone,
+    ...(grouping
+      ? group
+        ? {
+            group: grouping,
+            groupKey: JSON.stringify(group.key),
+            cursor: group.cursor,
+            limit: customerPageSize,
+          }
+        : { group: grouping, groupLimit: customerGroupPageSize }
+      : { limit: customerPageSize, cursor: search.cursor }),
   };
 }
 
-/** Loads a page of imported customer profiles with their sources. */
+/** Loads a page of imported customer profiles with their sources, or a grouped read. */
 export function customersOptions(
   organizationId: string,
-  search: CustomersSearch,
-  q = '',
+  query: CustomerListQueryInput,
 ) {
-  const query = customerListQuery(search, q);
-
   return queryOptions({
     ...privateQueryDefaults,
     queryKey: ['private', 'organization', organizationId, 'customers', query],
     refetchOnReconnect: 'always',
+    // A changed filter keeps the previous rows visible until the new ones arrive.
+    placeholderData: keepPreviousData,
     queryFn: ({ signal }) =>
       api.customers.list({ params: { organizationId }, query }, { signal }),
   });

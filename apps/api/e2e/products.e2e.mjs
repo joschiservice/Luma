@@ -25,6 +25,26 @@ it('compares catalog listings by source, finds gaps and follows related records'
       ['Tokyo store', 5],
     ],
   );
+  // Count sorts run in both directions; SKUs without a code or price come last.
+  const listings = (
+    await f.request(f.member, `${f.base}/products?sort=listings&direction=desc`)
+  ).items.map((item) => item.listings.length);
+  expect(listings).toEqual([...listings].sort((a, b) => b - a));
+  const lowest = (item) =>
+    item.listings
+      .filter((listing) => listing.price?.currency)
+      .map((listing) => [listing.price.currency, Number(listing.price.amount)])
+      .sort((a, b) => a[0].localeCompare(b[0]) || a[1] - b[1])[0] ?? null;
+  const prices = (
+    await f.request(f.member, `${f.base}/products?sort=price`)
+  ).items.map(lowest);
+  const priced = prices.filter((price) => price !== null);
+  expect(priced).toEqual(
+    [...priced].sort((a, b) => a[0].localeCompare(b[0]) || a[1] - b[1]),
+  );
+  expect(prices.slice(priced.length).every((price) => price === null)).toBe(
+    true,
+  );
   const tote = list.items.find((item) => item.sku === 'SKU-100');
   // Prices without a currency and barcodes with leading zeros are not differences.
   expect(tote.differences).toEqual(['title', 'published']);
@@ -190,6 +210,97 @@ it('pages a large catalog with a cursor bound to its filters', async (t) => {
   );
 });
 
+it('filters and groups products by listing conditions per source', async (t) => {
+  const f = await settingsFixture(t);
+  const catalog = await productsFixture(t, f);
+  const where = (conditions, match = 'all') =>
+    `where=${encodeURIComponent(JSON.stringify({ match, conditions }))}`;
+  const skus = async (query) =>
+    (await f.request(f.member, `${f.base}/products?${query}`)).items.map(
+      (item) => item.sku,
+    );
+
+  expect(
+    await skus(where([{ field: 'status', op: 'any_of', value: ['draft'] }])),
+  ).toEqual(['SCARF-1']);
+  // A named source scope reads only that source's listing.
+  expect(
+    await skus(
+      where([
+        {
+          field: 'published',
+          op: 'is',
+          value: false,
+          source: catalog.erp,
+        },
+      ]),
+    ),
+  ).toEqual(['SKU-100']);
+  expect(
+    await skus(
+      where([
+        { field: 'price', op: 'lt', value: { amount: '20', currency: 'EUR' } },
+      ]),
+    ),
+  ).toEqual(['APR-M', 'APR-S']);
+  expect(
+    await skus(
+      where([{ field: 'listings', op: 'any_of', value: [catalog.erp] }]),
+    ),
+  ).toEqual(['APR-S', 'GIFT-BOX ', 'SKU-100']);
+  const filtered = await f.request(
+    f.member,
+    `${f.base}/products?${where([{ field: 'vendor', op: 'is', value: 'Luma Goods' }])}`,
+  );
+  expect(filtered.counts).toMatchObject({ all: 1, differs: 1 });
+
+  const grouped = await f.request(
+    f.member,
+    `${f.base}/products?group=status&groupLimit=2`,
+  );
+  expect(grouped.groups.map((group) => [group.key, group.count])).toEqual([
+    ['active', 5],
+    ['draft', 1],
+  ]);
+  const active = grouped.groups[0];
+  expect(active.itemIds).toHaveLength(2);
+  const more = await f.request(
+    f.member,
+    `${f.base}/products?group=status&groupKey=${encodeURIComponent('"active"')}&limit=3&cursor=${active.nextCursor}`,
+  );
+  expect(more.items).toHaveLength(3);
+  expect(more.groups).toEqual([
+    expect.objectContaining({ key: 'active', count: 5, nextCursor: null }),
+  ]);
+  expect(
+    new Set([...active.itemIds, ...more.items.map((item) => item.skuId)]).size,
+  ).toBe(5);
+
+  for (const query of [
+    where([{ field: 'title', op: 'contains', value: 'tote' }]),
+    where([{ field: 'updated', op: 'empty', source: catalog.erp }]),
+    where([
+      {
+        field: 'price',
+        op: 'gt',
+        value: { amount: '1', currency: 'EUR' },
+        source: 'lowest',
+      },
+    ]),
+    where([{ field: 'status', op: 'any_of', value: ['retired'] }]),
+    'group=sku',
+    `groupKey=${encodeURIComponent('"active"')}`,
+    `group=status&cursor=${active.nextCursor}`,
+  ])
+    await f.request(
+      f.member,
+      `${f.base}/products?${query}`,
+      'GET',
+      undefined,
+      400,
+    );
+});
+
 // Set LUMA_PRODUCT_BENCHMARK to a SKU count (for example 20000) to time catalog reads through
 // the API at that size. Each SKU is listed in both sources; a tenth only have an unlinked match.
 it.skipIf(!process.env.LUMA_PRODUCT_BENCHMARK)(
@@ -255,6 +366,34 @@ it.skipIf(!process.env.LUMA_PRODUCT_BENCHMARK)(
     const second = await time('second page', `?cursor=${first.nextCursor}`);
     await time('deep page', `?cursor=${second.nextCursor}`);
     await time('detail', `/${catalog.skuId}`);
+    const where = (conditions) =>
+      `?where=${encodeURIComponent(JSON.stringify({ match: 'all', conditions }))}`;
+    await time(
+      'status in every source',
+      where([
+        { field: 'status', op: 'any_of', value: ['active'], source: 'every' },
+      ]),
+    );
+    await time(
+      'price range in one source',
+      where([
+        {
+          field: 'price',
+          op: 'between',
+          value: {
+            from: { amount: '12', currency: 'EUR' },
+            to: { amount: '14', currency: 'EUR' },
+          },
+          source: catalog.store,
+        },
+      ]),
+    );
+    await time(
+      'differing field',
+      where([{ field: 'differences', op: 'any_of', value: ['status'] }]),
+    );
+    await time('grouped by status', '?group=status');
+    await time('grouped by differing field', '?group=differences');
     await writeFile(
       `/tmp/luma101-products-${count}.json`,
       JSON.stringify({ count, timings }, null, 2),

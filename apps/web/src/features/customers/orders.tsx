@@ -1,14 +1,16 @@
-import type { OrderList } from '@luma/api-contract';
+import { type OrderList, orderSortSchema } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
 import { Empty } from '@luma/ui/components/primitives/empty';
 import { Pagination } from '@luma/ui/components/primitives/pagination';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { PackageSearch } from 'lucide-react';
 import { useState } from 'react';
 
 import { IdentityError } from '../../kit/identity/data';
+import { sortLabels } from '../../shared/orders/presentation';
 import { OrdersTable } from '../orders/list-table';
 import {
   customerOrderPageSize,
@@ -22,7 +24,7 @@ const firstPage: CustomerOrdersState = { sort: 'placed', direction: 'desc' };
 
 // The history sits beside the profile, so it leaves out the source update time.
 const columns = [
-  'order',
+  'number',
   'placed',
   'status',
   'fulfillment',
@@ -138,20 +140,27 @@ export function CustomerOrdersView({
       {list ? (
         <>
           <OrdersTable
-            organizationId={organizationId}
-            search={{
-              sort: state.sort,
-              direction: state.direction,
-              from: customerPath,
-            }}
+            caption={m.orders_list_caption({
+              view: m.customers_history_title(),
+              sort: sortLabels[state.sort],
+            })}
             items={list.items}
             columns={columns}
-            change={(search) =>
+            link={(order) => (
+              <Link
+                to="/app/$organizationId/orders/$orderId"
+                params={{ organizationId, orderId: order.id }}
+                search={{ from: customerPath }}
+              />
+            )}
+            sort={{ key: state.sort, direction: state.direction }}
+            onSortChange={(next) => {
+              const sort = orderSortSchema.safeParse(next.key);
               change({
-                sort: search.sort ?? firstPage.sort,
-                direction: search.direction ?? firstPage.direction,
-              })
-            }
+                sort: sort.success ? sort.data : firstPage.sort,
+                direction: next.direction,
+              });
+            }}
             empty={
               <Empty>
                 <PackageSearch size={30} aria-hidden="true" />

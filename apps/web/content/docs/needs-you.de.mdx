@@ -21,7 +21,25 @@ Entscheidungen verschwinden aus der Liste, sobald sie beantwortet sind, ablaufen
 - **Mir zugewiesen**: Entscheidungen, die du übernommen hast oder die dir zugewiesen wurden.
 - **Nicht zugewiesen**: Entscheidungen, um die sich noch niemand kümmert.
 
-Filtere nach **Bereich** (Bestellungen, Fulfillment, Bestand, Beschaffung oder Sonstige Abläufe) oder nach **Grund**. Jede Option zeigt, wie viele Entscheidungen passen. Ansicht, Filter und gewählte Entscheidung sind Teil der Adresse, sodass du einen Link teilen oder die Ansicht anheften kannst.
+Das Ansichtsmenü vor den Reitern listet auch die Ansichten, die du und dein Team gespeichert habt. Öffnest du **Wartet auf dich** über die Seitenleiste, kommst du zur zuletzt genutzten Ansicht zurück. Die Zahlen an den Reitern und in der Seitenleiste gelten immer für die ganze Liste, die du sehen kannst, egal wie du filterst.
+
+## Entscheidungen finden [#find-decisions]
+
+Suche nach dem Titel. Dein Suchtext bleibt auf der Seite: Er wird weder in der Seitenadresse noch in Ansichten gespeichert und ist leer, wenn du die Seite verlässt oder neu lädst.
+
+**Zuständig**, **Bereich** (Bestellungen, Fulfillment, Bestand, Beschaffung oder Sonstige Abläufe) und **Grund** über der Liste grenzen sie mit einem Klick ein. Über **Zuständig** findest du Entscheidungen, die du übernommen hast, Entscheidungen ohne Zuständigkeit oder die einer bestimmten Person; eine mit **Ich** gespeicherte Ansicht zeigt allen ihre eigenen. Für alles andere wählst du **Filter**: **Auswirkung**, **Frist** (ein Zeitraum, die nächsten Tage oder Entscheidungen ohne Frist) und **Wartet seit**. **Leeren** entfernt alle Filter und die Suche.
+
+Das Sortiermenü nach **Darstellung** nennt die aktuelle Reihenfolge. Wähle es, um nach Frist oder Wartezeit zu sortieren oder die Richtung umzukehren. Entscheidungen ohne Frist stehen beim Sortieren nach Frist am Ende.
+
+Ansicht, Filter und Sortierung sind zusammen mit der gewählten Entscheidung Teil der Adresse, sodass du einen Link teilen oder die Ansicht anheften kannst. Links aus der Zeit vor Ansichten, etwa zu einem Bereich aus Insights, öffnen dieselben Filter.
+
+## Liste anordnen [#arrange-the-queue]
+
+Wähle **Darstellung**, um festzulegen, was jede Entscheidung zeigt, etwa Art, Zuständigkeit, Auswirkung, Frist oder Wartezeit, um die Liste zu gruppieren und um zur Dichte **Kompakt** zu wechseln. Jede Zeile behält ihren Status, sodass nichts verborgen wird, was auf dich wartet.
+
+**Gruppieren nach** fasst Entscheidungen nach Bereich, Grund, Zuständigkeit oder Ursache zusammen, etwa alle Bestandskorrekturen, die auf Genehmigung warten. Jede Gruppe zeigt, wie viele Entscheidungen sie hat; **Mehr in …** lädt weitere. Eine als unvollständig markierte Gruppe kann Entscheidungen aus einem Bereich vermissen, der nicht geantwortet hat. Jede Entscheidung braucht weiterhin ihre eigene Antwort; nichts wird gesammelt genehmigt.
+
+Geänderte Filter, Sortierung, Gruppierung oder Darstellung markieren die Ansicht als **Geändert**; wähle **Speichern**, **Als neue Ansicht speichern** oder **Zurücksetzen**. Dichte und eingeklappte Gruppen sind deine eigenen Einstellungen.
 
 ## Wie die Liste sortiert ist [#how-the-queue-is-ordered]
 
@@ -30,8 +48,6 @@ Filtere nach **Bereich** (Bestellungen, Fulfillment, Bestand, Beschaffung oder S
 3. Alles andere, früheste Frist zuerst, dann älteste Anfrage.
 
 Eine Auswirkung, die Luma nicht bewertet hat, ist als **Auswirkung nicht bewertet** gekennzeichnet, statt als gering eingestuft zu werden.
-
-**Nach Ursache gruppieren** fasst Entscheidungen mit derselben Ursache zusammen, etwa alle Bestandskorrekturen, die auf Genehmigung warten. Gruppen gelten nur für die aktuelle Seite. Jede Entscheidung braucht weiterhin ihre eigene Antwort; nichts wird gesammelt genehmigt.
 
 ## Was jeder Status bedeutet [#what-each-status-means]
 
@@ -69,11 +85,17 @@ Mitglieder können Entscheidungen übernehmen und verfolgen, ihre Rolle enthält
 
 ## Durch die Liste navigieren [#move-through-the-queue]
 
-Mit **J** und **K** wechselst du zur nächsten und vorherigen Entscheidung, mit **Esc** schließt du die gewählte Entscheidung.
+- **J** und **K** oder die Pfeiltasten bewegen dich durch die Liste.
+- Die **Leertaste** öffnet die Entscheidung, auf der du stehst, neben der Liste oder schließt sie wieder. Solange sie offen ist, öffnen **J** und **K** die nächste und vorherige Entscheidung.
+- **Enter** öffnet die Entscheidung, auf der du stehst.
+- **Esc** schließt die Entscheidung und bringt dich zu ihrer Zeile zurück.
+- **/** springt zur Suche, **F** fügt einen Filter hinzu und **?** listet diese Tastenkürzel.
+
+Tastenkürzel wirken nicht, während du in ein Feld tippst. Aktualisiert sich die Liste, bleibt die Entscheidung ausgewählt, auf der du stehst, auch wenn sich andere um sie herum verschieben.
 
 ## Wenn die Liste unvollständig oder offline ist [#when-the-queue-is-incomplete-or-offline]
 
-- **Einige Entscheidungen konnten nicht geladen werden** nennt den Bereich, der nicht geantwortet hat. Seine Entscheidungen fehlen in der Liste, sie sind nicht erledigt. Wähle **„Wartet auf dich“ aktualisieren**, um es erneut zu versuchen.
+- **Einige Entscheidungen konnten nicht geladen werden** nennt den Bereich, der nicht geantwortet hat. Seine Entscheidungen fehlen in der Liste, sie sind nicht erledigt, auch wenn die Liste leer ist: Dann steht dort **Entscheidungen fehlen möglicherweise**. Wähle **„Wartet auf dich“ aktualisieren**, um es erneut zu versuchen.
 - **„Wartet auf dich“ konnte nicht aktualisiert werden** heißt, die Liste unten ist möglicherweise veraltet.
 - **Du bist offline**: Die Liste zeigt die zuletzt geladenen Entscheidungen, und Antworten sind pausiert, bis du wieder verbunden bist.
 

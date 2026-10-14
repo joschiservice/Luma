@@ -5,6 +5,7 @@ export const adaptiveRecordTypeSchema = z.enum([
   'product',
   'supplier',
   'purchase_order',
+  'customer',
 ]);
 
 export const customFieldTypeSchema = z.enum([
@@ -70,6 +71,14 @@ const customFieldRecordValueSchema = z.object({
 export const customFieldRecordSchema = z.object({
   fields: z.array(customFieldSchema),
   values: z.array(customFieldRecordValueSchema),
+});
+
+/** Permitted fields and the values of several records, as list columns show them. */
+export const customFieldRecordsSchema = z.object({
+  fields: z.array(customFieldSchema),
+  values: z.array(
+    customFieldRecordValueSchema.extend({ recordId: z.string().uuid() }),
+  ),
 });
 
 const customFieldFilterSchema = z

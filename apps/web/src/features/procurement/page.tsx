@@ -1,369 +1,154 @@
 import './procurement.css';
 
-import {
-  type OrderStage,
-  orderStageSchema,
-  type OrderSummary,
-  type PurchaseOrder,
-  type Supplier,
-} from '@luma/api-contract';
-import { formatList, formatNumber } from '@luma/i18n/format';
+import type { PurchaseOrderList } from '@luma/api-contract';
+import { formatNumber } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
-import { Badge } from '@luma/ui/components/primitives/badge';
 import { Button } from '@luma/ui/components/primitives/button';
 import {
   CollectionToolbar,
   CollectionViews,
 } from '@luma/ui/components/primitives/collection-toolbar';
-import {
-  DataTable,
-  type DataTableColumn,
-  DataTableRowLink,
-} from '@luma/ui/components/primitives/data-table';
 import { Empty } from '@luma/ui/components/primitives/empty';
-import { StatePill } from '@luma/ui/components/primitives/state';
-import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { PageTitle } from '@luma/ui/components/workspace/page-header';
 import { useQuery } from '@tanstack/react-query';
-import {
-  Link,
-  useNavigate,
-  useParams,
-  useSearch,
-} from '@tanstack/react-router';
+import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import {
   ArrowUpRight,
   Building2,
-  CircleDot,
   FileText,
   PackageCheck,
   Plus,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
 
-import { SignInRedirect } from '../../kit/identity/common';
-import { IdentityError } from '../../kit/identity/data';
+import { allSuppliersOptions } from '../../shared/procurement/suppliers';
 import {
   ordersOptions,
-  procurementError,
-  progressOptions,
+  type ProcurementSearch,
+  procurementTab,
   suppliersOptions,
 } from './data';
 import { OrderDialog, SupplierDialog } from './forms';
-import {
-  calendarDate,
-  OrderStatus,
-  ownerLabels,
-  StagePill,
-  stages,
-  statusLabels,
-} from './presentation';
+import { PurchaseOrdersList } from './orders-list';
 import { purchasingOptions } from './purchasing-data';
 import { PurchasingWorkbench } from './purchasing-workbench';
 import { ReplenishmentOverview } from './replenishment-overview';
+import { SuppliersList } from './suppliers-list';
 
-function orderColumns(
-  organizationId: string,
-  progress: Map<string, OrderSummary> | undefined,
-): DataTableColumn<PurchaseOrder>[] {
-  return [
-    {
-      key: 'reference',
-      header: m.procurement_column_purchase_order(),
-      cell: (order) => (
-        <span className="procurement-cell">
-          <DataTableRowLink
-            render={
-              <Link
-                to="/app/$organizationId/procurement/$purchaseOrderId"
-                params={{ organizationId, purchaseOrderId: order.id }}
-              />
-            }
-          >
-            {order.reference}
-          </DataTableRowLink>
-          <small>
-            {m.procurement_lines_count({ count: order.lines.length })}
-            {progress?.get(order.id)?.externalOrderNumber
-              ? ` · ${m.procurement_erp_order_number({ number: progress.get(order.id)!.externalOrderNumber! })}`
-              : ''}
-          </small>
-        </span>
-      ),
-    },
-    {
-      key: 'supplier',
-      header: m.procurement_column_supplier(),
-      cell: (order) => order.supplierName,
-    },
-    {
-      key: 'stage',
-      header: m.procurement_column_stage(),
-      cell: (order) => {
-        const summary = progress?.get(order.id);
+type Counts = PurchaseOrderList['counts'];
 
-        return summary ? (
-          <span className="procurement-flags">
-            <StagePill stage={summary.stage} />
-            {summary.attention ? (
-              <Badge tone={summary.overdue ? 'danger' : 'warning'}>
-                {summary.overdue
-                  ? m.procurement_overdue()
-                  : m.procurement_to_answer({ count: summary.attention })}
-              </Badge>
-            ) : null}
-          </span>
-        ) : (
-          <OrderStatus status={order.status} />
-        );
-      },
-    },
-    {
-      key: 'expected',
-      header: m.procurement_column_expected(),
-      hideOnNarrow: true,
-      cell: (order) => {
-        const date = progress?.get(order.id)?.expectedDate;
-
-        return date ? (
-          calendarDate(date)
-        ) : (
-          <span className="procurement-muted">{m.common_empty_value()}</span>
-        );
-      },
-    },
-    {
-      key: 'next',
-      header: m.procurement_column_owner(),
-      hideOnNarrow: true,
-      cell: (order) => {
-        const owner = progress?.get(order.id)?.nextOwner;
-
-        return owner ? ownerLabels[owner]() : m.common_empty_value();
-      },
-    },
-  ];
-}
-
-function supplierColumns({
-  organizationId,
-  orderCount,
-  showOrders,
-}: {
-  organizationId: string;
-  orderCount: (supplier: Supplier) => number | undefined;
-  showOrders: (supplier: Supplier) => void;
-}): DataTableColumn<Supplier>[] {
-  return [
-    {
-      key: 'name',
-      header: m.procurement_column_supplier(),
-      cell: (supplier) => (
-        <DataTableRowLink
-          render={
-            <Link
-              to="/app/$organizationId/procurement/suppliers/$supplierId"
-              params={{ organizationId, supplierId: supplier.id }}
-            />
-          }
-        >
-          {supplier.name}
-        </DataTableRowLink>
-      ),
-    },
-    {
-      key: 'link',
-      header: m.procurement_column_link(),
-      hideOnNarrow: true,
-      cell: (supplier) =>
-        supplier.link ? (
-          <StatePill state="verified">
-            {supplier.link.name ??
-              m.procurement_supplier_external({
-                id: supplier.link.externalId,
-              })}
-          </StatePill>
-        ) : (
-          <span className="procurement-muted">
-            {m.procurement_not_linked()}
-          </span>
-        ),
-    },
-    {
-      key: 'references',
-      header: m.procurement_column_references(),
-      hideOnNarrow: true,
-      cell: (supplier) =>
-        supplier.externalReferences.length
-          ? formatList(
-              supplier.externalReferences.map(
-                (ref) => `${ref.system} · ${ref.externalId}`,
-              ),
-            )
-          : m.common_none(),
-    },
-    {
-      key: 'added',
-      header: m.procurement_column_added(),
-      hideOnNarrow: true,
-      cell: (supplier) => <WorkspaceDate value={supplier.createdAt} />,
-    },
-    {
-      key: 'orders',
-      header: m.procurement_column_orders(),
-      numeric: true,
-      cell: (supplier) => {
-        const count = orderCount(supplier);
-
-        return count === undefined
-          ? m.common_empty_value()
-          : formatNumber(count);
-      },
-    },
-    {
-      key: 'actions',
-      header: <span className="sr-only">{m.common_actions()}</span>,
-      cell: (supplier) => (
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={m.procurement_list_show_supplier_orders({
-            supplier: supplier.name,
-          })}
-          title={m.procurement_list_show_orders()}
-          onClick={() => showOrders(supplier)}
-        >
-          <ArrowUpRight size={16} aria-hidden="true" />
-        </Button>
-      ),
-    },
-  ];
-}
-
-const stageFilters = ['attention', ...orderStageSchema.options] as const;
+/** The overview's count buttons, each opening a built-in purchase-order view. */
+const overviewViews = [
+  {
+    segment: 'attention',
+    count: (counts: NonNullable<Counts>) => counts.attention,
+    label: m.procurement_overview_attention,
+    aria: m.procurement_overview_attention_label,
+  },
+  {
+    segment: 'awaiting_confirmation',
+    count: (counts: NonNullable<Counts>) =>
+      counts.stages.awaiting_confirmation ?? 0,
+    label: m.procurement_overview_waiting,
+    aria: m.procurement_overview_waiting_label,
+  },
+  {
+    segment: 'draft',
+    count: (counts: NonNullable<Counts>) => counts.stages.draft ?? 0,
+    label: m.procurement_overview_drafts,
+    aria: m.procurement_overview_drafts_label,
+  },
+] as const;
 
 /**
- * Lists the order stage filter choices. A legacy `status` link has no stage, so its status is
- * offered as one more choice while it applies, letting the chip name it.
+ * Whether the URL shows the first page of All purchase orders without search, conditions or
+ * grouping: that read carries the workspace counts, so the overview needs no read of its own.
  */
-function stageOptions(status: string) {
-  const legacy = Object.entries(statusLabels).find(
-    ([value]) => value === status,
+function unfilteredOrders(search: ProcurementSearch) {
+  return (
+    procurementTab(search) === 'orders' &&
+    (search.view ?? 'all') === 'all' &&
+    !search.where?.conditions.length &&
+    !search.group &&
+    !search.q &&
+    !search.cursor
   );
-
-  return [
-    { value: 'attention', label: m.procurement_list_filter_attention() },
-    ...orderStageSchema.options.map((value) => ({
-      value,
-      label: stages[value].label,
-    })),
-    ...(legacy ? [{ value: `status:${legacy[0]}`, label: legacy[1]() }] : []),
-  ];
 }
 
-/** Keeps procurement views and filters shareable without accepting unsupported statuses. */
-export function parseProcurementSearch(value: Record<string, unknown>): {
-  view: 'orders' | 'suppliers' | 'purchasing';
-  demandPeriodDays?: number;
-  q: string;
-  status: string;
-  stage?: OrderStage | 'attention';
-} {
-  const stage =
-    typeof value.stage === 'string' &&
-    (value.stage === 'attention' || Object.hasOwn(stages, value.stage))
-      ? (value.stage as OrderStage | 'attention')
-      : undefined;
-
-  return {
-    view:
-      value.view === 'purchasing'
-        ? 'purchasing'
-        : value.view === 'suppliers'
-          ? 'suppliers'
-          : 'orders',
-    ...([7, 30, 60, 90, 180].includes(Number(value.demandPeriodDays))
-      ? { demandPeriodDays: Number(value.demandPeriodDays) }
-      : {}),
-    q: typeof value.q === 'string' ? value.q.slice(0, 200) : '',
-    status:
-      typeof value.status === 'string' &&
-      Object.hasOwn(statusLabels, value.status)
-        ? value.status
-        : '',
-    ...(stage ? { stage } : {}),
-  };
-}
-
-/** Lists authoritative purchase orders and the workspace supplier directory. */
+/**
+ * The procurement page: supplier commitments with counts that open built-in views, then the
+ * purchase-order list, the supplier list or the purchasing workbench. Both lists are
+ * configurable views; the URL holds the tab, the view and the page position.
+ */
 export function ProcurementPage() {
   const { organizationId } = useParams({ from: '/app/$organizationId' });
-  const filters = useSearch({ from: '/app/$organizationId/procurement/' });
+  const search = useSearch({ from: '/app/$organizationId/procurement/' });
   const navigate = useNavigate({ from: '/app/$organizationId/procurement/' });
-  const orders = useQuery(ordersOptions(organizationId));
-  const progress = useQuery(progressOptions(organizationId));
-  const summaries = progress.data
-    ? new Map(progress.data.items.map((item) => [item.id, item]))
-    : undefined;
-  const suppliers = useQuery(suppliersOptions(organizationId));
+  const tab = procurementTab(search);
+  const counted = unfilteredOrders(search);
+  const [listCounts, setListCounts] = useState<Counts>(null);
+  const overview = useQuery({
+    ...ordersOptions(organizationId, { limit: 1 }),
+    enabled: !counted,
+  });
+  const counts = (counted ? listCounts : overview.data?.counts) ?? undefined;
+  const directorySize = useQuery(
+    suppliersOptions(organizationId, { limit: 1, count: 'exact' }),
+  );
+  const supplierCount = directorySize.data?.totalCount ?? undefined;
   const purchasing = useQuery(
-    purchasingOptions(organizationId, filters.demandPeriodDays ?? 30),
+    purchasingOptions(organizationId, search.demandPeriodDays ?? 30),
   );
   const [dialog, setDialog] = useState<'supplier' | 'order' | null>(null);
+  const directory = useQuery({
+    ...allSuppliersOptions(organizationId),
+    enabled: dialog === 'order',
+  });
   const dialogTrigger = useRef<HTMLButtonElement | null>(null);
-  const selected = filters.view === 'orders' ? orders : suppliers;
-  const query = filters.q.trim().toLowerCase();
-  const visibleOrders = orders.data?.items.filter(
-    (o) =>
-      (!filters.status || o.status === filters.status) &&
-      (!filters.stage ||
-        (filters.stage === 'attention'
-          ? (summaries?.get(o.id)?.attention ?? 0) > 0
-          : summaries?.get(o.id)?.stage === filters.stage)) &&
-      [o.reference, o.supplierName, ...o.lines.map((line) => line.sku)]
-        .join(' ')
-        .toLowerCase()
-        .includes(query),
-  );
-  const visibleSuppliers = suppliers.data?.items.filter((s) =>
-    [
-      s.name,
-      ...s.externalReferences.flatMap((ref) => [ref.system, ref.externalId]),
-    ]
-      .join(' ')
-      .toLowerCase()
-      .includes(query),
-  );
-  const orderCounts = new Map<string, number>();
-  for (const order of orders.data?.items ?? [])
-    orderCounts.set(
-      order.supplierId,
-      (orderCounts.get(order.supplierId) ?? 0) + 1,
-    );
-  const canManage = selected.data?.canManage && !selected.error;
-  const waitingCount = progress.data?.items.filter(
-    (item) => item.stage === 'awaiting_confirmation',
-  ).length;
-  const attentionCount = progress.data?.items.filter(
-    (item) => item.attention > 0,
-  ).length;
-  const draftCount = progress.data?.items.filter(
-    (item) => item.stage === 'draft',
-  ).length;
-  const change = (
-    next: Partial<Omit<typeof filters, 'stage'>> & {
-      stage?: typeof filters.stage | undefined;
-    },
+  const canManage = directorySize.data?.canManage ?? false;
+  const hasSuppliers = (supplierCount ?? 0) > 0;
+  const go = (next: ProcurementSearch) =>
+    void navigate({ search: next, resetScroll: false });
+  const openDialog = (
+    event: { currentTarget: HTMLButtonElement },
+    kind: 'supplier' | 'order',
   ) => {
-    const { stage, ...rest } = { ...filters, ...next };
-    void navigate({
-      search: { ...rest, ...(stage ? { stage } : {}) },
-      replace: true,
-    });
+    dialogTrigger.current = event.currentTarget;
+    setDialog(kind);
   };
-  if (selected.error instanceof IdentityError && selected.error.status === 401)
-    return <SignInRedirect />;
+
+  const tabs = (
+    <CollectionViews
+      label={m.procurement_list_views()}
+      value={tab}
+      views={[
+        ...(purchasing.data?.enabled
+          ? [
+              {
+                value: 'purchasing' as const,
+                label: m.purchasing_title(),
+                icon: <PackageCheck aria-hidden="true" />,
+              },
+            ]
+          : []),
+        {
+          value: 'orders' as const,
+          label: m.procurement_list_view_orders(),
+          icon: <FileText aria-hidden="true" />,
+          count: counts?.all,
+        },
+        {
+          value: 'suppliers' as const,
+          label: m.procurement_list_view_suppliers(),
+          icon: <Building2 aria-hidden="true" />,
+          count: supplierCount,
+        },
+      ]}
+      // Each list opens the member's remembered view for it.
+      onChange={(next) => go(next === 'orders' ? {} : { tab: next })}
+    />
+  );
 
   return (
     <div className="procurement-page">
@@ -372,18 +157,16 @@ export function ProcurementPage() {
         actions={
           canManage ? (
             <Button
-              onClick={(event) => {
-                dialogTrigger.current = event.currentTarget;
-                setDialog(
-                  filters.view === 'suppliers' || !suppliers.data?.items.length
-                    ? 'supplier'
-                    : 'order',
-                );
-              }}
-              disabled={suppliers.isPending || !!suppliers.error}
+              onClick={(event) =>
+                openDialog(
+                  event,
+                  tab === 'suppliers' || !hasSuppliers ? 'supplier' : 'order',
+                )
+              }
+              disabled={directorySize.isPending || !!directorySize.error}
             >
               <Plus size={16} />
-              {filters.view === 'suppliers' || !suppliers.data?.items.length
+              {tab === 'suppliers' || !hasSuppliers
                 ? m.procurement_list_add_supplier()
                 : m.procurement_list_new_order()}
             </Button>
@@ -403,267 +186,113 @@ export function ProcurementPage() {
             </div>
           </div>
           <div className="procurement-overview-actions">
-            {(
-              [
-                [
-                  'attention',
-                  attentionCount,
-                  m.procurement_overview_attention,
-                  m.procurement_overview_attention_label,
-                ],
-                [
-                  'awaiting_confirmation',
-                  waitingCount,
-                  m.procurement_overview_waiting,
-                  m.procurement_overview_waiting_label,
-                ],
-                [
-                  'draft',
-                  draftCount,
-                  m.procurement_overview_drafts,
-                  m.procurement_overview_drafts_label,
-                ],
-              ] as const
-            ).map(([stage, count, label, aria]) => (
-              <Button
-                key={stage}
-                variant="ghost"
-                aria-label={aria()}
-                aria-pressed={
-                  filters.view === 'orders' && filters.stage === stage
-                }
-                onClick={() =>
-                  change(
-                    filters.stage === stage
-                      ? { view: 'orders', stage: undefined }
-                      : { view: 'orders', q: '', status: '', stage },
-                  )
-                }
-              >
-                <strong>
-                  {count === undefined
-                    ? m.common_empty_value()
-                    : formatNumber(count)}
-                </strong>
-                <span>{label()}</span>
-                <ArrowUpRight size={14} aria-hidden="true" />
-              </Button>
-            ))}
+            {overviewViews.map((item) => {
+              const pressed = tab === 'orders' && search.view === item.segment;
+
+              return (
+                <Button
+                  key={item.segment}
+                  variant="ghost"
+                  aria-label={item.aria()}
+                  aria-pressed={pressed}
+                  onClick={() => go({ view: pressed ? 'all' : item.segment })}
+                >
+                  <strong>
+                    {counts
+                      ? formatNumber(item.count(counts))
+                      : m.common_empty_value()}
+                  </strong>
+                  <span>{item.label()}</span>
+                  <ArrowUpRight size={14} aria-hidden="true" />
+                </Button>
+              );
+            })}
           </div>
         </section>
         <ReplenishmentOverview organizationId={organizationId} />
       </div>
       <div className="procurement-collection">
-        <CollectionToolbar
-          views={
-            <CollectionViews
-              label={m.procurement_list_views()}
-              value={filters.view}
-              views={[
-                ...(purchasing.data?.enabled
-                  ? [
-                      {
-                        value: 'purchasing' as const,
-                        label: m.purchasing_title(),
-                        icon: <PackageCheck aria-hidden="true" />,
-                      },
-                    ]
-                  : []),
-                {
-                  value: 'orders',
-                  label: m.procurement_list_view_orders(),
-                  icon: <FileText aria-hidden="true" />,
-                  count: orders.data?.items.length,
-                },
-                {
-                  value: 'suppliers',
-                  label: m.procurement_list_view_suppliers(),
-                  icon: <Building2 aria-hidden="true" />,
-                  count: suppliers.data?.items.length,
-                },
-              ]}
-              onChange={(view) => change({ view, q: '', status: '' })}
-            />
-          }
-          search={{
-            value: filters.q || undefined,
-            onChange: (q) => change({ q: q ?? '' }),
-            label:
-              filters.view === 'purchasing'
-                ? m.purchasing_search_label()
-                : filters.view === 'orders'
-                  ? m.procurement_list_search_orders()
-                  : m.procurement_list_search_suppliers(),
-            placeholder:
-              filters.view === 'purchasing'
-                ? m.purchasing_search_placeholder()
-                : filters.view === 'orders'
-                  ? m.procurement_list_search_orders_placeholder()
-                  : m.procurement_list_search_suppliers_placeholder(),
-            maxLength: 200,
-          }}
-          filters={
-            filters.view === 'orders'
-              ? [
-                  {
-                    kind: 'choice',
-                    key: 'stage',
-                    label: m.procurement_list_filter_stage(),
-                    icon: CircleDot,
-                    value:
-                      filters.stage ??
-                      (filters.status ? `status:${filters.status}` : undefined),
-                    options: stageOptions(filters.status),
-                    onChange: (value) =>
-                      change(
-                        value?.startsWith('status:')
-                          ? { status: value.slice(7), stage: undefined }
-                          : {
-                              status: '',
-                              stage: stageFilters.find(
-                                (stage) => stage === value,
-                              ),
-                            },
-                      ),
-                  },
-                ]
-              : []
-          }
-          onClear={() => change({ q: '', status: '', stage: undefined })}
-          onRefresh={() => {
-            void orders.refetch();
-            void suppliers.refetch();
-            if (filters.view === 'purchasing') void purchasing.refetch();
-          }}
-          refreshing={
-            orders.isFetching ||
-            suppliers.isFetching ||
-            (filters.view === 'purchasing' && purchasing.isFetching)
-          }
-          refreshLabel={m.procurement_list_refresh()}
-        />
-        {filters.view === 'purchasing' ? (
-          <PurchasingWorkbench
-            organizationId={organizationId}
-            search={filters.q}
-            period={filters.demandPeriodDays ?? 30}
-            onPeriod={(demandPeriodDays) => change({ demandPeriodDays })}
-          />
-        ) : selected.isPending ? (
-          <div className="procurement-loading" role="status">
-            {filters.view === 'orders'
-              ? m.procurement_list_loading_orders()
-              : m.procurement_list_loading_suppliers()}
-          </div>
-        ) : selected.error ? (
-          <Alert role="alert" tone="danger">
-            {procurementError(selected.error)}
-            <Button variant="outline" onClick={() => void selected.refetch()}>
-              {m.common_retry()}
-            </Button>
-          </Alert>
-        ) : filters.view === 'orders' ? (
+        {tab === 'purchasing' ? (
           <>
-            {!visibleOrders?.length ? (
+            <CollectionToolbar
+              views={tabs}
+              search={{
+                value: search.q,
+                onChange: (q) => go({ ...search, q: q || undefined }),
+                label: m.purchasing_search_label(),
+                placeholder: m.purchasing_search_placeholder(),
+                maxLength: 200,
+              }}
+              onClear={() => go({ ...search, q: undefined })}
+              onRefresh={() => void purchasing.refetch()}
+              refreshing={purchasing.isFetching}
+              refreshLabel={m.procurement_list_refresh()}
+            />
+            <PurchasingWorkbench
+              organizationId={organizationId}
+              search={search.q ?? ''}
+              period={search.demandPeriodDays ?? 30}
+              onPeriod={(demandPeriodDays) =>
+                go({ ...search, demandPeriodDays })
+              }
+            />
+          </>
+        ) : tab === 'suppliers' ? (
+          <SuppliersList
+            organizationId={organizationId}
+            search={search}
+            tabs={tabs}
+            empty={
               <Empty>
-                <FileText size={30} />
-                <h3>
-                  {orders.data?.items.length
-                    ? m.procurement_list_orders_filtered_title()
-                    : m.procurement_list_orders_empty_title()}
-                </h3>
-                <p>
-                  {orders.data?.items.length
-                    ? m.procurement_list_orders_filtered_body()
-                    : m.procurement_list_orders_empty_body()}
-                </p>
-                {filters.q || filters.status || filters.stage ? (
+                <Building2 size={30} aria-hidden="true" />
+                <h3>{m.procurement_list_suppliers_empty_title()}</h3>
+                <p>{m.procurement_list_suppliers_empty_body()}</p>
+                {canManage ? (
                   <Button
                     variant="outline"
-                    onClick={() =>
-                      change({ q: '', status: '', stage: undefined })
+                    onClick={(event) => openDialog(event, 'supplier')}
+                  >
+                    {m.procurement_list_add_first_supplier()}
+                  </Button>
+                ) : null}
+              </Empty>
+            }
+          />
+        ) : (
+          <PurchaseOrdersList
+            organizationId={organizationId}
+            search={search}
+            tabs={tabs}
+            onCounts={setListCounts}
+            empty={
+              <Empty>
+                <FileText size={30} aria-hidden="true" />
+                <h3>{m.procurement_list_orders_empty_title()}</h3>
+                <p>{m.procurement_list_orders_empty_body()}</p>
+                {canManage ? (
+                  <Button
+                    variant="outline"
+                    disabled={directorySize.isPending || !!directorySize.error}
+                    onClick={(event) =>
+                      openDialog(event, hasSuppliers ? 'order' : 'supplier')
                     }
                   >
-                    {m.common_clear_filters()}
-                  </Button>
-                ) : canManage ? (
-                  <Button
-                    variant="outline"
-                    disabled={suppliers.isPending || !!suppliers.error}
-                    onClick={(event) => {
-                      dialogTrigger.current = event.currentTarget;
-                      setDialog(
-                        suppliers.data?.items.length ? 'order' : 'supplier',
-                      );
-                    }}
-                  >
-                    {suppliers.data?.items.length
+                    {hasSuppliers
                       ? m.procurement_list_create_order()
                       : m.procurement_list_add_first_supplier()}
                   </Button>
-                ) : (
+                ) : directorySize.data ? (
                   <p>{m.procurement_list_no_permission()}</p>
-                )}
+                ) : null}
               </Empty>
-            ) : (
-              <DataTable
-                caption={m.procurement_list_view_orders()}
-                columns={orderColumns(organizationId, summaries)}
-                rows={visibleOrders}
-                rowKey={(order) => order.id}
-              />
-            )}
-          </>
-        ) : !visibleSuppliers?.length ? (
-          <Empty>
-            <Building2 size={30} />
-            <h3>
-              {suppliers.data?.items.length
-                ? m.procurement_list_suppliers_filtered_title()
-                : m.procurement_list_suppliers_empty_title()}
-            </h3>
-            <p>
-              {suppliers.data?.items.length
-                ? m.procurement_list_suppliers_filtered_body()
-                : m.procurement_list_suppliers_empty_body()}
-            </p>
-            {filters.q ? (
-              <Button variant="outline" onClick={() => change({ q: '' })}>
-                {m.procurement_list_clear_search()}
-              </Button>
-            ) : (
-              canManage && (
-                <Button
-                  variant="outline"
-                  onClick={(event) => {
-                    dialogTrigger.current = event.currentTarget;
-                    setDialog('supplier');
-                  }}
-                >
-                  {m.procurement_list_add_first_supplier()}
-                </Button>
-              )
-            )}
-          </Empty>
-        ) : (
-          <DataTable
-            caption={m.procurement_list_view_suppliers()}
-            columns={supplierColumns({
-              organizationId,
-              orderCount: (supplier) =>
-                orders.data ? (orderCounts.get(supplier.id) ?? 0) : undefined,
-              showOrders: (supplier) =>
-                change({ view: 'orders', q: supplier.name, status: '' }),
-            })}
-            rows={visibleSuppliers}
-            rowKey={(supplier) => supplier.id}
+            }
           />
         )}
       </div>
-      {suppliers.error && filters.view === 'orders' && (
+      {directorySize.error && tab === 'orders' && (
         <Alert tone="warning">
           {m.procurement_list_suppliers_failed()}{' '}
-          <Button variant="ghost" onClick={() => void suppliers.refetch()}>
+          <Button variant="ghost" onClick={() => void directorySize.refetch()}>
             {m.procurement_list_suppliers_retry()}
           </Button>
         </Alert>
@@ -675,11 +304,11 @@ export function ProcurementPage() {
           close={() => setDialog(null)}
         />
       )}
-      {dialog === 'order' && suppliers.data && (
+      {dialog === 'order' && directory.data && (
         <OrderDialog
           organizationId={organizationId}
           returnFocus={dialogTrigger}
-          suppliers={suppliers.data.items}
+          suppliers={directory.data.items}
           close={() => setDialog(null)}
           saved={(order) => {
             setDialog(null);

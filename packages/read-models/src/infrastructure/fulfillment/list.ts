@@ -5,37 +5,36 @@ import type {
   FulfillmentQuery,
   FulfillmentView,
 } from '../../application/fulfillment.js';
-import { iso } from '../orders/values.js';
+import type { CollectionCursorPosition } from '../collection/cursor.js';
+import {
+  type CollectionGroupRow,
+  groupCtes,
+  groupHeadIds,
+  groupMemberPredicate,
+  groupsJson,
+} from '../collection/group.js';
+import {
+  type CollectionOrdering,
+  keysetCandidates,
+  sortOrder,
+} from '../collection/keyset.js';
+import { likePattern } from '../collection/parameters.js';
+import {
+  collectionContext,
+  collectionGrouping,
+  collectionGroupLimit,
+  maxCollectionGroups,
+} from '../collection/request.js';
+import { compileWhere } from '../collection/where.js';
+import {
+  fulfillmentCollectionFields,
+  fulfillmentDirection,
+  fulfillmentGroupFields,
+  fulfillmentSort,
+} from './collection-fields.js';
 import { classified, itemJson, readItem, stalledAfterHours } from './rules.js';
 
-/** Position of the last fulfillment on a page, in the requested order. */
-export interface FulfillmentPosition {
-  rank: number;
-  key: string;
-  entityId: string;
-  connectionId: string;
-}
-
-const orders = {
-  waiting: {
-    rank: '0',
-    key: 'c.progress_at',
-    order: 'sort_key,c.entity_id,c.connection_id',
-    after: '>',
-  },
-  recent: {
-    rank: '0',
-    key: 'c.progress_at',
-    order: 'sort_key DESC,c.entity_id DESC,c.connection_id DESC',
-    after: '<',
-  },
-  deadline: {
-    rank: '(c.deadline_at IS NULL)::int',
-    key: 'COALESCE(c.deadline_at,c.progress_at)',
-    order: 'sort_rank,sort_key,c.entity_id,c.connection_id',
-    after: '>',
-  },
-} as const;
+export { fulfillmentDirection } from './collection-fields.js';
 
 // Search matches order numbers, tracking numbers, location names and source order or
 // fulfillment IDs literally.
@@ -47,40 +46,33 @@ const filters = `($4::uuid IS NULL OR f.connection_id=$4) AND ($5::uuid IS NULL 
   OR f.order_id IN (SELECT m.canonical_id FROM connector_source_mappings m WHERE m.tenant_id=$1
    AND m.resource='order' AND m.external_id ILIKE $8))`;
 
-function listSql(sort: FulfillmentQuery['sort']) {
-  const { rank, key, order, after } = orders[sort];
+const views = `($9='all' OR ($9='attention' AND o.attention) OR ($9='held' AND o.held) OR ($9='delayed' AND o.delayed)
+  OR ($9='open' AND o.open) OR ($9='in_transit' AND o.in_transit))`;
 
-  return `WITH ${classified(filters)},
-selected AS (
- SELECT c.*,${rank} AS sort_rank,${key} AS sort_key FROM classified c
- WHERE ($9='all' OR ($9='attention' AND c.attention) OR ($9='held' AND c.held) OR ($9='delayed' AND c.delayed)
-  OR ($9='open' AND c.open) OR ($9='in_transit' AND c.in_transit))
-  AND ($10::int IS NULL OR (${rank},${key},c.entity_id,c.connection_id)${after}($10,$11::timestamptz,$12::uuid,$13::uuid))
- ORDER BY ${order.replaceAll('sort_rank', rank).replaceAll('sort_key', key)} LIMIT $14
-)
-SELECT (SELECT jsonb_build_object('all',count(*),'attention',count(*) FILTER (WHERE attention),
-  'held',count(*) FILTER (WHERE held),'delayed',count(*) FILTER (WHERE delayed),'open',count(*) FILTER (WHERE open),
-  'in_transit',count(*) FILTER (WHERE in_transit)) FROM classified) AS counts,
- COALESCE((SELECT jsonb_agg(${itemJson}||jsonb_build_object('rank',c.sort_rank,'key',c.sort_key)
-  ORDER BY ${order}) FROM selected c JOIN orders_snapshots s ON s.tenant_id=c.tenant_id AND s.id=c.snapshot_id),'[]') AS page`;
+/** One page of fulfillments, or every group's first rows, with per-view counts. */
+export interface FulfillmentPage {
+  counts: Record<FulfillmentView, number>;
+  /** Page rows in order (up to `limit` + 1), or every group's first rows when grouped. */
+  items: { item: FulfillmentItem; position: CollectionCursorPosition }[];
+  groups: CollectionGroupRow[] | null;
+  /** Exact match count of the view, read only for one group's pages. */
+  total: number | null;
 }
 
 /**
- * Reads one page of up to `limit` + 1 fulfillments with per-view counts under the current
- * search and filters, evaluated at `asOf`.
+ * Reads one page of up to `limit` + 1 fulfillments after `after`, or with `group` every
+ * group's count and first rows, with per-view counts under the search, filters and
+ * conditions, evaluated at `asOf`. Throws a 400 error for invalid conditions or grouping.
  */
 export async function readFulfillments(
   tx: SqlTransaction,
   tenantId: string,
+  userId: string,
   query: FulfillmentQuery,
   asOf: string,
-  after: FulfillmentPosition | null,
-) {
-  const pattern = `%${query.q.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`;
-  const result = await tx.query<{
-    counts: Record<FulfillmentView, number>;
-    page: (Record<string, unknown> & { rank: number; key: string })[];
-  }>(listSql(query.sort), [
+  after: CollectionCursorPosition | null,
+): Promise<FulfillmentPage> {
+  const values: unknown[] = [
     tenantId,
     asOf,
     stalledAfterHours,
@@ -88,32 +80,110 @@ export async function readFulfillments(
     query.locationId ?? null,
     query.kind ?? null,
     query.q,
-    pattern,
+    likePattern(query.q),
     query.view,
-    after?.rank ?? null,
-    after?.key ?? null,
-    after?.entityId ?? null,
-    after?.connectionId ?? null,
-    (query.limit ?? 50) + 1,
-  ]);
-  const { counts, page } = result.rows[0]!;
+  ];
+  const context = collectionContext(values, asOf, query.timeZone, userId);
+  const { parameters } = context;
+  const where = query.where?.conditions.length
+    ? compileWhere(query.where, fulfillmentCollectionFields, context).sql
+    : 'true';
+  const { request, grouped } = collectionGrouping(
+    query,
+    fulfillmentGroupFields,
+  );
+  const member =
+    request && query.groupKey !== undefined
+      ? groupMemberPredicate(request, query.groupKey, context)
+      : 'true';
+  const direction = fulfillmentDirection(query);
+  const ordering: CollectionOrdering = {
+    sort: fulfillmentSort(query.sort, direction),
+    direction,
+    id: 'o.entity_id',
+  };
+  let page: string;
+  let groups = 'NULL::jsonb';
+  let ctes = '';
+  if (request && grouped) {
+    ctes = `${groupCtes(
+      'filtered',
+      request,
+      ordering,
+      parameters.bind(collectionGroupLimit(query), 'integer'),
+      maxCollectionGroups,
+      undefined,
+      context,
+    )},`;
+    groups = groupsJson;
+    page = `SELECT o.*,0 AS sort_rank,'{}'::text[] AS sort_keys,0::bigint AS n FROM filtered o
+ WHERE o.entity_id IN (SELECT id::uuid FROM (${groupHeadIds}) h)`;
+  } else {
+    const limit = parameters.bind((query.limit ?? 50) + 1, 'integer');
+    page = `SELECT o.*,row_number() OVER (ORDER BY ${sortOrder(ordering)}) AS n FROM (${keysetCandidates(
+      'filtered',
+      ordering,
+      limit,
+      {
+        rank: parameters.bind(after?.rank ?? null, 'integer'),
+        keys: parameters.bind(after?.keys ?? null, 'text[]'),
+        id: parameters.bind(after?.id ?? null, 'uuid'),
+      },
+    )}) o ORDER BY ${sortOrder(ordering)} LIMIT ${limit}`;
+  }
+  const result = await tx.query<{
+    counts: Record<FulfillmentView, number>;
+    total: number | null;
+    page: (Record<string, unknown> & {
+      sortRank: 0 | 1;
+      sortKeys: (string | null)[];
+    })[];
+    groups: CollectionGroupRow[] | null;
+  }>(
+    `WITH ${classified(filters)},
+matched AS MATERIALIZED (SELECT * FROM classified o WHERE ${where}),
+filtered AS NOT MATERIALIZED (SELECT * FROM matched o WHERE ${views} AND ${member}),
+${ctes} page AS MATERIALIZED (${page})
+SELECT (SELECT jsonb_build_object('all',count(*),'attention',count(*) FILTER (WHERE attention),
+  'held',count(*) FILTER (WHERE held),'delayed',count(*) FILTER (WHERE delayed),'open',count(*) FILTER (WHERE open),
+  'in_transit',count(*) FILTER (WHERE in_transit)) FROM matched) AS counts,
+ ${query.groupKey !== undefined ? '(SELECT count(*) FROM filtered)::int' : 'NULL::int'} AS total,
+ COALESCE((SELECT jsonb_agg(${itemJson}||jsonb_build_object('sortRank',c.sort_rank,'sortKeys',c.sort_keys)
+  ORDER BY c.n,c.entity_id) FROM page c JOIN orders_snapshots s ON s.tenant_id=c.tenant_id AND s.id=c.snapshot_id),'[]') AS page,
+ ${groups} AS groups`,
+    values,
+  );
+  const row = result.rows[0]!;
 
   return {
-    counts,
-    items: page.map((row) => {
-      const item: FulfillmentItem = readItem(row);
+    counts: row.counts,
+    total: row.total,
+    groups: row.groups,
+    items: row.page.map((value) => {
+      const item = readItem(value);
 
       return {
         item,
-        position: {
-          rank: row.rank,
-          key: iso(row.key)!,
-          entityId: item.id,
-          connectionId: item.connectionId,
-        },
+        position: { rank: value.sortRank, keys: value.sortKeys, id: item.id },
       };
     }),
   };
+}
+
+/**
+ * Whether a fulfillment import of the tenant is still reading a source's history, so group
+ * counts may miss records.
+ */
+export async function fulfillmentsImporting(
+  tx: SqlTransaction,
+  tenantId: string,
+) {
+  const result = await tx.query(
+    `SELECT 1 FROM commerce_sync_streams WHERE tenant_id=$1 AND record_type='fulfillments' AND phase='backfill' LIMIT 1`,
+    [tenantId],
+  );
+
+  return !!result.rowCount;
 }
 
 /** Lists mapped locations with their open fulfillment count. */

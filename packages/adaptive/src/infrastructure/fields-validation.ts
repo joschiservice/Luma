@@ -12,6 +12,7 @@ const adaptiveRecordTypeSchema = z.enum([
   'product',
   'supplier',
   'purchase_order',
+  'customer',
 ]);
 
 const customFieldTypeSchema = z.enum([

@@ -12,10 +12,9 @@ import {
 } from '@luma/ui/components/primitives/dialog';
 import { Input } from '@luma/ui/components/primitives/input';
 import { Select } from '@luma/ui/components/primitives/select';
-import { WorkspaceTimezone } from '@luma/ui/components/primitives/workspace-date';
 import { useQuery } from '@tanstack/react-query';
 import { Link2, Plus } from 'lucide-react';
-import { useContext, useEffect, useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { z } from 'zod';
 
 import { usePermissions } from '../../kit/identity/permissions';
@@ -206,12 +205,9 @@ function useDebounced(value: string, delay = 300) {
   return debounced;
 }
 
-const contains = (text: string | null | undefined, query: string) =>
-  !!text && text.toLowerCase().includes(query.toLowerCase());
-
 /**
- * Finds records of one kind by a typed search over the lists the reader can already read: orders
- * and customers search on the server; suppliers and purchase orders filter the workspace lists.
+ * Finds records of one kind by a typed search over the lists the reader can already read; every
+ * list searches on the server.
  * Cases are linked by their ID.
  */
 function useCandidates(
@@ -220,22 +216,21 @@ function useCandidates(
   query: string,
   allowed: boolean,
 ) {
-  const timeZone = useContext(WorkspaceTimezone);
   const q = query.trim();
   const orders = useQuery({
-    ...commerceOrdersOptions(organizationId, { q }, timeZone),
+    ...commerceOrdersOptions(organizationId, { q }),
     enabled: allowed && kind === 'order' && q.length > 0,
   });
   const customers = useQuery({
-    ...customersOptions(organizationId, {}, q),
+    ...customersOptions(organizationId, { q }),
     enabled: allowed && kind === 'customer' && q.length > 0,
   });
   const suppliers = useQuery({
-    ...suppliersOptions(organizationId),
+    ...suppliersOptions(organizationId, { q, limit: 20 }),
     enabled: allowed && kind === 'supplier',
   });
   const purchaseOrders = useQuery({
-    ...purchaseOrdersOptions(organizationId),
+    ...purchaseOrdersOptions(organizationId, { q, limit: 20 }),
     enabled: allowed && kind === 'purchase_order',
   });
 
@@ -275,25 +270,19 @@ function useCandidates(
       );
     case 'supplier':
       return result(
-        suppliers.data?.items
-          .filter((supplier) => !q || contains(supplier.name, q))
-          .map((supplier) => ({ id: supplier.id, label: supplier.name })),
+        suppliers.data?.items.map((supplier) => ({
+          id: supplier.id,
+          label: supplier.name,
+        })),
         suppliers,
       );
     case 'purchase_order':
       return result(
-        purchaseOrders.data?.items
-          .filter(
-            (order) =>
-              !q ||
-              contains(order.reference, q) ||
-              contains(order.supplierName, q),
-          )
-          .map((order) => ({
-            id: order.id,
-            label: order.reference,
-            detail: order.supplierName,
-          })),
+        purchaseOrders.data?.items.map((order) => ({
+          id: order.id,
+          label: order.reference,
+          detail: order.supplierName,
+        })),
         purchaseOrders,
       );
     case 'case':

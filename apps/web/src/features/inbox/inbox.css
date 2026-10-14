@@ -62,6 +62,11 @@
   height: 14px;
 }
 
+.messaging-row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .messaging-row-head {
   display: flex;
   align-items: baseline;
@@ -88,7 +93,7 @@
   font-size: 12px;
 }
 
-.messaging-row[data-closed] .case-row-summary,
+.messaging-row[data-closed] .messaging-row-name,
 .messaging-row[data-closed] .messaging-row-subject {
   color: var(--foreground-muted);
   font-weight: 450;
@@ -102,9 +107,8 @@
   font-size: 12px;
 }
 
-.messaging-row-meta {
-  flex-wrap: wrap;
-  align-items: flex-start;
+/* Reply state wraps within its column instead of widening every row. */
+.messaging-row .ui-collection-list-status {
   max-width: 220px;
 }
 
@@ -710,4 +714,10 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.messaging-group-empty {
+  margin: 4px 20px 12px;
+  color: var(--foreground-subtle);
+  font-size: 12px;
 }

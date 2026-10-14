@@ -18,7 +18,7 @@ import { RefreshButton } from '@luma/ui/components/primitives/refresh-button';
 import { WorkspaceDate } from '@luma/ui/components/primitives/workspace-date';
 import { RecordHeader } from '@luma/ui/components/workspace/record-header';
 import { onlineManager, useQuery } from '@tanstack/react-query';
-import { Link, useParams } from '@tanstack/react-router';
+import { Link, useParams, useSearch } from '@tanstack/react-router';
 import { UsersRound } from 'lucide-react';
 import { type ReactNode, useSyncExternalStore } from 'react';
 
@@ -27,9 +27,10 @@ import { IdentityError } from '../../kit/identity/data';
 import { RecordAssistance } from '../../kit/record-assistance';
 import { RecordMessages } from '../../kit/record-messages';
 import { formatMoney } from '../../shared/orders/presentation';
+import { RecordFields } from '../adaptive/record-fields';
 import { systemName } from '../products/presentation';
 import { CustomerReturnCases } from '../returns/case-list';
-import { customerOptions } from './data';
+import { customerFilters, customerOptions, type CustomersSearch } from './data';
 import { CustomerOrders } from './orders';
 import {
   addressLines,
@@ -49,6 +50,9 @@ export function CustomerPage() {
   const { organizationId, customerId } = useParams({
     from: '/app/$organizationId/customers/$customerId',
   });
+  const search = useSearch({
+    from: '/app/$organizationId/customers/$customerId',
+  });
   const query = useQuery(customerOptions(organizationId, customerId));
   const online = useSyncExternalStore(
     subscribe,
@@ -64,6 +68,7 @@ export function CustomerPage() {
     <CustomerDetailView
       contextualAssistance
       organizationId={organizationId}
+      search={search}
       detail={detail}
       loading={query.isPending}
       refreshing={query.isFetching}
@@ -95,6 +100,11 @@ export function CustomerPage() {
       history={
         detail ? (
           <>
+            <RecordFields
+              organizationId={organizationId}
+              recordType="customer"
+              recordId={detail.item.id}
+            />
             <CustomerOrders
               key={detail.item.id}
               organizationId={organizationId}
@@ -157,6 +167,7 @@ function Missing() {
 export function CustomerDetailView({
   contextualAssistance = false,
   organizationId,
+  search = {},
   detail,
   error,
   loading = false,
@@ -167,6 +178,8 @@ export function CustomerDetailView({
   messages,
 }: {
   organizationId: string;
+  /** The list state the customer was opened from; the breadcrumb returns to it. */
+  search?: CustomersSearch;
   /** The connected page supplies the authorized assistant control. */
   contextualAssistance?: boolean;
   detail?: CustomerDetail | undefined;
@@ -185,6 +198,11 @@ export function CustomerDetailView({
   const withheld = <Withheld />;
   const missing = <Missing />;
   const address = addressLines(detail?.address ?? null);
+  const listSearch: CustomersSearch = {
+    ...customerFilters(search),
+    cursor: search.cursor,
+    page: search.page,
+  };
 
   return (
     <div className="customers-page">
@@ -196,6 +214,7 @@ export function CustomerDetailView({
             <Link
               to="/app/$organizationId/customers"
               params={{ organizationId }}
+              search={listSearch}
             />
           ),
         }}

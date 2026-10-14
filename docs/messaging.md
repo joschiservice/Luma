@@ -66,6 +66,16 @@ the thread revision; every write is idempotent by its request ID (a repeated ID 
 body is a conflict), writes a timeline event and an audit entry in the same transaction. Notes
 are internal and are never sent.
 
+The thread list is a configurable list. Its conditions use structured thread properties only:
+owner (`me` resolves to each reader, empty is unassigned), status, mailbox, reply deadline,
+last message, the kinds of actively linked records, attachments, awaiting a reply and facts to
+review. Message text and subjects are never conditions, so a saved view cannot carry message
+content; search (subject and correspondent) stays a request parameter. View counts follow the
+search and the older `connectionId` parameter but never conditions, so the built-in views keep
+their numbers. Sorts are the latest message (newest first by default) and the reply deadline,
+with threads without one last in both directions. Groups are mailbox, owner and status. Cursors
+bind the reader, view, search, conditions, sort and page size, or the group key within a group.
+
 ## Links and evidence
 
 Links come from evidence, never from guesses:

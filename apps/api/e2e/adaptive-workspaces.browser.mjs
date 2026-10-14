@@ -114,7 +114,7 @@ test('authors reviewed live views and business fields with search, history and r
   await page
     .getByRole('button', { name: 'Save reviewed view', exact: true })
     .click();
-  await expect(page).toHaveURL(/\/views\/[0-9a-f-]+$/);
+  await expect(page).toHaveURL(/\/views\/[0-9a-f-]+\?manage=true$/);
   await expect(
     page.getByText('Priority shipment', { exact: true }),
   ).toBeVisible();
@@ -123,7 +123,7 @@ test('authors reviewed live views and business fields with search, history and r
   ).items.find((item) => item.name === 'Priority orders');
   expect(saved.sharing.scope).toBe('workspace');
   expect(
-    saved.query.columns.some((column) => column.startsWith('custom:')),
+    saved.query.state.columns.some((column) => column.id.startsWith('custom:')),
   ).toBe(true);
   await page
     .getByRole('button', { name: 'Version history', exact: true })

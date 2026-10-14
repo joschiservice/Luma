@@ -23,21 +23,13 @@ import { Alert, AlertDescription, AlertTitle } from '../primitives/alert';
 import { Badge } from '../primitives/badge';
 import { Button } from '../primitives/button';
 import { Disclosure } from '../primitives/disclosure';
-import { DomainIcon } from '../primitives/domain-icon';
-import { StatePill } from '../primitives/state';
 import { WorkspaceDate } from '../primitives/workspace-date';
 import {
   caseStateLabel,
   caseSummaryText,
-  elapsed,
   freshnessLabel,
-  issueKind,
-  issueStatus,
   quantityLabel,
-  recordKindLabel,
   severityFullLabel,
-  severityLabel,
-  sourceLabel,
   unitLabel,
 } from './case-presentation';
 import { IssueCollection } from './issue-collection';
@@ -91,49 +83,6 @@ export function CaseStatus({ item }: { item: CaseSummary }) {
         {severityFullLabel(item.severity)}
       </Badge>
       {issueStateLabel(item) && <Badge>{issueStateLabel(item)}</Badge>}
-    </div>
-  );
-}
-
-/** Renders a compact case summary for an inbox entry: what it is, where it stands and how long it has waited. */
-export function CaseRow({ item }: { item: CaseSummary }) {
-  const kind = issueKind(item);
-  const status = issueStatus(item);
-  const subject =
-    item.subject.id.length > 24
-      ? `…${item.subject.id.slice(-8)}`
-      : item.subject.id;
-
-  return (
-    <div className="issue-row" data-state={status.state}>
-      <DomainIcon domain={kind.domain} size="sm" className="issue-row-icon" />
-      <div className="issue-row-copy">
-        <strong className="case-row-summary">
-          {caseSummaryText(item.summary).replace(/\.+$/, '')}
-        </strong>
-        <span className="case-row-subject">
-          <span>{kind.label}</span>
-          <span>
-            {item.sources.map(sourceLabel).join(' · ') ||
-              m.issues_source_unknown()}
-          </span>
-          <span title={item.subject.id}>
-            {recordKindLabel(item.subject.kind)} {subject}
-          </span>
-        </span>
-      </div>
-      <div className="issue-row-meta">
-        <span className="issue-severity" data-severity={item.severity}>
-          <span aria-hidden="true">{severityLabel(item.severity)}</span>
-          <span className="sr-only">{severityFullLabel(item.severity)}</span>
-        </span>
-        <StatePill state={status.state}>{status.label}</StatePill>
-        <span className="case-row-time" title={item.lastActivityAt}>
-          <time dateTime={item.lastActivityAt}>
-            {elapsed(item.lastActivityAt)}
-          </time>
-        </span>
-      </div>
     </div>
   );
 }

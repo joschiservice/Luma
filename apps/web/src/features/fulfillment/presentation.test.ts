@@ -1,7 +1,6 @@
 import type { FulfillmentDetail, FulfillmentItem } from '@luma/api-contract';
 import { expect, it } from 'vitest';
 
-import { fulfillmentListQuery } from './data';
 import {
   duration,
   fulfillmentReason,
@@ -225,18 +224,6 @@ it('describes what changed between reads and finds the last change', () => {
   expect(
     lastChange({ timeline: { entries, truncated: false } })?.changes,
   ).toEqual(['Waiting to start → In progress', 'Holds released']);
-});
-
-it('opens on the attention view with the longest wait first', () => {
-  expect(fulfillmentListQuery({})).toEqual({
-    q: '',
-    view: 'attention',
-    connectionId: undefined,
-    locationId: undefined,
-    kind: undefined,
-    sort: 'waiting',
-    cursor: undefined,
-  });
 });
 
 it('names piece units in the interface language and keeps other units', () => {

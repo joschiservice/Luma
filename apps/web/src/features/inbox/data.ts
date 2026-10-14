@@ -1,5 +1,7 @@
 import type {
   AssignInput,
+  CollectionGroup,
+  CollectionViewState,
   DeadlineInput,
   DocumentDetail,
   FactInput,
@@ -15,7 +17,7 @@ import type {
   ThreadLinkInput,
   ThreadView,
 } from '@luma/api-contract';
-import { threadViewSchema } from '@luma/api-contract';
+import { type threadQuerySchema, threadViewSchema } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import {
   infiniteQueryOptions,
@@ -26,6 +28,8 @@ import {
 import { useState } from 'react';
 import { z } from 'zod';
 
+import { anyOf, withLegacyConditions } from '../../kit/collections/legacy';
+import { collectionSearchShape, groupOf } from '../../kit/collections/state';
 import { IdentityError } from '../../kit/identity/data';
 import { requestErrorMessage } from '../../kit/identity/errors';
 import { createWebApiClient } from '../../lib/api-client';
@@ -38,25 +42,99 @@ type ThreadPage = Awaited<ReturnType<typeof api.threads>>;
 /** Polling interval used beside the live stream, so an interrupted stream still converges. */
 const inboxPollMs = 30_000;
 
+/** The thread list request as the API client accepts it. */
+export type ThreadListQueryInput = z.input<typeof threadQuerySchema>;
+
 /**
- * URL state of the inbox. `thread` keeps the open thread so links and Back restore it; search text
- * stays in the URL because it only names what the reader looks for, not message content.
+ * URL state of the inbox: the shared list keys (view, conditions, sort, grouping and display),
+ * the search text and the open thread, so links and Back restore it. Search text stays in the
+ * URL because it only names what the reader looks for; conditions never read message content.
+ * Older links name a mailbox, which the route turns into a mailbox condition.
  */
 export const inboxSearch = z.object({
-  view: threadViewSchema.optional().catch(undefined),
-  connectionId: z.string().uuid().optional().catch(undefined),
+  ...collectionSearchShape,
   q: z.string().max(200).optional().catch(undefined),
+  connectionId: z.string().uuid().optional().catch(undefined),
   thread: z.string().uuid().optional().catch(undefined),
 });
 
 export type InboxSearch = z.infer<typeof inboxSearch>;
 
-/** The list filters that define which threads are shown; changing them restarts paging. */
-export function inboxFilters(search: InboxSearch) {
+/** The thread view a view value names; saved view IDs and unknown values show open threads. */
+export function threadView(value: string | null | undefined): ThreadView {
+  const parsed = threadViewSchema.safeParse(value);
+
+  return parsed.success ? parsed.data : 'open';
+}
+
+/** Whether the URL still uses the mailbox filter of older links. */
+export function hasLegacyFilters(search: InboxSearch) {
+  return search.connectionId !== undefined;
+}
+
+/** Rewrites an older link's mailbox into the same condition, merged with the URL's own. */
+export function withoutLegacyFilters(search: InboxSearch): InboxSearch {
+  const next: InboxSearch = { ...search };
+  delete next.connectionId;
+
+  return search.connectionId
+    ? {
+        ...next,
+        where: withLegacyConditions(search.where, [
+          anyOf('mailbox', search.connectionId),
+        ]),
+      }
+    : next;
+}
+
+/** Whether the URL says what to show, so the route must not restore the remembered view. */
+export function namesListState(search: InboxSearch) {
+  return Boolean(search.thread || search.q);
+}
+
+/** The newest activity first, the inbox's order when a view names no sort. */
+export const defaultThreadSort = {
+  field: 'activity',
+  direction: 'desc',
+} as const;
+
+/** Threads each group shows before "Show more", and the size of each further page. */
+const threadGroupPageSize = 10;
+
+/**
+ * Builds the thread request for a view: its built-in view, conditions (sent only when there are
+ * any), sort and grouping, with the search text. Grouped reads return each group's first
+ * threads; `group` reads one group's next page.
+ */
+export function threadListQuery(
+  state: CollectionViewState,
+  q: string | undefined,
+  timeZone: string,
+  group?: { key: CollectionGroup['key']; cursor: string },
+): ThreadListQueryInput {
+  const grouping = groupOf(state);
+  const sort = state.sort ?? defaultThreadSort;
+  const text = q?.trim();
+
   return {
-    view: search.view ?? ('open' satisfies ThreadView),
-    connectionId: search.connectionId,
-    q: search.q?.trim() || undefined,
+    view: threadView(state.segment),
+    ...(text ? { q: text } : {}),
+    ...(state.where.conditions.length
+      ? { where: JSON.stringify(state.where) }
+      : {}),
+    sort: sort.field === 'due' ? 'due' : 'activity',
+    direction: sort.direction,
+    timeZone,
+    ...(grouping
+      ? group
+        ? {
+            group: grouping,
+            groupKey: JSON.stringify(group.key),
+            cursor: group.cursor,
+            limit: 50,
+          }
+        : { group: grouping, groupLimit: threadGroupPageSize }
+      : { limit: 50 }),
   };
 }
 
@@ -75,37 +153,42 @@ export const mailboxesOptions = (organizationId: string) =>
   });
 
 /**
- * Pages through threads for the given filters, newest activity first. The first page carries the
- * view counts. Polls as a fallback for the live stream.
+ * Pages through threads for a view, or reads every group's first threads of a grouped view. The
+ * first page carries the view counts. Polls as a fallback for the live stream.
  */
 export const threadsOptions = (
   organizationId: string,
-  filters: ReturnType<typeof inboxFilters>,
+  query: ThreadListQueryInput,
 ) =>
   infiniteQueryOptions({
     ...privateQueryDefaults,
-    queryKey: [...messagingKey(organizationId), 'threads', filters],
+    queryKey: [...messagingKey(organizationId), 'threads', query],
     refetchInterval: inboxPollMs,
     refetchOnWindowFocus: 'always',
     refetchOnReconnect: 'always',
     initialPageParam: undefined as string | undefined,
-    getNextPageParam: (page: ThreadPage) => page.nextCursor ?? undefined,
+    getNextPageParam: (page: ThreadPage) =>
+      page.groups ? undefined : (page.nextCursor ?? undefined),
     queryFn: ({ signal, pageParam }): Promise<ThreadPage> =>
       api.threads(
         {
           params: { organizationId },
-          query: {
-            view: filters.view,
-            limit: 50,
-            ...(filters.connectionId
-              ? { connectionId: filters.connectionId }
-              : {}),
-            ...(filters.q ? { q: filters.q } : {}),
-            ...(pageParam ? { cursor: pageParam } : {}),
-          },
+          query: { ...query, ...(pageParam ? { cursor: pageParam } : {}) },
         },
         { signal },
       ),
+  });
+
+/** Reads the next threads of one group, for its "Show more". */
+export const threadGroupOptions = (
+  organizationId: string,
+  query: ThreadListQueryInput,
+) =>
+  queryOptions({
+    ...privateQueryDefaults,
+    queryKey: [...messagingKey(organizationId), 'threads', 'group', query],
+    queryFn: ({ signal }): Promise<ThreadPage> =>
+      api.threads({ params: { organizationId }, query }, { signal }),
   });
 
 /**

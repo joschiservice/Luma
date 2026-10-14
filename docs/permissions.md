@@ -11,7 +11,8 @@ Workspace details and approval rules.
 | Permission | Key | Description | Sensitive | Owner | Admin | Member |
 | --- | --- | --- | --- | --- | --- | --- |
 | Manage custom fields | `adaptive.fields.manage` | Define and archive typed custom fields and their access rules. | Yes | Yes | Yes |  |
-| Manage shared views | `adaptive.views.manage` | Edit and archive views owned by other workspace members. |  | Yes | Yes |  |
+| Manage shared views | `adaptive.views.manage` | Share views with the workspace or roles, and edit and archive views other members own. |  | Yes | Yes |  |
+| Export lists | `lists.export` | Download lists as CSV files with the columns you can see. Every export is recorded in the audit log. | Yes | Yes | Yes |  |
 | Manage operational packages | `adaptive.packages.manage` | Review, install and remove operational package definitions. | Yes | Yes | Yes |  |
 | Edit workspace settings | `workspace.settings.manage` | Change the workspace name, display time zone and authoritative sources. |  | Yes | Yes |  |
 | Manage approval rules | `workspace.approval_policy.manage` | Choose when changes need approval and whether another person must approve. | Yes | Yes | Yes |  |

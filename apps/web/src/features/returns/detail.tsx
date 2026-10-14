@@ -36,7 +36,7 @@ import {
 import { AppExtension } from '../apps/extension';
 import { recordReturnPath } from '../records/data';
 import { StoreReturnCase } from './case-entry';
-import { returnFilters, returnOptions, type ReturnsSearch } from './data';
+import { returnListSearch, returnOptions, type ReturnsSearch } from './data';
 import {
   nextStep,
   refundLabels,
@@ -520,7 +520,7 @@ export function ReturnDetailView({
             <Link
               to="/app/$organizationId/returns"
               params={{ organizationId }}
-              search={returnFilters(search)}
+              search={returnListSearch(search)}
             />
           ),
         }}

@@ -372,7 +372,11 @@ export function ProductDetailView({
             <Link
               to="/app/$organizationId/products"
               params={{ organizationId }}
-              search={productFilters(search)}
+              search={{
+                ...productFilters(search),
+                cursor: search.cursor,
+                page: search.page,
+              }}
             />
           ),
         }}

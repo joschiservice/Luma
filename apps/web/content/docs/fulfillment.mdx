@@ -16,9 +16,28 @@ The page opens on **Needs attention**: held, delayed and failed fulfillments, lo
 - **Late delivery**: a shipment passed its estimated delivery date and isn’t delivered.
 - **Failed**: the source reports that the fulfillment failed.
 
-The other views are **On hold**, **Delayed**, **Open work**, **In transit** and **All**. Search by order number, tracking number, location or source ID. Narrow the list with **Source**, **Location** and **Type**, and sort by **Longest waiting**, **Recent progress** or **Deadline**. The view and filters are part of the page address, so you can share them or pin them to the sidebar.
+The other built-in views are **On hold**, **Delayed**, **Open work**, **In transit** and **All**. The tabs above the list show how many fulfillments each view holds under your search and filters; the view menu also lists the views you and your team saved. Opening **Fulfillment** from the sidebar returns to the view you used last, with any changes you hadn't saved.
 
-An empty view, such as **No fulfillments need attention**, describes that view only. **No fulfillments match these filters** means the search or filters exclude everything. **No fulfillments yet** means no connected system has reported fulfillment work; check [Data sync](/docs/data-sync).
+Search by order number, tracking number, location or source ID. **Source**, **Status**, **Signals**, **Location** and **Shipping stage** above the list narrow it in one click. For anything else, choose **Filter** and pick a field, such as **Type**, **Holds**, **Carrier**, **Carrier status**, **Delivery type**, **Has tracking**, **Fulfill by**, **Estimated delivery** or **Order placed**, then a condition and a value. Holds a source doesn't report, such as JTL-Wawi's, are unknown: they match **is unknown**, never a hold reason or **is empty**. The sort menu names the current order, such as **Last progress**; choose it to sort by **Deadline**, **Order number**, **Location** or a date, or flip the direction. Work without the sorted value comes last either way. **Clear** removes every filter and the search.
+
+An empty view, such as **No fulfillments need attention**, describes that view only. **No fulfillments match these filters** means the search or filters exclude everything. **No fulfillments yet** means no connected system has reported fulfillment work; check [Data sync](/docs/data-sync). When a view uses a filter you can't use, Luma says so instead of showing more work than the view means; choose **Remove unsupported conditions**.
+
+## Arrange the list
+
+Choose **Display** to change how the list looks:
+
+- **Layout**: **Table** shows columns, **List** shows one row per fulfillment with the properties you choose, and **Board** shows a column per group, such as one per shipping stage. You can't move work between board columns, because the stage comes from your connected systems.
+- **Columns** or **Properties**: choose what each fulfillment shows and in which order.
+- **Group by**: group by status, signal, shipping stage, carrier status, type, source, location, carrier or delivery method, and dates by day, week or month. Work with two signals appears in both groups. **Incomplete** means a source is still importing its fulfillment history.
+- **Open records in a preview**: choosing a fulfillment shows what blocks it, the next safe step and its items beside the list. From the preview, you can narrow the list to its status, type, source, location or carrier, or hide them.
+
+## Save and share views
+
+When you change filters, sorting, grouping or display, the view is marked **Modified**. Choose **Save as new view** to keep your changes, **Save** to update a saved view you can edit, or **Reset** to undo them. See [Saved views](/docs/saved-views). A saved view can also show metrics and charts above the list.
+
+## Work from the keyboard
+
+**J** and **K** move through the work, **Enter** opens it, **Space** opens it in the preview, **X** selects it, **/** goes to search, **F** adds a filter and **?** lists every shortcut.
 
 ## Read a fulfillment
 

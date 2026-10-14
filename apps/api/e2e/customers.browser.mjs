@@ -1,6 +1,8 @@
 /* global document, window */
 import { randomUUID } from 'node:crypto';
 
+import { createObservability } from '@luma/platform/composition';
+
 import { appScopes } from './app-scopes.mjs';
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
@@ -12,7 +14,14 @@ test('opens an imported customer from an order, lists their imported orders and 
 }) => {
   const port = await availablePort();
   const origin = `http://127.0.0.1:${port}`;
-  const f = await settingsFixture(t, origin);
+  // Saved views are behind a release flag.
+  const observability = createObservability({
+    environment: 'test',
+    release: 'test',
+    sampleRate: 0,
+    featureFlagOverrides: { 'adaptive-saved-views': true },
+  });
+  const f = await settingsFixture(t, origin, { observability });
   await f.db.owner.query(
     `GRANT luma_connectors TO "${new URL(f.db.runtimeUrl).username}"`,
   );
@@ -133,13 +142,17 @@ test('opens an imported customer from an order, lists their imported orders and 
       },
     });
   });
-  const profile = async (externalId, name) => {
+  const profile = async (
+    externalId,
+    name,
+    { state = 'enabled', spent = '84.00' } = {},
+  ) => {
     const id = randomUUID();
     await f.db.owner.query(
       `INSERT INTO customer_profiles(tenant_id,connection_id,external_id,id,display_name,email,phone,address,state,
         source_created_at,order_count,amount_spent,currency,tags,contact_shared,address_shared,source_updated_at,
         observed_at,observation_id)
-       VALUES($1,$2,$3,$4,$5,$6,NULL,NULL,'enabled',$7,2,'84.00','EUR','{}',true,false,NULL,now(),$8)`,
+       VALUES($1,$2,$3,$4,$5,$6,NULL,NULL,$9,$7,2,$10,'EUR','{}',true,false,NULL,now(),$8)`,
       [
         f.org.id,
         source.store,
@@ -149,13 +162,18 @@ test('opens an imported customer from an order, lists their imported orders and 
         `${externalId.split('/').at(-1)}@example.test`,
         timestamp,
         randomUUID(),
+        state,
+        spent,
       ],
     );
 
     return id;
   };
   const averyId = await profile(customerId, 'Avery Tan');
-  const otherAveryId = await profile('gid://shopify/Customer/72', 'Avery Tan');
+  const otherAveryId = await profile('gid://shopify/Customer/72', 'Avery Tan', {
+    state: 'disabled',
+    spent: '20.00',
+  });
   // Sync records which source customer placed each order.
   await f.db.owner.query(
     `INSERT INTO customer_orders(tenant_id,connection_id,order_scope_key,order_external_id,customer_external_id,observed_at)
@@ -217,7 +235,8 @@ test('opens an imported customer from an order, lists their imported orders and 
   await page.getByRole('searchbox', { name: 'Search customers' }).fill('72@');
   await page.keyboard.press('Enter');
   await page.getByText('72@example.test', { exact: true }).waitFor();
-  expect(await page.getByText('71@example.test', { exact: true }).count()).toBe(
+  // The previous rows stay until the search's rows arrive.
+  await expect(page.getByText('71@example.test', { exact: true })).toHaveCount(
     0,
   );
   // Only the query string could carry search text; ports and IDs may contain the digits.
@@ -226,6 +245,93 @@ test('opens an imported customer from an order, lists their imported orders and 
     path: '/tmp/luma-customers-list.png',
     fullPage: true,
   });
+
+  // A link's search is adopted and leaves the address.
+  await page.goto(`/app/${f.org.id}/customers?q=72%40`);
+  await page.waitForURL((url) => !url.searchParams.has('q'));
+  expect(
+    await page
+      .getByRole('searchbox', { name: 'Search customers' })
+      .inputValue(),
+  ).toBe('72@');
+  await page.getByText('72@example.test', { exact: true }).waitFor();
+  // The previous rows stay until the search's rows arrive.
+  await expect(page.getByText('71@example.test', { exact: true })).toHaveCount(
+    0,
+  );
+
+  // A condition, a sort and a grouping become a personal view that opens again later.
+  await page.goto(`/app/${f.org.id}/customers?view=all`);
+  await page.getByText('71@example.test', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Add a filter' }).click();
+  const picker = page.getByRole('dialog', { name: 'Add a filter' });
+  await picker.getByRole('searchbox', { name: 'Find a field' }).fill('Amount');
+  await picker
+    .getByRole('button', { name: 'Amount spent', exact: true })
+    .click();
+  const spent = page.getByRole('dialog', { name: 'Amount spent' });
+  await spent.getByRole('combobox', { name: 'Condition' }).click();
+  await page.getByRole('option', { name: 'is not empty' }).click();
+  await spent.getByRole('button', { name: 'Apply filter' }).click();
+  await page
+    .getByRole('button', { name: 'Edit filter: Amount spent is not empty' })
+    .waitFor();
+  expect(JSON.parse(new URL(page.url()).searchParams.get('where'))).toEqual({
+    match: 'all',
+    conditions: [{ field: 'spent', op: 'not_empty' }],
+  });
+  const spentHeader = page.getByRole('columnheader', { name: /Amount spent/ });
+  await spentHeader
+    .getByRole('button', { name: 'Amount spent', exact: true })
+    .click();
+  await expect(spentHeader).toHaveAttribute('aria-sort', 'descending');
+  await expect(page.locator('tbody tr').first()).toContainText(
+    '71@example.test',
+  );
+  await page.getByRole('button', { name: 'Display' }).click();
+  await page.getByRole('combobox', { name: 'Group by' }).click();
+  await page.getByRole('option', { name: 'Account', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: /^Has account/ }).waitFor();
+  await page.getByRole('button', { name: /^No account/ }).waitFor();
+  await page.getByText('Modified', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Save as new view' }).click();
+  const save = page.getByRole('dialog', { name: 'Save as new view' });
+  await save.getByLabel('Name').fill('Spenders by account');
+  await save.getByRole('button', { name: 'Save', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Spenders by account', exact: true })
+    .waitFor();
+  await page.waitForURL((url) =>
+    /^[0-9a-f-]{36}$/.test(url.searchParams.get('view') ?? ''),
+  );
+  const viewId = new URL(page.url()).searchParams.get('view');
+  await page.screenshot({
+    path: '/tmp/luma317-customers-view.png',
+    fullPage: true,
+  });
+
+  // Opening Customers without a view returns to the remembered one, and a customer's
+  // breadcrumb returns to it too.
+  await page.waitForTimeout(1500);
+  await page.goto(`/app/${f.org.id}/customers`);
+  await page.waitForURL((url) => url.searchParams.get('view') === viewId);
+  await page
+    .getByRole('button', { name: 'Edit filter: Amount spent is not empty' })
+    .waitFor();
+  await page.getByRole('button', { name: /^No account/ }).waitFor();
+  await page.getByRole('link', { name: 'Avery Tan' }).first().click();
+  await page.getByRole('heading', { name: 'Avery Tan', level: 1 }).waitFor();
+  await page
+    .getByRole('navigation', { name: 'Breadcrumb' })
+    .getByRole('link', { name: 'Customers' })
+    .click();
+  await page.waitForURL(
+    (url) =>
+      url.pathname.endsWith('/customers') &&
+      url.searchParams.get('view') === viewId,
+  );
+  await page.getByRole('button', { name: /^Has account/ }).waitFor();
 
   // A source customer Luma has not imported says so instead of guessing.
   await page.goto(

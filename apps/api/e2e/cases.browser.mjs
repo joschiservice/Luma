@@ -168,25 +168,62 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
     ids.push(result.incident.id);
   }
   await page.getByRole('tab', { name: 'All open', exact: true }).click();
-  await page.locator('.inbox-rows li').first().waitFor();
-  expect(await page.locator('.inbox-rows li').count()).toBe(25);
+  const issueRows = page
+    .getByRole('list', { name: 'Issues', exact: true })
+    .getByRole('listitem');
+  await issueRows.first().waitFor();
+  expect(await issueRows.count()).toBe(25);
   await page.getByText('Page 1 of 2', { exact: true }).waitFor();
   await page.getByText('1–25 of 27 issues', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Next', exact: true }).click();
-  await expect.poll(() => page.locator('.inbox-rows li').count()).toBe(2);
+  await expect.poll(() => issueRows.count()).toBe(2);
   await page.getByText('Page 2 of 2', { exact: true }).waitFor();
   await page.getByText('26–27 of 27 issues', { exact: true }).waitFor();
+  // The page and the way back survive a reload.
   await page.reload();
   await page.getByText('Page 2 of 2', { exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Return to first page' }).click();
+  await page.getByRole('button', { name: 'Previous', exact: true }).click();
+  await page.getByText('Page 1 of 2', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByRole('button', { name: 'Previous', exact: true }).click();
+  // Search finds a record without entering the address; the owner pill writes a condition.
+  const searched = await (
+    await context.request.get(
+      `/api/v1/organizations/${organizationId}/exceptions/${ids[3]}`,
+    )
+  ).json();
+  const search = page.getByRole('searchbox', { name: 'Search issues' });
+  await search.fill(searched.subject.id);
+  await expect.poll(() => issueRows.count()).toBe(1);
+  await page.locator(`#case-${ids[3]}`).waitFor();
+  expect(new URL(page.url()).searchParams.has('q')).toBe(false);
+  await search.fill('');
+  await expect.poll(() => issueRows.count()).toBe(25);
+  await page
+    .getByRole('button', { name: 'Add Case owner filter', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Unassigned', exact: true }).click();
+  await page
+    .getByRole('button', {
+      name: 'Edit Case owner filter: Unassigned',
+      exact: true,
+    })
+    .waitFor();
+  expect(new URL(page.url()).searchParams.get('where')).toContain('empty');
+  await page.getByText('1–25 of 27 issues', { exact: true }).waitFor();
+  await page
+    .getByRole('button', {
+      name: 'Remove Case owner filter: Unassigned',
+      exact: true,
+    })
+    .click();
   await page
     .getByRole('button', { name: 'Add Issue type filter', exact: true })
     .click();
   await page
     .getByRole('button', { name: 'Connection issue', exact: true })
     .click();
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
   const issueTypeFilter = page.getByRole('button', {
     name: 'Edit Issue type filter: Connection issue',
     exact: true,
@@ -669,7 +706,7 @@ test('reads persisted cases, restores desktop/mobile routes and focus, and denie
   );
   await refreshIssues.click();
   await page
-    .getByText('Issues couldn’t be refreshed', { exact: true })
+    .getByText('The list couldn’t be refreshed', { exact: false })
     .waitFor();
   await services.diagnoses.run(tenant, ids[1]);
   await page.goto(`/app/${organizationId}/home`);

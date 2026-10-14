@@ -5,6 +5,8 @@ import {
   caseDetailSchema,
   caseEvidencePageSchema,
   caseListSchema,
+  collectionQueryIssue,
+  issuesCatalog,
 } from '@luma/api-contract';
 import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
@@ -12,6 +14,16 @@ import { implement } from '@orpc/server';
 import type { FastifyRequest } from 'fastify';
 
 import type { CaseService } from '../application/cases.js';
+
+/**
+ * Checks conditions and grouping against the issues catalog. Throws a 400 error naming the first invalid
+ * condition ("Condition 2: …") or the grouping.
+ */
+function validateCaseQuery(query: Parameters<typeof collectionQueryIssue>[1]) {
+  const message = collectionQueryIssue(issuesCatalog, query);
+  if (message)
+    throw Object.assign(new Error(message), { statusCode: 400, expose: true });
+}
 
 /** Creates tenant-scoped case, investigation, and evidence handlers with validated responses. */
 export function caseRoutes(service?: CaseService) {
@@ -41,6 +53,7 @@ export function caseRoutes(service?: CaseService) {
     list: os.list.handler(
       async ({ context: { request }, input: { query } }) => {
         const { context, service } = use(request);
+        validateCaseQuery(query);
 
         return caseListSchema.parse(await service.list(context, query));
       },

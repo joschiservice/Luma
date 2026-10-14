@@ -1,5 +1,13 @@
 import { z } from 'zod';
 
+import {
+  collectionGroupKeyParameter,
+  collectionGroupLimitParameter,
+  collectionGroupParameter,
+  collectionGroupSchema,
+  collectionTimeZoneParameter,
+  collectionWhereParameter,
+} from './collections.js';
 import { stockPositionSchema } from './inventory.js';
 import { purchasingTimelineSchema } from './purchasing-timeline.js';
 
@@ -538,9 +546,181 @@ export const orderSummarySchema = z.object({
   stage: orderStageSchema,
   expectedDate: isoDate.nullable(),
   attention: z.number().int(),
+  attentionKinds: z
+    .array(attentionSchema.shape.kind)
+    .optional()
+    .describe(
+      'Kinds of the open items counted in `attention`, each once. A pending send approval shows in the stage instead.',
+    ),
   overdue: z.boolean(),
   nextOwner: nextOwnerSchema,
   externalOrderNumber: z.string().nullable(),
+  confirmationDueAt: z
+    .string()
+    .datetime()
+    .nullable()
+    .optional()
+    .describe(
+      'When the supplier should confirm a sent order; null before it is sent.',
+    ),
+  nextCheckAt: z
+    .string()
+    .datetime()
+    .nullable()
+    .optional()
+    .describe(
+      'Earliest check time recorded for an item someone is following up. A past time means the item needs attention again.',
+    ),
+  value: z
+    .union([
+      z.object({ amount: z.string(), currency: z.string() }),
+      z.literal('unknown'),
+    ])
+    .nullable()
+    .optional()
+    .describe(
+      'Sum of quantity × unit price over every line. Null when no line has a price; `unknown` when only some lines have one or prices use different currencies.',
+    ),
+});
+
+const listCursor = z.string().min(1).max(1024).optional();
+
+const listCount = z
+  .literal('exact')
+  .optional()
+  .describe(
+    'Request the exact number of matches. Without this option, totalCount is null.',
+  );
+
+export const purchaseOrderSortSchema = z.enum([
+  'created',
+  'updated',
+  'expected',
+  'reference',
+  'supplier',
+  'confirmationDue',
+  'nextCheck',
+  'value',
+]);
+
+/** Native supplier list sorts; `custom:<field ID>` sorts are accepted beside them. */
+export const supplierSortSchema = z.enum(['name', 'created', 'orders']);
+
+export const purchaseOrderListQuerySchema = z
+  .object({
+    q: z
+      .string()
+      .trim()
+      .max(200)
+      .default('')
+      .describe(
+        'Matches the reference, supplier name or a line SKU, ignoring case.',
+      ),
+    stage: z
+      .union([orderStageSchema, z.literal('attention')])
+      .optional()
+      .describe(
+        'Orders in this stage, or `attention`: orders with at least one item that needs an answer beyond a pending send approval.',
+      ),
+    supplierId: z.string().uuid().optional(),
+    status: purchaseOrderStatusSchema.optional(),
+    where: collectionWhereParameter.optional(),
+    group: collectionGroupParameter.optional(),
+    groupKey: collectionGroupKeyParameter.optional(),
+    groupLimit: collectionGroupLimitParameter,
+    timeZone: collectionTimeZoneParameter,
+    sort: z
+      .union([
+        purchaseOrderSortSchema,
+        z.templateLiteral(['custom:', z.uuid()]),
+      ])
+      .default('created')
+      .describe(
+        '`expected` is the earliest expected date of outstanding units, `confirmationDue` when the supplier should confirm, `nextCheck` the earliest follow-up check and `value` the order value: by currency code, then amount, both in the sort direction, so amounts are only ranked within their currency. `custom:<field ID>` sorts by a readable custom purchase-order field that holds one value. Orders without a value come last in both directions.',
+      ),
+    direction: z
+      .enum(['asc', 'desc'])
+      .optional()
+      .describe(
+        'Defaults to descending for `created` and `updated`, ascending for every other sort.',
+      ),
+    limit: z.coerce.number().int().min(1).max(50).default(50),
+    count: listCount,
+    cursor: listCursor,
+  })
+  .strict();
+
+export const purchaseOrderListSchema = z.object({
+  items: z.array(
+    purchaseOrderSchema.extend({
+      summary: orderSummarySchema.describe(
+        'Stage, expected date and attention, evaluated at `asOf`.',
+      ),
+    }),
+  ),
+  canManage: z.boolean(),
+  totalCount: z.number().int().nonnegative().nullable(),
+  counts: z
+    .object({
+      all: z.number().int().nonnegative(),
+      attention: z.number().int().nonnegative(),
+      stages: z.partialRecord(orderStageSchema, z.number().int().nonnegative()),
+    })
+    .nullable()
+    .describe(
+      'Orders in the workspace, needing attention and per stage. Returned with the first page of an unfiltered list only; null otherwise.',
+    ),
+  nextCursor: z.string().nullable(),
+  groups: z
+    .array(collectionGroupSchema)
+    .optional()
+    .describe(
+      'With `group`: each group in display order with its exact count, first rows (whose items are in `items`) and per-currency value sums. With `groupKey`: the one group, with this page of its rows.',
+    ),
+  groupsTruncated: z
+    .boolean()
+    .optional()
+    .describe(
+      'More than 50 groups match; narrow the conditions to see the rest.',
+    ),
+  asOf: z.string().datetime(),
+});
+
+export const supplierListQuerySchema = z
+  .object({
+    q: z
+      .string()
+      .trim()
+      .max(200)
+      .default('')
+      .describe(
+        'Matches the name or an external reference system or ID, ignoring case.',
+      ),
+    where: collectionWhereParameter.optional(),
+    timeZone: collectionTimeZoneParameter,
+    sort: z
+      .union([supplierSortSchema, z.templateLiteral(['custom:', z.uuid()])])
+      .default('name')
+      .describe(
+        '`orders` is the number of purchase orders of the supplier. `custom:<field ID>` sorts by a readable custom supplier field that holds one value; suppliers without a value come last in both directions.',
+      ),
+    direction: z
+      .enum(['asc', 'desc'])
+      .optional()
+      .describe('Defaults to ascending for `name`, descending otherwise.'),
+    limit: z.coerce.number().int().min(1).max(50).default(50),
+    count: listCount,
+    cursor: listCursor,
+  })
+  .strict();
+
+export const supplierListSchema = z.object({
+  items: z.array(
+    supplierSchema.extend({ orderCount: z.number().int().nonnegative() }),
+  ),
+  canManage: z.boolean(),
+  totalCount: z.number().int().nonnegative().nullable(),
+  nextCursor: z.string().nullable(),
 });
 
 export const supplierRecordSchema = z.object({
@@ -643,7 +823,15 @@ export type OrderStage = z.infer<typeof orderStageSchema>;
 
 export type PurchaseOrderRecord = z.infer<typeof purchaseOrderRecordSchema>;
 
-export type OrderSummary = z.infer<typeof orderSummarySchema>;
+export type PurchaseOrderListQuery = z.input<
+  typeof purchaseOrderListQuerySchema
+>;
+
+export type PurchaseOrderList = z.infer<typeof purchaseOrderListSchema>;
+
+export type SupplierListQuery = z.input<typeof supplierListQuerySchema>;
+
+export type SupplierList = z.infer<typeof supplierListSchema>;
 
 export type SupplierRecord = z.infer<typeof supplierRecordSchema>;
 

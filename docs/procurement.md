@@ -53,6 +53,84 @@ uncertain response, resend the same ID and body: an exact retry by the same acto
 the original result, a changed request returns 409, and an older command never rolls back
 the current state.
 
+## Lists
+
+The purchase-order and supplier lists filter, sort and page on the server; clients never
+filter a returned page. Search matches a purchase order's reference, supplier name or line
+SKUs, and a supplier's name or external reference system and ID, ignoring case and treating
+wildcards literally.
+
+Both lists accept conditions from their catalogs in `@luma/api-contract`, with the shared
+rules in [Conditions and grouping](orders-workspace.md#conditions-and-grouping): empty and
+unknown values never match comparisons, amounts compare within one currency, and days and
+relative periods follow the request's `timeZone`. The API checks conditions against the
+catalog and answers 400 naming the condition. One evaluator in the application applies the
+rules to derived values in memory; stored fields (supplier, status, authority, reference,
+line SKU and location, created and updated) compile to SQL with every value bound as a
+parameter. With `match: any`, conditions stay in SQL only when every
+one is stored; otherwise every order is evaluated in memory.
+
+A purchase order's stage, attention, next owner, expected date, confirmation due time and
+next check come from the same progress rules as its record, evaluated at the first page's
+time; later pages keep that time so orders do not shift between pages. Conditions, groups
+and sorts on them read every order that matches the stored conditions and summarize it
+before paging, so their cost grows with the workspace's orders.
+
+- Attention lists open item kinds except a pending send approval, which shows in the stage.
+  `attention` not empty is the legacy `stage=attention` filter.
+- Next check is the earliest check time recorded for an item someone is following up: its
+  latest response is a follow-up with a check time, and the item would otherwise need
+  attention. A past time means the check is due and the item is back in attention.
+- Value is the exact sum of quantity × unit price. It is empty when no line has a price and
+  unknown when only some lines have one or prices use different currencies. Value sorts by
+  currency code, then amount.
+- Line SKU and location match when any line matches; their negative operators match when
+  none does. Location is empty when no line names one.
+- Expected dates are calendar days and compare as days; a time in a condition names its
+  local day.
+
+Missing sort values come last in both directions, ties by ID. Sorts by creation, update,
+reference and supplier read in SQL order, so collation stays the same between pages.
+Groups by supplier, status, stage, next owner and authority count every match exactly and
+return their first rows (10 by default, at most 50) with per-currency value sums. Statuses,
+stages and owners follow the catalog's option order; suppliers sort by name, then ID. At most
+50 groups return; `groupsTruncated` says when more match.
+
+Cursors are bound to the tenant and the complete query: search, filters, conditions, time
+zone, grouping and sort, regardless of property order. A group's cursor also binds its group
+key but not the page sizes; a grouped read without a group key accepts no cursor. Any other
+cursor returns 400. The first page of an unfiltered order list also counts the workspace's
+orders per stage and needing attention, which evaluates every order.
+
+The page offers built-in purchase-order views for the overview counts (needing an answer,
+waiting on the supplier, drafts); they are the list's `stage` parameter, combined with any
+conditions. The board groups by derived fields only, so it is read-only.
+
+Both lists filter and sort by custom fields (`custom:<field ID>`) of their record type in SQL,
+before paging, with the collection operators of the field type. The list checks each field
+against the live definitions in the read's snapshot: archived, unknown or other-type fields
+answer 400, so the view needs repair, and fields behind a read permission the reader lacks
+answer 403 for conditions and sorts alike, so their values can't be inferred. Values are
+Luma-owned, so a record without a value is empty: comparisons and negative comparisons never
+match it, `none_of`, `is_not` and `not_contains` do. Dates are calendar days and compare as
+days in the reader's zone; `me` in a person condition is the reader. Text sorts by its first
+200 characters, which keeps cursors short, and records without a value come last in both
+directions. Custom conditions run only in SQL, so `match: any` cannot combine them with
+derived purchase-order fields such as stage or value (400). Procurement reads the adaptive
+field tables in its own infrastructure because the shared collection engine lives in
+read-models, which depends on procurement; the API login holds `luma_adaptive` for this.
+Saved purchase-order views, their metrics, charts, exports and row actions read this same list:
+built-in views as `stage` and catalog conditions as `where`. Format 1 views with the earlier
+`attention`, `supplierId` and `status` filters are upgraded to the equivalent conditions on read.
+A row's `attention` value in a view is the key of one open item, preferring the kinds the view's
+conditions name, so row actions such as a supplier follow-up can name it; reading those keys
+evaluates the open orders once per page that has any.
+
+Suppliers carry their purchase-order count. Supplier conditions run in SQL. Has open orders
+means a purchase order with status open. Confirmation overdue means an order with an open
+`confirmation_overdue` item; the progress rules decide it in a separate read just before the
+page, so the two reads can differ by a moment.
+
 ## Capabilities and effects
 
 Procurement exposes versioned capabilities for supplier lookup, open purchase-order

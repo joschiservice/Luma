@@ -7,13 +7,6 @@
 .returns-page a {
   color: var(--signal-text);
 }
-.returns-pagination,
-.returns-pagination > div {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
 .returns-cell {
   display: grid;
   gap: 4px;
@@ -26,7 +19,6 @@
 .returns-cell small,
 .returns-note,
 .returns-muted,
-.returns-pagination,
 .returns-steps small,
 .returns-payments small,
 .returns-money-summary small {
@@ -41,9 +33,6 @@
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
-.returns-pagination {
-  justify-content: space-between;
-}
 .returns-loading {
   display: grid;
   gap: 8px;
@@ -53,6 +42,30 @@
 }
 .returns-list-table table {
   min-width: 760px;
+}
+.returns-results {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.returns-preview {
+  min-height: min(720px, calc(100vh - 220px));
+}
+.returns-flags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.return-preview-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+}
+.return-preview-reasons > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
 }
 
 /* Pending work by stage. */

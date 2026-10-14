@@ -12,6 +12,10 @@ import type {
   DecisionView,
 } from '../domain/decision-item.js';
 import type { SupplierCommitmentDecision } from '../domain/decisions.js';
+import type {
+  CollectionGroupedResult,
+  CollectionListParameters,
+} from './collections.js';
 
 export type DecisionItem = BaseDecisionItem & { diff?: ActionDiff | null };
 
@@ -31,10 +35,15 @@ export interface DecisionProvider {
   pending(context: TenantContext): Promise<DecisionCandidate[]>;
 }
 
-export interface DecisionQuery {
+export interface DecisionQuery extends CollectionListParameters {
   view: DecisionView;
   domain?: DecisionDomain | undefined;
   reason?: DecisionReason | undefined;
+  /** Searches titles; it may name people or records and is never logged. */
+  q?: string | undefined;
+  /** `urgency` by default; `requested` is how long the decision has waited. */
+  sort?: 'urgency' | 'deadline' | 'requested' | undefined;
+  direction?: 'asc' | 'desc' | undefined;
   cursor?: string | undefined;
   /** Reads only this decision. */
   id?: string | undefined;
@@ -42,7 +51,7 @@ export interface DecisionQuery {
   limit: number;
 }
 
-export interface DecisionList {
+export interface DecisionList extends CollectionGroupedResult {
   schemaVersion: 1;
   asOf: string;
   items: DecisionItem[];

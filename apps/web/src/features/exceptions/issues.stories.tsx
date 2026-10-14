@@ -1,16 +1,16 @@
-import type { CaseQuery } from '@luma/api-contract';
+import {
+  caseClasses,
+  caseStates,
+  type CollectionGroup,
+} from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import {
   caseFixture,
   inventoryCase,
 } from '@luma/ui/components/issues/case-fixtures';
-import {
-  CaseInvestigation,
-  CaseRow,
-} from '@luma/ui/components/issues/case-investigation';
+import { CaseInvestigation } from '@luma/ui/components/issues/case-investigation';
 import { CaseTimeline } from '@luma/ui/components/issues/case-timeline';
 import { IssueInspectorHeader } from '@luma/ui/components/issues/issue-inspector-header';
-import { IssueListToolbar } from '@luma/ui/components/issues/issue-list-toolbar';
 import { IssuePanelLayout } from '@luma/ui/components/issues/issue-panel-layout';
 import { IssueSplitView } from '@luma/ui/components/issues/issue-split-view';
 import { IssueSummary } from '@luma/ui/components/issues/issue-summary';
@@ -21,6 +21,10 @@ import {
 } from '@luma/ui/components/issues/resolution-fixtures';
 import { ResolutionReview } from '@luma/ui/components/issues/resolution-review';
 import { Button } from '@luma/ui/components/primitives/button';
+import {
+  type CollectionFilter,
+  CollectionToolbar,
+} from '@luma/ui/components/primitives/collection-toolbar';
 import { Pagination } from '@luma/ui/components/primitives/pagination';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Maximize2, RefreshCw } from 'lucide-react';
@@ -29,25 +33,50 @@ import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { MINIMAL_VIEWPORTS } from 'storybook/viewport';
 
 import { StoryShell } from '../../shell/storybook-shell';
+import { issuePresentation, issueProperties } from './issue-list';
+import { IssueResults } from './results';
 
+// Fixtures share one ID; the list keys rows by ID, so each gets its own.
 const issues = [
   inventoryCase,
   caseFixture('sync_failure'),
   caseFixture('stuck_fulfillment'),
   caseFixture('workflow_failure'),
   caseFixture('pending'),
-];
+].map((issue, index) => ({
+  ...issue,
+  id: `11111111-1111-4111-8111-11111111111${index}`,
+}));
+
+/** Groups the fixtures by state, as the list API's `groups` would return them. */
+const stateGroups: CollectionGroup[] = [
+  ...new Set(issues.map((issue) => issue.state)),
+].map((state) => {
+  const rows = issues.filter((issue) => issue.state === state);
+
+  return {
+    key: state,
+    count: rows.length,
+    complete: true,
+    itemIds: rows.map((issue) => issue.id),
+    nextCursor: null,
+    sums: [],
+  };
+});
 
 function IssuesExample({
   selectedInitially = true,
   longEvidence = false,
   proposalReady = false,
   unconfirmed = false,
+  layout = 'list',
 }: {
   selectedInitially?: boolean;
   longEvidence?: boolean;
   proposalReady?: boolean;
   unconfirmed?: boolean;
+  /** `grouped` groups the list by state; `board` shows the read-only board. */
+  layout?: 'list' | 'grouped' | 'board';
 }) {
   const [selected, setSelected] = useState<number | undefined>(
     selectedInitially ? 0 : undefined,
@@ -63,9 +92,25 @@ function IssuesExample({
   const [view, setView] = useState<'needs_you' | 'active' | 'history'>(
     'needs_you',
   );
-  const [filters, setFilters] = useState<
-    Pick<CaseQuery, 'state' | 'class' | 'severity'>
-  >({});
+  const [filters, setFilters] = useState<Record<string, string[]>>({});
+  // The page's quick filters: each is one "is any of" condition on its catalog field.
+  const quick = (key: string, values: readonly string[]): CollectionFilter => ({
+    key,
+    kind: 'multi-choice',
+    label: issuePresentation[key]?.label() ?? key,
+    value: filters[key],
+    options: values.map((value) => ({
+      value,
+      label: issuePresentation[key]?.option?.(value) ?? value,
+    })),
+    onChange: (next) =>
+      setFilters((current) => {
+        const rest = { ...current };
+        delete rest[key];
+
+        return next ? { ...rest, [key]: next } : rest;
+      }),
+  });
   const selectedItem = selected === undefined ? undefined : issues[selected];
   const item =
     selectedItem && longEvidence && selectedItem.diagnosis
@@ -98,11 +143,14 @@ function IssuesExample({
             selected={selected !== undefined}
             list={
               <div className="inbox-list">
-                <IssueListToolbar
-                  filters={filters}
-                  onFiltersChange={(patch) =>
-                    setFilters((current) => ({ ...current, ...patch }))
-                  }
+                <CollectionToolbar
+                  className="inbox-toolbar"
+                  filters={[
+                    quick('class', caseClasses),
+                    quick('state', caseStates),
+                    quick('severity', ['high', 'medium']),
+                  ]}
+                  onClear={() => setFilters({})}
                   onRefresh={() => {}}
                   views={
                     <IssueViewTabs
@@ -120,22 +168,40 @@ function IssuesExample({
                     />
                   }
                 />
-                <ul className="inbox-rows">
-                  {issues.map((item, index) => (
-                    <li key={index}>
-                      <a
-                        href={`#issue-${index}`}
-                        aria-current={selected === index ? 'page' : undefined}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          setSelected(index);
-                        }}
-                      >
-                        <CaseRow item={item} />
-                      </a>
-                    </li>
-                  ))}
-                </ul>
+                <IssueResults
+                  items={issues}
+                  groups={layout === 'list' ? undefined : stateGroups}
+                  layout={layout === 'board' ? 'board' : 'list'}
+                  density="comfortable"
+                  grouping={
+                    layout === 'list'
+                      ? null
+                      : { field: 'state', showEmpty: false }
+                  }
+                  caption="Issues by status"
+                  current={
+                    selected === undefined ? undefined : issues[selected]?.id
+                  }
+                  link={(item) => (
+                    <a
+                      href={`#issue-${item.id}`}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setSelected(
+                          issues.findIndex((issue) => issue.id === item.id),
+                        );
+                      }}
+                    />
+                  )}
+                  empty={null}
+                  properties={issueProperties}
+                  groupLabel={(key) =>
+                    issuePresentation.state?.option?.(String(key)) ?? ''
+                  }
+                  collapsed={[]}
+                  onCollapsedChange={() => {}}
+                  more={() => undefined}
+                />
                 <Pagination
                   count={page === 1 ? 25 : 21}
                   totalCount={46}
@@ -337,6 +403,7 @@ export const RemovableFilters: Story = {
       canvas.getByRole('button', { name: 'Add Severity filter' }),
     );
     await userEvent.click(await body.findByRole('button', { name: 'High' }));
+    await userEvent.click(body.getByRole('button', { name: 'Done' }));
     await expect(
       canvas.getByRole('button', { name: 'Edit Severity filter: High' }),
     ).toBeVisible();
@@ -347,8 +414,11 @@ export const RemovableFilters: Story = {
       canvas.getByRole('button', { name: 'Edit Severity filter: High' }),
     );
     await userEvent.click(await body.findByRole('button', { name: 'Medium' }));
+    await userEvent.click(body.getByRole('button', { name: 'Done' }));
     await userEvent.click(
-      canvas.getByRole('button', { name: 'Remove Severity filter: Medium' }),
+      canvas.getByRole('button', {
+        name: 'Remove Severity filter: High or Medium',
+      }),
     );
     await waitFor(() =>
       expect(
@@ -443,4 +513,34 @@ export const ViewNavigation: Story = {
       'true',
     );
   },
+};
+
+export const GroupedByStatus: Story = {
+  args: { selectedInitially: false, layout: 'grouped' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const groups = canvas.getByRole('group', { name: 'Issues by status' });
+    await expect(
+      within(groups).getAllByRole('button', { expanded: true }).length,
+    ).toBeGreaterThan(0);
+  },
+};
+
+export const Board: Story = {
+  args: { selectedInitially: false, layout: 'board' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByText(/cards can’t be moved between columns/),
+    ).toBeVisible();
+    // The board is read-only: no card offers a move.
+    await expect(
+      canvas.queryByRole('button', { name: /Move to/ }),
+    ).not.toBeInTheDocument();
+  },
+};
+
+export const BoardDark: Story = {
+  args: { selectedInitially: false, layout: 'board' },
+  globals: { theme: 'dark' },
 };

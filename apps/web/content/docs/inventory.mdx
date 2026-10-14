@@ -3,7 +3,7 @@ title: Compare stock across systems
 description: See stock by SKU, location and source, find where your systems disagree, link the same SKU across systems and correct Shopify stock from your ERP.
 ---
 
-Inventory shows the stock each connected store and ERP reports, by SKU, location and source. Use it to find where systems disagree, see what depends on a SKU’s stock and, with Shopify, correct the available quantity from your ERP. Open **Inventory** in the sidebar or press **G**, then **V**.
+Inventory shows the stock each connected store and ERP reports, by SKU, location and source. Use it to find where systems disagree, see what depends on a SKU’s stock and, with Shopify, correct the available quantity from your ERP. Open **Inventory** in the sidebar or press **G**, then **Y**.
 
 ## Find stock
 
@@ -13,7 +13,11 @@ Each row is one SKU at one location in one unit, with every source’s quantitie
 - **Source differences** shows positions where sources report different quantities.
 - **Incomplete stock** shows positions where a source hasn’t reported every quantity.
 
-Search by SKU or location, or narrow the list with **SKU**, **Location** and **Source**. A source filter selects positions that source reports, and still shows the other sources for each position. The view and filters are part of the page address, so you can share them or pin them to the sidebar.
+The view menu also lists the views you and your team saved, and opening **Inventory** from the sidebar returns to the view you used last.
+
+Search by SKU or location. **Location** and **Source** above the list narrow it in one click; a source filter selects positions that source reports and still shows the other sources. For anything else, choose **Filter** and pick a field, such as **On hand**, **Available**, **Reserved**, **Incoming**, **Below safety stock**, **Differs in**, **Awaiting sync** or **Last read**. Quantity conditions let you choose a **Source**: **Any source**, **Every source**, one named source, or **Lowest across sources**, which compares the most cautious figure any source reports. A source that reports no quantity never counts as zero. Sort by SKU, location, a quantity (its lowest reported value) or the last read, in either direction. Links from a product or stock position show one SKU's positions; remove the **SKU** filter to see all.
+
+Choose **Display** to switch between **Table** and **List**, choose columns, and group by location, SKU or source. Grouping by SKU shows one product across every warehouse. **Open records in a preview** shows a position's quantities by source, its orders and purchase orders beside the list. Changes mark the view **Modified**; choose **Save as new view** to keep it, see [Saved views](/docs/saved-views). **J** and **K** move through the positions, **Enter** opens one, **Space** previews it, **/** goes to search, **F** adds a filter and **?** lists every shortcut.
 
 **No stock imported yet** means no connected system has shared stock; check [Data sync](/docs/data-sync) for progress. **No stock matches** means the search or filters exclude every position.
 
@@ -108,7 +112,9 @@ If Luma cannot confirm the adjustment reference, the action stays uncertain even
 ## Follow transfers and receiving
 
 Choose **Transfers** in Inventory to follow stock moving between locations. Switch between
-transfer requests and shipments. Open a record to inspect its exact source lines, requested,
+transfer requests and shipments in the view menu. Filter by source, requested, shipped, received
+or unreceived quantity, request date or last source update, and sort by name or update; without
+a sort, the newest requests come first. Open a record to inspect its exact source lines, requested,
 ready, shipped and receiving quantities. These quantities provide context; Luma does not add
 them to the stock reported at a location.
 

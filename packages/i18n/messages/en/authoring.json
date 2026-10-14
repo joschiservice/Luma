@@ -483,7 +483,6 @@
   "authoring_coordination_owner": "Case owner",
   "authoring_coordination_unassigned": "Unassigned",
   "authoring_coordination_clear": "Clear owner",
-  "authoring_coordination_owner_all": "All owners",
   "authoring_coordination_subscriptions": "Start subscriptions",
   "authoring_coordination_subscription_default": "Use the published trigger",
   "authoring_coordination_subscription_schedule": "Schedule future starts",

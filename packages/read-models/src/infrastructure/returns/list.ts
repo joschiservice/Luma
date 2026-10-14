@@ -8,6 +8,32 @@ import type {
   ReturnStage,
   ReturnView,
 } from '../../application/returns.js';
+import type { CollectionCursorPosition } from '../collection/cursor.js';
+import {
+  type CollectionGroupRow,
+  groupCtes,
+  groupHeadIds,
+  groupMemberPredicate,
+  groupsJson,
+} from '../collection/group.js';
+import {
+  type CollectionOrdering,
+  keysetCandidates,
+  sortOrder,
+} from '../collection/keyset.js';
+import { likePattern } from '../collection/parameters.js';
+import {
+  collectionContext,
+  collectionGrouping,
+  collectionGroupLimit,
+  maxCollectionGroups,
+} from '../collection/request.js';
+import { compileWhere } from '../collection/where.js';
+import {
+  returnCollectionFields,
+  returnGroupFields,
+  returnSorts,
+} from './collection-fields.js';
 
 const iso = (column: string) =>
   `to_char(${column} AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
@@ -29,57 +55,129 @@ export const itemColumns = `r.entity_id AS id,r.kind,r.connection_id AS "connect
  r.reasons,${iso('r.requested_at')} AS "requestedAt",${iso('r.activity_at')} AS "activityAt",
  ${iso('r.observed_at')} AS "observedAt",${iso('r.source_updated_at')} AS "sourceUpdatedAt",r.deleted`;
 
-/** Position of the last row on a page in the requested order. */
-export interface ReturnPosition {
-  key: string;
-  id: string;
+/** One page of returns, or every group's first rows, with counts per view and stage. */
+export interface ReturnPage {
+  rows: { item: ReturnListItem; position: CollectionCursorPosition }[];
+  counts: {
+    views: Record<ReturnView, number>;
+    stages: Record<ReturnStage, number>;
+  };
+  groups: CollectionGroupRow[] | null;
+  /** Exact match count, read only for one group's pages. */
+  total: number | null;
 }
 
 /**
- * Lists up to `limit + 1` returns for the filters after `after`, with counts per view and
- * stage. Removed records are excluded. Search matches the return name, order number, reasons
- * and source IDs of the return, refund or order.
+ * Lists up to `limit + 1` returns for the filters and conditions after `after`, or with
+ * `group` every group's count and first rows, with counts per view and stage. Removed records
+ * are excluded. Search matches the return name, order number, reasons and source IDs of the
+ * return, refund or order, and with `customers` the name and email address of the order's
+ * customer when the source shares contact details. Throws a 400 error for invalid conditions
+ * or grouping. Relative dates resolve against `asOf`.
  */
 export async function readReturns(
   tx: SqlTransaction,
   tenantId: string,
+  userId: string,
   query: ReturnQuery,
-  after: ReturnPosition | null,
-) {
-  const key = query.sort === 'activity' ? 'r.activity_at' : 'r.requested_key';
+  asOf: string,
+  after: CollectionCursorPosition | null,
+  customers: boolean,
+): Promise<ReturnPage> {
   const q = query.q.trim();
-  const pattern = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-  const scoped = `WITH scoped AS (
-    SELECT r.* FROM orders_returns r
-    WHERE r.tenant_id=$1 AND NOT r.deleted AND ($2::uuid IS NULL OR r.connection_id=$2)
-     AND ($3='' OR r.name ILIKE $4 OR r.order_number ILIKE $4 OR r.entity_id::text=lower($3)
-      OR r.order_id::text=lower($3) OR EXISTS (SELECT 1 FROM unnest(r.reasons) reason WHERE reason ILIKE $4)
-      OR EXISTS (SELECT 1 FROM connector_source_mappings m WHERE m.tenant_id=$1
-       AND m.resource IN ('return','refund','order') AND m.canonical_id IN (r.entity_id,r.order_id)
-       AND m.connection_id=r.connection_id AND m.external_id ILIKE $4))
-  )`;
-  const filters = [query.connectionId ?? null, q, pattern];
-  const counts = await tx.query<{ stage: ReturnStage; count: number }>(
-    `${scoped} SELECT stage,count(*)::int AS count FROM scoped GROUP BY stage`,
-    [tenantId, ...filters],
+  const values: unknown[] = [
+    tenantId,
+    query.connectionId ?? null,
+    q,
+    likePattern(q),
+    customers,
+    query.view,
+    query.stage ?? null,
+  ];
+  const context = collectionContext(values, asOf, query.timeZone, userId);
+  const { parameters } = context;
+  const where = query.where?.conditions.length
+    ? compileWhere(query.where, returnCollectionFields, context).sql
+    : 'true';
+  const { request, grouped } = collectionGrouping(query, returnGroupFields);
+  const member =
+    request && query.groupKey !== undefined
+      ? groupMemberPredicate(request, query.groupKey, context)
+      : 'true';
+  const ordering: CollectionOrdering = {
+    sort: returnSorts[query.sort],
+    direction: query.direction,
+    id: 'o.entity_id',
+  };
+  let page: string;
+  let groups = 'NULL::jsonb';
+  let ctes = '';
+  if (request && grouped) {
+    ctes = `${groupCtes(
+      'filtered',
+      request,
+      ordering,
+      parameters.bind(collectionGroupLimit(query), 'integer'),
+      maxCollectionGroups,
+      {
+        field: 'value',
+        amount: 'o.value_amount',
+        currency: 'o.value_currency',
+      },
+      context,
+    )},`;
+    groups = groupsJson;
+    page = `SELECT o.*,0 AS sort_rank,'{}'::text[] AS sort_keys,0::bigint AS n FROM filtered o
+ WHERE o.entity_id IN (SELECT id::uuid FROM (${groupHeadIds}) h)`;
+  } else {
+    const limit = parameters.bind(query.limit + 1, 'integer');
+    page = `SELECT o.*,row_number() OVER (ORDER BY ${sortOrder(ordering)}) AS n FROM (${keysetCandidates(
+      'filtered',
+      ordering,
+      limit,
+      {
+        rank: parameters.bind(after?.rank ?? null, 'integer'),
+        keys: parameters.bind(after?.keys ?? null, 'text[]'),
+        id: parameters.bind(after?.id ?? null, 'uuid'),
+      },
+    )}) o ORDER BY ${sortOrder(ordering)} LIMIT ${limit}`;
+  }
+  const result = await tx.query<{
+    stages: { stage: ReturnStage; count: number }[];
+    total: number | null;
+    page: (ReturnListItem & { sortRank: 0 | 1; sortKeys: (string | null)[] })[];
+    groups: CollectionGroupRow[] | null;
+  }>(
+    // Matching customers resolve to their orders once, so search stays one semi-join.
+    `WITH customer_orders_matched AS MATERIALIZED (
+  SELECT DISTINCT m.canonical_id AS order_id FROM customer_profiles p
+  JOIN customer_orders c ON c.tenant_id=p.tenant_id AND c.connection_id=p.connection_id AND c.customer_external_id=p.external_id
+  JOIN connector_source_mappings m ON m.tenant_id=c.tenant_id AND m.connection_id=c.connection_id
+   AND m.resource='order' AND m.scope_key=c.order_scope_key AND m.external_id=c.order_external_id
+  WHERE p.tenant_id=$1 AND $5::boolean AND $3<>'' AND p.contact_shared
+   AND (p.display_name ILIKE $4 OR p.email ILIKE $4)
+), matched AS MATERIALIZED (
+  SELECT o.* FROM orders_returns o
+  WHERE o.tenant_id=$1 AND NOT o.deleted AND ($2::uuid IS NULL OR o.connection_id=$2)
+   AND ($3='' OR o.name ILIKE $4 OR o.order_number ILIKE $4 OR o.entity_id::text=lower($3)
+    OR o.order_id::text=lower($3) OR EXISTS (SELECT 1 FROM unnest(o.reasons) reason WHERE reason ILIKE $4)
+    OR EXISTS (SELECT 1 FROM connector_source_mappings m WHERE m.tenant_id=$1
+     AND m.resource IN ('return','refund','order') AND m.canonical_id IN (o.entity_id,o.order_id)
+     AND m.connection_id=o.connection_id AND m.external_id ILIKE $4)
+    OR o.order_id IN (SELECT order_id FROM customer_orders_matched))
+   AND ${where}
+), filtered AS NOT MATERIALIZED (
+  SELECT * FROM matched o WHERE ($6='all' OR o.stage_group=$6) AND ($7::text IS NULL OR o.stage=$7) AND ${member}
+), ${ctes} page AS MATERIALIZED (${page})
+SELECT COALESCE((SELECT jsonb_agg(jsonb_build_object('stage',stage,'count',count)) FROM
+  (SELECT stage,count(*)::int AS count FROM matched GROUP BY stage) s),'[]') AS stages,
+ ${query.groupKey !== undefined ? '(SELECT count(*) FROM filtered)::int' : 'NULL::int'} AS total,
+ COALESCE((SELECT jsonb_agg(to_jsonb(i)-'n' ORDER BY i.n,i.id) FROM (
+  SELECT ${itemColumns},r.sort_rank AS "sortRank",r.sort_keys AS "sortKeys",r.n FROM page r) i),'[]') AS page,
+ ${groups} AS groups`,
+    values,
   );
-  const direction = query.direction === 'asc' ? 'ASC' : 'DESC';
-  const rows = await tx.query<ReturnListItem & { position: string }>(
-    `${scoped} SELECT ${itemColumns},
-      to_char(${key} AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS position FROM scoped r
-     WHERE ($5='all' OR r.stage_group=$5) AND ($6::text IS NULL OR r.stage=$6)
-      AND ($7::timestamptz IS NULL OR (${key},r.entity_id) ${direction === 'ASC' ? '>' : '<'} ($7,$8::uuid))
-     ORDER BY ${key} ${direction},r.entity_id ${direction} LIMIT $9`,
-    [
-      tenantId,
-      ...filters,
-      query.view,
-      query.stage ?? null,
-      after?.key ?? null,
-      after?.id ?? null,
-      query.limit + 1,
-    ],
-  );
+  const row = result.rows[0]!;
   const stages: Record<ReturnStage, number> = {
     requested: 0,
     awaiting_items: 0,
@@ -100,15 +198,20 @@ export async function readReturns(
     done: 0,
     all: 0,
   };
-  for (const row of counts.rows) {
-    stages[row.stage] = row.count;
-    byView.all += row.count;
-    byView[stageGroups[row.stage]] += row.count;
+  for (const { stage, count } of row.stages) {
+    stages[stage] = count;
+    byView.all += count;
+    byView[stageGroups[stage]] += count;
   }
 
   return {
-    rows: rows.rows.map(({ position, ...item }) => ({ position, item })),
+    rows: row.page.map(({ sortRank, sortKeys, ...item }) => ({
+      position: { rank: sortRank, keys: sortKeys, id: item.id },
+      item,
+    })),
     counts: { views: byView, stages },
+    groups: row.groups,
+    total: row.total,
   };
 }
 

@@ -9,12 +9,20 @@
 .inventory-page a {
   color: var(--signal-text);
 }
-.inventory-pagination,
-.inventory-pagination > div {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+.inventory-transfers-link {
+  justify-self: start;
+}
+.inventory-results {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.inventory-preview {
+  min-height: min(720px, calc(100vh - 220px));
+}
+.inventory-preview-source {
+  display: grid;
+  gap: 2px;
 }
 .inventory-cell {
   display: grid;
@@ -27,7 +35,6 @@
 .inventory-cell small,
 .inventory-source-stack small,
 .inventory-note,
-.inventory-pagination,
 .inventory-related small {
   color: var(--muted-foreground);
   font-size: 12px;
@@ -55,16 +62,6 @@
 .inventory-note {
   margin: 0;
   line-height: 1.6;
-}
-.inventory-pagination {
-  justify-content: space-between;
-}
-.inventory-loading {
-  display: grid;
-  gap: 8px;
-}
-.inventory-loading .lu-skeleton {
-  height: 74px;
 }
 .inventory-explanation {
   border-left: 3px solid var(--primary);

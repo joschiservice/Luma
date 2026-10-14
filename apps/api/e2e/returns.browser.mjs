@@ -1,6 +1,8 @@
 /* global document */
 import { randomUUID } from 'node:crypto';
 
+import { createObservability } from '@luma/platform/composition';
+
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 import { returnsFixture } from './returns-fixture.mjs';
@@ -11,7 +13,14 @@ test('opens a return from its order, tells pending work from money returned and 
 }) => {
   const port = await availablePort(),
     origin = `http://127.0.0.1:${port}`;
-  const f = await settingsFixture(t, origin);
+  // Saved views are behind a release flag.
+  const observability = createObservability({
+    environment: 'test',
+    release: 'test',
+    sampleRate: 0,
+    featureFlagOverrides: { 'adaptive-saved-views': true },
+  });
+  const f = await settingsFixture(t, origin, { observability });
   const r = await returnsFixture(t, f);
   const casesPath = `${f.base}/orders/${r.orders[1002]}/return-cases`;
   const options = await f.request(f.owner, casesPath);
@@ -153,17 +162,41 @@ test('opens a return from its order, tells pending work from money returned and 
   ).toBe(true);
   await page.setViewportSize({ width: 1440, height: 1000 });
 
-  // A stage card filters the list and is part of the address.
+  // A stage card is a condition in the address; a waiting stage opens All returns.
+  const stageWhere = {
+    match: 'all',
+    conditions: [{ field: 'stage', op: 'any_of', value: ['refund_pending'] }],
+  };
   await page.getByRole('button', { name: /^Refund processing/ }).click();
   await page.getByRole('link', { name: '#1002-R1', exact: true }).waitFor();
-  expect(new URL(page.url()).searchParams.get('stage')).toBe('refund_pending');
+  expect(new URL(page.url()).searchParams.get('view')).toBe('all');
+  expect(JSON.parse(new URL(page.url()).searchParams.get('where'))).toEqual(
+    stageWhere,
+  );
+  // Other stages keep their counts while one is chosen.
+  await expect(
+    page.getByRole('button', { name: /^Refund processing/ }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(
+    page.getByRole('button', { name: /^To review/ }).locator('strong'),
+  ).toHaveText('1');
   await page.getByRole('link', { name: '#1002-R1', exact: true }).click();
   await page.getByRole('heading', { name: '#1002-R1', level: 1 }).waitFor();
   await page
     .getByRole('navigation', { name: 'Breadcrumb' })
     .getByRole('link', { name: 'Returns' })
     .click();
-  expect(new URL(page.url()).searchParams.get('stage')).toBe('refund_pending');
+  await page.waitForURL((url) => url.pathname.endsWith('/returns'));
+  expect(JSON.parse(new URL(page.url()).searchParams.get('where'))).toEqual(
+    stageWhere,
+  );
+
+  // Home's stage rows from before views still open the same stage.
+  await page.goto(`/app/${f.org.id}/returns?view=all&stage=refund_pending`);
+  await page.waitForURL((url) => !url.searchParams.has('stage'));
+  expect(JSON.parse(new URL(page.url()).searchParams.get('where'))).toEqual(
+    stageWhere,
+  );
 
   // Search finds the refund without a return by its source ID.
   await page.goto(`/app/${f.org.id}/returns?view=all`);
@@ -171,11 +204,76 @@ test('opens a return from its order, tells pending work from money returned and 
   await search.fill('gid://shopify/Refund/2003');
   await search.press('Enter');
   await page.getByText('Refund without a return', { exact: false }).waitFor();
+  // Search can match customer names, so it stays out of the address.
+  expect(new URL(page.url()).searchParams.has('q')).toBe(false);
   await search.fill('nothing');
   await search.press('Enter');
   await page
     .getByRole('heading', { name: 'No returns match these filters' })
     .waitFor();
+
+  // A link's search is adopted and leaves the address.
+  await page.goto(`/app/${f.org.id}/returns?view=all&q=%231002-R1`);
+  await page.waitForURL((url) => !url.searchParams.has('q'));
+  expect(await search.inputValue()).toBe('#1002-R1');
+  await page.getByRole('link', { name: '#1002-R1', exact: true }).waitFor();
+  expect(
+    await page.getByRole('link', { name: '#1001-R1', exact: true }).count(),
+  ).toBe(0);
+
+  // A preview value becomes a condition, and a board by stage becomes a saved view.
+  await page.goto(`/app/${f.org.id}/returns?view=all`);
+  await page.getByRole('link', { name: '#1001-R1', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Display' }).click();
+  await page
+    .getByRole('checkbox', { name: 'Open records in a preview' })
+    .check();
+  await page.keyboard.press('Escape');
+  await page.getByRole('link', { name: '#1002-R1', exact: true }).click();
+  const preview = page.getByRole('region', { name: 'Return preview' });
+  await preview.getByRole('button', { name: 'Filter by Defective' }).click();
+  await page.getByRole('menuitem', { name: 'Show only this value' }).click();
+  await page.waitForURL((url) => url.searchParams.has('where'));
+  expect(JSON.parse(new URL(page.url()).searchParams.get('where'))).toEqual({
+    match: 'all',
+    conditions: [{ field: 'reasons', op: 'any_of', value: ['Defective'] }],
+  });
+  await expect(
+    page.getByRole('link', { name: '#1001-R1', exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole('button', { name: 'Close preview' }).click();
+  await page.getByRole('button', { name: 'Display' }).click();
+  await page.getByRole('combobox', { name: 'Group by' }).click();
+  await page.getByRole('option', { name: 'Stage', exact: true }).click();
+  // The layout choice is a labelled segment; its radio input is visually hidden.
+  await page
+    .getByRole('dialog', { name: 'Display options' })
+    .getByText('Board', { exact: true })
+    .click();
+  await expect(page.getByRole('radio', { name: 'Board' })).toBeChecked();
+  await page.keyboard.press('Escape');
+  await page.getByRole('region', { name: /^Refund processing/ }).waitFor();
+  // The store owns the stage, so cards never move between columns.
+  expect(await page.getByRole('button', { name: 'Move to…' }).count()).toBe(0);
+  await page.getByRole('button', { name: 'Save as new view' }).click();
+  const save = page.getByRole('dialog', { name: 'Save as new view' });
+  await save.getByLabel('Name').fill('Defective by stage');
+  await save.getByRole('button', { name: 'Save', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Defective by stage', exact: true })
+    .waitFor();
+  await page.waitForURL((url) =>
+    /^[0-9a-f-]{36}$/.test(url.searchParams.get('view') ?? ''),
+  );
+  const viewId = new URL(page.url()).searchParams.get('view');
+  await screenshot('board');
+  await page.waitForTimeout(1500);
+  await page.goto(`/app/${f.org.id}/returns`);
+  await page.waitForURL((url) => url.searchParams.get('view') === viewId);
+  await page.getByRole('region', { name: /^Refund processing/ }).waitFor();
+  expect(
+    await page.getByRole('link', { name: '#1001-R1', exact: true }).count(),
+  ).toBe(0);
 
   // G then T opens Returns from anywhere in the workspace.
   await page.goto(`/app/${f.org.id}/orders/${r.orders[1001]}`);

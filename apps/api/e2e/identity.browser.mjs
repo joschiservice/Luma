@@ -92,11 +92,16 @@ test('registers, creates EU workspaces, restores links, switches tabs and revoke
   await heading(page, 'Sign in to Luma');
   await page.goto(`/app/${first}/exceptions`);
   await heading(page, 'Sign in to Luma');
+  // The list's view is not in the address; the member's remembered view decides it.
   expect(new URL(page.url()).searchParams.get('returnTo')).toBe(
-    `/app/${first}/exceptions?view=needs_you`,
+    `/app/${first}/exceptions`,
   );
   await signIn(page);
   await heading(page, 'Issues');
+  expect(new URL(page.url()).pathname).toBe(`/app/${first}/exceptions`);
+  await page
+    .getByRole('button', { name: 'Needs review', exact: true })
+    .waitFor();
   await page.goto('/app/workspaces/new');
   const second = await createWorkspace(page, 'South Studio');
   await page.goto('/app');

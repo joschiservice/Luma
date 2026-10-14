@@ -4,12 +4,14 @@ import {
   apiContract,
   productDetailSchema,
   productListSchema,
+  productsCatalog,
 } from '@luma/api-contract';
 import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
 import { implement } from '@orpc/server';
 
 import type { ProductWorkspace } from '../application/products.js';
+import { validateCollectionQuery } from './collection-validation.js';
 
 /** Exposes the tenant's product catalog comparison and SKU details to readers with `products.read`. */
 export function productRoutes(service?: ProductWorkspace) {
@@ -30,6 +32,7 @@ export function productRoutes(service?: ProductWorkspace) {
             'SERVICE_UNAVAILABLE',
             'Products are unavailable',
           );
+        validateCollectionQuery(productsCatalog, query, { customFields: true });
 
         return productListSchema.parse(
           await service.list(request.tenantContext, query),

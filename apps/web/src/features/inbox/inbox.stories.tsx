@@ -10,6 +10,7 @@ import {
 import { useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 
+import { groupId } from '../../kit/collections/groups';
 import { contextFixture } from '../../kit/identity/context.fixture';
 import { contextOptions } from '../../kit/identity/data';
 import { membersOptions } from '../../kit/settings/data';
@@ -49,6 +50,8 @@ type Screen =
       search: InboxSearch;
       state?: 'ready' | 'loading' | 'error' | 'empty' | 'none';
       detail?: ThreadDetail;
+      /** Groups the threads by owner, as the list API's groups would. */
+      grouped?: boolean;
     }
   | { kind: 'settings'; mailboxes: Mailbox[] | undefined; manage: boolean }
   | { kind: 'document'; detail: DocumentDetail };
@@ -107,6 +110,38 @@ function Content({ screen }: { screen: Screen }) {
         now={inboxNow}
         members={members}
         self={alex}
+        grouped={
+          screen.grouped && state === 'ready'
+            ? {
+                grouping: { field: 'owner', showEmpty: false },
+                groups: [
+                  ...new Set(threadFixtures.map((thread) => thread.ownerId)),
+                ].map((owner) => {
+                  const rows = threadFixtures.filter(
+                    (thread) => thread.ownerId === owner,
+                  );
+
+                  return {
+                    id: groupId(owner),
+                    group: {
+                      key: owner,
+                      count: rows.length,
+                      complete: true,
+                      itemIds: rows.map((thread) => thread.id),
+                      nextCursor: null,
+                      sums: [],
+                    },
+                    rows,
+                    more: undefined,
+                  };
+                }),
+                label: (key) =>
+                  typeof key === 'string' ? people.name(key) : 'Unassigned',
+                collapsed: [],
+                onCollapsedChange: () => undefined,
+              }
+            : undefined
+        }
         detail={
           search.thread ? (
             <ThreadDetailView
@@ -186,6 +221,16 @@ export const List: Story = {
     await expect(canvas.getByText('Reply overdue')).toBeVisible();
     await expect(canvas.getAllByText('Awaiting reply')[0]).toBeVisible();
     await expect(canvas.getByText('3 facts to review')).toBeVisible();
+  },
+};
+
+export const GroupedByOwner: Story = {
+  args: { screen: { kind: 'inbox', search: {}, grouped: true } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByRole('group', { name: 'Threads by Owner' }),
+    ).toBeVisible();
   },
 };
 

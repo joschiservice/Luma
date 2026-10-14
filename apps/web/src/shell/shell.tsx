@@ -171,6 +171,8 @@ function useGoShortcuts(organizationId: string) {
       const key = event.key.toLowerCase();
       if (armedAt && Date.now() - armedAt < 1200) {
         armedAt = 0;
+        // The key after G belongs to the sequence, so list shortcuts such as K or F skip it.
+        if (key.length === 1) event.preventDefault();
         const destination = workspaceDestinations.find(
           (item) => item.shortcut === key,
         );
@@ -179,7 +181,6 @@ function useGoShortcuts(organizationId: string) {
           (destination.path === 'views' && !adaptive.data?.views)
         )
           return;
-        event.preventDefault();
         void navigate({
           to: `/app/$organizationId/${destination.path}`,
           params: { organizationId },
@@ -189,9 +190,10 @@ function useGoShortcuts(organizationId: string) {
       }
       armedAt = key === 'g' ? Date.now() : 0;
     };
-    window.addEventListener('keydown', onKey);
+    // Capture runs before the pages' own key listeners, which skip prevented keys.
+    window.addEventListener('keydown', onKey, true);
 
-    return () => window.removeEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, [navigate, organizationId, adaptive.data?.views]);
 }
 

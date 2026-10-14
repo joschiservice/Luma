@@ -14,9 +14,12 @@ export const customersContract = {
       path: '/v1/organizations/{organizationId}/customers',
       summary: 'Browse customers',
       description:
-        'List customer profiles imported from connected stores. Each profile belongs to one connection and source customer; profiles are never merged across stores, and names or email addresses do not establish identity. Name, email and phone are null unless the source shares contact details (`shared.contact`). `orderCount` and `amountSpent` are what the source reports. Search matches the name, email address, phone number and source customer ID. `externalId` with `connectionId` finds one source customer. `sources` lists each commerce connection and whether it shares customers with Luma. Results contain up to `limit` profiles (at most 50) with `totalCount` matches; nextCursor continues the same filters and sorting.',
+        'List customer profiles imported from connected stores. Each profile belongs to one connection and source customer; profiles are never merged across stores, and names or email addresses do not establish identity. Name, email and phone are null unless the source shares contact details (`shared.contact`). `orderCount` and `amountSpent` are what the source reports. Search matches the name, email address, phone number and source customer ID. `externalId` with `connectionId` finds one source customer. Conditions (`where`) and grouping (`group`) use the Customers catalog fields, and conditions and sorting also accept readable custom customer fields as `custom:<field ID>`; a country the source does not share is unknown and never matches a country condition, and amounts compare only within one currency. The last order date needs access to orders. `sources` lists each commerce connection and whether it shares customers with Luma. Results contain up to `limit` profiles (at most 50) with `totalCount` matches; nextCursor continues the same filters, conditions, grouping and sorting.',
     })
-    .meta({ access: requires('customers.read'), errors: [400, 401, 404, 503] })
+    .meta({
+      access: requires('customers.read'),
+      errors: [400, 401, 403, 404, 503],
+    })
     .input(
       z.object({
         params: organizationParamsSchema,

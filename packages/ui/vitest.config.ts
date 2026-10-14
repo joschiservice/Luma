@@ -7,28 +7,46 @@ import { defineConfig, mergeConfig } from 'vitest/config';
 
 import viteConfig from './vite.config.ts';
 
-export default mergeConfig(
-  viteConfig,
-  defineConfig({
-    plugins: [
-      storybookTest({
-        configDir: fileURLToPath(new URL('./.storybook', import.meta.url)),
-        storybookScript: 'pnpm storybook',
-      }),
-    ],
-    test: {
-      name: 'storybook',
-      exclude: ['jtl', 'shopify'].every((app) =>
-        existsSync(new URL(`../apps/${app}/package.json`, import.meta.url)),
-      )
-        ? []
-        : ['../../apps/web/src/features/connections/*.stories.tsx'],
-      browser: {
-        enabled: true,
-        provider: playwright(),
-        headless: true,
-        instances: [{ browser: 'chromium' }],
+export default defineConfig({
+  test: {
+    projects: [
+      // Pure helpers run in Node; components are tested through their stories in a browser.
+      {
+        test: {
+          name: 'unit',
+          include: ['src/**/*.test.ts'],
+          environment: 'node',
+        },
       },
-    },
-  }),
-);
+      mergeConfig(
+        viteConfig,
+        defineConfig({
+          plugins: [
+            storybookTest({
+              configDir: fileURLToPath(
+                new URL('./.storybook', import.meta.url),
+              ),
+              storybookScript: 'pnpm storybook',
+            }),
+          ],
+          test: {
+            name: 'storybook',
+            exclude: ['jtl', 'shopify'].every((app) =>
+              existsSync(
+                new URL(`../apps/${app}/package.json`, import.meta.url),
+              ),
+            )
+              ? []
+              : ['../../apps/web/src/features/connections/*.stories.tsx'],
+            browser: {
+              enabled: true,
+              provider: playwright(),
+              headless: true,
+              instances: [{ browser: 'chromium' }],
+            },
+          },
+        }),
+      ),
+    ],
+  },
+});

@@ -1,5 +1,11 @@
 import type { OrderDetail, OrderList, OrderListItem } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
+import { CollectionToolbar } from '@luma/ui/components/primitives/collection-toolbar';
+import type { DataTableSort } from '@luma/ui/components/primitives/data-table';
+import { Empty } from '@luma/ui/components/primitives/empty';
+import { Pagination } from '@luma/ui/components/primitives/pagination';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
   createRootRoute,
@@ -9,13 +15,18 @@ import {
 import { type ReactNode, useState } from 'react';
 import { expect, userEvent, within } from 'storybook/test';
 
+import { CollectionNotices } from '../../kit/collections/notices';
+import type { CollectionError } from '../../kit/collections/paging';
 import { StoryShell } from '../../shell/storybook-shell';
 import appStyles from '../../styles.css?inline';
 import { returnItem } from '../returns/returns-fixtures';
-import type { OrdersError, OrdersSearch } from './data';
+import { orderGroupLabel } from './collection';
+import { orderOptions } from './data';
 import { OrderDetailView, type OrderError } from './detail';
 import { OrderJourney } from './journey';
 import { OrdersView } from './page';
+import { OrderPreview } from './preview';
+import { OrderResults } from './results';
 
 const organizationId = '33333333-3333-4333-8333-333333333333';
 const shop = '44444444-4444-4444-8444-444444444444';
@@ -464,19 +475,82 @@ const detail: OrderDetail = {
 
 type ListState =
   | 'ready'
+  | 'list'
+  | 'grouped'
+  | 'board'
+  | 'preview'
   | 'loading'
   | 'empty'
   | 'unmatched'
   | 'unavailable'
   | 'page'
   | 'access'
-  | 'offline';
+  | 'offline'
+  | 'repair';
+
+const groupedList: OrderList = {
+  ...list,
+  nextCursor: null,
+  totalCount: null,
+  groups: [
+    {
+      key: 'unfulfilled',
+      count: 41,
+      complete: true,
+      itemIds: [list.items[1]!.id],
+      nextCursor: 'group-next',
+      sums: [{ field: 'total', currency: 'EUR', amount: '1840.00' }],
+    },
+    {
+      key: 'partial',
+      count: 1,
+      complete: false,
+      itemIds: [list.items[0]!.id],
+      nextCursor: null,
+      sums: [{ field: 'total', currency: 'EUR', amount: '48.00' }],
+    },
+    {
+      key: 'fulfilled',
+      count: 1,
+      complete: true,
+      itemIds: [list.items[2]!.id],
+      nextCursor: null,
+      sums: [],
+    },
+  ],
+};
 
 function ListPreview({ state = 'ready' }: { state?: ListState }) {
-  const [search, change] = useState<OrdersSearch>(
-    state === 'unmatched' ? { q: 'NOPE', view: 'overdue' } : {},
+  const [sort, setSort] = useState<DataTableSort>({
+    key: 'updated',
+    direction: 'desc',
+  });
+  const [collapsed, setCollapsed] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [open, setOpen] = useState<string | undefined>(
+    state === 'preview' ? list.items[0]!.id : undefined,
   );
-  const error: OrdersError | undefined =
+  const [client] = useState(() => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(
+      orderOptions(organizationId, list.items[0]!.id).queryKey,
+      detail,
+    );
+
+    return queryClient;
+  });
+  const layout =
+    state === 'list' ? 'list' : state === 'board' ? 'board' : 'table';
+  const grouping =
+    state === 'grouped' || state === 'board'
+      ? { field: 'fulfillment', showEmpty: false }
+      : null;
+  const shown = ['empty', 'unmatched'].includes(state)
+    ? { ...list, items: [], totalCount: 0, nextCursor: null }
+    : grouping
+      ? groupedList
+      : list;
+  const error: CollectionError | undefined =
     state === 'unavailable' || state === 'access'
       ? { kind: state }
       : state === 'page'
@@ -485,30 +559,146 @@ function ListPreview({ state = 'ready' }: { state?: ListState }) {
             message:
               'This page link no longer matches the order filters. Start from the first page.',
           }
-        : undefined;
+        : state === 'repair'
+          ? { kind: 'invalid', message: m.collections_needs_repair() }
+          : undefined;
+  const hidden = ['loading', 'access', 'page', 'repair'].includes(state);
+  const link = (item: OrderListItem) => (
+    <a
+      href={`#order-${item.id}`}
+      onClick={(event) => {
+        if (state !== 'preview') return;
+        event.preventDefault();
+        setOpen(item.id);
+      }}
+    />
+  );
+  const openOrder = shown.items.find((item) => item.id === open);
 
   return (
-    <OrdersView
-      organizationId={organizationId}
-      search={search}
-      change={change}
-      refresh={() => {}}
-      loading={state === 'loading'}
-      offline={state === 'offline'}
-      error={error}
-      sources={[
-        { id: shop, label: 'Tokyo store' },
-        { id: erp, label: 'JTL-Wawi' },
-      ]}
-      next={() => change({ ...search, cursor: 'next', page: 2 })}
-      list={
-        ['loading', 'access', 'page'].includes(state)
-          ? undefined
-          : ['empty', 'unmatched'].includes(state)
-            ? { ...list, items: [], totalCount: 0, nextCursor: null }
-            : list
-      }
-    />
+    <QueryClientProvider client={client}>
+      <OrdersView
+        toolbar={
+          <CollectionToolbar
+            search={{
+              value: state === 'unmatched' ? 'NOPE' : undefined,
+              onChange: () => {},
+              label: m.orders_list_search_label(),
+              placeholder: m.orders_list_search_placeholder(),
+            }}
+            sort={{
+              value: sort.key,
+              options: [
+                { value: 'updated', label: 'Updated' },
+                { value: 'placed', label: 'Placed' },
+              ],
+              onChange: (key) => setSort({ ...sort, key }),
+              direction: sort.direction,
+              onDirectionChange: (direction) => setSort({ ...sort, direction }),
+            }}
+            onRefresh={() => {}}
+          />
+        }
+        notices={
+          <CollectionNotices
+            offline={state === 'offline'}
+            error={error}
+            hasRows={!hidden}
+            retry={() => {}}
+            firstPage={() => {}}
+            repair={state === 'repair' ? () => {} : undefined}
+          />
+        }
+        loading={state === 'loading'}
+        results={
+          hidden ? undefined : (
+            <OrderResults
+              list={shown}
+              layout={layout}
+              density="comfortable"
+              grouping={grouping}
+              caption="All orders. Sorted by: Updated"
+              link={link}
+              empty={
+                <Empty>
+                  <h2>
+                    {state === 'unmatched'
+                      ? m.orders_list_unmatched_title()
+                      : m.orders_list_empty_title()}
+                  </h2>
+                </Empty>
+              }
+              sort={sort}
+              onSortChange={setSort}
+              columnState={{
+                columns: [
+                  'number',
+                  'placed',
+                  'status',
+                  'fulfillment',
+                  'total',
+                  'tags',
+                  'sources',
+                  'updated',
+                ].map((key) => ({ key })),
+              }}
+              onColumnStateChange={() => {}}
+              properties={['status', 'fulfillment', 'total', 'placed']}
+              current={open}
+              selection={{ selected, onChange: setSelected }}
+              groupLabel={(key) =>
+                orderGroupLabel('fulfillment', undefined, key)
+              }
+              more={(group) => ({
+                rows: [],
+                load: group.nextCursor ? () => {} : undefined,
+                pending: false,
+                failed: false,
+              })}
+              collapsed={collapsed}
+              onCollapsedChange={(id, closed) =>
+                setCollapsed((current) =>
+                  closed
+                    ? [...current, id]
+                    : current.filter((item) => item !== id),
+                )
+              }
+            />
+          )
+        }
+        pagination={
+          !hidden && !grouping && shown.items.length ? (
+            <Pagination
+              count={shown.items.length}
+              totalCount={shown.totalCount ?? undefined}
+              page={1}
+              pageSize={50}
+              hasNext={!!shown.nextCursor}
+              onNext={() => {}}
+              formatTotal={(count) => m.orders_list_pagination_total({ count })}
+              label={m.orders_list_pagination_label()}
+            />
+          ) : null
+        }
+        preview={
+          state === 'preview'
+            ? {
+                open: !!openOrder,
+                title: openOrder?.displayNumber,
+                content: openOrder ? (
+                  <OrderPreview
+                    organizationId={organizationId}
+                    orderId={openOrder.id}
+                    order={openOrder}
+                    filter={() => {}}
+                  />
+                ) : null,
+                onClose: () => setOpen(undefined),
+              }
+            : undefined
+        }
+      />
+    </QueryClientProvider>
   );
 }
 
@@ -662,59 +852,72 @@ export const Browse: Story = {
     ).toBeVisible();
     await expect(canvas.getByText('1–3 of 1,284 orders')).toBeVisible();
     const placed = canvas.getByRole('columnheader', { name: /Placed/ });
-    await userEvent.click(within(placed).getByRole('button'));
-    await expect(placed).toHaveAttribute('aria-sort', 'descending');
-    await userEvent.click(within(placed).getByRole('button'));
-    await expect(placed).toHaveAttribute('aria-sort', 'ascending');
-    await userEvent.click(canvas.getByRole('tab', { name: 'Overdue' }));
-    await expect(canvas.getByRole('tab', { name: 'Overdue' })).toHaveAttribute(
-      'aria-selected',
-      'true',
+    await userEvent.click(
+      within(placed).getByRole('button', { name: 'Placed' }),
     );
-    await expect(
-      canvas.getByRole('tab', { name: 'All orders' }),
-    ).toHaveAttribute('aria-selected', 'false');
+    await expect(placed).toHaveAttribute('aria-sort', 'descending');
+    await userEvent.click(
+      within(placed).getByRole('button', { name: 'Placed' }),
+    );
+    await expect(placed).toHaveAttribute('aria-sort', 'ascending');
   },
 };
 
-export const Filter: Story = {
+export const List: Story = {
+  args: { state: 'list' },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const page = within(canvasElement.ownerDocument.body);
-    await userEvent.click(
-      await canvas.findByRole('button', { name: 'Add Status filter' }),
-    );
-    await userEvent.click(
-      within(await page.findByRole('dialog')).getByRole('button', {
-        name: 'Open',
-      }),
-    );
     await expect(
-      await canvas.findByRole('button', { name: 'Edit Status filter: Open' }),
+      await canvas.findByRole('list', { name: /All orders/ }),
     ).toBeVisible();
-    await userEvent.click(
-      canvas.getByRole('button', { name: 'Add Placed filter' }),
-    );
-    await userEvent.click(
-      within(await page.findByRole('dialog')).getByRole('button', {
-        name: 'Last 7 days',
-      }),
-    );
+    await expect(canvas.getByRole('link', { name: /SO-10/ })).toBeVisible();
+  },
+};
+
+export const Grouped: Story = {
+  args: { state: 'grouped' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const unfulfilled = await canvas.findByRole('button', {
+      name: /^Unfulfilled/,
+    });
+    await expect(unfulfilled).toHaveAttribute('aria-expanded', 'true');
+    await expect(canvas.getByText('Incomplete')).toBeVisible();
     await expect(
-      await canvas.findByRole('button', {
-        name: 'Edit Placed filter: Last 7 days',
-      }),
+      canvas.getByRole('button', { name: 'Show more in Unfulfilled' }),
     ).toBeVisible();
-    await userEvent.click(
-      canvas.getByRole('button', { name: 'Remove Status filter: Open' }),
-    );
+    await userEvent.click(unfulfilled);
+    await expect(unfulfilled).toHaveAttribute('aria-expanded', 'false');
+  },
+};
+
+export const Board: Story = {
+  args: { state: 'board' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
     await expect(
-      canvas.queryByRole('button', { name: 'Edit Status filter: Open' }),
-    ).toBeNull();
-    await userEvent.click(canvas.getByRole('button', { name: 'Clear' }));
+      await canvas.findByRole('region', { name: /Partially fulfilled/ }),
+    ).toBeVisible();
+    await expect(canvas.queryByRole('button', { name: 'Move to…' })).toBeNull();
+  },
+};
+
+export const BoardDark: Story = {
+  args: { state: 'board' },
+  globals: { theme: 'dark' },
+};
+
+export const OpenPreview: Story = {
+  args: { state: 'preview' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const preview = await canvas.findByRole('region', {
+      name: 'Order preview',
+    });
+    await expect(within(preview).getByText('Canvas tote')).toBeVisible();
     await expect(
-      canvas.queryByRole('button', { name: /^Edit Placed filter/ }),
-    ).toBeNull();
+      within(preview).getByRole('button', { name: 'Filter by Open' }),
+    ).toBeVisible();
   },
 };
 
@@ -726,6 +929,18 @@ export const NoMatches: Story = { args: { state: 'unmatched' } };
 
 export const Unavailable: Story = { args: { state: 'unavailable' } };
 
+export const NeedsRepair: Story = {
+  args: { state: 'repair' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByRole('button', {
+        name: 'Remove unsupported conditions',
+      }),
+    ).toBeVisible();
+  },
+};
+
 export const StalePage: Story = {
   args: { state: 'page' },
   play: async ({ canvasElement }) => {
@@ -734,7 +949,7 @@ export const StalePage: Story = {
       await canvas.findByText(/This page link no longer matches/),
     ).toBeVisible();
     await expect(
-      canvas.getByRole('button', { name: 'Go to first page' }),
+      canvas.getByRole('button', { name: 'First page' }),
     ).toBeVisible();
   },
 };

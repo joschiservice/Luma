@@ -7,7 +7,7 @@ import { Input } from '@luma/ui/components/primitives/input';
 import { Select } from '@luma/ui/components/primitives/select';
 import { Switch } from '@luma/ui/components/primitives/switch';
 import { LanguageSelect } from '@luma/ui/components/workspace/language-select';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowDown,
   ArrowUp,
@@ -17,8 +17,9 @@ import {
   RotateCcw,
   Sun,
 } from 'lucide-react';
-import { useId } from 'react';
+import { useId, useState } from 'react';
 
+import { resetAllCollectionStates } from '../../kit/collections/data';
 import {
   defaultHome,
   homeModules,
@@ -327,6 +328,64 @@ export function HomeSidebarSettings({
           <p className="settings-note">{m.settings_pins_empty()}</p>
         )}
       </div>
+      <ListSettingsReset organizationId={organizationId} />
     </section>
+  );
+}
+
+/**
+ * Clears the member's remembered state and display settings on every list in this workspace,
+ * after confirmation. Saved views are not changed.
+ */
+function ListSettingsReset({ organizationId }: { organizationId: string }) {
+  const queryClient = useQueryClient();
+  const [confirming, setConfirming] = useState(false);
+  const reset = useMutation({
+    mutationFn: () => resetAllCollectionStates(organizationId),
+    onSuccess: () => {
+      setConfirming(false);
+      void queryClient.invalidateQueries({
+        queryKey: ['private', 'organization', organizationId, 'collections'],
+      });
+    },
+  });
+
+  return (
+    <div className="settings-panel">
+      <div className="settings-panel-heading">
+        <div>
+          <h3>{m.settings_lists_title()}</h3>
+          <p>{m.settings_lists_description()}</p>
+        </div>
+        {confirming ? (
+          <span className="settings-confirm">
+            <Button
+              variant="destructive"
+              disabled={reset.isPending}
+              onClick={() => reset.mutate()}
+            >
+              {m.settings_lists_reset_confirm()}
+            </Button>
+            <Button variant="ghost" onClick={() => setConfirming(false)}>
+              {m.common_cancel()}
+            </Button>
+          </span>
+        ) : (
+          <Button variant="ghost" onClick={() => setConfirming(true)}>
+            <RotateCcw aria-hidden="true" />
+            {m.settings_lists_reset()}
+          </Button>
+        )}
+      </div>
+      {reset.isSuccess ? (
+        <Alert role="status">
+          {m.settings_lists_reset_done({ count: reset.data.removed })}
+        </Alert>
+      ) : reset.isError ? (
+        <Alert tone="danger" role="alert">
+          {m.settings_lists_reset_failed()}
+        </Alert>
+      ) : null}
+    </div>
   );
 }

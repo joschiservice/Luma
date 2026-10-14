@@ -1,0 +1,35 @@
+import {
+  collectionDomainSchema,
+  collectionMemberStateSchema,
+  collectionPermissions,
+} from '@luma/api-contract';
+import { IdentityError } from '@luma/identity';
+
+import type { CollectionMemberStateDocument } from '../domain/collection-states.js';
+
+/** Validates list identifiers and member state against the shared list contract. */
+export const collectionsValidation = {
+  domain(value: unknown) {
+    const parsed = collectionDomainSchema.safeParse(value);
+    if (!parsed.success)
+      throw new IdentityError(404, 'NOT_FOUND', 'List not found.');
+
+    return parsed.data;
+  },
+  state(value: unknown): CollectionMemberStateDocument {
+    const parsed = collectionMemberStateSchema.safeParse(value);
+    if (!parsed.success)
+      throw new IdentityError(
+        422,
+        'VALIDATION_ERROR',
+        'The list state is not valid.',
+      );
+
+    return parsed.data;
+  },
+  permission(domain: string) {
+    const parsed = collectionDomainSchema.safeParse(domain);
+
+    return parsed.success ? collectionPermissions[parsed.data] : null;
+  },
+};

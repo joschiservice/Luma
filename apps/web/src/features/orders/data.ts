@@ -1,25 +1,24 @@
 import {
+  type CollectionGroup,
+  type CollectionViewState,
   type OrderChangePlanQuery,
-  type OrderListQuery,
+  type OrderListQueryInput,
+  orderSortSchema,
+  orderViewSchema,
 } from '@luma/api-contract';
-import { nextCalendarDay, workspaceInstant } from '@luma/ui/lib/timezone';
 import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { IdentityError } from '../../kit/identity/data';
+import { collectionSearchShape, groupOf } from '../../kit/collections/state';
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
+import {
+  legacyOrderConditions,
+  type LegacyOrderSearch,
+  withLegacyConditions,
+} from './collection';
 
 const api = createWebApiClient();
-
-export const orderViews = [
-  'all',
-  'outstanding',
-  'overdue',
-  'needs_you',
-  'differs',
-  'stuck',
-] as const;
 
 export const orderStatuses = [
   'open',
@@ -28,7 +27,7 @@ export const orderStatuses = [
   'unknown',
 ] as const;
 
-export const orderPaymentStatuses = [
+const orderPaymentStatuses = [
   'pending',
   'authorized',
   'paid',
@@ -37,8 +36,6 @@ export const orderPaymentStatuses = [
   'failed',
   'unknown',
 ] as const;
-
-export const orderSorts = ['updated', 'placed', 'number', 'due'] as const;
 
 const day = z
   .string()
@@ -50,12 +47,11 @@ const day = z
   );
 
 /**
- * URL state for the order list. Placed dates are workspace calendar days; updated bounds are
- * exact instants carried over from metric drilldowns.
+ * Filters of links from before configurable views. The route converts them into conditions:
+ * placed bounds are workspace calendar days, updated bounds exact instants from metric
+ * drill-downs.
  */
-export const ordersSearch = z.object({
-  q: z.string().max(120).optional().catch(undefined),
-  view: z.enum(orderViews).optional().catch(undefined),
+const legacyShape = {
   status: z.enum(orderStatuses).optional().catch(undefined),
   paymentStatus: z.enum(orderPaymentStatuses).optional().catch(undefined),
   connectionId: z.uuid().optional().catch(undefined),
@@ -63,10 +59,14 @@ export const ordersSearch = z.object({
   placedTo: day.optional().catch(undefined),
   updatedFrom: z.iso.datetime().optional().catch(undefined),
   updatedBefore: z.iso.datetime().optional().catch(undefined),
-  sort: z.enum(orderSorts).optional().catch(undefined),
-  direction: z.enum(['asc', 'desc']).optional().catch(undefined),
-  cursor: z.string().max(1024).optional().catch(undefined),
-  page: z.coerce.number().int().min(1).max(100000).optional().catch(undefined),
+};
+
+const legacyKeys = Object.keys(legacyShape) as (keyof LegacyOrderSearch)[];
+
+/** Page context the Orders pages carry besides the view: where the reader came from and plans. */
+const contextShape = {
+  /** The order open in the preview pane. */
+  item: z.uuid().optional().catch(undefined),
   linkedFrom: z.uuid().optional().catch(undefined),
   from: z.string().max(2048).optional().catch(undefined),
   /** A proposed quantity change to plan: the line's comparison key and its new quantity. */
@@ -78,43 +78,69 @@ export const ordersSearch = z.object({
     .catch(undefined),
   /** The connection whose app should open its edit, prefilled from the plan's Luma step. */
   edit: z.uuid().optional().catch(undefined),
+};
+
+/**
+ * URL state of the Orders list and order pages: the shared list keys (view, conditions, sort,
+ * grouping, display and paging), filters of older links and page context. `q` only arrives
+ * with links, such as a product's orders: search can match customer data, so the page moves
+ * it into page state and removes it from the address.
+ */
+export const ordersSearch = z.object({
+  ...collectionSearchShape,
+  ...legacyShape,
+  ...contextShape,
 });
 
 export type OrdersSearch = z.infer<typeof ordersSearch>;
 
 export const orderPageSize = 50;
 
-/** Converts URL filters to the API query, resolving calendar days in the workspace time zone. */
-export function orderListQuery(
-  search: OrdersSearch,
-  timeZone = 'UTC',
-): OrderListQuery {
-  return {
-    q: search.q?.trim() ?? '',
-    view: search.view ?? 'all',
-    status: search.status,
-    paymentStatus: search.paymentStatus,
-    connectionId: search.connectionId,
-    placedFrom: search.placedFrom
-      ? workspaceInstant(search.placedFrom, timeZone)
-      : undefined,
-    placedBefore: search.placedTo
-      ? workspaceInstant(nextCalendarDay(search.placedTo), timeZone)
-      : undefined,
-    updatedFrom: search.updatedFrom,
-    updatedBefore: search.updatedBefore,
-    sort: search.sort ?? 'updated',
-    direction: search.direction ?? 'desc',
-    limit: orderPageSize,
-    cursor: search.cursor,
-  };
+/** Rows each group shows before "Show more", and the size of each further page. */
+const orderGroupPageSize = 10;
+
+/** Whether the URL still uses filters of older links. */
+export function hasLegacyFilters(search: OrdersSearch) {
+  return legacyKeys.some((key) => search[key] !== undefined);
 }
 
-/** Returns the list filters without paging, so a filter change starts from the first page. */
+/**
+ * Rewrites older filter keys into conditions, merged with the URL's own conditions, and starts
+ * from the first page because a cursor binds the filters it was read with.
+ */
+export function withoutLegacyFilters(search: OrdersSearch): OrdersSearch {
+  const conditions = legacyOrderConditions(search);
+  const next: OrdersSearch = { ...search };
+  for (const key of legacyKeys) delete next[key];
+  delete next.cursor;
+  delete next.page;
+
+  return conditions.length
+    ? { ...next, where: withLegacyConditions(search.where, conditions) }
+    : next;
+}
+
+/** Whether the URL says what to show, so the page must not restore the remembered view. */
+export function namesListState(search: OrdersSearch) {
+  return Boolean(
+    search.q ||
+    search.cursor ||
+    search.page ||
+    search.item ||
+    search.from ||
+    search.linkedFrom ||
+    search.changeLine ||
+    search.changeQuantity ||
+    search.edit,
+  );
+}
+
+/** Returns the list state without paging and page context, so the list starts on page one. */
 export function orderFilters(search: OrdersSearch): OrdersSearch {
   const filters = { ...search };
   delete filters.cursor;
   delete filters.page;
+  delete filters.item;
   delete filters.from;
   delete filters.linkedFrom;
   delete filters.changeLine;
@@ -124,42 +150,67 @@ export function orderFilters(search: OrdersSearch): OrdersSearch {
   return filters;
 }
 
-export type OrdersError = {
-  kind: 'access' | 'page' | 'unavailable';
-  /** The server's explanation, when it sent one that people can act on. */
-  message?: string | undefined;
-};
+const sorts = new Set<string>(orderSortSchema.options);
+const views = new Set<string>(orderViewSchema.options);
 
 /**
- * Classifies an order list failure. 403 and 404 mean the reader lost access, because the API
- * hides workspaces they no longer belong to. A validation error on a request with a page cursor
- * means the page link no longer matches its filters; the reader can start from the first page.
+ * Builds the list request for a view: its built-in segment, conditions (sent only when there
+ * are any), sort (a catalog field or a custom field) and grouping, with search text and the page cursor. Grouped reads return each
+ * group's first rows and take no page cursor; `group` reads one group's next page instead.
+ * Calendar conditions and date groups follow `timeZone`, the workspace's time zone.
  */
-export function orderListError(
-  error: unknown,
-  search: OrdersSearch,
-): OrdersError | undefined {
-  if (!error) return undefined;
-  if (!(error instanceof IdentityError)) return { kind: 'unavailable' };
-  if ([403, 404].includes(error.status)) return { kind: 'access' };
-  if (error.code === 'VALIDATION_ERROR' && search.cursor)
-    return { kind: 'page', message: error.message };
+export function orderListQuery(
+  state: CollectionViewState,
+  search: Pick<OrdersSearch, 'q' | 'cursor'>,
+  timeZone: string,
+  group?: { key: CollectionGroup['key']; cursor: string },
+): OrderListQueryInput {
+  const grouping = groupOf(state);
+  const field = state.sort?.field;
+  // Catalog sorts and custom fields go through; the server checks the custom field.
+  const sort: OrderListQueryInput['sort'] =
+    field && sorts.has(field)
+      ? (field as OrderListQueryInput['sort'])
+      : field && /^custom:[0-9a-f-]{36}$/.test(field)
+        ? (field as `custom:${string}`)
+        : 'updated';
 
-  return { kind: 'unavailable' };
+  return {
+    q: search.q?.trim() ?? '',
+    view:
+      state.segment && views.has(state.segment)
+        ? (state.segment as OrderListQueryInput['view'])
+        : 'all',
+    ...(state.where.conditions.length
+      ? { where: JSON.stringify(state.where) }
+      : {}),
+    sort,
+    direction: state.sort?.direction ?? 'desc',
+    timeZone,
+    ...(grouping
+      ? group
+        ? {
+            group: grouping,
+            groupKey: JSON.stringify(group.key),
+            cursor: group.cursor,
+            limit: orderPageSize,
+          }
+        : { group: grouping, groupLimit: orderGroupPageSize }
+      : { limit: orderPageSize, cursor: search.cursor }),
+  };
 }
 
-/** Loads one keyset page of current orders for the active workspace. */
+/** Loads one page of current orders, or a grouped read, for the active workspace. */
 export function ordersOptions(
   organizationId: string,
-  search: OrdersSearch,
-  timeZone = 'UTC',
+  query: OrderListQueryInput,
 ) {
-  const query = orderListQuery(search, timeZone);
-
   return queryOptions({
     ...privateQueryDefaults,
     queryKey: ['private', 'organization', organizationId, 'orders', query],
     refetchOnReconnect: 'always',
+    // A changed filter keeps the previous rows visible until the new ones arrive.
+    placeholderData: keepPreviousData,
     queryFn: ({ signal }) =>
       api.orders.list({ params: { organizationId }, query }, { signal }),
   });

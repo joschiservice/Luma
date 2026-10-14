@@ -2,11 +2,10 @@ import type {
   AdaptiveViewPreview,
   AdaptiveViewQuery,
 } from '@luma/api-contract';
-import { formatDateTime, formatNumber } from '@luma/i18n/format';
+import { formatDate, formatDateTime, formatNumber } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Badge } from '@luma/ui/components/primitives/badge';
-import { BarChart } from '@luma/ui/components/primitives/bar-chart';
 import { Button } from '@luma/ui/components/primitives/button';
 import {
   Card,
@@ -24,13 +23,14 @@ import { useQuery } from '@tanstack/react-query';
 
 import { usePermissions } from '../../kit/identity/permissions';
 import { adaptiveApi, adaptiveAvailabilityOptions, adaptiveKey } from './data';
-import { LinePlot } from './line-plot';
 import {
   adaptiveLabel,
   cellValue,
   columnLabel,
   recordDestination,
 } from './presentation';
+import { customRecordType, fieldType, viewColumns } from './query-fields';
+import { ViewMetricsAndCharts } from './view-summary';
 
 type Row = Record<string, unknown>;
 
@@ -43,13 +43,15 @@ function adaptiveRecordId(row: Row): string | null {
       : null;
 }
 
-function rowTitle(row: Row) {
+/** Names a row by its first shown column, falling back to common catalog names. */
+function rowTitle(row: Row, first: string | undefined) {
   return cellValue(
-    row.displayNumber ??
+    (first === undefined ? undefined : row[first]) ??
+      row.number ??
       row.reference ??
       row.summary ??
       row.title ??
-      row.displayName ??
+      row.name ??
       row.sku ??
       row.id,
   );
@@ -75,25 +77,26 @@ export function AdaptiveRecords({
 }) {
   const { can } = usePermissions(organizationId);
   const availability = useQuery(adaptiveAvailabilityOptions(organizationId));
-  const recordType =
-    configuration.domain === 'orders'
-      ? 'order'
-      : configuration.domain === 'products'
-        ? 'product'
-        : 'purchase_order';
+  const recordType = customRecordType(configuration.domain);
+  const shown = viewColumns(configuration);
+  const group = configuration.state.group;
   const fields = useQuery({
     queryKey: [...adaptiveKey(organizationId), 'field-labels', recordType],
     queryFn: ({ signal }) =>
-      adaptiveApi.adaptiveFields.list(
-        {
-          params: { organizationId },
-          query: { recordType, includeArchived: false },
-        },
-        { signal },
-      ),
+      recordType
+        ? adaptiveApi.adaptiveFields.list(
+            {
+              params: { organizationId },
+              query: { recordType, includeArchived: false },
+            },
+            { signal },
+          )
+        : [],
     enabled:
-      configuration.columns.some((column) => column.startsWith('custom:')) &&
-      ['orders', 'products', 'procurement'].includes(configuration.domain) &&
+      !!recordType &&
+      [...shown, group?.field ?? ''].some((column) =>
+        column.startsWith('custom:'),
+      ) &&
       can('adaptive.fields.read') &&
       availability.data?.fields === true,
   });
@@ -117,13 +120,38 @@ export function AdaptiveRecords({
 
       return choice ? adaptiveLabel(choice.label) : m.adaptive_unknown();
     }
+    if (
+      fieldType(configuration.domain, key, fields.data) === 'date' &&
+      typeof scalar === 'string' &&
+      !Number.isNaN(Date.parse(scalar))
+    )
+      return formatDateTime(scalar);
 
     return cellValue(scalar);
   };
+  // Date groups follow the view's period; weeks and months show their first day.
+  const groupLabel = (row: Row) => {
+    if (!group) return '';
+    const scalar = row[group.field];
+    if (
+      !group.granularity ||
+      typeof scalar !== 'string' ||
+      Number.isNaN(Date.parse(scalar))
+    )
+      return value(row, group.field);
+    const date = new Date(scalar);
+    if (group.granularity === 'week')
+      date.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+    if (group.granularity === 'month') date.setDate(1);
+
+    return group.granularity === 'month'
+      ? formatDate(date, { month: 'long', year: 'numeric' })
+      : formatDate(date);
+  };
   const groups = new Map<string, Row[]>();
-  if (configuration.groupBy)
+  if (group)
     for (const row of preview.items) {
-      const label = cellValue(row[configuration.groupBy]);
+      const label = groupLabel(row);
       groups.set(label, [...(groups.get(label) ?? []), row]);
     }
   const rowLink = (row: Row, text: string) => {
@@ -135,18 +163,13 @@ export function AdaptiveRecords({
       text
     );
   };
-  const columns = configuration.columns.map((field, index) => ({
+  const columns = shown.map((field, index) => ({
     key: field,
     header: header(field),
     hideOnNarrow: index >= 2,
     cell: (row: Row) => {
-      const available = preview.availableColumns.includes(field);
-      const text = available
-        ? field.endsWith('At') &&
-          typeof row[field] === 'string' &&
-          !Number.isNaN(Date.parse(row[field]))
-          ? formatDateTime(row[field])
-          : value(row, field)
+      const text = preview.availableColumns.includes(field)
+        ? value(row, field)
         : m.adaptive_unavailable_field();
 
       return index === 0 ? rowLink(row, text) : text;
@@ -163,7 +186,9 @@ export function AdaptiveRecords({
         return (
           <input
             type="checkbox"
-            aria-label={m.adaptive_select_record({ record: rowTitle(row) })}
+            aria-label={m.adaptive_select_record({
+              record: rowTitle(row, shown[0]),
+            })}
             disabled={!id}
             checked={!!id && !!selected?.includes(id)}
             onChange={(event) => {
@@ -183,7 +208,7 @@ export function AdaptiveRecords({
       caption={caption}
       rows={rows}
       columns={columns}
-      rowHeader={configuration.columns[0]}
+      rowHeader={shown[0]}
       rowKey={(row) => adaptiveRecordId(row) ?? JSON.stringify(row)}
       empty={
         <Empty>
@@ -209,95 +234,11 @@ export function AdaptiveRecords({
           {warning}
         </Alert>
       ))}
-      {configuration.metrics.length ? (
-        <div className="adaptive-metrics">
-          {configuration.metrics.map((metric) => {
-            const aggregate = preview.aggregates.find(
-              (item) => item.metricId === metric.id,
-            );
-
-            return (
-              <div className="adaptive-metric" key={metric.id}>
-                <span>{columnLabel(metric.id)}</span>
-                <strong>
-                  {aggregate?.value === null || !aggregate
-                    ? m.adaptive_unknown()
-                    : formatNumber(aggregate.value)}
-                </strong>
-                {!aggregate?.complete ? (
-                  <span>{m.overview_coverage_partial()}</span>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-      ) : null}
-      {configuration.charts.map((chart) => {
-        const series = preview.chartSeries.find((item) => item.id === chart.id);
-        const categories = (series?.points ?? []).map((point, index) => ({
-          key: String(index),
-          label: cellValue(point.key),
-          values: { count: point.value ?? 0 },
-          ...(point.value === null ? { unknown: m.adaptive_unknown() } : {}),
-          ...(!series?.complete ? { note: m.overview_coverage_partial() } : {}),
-        }));
-
-        return (
-          <Card key={chart.id}>
-            <CardHeader>
-              <CardTitle as="h3">{columnLabel(chart.id)}</CardTitle>
-              <p>
-                {series?.truncated
-                  ? m.adaptive_chart_truncated()
-                  : !series?.complete
-                    ? m.overview_coverage_partial()
-                    : m.adaptive_chart_complete()}
-              </p>
-            </CardHeader>
-            <CardContent>
-              {chart.type === 'line' ? (
-                <LinePlot points={categories} label={columnLabel(chart.id)} />
-              ) : (
-                <BarChart
-                  label={columnLabel(chart.id)}
-                  orientation="horizontal"
-                  series={[
-                    {
-                      id: 'count',
-                      label: columnLabel(chart.metricId),
-                      color: 'chart-1',
-                    },
-                  ]}
-                  categories={categories}
-                />
-              )}
-              <DataTable
-                caption={columnLabel(chart.id)}
-                density="compact"
-                variant="plain"
-                rows={categories}
-                rowKey={(row) => row.key}
-                columns={[
-                  {
-                    key: 'label',
-                    header: columnLabel(chart.groupBy),
-                    cell: (row) => row.label,
-                  },
-                  {
-                    key: 'count',
-                    header: columnLabel(chart.metricId),
-                    numeric: true,
-                    cell: (row) =>
-                      row.unknown
-                        ? m.adaptive_unknown()
-                        : formatNumber(row.values.count),
-                  },
-                ]}
-              />
-            </CardContent>
-          </Card>
-        );
-      })}
+      <ViewMetricsAndCharts
+        configuration={configuration}
+        preview={preview}
+        header={header}
+      />
       {onSelected && preview.items.length ? (
         <label className="adaptive-check">
           <input
@@ -323,8 +264,8 @@ export function AdaptiveRecords({
           {m.adaptive_select_all()}
         </label>
       ) : null}
-      {configuration.groupBy && groups.size ? (
-        configuration.layout === 'board' ? (
+      {group && groups.size ? (
+        configuration.state.layout === 'board' ? (
           <div className="adaptive-board">
             {[...groups].map(([label, rows]) => (
               <Card key={label}>
@@ -339,7 +280,7 @@ export function AdaptiveRecords({
                       className="adaptive-board-row"
                       key={adaptiveRecordId(row) ?? JSON.stringify(row)}
                     >
-                      {rowLink(row, rowTitle(row))}
+                      {rowLink(row, rowTitle(row, shown[0]))}
                     </div>
                   ))}
                 </CardContent>

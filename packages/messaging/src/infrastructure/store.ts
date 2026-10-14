@@ -15,6 +15,16 @@ import type {
 import type { Mailbox, MailboxRule } from '../domain/mailbox.js';
 import { documentReading } from './documents-store.js';
 import { outboundRepository } from './outbound-store.js';
+import {
+  factsToReview,
+  threadAfter,
+  threadConditions,
+  threadGroupField,
+  threadGroupMember,
+  threadListError,
+  ThreadListParameters,
+  threadOrder,
+} from './thread-list.js';
 
 /** Discovery reads routing identities only; it needs a tenant setting but no tenant data. */
 const discoveryTenant = '00000000-0000-4000-8000-000000000000';
@@ -171,8 +181,7 @@ const viewConditions: Record<ThreadFilter['view'], string> = {
   mine: "t.status<>'closed' AND t.owner_id=$2",
   unassigned: "t.status<>'closed' AND t.owner_id IS NULL",
   overdue: "t.status<>'closed' AND t.reply_due_at<$3::timestamptz",
-  review:
-    "EXISTS (SELECT 1 FROM messaging_facts f JOIN messaging_documents d ON d.tenant_id=f.tenant_id AND d.id=f.document_id WHERE f.tenant_id=t.tenant_id AND d.thread_id=t.id AND f.status IN ('proposed','needs_correction'))",
+  review: factsToReview,
   closed: "t.status='closed'",
   all: 'true',
 };
@@ -185,6 +194,42 @@ const like = (q: string | undefined) =>
 const listFilter = `t.tenant_id=$1 AND ($4::uuid IS NULL OR t.connection_id=$4)
   AND ($5::text IS NULL OR t.subject ILIKE $5 OR t.document->'correspondent'->>'address' ILIKE $5
    OR t.document->'correspondent'->>'name' ILIKE $5)`;
+
+/**
+ * The fixed parameters of a list read, `$1` to `$5`, and its filter over `t`: the view, mailbox,
+ * search and conditions. Further values bind after them.
+ */
+function threadQuery(tenantId: string, filter: Omit<ThreadFilter, 'limit'>) {
+  const parameters = new ThreadListParameters([
+    tenantId,
+    filter.actorId,
+    filter.now,
+    filter.connectionId ?? null,
+    like(filter.q),
+  ]);
+  const timeZone = filter.timeZone ?? 'UTC';
+  try {
+    new Intl.DateTimeFormat('en', { timeZone });
+  } catch {
+    throw threadListError('Use an IANA time zone, such as Europe/Berlin.');
+  }
+  let zone: string | undefined;
+  const conditions = threadConditions(filter, {
+    parameters,
+    now: '$3::timestamptz',
+    // Bound on first use: PostgreSQL rejects parameters a query never reads.
+    zone: () => (zone ??= parameters.bind(timeZone, 'text')),
+  });
+  // Every view binds the reader and time, so both parameters are always typed.
+  const where = `${listFilter} AND ${viewConditions[filter.view]} AND ${conditions}
+    AND $2::text IS NOT NULL AND $3::timestamptz IS NOT NULL${
+      filter.member
+        ? ` AND ${threadGroupMember(filter.member, parameters)}`
+        : ''
+    }`;
+
+  return { parameters, where };
+}
 
 /** Builds one transaction's repositories over the tenant-scoped connection. */
 function repositories(
@@ -425,25 +470,65 @@ function repositories(
         );
       },
       async list(filter) {
+        const { parameters, where } = threadQuery(tenantId, filter);
+        const after = threadAfter(filter, filter.after, parameters);
+        const limit = parameters.bind(filter.limit, 'integer');
+
         return (
           await rows(
-            // Every view binds the reader and time, so both parameters are always typed.
-            `SELECT t.* FROM messaging_threads t WHERE ${listFilter} AND ${viewConditions[filter.view]}
-              AND $2::text IS NOT NULL AND $3::timestamptz IS NOT NULL
-              AND ($6::timestamptz IS NULL OR (t.last_message_at,t.id)<($6::timestamptz,$7::uuid))
-            ORDER BY t.last_message_at DESC,t.id DESC LIMIT $8`,
-            [
-              tenantId,
-              filter.actorId,
-              filter.now,
-              filter.connectionId ?? null,
-              like(filter.q),
-              filter.after?.lastMessageAt ?? null,
-              filter.after?.id ?? null,
-              filter.limit,
-            ],
+            `SELECT t.* FROM messaging_threads t WHERE ${where} AND ${after}
+            ORDER BY ${threadOrder(filter)} LIMIT ${limit}`,
+            parameters.values,
           )
         ).map(thread);
+      },
+      async count(filter) {
+        const { parameters, where } = threadQuery(tenantId, filter);
+        const [row] = await rows(
+          `SELECT count(*)::integer AS count FROM messaging_threads t WHERE ${where}`,
+          parameters.values,
+        );
+
+        return row!.count as number;
+      },
+      async groups(filter) {
+        const { parameters, where } = threadQuery(tenantId, filter);
+        const field = threadGroupField(filter.field);
+        const perGroup = parameters.bind(filter.perGroup, 'integer');
+        const [result] = await rows(
+          `WITH keyed AS (SELECT t.*,${field.key} AS group_key,
+            row_number() OVER (PARTITION BY ${field.key} ORDER BY ${threadOrder(filter)}) AS position
+            FROM messaging_threads t WHERE ${where}),
+          group_list AS (SELECT g.key,count(*)::integer AS count,
+            row_number() OVER (ORDER BY g.key IS NULL,${field.order(parameters)}) AS place
+            FROM (SELECT group_key AS key FROM keyed) g GROUP BY g.key ORDER BY place LIMIT ${filter.maxGroups + 1}),
+          heads AS (SELECT k.* FROM keyed k JOIN group_list l ON l.key IS NOT DISTINCT FROM k.group_key
+            AND l.place<=${filter.maxGroups} WHERE k.position<=${perGroup})
+          SELECT (SELECT count(*)>${filter.maxGroups} FROM group_list) AS truncated,
+           COALESCE((SELECT jsonb_agg(jsonb_build_object('key',l.key,'count',l.count,
+            'ids',COALESCE((SELECT jsonb_agg(h.id ORDER BY h.position) FROM heads h WHERE h.group_key IS NOT DISTINCT FROM l.key),'[]'::jsonb))
+            ORDER BY l.place) FROM group_list l WHERE l.place<=${filter.maxGroups}),'[]'::jsonb) AS groups`,
+          parameters.values,
+        );
+        const groups = result!.groups as {
+          key: string | null;
+          count: number;
+          ids: string[];
+        }[];
+        const ids = groups.flatMap((group) => group.ids);
+
+        return {
+          truncated: result!.truncated as boolean,
+          groups,
+          rows: ids.length
+            ? (
+                await rows(
+                  'SELECT * FROM messaging_threads WHERE tenant_id=$1 AND id=ANY($2::uuid[])',
+                  [tenantId, ids],
+                )
+              ).map(thread)
+            : [],
+        };
       },
       async counts(filter) {
         const [row] = await rows(

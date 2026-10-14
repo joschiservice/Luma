@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { collectionGroupSchema } from '../collections.js';
 import { endpoint, organizationParamsSchema, requires } from '../common.js';
 import {
   assignInputSchema,
@@ -117,7 +118,7 @@ export const messagingContract = {
       path: `${path}/threads`,
       summary: 'List message threads',
       description:
-        'Lists threads read from connected mailboxes, newest activity first. `overdue` lists threads whose reply deadline passed; `review` lists threads with document facts to review.',
+        'Lists threads read from connected mailboxes, newest activity first unless `sort` says otherwise. `overdue` lists threads whose reply deadline passed; `review` lists threads with document facts to review. Conditions use structured thread properties only, never message text. View counts follow the search and mailbox but not the conditions.',
     })
     .meta({ access: requires('messages.read'), errors })
     .input(
@@ -134,6 +135,18 @@ export const messagingContract = {
           overdue: z.number().int(),
           review: z.number().int(),
         }),
+        groups: z
+          .array(collectionGroupSchema)
+          .optional()
+          .describe(
+            'With `group`: each group in display order with its exact count and first rows, whose threads are in `items`. With `groupKey`: the one group, with this page of its rows.',
+          ),
+        groupsTruncated: z
+          .boolean()
+          .optional()
+          .describe(
+            'More than 50 groups match; narrow the conditions to see the rest.',
+          ),
       }),
     ),
   thread: endpoint

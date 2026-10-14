@@ -159,7 +159,7 @@ function SupplierRecordView({
             <Link
               to="/app/$organizationId/procurement"
               params={{ organizationId }}
-              search={{ view: 'suppliers', q: '', status: '' }}
+              search={{ tab: 'suppliers' }}
             />
           ),
         }}
@@ -230,7 +230,7 @@ function SupplierRecordView({
           <Link
             to="/app/$organizationId/procurement"
             params={{ organizationId }}
-            search={{ view: 'suppliers', q: '', status: '' }}
+            search={{ tab: 'suppliers' }}
           >
             {m.procurement_supplier_missing_link()}
           </Link>

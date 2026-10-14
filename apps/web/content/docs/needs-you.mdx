@@ -21,7 +21,25 @@ Decisions leave the queue as soon as they’re answered, expire or no longer app
 - **Assigned to me**: decisions you took or someone assigned to you.
 - **Unassigned**: decisions nobody is looking after yet.
 
-Filter by **Area** (Orders, Fulfillment, Inventory, Procurement or Other operations) or by **Reason**. Each option shows how many decisions match. The view, filters and selected decision are part of the address, so you can share a link or pin the view.
+The view menu before the tabs also lists the views you and your team saved. Opening **Needs you** from the sidebar returns to the view you used last. The counts on the tabs, and in the sidebar, always cover the whole queue you can see, whatever you filter.
+
+## Find decisions
+
+Search by title. Your search text stays on the page: it isn’t saved in the page address or in views, and it’s cleared when you leave or reload the page.
+
+**Owner**, **Area** (Orders, Fulfillment, Inventory, Procurement or Other operations) and **Reason** above the queue narrow it in one click. **Owner** finds decisions you hold, decisions nobody holds or the decisions of one person; a view saved with **Me** shows each person their own. For anything else, choose **Filter**: **Impact**, **Deadline** (a date range, the next few days, or decisions without one) and **Waiting since**. **Clear** removes every filter and the search.
+
+The sort menu after **Display** names the current order. Choose it to sort by deadline or by how long decisions have waited, or to flip the direction. Decisions without a deadline come last when you sort by deadline.
+
+Your view, filters and sort are part of the address, together with the selected decision, so you can share a link or pin the view. Links from before views, such as one area from Insights, open the same filters.
+
+## Arrange the queue
+
+Select **Display** to choose what each decision shows, such as its type, owner, impact, deadline or waiting time, to group the queue, and to switch to **Compact** density. Every row keeps its status, so nothing waiting on you is hidden.
+
+**Group by** puts decisions together by area, reason, owner or cause, such as all stock corrections waiting for approval. Each group shows how many decisions it has; **Show more** loads more. A group marked incomplete may be missing decisions from an area that didn’t answer. Each decision still needs its own response; nothing is approved in bulk.
+
+Changed filters, sorting, grouping or display mark the view **Modified**; select **Save**, **Save as new view** or **Reset**. Density and collapsed groups are your own settings.
 
 ## How the queue is ordered
 
@@ -30,8 +48,6 @@ Filter by **Area** (Orders, Fulfillment, Inventory, Procurement or Other operati
 3. Everything else, earliest deadline first, then oldest request.
 
 Impact Luma hasn’t assessed is labeled **Impact not assessed** instead of being ranked as low.
-
-**Group by cause** puts decisions with the same cause together, such as all stock corrections waiting for approval. Groups cover the current page only. Each decision still needs its own response; nothing is approved in bulk.
 
 ## What each status means
 
@@ -69,11 +85,17 @@ Members can take decisions and follow them, but their role doesn’t include **A
 
 ## Move through the queue
 
-Use **J** and **K** to move to the next and previous decision, and **Esc** to close the selected decision.
+- **J** and **K**, or the arrow keys, move through the queue.
+- **Space** opens the decision you're on beside the queue, or closes it. While it's open, **J** and **K** open the next and previous decision.
+- **Enter** opens the decision you're on.
+- **Esc** closes the decision and returns you to its row.
+- **/** goes to search, **F** adds a filter and **?** lists these shortcuts.
+
+Shortcuts don't work while you type in a field. When the queue refreshes, the decision you're on stays selected even if others move around it.
 
 ## When the queue is incomplete or offline
 
-- **Some decisions couldn’t be loaded** names the area that didn’t answer. Its decisions are missing from the list, not resolved. Choose **Refresh Needs you** to try again.
+- **Some decisions couldn’t be loaded** names the area that didn’t answer. Its decisions are missing from the list, not resolved, even when the list is empty: **Decisions may be missing** then replaces the empty message. Choose **Refresh Needs you** to try again.
 - **Needs you couldn’t be refreshed** means the list below may be out of date.
 - **You’re offline**: the list shows the decisions Luma last loaded, and responses are paused until you reconnect.
 

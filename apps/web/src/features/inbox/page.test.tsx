@@ -16,7 +16,7 @@ import {
   threadDetailFixture,
   threadFixtures,
 } from './fixtures';
-import { ThreadRow } from './page';
+import { ThreadList } from './page';
 import { memberName } from './people';
 import { RecordThreadList } from './record-messages';
 import { threadAccess, ThreadDetailView } from './thread';
@@ -44,9 +44,10 @@ const people = {
 
 it('shows reply state, owner, links and review counts in a thread row', async () => {
   const html = await render(
-    <ThreadRow
-      thread={threadFixtures[0]!}
+    <ThreadList
       organizationId={inboxOrg}
+      search={{}}
+      threads={[threadFixtures[0]!]}
       members={members}
       self={alex}
       now={inboxNow}
@@ -58,6 +59,24 @@ it('shows reply state, owner, links and review counts in a thread row', async ()
   expect(html).toContain('Awaiting reply');
   expect(html).toContain('Owner: You');
   expect(html).toContain('PO-2026-0412');
+  expect(html).toContain('3 facts to review');
+});
+
+it('keeps reply state visible when the reader hides every optional property', async () => {
+  const html = await render(
+    <ThreadList
+      organizationId={inboxOrg}
+      search={{}}
+      threads={[threadFixtures[0]!]}
+      members={members}
+      self={alex}
+      now={inboxNow}
+      showMailbox={false}
+      properties={['activity']}
+    />,
+  );
+  expect(html).not.toContain('Owner: You');
+  expect(html).toContain('Reply overdue');
   expect(html).toContain('3 facts to review');
 });
 

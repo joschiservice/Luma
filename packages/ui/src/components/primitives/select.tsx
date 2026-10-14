@@ -72,7 +72,8 @@ export function Select<Value extends string>({
           align="start"
           sideOffset={6}
           alignItemWithTrigger={false}
-          className="z-50 outline-none"
+          // Above responsive pickers (z-index 60), which hold selects such as a condition's operator.
+          className="z-[70] outline-none"
         >
           <SelectPrimitive.Popup className="lu-popover max-w-[var(--available-width)] min-w-[var(--anchor-width)] overflow-hidden font-sans text-[13px]">
             <SelectPrimitive.List

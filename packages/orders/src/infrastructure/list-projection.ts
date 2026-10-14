@@ -13,6 +13,14 @@ import {
 const timestampKey = (column: string) =>
   `to_char(${column} AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US')`;
 
+// The snapshot's total as `amount` and `currency`, both null unless the amount is a plain
+// decimal and the currency an ISO code, so a malformed source total never fails a refresh.
+const orderTotal = (
+  snapshot: string,
+) => `SELECT CASE WHEN ok THEN (t->>'amount')::numeric END AS amount,CASE WHEN ok THEN t->>'currency' END AS currency
+ FROM (SELECT t,(t->>'amount' ~ '^-?[0-9]{1,30}(\\.[0-9]{1,30})?$' AND t->>'currency' ~ '^[A-Z]{3}$') AS ok
+  FROM (SELECT document->'data'->'total' AS t FROM orders_snapshots WHERE tenant_id=$1 AND id=${snapshot}) s) v`;
+
 /**
  * Rebuilds locked orders from their current source pointers in the caller's transaction.
  * Callers must hold the orders:<tenant>:<order> lock for each ID, in sorted order.
@@ -43,7 +51,8 @@ export async function refreshOrderList(
     winners AS (SELECT DISTINCT ON(entity_id) entity_id,connection_id FROM sources ORDER BY entity_id,${sourceSelectionOrder})
     INSERT INTO orders_list(tenant_id,entity_id,connection_id,snapshot_id,selected,status,payment_status,display_number,
       observed_at,source_updated_at,placed_at,due_at,deleted,line_count,fulfillment,open,state_valid_from,differs,
-      updated_key,placed_key,placed_rank,number_key,number_rank,due_key,due_rank,external_order_number,comparison_signature,comparison_changed_at,comparison_raw,comparison_read_at,comparison_latest_read_at,comparison_confirm_after,comparison_differences)
+      updated_key,placed_key,placed_rank,number_key,number_rank,due_key,due_rank,external_order_number,comparison_signature,comparison_changed_at,comparison_raw,comparison_read_at,comparison_latest_read_at,comparison_confirm_after,comparison_differences,total_amount,total_currency,
+      channel,currency,test,cancel_reason)
     SELECT $1,o.entity_id,o.connection_id,o.snapshot_id,w.connection_id=o.connection_id,o.status,o.payment_status,o.display_number,
       o.observed_at,o.source_updated_at,o.placed_at,o.due_at,o.deleted,o.line_count,o.fulfillment,o.open,
       GREATEST(o.observed_at,COALESCE((SELECT max(s.observed_at) FROM orders_snapshots s
@@ -58,8 +67,12 @@ export async function refreshOrderList(
       (SELECT obs.document->'observation'->'data'->>'externalOrderNumber' FROM orders_snapshots snap
        JOIN connector_observations obs ON obs.tenant_id=snap.tenant_id AND obs.id=snap.observation_id
        WHERE snap.tenant_id=$1 AND snap.id=o.snapshot_id),
-      v.signature,v.changed_at,COALESCE(v.raw,'inconclusive'),v.read_at,v.latest_read_at,v.confirm_after,COALESCE(v.differences,'[]'::jsonb)
+      v.signature,v.changed_at,COALESCE(v.raw,'inconclusive'),v.read_at,v.latest_read_at,v.confirm_after,COALESCE(v.differences,'[]'::jsonb),
+      total.amount,total.currency,facts.channel,facts.currency,facts.test,facts.cancel_reason
     FROM order_state o JOIN winners w USING(entity_id) LEFT JOIN comparisons v ON v.entity_id=o.entity_id AND v.connection_id=o.connection_id
+    LEFT JOIN LATERAL (${orderTotal('o.snapshot_id')}) total ON true
+    LEFT JOIN LATERAL (SELECT f.* FROM orders_snapshots snap CROSS JOIN LATERAL orders_commercial_scalars(snap.document->'data') f
+      WHERE snap.tenant_id=$1 AND snap.id=o.snapshot_id) facts ON true
     ON CONFLICT(tenant_id,entity_id,connection_id) DO UPDATE SET
       snapshot_id=EXCLUDED.snapshot_id,selected=EXCLUDED.selected,status=EXCLUDED.status,payment_status=EXCLUDED.payment_status,
       display_number=EXCLUDED.display_number,observed_at=EXCLUDED.observed_at,source_updated_at=EXCLUDED.source_updated_at,
@@ -70,8 +83,22 @@ export async function refreshOrderList(
       comparison_signature=EXCLUDED.comparison_signature,comparison_changed_at=EXCLUDED.comparison_changed_at,
       comparison_raw=EXCLUDED.comparison_raw,comparison_read_at=EXCLUDED.comparison_read_at,
       comparison_latest_read_at=EXCLUDED.comparison_latest_read_at,comparison_confirm_after=EXCLUDED.comparison_confirm_after,
-      comparison_differences=EXCLUDED.comparison_differences`,
+      comparison_differences=EXCLUDED.comparison_differences,total_amount=EXCLUDED.total_amount,total_currency=EXCLUDED.total_currency,
+      channel=EXCLUDED.channel,currency=EXCLUDED.currency,test=EXCLUDED.test,cancel_reason=EXCLUDED.cancel_reason`,
     [tenant, 'infinity', ids, JSON.stringify(comparisons)],
+  );
+  // Tags, discount codes and shipping methods follow each list row's current snapshot.
+  await tx.query(
+    'DELETE FROM orders_list_facets WHERE tenant_id=$1 AND entity_id=ANY($2::uuid[])',
+    [tenant, ids],
+  );
+  await tx.query(
+    `INSERT INTO orders_list_facets(tenant_id,kind,value,entity_id,connection_id)
+    SELECT DISTINCT o.tenant_id,f.kind,f.value,o.entity_id,o.connection_id
+    FROM orders_list o JOIN orders_snapshots s ON s.tenant_id=o.tenant_id AND s.id=o.snapshot_id
+    CROSS JOIN LATERAL orders_commercial_facets(s.document->'data') f
+    WHERE o.tenant_id=$1 AND o.entity_id=ANY($2::uuid[]) AND NOT o.deleted`,
+    [tenant, ids],
   );
   if (!refreshSearch) return;
   await tx.query(

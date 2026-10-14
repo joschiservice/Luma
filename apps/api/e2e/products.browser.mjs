@@ -1,4 +1,6 @@
 /* global document */
+import { createObservability } from '@luma/platform/composition';
+
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 import { productsFixture } from './products-fixture.mjs';
@@ -9,7 +11,14 @@ test('finds a SKU, compares its store and ERP listings and follows affected orde
 }) => {
   const port = await availablePort(),
     origin = `http://127.0.0.1:${port}`;
-  const f = await settingsFixture(t, origin);
+  // Saved views are behind a release flag.
+  const observability = createObservability({
+    environment: 'test',
+    release: 'test',
+    sampleRate: 0,
+    featureFlagOverrides: { 'adaptive-saved-views': true },
+  });
+  const f = await settingsFixture(t, origin, { observability });
   const catalog = await productsFixture(t, f);
   const apiOrigin = await f.app.listen({ host: '127.0.0.1', port: 0 });
   const web = startProcess(
@@ -91,11 +100,18 @@ test('finds a SKU, compares its store and ERP listings and follows affected orde
   await page.screenshot({ path: '/tmp/luma101-list-dark.png', fullPage: true });
   await page.evaluate(() => document.documentElement.classList.remove('dark'));
   await page.getByRole('tab', { name: /Not in every source/ }).click();
-  await page.getByRole('button', { name: 'Add Missing from filter' }).click();
-  await page.getByRole('button', { name: 'JTL-Wawi', exact: true }).click();
-  await page
-    .getByRole('button', { name: 'Edit Missing from filter: JTL-Wawi' })
-    .waitFor();
+  await page.waitForURL((url) => url.searchParams.get('view') === 'missing');
+
+  // A "Missing from" link from before views becomes the same condition.
+  await page.goto(
+    `/app/${f.org.id}/products?view=missing&missingFrom=${catalog.erp}`,
+  );
+  await page.waitForURL((url) => url.searchParams.has('where'));
+  expect(new URL(page.url()).searchParams.has('missingFrom')).toBe(false);
+  expect(JSON.parse(new URL(page.url()).searchParams.get('where'))).toEqual({
+    match: 'all',
+    conditions: [{ field: 'missing', op: 'any_of', value: [catalog.erp] }],
+  });
   await page.getByRole('link', { name: 'APR-M', exact: true }).waitFor();
   expect(
     await page.getByRole('link', { name: 'SKU-100', exact: true }).count(),
@@ -108,14 +124,61 @@ test('finds a SKU, compares its store and ERP listings and follows affected orde
     .getByRole('navigation', { name: 'Breadcrumb' })
     .getByRole('link', { name: 'Products' })
     .click();
+  await page.getByRole('link', { name: 'APR-M', exact: true }).waitFor();
   const url = new URL(page.url());
   expect(url.searchParams.get('view')).toBe('missing');
-  expect(url.searchParams.get('missingFrom')).toBe(catalog.erp);
+  expect(url.searchParams.get('where')).toContain(catalog.erp);
   await page
     .getByRole('searchbox', { name: 'Search products' })
     .fill('nothing');
   await page.keyboard.press('Enter');
   await page.getByRole('heading', { name: 'No products match' }).waitFor();
+
+  // A per-source condition, a sort and a grouping become a personal view that opens again.
+  await page.goto(`/app/${f.org.id}/products?view=all`);
+  await page.getByRole('link', { name: 'APR-M', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Add a filter' }).click();
+  const picker = page.getByRole('dialog', { name: 'Add a filter' });
+  await picker.getByRole('searchbox', { name: 'Find a field' }).fill('Vendor');
+  await picker.getByRole('button', { name: 'Vendor', exact: true }).click();
+  const vendor = page.getByRole('dialog', { name: 'Vendor' });
+  await vendor.getByRole('combobox', { name: 'Condition' }).click();
+  await page.getByRole('option', { name: 'is not empty' }).click();
+  await vendor.getByRole('button', { name: 'Apply filter' }).click();
+  await page.getByRole('button', { name: /^Edit filter: Vendor/ }).waitFor();
+  await expect(
+    page.getByRole('link', { name: 'APR-M', exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole('link', { name: 'SKU-100', exact: true }).waitFor();
+  const skuHeader = page.getByRole('columnheader', { name: /^SKU/ }).first();
+  await skuHeader.getByRole('button', { name: 'SKU', exact: true }).click();
+  await expect(skuHeader).toHaveAttribute('aria-sort', 'ascending');
+  expect(new URL(page.url()).searchParams.get('sort')).toBe('sku');
+  await page.getByRole('button', { name: 'Display' }).click();
+  await page.getByRole('combobox', { name: 'Group by' }).click();
+  await page.getByRole('option', { name: 'Status', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: /^Active/ }).waitFor();
+  await page.getByRole('button', { name: 'Save as new view' }).click();
+  const save = page.getByRole('dialog', { name: 'Save as new view' });
+  await save.getByLabel('Name').fill('Vendor listings');
+  await save.getByRole('button', { name: 'Save', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Vendor listings', exact: true })
+    .waitFor();
+  await page.waitForURL((url) =>
+    /^[0-9a-f-]{36}$/.test(url.searchParams.get('view') ?? ''),
+  );
+  const viewId = new URL(page.url()).searchParams.get('view');
+  await page.screenshot({
+    path: '/tmp/luma319-products-view.png',
+    fullPage: true,
+  });
+  await page.waitForTimeout(1500);
+  await page.goto(`/app/${f.org.id}/products`);
+  await page.waitForURL((link) => link.searchParams.get('view') === viewId);
+  await page.getByRole('button', { name: /^Edit filter: Vendor/ }).waitFor();
+  await page.getByRole('button', { name: /^Active/ }).waitFor();
 
   // Stock detail leads to the product, and the product leads to inventory.
   await page.goto(`/app/${f.org.id}/inventory/${catalog.position.id}`);

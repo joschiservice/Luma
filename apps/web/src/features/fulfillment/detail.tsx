@@ -521,7 +521,11 @@ export function FulfillmentDetailView({
             <Link
               to="/app/$organizationId/fulfillment"
               params={{ organizationId }}
-              search={fulfillmentFilters(search)}
+              search={{
+                ...fulfillmentFilters(search),
+                cursor: search.cursor,
+                page: search.page,
+              }}
             />
           ),
         }}

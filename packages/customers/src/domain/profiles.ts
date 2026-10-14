@@ -60,6 +60,8 @@ export interface CustomerOrder {
   connectionId: string;
   order: { externalId: string; scopeKey: string };
   customerExternalId: string | null;
+  /** When the source reports the order was placed; omitted or null when it reports none. */
+  placedAt?: string | null;
   observedAt: string;
 }
 

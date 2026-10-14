@@ -3,8 +3,13 @@ import type {
   FulfillmentItem,
   FulfillmentList,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
 import { Button } from '@luma/ui/components/primitives/button';
+import { CollectionToolbar } from '@luma/ui/components/primitives/collection-toolbar';
+import type { DataTableSort } from '@luma/ui/components/primitives/data-table';
+import { Pagination } from '@luma/ui/components/primitives/pagination';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
   createRootRoute,
@@ -14,10 +19,16 @@ import {
 import { useState } from 'react';
 import { expect, userEvent, within } from 'storybook/test';
 
+import { CollectionNotices } from '../../kit/collections/notices';
+import type { CollectionError } from '../../kit/collections/paging';
 import appStyles from '../../styles.css?inline';
-import type { FulfillmentSearch } from './data';
+import { fulfillmentGroupLabel } from './collection';
+import { fulfillmentOptions } from './data';
 import { FulfillmentDetailView } from './detail';
-import { FulfillmentView } from './page';
+import { FulfillmentEmpty, FulfillmentTabs, FulfillmentView } from './page';
+import { orderLabel } from './presentation';
+import { FulfillmentPreview } from './preview';
+import { FulfillmentResults } from './results';
 
 const org = '33333333-3333-4333-8333-333333333333';
 const store = '66666666-6666-4666-8666-666666666666';
@@ -313,7 +324,6 @@ const actions = (
 );
 
 function Content({ state }: { state: string }) {
-  const [search, change] = useState<FulfillmentSearch>({});
   if (state === 'shipping-handoff' || state === 'stale-tracking') {
     const carrier = state === 'stale-tracking';
 
@@ -389,33 +399,236 @@ function Content({ state }: { state: string }) {
       />
     );
 
-  return (
-    <FulfillmentView
-      organizationId={org}
-      search={search}
-      change={change}
-      refresh={() => {}}
-      next={() => {}}
-      list={
-        state === 'loading' || state === 'error'
-          ? undefined
-          : state === 'calm'
-            ? {
-                ...list,
-                items: [],
-                counts: { ...list.counts, attention: 0, held: 0, delayed: 0 },
-                nextCursor: null,
-              }
-            : list
-      }
-      loading={state === 'loading'}
-      offline={state === 'offline'}
-      error={state === 'error' ? 'Service unavailable.' : undefined}
+  return <ListPreview state={state} />;
+}
+
+const groupedList: FulfillmentList = {
+  ...list,
+  nextCursor: null,
+  groups: [
+    {
+      key: 'merchant',
+      count: 9,
+      complete: true,
+      itemIds: [items[0]!.id, held.id],
+      nextCursor: 'group-next',
+      sums: [],
+    },
+    {
+      key: 'carrier',
+      count: 1,
+      complete: false,
+      itemIds: [items[2]!.id],
+      nextCursor: null,
+      sums: [],
+    },
+    {
+      key: null,
+      count: 1,
+      complete: true,
+      itemIds: [items[3]!.id],
+      nextCursor: null,
+      sums: [],
+    },
+  ],
+};
+
+/** The list page as the route renders it, with fixed rows and local view state. */
+function ListPreview({ state }: { state: string }) {
+  const [segment, setSegment] = useState('attention');
+  const [sort, setSort] = useState<DataTableSort>({
+    key: 'waiting',
+    direction: 'asc',
+  });
+  const [collapsed, setCollapsed] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [open, setOpen] = useState<string | undefined>(
+    state === 'preview' ? held.id : undefined,
+  );
+  const [client] = useState(() => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(fulfillmentOptions(org, held.id).queryKey, {
+      ...detail,
+      stalledAfterHours: 48,
+      asOf,
+    });
+
+    return queryClient;
+  });
+  const layout =
+    state === 'list' ? 'list' : state === 'board' ? 'board' : 'table';
+  const grouping =
+    state === 'grouped' || state === 'board'
+      ? { field: 'stage', showEmpty: false }
+      : null;
+  const shown =
+    state === 'calm'
+      ? {
+          ...list,
+          items: [],
+          counts: { ...list.counts, attention: 0, held: 0, delayed: 0 },
+          nextCursor: null,
+        }
+      : state === 'unmatched'
+        ? { ...list, items: [], nextCursor: null }
+        : grouping
+          ? groupedList
+          : list;
+  const error: CollectionError | undefined =
+    state === 'error'
+      ? { kind: 'unavailable' }
+      : state === 'repair'
+        ? { kind: 'invalid', message: m.collections_needs_repair() }
+        : undefined;
+  const hidden = ['loading', 'error', 'repair'].includes(state);
+  const link = (row: FulfillmentItem) => (
+    <a
+      href={`#fulfillment-${row.id}`}
+      onClick={(event) => {
+        if (state !== 'preview') return;
+        event.preventDefault();
+        setOpen(row.id);
+      }}
     />
+  );
+  const openItem = shown.items.find((row) => row.id === open);
+
+  return (
+    <QueryClientProvider client={client}>
+      <FulfillmentView
+        toolbar={
+          <CollectionToolbar
+            views={
+              <FulfillmentTabs
+                value={segment}
+                counts={hidden ? undefined : shown.counts}
+                onChange={setSegment}
+              />
+            }
+            search={{
+              value: state === 'unmatched' ? 'NOPE' : undefined,
+              onChange: () => {},
+              label: m.fulfillment_list_search_label(),
+              placeholder: m.fulfillment_list_search_placeholder(),
+            }}
+            sort={{
+              value: sort.key,
+              options: [
+                { value: 'waiting', label: 'Last progress' },
+                { value: 'fulfillBy', label: 'Fulfill by' },
+              ],
+              onChange: (key) => setSort({ ...sort, key }),
+              direction: sort.direction,
+              onDirectionChange: (direction) => setSort({ ...sort, direction }),
+            }}
+            onRefresh={() => {}}
+          />
+        }
+        note={m.fulfillment_list_note({ hours: 48 })}
+        notices={
+          <CollectionNotices
+            offline={state === 'offline'}
+            error={error}
+            hasRows={!hidden}
+            retry={() => {}}
+            firstPage={() => {}}
+            repair={state === 'repair' ? () => {} : undefined}
+          />
+        }
+        loading={state === 'loading'}
+        results={
+          hidden ? undefined : (
+            <FulfillmentResults
+              list={shown}
+              layout={layout}
+              density="comfortable"
+              grouping={grouping}
+              caption="Needs attention. Sorted by: Last progress"
+              link={link}
+              empty={
+                <FulfillmentEmpty
+                  organizationId={org}
+                  segment={segment}
+                  filtered={state === 'unmatched'}
+                  clear={() => {}}
+                />
+              }
+              sort={sort}
+              onSortChange={setSort}
+              columnState={{
+                columns: [
+                  'order',
+                  'status',
+                  'signals',
+                  'location',
+                  'progress',
+                ].map((key) => ({ key })),
+              }}
+              onColumnStateChange={() => {}}
+              properties={['status', 'signals', 'location', 'progress']}
+              current={open}
+              selection={{ selected, onChange: setSelected }}
+              groupLabel={(key) =>
+                fulfillmentGroupLabel('stage', undefined, key)
+              }
+              more={(group) => ({
+                rows: [],
+                load: group.nextCursor ? () => {} : undefined,
+                pending: false,
+                failed: false,
+              })}
+              collapsed={collapsed}
+              onCollapsedChange={(id, closed) =>
+                setCollapsed((current) =>
+                  closed
+                    ? [...current, id]
+                    : current.filter((item) => item !== id),
+                )
+              }
+            />
+          )
+        }
+        pagination={
+          !hidden && !grouping && shown.items.length ? (
+            <Pagination
+              count={shown.items.length}
+              totalCount={shown.counts.attention}
+              page={1}
+              pageSize={50}
+              hasNext={!!shown.nextCursor}
+              onNext={() => {}}
+              formatTotal={(count) =>
+                m.fulfillment_list_pagination_total({ count })
+              }
+              label={m.fulfillment_list_pagination_label()}
+            />
+          ) : null
+        }
+        preview={
+          state === 'preview'
+            ? {
+                open: !!openItem,
+                title: openItem ? orderLabel(openItem) : undefined,
+                content: openItem ? (
+                  <FulfillmentPreview
+                    organizationId={org}
+                    fulfillmentId={openItem.id}
+                    item={openItem}
+                    sources={shown.sources}
+                    asOf={asOf}
+                    filter={() => {}}
+                  />
+                ) : null,
+                onClose: () => setOpen(undefined),
+              }
+            : undefined
+        }
+      />
+    </QueryClientProvider>
   );
 }
 
-function Preview({ state = 'list' }: { state?: string }) {
+function Preview({ state = 'table' }: { state?: string }) {
   const [router] = useState(() =>
     createRouter({
       history: createMemoryHistory(),
@@ -450,7 +663,7 @@ export const Attention: Story = {
       await canvas.findByRole('link', { name: '#1042' }),
     ).toBeVisible();
     await expect(canvas.getByText('Held: Incorrect address.')).toBeVisible();
-    await expect(canvas.getByText('Past fulfill-by date')).toBeVisible();
+    await expect(canvas.getByText('1–4 of 4 fulfillments')).toBeVisible();
     await userEvent.click(canvas.getByRole('tab', { name: /On hold/ }));
     await expect(canvas.getByRole('tab', { name: /On hold/ })).toHaveAttribute(
       'aria-selected',
@@ -459,37 +672,77 @@ export const Attention: Story = {
   },
 };
 
-export const Filter: Story = {
+export const List: Story = {
+  args: { state: 'list' },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const page = within(canvasElement.ownerDocument.body);
-    await userEvent.click(
-      await canvas.findByRole('button', { name: 'Add Location filter' }),
-    );
-    await userEvent.click(
-      await page.findByRole('button', { name: 'Tokyo warehouse · 14 open' }),
-    );
     await expect(
-      await canvas.findByRole('button', {
-        name: 'Edit Location filter: Tokyo warehouse · 14 open',
+      await canvas.findByRole('list', { name: /Needs attention/ }),
+    ).toBeVisible();
+    await expect(canvas.getByRole('link', { name: /#1042/ })).toBeVisible();
+  },
+};
+
+export const Grouped: Story = {
+  args: { state: 'grouped' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const merchant = await canvas.findByRole('button', {
+      name: /^Waiting at merchant/,
+    });
+    await expect(merchant).toHaveAttribute('aria-expanded', 'true');
+    await expect(canvas.getByText('Incomplete')).toBeVisible();
+    await expect(
+      canvas.getByRole('button', { name: 'Show more in Waiting at merchant' }),
+    ).toBeVisible();
+  },
+};
+
+export const BoardByStage: Story = {
+  args: { state: 'board' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByRole('region', { name: /With carrier/ }),
+    ).toBeVisible();
+    // Sources own the shipping stage, so cards can't be moved.
+    await expect(canvas.queryByRole('button', { name: 'Move to…' })).toBeNull();
+  },
+};
+
+export const BoardDark: Story = {
+  args: { state: 'board' },
+  globals: { theme: 'dark' },
+};
+
+export const OpenPreview: Story = {
+  args: { state: 'preview' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const preview = await canvas.findByRole('region', {
+      name: 'Fulfillment preview',
+    });
+    await expect(
+      await within(preview).findByText('Linen shirt · M'),
+    ).toBeVisible();
+    await expect(
+      within(preview).getByRole('button', {
+        name: 'Filter by Waiting to start',
       }),
     ).toBeVisible();
-    await userEvent.click(
-      canvas.getByRole('button', { name: 'Add Type filter' }),
-    );
-    await userEvent.click(
-      await page.findByRole('button', { name: 'Shipments' }),
-    );
-    await userEvent.click(
+  },
+};
+
+export const NoMatches: Story = { args: { state: 'unmatched' } };
+
+export const NeedsRepair: Story = {
+  args: { state: 'repair' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
       await canvas.findByRole('button', {
-        name: 'Remove Type filter: Shipments',
+        name: 'Remove unsupported conditions',
       }),
-    );
-    await expect(
-      canvas.queryByRole('button', { name: /^(Edit|Remove) Type filter/ }),
-    ).toBeNull();
-    await expect(
-      canvas.getByRole('button', { name: /^Edit Location filter/ }),
     ).toBeVisible();
   },
 };

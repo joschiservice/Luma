@@ -6,6 +6,7 @@ import {
   customFieldQueryResultSchema,
   customFieldQuerySchema,
   customFieldRecordSchema,
+  customFieldRecordsSchema,
   customFieldSchema,
   customFieldValueSchema,
   fieldWorkflowReviewSchema,
@@ -198,6 +199,30 @@ export const adaptiveFieldsContract = {
       }),
     )
     .output(customFieldSchema),
+  readMany: endpoint
+    .route({
+      method: 'POST',
+      path: `${root}/records/{recordType}/values`,
+      summary: 'Read custom field values of several records',
+      description:
+        'Reads permitted fields and their values for up to 100 records of one type, as list columns show them. Records you cannot see return no values; records without values are absent.',
+    })
+    .meta({
+      access: requires('adaptive.fields.read'),
+      readOnly: true,
+      errors: [401, 403, 422, 503],
+    })
+    .input(
+      z.object({
+        params: organizationParamsSchema.extend({
+          recordType: adaptiveRecordTypeSchema,
+        }),
+        body: z
+          .object({ recordIds: z.array(z.string().uuid()).min(1).max(100) })
+          .strict(),
+      }),
+    )
+    .output(customFieldRecordsSchema),
   readValues: endpoint
     .route({
       method: 'GET',

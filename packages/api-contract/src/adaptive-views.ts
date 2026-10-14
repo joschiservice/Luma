@@ -1,175 +1,11 @@
 import { z } from 'zod';
 
-export const adaptiveViewDomainSchema = z.enum([
-  'orders',
-  'inventory',
-  'fulfillment',
-  'customers',
-  'products',
-  'procurement',
-  'issues',
-  'decisions',
-]);
-const scalar = z.union([
-  z.string().max(2000),
-  z.number().finite(),
-  z.boolean(),
-  z.null(),
-]);
+import {
+  adaptiveViewQueryInputSchema,
+  adaptiveViewQuerySchema,
+} from './adaptive-view-query.js';
+
 const field = z.string().min(1).max(120);
-
-const adaptiveViewActionSchema = z
-  .object({
-    id: z.string().uuid(),
-    label: z
-      .object({
-        en: z.string().trim().min(1).max(80),
-        de: z.string().trim().min(1).max(80),
-      })
-      .strict(),
-    target: z
-      .object({
-        kind: z.enum(['capability', 'workflow']),
-        id: z.string().min(1).max(200),
-        version: z.string().max(100).optional(),
-      })
-      .strict(),
-    inputs: z
-      .record(
-        z.string().min(1).max(100),
-        z.discriminatedUnion('source', [
-          z.object({ source: z.literal('row'), field }).strict(),
-          z.object({ source: z.literal('literal'), value: scalar }).strict(),
-        ]),
-      )
-      .refine((values) => Object.keys(values).length <= 50),
-  })
-  .strict();
-
-/** Versioned query descriptions keep live records in their owning domains. */
-export const adaptiveViewQuerySchema = z
-  .object({
-    version: z.literal(1),
-    domain: adaptiveViewDomainSchema,
-    filters: z
-      .record(z.string().min(1).max(100), scalar)
-      .refine((values) => Object.keys(values).length <= 30)
-      .default({}),
-    customFilters: z
-      .array(
-        z
-          .object({
-            fieldId: z.string().uuid(),
-            operator: z.enum([
-              'eq',
-              'ne',
-              'gt',
-              'gte',
-              'lt',
-              'lte',
-              'contains',
-              'is_empty',
-            ]),
-            value: scalar,
-          })
-          .strict(),
-      )
-      .max(20)
-      .default([]),
-    columns: z.array(field).min(1).max(30),
-    sort: z
-      .object({ field, direction: z.enum(['asc', 'desc']) })
-      .strict()
-      .nullable()
-      .default(null),
-    groupBy: field.nullable().default(null),
-    layout: z.enum(['table', 'board']).default('table'),
-    metrics: z
-      .array(
-        z
-          .object({
-            id: field,
-            operation: z.enum(['count', 'sum', 'average']),
-            field: field.nullable().default(null),
-          })
-          .strict(),
-      )
-      .max(8)
-      .default([]),
-    charts: z
-      .array(
-        z
-          .object({
-            id: field,
-            type: z.enum(['bar', 'line']),
-            groupBy: field,
-            metricId: field,
-          })
-          .strict(),
-      )
-      .max(4)
-      .default([]),
-    actions: z.array(adaptiveViewActionSchema).max(8).default([]),
-  })
-  .strict()
-  .superRefine((query, context) => {
-    if (new Set(query.columns).size !== query.columns.length)
-      context.addIssue({
-        code: 'custom',
-        message: 'Columns must be unique',
-        path: ['columns'],
-      });
-    if (
-      query.metrics.some(
-        (metric) => metric.operation !== 'count' && metric.field === null,
-      )
-    )
-      context.addIssue({
-        code: 'custom',
-        message: 'Numeric metrics require a field',
-        path: ['metrics'],
-      });
-    if (
-      new Set(query.actions.map((action) => action.id)).size !==
-      query.actions.length
-    )
-      context.addIssue({
-        code: 'custom',
-        message: 'Action identities must be unique',
-        path: ['actions'],
-      });
-    if (
-      new Set(query.charts.map((chart) => chart.id)).size !==
-      query.charts.length
-    )
-      context.addIssue({
-        code: 'custom',
-        message: 'Chart identities must be unique',
-        path: ['charts'],
-      });
-    if (query.layout === 'board' && !query.groupBy)
-      context.addIssue({
-        code: 'custom',
-        message: 'Board layout requires grouping',
-        path: ['groupBy'],
-      });
-    if (
-      new Set(query.metrics.map((metric) => metric.id)).size !==
-      query.metrics.length
-    )
-      context.addIssue({
-        code: 'custom',
-        message: 'Metrics must have unique identities',
-        path: ['metrics'],
-      });
-    for (const chart of query.charts)
-      if (!query.metrics.some((metric) => metric.id === chart.metricId))
-        context.addIssue({
-          code: 'custom',
-          message: 'Chart metric must belong to this query',
-          path: ['charts'],
-        });
-  });
 
 const adaptiveViewSharingSchema = z
   .object({
@@ -187,20 +23,23 @@ const adaptiveViewSharingSchema = z
       });
   });
 
+/** A reviewed view to save. The query may be format 1 or 2; it is stored in format 2. */
 export const adaptiveViewInputSchema = z
   .object({
     commandId: z.string().uuid(),
     name: z.string().trim().min(1).max(120),
     description: z.string().trim().max(1000).default(''),
     sharing: adaptiveViewSharingSchema,
-    query: adaptiveViewQuerySchema,
+    query: adaptiveViewQueryInputSchema,
     reviewed: z.literal(true),
   })
   .strict();
 
+/** A saved view. Its query is always in format 2, upgraded on read when stored in format 1. */
 export const adaptiveViewSchema = adaptiveViewInputSchema
   .omit({ reviewed: true, commandId: true })
   .extend({
+    query: adaptiveViewQuerySchema,
     id: z.string().uuid(),
     tenantId: z.string().uuid(),
     ownerId: z.string().uuid(),
@@ -276,10 +115,6 @@ export const adaptiveViewDraftSchema = z.object({
   warnings: z.array(z.string().max(1000)).max(20),
   preview: adaptiveViewPreviewSchema.nullable(),
 });
-
-export type AdaptiveViewDomain = z.infer<typeof adaptiveViewDomainSchema>;
-
-export type AdaptiveViewQuery = z.infer<typeof adaptiveViewQuerySchema>;
 
 export type AdaptiveViewInput = z.infer<typeof adaptiveViewInputSchema>;
 

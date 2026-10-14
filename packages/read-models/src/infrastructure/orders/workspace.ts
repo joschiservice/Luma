@@ -13,6 +13,7 @@ import type {
   OrderWorkspace,
 } from '../../application/orders.js';
 import { type ActionPermission, readChangePlan } from './change-plan.js';
+import { orderFieldPermissions } from './collection-fields.js';
 import { readDetail } from './detail.js';
 import { listOrders } from './list.js';
 import type { OrderReadQueries } from './list-query.js';
@@ -88,6 +89,16 @@ export function createOrderWorkspace(
           requirePermission(fresh, 'fulfillment.read');
         if (query.stockBlocked) requirePermission(fresh, 'inventory.read');
         if (query.customerId) requirePermission(fresh, 'customers.read');
+        // Gated catalog fields answer 403 like their dedicated filters.
+        for (const field of [
+          ...(query.where?.conditions.map((condition) => condition.field) ??
+            []),
+          ...(query.group ? [query.group.field] : []),
+        ])
+          for (const permission of Object.hasOwn(orderFieldPermissions, field)
+            ? (orderFieldPermissions[field] ?? [])
+            : [])
+            requirePermission(fresh, permission);
         const list = await listOrders(
           tx,
           queries,

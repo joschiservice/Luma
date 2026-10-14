@@ -35,6 +35,7 @@ import { useDeferredValue, useId, useState } from 'react';
 import { useCan } from '../../kit/identity/permissions';
 import { createWebApiClient } from '../../lib/api-client';
 import { privateQueryDefaults } from '../../lib/private-query';
+import { allSuppliersOptions } from './suppliers';
 
 const api = createWebApiClient();
 
@@ -320,17 +321,8 @@ function TermsDialog({
       ),
   });
   const suppliers = useQuery({
-    queryKey: [
-      'private',
-      'organization',
-      organizationId,
-      'procurement',
-      'suppliers',
-    ],
-    ...privateQueryDefaults,
+    ...allSuppliersOptions(organizationId),
     enabled: !supplierId && !existing,
-    queryFn: ({ signal }) =>
-      api.procurement.suppliers({ params: { organizationId } }, { signal }),
   });
   const mutation = useMutation({
     mutationFn: (body: SupplierTermsInput) =>

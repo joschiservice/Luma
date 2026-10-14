@@ -1,0 +1,7 @@
+/* Notes beside grouped issues: the read-only board and groups without rows. */
+.issue-board-note,
+.issue-group-empty {
+  margin: 4px 20px 12px;
+  color: var(--foreground-subtle);
+  font-size: 12px;
+}

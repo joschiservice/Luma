@@ -3,6 +3,10 @@ import {
   type AdaptiveViewInput,
   adaptiveViewInputSchema,
   type AdaptiveViewQuery,
+  collectionCatalogs,
+  type CollectionColumn,
+  type CollectionGranularity,
+  type CustomField,
 } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
@@ -14,22 +18,61 @@ import { Textarea } from '@luma/ui/components/primitives/textarea';
 import { useForm } from '@tanstack/react-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { usePermissions } from '../../kit/identity/permissions';
 import { rolesOptions } from '../../kit/settings/roles-data';
+import { ConditionRows } from './conditions';
 import {
   adaptiveApi,
   adaptiveKey,
-  defaultColumns,
   emptyViewQuery,
   previewOptions,
 } from './data';
-import { adaptiveLabel, columnLabel, domainOptions } from './presentation';
+import {
+  adaptiveLabel,
+  columnLabel,
+  domainLabel,
+  domainOptions,
+  optionLabel,
+  segmentLabel,
+} from './presentation';
 import { QueryExtras } from './query-extras';
-import { filterChoices, filterFields, sortFields } from './query-fields';
+import {
+  columnFields,
+  conditionFields,
+  customRecordType,
+  groupFields,
+  invalidConditions,
+  metricFields,
+  previewable,
+  sortFields,
+  viewColumns,
+} from './query-fields';
 import { AdaptiveRecords } from './records';
+
+/** Record types whose custom fields the previewable lists show. */
+type EditorRecordType = 'order' | 'product' | 'purchase_order';
+
+function editorRecordType(type: string | null): type is EditorRecordType {
+  return type === 'order' || type === 'product' || type === 'purchase_order';
+}
+
+/** Keeps a column's saved width when the column stays shown. */
+function widthOf(columns: readonly CollectionColumn[], id: string) {
+  const width = columns.find((column) => column.id === id)?.width;
+
+  return width === undefined ? {} : { width };
+}
+
+function periodLabel(granularity: CollectionGranularity) {
+  return {
+    day: m.adaptive_period_day,
+    week: m.adaptive_period_week,
+    month: m.adaptive_period_month,
+  }[granularity]();
+}
 
 type EditorValues = {
   name: string;
@@ -81,12 +124,14 @@ export function ViewEditor({
         }),
       ]);
 
-      return {
+      const loaded: Record<EditorRecordType, CustomField[]> = {
         order: order.status === 'fulfilled' ? order.value : [],
         product: product.status === 'fulfilled' ? product.value : [],
         purchase_order:
           purchase_order.status === 'fulfilled' ? purchase_order.value : [],
       };
+
+      return loaded;
     },
     enabled: permissions.can('adaptive.fields.read'),
   });
@@ -114,7 +159,7 @@ export function ViewEditor({
       void navigate({
         to: '/app/$organizationId/views/$viewId',
         params: { organizationId, viewId: saved.id },
-        search: {},
+        search: { manage: true },
       });
       onClose?.();
     },
@@ -240,51 +285,34 @@ export function ViewEditor({
         </form.Field>
         <form.Subscribe selector={(state) => state.values.query}>
           {(query) => {
-            const definitions =
-              customFields.data?.[
-                query.domain === 'orders'
-                  ? 'order'
-                  : query.domain === 'products'
-                    ? 'product'
-                    : 'purchase_order'
-              ] ?? [];
-            const custom = ['orders', 'products', 'procurement'].includes(
-              query.domain,
-            )
-              ? definitions
+            const recordType = customRecordType(query.domain);
+            const custom = editorRecordType(recordType)
+              ? (customFields.data?.[recordType] ?? [])
               : [];
-            const fields = [
-              ...new Set([
-                ...defaultColumns[query.domain],
-                ...query.columns,
-                ...Object.keys(query.filters),
-                ...(preview.data?.availableColumns ?? []),
-                ...custom.map((field) => `custom:${field.id}`),
-              ]),
-            ];
-            const options = fields.map((field) => ({
-              value: field,
-              label: (() => {
-                const definition = custom.find(
-                  (item) => `custom:${item.id}` === field,
-                );
+            const label = (field: string) => {
+              const definition = custom.find(
+                (item) => `custom:${item.id}` === field,
+              );
 
-                return definition
-                  ? adaptiveLabel(definition.label)
-                  : columnLabel(field);
-              })(),
-            }));
-            const filters = filterFields(query.domain).map((field) => ({
-              value: field,
-              label: columnLabel(field),
-            }));
-            const sorts = [
-              ...sortFields(query.domain).map((field) => ({
-                value: field,
-                label: columnLabel(field),
-              })),
-              ...options.filter((option) => option.value.startsWith('custom:')),
+              return definition
+                ? adaptiveLabel(definition.label)
+                : columnLabel(field);
+            };
+            const state = query.state;
+            const columns = viewColumns(query);
+            const columnOptions = [
+              ...new Set([...columnFields(query.domain, custom), ...columns]),
             ];
+            const conditions = conditionFields(query.domain, custom);
+            const sorts = sortFields(query.domain, custom);
+            const groups = groupFields(query.domain, custom);
+            const grouping = groups.find(
+              (item) => item.id === state.group?.field,
+            );
+            const changeState = (next: Partial<typeof state>) =>
+              changeQuery({ ...query, state: { ...state, ...next } });
+            const conditionsInvalid =
+              invalidConditions(conditions, state.where.conditions).length > 0;
 
             return (
               <>
@@ -292,124 +320,86 @@ export function ViewEditor({
                   <FieldLabel>{m.adaptive_domain()}</FieldLabel>
                   <Select
                     aria-label={m.adaptive_domain()}
-                    value={query.domain}
+                    value={previewable(query.domain) ? query.domain : null}
+                    placeholder={domainLabel(query.domain)}
                     options={domainOptions()}
                     onValueChange={(domain) => {
                       if (domain) changeQuery(emptyViewQuery(domain));
                     }}
                   />
                 </Field>
+                <Field>
+                  <FieldLabel>{m.adaptive_segment()}</FieldLabel>
+                  <Select
+                    aria-label={m.adaptive_segment()}
+                    value={state.segment ?? '__default'}
+                    options={[
+                      {
+                        value: '__default',
+                        label: m.adaptive_segment_default(),
+                      },
+                      ...[
+                        ...new Set([
+                          ...collectionCatalogs[query.domain].segments,
+                          ...(state.segment ? [state.segment] : []),
+                        ]),
+                      ].map((segment) => ({
+                        value: segment,
+                        label: segmentLabel(segment),
+                      })),
+                    ]}
+                    onValueChange={(segment) =>
+                      changeState({
+                        segment:
+                          segment && segment !== '__default' ? segment : null,
+                      })
+                    }
+                  />
+                </Field>
                 <section className="adaptive-editor-group">
                   <h2>{m.adaptive_columns()}</h2>
                   <div className="adaptive-checks">
-                    {fields.map((field) => (
+                    {columnOptions.map((field) => (
                       <label className="adaptive-check" key={field}>
                         <input
                           type="checkbox"
-                          checked={query.columns.includes(field)}
+                          checked={columns.includes(field)}
                           onChange={(event) =>
-                            changeQuery({
-                              ...query,
-                              columns: event.target.checked
-                                ? [...query.columns, field]
-                                : query.columns.filter(
-                                    (column) => column !== field,
-                                  ),
+                            changeState({
+                              columns: (event.target.checked
+                                ? [...columns, field]
+                                : columns.filter((column) => column !== field)
+                              ).map((id) => ({
+                                id,
+                                ...widthOf(state.columns, id),
+                              })),
                             })
                           }
                         />
-                        {options.find((option) => option.value === field)
-                          ?.label ?? columnLabel(field)}
+                        {label(field)}
                       </label>
                     ))}
                   </div>
                 </section>
                 <section className="adaptive-editor-group">
                   <h2>{m.adaptive_filters()}</h2>
-                  {Object.entries(query.filters).map(([key, value]) => (
-                    <div className="adaptive-filter" key={key}>
-                      <Field>
-                        <FieldLabel>{m.adaptive_field()}</FieldLabel>
-                        <Input
-                          value={key}
-                          readOnly
-                          aria-label={m.adaptive_field()}
-                        />
-                      </Field>
-                      <Field>
-                        <FieldLabel htmlFor={`filter-${key}`}>
-                          {m.adaptive_value()}
-                        </FieldLabel>
-                        {filterChoices(query.domain, key).length ? (
-                          <Select
-                            aria-label={columnLabel(key)}
-                            value={typeof value === 'string' ? value : null}
-                            options={filterChoices(query.domain, key).map(
-                              (choice) => ({
-                                value: choice,
-                                label: columnLabel(choice),
-                              }),
-                            )}
-                            onValueChange={(selected) => {
-                              if (selected)
-                                changeQuery({
-                                  ...query,
-                                  filters: {
-                                    ...query.filters,
-                                    [key]: selected,
-                                  },
-                                });
-                            }}
-                          />
-                        ) : (
-                          <Input
-                            id={`filter-${key}`}
-                            value={value === null ? '' : String(value)}
-                            onChange={(event) =>
-                              changeQuery({
-                                ...query,
-                                filters: {
-                                  ...query.filters,
-                                  [key]: event.target.value,
-                                },
-                              })
-                            }
-                          />
-                        )}
-                      </Field>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label={m.adaptive_remove()}
-                        onClick={() => {
-                          const filters = { ...query.filters };
-                          delete filters[key];
-                          changeQuery({ ...query, filters });
-                        }}
-                      >
-                        <Trash2 aria-hidden="true" />
-                      </Button>
-                    </div>
-                  ))}
-                  <Select
-                    aria-label={m.adaptive_add_filter()}
-                    value={null}
-                    placeholder={m.adaptive_add_filter()}
-                    options={filters.filter(
-                      (option) => !(option.value in query.filters),
-                    )}
-                    onValueChange={(field) => {
-                      if (field)
-                        changeQuery({
-                          ...query,
-                          filters: {
-                            ...query.filters,
-                            [field]:
-                              filterChoices(query.domain, field)[0] ?? '',
-                          },
-                        });
+                  <ConditionRows
+                    fields={conditions}
+                    where={state.where}
+                    label={label}
+                    optionLabel={(field, option) => {
+                      const choice = field.custom?.choices.find(
+                        (item) => item.key === option,
+                      );
+
+                      return choice
+                        ? adaptiveLabel(choice.label)
+                        : optionLabel(query.domain, field.id, option);
                     }}
+                    allowed={(field) =>
+                      !field.permission || permissions.can(field.permission)
+                    }
+                    onChange={(where) => changeState({ where })}
                   />
                 </section>
                 <div className="adaptive-editor-pair">
@@ -417,22 +407,26 @@ export function ViewEditor({
                     <FieldLabel>{m.adaptive_sort()}</FieldLabel>
                     <Select
                       aria-label={m.adaptive_sort()}
-                      value={query.sort?.field ?? '__none'}
+                      value={state.sort?.field ?? '__none'}
                       options={[
                         { value: '__none', label: m.adaptive_none() },
-                        ...sorts,
+                        ...[
+                          ...new Set([
+                            ...sorts,
+                            ...(state.sort ? [state.sort.field] : []),
+                          ]),
+                        ].map((field) => ({
+                          value: field,
+                          label: label(field),
+                        })),
                       ]}
                       onValueChange={(field) =>
-                        changeQuery({
-                          ...query,
+                        changeState({
                           sort:
                             field && field !== '__none'
                               ? {
                                   field,
-                                  direction:
-                                    query.domain === 'fulfillment'
-                                      ? 'desc'
-                                      : (query.sort?.direction ?? 'asc'),
+                                  direction: state.sort?.direction ?? 'asc',
                                 }
                               : null,
                         })
@@ -440,21 +434,18 @@ export function ViewEditor({
                     />
                   </Field>
                   <Field>
-                    <FieldLabel>{m.adaptive_sort()}</FieldLabel>
+                    <FieldLabel>{m.adaptive_sort_direction()}</FieldLabel>
                     <Select
-                      aria-label={m.adaptive_sort()}
-                      value={query.sort?.direction ?? 'asc'}
-                      disabled={!query.sort || query.domain === 'fulfillment'}
+                      aria-label={m.adaptive_sort_direction()}
+                      value={state.sort?.direction ?? 'asc'}
+                      disabled={!state.sort}
                       options={[
                         { value: 'asc', label: m.adaptive_ascending() },
                         { value: 'desc', label: m.adaptive_descending() },
                       ]}
                       onValueChange={(direction) => {
-                        if (query.sort && direction)
-                          changeQuery({
-                            ...query,
-                            sort: { ...query.sort, direction },
-                          });
+                        if (state.sort && direction)
+                          changeState({ sort: { ...state.sort, direction } });
                       }}
                     />
                   </Field>
@@ -464,35 +455,94 @@ export function ViewEditor({
                     <FieldLabel>{m.adaptive_group()}</FieldLabel>
                     <Select
                       aria-label={m.adaptive_group()}
-                      value={query.groupBy ?? '__none'}
+                      value={state.group?.field ?? '__none'}
                       options={[
                         { value: '__none', label: m.adaptive_none() },
-                        ...options,
+                        ...[
+                          ...new Set([
+                            ...groups.map((item) => item.id),
+                            ...(state.group ? [state.group.field] : []),
+                          ]),
+                        ].map((field) => ({
+                          value: field,
+                          label: label(field),
+                        })),
                       ]}
-                      onValueChange={(field) =>
+                      onValueChange={(field) => {
+                        const next = groups.find((item) => item.id === field);
                         changeQuery({
                           ...query,
-                          groupBy: field && field !== '__none' ? field : null,
-                          layout: field === '__none' ? 'table' : query.layout,
-                        })
-                      }
+                          state: {
+                            ...state,
+                            group: next
+                              ? {
+                                  field: next.id,
+                                  showEmpty: false,
+                                  ...(next.granularities?.[0]
+                                    ? { granularity: next.granularities[0] }
+                                    : {}),
+                                }
+                              : null,
+                            layout:
+                              next || state.layout !== 'board'
+                                ? state.layout
+                                : 'table',
+                          },
+                          charts: next
+                            ? query.charts.map((chart) =>
+                                chart.id === 'count_by_group'
+                                  ? { ...chart, groupBy: next.id }
+                                  : chart,
+                              )
+                            : query.charts.filter(
+                                (chart) => chart.id !== 'count_by_group',
+                              ),
+                        });
+                      }}
                     />
                   </Field>
+                  {grouping?.granularities && state.group ? (
+                    <Field>
+                      <FieldLabel>{m.adaptive_period()}</FieldLabel>
+                      <Select
+                        aria-label={m.adaptive_period()}
+                        value={state.group.granularity ?? null}
+                        options={grouping.granularities.map((granularity) => ({
+                          value: granularity,
+                          label: periodLabel(granularity),
+                        }))}
+                        onValueChange={(granularity) => {
+                          if (granularity && state.group)
+                            changeState({
+                              group: { ...state.group, granularity },
+                            });
+                        }}
+                      />
+                    </Field>
+                  ) : null}
                   <Field>
                     <FieldLabel>{m.adaptive_layout()}</FieldLabel>
                     <Select
                       aria-label={m.adaptive_layout()}
-                      value={query.layout}
+                      value={state.layout}
                       options={[
                         { value: 'table', label: m.adaptive_table() },
+                        ...(state.layout === 'list'
+                          ? [
+                              {
+                                value: 'list' as const,
+                                label: m.adaptive_list(),
+                              },
+                            ]
+                          : []),
                         {
                           value: 'board',
                           label: m.adaptive_board(),
-                          disabled: !query.groupBy,
+                          disabled: !state.group,
                         },
                       ]}
                       onValueChange={(layout) => {
-                        if (layout) changeQuery({ ...query, layout });
+                        if (layout) changeState({ layout });
                       }}
                     />
                   </Field>
@@ -534,7 +584,7 @@ export function ViewEditor({
                     <input
                       type="checkbox"
                       disabled={
-                        !query.groupBy ||
+                        !state.group ||
                         !query.metrics.some(
                           (metric) => metric.id === 'record_count',
                         )
@@ -546,13 +596,13 @@ export function ViewEditor({
                         changeQuery({
                           ...query,
                           charts:
-                            event.target.checked && query.groupBy
+                            event.target.checked && state.group
                               ? [
                                   ...query.charts,
                                   {
                                     id: 'count_by_group',
                                     type: 'bar',
-                                    groupBy: query.groupBy,
+                                    groupBy: state.group.field,
                                     metricId: 'record_count',
                                   },
                                 ]
@@ -568,13 +618,21 @@ export function ViewEditor({
                 <QueryExtras
                   organizationId={organizationId}
                   query={query}
-                  fields={custom}
+                  numericFields={metricFields(query.domain, custom)}
+                  label={label}
                   change={changeQuery}
                 />
+                {previewable(query.domain) ? null : (
+                  <Alert>{m.adaptive_preview_unsupported()}</Alert>
+                )}
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={!query.columns.length || preview.isFetching}
+                  disabled={
+                    !previewable(query.domain) ||
+                    conditionsInvalid ||
+                    preview.isFetching
+                  }
                   onClick={() => {
                     setPreviewed(query);
                   }}

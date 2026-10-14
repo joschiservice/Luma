@@ -2,16 +2,19 @@ import '@luma/identity/http';
 
 import {
   apiContract,
+  inventoryCatalog,
   inventoryDetailSchema,
   inventoryListSchema,
   transferDetailSchema,
   transferListSchema,
+  transfersCatalog,
 } from '@luma/api-contract';
 import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
 import { implement } from '@orpc/server';
 
 import type { InventoryWorkspace } from '../application/inventory.js';
+import { validateCollectionQuery } from './collection-validation.js';
 
 /** Exposes the tenant's stock position list and stock position details to readers with `inventory.read`. */
 export function inventoryRoutes(service?: InventoryWorkspace) {
@@ -32,6 +35,7 @@ export function inventoryRoutes(service?: InventoryWorkspace) {
             'SERVICE_UNAVAILABLE',
             'Transfers are unavailable',
           );
+        validateCollectionQuery(transfersCatalog, query);
 
         return transferListSchema.parse(
           await service.listTransfers(request.tenantContext, query),
@@ -77,6 +81,7 @@ export function inventoryRoutes(service?: InventoryWorkspace) {
             'SERVICE_UNAVAILABLE',
             'Inventory is unavailable',
           );
+        validateCollectionQuery(inventoryCatalog, query);
 
         return inventoryListSchema.parse(
           await service.list(request.tenantContext, query),

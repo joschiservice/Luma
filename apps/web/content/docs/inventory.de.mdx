@@ -13,7 +13,11 @@ Jede Zeile ist eine SKU an einem Lagerort in einer Einheit. Die Mengen aller Que
 - **Abweichungen zwischen Quellen** zeigt Positionen, für die Quellen unterschiedliche Mengen melden.
 - **Unvollständiger Bestand** zeigt Positionen, für die eine Quelle nicht alle Mengen gemeldet hat.
 
-Suche nach SKU oder Lagerort, oder grenze die Liste mit **SKU**, **Lagerort** und **Quelle** ein. Ein Quellenfilter wählt die Positionen dieser Quelle aus und zeigt trotzdem die anderen Quellen jeder Position. Ansicht und Filter sind Teil der Seitenadresse. So kannst du sie teilen oder an die Seitenleiste anheften.
+Das Ansichtsmenü listet auch die Ansichten, die du und dein Team gespeichert haben. Öffnest du **Bestand** über die Seitenleiste, kehrst du zur zuletzt genutzten Ansicht zurück.
+
+Suche nach SKU oder Lagerort. **Lagerort** und **Quelle** über der Liste grenzen sie mit einem Klick ein; ein Quellenfilter wählt die Positionen dieser Quelle aus und zeigt trotzdem die anderen Quellen. Für alles andere wähle **Filter** und ein Feld, etwa **Physischer Bestand**, **Verfügbar**, **Reserviert**, **Im Zulauf**, **Unter Sicherheitsbestand**, **Weicht ab bei**, **Wartet auf Abgleich** oder **Zuletzt gelesen**. Bei Mengenbedingungen wählst du eine **Quelle**: **Beliebige Quelle**, **Jede Quelle**, eine benannte Quelle oder **Niedrigster Wert aller Quellen**, der die vorsichtigste gemeldete Zahl vergleicht. Eine Quelle ohne Menge zählt nie als null. Sortiere nach SKU, Lagerort, einer Menge (ihrem niedrigsten gemeldeten Wert) oder dem letzten Abruf, in beide Richtungen. Links von einem Produkt oder einer Bestandsposition zeigen die Positionen einer SKU; entferne den Filter **SKU**, um alle zu sehen.
+
+Unter **Darstellung** wechselst du zwischen **Tabelle** und **Liste**, wählst Spalten und gruppierst nach Lagerort, SKU oder Quelle. Gruppieren nach SKU zeigt ein Produkt über alle Lager hinweg. **Datensätze in einer Vorschau öffnen** zeigt neben der Liste die Mengen einer Position je Quelle, ihre Bestellungen und Lieferantenbestellungen. Änderungen markieren die Ansicht als **Geändert**; mit **Als neue Ansicht speichern** behältst du sie, siehe [Gespeicherte Ansichten](/docs/saved-views). **J** und **K** bewegen dich durch die Positionen, **Enter** öffnet eine, die **Leertaste** zeigt sie in der Vorschau, **/** springt zur Suche, **F** fügt einen Filter hinzu und **?** listet alle Tastenkürzel.
 
 **Noch kein Bestand importiert** bedeutet, dass noch kein verbundenes System Bestand geteilt hat. Den Fortschritt siehst du unter [Datenabgleich](/docs/data-sync). **Kein passender Bestand** bedeutet, dass Suche oder Filter alle Positionen ausschließen.
 
@@ -106,3 +110,7 @@ Wähle **Bestand prüfen**, um Shopify erneut zu lesen. Solange die Menge nicht 
 Kann Luma die Anpassungsreferenz nicht bestätigen, bleibt die Aktion auch bei übereinstimmender Menge unklar. Eine passende Menge kann auf eine andere Änderung zurückgehen. Prüfe Shopify, bevor du eine weitere Aktion ausführst.
 
 Öffnen Sie das Produkt eines Bundles, um **Bundle-Komponenten** und das aktuelle Rezept der Quelle zu prüfen. Jede Komponente verlinkt auf ihre genaue Bestands-SKU, sofern bekannt. Im Rezeptverlauf können Sie Änderungen vergleichen. Bestand und Erfüllung verwenden die Komponenten; der Bundle-Artikel erzeugt keinen zusätzlichen physischen Bestand. Nicht lesbare Komponenten bleiben unbekannt. Shopify-Bestandskorrekturen verweisen bei bekannten Bundle-Artikeln auf den Komponentenbestand.
+
+## Umlagerungen und Wareneingang verfolgen [#follow-transfers-and-receiving]
+
+Wähle in Bestand **Umlagerungen**, um Bestand zu verfolgen, der zwischen Lagerorten unterwegs ist. Wechsle im Ansichtsmenü zwischen Umlagerungen und Sendungen. Filtere nach Quelle, angeforderter, versandter, empfangener oder nicht empfangener Menge, Anforderungsdatum oder letzter Aktualisierung in der Quelle, und sortiere nach Name oder Aktualisierung; ohne Sortierung stehen die neuesten Anforderungen oben. Öffne einen Beleg, um seine genauen Quellpositionen und Mengen zu prüfen. Diese Mengen liefern Kontext; Luma addiert sie nicht zum gemeldeten Bestand eines Lagerorts.

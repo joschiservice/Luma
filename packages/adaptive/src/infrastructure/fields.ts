@@ -124,6 +124,9 @@ function recordRelation(type: AdaptiveRecordType) {
       return { table: 'procurement_suppliers', kind: null };
     case 'purchase_order':
       return { table: 'procurement_purchase_orders', kind: null };
+    case 'customer':
+      // Each source customer is its own record; values follow that profile.
+      return { table: 'customer_profiles', kind: null };
   }
 }
 
@@ -257,6 +260,20 @@ export function createFieldsStore(
               ).rows.length,
             ),
           values,
+          valuesMany: async (type, ids) =>
+            (
+              await tx.query<{
+                record_id: string;
+                document: CustomFieldRecordValue;
+              }>(
+                'SELECT record_id,document FROM adaptive_field_values WHERE tenant_id=$1 AND record_type=$2 AND record_id=ANY($3::uuid[]) ORDER BY record_id,field_id',
+                [tenantId, type, ids],
+              )
+            ).rows.map((row) => ({
+              ...row.document,
+              recordId: row.record_id,
+              value: customFieldValueSchema.parse(row.document.value),
+            })),
           setValue: async (type, id, value) => {
             await tx.query(
               `INSERT INTO adaptive_field_values(tenant_id,record_type,record_id,field_id,value,document) VALUES($1,$2,$3,$4,$5::jsonb,$6::jsonb) ON CONFLICT(tenant_id,record_type,record_id,field_id) DO UPDATE SET value=EXCLUDED.value,document=EXCLUDED.document`,

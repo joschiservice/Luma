@@ -253,7 +253,7 @@ function PurchaseOrderRecordView({
             <Link
               to="/app/$organizationId/procurement"
               params={{ organizationId }}
-              search={{ view: 'orders', q: '', status: '' }}
+              search={{}}
             />
           ),
         }}
@@ -341,7 +341,7 @@ function PurchaseOrderRecordView({
           <Link
             to="/app/$organizationId/procurement"
             params={{ organizationId }}
-            search={{ view: 'orders', q: '', status: '' }}
+            search={{}}
           >
             {m.procurement_detail_missing_link()}
           </Link>

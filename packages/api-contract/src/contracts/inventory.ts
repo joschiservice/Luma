@@ -19,7 +19,7 @@ export const inventoryContract = {
       path: '/v1/organizations/{organizationId}/inventory/transfers',
       summary: 'Browse inventory transfers and shipments',
       description:
-        'Read up to 50 source summaries with separately reported stages. Transfer and shipment quantities do not augment stock balances. Signals require active grants and complete evidence observed within five minutes; a past arrival estimate establishes only that receipt is unconfirmed.',
+        'Read one page of up to 50 source summaries with separately reported stages, newest requested first by default. Transfer and shipment quantities do not augment stock balances. Signals require active grants and complete evidence observed within five minutes; a past arrival estimate establishes only that receipt is unconfirmed.',
     })
     .meta({ access: requires('inventory.read'), errors: [400, 401, 404, 503] })
     .input(
@@ -53,7 +53,7 @@ export const inventoryContract = {
       path: '/v1/organizations/{organizationId}/inventory',
       summary: 'Browse inventory',
       description:
-        'Search SKUs and locations and compare current stock quantities by source. Quantities are never added across sources. Null means unknown. Results contain up to 50 positions; nextCursor continues the same filters. Source filters select positions while retaining all sources for comparison.',
+        'Search SKUs and locations and compare current stock quantities by source. Quantities are never added across sources. Null means unknown. Results contain up to `limit` positions, by SKU and location unless sorted otherwise; nextCursor continues the same filters and sort. Source filters select positions while retaining all sources for comparison.',
     })
     .meta({ access: requires('inventory.read'), errors: [400, 401, 404, 503] })
     .input(

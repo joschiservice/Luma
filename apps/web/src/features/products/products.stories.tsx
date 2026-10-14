@@ -5,7 +5,12 @@ import type {
   ProductDetail,
   ProductList,
 } from '@luma/api-contract';
+import { m } from '@luma/i18n/messages';
+import { CollectionToolbar } from '@luma/ui/components/primitives/collection-toolbar';
+import type { DataTableSort } from '@luma/ui/components/primitives/data-table';
+import { Pagination } from '@luma/ui/components/primitives/pagination';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
   createRootRoute,
@@ -13,13 +18,19 @@ import {
   RouterProvider,
 } from '@tanstack/react-router';
 import { useState } from 'react';
-import { expect, userEvent, waitFor, within } from 'storybook/test';
+import { expect, userEvent, within } from 'storybook/test';
 
+import { CollectionNotices } from '../../kit/collections/notices';
+import type { CollectionError } from '../../kit/collections/paging';
 import appStyles from '../../styles.css?inline';
+import { customFieldText } from '../adaptive/presentation';
 import { IdentityLinksView } from '../sync/identity-links';
-import type { ProductsSearch } from './data';
+import { listingColumn, productGroupLabel } from './collection';
+import { productOptions } from './data';
 import { ProductDetailView } from './detail';
-import { ProductsView } from './page';
+import { ProductsEmpty, ProductsView, ProductTabs } from './page';
+import { ProductPreview } from './preview';
+import { ProductResults } from './results';
 
 const org = '33333333-3333-4333-8333-333333333333';
 const store = '66666666-6666-4666-8666-666666666666';
@@ -395,7 +406,6 @@ const identity = (
 );
 
 function Content({ state }: { state: string }) {
-  const [search, change] = useState<ProductsSearch>({});
   if (
     state === 'detail' ||
     state === 'missing' ||
@@ -464,37 +474,250 @@ function Content({ state }: { state: string }) {
       />
     );
 
-  return (
-    <ProductsView
-      organizationId={org}
-      search={state === 'no-matches' ? { view: 'differs' } : search}
-      change={change}
-      refresh={() => {}}
-      next={() => {}}
-      list={
-        state === 'loading' || state === 'error'
-          ? undefined
-          : state === 'empty'
-            ? {
-                ...list,
-                items: [],
-                sources: [],
-                counts: { all: 0, differs: 0, missing: 0, unlinked: 0 },
-                nextCursor: null,
-              }
-            : state === 'no-matches'
-              ? {
-                  ...list,
-                  items: [],
-                  counts: { ...list.counts, differs: 0 },
-                  nextCursor: null,
-                }
-              : list
-      }
-      loading={state === 'loading'}
-      offline={state === 'offline'}
-      error={state === 'error' ? 'Products could not be loaded.' : undefined}
+  return <ListPreview state={state} />;
+}
+
+const groupedList: ProductList = {
+  ...list,
+  nextCursor: null,
+  groups: [
+    {
+      key: 'active',
+      count: 4,
+      complete: true,
+      itemIds: items.slice(0, 3).map((item) => item.skuId),
+      nextCursor: 'group-next',
+      sums: [],
+    },
+    {
+      key: 'draft',
+      count: 1,
+      complete: true,
+      itemIds: [items[3]!.skuId],
+      nextCursor: null,
+      sums: [],
+    },
+  ],
+};
+
+/** A custom product field column and an archived one, as a view shows them. */
+const customColumns = [
+  {
+    key: 'custom:season',
+    header: 'Season',
+    cell: (item: CatalogItem) =>
+      customFieldText(
+        {
+          type: 'enum',
+          options: [{ value: 'summer', label: 'Summer' }],
+        },
+        item.skuId === items[0]!.skuId ? 'summer' : undefined,
+      ),
+  },
+  {
+    key: 'custom:legacy',
+    header: 'Legacy code',
+    cell: () => m.collections_field_archived(),
+  },
+];
+
+/** The list page as the route renders it, with fixed rows and local view state. */
+function ListPreview({ state }: { state: string }) {
+  const [segment, setSegment] = useState(
+    state === 'no-matches' ? 'differs' : 'all',
+  );
+  const [sort, setSort] = useState<DataTableSort | undefined>();
+  const [collapsed, setCollapsed] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [open, setOpen] = useState<string | undefined>(
+    state === 'preview' ? shirt.skuId : undefined,
+  );
+  const [client] = useState(() => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(productOptions(org, shirt.skuId).queryKey, detail);
+
+    return queryClient;
+  });
+  const shown =
+    state === 'empty'
+      ? {
+          ...list,
+          items: [],
+          sources: [],
+          counts: { all: 0, differs: 0, missing: 0, unlinked: 0 },
+          nextCursor: null,
+        }
+      : state === 'no-matches'
+        ? {
+            ...list,
+            items: [],
+            counts: { ...list.counts, differs: 0 },
+            nextCursor: null,
+          }
+        : state === 'grouped'
+          ? groupedList
+          : list;
+  const grouping =
+    state === 'grouped' ? { field: 'status', showEmpty: false } : null;
+  const error: CollectionError | undefined =
+    state === 'error'
+      ? { kind: 'unavailable' }
+      : state === 'repair'
+        ? { kind: 'invalid', message: m.collections_needs_repair() }
+        : undefined;
+  const hidden = ['loading', 'error', 'repair'].includes(state);
+  const link = (item: CatalogItem) => (
+    <a
+      href={`#product-${item.skuId}`}
+      onClick={(event) => {
+        if (state !== 'preview') return;
+        event.preventDefault();
+        setOpen(item.skuId);
+      }}
     />
+  );
+  const openItem = shown.items.find((item) => item.skuId === open);
+
+  return (
+    <QueryClientProvider client={client}>
+      <ProductsView
+        toolbar={
+          <CollectionToolbar
+            views={
+              <ProductTabs
+                value={segment}
+                counts={hidden ? undefined : shown.counts}
+                onChange={setSegment}
+              />
+            }
+            search={{
+              value: undefined,
+              onChange: () => {},
+              label: m.products_list_search_label(),
+              placeholder: m.products_list_search_placeholder(),
+            }}
+            sort={{
+              value: sort?.key ?? 'rank',
+              options: [
+                { value: 'rank', label: 'Catalog order' },
+                { value: 'price', label: 'Price' },
+              ],
+              onChange: (key) =>
+                setSort(key === 'rank' ? undefined : { key, direction: 'asc' }),
+              ...(sort
+                ? {
+                    direction: sort.direction,
+                    onDirectionChange: (direction: 'asc' | 'desc') =>
+                      setSort({ ...sort, direction }),
+                  }
+                : {}),
+            }}
+            onRefresh={() => {}}
+          />
+        }
+        note={m.products_list_note()}
+        notices={
+          <CollectionNotices
+            offline={state === 'offline'}
+            error={error}
+            hasRows={!hidden}
+            retry={() => {}}
+            firstPage={() => {}}
+            repair={state === 'repair' ? () => {} : undefined}
+          />
+        }
+        loading={state === 'loading'}
+        results={
+          hidden ? undefined : (
+            <ProductResults
+              list={shown}
+              layout={state === 'rows' ? 'list' : 'table'}
+              density="comfortable"
+              grouping={grouping}
+              caption="All SKUs. Sorted by: Catalog order"
+              link={link}
+              matchLink={(_, text) => <a href="#match">{text}</a>}
+              empty={
+                <ProductsEmpty
+                  organizationId={org}
+                  segment={segment}
+                  filtered={false}
+                  clear={() => {}}
+                />
+              }
+              sort={sort}
+              onSortChange={setSort}
+              columnState={{
+                columns: [
+                  'sku',
+                  ...shown.sources.map((source) =>
+                    listingColumn(source.connectionId),
+                  ),
+                  ...(state === 'custom'
+                    ? customColumns.map((column) => column.key)
+                    : []),
+                ].map((key) => ({ key })),
+              }}
+              extraColumns={state === 'custom' ? customColumns : []}
+              onColumnStateChange={() => {}}
+              properties={['status', 'price', 'listings', 'differences']}
+              current={open}
+              selection={{ selected, onChange: setSelected }}
+              groupLabel={(key) => productGroupLabel('status', undefined, key)}
+              more={(group) => ({
+                rows: [],
+                load: group.nextCursor ? () => {} : undefined,
+                pending: false,
+                failed: false,
+              })}
+              collapsed={collapsed}
+              onCollapsedChange={(id, closed) =>
+                setCollapsed((current) =>
+                  closed
+                    ? [...current, id]
+                    : current.filter((item) => item !== id),
+                )
+              }
+            />
+          )
+        }
+        pagination={
+          !hidden && !grouping && shown.items.length ? (
+            <Pagination
+              count={shown.items.length}
+              totalCount={shown.counts.all}
+              page={1}
+              pageSize={50}
+              hasNext={!!shown.nextCursor}
+              onNext={() => {}}
+              formatTotal={(count) =>
+                m.products_list_pagination_total({ count })
+              }
+              label={m.products_list_pagination_label()}
+            />
+          ) : null
+        }
+        preview={
+          state === 'preview'
+            ? {
+                open: !!openItem,
+                title: openItem?.sku,
+                content: openItem ? (
+                  <ProductPreview
+                    organizationId={org}
+                    skuId={openItem.skuId}
+                    item={openItem}
+                    sources={shown.sources}
+                    asOf={asOf}
+                    filter={() => {}}
+                  />
+                ) : null,
+                onClose: () => setOpen(undefined),
+              }
+            : undefined
+        }
+      />
+    </QueryClientProvider>
   );
 }
 
@@ -545,37 +768,71 @@ export const Browse: Story = {
   },
 };
 
-export const Filter: Story = {
+export const Rows: Story = {
+  args: { state: 'rows' },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const page = within(canvasElement.ownerDocument.body);
-    await userEvent.click(
-      await canvas.findByRole('button', { name: 'Add Missing from filter' }),
-    );
-    await userEvent.click(
-      await page.findByRole('button', { name: 'JTL-Wawi' }),
-    );
+    await expect(
+      await canvas.findByRole('list', { name: /All SKUs/ }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole('link', { name: /LINEN-SHIRT-M/ }),
+    ).toBeVisible();
+  },
+};
+
+export const GroupedByStatus: Story = {
+  args: { state: 'grouped' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByRole('button', { name: /^Active/ }),
+    ).toHaveAttribute('aria-expanded', 'true');
+    await expect(
+      canvas.getByRole('button', { name: 'Show more in Active' }),
+    ).toBeVisible();
+  },
+};
+
+export const OpenPreview: Story = {
+  args: { state: 'preview' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const preview = await canvas.findByRole('region', {
+      name: 'Product preview',
+    });
+    await expect(
+      within(preview).getByRole('heading', { name: 'Listings by source' }),
+    ).toBeVisible();
+    await expect(
+      within(preview).getByRole('button', { name: 'Filter by JTL-Wawi' }),
+    ).toBeVisible();
+  },
+};
+
+export const NeedsRepair: Story = {
+  args: { state: 'repair' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
     await expect(
       await canvas.findByRole('button', {
-        name: 'Edit Missing from filter: JTL-Wawi',
+        name: 'Remove unsupported conditions',
       }),
     ).toBeVisible();
-    const search = canvas.getByRole('searchbox', { name: 'Search products' });
-    await userEvent.type(search, 'apron{Enter}');
-    await waitFor(() =>
-      expect(
-        canvas.getByRole('searchbox', { name: 'Search products' }),
-      ).toHaveValue('apron'),
-    );
-    await userEvent.click(canvas.getByRole('button', { name: 'Clear' }));
+  },
+};
+
+export const CustomFields: Story = {
+  args: { state: 'custom' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
     await expect(
-      canvas.queryByRole('button', { name: /^Edit Missing from filter/ }),
-    ).toBeNull();
-    await waitFor(() =>
-      expect(
-        canvas.getByRole('searchbox', { name: 'Search products' }),
-      ).toHaveValue(''),
-    );
+      await canvas.findByRole('columnheader', { name: /Season/ }),
+    ).toBeVisible();
+    await expect(canvas.getByText('Summer')).toBeVisible();
+    await expect(
+      canvas.getAllByText('This field was archived.').length,
+    ).toBeGreaterThan(0);
   },
 };
 

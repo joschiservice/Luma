@@ -1,6 +1,9 @@
 import { expect, it } from 'vitest';
 
-import { destinationFor } from './workspace-destinations';
+import {
+  destinationFor,
+  workspaceDestinations,
+} from './workspace-destinations';
 
 it('finds the destination that owns a workspace URL', () => {
   expect(destinationFor('/app/org/exceptions?view=active').path).toBe(
@@ -31,4 +34,10 @@ it('finds the destination that owns a workspace URL', () => {
   expect(destinationFor('/app/org/overview').path).toBe('home');
   expect(destinationFor('/app/org/connections').path).toBe('apps');
   expect(destinationFor('/app/org/unknown').path).toBe('home');
+});
+
+it('gives every destination its own G shortcut', () => {
+  const shortcuts = workspaceDestinations.map(({ shortcut }) => shortcut);
+
+  expect(new Set(shortcuts).size).toBe(shortcuts.length);
 });

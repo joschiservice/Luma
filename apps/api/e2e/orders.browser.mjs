@@ -1,16 +1,24 @@
 /* global document, window */
+import { createObservability } from '@luma/platform/composition';
+
 import { performanceReport } from '../../../tooling/performance/report.mjs';
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 import { ordersFixture } from './orders-fixture.mjs';
 import { settingsFixture } from './settings-fixture.mjs';
 
-test('finds an order by number or SKU, explains it and pages a historical import', async ({
+test('finds an order by number or SKU, explains it, pages a historical import and keeps list views', async ({
   resources: t,
 }) => {
   const port = await availablePort();
   const origin = `http://127.0.0.1:${port}`;
-  const fixture = await settingsFixture(t, origin);
+  const observability = createObservability({
+    environment: 'test',
+    release: 'test',
+    sampleRate: 0,
+    featureFlagOverrides: { 'adaptive-saved-views': true },
+  });
+  const fixture = await settingsFixture(t, origin, { observability });
   const orders = await ordersFixture(t, fixture);
   const now = Date.now();
   const tote = await orders.order({
@@ -159,6 +167,9 @@ test('finds an order by number or SKU, explains it and pages a historical import
       message.text().includes('503')
     )
       return;
+    // The stale view save below is refused on purpose.
+    if (url.includes('/adaptive/views/') && message.text().includes('409'))
+      return;
     errors.push(`${url}: ${message.text()}`);
   });
 
@@ -181,25 +192,20 @@ test('finds an order by number or SKU, explains it and pages a historical import
   await page.getByRole('button', { name: 'Previous' }).click();
   await expect(orderRange).toHaveText('1–50');
 
-  await page.getByRole('tab', { name: 'Overdue', exact: true }).click();
+  // Built-in views live in the view menu.
+  await page.getByRole('button', { name: 'All orders', exact: true }).click();
+  await page.getByRole('menuitemradio', { name: 'Overdue' }).click();
   await expect(orderRange).toHaveText('1–1');
   await page.getByRole('link', { name: '#2003' }).waitFor();
-  await page.getByRole('tab', { name: 'All orders' }).click();
-
-  await page.getByRole('button', { name: 'Add Status filter' }).click();
-  await page.getByRole('button', { name: 'Open', exact: true }).click();
-  await page
-    .getByRole('button', { name: 'Edit Status filter: Open' })
-    .waitFor();
-  await page.waitForURL((url) => url.searchParams.get('status') === 'open');
-  await page
-    .getByRole('button', { name: 'Remove Status filter: Open' })
-    .click();
-  await page.waitForURL((url) => !url.searchParams.has('status'));
+  await page.getByRole('button', { name: 'Overdue', exact: true }).click();
+  await page.getByRole('menuitemradio', { name: 'All orders' }).click();
+  await page.waitForURL((url) => url.searchParams.get('view') === 'all');
 
   await page.getByRole('searchbox', { name: 'Search orders' }).fill('TOTE-red');
   await page.keyboard.press('Enter');
   await expect(orderRange).toHaveText('1–1');
+  // Search can match customer names, so it stays out of the address.
+  expect(new URL(page.url()).searchParams.has('q')).toBe(false);
   await page.getByRole('link', { name: '#2001' }).click();
   await page.getByRole('heading', { name: '#2001', level: 1 }).waitFor();
   await page.getByRole('heading', { name: 'Current state' }).waitFor();
@@ -271,9 +277,11 @@ test('finds an order by number or SKU, explains it and pages a historical import
     .getByRole('link', { name: 'Orders' })
     .click();
   await page.getByRole('heading', { name: 'Orders', exact: true }).waitFor();
+  // The search stayed on the page it was typed on; the view came back from the address.
   expect(
     await page.getByRole('searchbox', { name: 'Search orders' }).inputValue(),
-  ).toBe('TOTE-red');
+  ).toBe('');
+  expect(new URL(page.url()).searchParams.get('view')).toBe('all');
   await page.getByRole('link', { name: '#2001' }).waitFor();
   expect(
     await page.evaluate(
@@ -282,6 +290,15 @@ test('finds an order by number or SKU, explains it and pages a historical import
   ).toBe(true);
 
   await page.setViewportSize({ width: 1280, height: 900 });
+  // A link's search, such as a product's orders, is adopted and leaves the address.
+  await page.goto(`/app/${fixture.org.id}/orders?q=tote-red`);
+  await page.waitForURL((url) => !url.searchParams.has('q'));
+  expect(new URL(page.url()).searchParams.get('view')).toBe('all');
+  expect(
+    await page.getByRole('searchbox', { name: 'Search orders' }).inputValue(),
+  ).toBe('tote-red');
+  await expect(orderRange).toHaveText('1–1');
+
   await page.goto(`/app/${fixture.org.id}/orders?sort=number&direction=asc`);
   await expect(orderRange).toHaveText('1–50');
   expect(
@@ -292,5 +309,116 @@ test('finds an order by number or SKU, explains it and pages a historical import
   ).toBe('ascending');
   await page.getByRole('link', { name: '#2001' }).waitFor();
   await page.screenshot({ path: '/tmp/luma98-orders-desktop.png' });
+
+  // Filter with the condition builder, sort, and keep it as a personal view.
+  await page.goto(`/app/${fixture.org.id}/orders?view=all`);
+  await expect(orderRange).toHaveText('1–50');
+  await page.getByRole('button', { name: 'Add a filter' }).click();
+  const picker = page.getByRole('dialog', { name: 'Add a filter' });
+  await picker.getByRole('searchbox', { name: 'Find a field' }).fill('Tota');
+  await picker.getByRole('button', { name: 'Total', exact: true }).click();
+  const placed = page.getByRole('dialog', { name: 'Total' });
+  await placed.getByRole('combobox', { name: 'Condition' }).click();
+  await page.getByRole('option', { name: 'is not empty' }).click();
+  await placed.getByRole('button', { name: 'Apply filter' }).click();
+  await page
+    .getByRole('button', { name: 'Edit filter: Total is not empty' })
+    .waitFor();
+  await expect(orderRange).toHaveText('1–1');
+  await page.getByRole('link', { name: '#2001' }).waitFor();
+  const numberHeader = page
+    .getByRole('columnheader', { name: /Order/ })
+    .first();
+  await numberHeader
+    .getByRole('button', { name: 'Order', exact: true })
+    .click();
+  await expect(numberHeader).toHaveAttribute('aria-sort', 'descending');
+  await page.getByText('Modified', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Save as new view' }).click();
+  const save = page.getByRole('dialog', { name: 'Save as new view' });
+  await save.getByLabel('Name').fill('Placed orders');
+  await save.getByRole('button', { name: 'Save', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Placed orders', exact: true })
+    .waitFor();
+  await page.waitForURL((url) =>
+    /^[0-9a-f-]{36}$/.test(url.searchParams.get('view') ?? ''),
+  );
+  const viewId = new URL(page.url()).searchParams.get('view');
+  await page.screenshot({ path: '/tmp/luma286-orders-saved-view.png' });
+
+  // Opening Orders without a view returns to the remembered one.
+  await page.waitForTimeout(1500);
+  await page.goto(`/app/${fixture.org.id}/orders`);
+  await page.waitForURL((url) => url.searchParams.get('view') === viewId);
+  await page
+    .getByRole('button', { name: 'Edit filter: Total is not empty' })
+    .waitFor();
+  await expect(orderRange).toHaveText('1–1');
+
+  // A stale save is refused, and the member chooses what to keep.
+  await numberHeader
+    .getByRole('button', { name: 'Order', exact: true })
+    .click();
+  await page.getByText('Modified', { exact: true }).waitFor();
+  const saved = await fixture.request(
+    fixture.member,
+    `${fixture.base}/adaptive/views/${viewId}`,
+  );
+  await fixture.request(
+    fixture.member,
+    `${fixture.base}/adaptive/views/${viewId}`,
+    'PUT',
+    {
+      commandId: crypto.randomUUID(),
+      name: 'Placed orders (renamed)',
+      description: saved.description,
+      sharing: saved.sharing,
+      query: saved.query,
+      reviewed: true,
+      expectedRevision: saved.revision,
+    },
+  );
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page
+    .getByText('Someone else saved this view after you opened it.')
+    .waitFor();
+  await page
+    .getByRole('button', { name: 'Discard mine and load theirs' })
+    .click();
+  await page
+    .getByRole('button', { name: 'Placed orders (renamed)', exact: true })
+    .waitFor();
+
+  // Resetting the page opens the default view and can be undone.
+  await page.getByRole('button', { name: 'View options' }).click();
+  await page.getByRole('menuitem', { name: 'Reset page to default' }).click();
+  await page.getByRole('button', { name: 'All orders', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await page
+    .getByRole('button', { name: 'Placed orders (renamed)', exact: true })
+    .waitFor();
+
+  // List keys move through rows, and ? lists them.
+  await page
+    .locator('main')
+    .first()
+    .click({ position: { x: 4, y: 4 } });
+  await page.keyboard.press('j');
+  await expect(page.getByRole('link', { name: '#2001' })).toBeFocused();
+  await page.keyboard.press('?');
+  await page.getByRole('dialog', { name: 'Keyboard shortcuts' }).waitFor();
+  await page.keyboard.press('Escape');
+
+  // Links from before views, such as Insights drill-downs, become conditions.
+  await page.goto(`/app/${fixture.org.id}/orders?status=completed`);
+  await page.waitForURL((url) => !url.searchParams.has('status'));
+  expect(JSON.parse(new URL(page.url()).searchParams.get('where'))).toEqual({
+    match: 'all',
+    conditions: [{ field: 'status', op: 'any_of', value: ['completed'] }],
+  });
+  await page
+    .getByRole('button', { name: 'Edit Status filter: Completed' })
+    .waitFor();
   expect(errors).toEqual([]);
 });

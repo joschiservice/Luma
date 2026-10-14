@@ -1,5 +1,14 @@
 import { z } from 'zod';
 
+import {
+  collectionGroupKeyParameter,
+  collectionGroupLimitParameter,
+  collectionGroupParameter,
+  collectionGroupSchema,
+  collectionTimeZoneParameter,
+  collectionWhereParameter,
+} from './collections.js';
+
 const timestamp = z.string().datetime({ offset: true });
 
 const moneySchema = z.object({ amount: z.string(), currency: z.string() });
@@ -91,8 +100,22 @@ export const returnQuerySchema = z
     view: returnViewSchema.default('all'),
     stage: returnStageSchema.optional(),
     connectionId: z.string().uuid().optional(),
-    sort: z.enum(['requested', 'activity']).default('requested'),
+    where: collectionWhereParameter.optional(),
+    group: collectionGroupParameter.optional(),
+    groupKey: collectionGroupKeyParameter.optional(),
+    groupLimit: collectionGroupLimitParameter,
+    timeZone: collectionTimeZoneParameter,
+    sort: z
+      .enum(['requested', 'activity', 'value', 'pendingRefund', 'stage'])
+      .default('requested')
+      .describe(
+        '`value` and `pendingRefund` order by currency, then amount, so amounts compare only within one currency. `stage` follows the return lifecycle from requested to closed, then by request time. Returns without a value come last in both directions.',
+      ),
     direction: z.enum(['asc', 'desc']).default('desc'),
+    count: z
+      .literal('exact')
+      .optional()
+      .describe('Accepted for every list; return counts are always exact.'),
     cursor: z.string().min(1).max(4096).optional(),
     limit: z.coerce.number().int().min(1).max(50).default(50),
   })
@@ -106,6 +129,18 @@ export const returnListSchema = z.object({
     stages: z.partialRecord(returnStageSchema, z.number().int().nonnegative()),
   }),
   nextCursor: z.string().nullable(),
+  groups: z
+    .array(collectionGroupSchema)
+    .optional()
+    .describe(
+      'With `group`: each group in display order with its exact count, first rows (whose items are in `items`) and per-currency value sums. With `groupKey`: the one group, with this page of its rows. `complete` is false while a source is still importing its returns.',
+    ),
+  groupsTruncated: z
+    .boolean()
+    .optional()
+    .describe(
+      'More than 50 groups match; narrow the conditions to see the rest.',
+    ),
   asOf: timestamp,
 });
 

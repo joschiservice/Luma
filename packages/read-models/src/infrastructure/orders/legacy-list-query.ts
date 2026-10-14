@@ -1,8 +1,19 @@
 import type { OrderSort, OrderView } from '../../application/orders.js';
 import type { OrderReadQueries } from './list-query.js';
 
+/** Sorts the legacy read serves; others need the maintained list projection. */
+export type LegacyOrderSort = Extract<
+  OrderSort,
+  'updated' | 'placed' | 'number' | 'due'
+>;
+
+/** Whether the legacy read can serve `sort`. */
+export function isLegacySort(sort: string): sort is LegacyOrderSort {
+  return Object.hasOwn(sortKeys, sort);
+}
+
 // Sort keys are compared as text in byte order. Missing values always sort last.
-const sortKeys: Record<OrderSort, string> = {
+const sortKeys: Record<LegacyOrderSort, string> = {
   updated: `to_char(COALESCE(o.source_updated_at,o.observed_at) AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US')`,
   placed: `to_char(o.placed_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US')`,
   // Length first keeps "#999" before "#1001" for numbering schemes with a shared prefix. The
@@ -50,7 +61,7 @@ const hits = `sku_hits AS MATERIALIZED (
 export function legacyListSql(
   queries: OrderReadQueries,
   view: OrderView,
-  sort: OrderSort,
+  sort: LegacyOrderSort,
   direction: 'asc' | 'desc',
   search: boolean,
   exactCount = false,

@@ -1,9 +1,6 @@
-import { createHash } from 'node:crypto';
-
 import { hasPermission, requirePermission } from '@luma/identity';
 import { receivingSignals } from '@luma/inventory';
 import type { SqlTransaction, TenantDatabase } from '@luma/platform';
-import { z } from 'zod';
 
 import type {
   TransferDetail,
@@ -11,20 +8,37 @@ import type {
   TransferSummary,
   TransferWorkspace,
 } from '../../application/transfers.js';
+import { collectionCursorContext } from '../collection/cursor.js';
+import { likePattern } from '../collection/parameters.js';
+import { collectionContext } from '../collection/request.js';
+import { type CollectionFieldMap, compileWhere } from '../collection/where.js';
+import {
+  listKeyset,
+  type ListPosition,
+  positionOf,
+  readListCursor,
+  writeListCursor,
+} from '../list-paging.js';
 
-const cursorSchema = z
-  .object({
-    context: z.string(),
-    id: z.string().uuid(),
-    connectionId: z.string().uuid(),
-  })
-  .strict();
+/** Sort values; records without one come last. */
+const transferSortKeys = {
+  requested: 'r.source_created_at',
+  name: 'lower(r.name)',
+  updated: 'u.source_updated_at',
+} as const;
+
+/** The source's last change, read from the current snapshot. */
+const updatedJoin = `LEFT JOIN LATERAL (SELECT (s.document->>'sourceUpdatedAt')::timestamptz AS source_updated_at
+ FROM inventory_snapshots s WHERE s.tenant_id=r.tenant_id AND s.id=r.snapshot_id) u ON true`;
 
 type Row = Omit<TransferSummary, 'evidence' | 'signals'> & {
   available: boolean;
 };
 
-const rows = `SELECT r.entity_id AS id,r.connection_id AS "connectionId",r.kind,r.name,r.status,r.snapshot_id AS "snapshotId",r.observed_at::text AS "observedAt",r.facts,
+/** Selects summary rows `r`; `extra` adds columns. */
+const rows = (
+  extra = '',
+) => `SELECT ${extra} r.entity_id AS id,r.connection_id AS "connectionId",r.kind,r.name,r.status,r.snapshot_id AS "snapshotId",r.observed_at::text AS "observedAt",r.facts,
  COALESCE(c.document->>'label','Shopify') AS label,
  (c.document->>'status'='active' AND c.document->'permissions' ? CASE WHEN r.kind='inventory_transfer' THEN 'inventory.transfers.read' ELSE 'inventory.shipments.read' END
  AND c.document->'granted' ? CASE WHEN r.kind='inventory_transfer' THEN 'inventory.transfers.read' ELSE 'inventory.shipments.read' END) AS available
@@ -71,6 +85,110 @@ function summary(row: Row, now: Date, deleted = false): TransferSummary {
   };
 }
 
+/** Facts `r.facts` reports as decimal text; unknown quantities are null. */
+const quantity = (name: string) => ({
+  type: 'number' as const,
+  sql: `(r.facts->>'${name}')::numeric`,
+});
+
+/** Transfers catalog fields as SQL over the record row `r` and its update time `u`. */
+const transferFields: CollectionFieldMap = {
+  source: { type: 'reference', sql: 'r.connection_id', cast: 'uuid' },
+  requested: quantity('requested'),
+  shipped: quantity('shipped'),
+  received: quantity('received'),
+  unreceived: quantity('unreceived'),
+  requestedAt: { type: 'date', sql: 'r.source_created_at' },
+  updated: { type: 'date', sql: 'u.source_updated_at', requires: ['updated'] },
+};
+
+/**
+ * Reads up to `limit` + 1 current, non-removed transfer summaries of one kind in the requested
+ * order after `after`, with the exact match count when the query asks for it. Throws a 400
+ * error for invalid conditions.
+ */
+async function readTransferPage(
+  tx: SqlTransaction,
+  tenantId: string,
+  query: TransferQuery,
+  after: ListPosition | null,
+  options: { userId: string; asOf: string },
+) {
+  const sort = query.sort ?? 'requested';
+  const direction = query.direction ?? 'desc';
+  const limit = query.limit ?? 50;
+  const values: unknown[] = [
+    tenantId,
+    query.kind,
+    query.q,
+    likePattern(query.q),
+    query.connectionId ?? null,
+    query.skuId ?? null,
+    query.locationId ?? null,
+  ];
+  const where = query.where?.conditions.length
+    ? compileWhere(
+        query.where,
+        transferFields,
+        collectionContext(values, options.asOf, query.timeZone, options.userId),
+      )
+    : { sql: 'true', requires: new Set<string>() };
+  const filterValues = values.length;
+  const joins =
+    sort === 'updated' || where.requires.has('updated') ? updatedJoin : '';
+  const filters = `r.tenant_id=$1 AND r.kind=$2 AND NOT r.deleted
+  AND ($3::text='' OR r.name ILIKE $4)
+  AND ($5::uuid IS NULL OR r.connection_id=$5)
+  AND ($6::uuid IS NULL OR EXISTS(SELECT 1 FROM inventory_transfer_references f WHERE f.tenant_id=r.tenant_id AND f.entity_id=r.entity_id AND f.connection_id=r.connection_id AND f.resource='sku' AND f.canonical_id=$6))
+  AND ($7::uuid IS NULL OR EXISTS(SELECT 1 FROM inventory_transfer_references f WHERE f.tenant_id=r.tenant_id AND f.entity_id=r.entity_id AND f.connection_id=r.connection_id AND f.resource='location' AND f.canonical_id=$7))
+  AND ${where.sql}`;
+  const order = listKeyset(
+    {
+      keys: [
+        {
+          sql: transferSortKeys[sort],
+          type: sort === 'name' ? 'text' : 'timestamptz',
+        },
+      ],
+      ids: ['r.entity_id', 'r.connection_id'],
+      direction,
+      // Every record has a name.
+      ...(sort === 'name' ? { missing: false as const } : {}),
+    },
+    after,
+    values,
+  );
+  values.push(limit + 1);
+  const result = await tx.query<
+    Row & { list_rank: boolean; list_keys: string[] | null }
+  >(
+    `${rows(`${order.position},`)} ${joins}
+  WHERE ${filters} AND ${order.predicate}
+  ORDER BY ${order.orderBy} LIMIT $${values.length}`,
+    values,
+  );
+  const count =
+    query.count === 'exact'
+      ? (
+          await tx.query<{ count: number }>(
+            `SELECT count(*)::int AS count FROM inventory_transfer_records r ${where.requires.has('updated') ? updatedJoin : ''} WHERE ${filters}`,
+            values.slice(0, filterValues),
+          )
+        ).rows[0]!.count
+      : null;
+
+  return {
+    rows: result.rows.map(({ list_rank, list_keys, ...item }) => ({
+      item,
+      position: positionOf({ list_rank, list_keys }, [
+        item.id,
+        item.connectionId,
+      ]),
+    })),
+    totalCount: count,
+  };
+}
+
 /** Builds indexed operational lists and exact-source details in a consistent, tenant-scoped read snapshot. */
 export function createTransferWorkspace(
   db: TenantDatabase,
@@ -79,77 +197,41 @@ export function createTransferWorkspace(
   return {
     async listTransfers(context, query) {
       requirePermission(context, 'inventory.read');
-      const scope = createHash('sha256')
-        .update(
-          JSON.stringify([
-            'transfers/1',
-            context.tenantId,
-            query.kind,
-            query.q,
-            query.connectionId,
-            query.skuId,
-            query.locationId,
-          ]),
-        )
-        .digest('hex');
-      let after: z.infer<typeof cursorSchema> | null = null;
-      if (query.cursor) {
-        try {
-          const bytes = Buffer.from(query.cursor, 'base64url');
-          if (bytes.toString('base64url') !== query.cursor)
-            throw new Error('Encoding');
-          after = cursorSchema.parse(JSON.parse(bytes.toString()));
-          if (after.context !== scope) throw new Error('Scope');
-        } catch {
-          throw Object.assign(
-            new Error(
-              'This page link no longer matches the transfer filters. Start from the first page.',
-            ),
-            { statusCode: 400, expose: true },
-          );
-        }
-      }
+      const limit = query.limit ?? 50;
+      // Bound to the tenant and every filter, condition and sort; page sizes may change.
+      const scope = collectionCursorContext('transfers-v3', context.tenantId, {
+        ...query,
+        sort: query.sort ?? 'requested',
+        direction: query.direction ?? 'desc',
+        limit: undefined,
+        count: undefined,
+        cursor: undefined,
+      });
+      const after = query.cursor
+        ? readListCursor(query.cursor, scope, 'transfer')
+        : null;
       const at = now();
 
       return db.transaction(
         context.tenantId,
         async (tx) => {
           await tx.query("SET LOCAL statement_timeout = '4000ms'");
-          const pattern = `%${query.q.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`;
-          const result = await tx.query<Row>(
-            `${rows}
-          WHERE r.tenant_id=$1 AND r.kind=$2 AND NOT r.deleted
-          AND ($3::text='' OR r.name ILIKE $4)
-          AND ($5::uuid IS NULL OR r.connection_id=$5)
-          AND ($6::uuid IS NULL OR EXISTS(SELECT 1 FROM inventory_transfer_references f WHERE f.tenant_id=r.tenant_id AND f.entity_id=r.entity_id AND f.connection_id=r.connection_id AND f.resource='sku' AND f.canonical_id=$6))
-          AND ($7::uuid IS NULL OR EXISTS(SELECT 1 FROM inventory_transfer_references f WHERE f.tenant_id=r.tenant_id AND f.entity_id=r.entity_id AND f.connection_id=r.connection_id AND f.resource='location' AND f.canonical_id=$7))
-          AND ($8::uuid IS NULL OR (r.entity_id,r.connection_id)>($8::uuid,$9::uuid))
-          ORDER BY r.entity_id,r.connection_id LIMIT 51`,
-            [
-              context.tenantId,
-              query.kind,
-              query.q,
-              pattern,
-              query.connectionId ?? null,
-              query.skuId ?? null,
-              query.locationId ?? null,
-              after?.id ?? null,
-              after?.connectionId ?? null,
-            ],
+          const { rows: found, totalCount } = await readTransferPage(
+            tx,
+            context.tenantId,
+            query,
+            after,
+            { userId: context.actor.id, asOf: at.toISOString() },
           );
-          const last = result.rows[49];
+          const page = found.slice(0, limit);
+          const last = page.at(-1);
 
           return {
-            items: result.rows.slice(0, 50).map((row) => summary(row, at)),
+            items: page.map((row) => summary(row.item, at)),
+            totalCount,
             nextCursor:
-              result.rows.length > 50 && last
-                ? Buffer.from(
-                    JSON.stringify({
-                      context: scope,
-                      id: last.id,
-                      connectionId: last.connectionId,
-                    }),
-                  ).toString('base64url')
+              found.length > limit && last
+                ? writeListCursor(scope, last.position)
                 : null,
             asOf: at.toISOString(),
           };
@@ -166,7 +248,7 @@ export function createTransferWorkspace(
         async (tx) => {
           await tx.query("SET LOCAL statement_timeout = '4000ms'");
           const result = await tx.query<Row>(
-            `${rows} WHERE r.tenant_id=$1 AND r.entity_id=$2 AND r.connection_id=$3`,
+            `${rows()} WHERE r.tenant_id=$1 AND r.entity_id=$2 AND r.connection_id=$3`,
             [context.tenantId, id, connectionId],
           );
           const row = result.rows[0];
@@ -193,13 +275,13 @@ export function createTransferWorkspace(
           );
           const source = sourceRows.rows[0] ?? null;
           const shipments = await tx.query<Row>(
-            `${rows} JOIN connector_source_mappings m ON m.tenant_id=r.tenant_id AND m.connection_id=r.connection_id AND m.resource='inventory_shipment' AND m.canonical_id=r.entity_id
+            `${rows()} JOIN connector_source_mappings m ON m.tenant_id=r.tenant_id AND m.connection_id=r.connection_id AND m.resource='inventory_shipment' AND m.canonical_id=r.entity_id
           JOIN inventory_transfer_shipments f ON f.tenant_id=m.tenant_id AND f.connection_id=m.connection_id AND f.shipment_source_id=m.external_id AND f.shipment_scope_key=m.scope_key
           WHERE f.tenant_id=$1 AND f.entity_id=$2 AND f.connection_id=$3 AND NOT r.deleted ORDER BY r.entity_id LIMIT 51`,
             [context.tenantId, id, connectionId],
           );
           const transfers = await tx.query<Row>(
-            `${rows} JOIN inventory_transfer_shipments f ON f.tenant_id=r.tenant_id AND f.entity_id=r.entity_id AND f.connection_id=r.connection_id
+            `${rows()} JOIN inventory_transfer_shipments f ON f.tenant_id=r.tenant_id AND f.entity_id=r.entity_id AND f.connection_id=r.connection_id
           JOIN connector_source_mappings m ON m.tenant_id=f.tenant_id AND m.connection_id=f.connection_id AND m.resource='inventory_shipment' AND m.external_id=f.shipment_source_id AND m.scope_key=f.shipment_scope_key
           WHERE m.tenant_id=$1 AND m.canonical_id=$2 AND m.connection_id=$3 AND NOT r.deleted ORDER BY r.entity_id LIMIT 51`,
             [context.tenantId, id, connectionId],

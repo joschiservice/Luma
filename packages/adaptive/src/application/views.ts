@@ -3,7 +3,6 @@ import {
   hasPermission,
   IdentityError,
   requireChangesAllowed,
-  requirePermission,
   requireTenant,
 } from '@luma/identity';
 import type { ModelGateway, ModelSchema, TraceContext } from '@luma/platform';
@@ -13,6 +12,7 @@ import {
   ModelGatewayError,
 } from '@luma/platform';
 
+import type { CustomField } from '../domain/fields.js';
 import type {
   AdaptiveView,
   AdaptiveViewDomain,
@@ -20,13 +20,23 @@ import type {
   AdaptiveViewInput,
   AdaptiveViewPreview,
   AdaptiveViewQuery,
+  AdaptiveViewQueryV1,
   StoredAdaptiveView,
+  ViewExecutionQuery,
   ViewHistory,
+  ViewReaderDomain,
 } from '../domain/views.js';
-import { builtInViews, viewColumns, viewPermissions } from '../domain/views.js';
+import {
+  builtInViews,
+  viewPermissions,
+  viewReaderColumns,
+  viewReaderDomains,
+  viewReaderKeys,
+} from '../domain/views.js';
 
 export interface ViewsTransaction {
-  list(): Promise<StoredAdaptiveView[]>;
+  /** Live views the actor owns or that are shared, newest first. */
+  list(actorId: string): Promise<StoredAdaptiveView[]>;
   get(id: string): Promise<StoredAdaptiveView | null>;
   save(
     view: StoredAdaptiveView,
@@ -60,7 +70,7 @@ export interface ViewReadAdapter {
   read(
     context: TenantContext,
     filters: Record<string, unknown>,
-    query: AdaptiveViewQuery,
+    query: ViewExecutionQuery,
     selectedRecordIds?: readonly string[],
   ): Promise<ViewReadResult>;
   /** Explicitly enabled only by an adapter that combines custom predicates before pagination. */
@@ -70,16 +80,61 @@ export interface ViewReadAdapter {
   columns?: readonly string[];
 }
 
+/** The reader's current permissions. */
+export interface ViewPermissions {
+  has(permission: string): boolean;
+}
+
+/** A live custom field the reader may use in a view. */
+export interface ViewCustomField {
+  id: string;
+  type: CustomField['type'];
+}
+
+/** A reason a saved view cannot run; `forbidden` when the reader's role is the reason. */
+export interface ViewQueryIssue {
+  message: string;
+  forbidden: boolean;
+}
+
+/** A saved view compiled for the view engine, with each column's reader item key. */
+export interface ViewExecution {
+  query: ViewExecutionQuery;
+  /** Catalog column IDs in display order; `key` is null when no reader supplies the column. */
+  columns: { id: string; key: string | null }[];
+}
+
 export interface ViewsDependencies {
   store: ViewsStore;
   validation: {
+    /** Parses a query in format 1 or 2 and returns format 2. */
     query(value: unknown): AdaptiveViewQuery;
-    input(value: unknown): AdaptiveViewInput;
+    input(
+      value: unknown,
+    ): Omit<AdaptiveViewInput, 'query'> & { query: AdaptiveViewQuery };
     preview(value: unknown): AdaptiveViewPreview;
     prompt(value: unknown): string;
     ownerQuery(
-      query: AdaptiveViewQuery,
+      query: ViewExecutionQuery,
       cursor?: string,
+    ): Record<string, unknown>;
+    /** Checks a view against its list catalog and the reader's permissions. */
+    issues(
+      query: AdaptiveViewQuery,
+      options: {
+        permissions: ViewPermissions;
+        customFields: readonly ViewCustomField[];
+      },
+    ): ViewQueryIssue[];
+    /** Compiles a view for the engine; refuses what the engine cannot yet run with 422. */
+    execution(
+      query: AdaptiveViewQuery,
+      customFields: readonly ViewCustomField[],
+    ): ViewExecution;
+    /** Describes the lists a model may draft views for. */
+    describe(
+      domains: readonly ViewReaderDomain[],
+      permissions: ViewPermissions,
     ): Record<string, unknown>;
   };
   draftSchema: ModelSchema<Omit<AdaptiveViewDraft, 'preview'>>;
@@ -88,11 +143,14 @@ export interface ViewsDependencies {
     context: TenantContext,
     feature: 'adaptive-saved-views' | 'adaptive-view-generation',
   ): Promise<boolean>;
-  readers: Partial<Record<AdaptiveViewDomain, ViewReadAdapter>>;
+  readers: Partial<Record<ViewReaderDomain, ViewReadAdapter>>;
+  /** Custom fields of the list's record type the reader may see, including archived ones. */
   fields?(
     context: TenantContext,
     domain: AdaptiveViewDomain,
-  ): Promise<readonly { id: string; archived: boolean }[]>;
+  ): Promise<
+    readonly { id: string; archived: boolean; type: CustomField['type'] }[]
+  >;
   copyActions?(
     context: TenantContext,
     query: AdaptiveViewQuery,
@@ -119,13 +177,16 @@ export interface ViewsDependencies {
   now(): Date;
 }
 
+/**
+ * Decisions span record domains: a view limited by `domain` conditions needs each named domain's
+ * permission; an unlimited view needs any of them.
+ */
 function canReadDomain(
   context: TenantContext,
-  query: Pick<AdaptiveViewQuery, 'domain' | 'filters'>,
+  query: Pick<AdaptiveViewQuery, 'domain' | 'state'>,
 ) {
   if (query.domain !== 'decisions')
     return context.permissions.has(viewPermissions[query.domain]);
-  const domain = query.filters.domain;
   const permissions: Record<string, string> = {
     orders: 'orders.read',
     inventory: 'inventory.read',
@@ -133,12 +194,37 @@ function canReadDomain(
     procurement: 'procurement.read',
     operations: 'issues.read',
   };
+  const values = query.state.where.conditions
+    .filter(
+      (condition) =>
+        condition.field === 'domain' &&
+        (condition.op === 'any_of' || condition.op === 'is'),
+    )
+    .flatMap((condition) =>
+      Array.isArray(condition.value) ? condition.value : [condition.value],
+    );
+  const named = values.flatMap((value) =>
+    typeof value === 'string' && permissions[value] ? [permissions[value]] : [],
+  );
 
-  return typeof domain === 'string' && permissions[domain]
-    ? context.permissions.has(permissions[domain])
+  return named.length > 0 && named.length === values.length
+    ? named.every((permission) => context.permissions.has(permission))
     : Object.values(permissions).some((permission) =>
         context.permissions.has(permission),
       );
+}
+
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Whether a view selects only explicit, fresh source stock holds. */
+function selectsStockHolds(query: AdaptiveViewQuery) {
+  return query.state.where.conditions.some(
+    (condition) =>
+      condition.field === 'stockBlocked' &&
+      condition.op === 'is' &&
+      condition.value === true,
+  );
 }
 
 /** Private views remain private even to workspace administrators. */
@@ -166,6 +252,36 @@ function canEditView(
     (view.ownerId === context.actor.id ||
       hasPermission(context, 'adaptive.views.manage'))
   );
+}
+
+const sharingRank = { private: 0, roles: 1, workspace: 2 } as const;
+
+/**
+ * Members without `adaptive.views.manage` keep views private. They may keep or narrow the
+ * sharing of a view they already own, but never widen it to more people.
+ */
+function requireSharingAllowed(
+  context: TenantContext,
+  next: AdaptiveViewInput['sharing'],
+  current?: AdaptiveViewInput['sharing'],
+) {
+  if (
+    next.scope === 'private' ||
+    hasPermission(context, 'adaptive.views.manage')
+  )
+    return;
+  const narrower =
+    current &&
+    (sharingRank[next.scope] < sharingRank[current.scope] ||
+      (next.scope === current.scope &&
+        (next.scope === 'workspace' ||
+          next.roleIds.every((role) => current.roleIds.includes(role)))));
+  if (!narrower)
+    throw new IdentityError(
+      403,
+      'FORBIDDEN',
+      'Sharing a view with the workspace or with roles requires permission to manage views.',
+    );
 }
 
 /** Stores reviewed query descriptions and reauthorizes every read, preview and change. */
@@ -209,38 +325,43 @@ export function createViewsService(deps: ViewsDependencies) {
     return value;
   }
 
-  async function validateQuery(context: TenantContext, raw: AdaptiveViewQuery) {
-    const query = deps.validation.query(raw);
-    if (!canReadDomain(context, query))
-      throw new IdentityError(
-        403,
-        'FORBIDDEN',
-        'Your role cannot read this record source.',
-      );
-    if (query.domain === 'orders' && query.filters.customerId)
-      requirePermission(context, 'customers.read');
-    const reader = deps.readers[query.domain];
+  async function customFields(
+    context: TenantContext,
+    domain: AdaptiveViewDomain,
+  ): Promise<ViewCustomField[]> {
+    return ((await deps.fields?.(context, domain)) ?? [])
+      .filter((field) => !field.archived)
+      .map((field) => ({ id: field.id, type: field.type }));
+  }
+
+  /** Compiles a view for its reader and checks the reader can run every part of it. */
+  function engine(
+    query: AdaptiveViewQuery,
+    fields: readonly ViewCustomField[],
+  ) {
+    const execution = deps.validation.execution(query, fields);
+    const compiled = execution.query;
+    const reader = deps.readers[compiled.domain];
     if (!reader)
       throw new IdentityError(
         503,
         'SERVICE_UNAVAILABLE',
         'This record source is unavailable.',
       );
-    const customQuery =
-      query.customFilters.length > 0 ||
-      query.sort?.field.startsWith('custom:') ||
-      query.groupBy?.startsWith('custom:');
-    if (customQuery && !reader.supportsCustomQueries)
+    const customSort = !!compiled.sort?.field.startsWith('custom:');
+    if (
+      (compiled.customFilters.length > 0 ||
+        customSort ||
+        compiled.groupBy?.startsWith('custom:')) &&
+      !reader.supportsCustomQueries
+    )
       throw new IdentityError(
         422,
         'VALIDATION_ERROR',
         'This record source cannot yet combine custom field filters or ordering with its live query.',
       );
-    if (!query.sort?.field.startsWith('custom:'))
-      deps.validation.ownerQuery(query);
-    else deps.validation.ownerQuery({ ...query, sort: null });
     if (
-      (query.groupBy || query.metrics.length || query.charts.length) &&
+      (compiled.groupBy || compiled.metrics.length || compiled.charts.length) &&
       !reader.supportsAggregates
     )
       throw new IdentityError(
@@ -248,28 +369,46 @@ export function createViewsService(deps: ViewsDependencies) {
         'VALIDATION_ERROR',
         'Grouping and metrics require a complete query adapter for this source.',
       );
-    const available = new Set(reader.columns ?? viewColumns[query.domain]);
-    const fields = (await deps.fields?.(context, query.domain)) ?? [];
-    for (const item of fields)
-      if (!item.archived) available.add(`custom:${item.id}`);
-    const references = [
-      query.groupBy,
-      query.sort?.field,
-      ...query.customFilters.map((filter) => `custom:${filter.fieldId}`),
-      ...query.metrics.map((metric) => metric.field),
-      ...query.charts.map((chart) => chart.groupBy),
-    ].filter((value): value is string => !!value);
-    for (const reference of references) {
-      // Native sort keys belong to the owner's query schema rather than display columns.
-      if (reference === query.sort?.field && !reference.startsWith('custom:'))
-        continue;
-      if (!available.has(reference))
-        throw new IdentityError(
-          422,
-          'VALIDATION_ERROR',
-          'A filter, grouping or metric references an unavailable field.',
-        );
-    }
+    deps.validation.ownerQuery(
+      customSort ? { ...compiled, sort: null } : compiled,
+    );
+
+    return { execution, reader, customSort };
+  }
+
+  /**
+   * Validates a view in either format against its list catalog and returns it in format 2.
+   * Metrics, charts and actions run only in the view engine, so their views must compile.
+   */
+  async function validateQuery(
+    context: TenantContext,
+    raw: AdaptiveViewQuery | AdaptiveViewQueryV1,
+  ) {
+    const query = deps.validation.query(raw);
+    if (!canReadDomain(context, query))
+      throw new IdentityError(
+        403,
+        'FORBIDDEN',
+        'Your role cannot read this record source.',
+      );
+    const fields = await customFields(context, query.domain);
+    const issues = deps.validation.issues(query, {
+      permissions: context.permissions,
+      customFields: fields,
+    });
+    const forbidden = issues.find((issue) => issue.forbidden);
+    if (forbidden) throw new IdentityError(403, 'FORBIDDEN', forbidden.message);
+    if (issues.length)
+      throw new IdentityError(
+        422,
+        'VALIDATION_ERROR',
+        `This view needs repair. ${issues
+          .slice(0, 5)
+          .map((issue) => issue.message)
+          .join(' ')}`,
+      );
+    if (query.metrics.length || query.charts.length || query.actions.length)
+      engine(query, fields);
     if (query.actions.length) {
       if (!deps.validateActions)
         throw new IdentityError(
@@ -280,35 +419,41 @@ export function createViewsService(deps: ViewsDependencies) {
       await deps.validateActions(context, query);
     }
 
-    return { query, reader, available };
+    return { query, fields };
   }
 
   async function previewFresh(
     context: TenantContext,
-    raw: AdaptiveViewQuery,
+    raw: AdaptiveViewQuery | AdaptiveViewQueryV1,
     cursor?: string,
     selectedRecordIds?: readonly string[],
   ): Promise<AdaptiveViewPreview> {
-    const { query, reader, available } = await validateQuery(context, raw);
+    const { query, fields } = await validateQuery(context, raw);
+    const { execution, reader, customSort } = engine(query, fields);
+    const compiled = execution.query;
     const filters = deps.validation.ownerQuery(
-      query.sort?.field.startsWith('custom:')
-        ? { ...query, sort: null }
-        : query,
+      customSort ? { ...compiled, sort: null } : compiled,
       cursor,
     );
     const result = await reader.read(
       context,
       filters,
-      query,
+      compiled,
       selectedRecordIds,
     );
+    const readable = new Set([
+      ...(reader.columns ?? viewReaderKeys(compiled.domain)),
+      ...fields.map((field) => `custom:${field.id}`),
+    ]);
+    const shown = execution.columns.flatMap(({ id, key }) =>
+      key !== null && readable.has(key) ? [{ id, key }] : [],
+    );
     const warnings = [...(result.warnings ?? [])];
-    const missing = query.columns.filter((column) => !available.has(column));
-    if (missing.length)
+    if (shown.length < execution.columns.length)
       warnings.push(
         'Some columns are unavailable. Their values are omitted; the saved query has not changed.',
       );
-    if (query.filters.stockBlocked === true)
+    if (selectsStockHolds(query))
       warnings.push(
         'Only explicit source stock holds observed within five minutes are included. Missing, stale or incomplete fulfillment evidence does not establish whether other orders are stock-blocked.',
       );
@@ -316,13 +461,12 @@ export function createViewsService(deps: ViewsDependencies) {
       warnings.push(
         'More matching records are available. This page is not the complete result.',
       );
+    // Rows leave the engine keyed by catalog column IDs, so clients see one vocabulary.
     const items = result.items.map((item) =>
-      Object.fromEntries(
-        Object.entries(item).filter(
-          ([key]) =>
-            key === 'id' || (query.columns.includes(key) && available.has(key)),
-        ),
-      ),
+      Object.fromEntries([
+        ['id', item.id],
+        ...shown.map(({ id, key }) => [id, item[key]]),
+      ]),
     );
 
     return deps.validation.preview({
@@ -330,7 +474,12 @@ export function createViewsService(deps: ViewsDependencies) {
       items,
       totalCount: result.totalCount ?? null,
       warnings,
-      availableColumns: [...available],
+      availableColumns: [
+        ...Object.entries(viewReaderColumns[compiled.domain]).flatMap(
+          ([id, key]) => (readable.has(key) ? [id] : []),
+        ),
+        ...fields.map((field) => `custom:${field.id}`),
+      ],
       aggregates: result.aggregates ?? [],
       groups: result.groups ?? [],
       chartSeries: result.chartSeries ?? [],
@@ -358,7 +507,7 @@ export function createViewsService(deps: ViewsDependencies) {
       const fresh = await authorize(context);
 
       return deps.store.transaction(fresh.tenantId, async (tx) => ({
-        items: (await tx.list())
+        items: (await tx.list(fresh.actor.id))
           .filter((view) => !view.archived && canReadView(fresh, view))
           .map((view) => expose(fresh, view)),
         builtIns: builtInViews.filter((view) =>
@@ -376,6 +525,7 @@ export function createViewsService(deps: ViewsDependencies) {
     async create(context: TenantContext, raw: AdaptiveViewInput) {
       const fresh = await authorize(context, true);
       const input = await validateInput(fresh, raw);
+      requireSharingAllowed(fresh, input.sharing);
       const now = deps.now().toISOString();
       const value: StoredAdaptiveView = {
         name: input.name,
@@ -448,6 +598,7 @@ export function createViewsService(deps: ViewsDependencies) {
             'CONFLICT',
             'Archived views cannot be revised.',
           );
+        requireSharingAllowed(fresh, input.sharing, current.sharing);
         const value: StoredAdaptiveView = {
           ...current,
           name: input.name,
@@ -536,7 +687,7 @@ export function createViewsService(deps: ViewsDependencies) {
     },
     async preview(
       context: TenantContext,
-      query: AdaptiveViewQuery,
+      query: AdaptiveViewQuery | AdaptiveViewQueryV1,
       cursor?: string,
       selectedRecordIds?: readonly string[],
     ) {
@@ -569,6 +720,9 @@ export function createViewsService(deps: ViewsDependencies) {
         items: [],
         complete: false,
       };
+      const authorized = viewReaderDomains.filter((domain) =>
+        fresh.permissions.has(viewPermissions[domain]),
+      );
       try {
         const result = await deps.model.generate<
           Omit<AdaptiveViewDraft, 'preview'>
@@ -585,32 +739,7 @@ export function createViewsService(deps: ViewsDependencies) {
           messages: [
             {
               role: 'system',
-              content: `Propose a read-only live view. Never invent identities or UUIDs. Canonical identities: ${JSON.stringify(identities)}. Labels do not establish country or geography. Match a named identity only if exactly one supplied identity fits; otherwise ask for clarification. Return needs_clarification for named warehouses, suppliers, customers or connections without an exact supplied identity; unsupported for relationships or causal claims unsupported by filters. 'Orders delayed by stock at my German warehouse' requires exactly one supplied warehouse identity; use orders filters locationId:<exact canonical UUID>,stockBlocked:true when resolved. This only selects explicit fresh source inventory_out_of_stock holds; missing and stale reads are unknown and excluded. Explain that 'stuck' does not prove stock caused the delay. Do not generate actions. No SQL or write instructions. Only these authorized domains/columns: ${JSON.stringify(Object.fromEntries(Object.entries(viewColumns).filter(([domain]) => fresh.permissions.has(viewPermissions[domain as AdaptiveViewDomain]))))}. Supported owner filter schemas: ${JSON.stringify(
-                Object.fromEntries(
-                  Object.entries(viewPermissions)
-                    .filter(([, permission]) =>
-                      fresh.permissions.has(permission),
-                    )
-                    .map(([domain]) => [
-                      domain,
-                      domain === 'orders'
-                        ? 'q,view(all|outstanding|overdue|needs_you|differs|stuck),status,paymentStatus,connectionId,customerId,locationId,stockBlocked(true:explicit fresh source inventory_out_of_stock hold),placedFrom,placedBefore,updatedFrom,updatedBefore'
-                        : domain === 'inventory'
-                          ? 'q,view(all|differs|unknown),skuId,locationId,connectionId'
-                          : domain === 'decisions'
-                            ? 'view(all|mine|unassigned),domain(orders|fulfillment|inventory|procurement|operations),reason'
-                            : domain === 'fulfillment'
-                              ? 'q,view,connectionId,locationId,kind'
-                              : domain === 'products'
-                                ? 'q,view,connectionId,missingFrom'
-                                : domain === 'customers'
-                                  ? 'q,state,connectionId,externalId'
-                                  : domain === 'issues'
-                                    ? 'view(needs_you|active|history),ownerId,class,severity,state'
-                                    : 'no filters',
-                    ]),
-                ),
-              )}. Use table layout, null sort/group, empty customFilters/metrics/charts/actions. Ready requires a fully supported query. Explain evidence limits and incomplete paginated results. This is a draft requiring explicit user review.`,
+              content: `Propose a read-only live view as a format 2 saved view: {"version":2,"domain":<list>,"state":{"segment":<built-in view or null>,"where":{"match":"all","conditions":[{"field","op","value"}]},"sort":null or {"field","direction"},"group":null,"layout":"table","density":"comfortable","columns":[{"id"}],"properties":[],"preview":false},"metrics":[],"charts":[],"actions":[]}. Use only these authorized lists with their segments, column IDs, condition fields, operators and sort fields: ${JSON.stringify(deps.validation.describe(authorized, fresh.permissions))}. Condition values: a list for any_of, none_of and all_of; true or false for is on yes/no fields; ISO 8601 dates for before and after; omit value for empty and not_empty. Fields with "identities" take canonical identity UUIDs. Never invent identities or UUIDs. Canonical identities: ${JSON.stringify(identities)}. Labels do not establish country or geography. Match a named identity only if exactly one supplied identity fits; otherwise ask for clarification. Return needs_clarification for named warehouses, suppliers, customers or connections without an exact supplied identity; unsupported for relationships or causal claims the conditions cannot express. 'Orders delayed by stock at my German warehouse' requires exactly one supplied warehouse identity; when resolved use the orders conditions warehouse any_of [<exact canonical UUID>] and stockBlocked is true. stockBlocked selects only explicit fresh source inventory_out_of_stock holds; missing and stale reads are unknown and excluded. Explain that 'stuck' does not prove stock caused the delay. Do not generate actions, metrics or charts. No SQL or write instructions. Ready requires a fully supported query. Explain evidence limits and incomplete paginated results. This is a draft requiring explicit user review.`,
             },
             { role: 'user', content: text },
           ],
@@ -628,20 +757,17 @@ export function createViewsService(deps: ViewsDependencies) {
           };
         if (draft.status !== 'ready' || !draft.query)
           return { ...draft, query: null, preview: null };
-        const identityFilters = [
-          'locationId',
-          'supplierId',
-          'connectionId',
-          'customerId',
-        ];
+        const named = draft.query.state.where.conditions.flatMap((condition) =>
+          (Array.isArray(condition.value)
+            ? condition.value
+            : [condition.value]
+          ).filter(
+            (value): value is string =>
+              typeof value === 'string' && uuidPattern.test(value),
+          ),
+        );
         if (
-          identityFilters.some(
-            (key) =>
-              draft.query?.filters[key] &&
-              !identities.items.some(
-                (item) => item.id === draft.query?.filters[key],
-              ),
-          )
+          named.some((id) => !identities.items.some((item) => item.id === id))
         )
           return {
             status: 'needs_clarification',
@@ -656,7 +782,7 @@ export function createViewsService(deps: ViewsDependencies) {
             text,
           ) &&
           draft.query.domain === 'orders' &&
-          draft.query.filters.stockBlocked !== true
+          !selectsStockHolds(draft.query)
         )
           return {
             status: 'unsupported',
@@ -666,12 +792,16 @@ export function createViewsService(deps: ViewsDependencies) {
             warnings: [],
             preview: null,
           };
-        if (draft.query.actions.length)
+        if (
+          draft.query.actions.length ||
+          draft.query.metrics.length ||
+          draft.query.charts.length
+        )
           return {
             status: 'unsupported',
             query: null,
             explanation:
-              'Generated views cannot propose actions. Add governed actions manually after review.',
+              'Generated views cannot propose actions, metrics or charts. Add them manually after review.',
             warnings: [],
             preview: null,
           };

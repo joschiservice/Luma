@@ -156,5 +156,11 @@
   "activity_action_support_access_requested": "Support-Zugriff angefragt",
   "activity_action_support_access_request_approved": "Anfrage für Support-Zugriff angenommen",
   "activity_action_support_access_request_declined": "Anfrage für Support-Zugriff abgelehnt",
-  "activity_action_issue_closed": "Problem manuell geschlossen"
+  "activity_action_issue_closed": "Problem manuell geschlossen",
+  "activity_view_all": "Alle Aktivitäten",
+  "activity_filter_actor": "Erfasst von",
+  "activity_actor_me": "Ich",
+  "activity_actor_luma": "Luma",
+  "activity_actor_workflows": "Workflows",
+  "activity_actor_unknown_person": "Unbekannte Person"
 }

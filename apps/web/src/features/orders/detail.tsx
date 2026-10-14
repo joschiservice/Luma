@@ -4,30 +4,11 @@ import type { OrderDetail, OrderSourceFacts } from '@luma/api-contract';
 import { m } from '@luma/i18n/messages';
 import { Alert } from '@luma/ui/components/primitives/alert';
 import { Button } from '@luma/ui/components/primitives/button';
-import {
-  formatWorkspaceDateTime,
-  WorkspaceTimezone,
-} from '@luma/ui/components/primitives/workspace-date';
 import { onlineManager, useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router';
-import {
-  CircleCheck,
-  CircleHelp,
-  ClipboardList,
-  Clock,
-  GitCompareArrows,
-  Inbox,
-  Info,
-  type LucideIcon,
-  Mail,
-  PackageOpen,
-  Radio,
-  Trash2,
-  TriangleAlert,
-} from 'lucide-react';
+import { ClipboardList, Mail, Radio } from 'lucide-react';
 import {
   type ReactNode,
-  useContext,
   useEffect,
   useState,
   useSyncExternalStore,
@@ -38,10 +19,6 @@ import { SignInRedirect } from '../../kit/identity/common';
 import { IdentityError } from '../../kit/identity/data';
 import { RecordMessages } from '../../kit/record-messages';
 import { OrderSection } from '../../shared/orders/order-section';
-import {
-  orderSummary,
-  type SummaryKind,
-} from '../../shared/orders/presentation';
 import { RecordFields } from '../adaptive/record-fields';
 import { AppExtension } from '../apps/extension';
 import { recordReturnPath } from '../records/data';
@@ -73,33 +50,7 @@ import {
 } from './order-timeline';
 import { SalesRecord } from './sales-record';
 import { OrderLines, SourceComparison } from './source-facts';
-
-const summaryIcons: Record<SummaryKind, LucideIcon> = {
-  state: Info,
-  removed: Trash2,
-  closed: CircleCheck,
-  remaining: PackageOpen,
-  unknown: CircleHelp,
-  overdue: Clock,
-  failed: TriangleAlert,
-  issues: Inbox,
-  differs: GitCompareArrows,
-};
-
-const summaryTones: Record<
-  SummaryKind,
-  'neutral' | 'warning' | 'danger' | 'success'
-> = {
-  state: 'neutral',
-  removed: 'warning',
-  closed: 'success',
-  remaining: 'neutral',
-  unknown: 'warning',
-  overdue: 'danger',
-  failed: 'danger',
-  issues: 'warning',
-  differs: 'warning',
-};
+import { OrderSummaryList } from './summary';
 
 const subscribe = (changed: () => void) => onlineManager.subscribe(changed);
 const onlineSnapshot = () => onlineManager.isOnline();
@@ -346,7 +297,6 @@ export function OrderDetailView({
   changePlan?: ReactNode;
   sourceContext?: (source: OrderSourceFacts) => ReactNode;
 }) {
-  const timeZone = useContext(WorkspaceTimezone);
   const [chosen, setChosen] = useState<string | null>(null);
   const returnPath = recordReturnPath(organizationId, search.from);
   const listSearch = {
@@ -415,20 +365,7 @@ export function OrderDetailView({
               title={m.orders_detail_state_title()}
               icon={ClipboardList}
             >
-              <ul className="order-summary">
-                {orderSummary(detail, (value) =>
-                  formatWorkspaceDateTime(value, timeZone, 'day'),
-                ).map(({ kind, text }) => {
-                  const Icon = summaryIcons[kind];
-
-                  return (
-                    <li key={text} data-tone={summaryTones[kind]}>
-                      <Icon aria-hidden="true" />
-                      <span>{text}</span>
-                    </li>
-                  );
-                })}
-              </ul>
+              <OrderSummaryList detail={detail} />
             </OrderSection>
             <OrderJourney
               detail={detail}

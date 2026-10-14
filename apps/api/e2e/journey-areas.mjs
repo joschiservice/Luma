@@ -66,7 +66,9 @@ export const sharedPaths = [
 // Read models
 const rmBase = [
   'packages/read-models/src/{composition,http,index}.ts',
-  'packages/read-models/src/application/{access,records}.ts',
+  'packages/read-models/src/application/{access,collections,records}.ts',
+  'packages/read-models/src/infrastructure/collection/**',
+  'packages/read-models/src/api/collection-validation.ts',
 ];
 const rmOrders = [
   ...rmBase,
@@ -80,6 +82,7 @@ const rmFulfillment = [
   'packages/read-models/src/api/fulfillment.ts',
   'packages/read-models/src/application/{fulfillment,orders}.ts',
   'packages/read-models/src/infrastructure/fulfillment/**',
+  'packages/read-models/src/infrastructure/list-paging.ts',
   'packages/read-models/src/infrastructure/orders/{identity-references,links,list-query,search-query,values}.ts',
 ];
 const rmInsights = [
@@ -97,6 +100,7 @@ const rmInventory = [
   'packages/read-models/src/application/{inventory,transfers}.ts',
   'packages/read-models/src/domain/inventory.ts',
   'packages/read-models/src/infrastructure/inventory/**',
+  'packages/read-models/src/infrastructure/{list-groups,list-paging}.ts',
 ];
 const rmProducts = [
   ...rmBase,
@@ -104,7 +108,8 @@ const rmProducts = [
   'packages/read-models/src/application/{products,inventory}.ts',
   'packages/read-models/src/domain/inventory.ts',
   'packages/read-models/src/infrastructure/products/**',
-  'packages/read-models/src/infrastructure/inventory/positions.ts',
+  'packages/read-models/src/infrastructure/{list-groups,list-paging}.ts',
+  'packages/read-models/src/infrastructure/inventory/{collection-fields,positions}.ts',
 ];
 const rmProcurementContext = [
   ...rmBase,
@@ -112,13 +117,15 @@ const rmProcurementContext = [
   'packages/read-models/src/application/{procurement,inventory}.ts',
   'packages/read-models/src/domain/inventory.ts',
   'packages/read-models/src/infrastructure/procurement/**',
-  'packages/read-models/src/infrastructure/inventory/positions.ts',
+  'packages/read-models/src/infrastructure/{list-groups,list-paging}.ts',
+  'packages/read-models/src/infrastructure/inventory/{collection-fields,positions}.ts',
 ];
 const rmReturns = [
   ...rmBase,
   'packages/read-models/src/api/returns.ts',
   'packages/read-models/src/application/returns.ts',
   'packages/read-models/src/infrastructure/returns/**',
+  'packages/read-models/src/infrastructure/list-paging.ts',
   'packages/read-models/src/infrastructure/orders/identity-references.ts',
 ];
 const rmCustomers = [
@@ -126,6 +133,7 @@ const rmCustomers = [
   'packages/read-models/src/api/customers.ts',
   'packages/read-models/src/application/customers.ts',
   'packages/read-models/src/infrastructure/customers/**',
+  'packages/read-models/src/infrastructure/list-paging.ts',
 ];
 const rmDecisions = [
   ...rmBase,
@@ -182,7 +190,7 @@ const scheduledDetection = [
 ];
 const orderAttention = [
   'packages/exceptions/src/{composition,index}.ts',
-  'packages/exceptions/src/infrastructure/cases.ts',
+  'packages/exceptions/src/infrastructure/{cases,case-list}.ts',
   'packages/resolution/src/{composition,index}.ts',
   'packages/resolution/src/**/activity*.ts',
 ];
@@ -442,7 +450,7 @@ const webActivity = [
   'apps/web/src/features/activity/**',
   'apps/web/src/features/sync/presentation.ts',
   'apps/web/src/routes/app.$organizationId.activity.tsx',
-  'packages/i18n/messages/*/{activity,connections,sync}.json',
+  'packages/i18n/messages/*/{activity,collections,connections,sync}.json',
 ];
 const webApps = [
   'apps/web/src/features/apps/**',
@@ -452,6 +460,7 @@ const webApps = [
   'packages/i18n/messages/*/{apps,catalog,connections,issues,settings,sync}.json',
 ];
 const webCustomers = [
+  'apps/web/src/features/adaptive/{data.ts,presentation.ts,query-fields.ts}',
   'apps/web/src/features/customers/**',
   'apps/web/src/features/orders/data.ts',
   'apps/web/src/features/orders/list-table.tsx',
@@ -460,7 +469,7 @@ const webCustomers = [
   'apps/web/src/features/products/presentation.ts',
   'apps/web/src/features/sync/{coverage.tsx,data.ts,presentation.ts,sync.css}',
   'apps/web/src/routes/app.$organizationId.customers.*',
-  'packages/i18n/messages/*/{customers,issues,orders,products,sync}.json',
+  'packages/i18n/messages/*/{adaptive,collections,customers,issues,orders,products,sync}.json',
 ];
 const webCases = [
   'apps/web/src/features/exceptions/**',
@@ -473,7 +482,7 @@ const webCases = [
   'apps/web/src/features/workflows/shadow/shadow.css',
   'apps/web/src/features/workflows/data.ts',
   'apps/web/src/routes/app.$organizationId.exceptions{,_}.*',
-  'packages/i18n/messages/*/{connections,exceptions,settings,shadow,workflows}.json',
+  'packages/i18n/messages/*/{collections,connections,decisions,exceptions,settings,shadow,workflows}.json',
   // Case detail shows the change plan of the case's order.
   'apps/web/src/features/orders/{change-plan.tsx,data.ts,orders.css}',
   'apps/web/src/shared/orders/{order-section.tsx,presentation.ts}',
@@ -481,13 +490,14 @@ const webCases = [
 ];
 const webFulfillment = [
   'apps/web/src/features/activity/presentation.ts',
+  'apps/web/src/features/adaptive/{adaptive.css,bulk-actions.tsx,data.ts,presentation.ts,query-fields.ts,summary-band.tsx}',
   'apps/web/src/features/apps/extension.tsx',
   'apps/web/src/features/fulfillment/**',
   'apps/web/src/shared/orders/presentation.ts',
   'apps/web/src/features/records/data.ts',
   'apps/web/src/features/sync/{coverage.tsx,data.ts,presentation.ts,sync.css}',
   'apps/web/src/routes/app.$organizationId.fulfillment.*',
-  'packages/i18n/messages/*/{activity,apps,catalog,connections,fulfillment,issues,orders,settings,sync}.json',
+  'packages/i18n/messages/*/{activity,adaptive,apps,catalog,collections,connections,fulfillment,issues,orders,settings,sync}.json',
 ];
 const webInsights = [
   'apps/web/src/features/fulfillment/presentation.ts',
@@ -500,6 +510,7 @@ const webInsights = [
   'packages/i18n/messages/*/{connections,fulfillment,insights,issues,metrics,orders,overview,procurement}.json',
 ];
 const webInventory = [
+  'apps/web/src/features/adaptive/{adaptive.css,bulk-actions.tsx,data.ts,presentation.ts,query-fields.ts,summary-band.tsx}',
   'apps/web/src/features/apps/extension.tsx',
   'apps/web/src/features/inventory/**',
   'apps/web/src/shared/orders/presentation.ts',
@@ -507,7 +518,7 @@ const webInventory = [
   'apps/web/src/features/sync/{coverage.tsx,data.ts,identity-links.tsx,presentation.ts,sync.css}',
   'apps/web/src/features/workflows/{coverage.tsx,data.ts,readiness.css,readiness.tsx}',
   'apps/web/src/routes/app.$organizationId.inventory.*',
-  'packages/i18n/messages/*/{apps,catalog,connections,inventory,issues,orders,settings,sync,workflows}.json',
+  'packages/i18n/messages/*/{adaptive,apps,catalog,collections,connections,inventory,issues,orders,settings,sync,workflows}.json',
 ];
 const webNeedsYou = [
   'apps/web/src/features/apps/extension.tsx',
@@ -518,34 +529,40 @@ const webNeedsYou = [
   'apps/web/src/features/procurement/{data.ts,detail.tsx,forms.tsx,presentation.tsx,procurement.css,record-dialogs.tsx}',
   'apps/web/src/features/workflows/{coverage.tsx,data.ts,readiness.css,readiness.tsx,replenishment-setup.tsx,replenishment.css,replenishment.tsx,workflows.css}',
   'apps/web/src/routes/app.$organizationId.needs-you.tsx',
-  'packages/i18n/messages/*/{apps,catalog,connections,decisions,exceptions,inventory,issues,orders,procurement,settings,workflows}.json',
+  'packages/i18n/messages/*/{apps,catalog,collections,connections,decisions,exceptions,inventory,issues,orders,procurement,settings,workflows}.json',
 ];
 const webOrders = [
   'apps/web/src/features/activity/presentation.ts',
+  'apps/web/src/features/adaptive/{data.ts,presentation.ts,query-fields.ts}',
+  'apps/web/src/features/fulfillment/data.ts',
   'apps/web/src/features/apps/extension.tsx',
   'apps/web/src/features/orders/**',
   'apps/web/src/features/records/data.ts',
   'apps/web/src/features/returns/{order-returns.tsx,presentation.ts,returns.css}',
   'apps/web/src/features/sync/{coverage.tsx,data.ts,identity-links.tsx,presentation.ts,sync.css}',
   'apps/web/src/routes/app.$organizationId.orders.*',
-  'packages/i18n/messages/*/{activity,apps,catalog,connections,issues,orders,records,returns,settings,sync}.json',
+  'packages/i18n/messages/*/{activity,adaptive,apps,catalog,collections,connections,issues,orders,records,returns,settings,sync}.json',
 ];
 const webProcurement = [
+  'apps/web/src/features/adaptive/{adaptive.css,bulk-actions.tsx,data.ts,presentation.ts,query-fields.ts,summary-band.tsx}',
+  'apps/web/src/features/fulfillment/data.ts',
   'apps/web/src/features/inventory/presentation.tsx',
   'apps/web/src/shared/orders/presentation.ts',
+  'apps/web/src/shared/procurement/suppliers.ts',
   'apps/web/src/features/procurement/**',
   'apps/web/src/features/workflows/{coverage.tsx,data.ts,readiness.css,readiness.tsx}',
   'apps/web/src/routes/app.$organizationId.procurement.*',
-  'packages/i18n/messages/*/{inventory,issues,orders,procurement,workflows}.json',
+  'packages/i18n/messages/*/{adaptive,collections,inventory,issues,orders,procurement,workflows}.json',
 ];
 const webProducts = [
+  'apps/web/src/features/adaptive/{adaptive.css,bulk-actions.tsx,data.ts,presentation.ts,query-fields.ts,summary-band.tsx}',
   'apps/web/src/features/inventory/presentation.tsx',
   'apps/web/src/shared/orders/presentation.ts',
   'apps/web/src/features/products/**',
   'apps/web/src/features/records/data.ts',
   'apps/web/src/features/sync/{coverage.tsx,data.ts,identity-links.tsx,presentation.ts,sync.css}',
   'apps/web/src/routes/app.$organizationId.products.*',
-  'packages/i18n/messages/*/{inventory,issues,orders,products,sync}.json',
+  'packages/i18n/messages/*/{adaptive,collections,inventory,issues,orders,products,sync}.json',
 ];
 const webRecords = [
   'apps/web/src/features/records/**',
@@ -554,13 +571,14 @@ const webRecords = [
   'packages/i18n/messages/*/{connections,records,sync}.json',
 ];
 const webReturns = [
+  'apps/web/src/features/adaptive/{data.ts,presentation.ts,query-fields.ts}',
   'apps/web/src/features/apps/extension.tsx',
   'apps/web/src/shared/orders/presentation.ts',
   'apps/web/src/features/records/data.ts',
   'apps/web/src/features/returns/**',
   'apps/web/src/features/sync/{coverage.tsx,data.ts,presentation.ts,sync.css}',
   'apps/web/src/routes/app.$organizationId.returns.*',
-  'packages/i18n/messages/*/{apps,catalog,connections,issues,orders,returns,settings,sync}.json',
+  'packages/i18n/messages/*/{adaptive,apps,catalog,collections,connections,issues,orders,returns,settings,sync}.json',
 ];
 const webSettings = [
   'apps/web/src/features/orders/authority.ts',
@@ -578,7 +596,7 @@ const webSync = [
 const webInbox = [
   'apps/web/src/features/inbox/**',
   'apps/web/src/routes/app.$organizationId.inbox.*',
-  'packages/i18n/messages/*/messaging.json',
+  'packages/i18n/messages/*/{collections,messaging}.json',
 ];
 const webWorkflows = [
   'apps/web/src/features/workflows/shadow/data.ts',
@@ -604,6 +622,9 @@ export const journeyAreas = {
   'activity.browser.mjs': [
     ...appHost,
     ...activity,
+    // Saved activity views.
+    'packages/adaptive/**',
+    'packages/api-contract/src/{adaptive*,collection*}.ts',
     ...cases,
     ...playbooks,
     ...webShell,
@@ -1051,6 +1072,9 @@ export const journeyAreas = {
   'procurement.browser.mjs': [
     ...procurement,
     ...activity,
+    // Saved purchase-order views.
+    'packages/adaptive/**',
+    'packages/api-contract/src/{adaptive*,collection*}.ts',
     ...webShell,
     ...webProcurement,
     ...webActivity,

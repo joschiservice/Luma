@@ -291,7 +291,8 @@ test('reviews decisions, recovers ambiguous commands and escalates through the c
     .getByRole('button', { name: 'Refresh issues', exact: true })
     .click();
   await page
-    .getByText('Issues couldn’t be refreshed', { exact: true })
+    .getByRole('alert')
+    .filter({ hasText: 'The list couldn’t be refreshed.' })
     .waitFor();
   await expect.poll(() => approve.isEnabled()).toBe(true);
   await page.unroute(`**/api/v1/organizations/${organizationId}/exceptions?*`);

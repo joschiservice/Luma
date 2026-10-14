@@ -1,5 +1,14 @@
 import { z } from 'zod';
 
+import {
+  collectionGroupKeyParameter,
+  collectionGroupLimitParameter,
+  collectionGroupParameter,
+  collectionGroupSchema,
+  collectionTimeZoneParameter,
+  collectionWhereParameter,
+} from './collections.js';
+
 const stockSourceSchema = z.object({
   bundleContext: z
     .object({
@@ -67,6 +76,15 @@ export const stockPositionSchema = z.object({
     .nullable(),
 });
 
+const inventorySortSchema = z.enum([
+  'sku',
+  'location',
+  'available',
+  'onHand',
+  'incoming',
+  'lastRead',
+]);
+
 export const inventoryQuerySchema = z
   .object({
     q: z.string().trim().max(120).default(''),
@@ -74,13 +92,44 @@ export const inventoryQuerySchema = z
     skuId: z.string().uuid().optional(),
     locationId: z.string().uuid().optional(),
     connectionId: z.string().uuid().optional(),
+    sort: inventorySortSchema
+      .default('sku')
+      .describe(
+        'Quantities sort by the lowest value any source reports; sources that report none are ignored. `lastRead` is the most recent read of any source. Positions without a value come last in both directions. Ties continue by SKU, location and position ID.',
+      ),
+    direction: z.enum(['asc', 'desc']).default('asc'),
+    limit: z.coerce.number().int().min(1).max(50).default(50),
+    count: z
+      .literal('exact')
+      .optional()
+      .describe(
+        'Request the exact number of matches. Without this option, totalCount is null.',
+      ),
+    where: collectionWhereParameter.optional(),
+    group: collectionGroupParameter.optional(),
+    groupKey: collectionGroupKeyParameter.optional(),
+    groupLimit: collectionGroupLimitParameter,
+    timeZone: collectionTimeZoneParameter,
     cursor: z.string().min(1).max(1024).optional(),
   })
   .strict();
 
 export const inventoryListSchema = z.object({
   items: z.array(stockPositionSchema),
+  totalCount: z.number().int().nonnegative().nullable(),
   nextCursor: z.string().nullable(),
+  groups: z
+    .array(collectionGroupSchema)
+    .optional()
+    .describe(
+      'With `group`: each group in display order with its exact count and first positions, whose items are in `items`. A position counts in the group of each of its sources. With `groupKey`: the one group, with this page of its positions.',
+    ),
+  groupsTruncated: z
+    .boolean()
+    .optional()
+    .describe(
+      'More than 50 groups match; narrow the conditions to see the rest.',
+    ),
   asOf: z.string().datetime({ offset: true }),
 });
 

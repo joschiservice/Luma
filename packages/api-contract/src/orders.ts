@@ -2,6 +2,14 @@ import { z } from 'zod';
 
 import { activityActorSchema } from './activity.js';
 import { factAuthoritySchema } from './authority.js';
+import {
+  collectionGroupKeyParameter,
+  collectionGroupLimitParameter,
+  collectionGroupParameter,
+  collectionGroupSchema,
+  collectionTimeZoneParameter,
+  collectionWhereParameter,
+} from './collections.js';
 import { returnListItemSchema } from './returns.js';
 
 const timestamp = z.string().datetime();
@@ -33,7 +41,17 @@ export const orderViewSchema = z.enum([
   'stuck',
 ]);
 
-export const orderSortSchema = z.enum(['updated', 'placed', 'number', 'due']);
+export const orderSortSchema = z.enum([
+  'updated',
+  'placed',
+  'number',
+  'due',
+  'total',
+  'status',
+  'paymentStatus',
+  'fulfillment',
+  'lineCount',
+]);
 
 const orderFulfillmentStateSchema = z.enum([
   'unfulfilled',
@@ -78,12 +96,42 @@ const orderListItemSchema = z.object({
   sources: z.array(orderSourceSchema),
   observedAt: timestamp,
   sourceUpdatedAt: timestamp.nullable(),
+  channel: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      'Sales channel the selected source reports; null when it reports none.',
+    ),
+  tags: z
+    .array(z.string())
+    .optional()
+    .describe('Tags the selected source reports.'),
+  test: z
+    .boolean()
+    .nullable()
+    .optional()
+    .describe(
+      'Whether the selected source marks this as a test order; null when not reported.',
+    ),
 });
 
 export const orderListSchema = z.object({
   items: z.array(orderListItemSchema),
   totalCount: z.number().int().nullable(),
   nextCursor: z.string().nullable(),
+  groups: z
+    .array(collectionGroupSchema)
+    .optional()
+    .describe(
+      'With `group`: each group in display order with its exact count and first rows, whose items are in `items`. With `groupKey`: the one group, with this page of its rows.',
+    ),
+  groupsTruncated: z
+    .boolean()
+    .optional()
+    .describe(
+      'More than 50 groups match; narrow the conditions to see the rest.',
+    ),
   asOf: timestamp,
 });
 
@@ -127,7 +175,17 @@ export const orderListQuerySchema = z
     placedBefore: timestamp.optional(),
     updatedFrom: timestamp.optional(),
     updatedBefore: timestamp.optional(),
-    sort: orderSortSchema.default('updated'),
+    where: collectionWhereParameter.optional(),
+    group: collectionGroupParameter.optional(),
+    groupKey: collectionGroupKeyParameter.optional(),
+    groupLimit: collectionGroupLimitParameter,
+    timeZone: collectionTimeZoneParameter,
+    sort: z
+      .union([orderSortSchema, z.templateLiteral(['custom:', z.uuid()])])
+      .default('updated')
+      .describe(
+        'Missing values sort last in both directions. `total` orders by currency code, then amount, both in the sort direction; amounts in different currencies are never compared. Status, payment and fulfillment follow their documented option order. `custom:<field ID>` sorts by a readable custom order field that holds one value.',
+      ),
     direction: z.enum(['asc', 'desc']).default('desc'),
     limit: z.coerce.number().int().min(1).max(100).default(50),
     cursor: z.string().min(1).max(1024).optional(),
@@ -904,6 +962,9 @@ export type OrderView = z.infer<typeof orderViewSchema>;
 export type OrderSort = z.infer<typeof orderSortSchema>;
 
 export type OrderListQuery = z.infer<typeof orderListQuerySchema>;
+
+/** The order list query as clients send it: conditions and group keys are JSON text. */
+export type OrderListQueryInput = z.input<typeof orderListQuerySchema>;
 
 export type OrderListItem = z.infer<typeof orderListItemSchema>;
 

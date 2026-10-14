@@ -16,7 +16,17 @@ export {
 
 export type { AdaptiveViews, ViewReadAdapter } from './application/views.js';
 
-export { viewColumns } from './domain/views.js';
+export type { CollectionStates } from './application/collection-states.js';
+
+export type { ViewExports } from './application/exports.js';
+
+export {
+  viewReaderColumns,
+  viewReaderDomains,
+  viewReaderKeys,
+} from './domain/views.js';
+
+export type { ViewReaderDomain } from './domain/views.js';
 
 export { isFieldWriteCapability } from './application/fields-effects.js';
 

@@ -1,3 +1,4 @@
+import type { TenantContext } from '@luma/identity';
 import type { SqlTransaction } from '@luma/platform';
 
 import type {
@@ -6,6 +7,37 @@ import type {
   CustomerQuery,
   CustomerSource,
 } from '../../application/customers.js';
+import type { CollectionCursorPosition } from '../collection/cursor.js';
+import {
+  collectionCustomFields,
+  customFieldIds,
+  customSort,
+} from '../collection/custom-fields.js';
+import {
+  type CollectionGroupRow,
+  groupCtes,
+  groupHeadIds,
+  groupMemberPredicate,
+  groupsJson,
+} from '../collection/group.js';
+import {
+  type CollectionOrdering,
+  keysetCandidates,
+  sortOrder,
+} from '../collection/keyset.js';
+import { likePattern } from '../collection/parameters.js';
+import {
+  collectionContext,
+  collectionGrouping,
+  collectionGroupLimit,
+  maxCollectionGroups,
+} from '../collection/request.js';
+import { compileWhere } from '../collection/where.js';
+import {
+  customerCollectionFields,
+  customerGroupFields,
+  customerSorts,
+} from './collection-fields.js';
 
 const iso = (column: string) =>
   `to_char(${column} AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
@@ -21,69 +53,147 @@ const itemColumns = `p.id,p.connection_id AS "connectionId",p.external_id AS "ex
  CASE WHEN p.amount_spent IS NULL THEN NULL
   ELSE jsonb_build_object('amount',trim_scale(p.amount_spent)::text,'currency',p.currency) END AS "amountSpent",
  p.tags,jsonb_build_object('contact',p.contact_shared,'address',p.address_shared) AS shared,
+ CASE WHEN p.address_shared THEN p.country END AS country,${iso('p.last_order_at')} AS "lastOrderAt",
  ${iso('p.source_updated_at')} AS "sourceUpdatedAt",${iso('p.observed_at')} AS "observedAt",
  (SELECT ${iso('i.missing_since')} FROM commerce_sync_items i WHERE i.tenant_id=p.tenant_id
   AND i.connection_id=p.connection_id AND i.record_type='customers' AND i.resource='customer'
   AND i.scope_key='' AND i.external_id=p.external_id) AS "missingSince"`;
 
-// Missing values sort as the lowest key so every profile has a position.
-const sortKeys = {
-  created: {
-    key: `COALESCE(p.source_created_at,'-infinity'::timestamptz)`,
-    type: 'timestamptz',
-  },
-  orders: { key: 'COALESCE(p.order_count,-1)', type: 'integer' },
-  name: { key: `COALESCE(lower(p.display_name),'')`, type: 'text' },
-} as const;
+/** One page of profiles, or every group's first rows, with the number of matches. */
+export interface CustomerPage {
+  rows: { item: CustomerListItem; position: CollectionCursorPosition }[];
+  totalCount: number;
+  groups: CollectionGroupRow[] | null;
+}
 
-/** Position of the last row on a page in the requested order. */
-export interface CustomerPosition {
-  key: string;
-  id: string;
+function isNativeSort(sort: string): sort is keyof typeof customerSorts {
+  return Object.hasOwn(customerSorts, sort);
 }
 
 /**
- * Lists up to `limit + 1` profiles for the filters after `after`, with the number of matches.
- * Search matches the name, email address and phone number anywhere, and the source customer ID
- * exactly or by its last path segment.
+ * Lists up to `limit + 1` profiles for the filters and conditions after `after`, or with
+ * `group` every group's count and first rows, with the number of matches. Search matches the
+ * name, email address and phone number anywhere, and the source customer ID exactly or by its
+ * last path segment. Conditions and the sort may name readable custom customer fields.
+ * Relative dates resolve against `asOf`. Throws a 400 error for invalid conditions, grouping
+ * or unavailable custom fields, and a 403 error for custom fields the reader may not read.
  */
 export async function readCustomers(
   tx: SqlTransaction,
-  tenantId: string,
+  tenant: TenantContext,
   query: CustomerQuery,
-  after: CustomerPosition | null,
-) {
+  asOf: string,
+  after: CollectionCursorPosition | null,
+): Promise<CustomerPage> {
   const q = query.q.trim();
-  const pattern = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-  const where = `p.tenant_id=$1 AND ($2::uuid IS NULL OR p.connection_id=$2)
-   AND ($3::text IS NULL OR p.state=$3) AND ($4::text IS NULL OR p.external_id=$4)
-   AND ($5='' OR p.display_name ILIKE $6 OR p.email ILIKE $6 OR p.phone ILIKE $6
-    OR p.external_id=$5 OR right(p.external_id,length($5)+1)='/'||$5)`;
-  const filters = [
-    tenantId,
+  const values: unknown[] = [
+    tenant.tenantId,
     query.connectionId ?? null,
     query.state ?? null,
     query.externalId ?? null,
     q,
-    pattern,
+    likePattern(q),
   ];
-  const count = await tx.query<{ count: number }>(
-    `SELECT count(*)::int AS count FROM customer_profiles p WHERE ${where}`,
-    filters,
+  const context = collectionContext(
+    values,
+    asOf,
+    query.timeZone,
+    tenant.actor.id,
   );
-  const { key, type } = sortKeys[query.sort];
-  const direction = query.direction === 'asc' ? 'ASC' : 'DESC';
-  const rows = await tx.query<CustomerListItem & { position: string }>(
-    `SELECT ${itemColumns},${key}::text AS position FROM customer_profiles p
-     WHERE ${where} AND ($7::text IS NULL
-      OR (${key},p.id) ${direction === 'ASC' ? '>' : '<'} ($7::${type},$8::uuid))
-     ORDER BY ${key} ${direction},p.id ${direction} LIMIT $9`,
-    [...filters, after?.key ?? null, after?.id ?? null, query.limit + 1],
+  const { parameters } = context;
+  const customIds = customFieldIds([
+    ...(query.where?.conditions.map((condition) => condition.field) ?? []),
+    query.sort,
+  ]);
+  const custom = customIds.length
+    ? await collectionCustomFields(
+        tx,
+        tenant,
+        { type: 'customer', id: 'o.id' },
+        customIds,
+        parameters,
+        context.timeZone,
+      )
+    : undefined;
+  const where = query.where?.conditions.length
+    ? compileWhere(
+        query.where,
+        { ...customerCollectionFields, ...custom?.fields },
+        context,
+      ).sql
+    : 'true';
+  const { request, grouped } = collectionGrouping(query, customerGroupFields);
+  const member =
+    request && query.groupKey !== undefined
+      ? groupMemberPredicate(request, query.groupKey, context)
+      : 'true';
+  const ordering: CollectionOrdering = {
+    sort: isNativeSort(query.sort)
+      ? customerSorts[query.sort]
+      : customSort(custom?.sorts, query.sort),
+    direction: query.direction,
+    id: 'o.id',
+  };
+  let page: string;
+  let groups = 'NULL::jsonb';
+  let ctes = '';
+  if (request && grouped) {
+    ctes = `${groupCtes(
+      'filtered',
+      request,
+      ordering,
+      parameters.bind(collectionGroupLimit(query), 'integer'),
+      maxCollectionGroups,
+      { field: 'spent', amount: 'o.amount_spent', currency: 'o.currency' },
+      context,
+    )},`;
+    groups = groupsJson;
+    page = `SELECT o.*,0 AS sort_rank,'{}'::text[] AS sort_keys,0::bigint AS n FROM filtered o
+ WHERE o.id IN (SELECT id::uuid FROM (${groupHeadIds}) h)`;
+  } else {
+    const limit = parameters.bind(query.limit + 1, 'integer');
+    page = `SELECT o.*,row_number() OVER (ORDER BY ${sortOrder(ordering)}) AS n FROM (${keysetCandidates(
+      'filtered',
+      ordering,
+      limit,
+      {
+        rank: parameters.bind(after?.rank ?? null, 'integer'),
+        keys: parameters.bind(after?.keys ?? null, 'text[]'),
+        id: parameters.bind(after?.id ?? null, 'uuid'),
+      },
+    )}) o ORDER BY ${sortOrder(ordering)} LIMIT ${limit}`;
+  }
+  const result = await tx.query<{
+    total: number;
+    page: (CustomerListItem & {
+      sortRank: 0 | 1;
+      sortKeys: (string | null)[];
+    })[];
+    groups: CollectionGroupRow[] | null;
+  }>(
+    `WITH filtered AS NOT MATERIALIZED (
+  SELECT o.* FROM customer_profiles o
+  WHERE o.tenant_id=$1 AND ($2::uuid IS NULL OR o.connection_id=$2)
+   AND ($3::text IS NULL OR o.state=$3) AND ($4::text IS NULL OR o.external_id=$4)
+   AND ($5='' OR o.display_name ILIKE $6 OR o.email ILIKE $6 OR o.phone ILIKE $6
+    OR o.external_id=$5 OR right(o.external_id,length($5)+1)='/'||$5)
+   AND ${where} AND ${member}
+), ${ctes} page AS MATERIALIZED (${page})
+SELECT (SELECT count(*) FROM filtered)::int AS total,
+ COALESCE((SELECT jsonb_agg(to_jsonb(i)-'n' ORDER BY i.n,i.id) FROM (
+  SELECT ${itemColumns},p.sort_rank AS "sortRank",p.sort_keys AS "sortKeys",p.n FROM page p) i),'[]') AS page,
+ ${groups} AS groups`,
+    values,
   );
+  const row = result.rows[0]!;
 
   return {
-    rows: rows.rows.map(({ position, ...item }) => ({ position, item })),
-    totalCount: count.rows[0]?.count ?? 0,
+    rows: row.page.map(({ sortRank, sortKeys, ...item }) => ({
+      position: { rank: sortRank, keys: sortKeys, id: item.id },
+      item,
+    })),
+    totalCount: row.total,
+    groups: row.groups,
   };
 }
 

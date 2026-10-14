@@ -1,5 +1,5 @@
 export type AdaptiveRecordType =
-  'order' | 'product' | 'supplier' | 'purchase_order';
+  'order' | 'product' | 'supplier' | 'purchase_order' | 'customer';
 
 type CustomFieldType =
   | 'text'

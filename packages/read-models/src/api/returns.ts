@@ -4,12 +4,14 @@ import {
   apiContract,
   returnDetailSchema,
   returnListSchema,
+  returnsCatalog,
 } from '@luma/api-contract';
 import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
 import { implement } from '@orpc/server';
 
 import type { ReturnWorkspace } from '../application/returns.js';
+import { validateCollectionQuery } from './collection-validation.js';
 
 /** Exposes the tenant's returns and refunds to readers with `returns.read`. */
 export function returnRoutes(service?: ReturnWorkspace) {
@@ -30,6 +32,7 @@ export function returnRoutes(service?: ReturnWorkspace) {
             'SERVICE_UNAVAILABLE',
             'Returns are unavailable',
           );
+        validateCollectionQuery(returnsCatalog, query);
 
         return returnListSchema.parse(
           await service.list(request.tenantContext, query),

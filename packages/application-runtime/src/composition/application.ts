@@ -1460,6 +1460,7 @@ export function createApplicationServices(
       orders,
       inventory,
       fulfillment,
+      returns,
       products,
       customers,
       decisions,

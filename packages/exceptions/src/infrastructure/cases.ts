@@ -6,7 +6,8 @@ import { z } from 'zod';
 import type {
   CaseDetail,
   CaseEvidencePage,
-  CaseQuery,
+  CaseGroup,
+  CaseListPage,
   CaseReader,
 } from '../application/cases.js';
 import type { Incident } from '../application/detection.js';
@@ -16,6 +17,21 @@ import {
   type CaseMetricItem,
   summarizeCaseMetrics,
 } from '../domain/metrics.js';
+import {
+  afterPosition,
+  atOrBefore,
+  boundGroupKey,
+  caseCursorContext,
+  caseFilter,
+  caseGroupFields,
+  caseListError,
+  CaseListParameters,
+  type CasePosition,
+  decodeCaseCursor,
+  encodeCaseCursor,
+  sortColumns,
+  sortOrder,
+} from './case-list.js';
 
 type Row = {
   document: Incident;
@@ -167,46 +183,112 @@ export function orderAttentionForOrders(orders: string) {
     WHERE r.tenant_id=$1 AND r.order_id IN (SELECT entity_id FROM ${orders}))`);
 }
 
-const cursorSchema = z
-  .object({
-    context: z.string(),
-    rank: z.number().int().min(0).max(1),
-    at: z.string().datetime(),
-    id: z.string().uuid(),
-  })
-  .strict();
+/** The summary of an issue whose investigation can't be shown, by class. */
+const fallbackSummaries: Readonly<Record<string, string>> = {
+  inventory_mismatch: 'Inventory quantities differ across mapped sources.',
+  order_quantity_mismatch: 'Order line quantities differ between systems.',
+  sync_failure: 'A connection read failed.',
+  stuck_fulfillment: 'Fulfillment progress needs investigation.',
+  workflow_failure: 'A workflow did not reach its expected outcome.',
+};
 
-function contextKey(tenantId: string, query: CaseQuery) {
-  return createHash('sha256')
-    .update(
-      JSON.stringify([
-        tenantId,
-        query.view,
-        query.class ?? null,
-        query.severity ?? null,
-        query.state ?? null,
-        query.ownerId ?? null,
-        query.limit,
-      ]),
-    )
-    .digest('hex');
+const fallbackSummary = 'An operation needs investigation.';
+
+/** Investigations show at most this many evidence references; more withhold their findings. */
+const evidenceDisplayLimit = 100;
+
+const withheldSummary =
+  'The full evidence must be reviewed before drawing conclusions.';
+
+const sqlText = (text: string) => `'${text.replaceAll("'", "''")}'`;
+
+/**
+ * The `listed` relation: every case of `ordered` with the values the list filters, sorts,
+ * groups and searches, computed exactly as `project` presents them at `$2`. Stale or missing
+ * investigation validity is never fresh.
+ */
+const listedCte = `listed AS (
+ SELECT o.*,o.document->>'id' AS id,o.document->>'exceptionClass' AS class,o.document->>'state' AS state,
+  o.document->>'severity' AS severity,o.document->'subject'->>'subjectKind' AS subject_kind,
+  o.document->'subject'->>'subjectId' AS subject_id,(o.owner->>'userId')::uuid AS owner_id,o.owner->>'name' AS owner_name,
+  ARRAY(SELECT DISTINCT e.value->'source'->>'provider'
+   FROM jsonb_array_elements(COALESCE(o.diagnosis->'provenance'->'evidence','[]'::jsonb)) WITH ORDINALITY AS e(value,position)
+   WHERE e.position<=${evidenceDisplayLimit} AND e.value->'source'->>'provider' IS NOT NULL) AS sources,
+  CASE WHEN d.valid_until IS NULL THEN 'unknown' WHEN d.valid_until<$2::timestamptz THEN 'stale' ELSE 'fresh' END AS freshness,
+  CASE WHEN o.diagnosis IS NULL THEN 'pending'
+   WHEN d.valid_until<$2::timestamptz THEN 'insufficient_evidence'
+   WHEN o.diagnosis->>'status'='pending' THEN 'pending'
+   WHEN d.evidence>${evidenceDisplayLimit} THEN 'insufficient_evidence'
+   ELSE o.diagnosis->>'status' END AS diagnosis_status,
+  CASE WHEN jsonb_typeof(o.document->'resolution')='object' THEN
+   CASE WHEN o.document->'resolution'->>'kind'='verification' THEN 'verified' ELSE 'human_disposition' END END AS resolution,
+  CASE WHEN o.diagnosis IS NOT NULL AND o.diagnosis->>'status'<>'pending' AND NOT COALESCE(d.valid_until<$2::timestamptz,false)
+   THEN CASE WHEN d.evidence>${evidenceDisplayLimit} THEN ${sqlText(withheldSummary)} ELSE o.diagnosis->>'summary' END
+   ELSE CASE o.document->>'exceptionClass' ${Object.entries(fallbackSummaries)
+     .map(([key, text]) => `WHEN ${sqlText(key)} THEN ${sqlText(text)}`)
+     .join(' ')} ELSE ${sqlText(fallbackSummary)} END END AS summary,
+  CASE WHEN o.document->>'firstDetectedAt' ~ '^\\d{4}-\\d{2}-\\d{2}T' THEN (o.document->>'firstDetectedAt')::timestamptz END AS detected_at,
+  o.activity::timestamptz AS last_activity,
+  CASE WHEN o.attention_reason IS NOT NULL THEN o.attention_at::timestamptz END AS waiting_since
+ FROM ordered o CROSS JOIN LATERAL (SELECT (o.diagnosis->'provenance'->>'validUntil')::timestamptz AS valid_until,
+  jsonb_array_length(COALESCE(o.diagnosis->'provenance'->'evidence','[]'::jsonb)) AS evidence) d
+)`;
+
+const groupFields = caseGroupFields();
+
+/** Groups a grouped read returns at most; `groupsTruncated` says when more match. */
+const maxGroups = 50;
+
+type ListRow = Row & {
+  id: string;
+  sort_missing: number;
+  sort_rank: number;
+  sort_key: string;
+};
+
+const position = (row: {
+  sort_missing: number;
+  sort_rank: number;
+  sort_key: string;
+  id: string;
+}): CasePosition => ({
+  missing: row.sort_missing,
+  rank: row.sort_rank,
+  at: row.sort_key,
+  id: row.id,
+});
+
+function zoneOf(timeZone: string | undefined) {
+  const zone = timeZone ?? 'UTC';
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: zone });
+  } catch {
+    throw caseListError('Use an IANA time zone, such as Europe/Berlin.');
+  }
+
+  return zone;
 }
 
 function project(row: Row, now: Date): CaseDetail {
   const incident = row.document;
   const diagnosis = row.diagnosis ? structuredClone(row.diagnosis) : null;
-  if (diagnosis && diagnosis.provenance.evidence.length > 100) {
+  if (
+    diagnosis &&
+    diagnosis.provenance.evidence.length > evidenceDisplayLimit
+  ) {
     const count = diagnosis.provenance.evidence.length;
     // Pending snapshots bypass diagnosis validation. Bound the read without deleting
     // persisted evidence or presenting conclusions supported by an incomplete set.
-    diagnosis.provenance.evidence = diagnosis.provenance.evidence.slice(0, 100);
+    diagnosis.provenance.evidence = diagnosis.provenance.evidence.slice(
+      0,
+      evidenceDisplayLimit,
+    );
     diagnosis.provenance.mappingVersions =
-      diagnosis.provenance.mappingVersions.slice(0, 100);
+      diagnosis.provenance.mappingVersions.slice(0, evidenceDisplayLimit);
     diagnosis.status =
       diagnosis.status === 'pending' ? 'pending' : 'insufficient_evidence';
     diagnosis.reason = 'evidence_display_limit';
-    diagnosis.summary =
-      'The full evidence must be reviewed before drawing conclusions.';
+    diagnosis.summary = withheldSummary;
     diagnosis.constraints = [
       `Only 100 of ${count} evidence references are shown. Findings and recommendations are withheld until the full evidence can be reviewed.`,
     ];
@@ -239,13 +321,6 @@ function project(row: Row, now: Date): CaseDetail {
       diagnosis.reason = 'stale_evidence';
     }
   }
-  const summaries: Record<string, string> = {
-    inventory_mismatch: 'Inventory quantities differ across mapped sources.',
-    order_quantity_mismatch: 'Order line quantities differ between systems.',
-    sync_failure: 'A connection read failed.',
-    stuck_fulfillment: 'Fulfillment progress needs investigation.',
-    workflow_failure: 'A workflow did not reach its expected outcome.',
-  };
 
   return {
     schemaVersion: 1,
@@ -258,8 +333,7 @@ function project(row: Row, now: Date): CaseDetail {
     summary:
       diagnosis && diagnosis.status !== 'pending' && !stale
         ? diagnosis.summary
-        : (summaries[incident.exceptionClass] ??
-          'An operation needs investigation.'),
+        : (fallbackSummaries[incident.exceptionClass] ?? fallbackSummary),
     subject: {
       kind: incident.subject.subjectKind,
       id: incident.subject.subjectId,
@@ -438,85 +512,183 @@ export function createCaseReader(
           }),
         };
       }),
-    list: (tenantId, query) =>
-      db.transaction(tenantId, async (tx) => {
+    list: (tenantId, query, actorId) =>
+      db.transaction(tenantId, async (tx): Promise<CaseListPage> => {
         const clock = now();
-        const key = contextKey(tenantId, query);
-        let cursor: z.infer<typeof cursorSchema> | undefined;
-        if (query.cursor) {
-          try {
-            cursor = cursorSchema.parse(
-              JSON.parse(Buffer.from(query.cursor, 'base64url').toString()),
-            );
-            if (cursor.context !== key)
-              throw new Error('Cursor context mismatch');
-          } catch {
-            throw Object.assign(new Error('Invalid cursor context'), {
-              statusCode: 400,
-            });
-          }
+        if (query.groupKey !== undefined && !query.group)
+          throw caseListError('Choose a grouping to read one group.');
+        const groupField =
+          query.group && Object.hasOwn(groupFields, query.group.field)
+            ? groupFields[query.group.field]
+            : undefined;
+        if (query.group && (!groupField || query.group.granularity))
+          throw caseListError('This field cannot be grouped');
+        const grouped = !!groupField && query.groupKey === undefined;
+        if (grouped && query.cursor)
+          throw caseListError(
+            'Use a group’s page link together with its group key.',
+          );
+        const context = caseCursorContext(
+          tenantId,
+          actorId,
+          query,
+          query.groupKey,
+        );
+        const cursor = query.cursor
+          ? decodeCaseCursor(query.cursor, context)
+          : undefined;
+        const parameters = new CaseListParameters([
+          tenantId,
+          clock.toISOString(),
+        ]);
+        const timeZone = zoneOf(query.timeZone);
+        let zone: string | undefined;
+        const compile = {
+          parameters,
+          now: '$2::timestamptz',
+          // Bound on first use: PostgreSQL rejects parameters a query never reads.
+          get zone() {
+            zone ??= parameters.bind(timeZone, 'text');
+
+            return zone;
+          },
+          actorId,
+        };
+        let filter = caseFilter(query, compile);
+        if (groupField && query.groupKey !== undefined) {
+          const key = boundGroupKey(groupField, query.groupKey, parameters);
+          filter += ` AND ${key === null ? groupField.empty : groupField.member(key)}`;
         }
+        const base = `${projection}, ${listedCte},
+        filtered AS (SELECT l.*,${sortColumns(query)} FROM listed l WHERE ${filter})`;
+        const coverage = async () =>
+          (
+            await tx.query<{ observed: boolean }>(
+              'SELECT EXISTS(SELECT 1 FROM exception_sources WHERE tenant_id=$1) AS observed',
+              [tenantId],
+            )
+          ).rows[0]?.observed
+            ? ('observed' as const)
+            : ('unobserved' as const);
+        const summary = (row: ListRow) => {
+          const { diagnosis, ...item } = project(row, clock);
+          void diagnosis;
+
+          return item;
+        };
+
+        if (grouped && groupField) {
+          const perGroup = parameters.bind(
+            Math.min(Math.max(query.groupLimit ?? 10, 1), 50),
+            'integer',
+          );
+          const result = await tx.query<{
+            total_count: number;
+            groups: {
+              key: string | null;
+              count: number;
+              head: {
+                id: string;
+                sort_missing: number;
+                sort_rank: number;
+                sort_key: string;
+              }[];
+            }[];
+            truncated: boolean;
+            items: ListRow[];
+          }>(
+            `${base},
+        keyed AS (SELECT l.*,k.key FROM filtered l CROSS JOIN LATERAL (${groupField.keys}) k),
+        group_list AS (SELECT g.key,count(*)::integer AS count,
+          row_number() OVER (ORDER BY g.key IS NULL,${groupField.order(parameters)}) AS position
+          FROM keyed g GROUP BY g.key ORDER BY position LIMIT ${maxGroups + 1}),
+        heads AS (SELECT h.* FROM (SELECT g.*,row_number() OVER (PARTITION BY g.key ORDER BY ${sortOrder(query, 'g')}) AS n FROM keyed g) h
+          JOIN group_list gl ON gl.key IS NOT DISTINCT FROM h.key AND gl.position<=${maxGroups} WHERE h.n<=${perGroup})
+        SELECT (SELECT count(*)::integer FROM filtered) AS total_count,
+        (SELECT count(*)>${maxGroups} FROM group_list) AS truncated,
+        COALESCE((SELECT jsonb_agg(jsonb_build_object('key',gl.key,'count',gl.count,
+          'head',COALESCE((SELECT jsonb_agg(jsonb_build_object('id',h.id,'sort_missing',h.sort_missing,'sort_rank',h.sort_rank,'sort_key',h.sort_key)
+            ORDER BY h.n) FROM heads h WHERE h.key IS NOT DISTINCT FROM gl.key),'[]'::jsonb)) ORDER BY gl.position)
+          FROM group_list gl WHERE gl.position<=${maxGroups}),'[]'::jsonb) AS groups,
+        COALESCE((SELECT jsonb_agg(d) FROM (SELECT DISTINCT ON (h.id) h.* FROM heads h ORDER BY h.id) d),'[]'::jsonb) AS items`,
+            parameters.values,
+          );
+          const row = result.rows[0]!;
+          const groups: CaseGroup[] = row.groups.map((group) => {
+            const last = group.head.at(-1);
+
+            return {
+              key: group.key,
+              count: group.count,
+              complete: true,
+              itemIds: group.head.map((item) => item.id),
+              nextCursor:
+                last && group.count > group.head.length
+                  ? encodeCaseCursor(
+                      caseCursorContext(tenantId, actorId, query, group.key),
+                      position(last),
+                    )
+                  : null,
+              sums: [],
+            };
+          });
+
+          return {
+            totalCount: row.total_count,
+            offset: 0,
+            items: row.items.map(summary),
+            nextCursor: null,
+            coverage: await coverage(),
+            groups,
+            groupsTruncated: row.truncated,
+          };
+        }
+
+        const after = afterPosition(query, 'f', cursor, parameters);
+        const before = cursor
+          ? atOrBefore(query, 'f', cursor, parameters)
+          : 'false';
+        const limit = parameters.bind(query.limit + 1, 'integer');
         const result = await tx.query<{
-          items: (Row & { sort_at: string })[];
+          items: ListRow[];
           total_count: number;
           offset: number;
         }>(
-          `${projection}
-        , filtered AS (SELECT * FROM ordered WHERE
-        ($3='needs_you' AND attention_reason IS NOT NULL OR $3='active' AND document->>'state'<>'resolved' OR $3='history' AND document->>'state'='resolved')
-        AND ($4::text IS NULL OR document->>'exceptionClass'=$4)
-        AND ($5::text IS NULL OR document->>'severity'=$5)
-        AND ($6::text IS NULL OR document->>'state'=$6)
-        AND ($11::text IS NULL OR ($11='unassigned' AND owner->>'userId' IS NULL) OR owner->>'userId'=$11)),
-        page AS (SELECT * FROM filtered WHERE ($7::integer IS NULL OR (rank,sort_at::timestamptz,document->>'id') > ($7,$8::timestamptz,$9))
-        ORDER BY rank,sort_at::timestamptz,document->>'id' LIMIT $10)
+          `${base},
+        page AS (SELECT * FROM filtered f WHERE ${after} ORDER BY ${sortOrder(query, 'f')} LIMIT ${limit})
         SELECT (SELECT count(*)::integer FROM filtered) AS total_count,
-        (SELECT count(*)::integer FROM filtered WHERE $7::integer IS NOT NULL AND
-          (rank,sort_at::timestamptz,document->>'id') <= ($7,$8::timestamptz,$9)) AS offset,
-        COALESCE((SELECT jsonb_agg(page ORDER BY rank,sort_at::timestamptz,document->>'id') FROM page), '[]'::jsonb) AS items`,
-          [
-            tenantId,
-            clock.toISOString(),
-            query.view,
-            query.class ?? null,
-            query.severity ?? null,
-            query.state ?? null,
-            cursor?.rank ?? null,
-            cursor?.at ?? null,
-            cursor?.id ?? null,
-            query.limit + 1,
-            query.ownerId ?? null,
-          ],
+        (SELECT count(*)::integer FROM filtered f WHERE ${before}) AS offset,
+        COALESCE((SELECT jsonb_agg(p ORDER BY ${sortOrder(query, 'p')}) FROM page p), '[]'::jsonb) AS items`,
+          parameters.values,
         );
         const page = result.rows[0]!;
         const rows = page.items.slice(0, query.limit);
         const last = rows.at(-1);
-        const coverage = await tx.query<{ observed: boolean }>(
-          'SELECT EXISTS(SELECT 1 FROM exception_sources WHERE tenant_id=$1) AS observed',
-          [tenantId],
-        );
+        const nextCursor =
+          page.items.length > query.limit && last
+            ? encodeCaseCursor(context, position(last))
+            : null;
 
         return {
           totalCount: page.total_count,
           offset: page.offset,
-          items: rows.map((row) => {
-            const { diagnosis, ...summary } = project(row, clock);
-            void diagnosis;
-
-            return summary;
-          }),
-          nextCursor:
-            page.items.length > query.limit && last
-              ? Buffer.from(
-                  JSON.stringify({
-                    context: key,
-                    rank: last.rank,
-                    at: new Date(last.sort_at).toISOString(),
-                    id: last.document.id,
-                  }),
-                ).toString('base64url')
-              : null,
-          coverage: coverage.rows[0]?.observed ? 'observed' : 'unobserved',
+          items: rows.map(summary),
+          nextCursor,
+          coverage: await coverage(),
+          ...(query.groupKey !== undefined
+            ? {
+                groups: [
+                  {
+                    key: query.groupKey,
+                    count: page.total_count,
+                    complete: true,
+                    itemIds: rows.map((row) => row.id),
+                    nextCursor,
+                    sums: [],
+                  },
+                ],
+              }
+            : {}),
         };
       }),
     get: (tenantId, id) =>

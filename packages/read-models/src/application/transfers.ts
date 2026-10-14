@@ -7,12 +7,27 @@ import type {
   TransferLocation,
 } from '@luma/inventory';
 
+import type { CollectionWhere } from './collections.js';
+
 export interface TransferQuery {
   kind: 'inventory_transfer' | 'inventory_shipment';
+  /** Catalog conditions, validated against the transfers catalog by the API layer. */
+  where?: CollectionWhere | undefined;
+  /** IANA zone for relative dates and `today`; UTC by default. */
+  timeZone?: string | undefined;
   q: string;
   connectionId?: string | undefined;
   skuId?: string | undefined;
   locationId?: string | undefined;
+  /**
+   * `requested`: when the source created the record. `updated`: the source's last change.
+   * `name`: alphabetical. Records without a value come last. Defaults to newest requested first.
+   */
+  sort?: 'requested' | 'name' | 'updated' | undefined;
+  direction?: 'asc' | 'desc' | undefined;
+  /** Page size from 1 to 50; defaults to 50. */
+  limit?: number | undefined;
+  count?: 'exact' | undefined;
   cursor?: string | undefined;
 }
 
@@ -60,12 +75,14 @@ export interface TransferDetail {
 
 /** Reads bounded source transfer and receiving evidence without modifying stock or making claims. */
 export interface TransferWorkspace {
-  /** Returns at most 50 summaries with a cursor scoped to the tenant and filters. */
+  /** Returns one page of summaries with a cursor scoped to the tenant, filters and sort. */
   listTransfers(
     context: TenantContext,
     query: TransferQuery,
   ): Promise<{
     items: TransferSummary[];
+    /** Null unless the query asked for an exact count. */
+    totalCount: number | null;
     nextCursor: string | null;
     asOf: string;
   }>;

@@ -136,7 +136,9 @@
   "permissions_adaptive_fields_manage_label": "Manage custom fields",
   "permissions_adaptive_fields_manage_description": "Define and archive typed custom fields and their access rules.",
   "permissions_adaptive_views_manage_label": "Manage shared views",
-  "permissions_adaptive_views_manage_description": "Edit and archive views owned by other workspace members.",
+  "permissions_adaptive_views_manage_description": "Share views with the workspace or roles, and edit and archive views other members own.",
   "permissions_adaptive_packages_manage_label": "Manage operational packages",
-  "permissions_adaptive_packages_manage_description": "Review, install and remove operational package definitions."
+  "permissions_adaptive_packages_manage_description": "Review, install and remove operational package definitions.",
+  "permissions_lists_export_label": "Export lists",
+  "permissions_lists_export_description": "Download lists as CSV files with the columns you can see. Every export is recorded in the audit log."
 }

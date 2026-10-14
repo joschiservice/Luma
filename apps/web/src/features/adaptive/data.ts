@@ -1,7 +1,9 @@
 import {
+  type AdaptiveRecordType,
   type AdaptiveViewDomain,
   type AdaptiveViewQuery,
   adaptiveViewQuerySchema,
+  collectionDomainSchema,
 } from '@luma/api-contract';
 import { queryOptions } from '@tanstack/react-query';
 import { z } from 'zod';
@@ -13,6 +15,15 @@ export const adaptiveApi = createWebApiClient();
 
 export const viewsSearch = z.object({
   q: z.string().max(120).optional().catch(undefined),
+  /** Narrows the directory to one list's views. */
+  domain: collectionDomainSchema.optional().catch(undefined),
+  /** Narrows the directory by who can open a view. */
+  sharing: z
+    .enum(['private', 'workspace', 'roles'])
+    .optional()
+    .catch(undefined),
+  /** Opens a view's settings, history and actions instead of its list page. */
+  manage: z.boolean().optional().catch(undefined),
   cursor: z.string().max(8192).optional().catch(undefined),
 });
 
@@ -80,22 +91,69 @@ export const previewOptions = (
       ),
   });
 
-/** Starts from a small table configuration without filters or consequential actions. */
+/** Starts from a small table of catalog columns without filters or consequential actions. */
 export function emptyViewQuery(domain: AdaptiveViewDomain): AdaptiveViewQuery {
   return adaptiveViewQuerySchema.parse({
-    version: 1,
+    version: 2,
     domain,
-    columns: defaultColumns[domain],
+    state: { columns: defaultColumns[domain].map((id) => ({ id })) },
   });
 }
 
-export const defaultColumns: Record<AdaptiveViewDomain, string[]> = {
-  orders: ['displayNumber', 'status', 'placedAt'],
+/** Catalog columns a new view starts with; every one is readable by the view preview. */
+const defaultColumns: Record<AdaptiveViewDomain, string[]> = {
+  orders: ['number', 'status', 'placed'],
   inventory: ['sku', 'location', 'differences'],
-  fulfillment: ['orderLabel', 'status'],
-  customers: ['displayName', 'email'],
+  fulfillment: ['order', 'status'],
+  customers: ['name', 'email'],
   products: ['sku', 'title'],
-  procurement: ['reference', 'supplierName', 'status'],
+  procurement: ['reference', 'supplier', 'status'],
   issues: ['summary', 'state', 'severity'],
-  decisions: ['summary', 'reason', 'response'],
+  decisions: ['title', 'kind', 'reason'],
+  returns: ['name', 'stage', 'requested'],
 };
+
+/**
+ * Lists a record type's custom fields the reader may see, including archived ones, so lists can
+ * mark views that still use them as needing repair.
+ */
+export const customFieldsOptions = (
+  organizationId: string,
+  recordType: AdaptiveRecordType,
+) =>
+  queryOptions({
+    ...privateQueryDefaults,
+    queryKey: [...adaptiveKey(organizationId), 'fields', recordType],
+    queryFn: ({ signal }) =>
+      adaptiveApi.adaptiveFields.list(
+        {
+          params: { organizationId },
+          query: { recordType, includeArchived: true },
+        },
+        { signal },
+      ),
+  });
+
+/** Reads permitted custom field values of the records on one list page, in one request. */
+export const customFieldValuesOptions = (
+  organizationId: string,
+  recordType: AdaptiveRecordType,
+  recordIds: readonly string[],
+) =>
+  queryOptions({
+    ...privateQueryDefaults,
+    queryKey: [
+      ...adaptiveKey(organizationId),
+      'field-values',
+      recordType,
+      [...recordIds].sort(),
+    ],
+    queryFn: ({ signal }) =>
+      adaptiveApi.adaptiveFields.readMany(
+        {
+          params: { organizationId, recordType },
+          body: { recordIds: [...recordIds].slice(0, 100) },
+        },
+        { signal },
+      ),
+  });

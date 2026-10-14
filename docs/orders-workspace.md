@@ -41,21 +41,98 @@ Missing, stale and unmapped evidence does not establish whether an order is stoc
 Both filters require fulfillment access; stock-blocked also requires inventory access. The
 query stops while source access is restricted or order projections are rebuilding.
 
+### Conditions and grouping
+
+The list accepts conditions, sorts and groups from the Orders field catalog in
+`@luma/api-contract`; the API checks them against the catalog, and the read model compiles
+them with the shared collection SQL in `@luma/read-models`, which binds every value as a
+parameter. Other record lists reuse the same compiler, keyset and grouping rules.
+
+- Empty means the source reported no value; unknown means Luma cannot know it, such as
+  overdue while open state is unknown. Neither matches a comparison: `lineCount eq 0`, `ne`,
+  ranges and date operators skip them. `none_of`, `is_not` and `not_contains` include empty
+  values but never unknown ones; booleans match only a known true or false.
+- Amounts compare and sum only within one currency. A money condition names its currency,
+  and a range needs one currency for both ends. The list keeps a total only when the
+  amount is a decimal and the currency an ISO code; anything else is a missing total.
+- Day values and `today` cover whole local days in the request's `timeZone` (default UTC).
+  `within_last n` starts at the beginning of the local day n units ago and ends at the
+  read time; `within_next n` runs from the read time to the end of the local day n units
+  ahead. Daylight-saving changes move the instant, not the calendar day.
+- Source matches any current source of the order. Has issue means an unresolved issue
+  about the order or one of its fulfillments, whether or not it needs a person; needs you
+  uses the same attention rules as the needs-you view. Warehouse and stock-blocked follow
+  the filters above. Warehouse needs fulfillment access, stock-blocked also inventory
+  access and customer customers access; without it the request returns 403.
+- Channel, tags, discount codes, shipping methods, shop currency, test and cancel reason
+  come from the selected source's snapshot. A source that reports no test flag or channel
+  leaves it unknown, so `test is false` never matches it. Discount codes are the labels of
+  code discounts only. Country is the ship-to country of an address the source shared; it
+  needs customers access, and an order without a shared address matches neither `any_of`
+  nor `none_of`.
+- Custom order fields filter as `custom:<field ID>` and sort as `sort=custom:<field ID>`
+  with the operators of their type. The read checks each field's read permission (403) and
+  that it is live (400, so a view shows that it needs repair). Their values are entered in
+  Luma, so a missing value is empty, not unknown. Multiple-choice fields cannot order rows,
+  and text orders by its first 200 characters so cursor keys stay within their limit.
+- Groups count every match, not only the returned rows, and return their first rows (10 by
+  default, at most 50) in the list's sort, a cursor for the rest and per-currency totals
+  over orders with a reported total. Reading one group with `groupKey` counts it exactly.
+  Status, payment, fulfillment and comparison groups follow the catalog's option order;
+  true comes before false; sources and warehouses group by ID; dates group by local day,
+  ISO week (from Monday) or month. Orders without a value form the last group. An order
+  with several sources or warehouses counts in each of their groups, so group counts can
+  add up to more than the total. At most 50 groups return; `groupsTruncated` says when
+  more match.
+- Conditions, groups and the sorts added with them read only the maintained list. They
+  return 503 while the projection rebuilds or source access is restricted, so a group never
+  claims a complete count it cannot have.
+
 ### Search and paging
 
 Search matches, case-insensitively and literally: any source's order number, source
 order IDs, SKU text on order lines, source SKU IDs mapped to a line's SKU, and the Luma
-order ID. Sorting uses last update (source update time, falling back to observation time),
-placed date, order number (shorter numbers first, then text) or due date. Missing sort
-values come last in both directions.
+order ID. For readers who can read customers it also matches the name and email address of
+the imported customer that a source attributes the order to, when that source shares contact
+details. Legacy reads (see [backfill](#backfill-and-rollout)) do not match customers. Sorting uses last update (source update time, falling back to observation time),
+placed date, order number (shorter numbers first, then text), due date, total, status,
+payment, fulfillment or line count. Total sorts by currency code, then amount, both in the
+sort direction, so amounts are only ranked within their currency. Status, payment and
+fulfillment sort in the catalog's option order. Missing sort values come last in both
+directions. A condition on `updated` uses the source update time; orders whose source
+reported none are empty.
 
 Native sorting uses a keyset cursor over the sort key and order ID, so new orders do not shift the
 page a reader is on. Saved views with custom predicates use indexed field joins before
 pagination and exact counting. Their cursors bind the complete tenant query, and custom
-ordering uses an offset; concurrent record or field changes can shift later pages. The cursor is bound to the tenant and the exact filters and sort; any
-other combination is rejected with 400. `totalCount` is null unless the request passes
+ordering uses an offset; concurrent record or field changes can shift later pages. The cursor is bound to the tenant and the exact filters, conditions,
+time zone, grouping and sort; any other combination is rejected with 400. A group's cursor
+also binds its group key but not the page size. `totalCount` is null unless the request passes
 `count=exact`, which counts every match and costs more for broad filters. Changing only
 that option does not invalidate a cursor.
+
+### List page
+
+Links from before configurable views (`status`, `paymentStatus`, `connectionId`, `placedFrom`,
+`placedTo`, `updatedFrom`, `updatedBefore`) are rewritten into conditions before the page
+loads. Placed bounds are inclusive workspace calendar days and become a day range, which the
+engine resolves in the request's time zone; updated bounds are instants, so the start stays
+inclusive and `updatedBefore` becomes `before`, which is exclusive. A connection becomes a
+`source` condition: it matches orders that source reports, while status and the other
+conditions still read the selected snapshot, unlike the old connection filter, which also
+chose the snapshot. Because they are conditions, these links answer 503 while projections
+rebuild or source access is restricted.
+
+Custom fields filter, sort and show as columns; the page reads the shown orders' values in
+one request. Every Orders grouping field is provider-owned or derived, so the board is
+read-only.
+
+Search can match customer names and email addresses, so the page keeps search text in page
+state only: never in the URL, saved views, remembered list state or browser storage, and
+paging trails are keyed without it. A link's `q`, such as a product's orders, is adopted on
+load and removed with a replace that names the current view, so the remembered view doesn't
+replace the one the link opened. The text is gone after a reload, and a page cursor read
+with it then no longer matches, which the page reports as a stale page link.
 
 ### Detail
 
@@ -239,8 +316,10 @@ not scan the preceding pages.
 The projection is refreshed in the same transaction as the current snapshot pointer and
 publication event. Order writes and all sibling fulfillment writes share the parent order's
 advisory transaction lock. Retained history and duplicate replay leave the list unchanged.
-Applied order writes also replace search links and SKU relationships; fulfillment writes
-update state without rewriting search terms.
+Applied order writes also replace search links, SKU relationships and the tag, discount-code
+and shipping-method postings; fulfillment writes update state without rewriting search terms.
+Multi-value facts live in postings with plain text equality, because row security keeps
+PostgreSQL from using array or JSON operators on an index.
 
 Stored progress includes all current fulfillments. `state_valid_from` records when all
 contributing observations have occurred; reads before that instant recompute only those
@@ -270,6 +349,11 @@ complete order-ID set to the list query; a broad search walks the requested sort
 tests membership, so a common SKU is not expanded into every matching order. Broad searches
 over many distinct values and exact counts still cost more; substring matching is not
 constant-time.
+
+Customer names stay in the erasable customer store and are never copied into these postings.
+A search with customer access scans the tenant's customer profiles for the text, follows at
+most 1,001 matching order links and adds their orders to the candidates; more switch to the
+broad plan, which also checks each walked order's customers.
 
 Attention stays owned by Exceptions. Ordinary pages evaluate it only for their order IDs;
 the needs-you view evaluates unresolved fulfillment issues before selecting its page.
@@ -304,6 +388,15 @@ counts, rare combinations of broad search and filters, and retained unreferenced
 still increase work. Re-measure with `LUMA_ORDER_BENCHMARK=<order count>` on the Orders
 integration test, which also checks that a single-order refresh uses dictionary hash lookups
 instead of scanning stored search values.
+
+Total, status, payment and line-count sorts have indexes; the status and payment indexes
+repeat the list's option-rank expressions and stop being used if the two differ. Fulfillment
+sorting and conditions on fulfillment, comparison, overdue, needs you and source are
+evaluated per row while the read walks the sort order, so selective conditions on them cost
+more than indexed filters. Grouping counts every match in one pass and then seeks each
+group's first rows; date groups read their period's rows before ordering them. Row security
+keeps non-leakproof expressions (such as the option ranks) from serving as index
+conditions, so a sort key that can be missing must be a plain column.
 
 ## Luma-owned records
 

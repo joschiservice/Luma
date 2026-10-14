@@ -16,11 +16,42 @@ and existing read grants.
 - Removed snapshots remain visible as provenance but do not participate in comparisons.
 - Observation time, source update time, connection status and reported versus derived
   availability remain separate facts.
-- Source filters select positions without hiding their other sources. Lists use 50-position
-  keyset pages; cursors belong to the tenant and filters that produced them.
+- Source filters select positions without hiding their other sources. Lists use keyset pages
+  of up to 50 positions; cursors belong to the tenant, filters, conditions, grouping and sort that produced them.
+- Lists order by SKU, then location, unless sorted by location, a quantity or the last read.
+  A quantity sort uses the lowest value any source reports, so a position sorts by its most
+  cautious figure; sources that report none are ignored. The last read is the most recent
+  read of any source. Positions without a value come last in both directions, still by SKU
+  and location. Positions are aggregates of their sources, so every sort orders all matching
+  positions before paging.
 - SKUs are labeled with a source SKU code from the product catalog when one is known,
   otherwise with the canonical key. `skuKey` keeps the canonical key that purchase orders
   and replenishment use.
+
+## Conditions and grouping
+
+The list accepts conditions and groups from the Inventory catalog in `@luma/api-contract`, with
+the shared rules for values, dates, groups and cursors described for
+[Orders](orders-workspace.md#conditions-and-grouping).
+
+- Available, on-hand, reserved and incoming quantities, below safety stock, availability basis,
+  tracking, item and location activity and the last read belong to each source. Without a source
+  scope a condition matches when any source matches; `every` needs every source to report a
+  matching value; a connection ID reads only that source; `lowest` compares the lowest quantity
+  any source reports, as the quantity sorts do, and refuses non-quantities.
+- A source without a quantity never satisfies a comparison and never counts as zero. `empty`
+  matches a source that reports none, or with `lowest` a position no source reports for.
+- Below safety stock compares one source's available stock with that source's safety stock; it
+  is unknown, and matches neither value, when either is missing.
+- Location, source, differing quantity and awaiting sync describe the position. Differences follow
+  the comparison rules above; awaiting sync is the wait detail shows.
+- Groups are location, SKU (one SKU across every location) and source; a position counts in the
+  group of each of its sources. Groups key by canonical ID, count every match and return their
+  first positions in the list's order.
+
+Every read aggregates the typed facts of all current sources once, evaluates conditions in that
+pass and orders all matches; labels, mappings and display facts are read only for the returned
+positions. Groups rank every match within its group.
 
 ## Detail
 
@@ -91,8 +122,12 @@ deadlines need their own evidence and policy. A Shopify arrival estimate cannot 
 downloads do not send a claim.
 
 Operational lists read scalar stage facts from a tenant-scoped index and return at most 50
-summaries. Detail reads retain at most 5,000 exact lines, 20 scalar history summaries with historical location facts and 50 related records
-per kind. Truncation is explicit. Cursors belong to the tenant, source and filters that produced them.
+summaries. Conditions can name the source, requested, shipped, received and unreceived
+quantities, the requested time (when the source created the record) and the source's last
+update; a quantity the record does not report never matches. Summaries carry no update time, so `updated` filters and
+sorts but is not a column. Transfer lists do not group: the
+record kind is the built-in view and routes are historical names, not identities. Detail reads retain at most 5,000 exact lines, 20 scalar history summaries with historical location facts and 50 related records
+per kind. Truncation is explicit. Cursors belong to the tenant, source, filters and conditions that produced them.
 
 ## Bundle evidence
 

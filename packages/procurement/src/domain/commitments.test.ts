@@ -418,6 +418,76 @@ it('returns a changed commitment after a wait, then respects a final decision', 
   ).toBe(false);
 });
 
+it('reports the earliest check of items still being followed up', () => {
+  const changed = fact({ quantity: 60 });
+  const follow = (
+    id: string,
+    key: string,
+    nextCheckAt: string | null,
+    response: FollowUp['response'] = 'following_up',
+  ): FollowUp => ({
+    id,
+    tenantId: 'tenant',
+    purchaseOrderId: 'order',
+    key,
+    response,
+    note: 'Called the supplier',
+    nextCheckAt,
+    respondedBy: 'buyer',
+    respondedAt: '2026-10-01T12:00:00.000Z',
+  });
+  const base = `commitment_changed:${changed.id}`;
+  expect(progress({ commitments: [changed] }).nextCheckAt).toBeNull();
+  const waiting = progress({
+    commitments: [changed],
+    followUps: [follow('wait', base, '2026-10-04T11:00:00+02:00')],
+    now: '2026-10-03T12:00:00.000Z',
+  });
+  expect(waiting.nextCheckAt).toBe('2026-10-04T09:00:00.000Z');
+  // A passed check stays reported while the item is back in attention.
+  const due = progress({
+    commitments: [changed],
+    followUps: [follow('wait', base, '2026-10-04T09:00:00.000Z')],
+    now: '2026-10-05T12:00:00.000Z',
+  });
+  expect(due.nextCheckAt).toBe('2026-10-04T09:00:00.000Z');
+  expect(due.attention.some((a) => a.kind === 'commitment_changed')).toBe(true);
+  // A later check of a rescheduled item, and none once the item is settled.
+  expect(
+    progress({
+      commitments: [changed],
+      followUps: [
+        follow('wait', base, '2026-10-04T09:00:00.000Z'),
+        follow(
+          'again',
+          `${base}:2026-10-04T09:00:00.000Z`,
+          '2026-10-08T09:00:00.000Z',
+        ),
+      ],
+    }).nextCheckAt,
+  ).toBe('2026-10-08T09:00:00.000Z');
+  expect(
+    progress({
+      commitments: [changed],
+      followUps: [
+        follow('wait', base, '2026-10-04T09:00:00.000Z'),
+        follow('accept', `${base}:2026-10-04T09:00:00.000Z`, null, 'accepted'),
+      ],
+    }).nextCheckAt,
+  ).toBeNull();
+  // The earliest of several: a missed confirmation followed up sooner.
+  const silent = progress({ now: '2026-10-03T11:00:00.000Z' });
+  const overdue = silent.attention.find(
+    (a) => a.kind === 'confirmation_overdue',
+  )!;
+  expect(
+    progress({
+      now: '2026-10-03T11:00:00.000Z',
+      followUps: [follow('chase', overdue.key, '2026-10-03T15:00:00.000Z')],
+    }).nextCheckAt,
+  ).toBe('2026-10-03T15:00:00.000Z');
+});
+
 it('removes credited shortages from expected arrivals and preserves receipt evidence', () => {
   const receipt = fact({ kind: 'received', quantity: 40 });
   const shortage = fact({ kind: 'shortage', quantity: 60 });

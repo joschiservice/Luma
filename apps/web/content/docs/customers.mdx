@@ -7,13 +7,41 @@ Customers shows the customer profiles your connected stores and JTL share with L
 
 ## Find a customer
 
-Search by name, email address, phone number or the customer’s ID in the store. Narrow the list with **Account** and **Source**, and sort by **Customer since**, **Orders** or **Name**. **Account** shows whether the customer has a store account: **Has account**, **No account** (for example after a guest checkout), **Invited** or **Declined invite**.
+Search by name, email address, phone number or the customer’s ID in the store. **Account** and **Source** above the list narrow it in one click. **Account** shows whether the customer has a store account: **Has account**, **No account** (for example after a guest checkout), **Invited** or **Declined invite**. For anything else, choose **Filter** and pick a field, such as **Customer since**, **Orders**, **Amount spent**, **Tags**, **Country**, **Last order**, **Contact details shared**, **No longer in source** or a custom field, then a condition and a value. When two or more filters apply, choose whether customers must match all of them or any. The sort menu after **Display** names the current order, such as **Customer since**; choose it to sort by name, orders, amount spent, last update, last order or a custom field, or to flip the direction. In the table, a column header sorts by that column. **Clear** removes every filter and the search.
+
+A few filters depend on what the source shares. **Country** is the country of the address the store shares; a customer whose address isn’t shared matches no country. JTL reports no order count or amount spent, so its customers match no condition on them, and an amount compares only with amounts in the same currency. **Last order** needs **View orders**.
 
 Each store and ERP keeps its own customers, and Luma never combines customers from different sources by name or email address. Someone who bought in two stores, or who is in both Shopify and JTL, appears once for each source. Compare the source and contact details before you choose.
 
-Your search text isn’t saved in the page address, so links you share or pin never contain a customer’s name or email address. Filters and sorting are saved.
+Your search text stays on the page: it isn’t saved in the page address, in views or in what Luma remembers about the list, so links you share or pin never contain a customer’s name or email address. It’s cleared when you leave the page or reload it. Filters, sorting and display are saved.
 
 **Coverage** above the list shows which stores have been imported and when. If a link points to a customer Luma hasn’t imported yet, the page says so; choose **Show all customers** to return to the list.
+
+## Arrange the list
+
+Choose **Display** to change how the list looks:
+
+- **Layout**: **Table** shows columns, and **List** shows one row per customer with the properties you choose.
+- **Columns** or **Properties**: choose what each customer shows, such as email, phone, tags or a custom field, and drag them into order. In the table you can also resize, move, pin and hide columns from each column’s menu.
+- **Group by**: group customers by account, source, tag or country, and by when they became a customer or last ordered, by day, week or month. Each group shows how many customers it has and the amount spent per currency. A customer with several tags appears in each tag’s group. **Incomplete** means a store is still importing customers. Choose a group’s name to collapse it, and **Show more** to see more of its customers.
+- **Density**: **Compact** fits more customers on screen. Density, column widths and collapsed groups are your own settings.
+- **Open records in a preview**: choosing a customer shows a summary beside the list instead of opening the customer: account, source, orders, amount spent, contact details, address and tags. From the preview you can narrow the list to a customer’s account, source, country or tag, or hide it. **Open full customer** opens the customer.
+
+## Save and share views
+
+When you change filters, sorting, grouping or display, the view is marked **Modified**. Choose **Save** to update a saved view you can edit, **Save as new view** to keep your changes as a new view, or **Reset** to return to the view as it was saved. A new view is private unless you share it with your workspace or with roles; see [Saved views](/docs/saved-views). Sharing a view never gives anyone access to customers they can't see.
+
+Opening **Customers** from the sidebar returns to the view you used last. You can copy a view’s link or pin it to the sidebar from **View options**, and **Make my default for this page** opens that view when you come to Customers. When you open a customer, **Customers** in the bar at the top returns to the list with your view.
+
+## Work from the keyboard
+
+- **J** and **K**, or the arrow keys, move through the customers.
+- **Enter** opens the customer you're on.
+- **Space** opens or closes it in the preview, when the preview is on. While it's open, **J** and **K** show the next and previous customer.
+- **X** selects a customer, **Shift**+**X** selects a range, and **Esc** clears the selection or closes the preview.
+- **/** goes to search, **F** adds a filter and **?** lists these shortcuts.
+
+Shortcuts don't work while you type in a field.
 
 ## Read a customer
 

@@ -4,6 +4,7 @@ import type { Socket } from 'node:net';
 import type { FieldWorkflowAdapter } from '@luma/adaptive';
 import {
   adaptiveAvailabilityRoutes,
+  collectionRoutes,
   fieldsRoutes,
   operationalPackageRoutes,
   viewActionRoutes,
@@ -425,6 +426,10 @@ export function buildApp(
         dependencies.fieldWorkflows,
       ),
       adaptiveViews: viewsRoutes(dependencies.adaptive?.views),
+      collections: collectionRoutes(
+        dependencies.adaptive?.collections,
+        dependencies.adaptive?.exports,
+      ),
       adaptiveActions: viewActionRoutes(dependencies.adaptive?.actions),
       adaptivePackages: operationalPackageRoutes(
         dependencies.adaptive?.packages,

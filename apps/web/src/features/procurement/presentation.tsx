@@ -6,7 +6,6 @@ import type {
 } from '@luma/api-contract';
 import { formatCalendarDate, formatNumber } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
-import { Badge } from '@luma/ui/components/primitives/badge';
 import {
   type OperationalState,
   StatePill,
@@ -19,20 +18,6 @@ export const statusLabels = {
   closed: m.procurement_status_closed,
   cancelled: m.procurement_status_cancelled,
 } satisfies Record<PurchaseOrderStatus, () => string>;
-
-/** Presents order state with a readable label and semantic color. */
-export function OrderStatus({ status }: { status: PurchaseOrderStatus }) {
-  return (
-    <Badge
-      tone={
-        status === 'open' ? 'info' : status === 'closed' ? 'success' : 'neutral'
-      }
-    >
-      <span className="procurement-status-dot" />
-      {statusLabels[status]()}
-    </Badge>
-  );
-}
 
 function stage(label: () => string, state: OperationalState) {
   return {

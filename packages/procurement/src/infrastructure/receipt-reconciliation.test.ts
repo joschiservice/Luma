@@ -89,6 +89,10 @@ function fixture() {
   const tx: CommitmentTransaction = {
     order: async (id) => (id === order.id ? order : null),
     orders: async () => [order],
+    purchaseOrders: async () => [
+      { record: order, position: { rank: 0, keys: null, id: order.id } },
+    ],
+    countPurchaseOrders: async () => 1,
     supplier: async (id) => (id === supplier.id ? supplier : null),
     updateSupplier: async () => {},
     history: async () => [],

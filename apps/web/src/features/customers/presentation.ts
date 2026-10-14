@@ -1,7 +1,6 @@
 import type {
   CustomerDetail,
   CustomerListItem,
-  CustomerSort,
   CustomerSource,
   CustomerState,
 } from '@luma/api-contract';
@@ -28,12 +27,6 @@ export const stateDescriptions: Record<CustomerState, string> = localizedLabels(
     unknown: m.customers_state_unknown_description,
   },
 );
-
-export const sortLabels: Record<CustomerSort, string> = localizedLabels({
-  created: m.customers_sort_created,
-  orders: m.customers_sort_orders,
-  name: m.customers_sort_name,
-});
 
 /**
  * Names a customer by what the source shares: name, then email, then the short source ID.

@@ -57,6 +57,7 @@ export function createViewActions(deps: {
     ids: string[],
   ): Promise<Record<string, unknown>[]>;
   catalog(context: TenantContext): Promise<ViewActionCapability[]>;
+  /** Scalar types of the row fields a list's view rows carry, keyed by catalog column ID. */
   rowTypes?(
     context: TenantContext,
     domain: string,
@@ -254,7 +255,10 @@ export function createViewActions(deps: {
       return { items };
     },
     /** Copies only bindings the actor may invoke; copying a view never grants an action. */
-    async copyBindings(context: TenantContext, query: AdaptiveViewQuery) {
+    async copyBindings(
+      context: TenantContext,
+      query: AdaptiveViewQuery,
+    ): Promise<AdaptiveViewQuery> {
       const catalog = await deps.catalog(context);
 
       return {
@@ -285,10 +289,12 @@ export function createViewActions(deps: {
           );
         for (const permission of capability.permissions)
           requirePermission(context, permission);
+        // Row fields are catalog column IDs the view lists explicitly, or the record ID.
+        const visible = new Set(query.state.columns.map((column) => column.id));
         for (const mapping of Object.values(action.inputs))
           if (
             mapping.source === 'row' &&
-            !query.columns.includes(mapping.field) &&
+            !visible.has(mapping.field) &&
             mapping.field !== 'id'
           )
             throw new IdentityError(

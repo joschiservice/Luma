@@ -9,31 +9,35 @@ import { useQuery } from '@tanstack/react-query';
 
 import { adaptiveApi, adaptiveAvailabilityOptions, adaptiveKey } from './data';
 import { columnLabel } from './presentation';
+import { previewable, viewColumns } from './query-fields';
 
 /** Maps only catalog-supported targets and typed inputs; the server revalidates every binding. */
 export function ActionMappings({
   organizationId,
   query,
+  label,
   change,
 }: {
   organizationId: string;
   query: AdaptiveViewQuery;
+  /** Names a row field: a catalog column, custom field or `id`. */
+  label: (field: string) => string;
   change: (query: AdaptiveViewQuery) => void;
 }) {
   const availability = useQuery(adaptiveAvailabilityOptions(organizationId));
+  const domain = previewable(query.domain) ? query.domain : null;
   const definitions = useQuery({
-    queryKey: [
-      ...adaptiveKey(organizationId),
-      'action-definitions',
-      query.domain,
-    ],
+    queryKey: [...adaptiveKey(organizationId), 'action-definitions', domain],
     queryFn: ({ signal }) =>
-      adaptiveApi.adaptiveActions.definitions(
-        { params: { organizationId }, query: { domain: query.domain } },
-        { signal },
-      ),
-    enabled: availability.data?.actions === true,
+      domain
+        ? adaptiveApi.adaptiveActions.definitions(
+            { params: { organizationId }, query: { domain } },
+            { signal },
+          )
+        : { items: [] },
+    enabled: availability.data?.actions === true && domain !== null,
   });
+  const columns = viewColumns(query);
   if (!availability.data?.actions) return null;
   const key = (target: {
     kind: string;
@@ -131,7 +135,7 @@ export function ActionMappings({
                         if (source)
                           bind(
                             source === 'row'
-                              ? { source, field: query.columns[0] ?? 'id' }
+                              ? { source, field: columns[0] ?? 'id' }
                               : {
                                   source,
                                   value:
@@ -152,10 +156,10 @@ export function ActionMappings({
                         aria-label={m.adaptive_value()}
                         value={binding.field}
                         options={[
-                          ...new Set(['id', ...query.columns, binding.field]),
+                          ...new Set(['id', ...columns, binding.field]),
                         ].map((field) => ({
                           value: field,
-                          label: columnLabel(field),
+                          label: label(field),
                         }))}
                         onValueChange={(field) => {
                           if (field) bind({ source: 'row', field });
@@ -228,9 +232,8 @@ export function ActionMappings({
           const inputs: AdaptiveViewQuery['actions'][number]['inputs'] = {};
           for (const input of definition.inputs)
             inputs[input.key] =
-              input.key === 'attentionKey' &&
-              query.columns.includes('attentionKey')
-                ? { source: 'row', field: 'attentionKey' }
+              input.key === 'attentionKey' && columns.includes('attention')
+                ? { source: 'row', field: 'attention' }
                 : {
                     source: 'literal',
                     value:

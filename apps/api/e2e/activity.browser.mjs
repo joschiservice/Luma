@@ -6,7 +6,7 @@ import { seedActivity } from './activity-fixture.mjs';
 import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, database, startApi, startProcess } from './helpers.mjs';
 
-test('filters, expands, returns, paginates and recovers workspace activity on desktop and narrow screens', async ({
+test('filters, saves views, expands, returns, paginates and recovers workspace activity on desktop and narrow screens', async ({
   resources: t,
 }) => {
   const port = await availablePort(),
@@ -15,7 +15,9 @@ test('filters, expands, returns, paginates and recovers workspace activity on de
   await db.migrate();
   await db.grantRuntime();
   // Connection and system filters list the workspace connections.
-  const api = await startApi(t, db, origin, 'e2e/connections-server.mjs');
+  const api = await startApi(t, db, origin, 'e2e/connections-server.mjs', {
+    FEATURE_FLAG_OVERRIDES: 'adaptive-saved-views=true',
+  });
   const web = startProcess(
     t,
     'e2e/web-server.mjs',
@@ -62,8 +64,13 @@ test('filters, expands, returns, paginates and recovers workspace activity on de
       .getByRole('button', { name: option, exact: true })
       .click();
   const param = (name) => new URL(page.url()).searchParams.get(name);
+  // Filters are the view's conditions, so they can be saved and shared.
+  const condition = (field) =>
+    JSON.parse(param('where') ?? '{"conditions":[]}').conditions.find(
+      (item) => item.field === field,
+    )?.value;
   await addFilter('System', 'jtl-cloud');
-  await expect.poll(() => param('system')).toBe('jtl-cloud');
+  await expect.poll(() => condition('system')).toEqual(['jtl-cloud']);
   const search = page.getByRole('searchbox', { name: 'Search activity' });
   // People are shown and found by name rather than by user ID.
   await search.fill('lovelace');
@@ -73,7 +80,7 @@ test('filters, expands, returns, paginates and recovers workspace activity on de
   await page.getByText('Ada Lovelace · jtl-cloud').first().waitFor();
   expect(await page.getByText(actor).count()).toBe(0);
   await addFilter('Outcome', 'Outcome unclear');
-  await expect.poll(() => param('outcome')).toBe('uncertain');
+  await expect.poll(() => condition('outcome')).toEqual(['uncertain']);
   await page
     .getByRole('button', { name: /Change attempt finished/ })
     .first()
@@ -110,7 +117,7 @@ test('filters, expands, returns, paginates and recovers workspace activity on de
   await page
     .getByRole('heading', { name: 'No activity matches these filters' })
     .waitFor();
-  expect(param('from')).toBe('2020-01-01');
+  expect(condition('time')).toEqual({ from: '2020-01-01', to: '2020-01-31' });
   await page.reload();
   // Removing the explicit range returns to the default last 30 days.
   await page
@@ -125,7 +132,56 @@ test('filters, expands, returns, paginates and recovers workspace activity on de
       exact: true,
     })
     .waitFor();
-  expect(param('from')).toBeNull();
+  expect(condition('time')).toBeUndefined();
+  await page.locator('.activity-event').first().waitFor();
+
+  // Who recorded an event narrows the timeline: Luma recorded none of these events.
+  await addFilter('Recorded by', 'Luma');
+  await page
+    .getByRole('heading', { name: 'No activity matches these filters' })
+    .waitFor();
+  await addFilter('Recorded by', 'Luma');
+  await addFilter('Recorded by', 'Me');
+  await expect.poll(() => condition('actor')).toEqual([{ dynamic: 'me' }]);
+  await page.locator('.activity-event').first().waitFor();
+  // The combination is kept as a personal view and comes back when Activity opens again.
+  await page.getByText('Modified', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Save as new view' }).click();
+  const save = page.getByRole('dialog', { name: 'Save as new view' });
+  await save.getByLabel('Name').fill('My connection activity');
+  await save.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.waitForURL((url) =>
+    /^[0-9a-f-]{36}$/.test(url.searchParams.get('view') ?? ''),
+  );
+  const viewId = param('view');
+  await expect
+    .poll(
+      async () =>
+        (
+          await (
+            await context.request.get(
+              `/api/v1/organizations/${tenantId}/collections/activity/state`,
+            )
+          ).json()
+        ).state?.view,
+    )
+    .toBe(viewId);
+  await page.goto(`/app/${tenantId}/activity`);
+  await page.waitForURL((url) => url.searchParams.get('view') === viewId);
+  await page
+    .getByRole('button', { name: 'My connection activity', exact: true })
+    .waitFor();
+  const panel = page.getByRole('complementary', { name: 'Filters' });
+  await expect(
+    panel
+      .getByRole('region', { name: 'Recorded by', exact: true })
+      .getByRole('button', { name: 'Me', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(
+    panel
+      .getByRole('region', { name: 'System', exact: true })
+      .getByRole('button', { name: 'jtl-cloud', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
   await page.locator('.activity-event').first().waitFor();
   let failOlder = true;
   const olderPattern = `**/v1/organizations/${tenantId}/activity?*`;

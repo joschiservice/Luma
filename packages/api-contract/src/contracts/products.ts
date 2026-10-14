@@ -14,7 +14,7 @@ export const productsContract = {
       path: '/v1/organizations/{organizationId}/products',
       summary: 'Browse the product catalog',
       description:
-        'List SKUs from the connected catalogs and compare each source’s title, status, listing, price and barcode. No source is treated as authoritative. `differs` returns SKUs whose sources disagree; `missing` returns SKUs absent from at least one catalog source; `unlinked` returns SKUs with an unlinked SKU of the same code in another source. Prices are compared only within the same reported currency. Results contain up to `limit` SKUs (at most 50) with counts per view; nextCursor continues the same filters.',
+        'List SKUs from the connected catalogs and compare each source’s title, status, listing, price and barcode. No source is treated as authoritative. `differs` returns SKUs whose sources disagree; `missing` returns SKUs absent from at least one catalog source; `unlinked` returns SKUs with an unlinked SKU of the same code in another source. Prices are compared only within the same reported currency. Results contain up to `limit` SKUs (at most 50) with counts per view; nextCursor continues the same filters and sort.',
     })
     .meta({ access: requires('products.read'), errors: [400, 401, 404, 503] })
     .input(

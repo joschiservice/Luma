@@ -1,6 +1,15 @@
 import '@luma/identity/http';
 
-import { apiContract } from '@luma/api-contract';
+import {
+  apiContract,
+  type CollectionCatalog,
+  type CollectionGranularity,
+  collectionGroupIssue,
+  type CollectionWhere,
+  collectionWhereIssues,
+  procurementCatalog,
+  suppliersCatalog,
+} from '@luma/api-contract';
 import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
 import { implement } from '@orpc/server';
@@ -12,6 +21,72 @@ import type { ProcurementService } from '../application/procurement.js';
 import type { PurchasingService } from '../application/purchasing.js';
 import type { PurchasingOutcomes } from '../application/purchasing-outcomes.js';
 import type { SupplierTermsService } from '../application/supplier-terms.js';
+
+function badRequest(message: string) {
+  return Object.assign(
+    new Error(message.endsWith('.') ? message : `${message}.`),
+    { statusCode: 400, expose: true },
+  );
+}
+
+/**
+ * The first invalid condition against `catalog` as a readable message, or null. Custom-field
+ * conditions (`custom:<id>`) are checked by the list against the workspace's live definitions,
+ * so they are skipped here and keep their positions in messages.
+ */
+function whereIssue(catalog: CollectionCatalog, where?: CollectionWhere) {
+  const checked = (where?.conditions ?? [])
+    .map((condition, index) => ({ condition, index }))
+    .filter(({ condition }) => !condition.field.startsWith('custom:'));
+  const found = checked.length
+    ? collectionWhereIssues(catalog, {
+        match: where?.match ?? 'all',
+        conditions: checked.map(({ condition }) => condition),
+      })[0]
+    : undefined;
+  if (!found) return null;
+  const index = found.index === null ? 0 : (checked[found.index]?.index ?? 0);
+
+  return `Condition ${index + 1}: ${found.message}.`;
+}
+
+/**
+ * Checks purchase-order conditions and grouping against the procurement catalog. Throws a 400
+ * error naming the first invalid condition, for a group key without a grouping, and for a page
+ * link of a grouped read without its group key.
+ */
+export function validatePurchaseOrderListQuery(query: {
+  where?: CollectionWhere | undefined;
+  group?:
+    | { field: string; granularity?: CollectionGranularity | undefined }
+    | undefined;
+  groupKey?: string | number | boolean | null | undefined;
+  cursor?: string | undefined;
+}) {
+  const message =
+    whereIssue(procurementCatalog, query.where) ??
+    (query.group
+      ? (collectionGroupIssue(
+          procurementCatalog,
+          query.group.field,
+          query.group.granularity,
+        ) ??
+        (query.groupKey === undefined && query.cursor
+          ? 'Use a group’s page link together with its group key'
+          : null))
+      : query.groupKey !== undefined
+        ? 'Choose a grouping to read one group'
+        : null);
+  if (message) throw badRequest(message);
+}
+
+/** Checks supplier conditions against the suppliers catalog; throws a 400 error otherwise. */
+export function validateSupplierListQuery(query: {
+  where?: CollectionWhere | undefined;
+}) {
+  const message = whereIssue(suppliersCatalog, query.where);
+  if (message) throw badRequest(message);
+}
 
 /** Registers tenant-authenticated procurement reads and permission-gated writes. */
 export function procurementRoutes(
@@ -164,16 +239,30 @@ export function procurementRoutes(
         return terms.save(s.context, body);
       },
     ),
-    suppliers: os.suppliers.handler(async ({ context: { request } }) => {
-      const s = use(request);
+    suppliers: os.suppliers.handler(
+      async ({ context: { request }, input: { query } }) => {
+        const s = use(request);
+        validateSupplierListQuery(query);
+        // A separate read: the order progress rules decide which confirmations are overdue.
+        const confirmationOverdue = query.where?.conditions.some(
+          (condition) => condition.field === 'confirmationOverdue',
+        )
+          ? await s.commitments.confirmationOverdueSuppliers(s.context)
+          : undefined;
 
-      return await s.service.suppliers(s.context);
-    }),
-    orders: os.orders.handler(async ({ context: { request } }) => {
-      const s = use(request);
+        return await s.service.listSuppliers(s.context, query, {
+          confirmationOverdue,
+        });
+      },
+    ),
+    orders: os.orders.handler(
+      async ({ context: { request }, input: { query } }) => {
+        const s = use(request);
+        validatePurchaseOrderListQuery(query);
 
-      return await s.service.orders(s.context);
-    }),
+        return await s.commitments.listOrders(s.context, query);
+      },
+    ),
     createSupplier: os.createSupplier.handler(
       async ({ context: { request }, input: { body } }) => {
         const s = use(request);

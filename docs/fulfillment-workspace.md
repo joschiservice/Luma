@@ -57,10 +57,32 @@ Filters compare plain columns because forced row security ignores JSON expressio
 Reads run in one read-only, repeatable-read transaction with a 4-second statement timeout,
 under the API login, which reads orders tables and mappings through `luma_case_reader`.
 
-The list returns up to 50 rows, counts per view under the current search and filters, the
-sources with rows and mapped locations with their open work. Search is literal. The cursor is
-bound to the tenant, filters and sort, and carries the first page's evaluation time so
-time-based views do not shift while paging.
+The list returns up to 50 rows, counts per view under the current search, filters and
+conditions, the sources with rows and mapped locations with their open work. Search is literal.
+The cursor is bound to the tenant, filters, conditions, grouping and sort, and carries the first
+page's evaluation time so time-based views do not shift while paging. Every sort runs in either
+direction; without one, `recent` and `orderPlaced` run newest first and the others ascending.
+Work without the sorted value comes last in both directions; the deadline sort orders undated
+work by last progress. The catalog declares the list's own sorts (`waiting`, `deadline`,
+`orderNumber`) as sort-only fields, so saved views can keep the default order; `recent` is
+`waiting` descending and older links are rewritten to it.
+
+### Conditions and grouping
+
+The list accepts conditions and groups from the Fulfillment catalog in `@luma/api-contract`, with
+the shared rules for values, dates, groups and cursors described for
+[Orders](orders-workspace.md#conditions-and-grouping).
+
+- Signals use the rules above at the list's evaluation time. Holds a source does not report
+  (`holds` null) are unknown: they match neither a hold reason nor `empty`, only `unknown`.
+- Carrier conditions compare, case-insensitively, every carrier the shipment's tracking names.
+  Has tracking means at least one tracking number. The shipping stage is the source's handoff
+  stage; work without handoff evidence has no stage, which differs from a reported `unknown`.
+- Groups: status, signal, shipping stage, delivery, kind, source, location, carrier, method name,
+  method type, and fulfill-by, estimated delivery and order placed by day, week or month. A
+  fulfillment counts in the group of each of its signals and carriers. Shipping stages group from
+  merchant to warehouse, carrier, delivered and unknown, then work without a stage.
+- Group counts are `complete: false` while a source still imports its fulfillment history.
 
 The detail adds lines, the same source's order, up to 50 other fulfillments of the order, up
 to 50 observed snapshots, issues, workflow runs for the order or its issues, and 25 activity
@@ -82,6 +104,7 @@ source reads.
 
 Every list read counts all views over the tenant's current fulfillments, so its cost grows
 with that number. Reads stayed around 200 ms or less at 100,000 rows on a development laptop.
+Grouped reads seek each group's first rows in the evaluated set, so they cost more than a page.
 Tenants well beyond 100,000 current fulfillments need maintained view counts or archiving of
 finished work. Re-measure with `LUMA_FULFILLMENT_BENCHMARK=<row count>` on
 `fulfillment.e2e.mjs`.

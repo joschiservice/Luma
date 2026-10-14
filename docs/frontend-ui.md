@@ -19,6 +19,10 @@
 | Empty collections                         | `Empty`                         | Describe this view, not the whole business                                      |
 | Supporting detail                         | `Disclosure`                    | Evidence, audit events, metadata and technical details                          |
 | Record lists and fact tables              | `DataTable`, `DataTableRowLink` | See [tables](#tables)                                                           |
+| Records as rows with chosen properties    | `CollectionList`                | See [list layout](#list-layout-and-preview)                                     |
+| The open record beside a table or list    | `CollectionPreview`             | See [list layout](#list-layout-and-preview)                                     |
+| Grouped records with collapsible sections | `CollectionGroups`              | See [groups and board](#groups-and-board)                                       |
+| Grouped records as columns of cards       | `CollectionBoard`               | See [groups and board](#groups-and-board)                                       |
 | Counts over time or by category           | `BarChart`, `ChartLegend`       | Pair with a table of the same values                                            |
 | Source text or cells beside cited facts   | `SourceText`, `SourceSheet`     | Facts list stays the keyboard path; highlights are click shortcuts              |
 
@@ -38,6 +42,8 @@ Map case states through `issueStatus` and `issueKind` in `components/issues/case
 ## Tables
 
 Every `DataTable` needs a `caption`; it is visually hidden and names the table for assistive technology. The first column labels each row unless `rowHeader` names another. Mark quantities, amounts and counts `numeric` for right alignment and tabular figures, and secondary columns `hideOnNarrow`. The caller owns sort state through `sort` and `onSortChange`. One `DataTableRowLink` per row makes the whole row open the record; pass a router link through `render`. Inside cards use `density="compact"` and `variant="plain"`. Wide tables scroll horizontally as a focusable region.
+
+`DataTable` never sorts, filters or pages rows; it renders what the server returned. Pages opt into configurable columns with `columnState` and `onColumnStateChange`: header menus sort, filter, move, pin and hide, and the resize handle works by drag or arrow keys. The row header column and `required` columns can't be hidden, and other columns never move in front of the pinned one. The header sticks only while the table scrolls inside its own frame, so give the table a maximum height when it should. `selection` adds labelled checkboxes with shift-click ranges and announces the count; rows keep table semantics, so selection is carried by the checkboxes rather than `aria-selected`.
 
 ## Charts
 
@@ -69,17 +75,46 @@ Home and sidebar pins are per-member layouts; see [workspace settings](workspace
 
 ## Collection pages
 
-List pages keep one order: `PageTitle`, `CollectionToolbar`, the coverage line, notices, the table and pagination. The toolbar puts views and Refresh first, then search, one pill per filter, display actions and a single **Sort** menu. Every offered filter stays visible: unset filters are dashed pills that open their values in one click, applied filters are chips. On small screens unset pills collapse into one **Filters** button. Pages describe filters as data (`choice`, `date-range` or link-set `applied` filters) and own their URL state; the toolbar owns presentation, focus and the search draft.
+List pages keep one order: `PageTitle`, `CollectionToolbar`, the coverage line, notices, the table and pagination. The toolbar puts views and Refresh first, then search, one pill per filter, display actions and a single **Sort** menu. Every offered filter stays visible: unset filters are dashed pills that open their values in one click, applied filters are chips. On small screens unset pills collapse into one **Filters** button. Pages describe filters as data (`choice`, `multi-choice`, `date-range` or link-set `applied` filters) and own their URL state; the toolbar owns presentation, focus and the search draft.
+
+Advanced conditions go through the toolbar's `conditions`: they follow the quick filters as chips, and **+ Filter** stays visible on every screen size. Conditions use the list API's `where` shape, so pass it through unchanged and show the API's per-condition problems through `issues` instead of dropping rejected conditions. `CollectionDisplay` goes into `display`, before Sort; it offers a layout only when a page has more than one, and board needs a grouping.
+
+List pages bind keys with `useListKeyboard`. Its shortcuts never fire while typing, with a modifier key or while a dialog or menu is open, and keys a focused control already uses keep their meaning. Pass `keys` so focus stays on the same record when a refresh or poll reorders rows. Pass `ShortcutHelp` only the commands the page handles.
 
 The toolbar and list sit directly on the page, which the shell already insets; don't wrap them in a raised panel. Tables use the framed `DataTable`, and row lists that aren't tables use the same thin border and row dividers, as in the Workflows library. Summaries above a list, such as Procurement's commitments, form one bordered band rather than separate raised cards.
 
 Use `CollectionFilterPanel` only for a narrow feed with five or more filters that people combine to investigate, as in Activity. Tables and split views keep the pills, because a docked panel costs them columns. Use `CollectionViews` for button views; link-based views can keep `Tabs`.
 
+### List layout and preview
+
+`CollectionList` is the list layout: one list item per record with one link, a title, an optional second line and the properties chosen in Display, in comfortable or compact density. Keep it a real list with links, never an ARIA grid. Properties are columns that line up across rows through subgrid and move under the title in narrow containers; a page may render short properties, such as owner, in the second line instead. State that tells the reader something needs attention goes in `status`, which no Display setting hides. The catalog's title field is never a property, and `useCollectionControls` edits `properties` instead of `columns` outside the table layout. Empty `properties` means the page's defaults, so hiding every property brings the defaults back.
+
+The preview pane shows the open record beside a table or list. The open record is page URL state (`item`, `thread` or a route segment), while the view's `preview` flag only says whether the layout opens records there; pages offer it through `useCollectionControls({ preview: true })`. Wire `useListKeyboard`'s `preview`: Space toggles the focused record only while focus is in the list, so Space still scrolls the preview; J and K move the open record with focus; Escape closes it first and returns focus to its row. `CollectionPreview` keeps both panes mounted, puts the preview in a resizable pane on wide screens and in a full-screen sheet over an inert list on narrow ones, moves focus into the sheet and back to the focused row when it closes. Opening by key leaves focus in the list. Issues, Needs you and the inbox keep `IssueSplitView`: their detail pane is the preview, so they don't offer the flag.
+
+### Groups and board
+
+Grouped tables and lists render the list API's `groups` in its order through `CollectionGroups`: each section's header button collapses it, names the group with its count, marks `complete: false` as incomplete and announces collapsing. Collapsed groups are the member's display setting (`collapsedGroups`), never view state, and pages scope them to the grouping so `true` of one field doesn't collapse another. Hide groups with no records unless the grouping says `showEmpty`; only choice and yes/no fields can name an empty group. "Show more" reads the group's next page with `groupKey` and the group's cursor through the kit's `useGroupPages`, whose pages reset when the request changes. Grouped reads take no page cursor, so the page shows no pagination.
+
+`CollectionBoard` shows the same groups as columns of cards. Cards are list rows, so J and K run down each column in turn, and the board owns the arrow keys inside and between columns. A board is read-only unless the page passes `onMove`, which it may only do when Luma owns the grouping field and moves go through the governed edit path; then each card offers "Move to…", also opened with M. Provider-owned or derived fields never get a move affordance.
+
+### Configurable list pages
+
+A configurable list page provides, in this order:
+
+- A route whose `validateSearch` extends the kit's `collectionSearchShape` with the page's context keys. `beforeLoad` rewrites filters of older links into `where` with `replace`, then calls `rememberedSearch` only when the URL names nothing: no view keys, search, page or context. A link such as `?q=SKU-1` or `?view=overdue` always wins over remembered state.
+- When the catalog's `search` is `private`, because search can match personal data, `usePrivateSearch` keeps the text in page state, adopts a link's `q` and removes it with a replace that names the current view. Key paging trails without the text.
+- `useCollectionView(catalog)` and `useCollectionControls` with the page's presentation, run-time options (connections, locations, currencies seen in rows) and `can`, so permission-gated fields show as unavailable instead of disappearing.
+- A request built from the effective view state: segment, `where` only when it has conditions, sort, grouping, search and cursor, with the workspace time zone for calendar conditions. Use `keepPreviousData` so a filter change keeps the old rows until the new ones arrive, and `useCursorPaging` keyed by the view and request.
+- `CollectionViewBar` in the toolbar's `views`, `DescribedFilter` in `actions`, `controls.display` and `controls.sort`, then `SyncCoverage`, `CollectionSummaryBand`, `CollectionNotices`, `CollectionBulkActions` for the selected rows, the results and `Pagination`.
+- A route that hosts several lists keeps the list in a context key, as Procurement's `tab`, and passes it in the view bar's `path`, such as `procurement?tab=suppliers`; pins and saved-view links append `view` to it. Lists whose API can't filter or sort custom fields pass `customFilters: false`, so they show them as columns only.
+- A view that asks for something the reader's list can't do needs repair, not a broader read: check conditions against the catalog and the reader's permissions before asking, map the engine's "Condition N" messages to their chips, and offer to remove what is unsupported.
+- Built-in views that need their counts visible stay as `CollectionViews` tabs beside the view bar, with a `null` value while a saved view is open. A catalog without a default sort gets a Sort menu built by the page whose first option names the API's default order; it maps to a view without a sort and is offered only when the open view has none, because the URL can't express removing a saved sort. Columns that depend on run-time data, such as one per catalog source, go in `extraColumns` with letter-and-digit IDs, and `defaultColumns` shows them in views without their own columns.
+
 `SyncCoverage` condenses what each source has imported into one line. It leads with sources that need attention and says the list is incomplete while any import runs.
 
 ## Issue views
 
-`IssueSplitView` keeps both pane trees mounted across layout changes so local interaction state survives resizing; don't conditionally render a pane. `IssuePageLayout` and `IssuePanelLayout` share section content and navigation. Contextual actions expand their target section before moving focus. `IssueListToolbar` adapts issue filters to `CollectionToolbar`; its caller owns URL state and fetching.
+`IssueSplitView` keeps both pane trees mounted across layout changes so local interaction state survives resizing; don't conditionally render a pane. `IssuePageLayout` and `IssuePanelLayout` share section content and navigation. Contextual actions expand their target section before moving focus. Issues, Needs you and the inbox are configurable lists: their toolbars are `CollectionToolbar` with the kit's controls, and an `owner` option of `useCollectionControls` adds the owner pill (Me, Unassigned or one member), which writes one owner condition that resolves `me` for each reader. Issues show grouped lists or a read-only board by state; Needs you and the inbox show grouped lists.
 
 ## State and data
 

@@ -2,10 +2,14 @@ import '@luma/identity/http';
 
 import {
   apiContract,
+  collectionGroupIssue,
+  collectionWhereIssues,
   type OrderChangePlanQuery,
   orderChangePlansSchema,
   orderDetailSchema,
+  type OrderListQuery,
   orderListSchema,
+  ordersCatalog,
 } from '@luma/api-contract';
 import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
@@ -32,6 +36,43 @@ function changeRequest(query: OrderChangePlanQuery): OrderChangeRequest | null {
     : { kind, lineKey, quantity: quantity ?? '' };
 }
 
+/**
+ * Checks conditions and grouping against the Orders catalog. Throws a 400 error naming the
+ * first invalid condition. Field permissions are checked by the workspace, which answers 403.
+ */
+export function validateOrderListQuery(query: OrderListQuery) {
+  // Custom fields are checked against the workspace's live definitions when the list reads.
+  const native = query.where?.conditions
+    .map((condition, index) => ({ condition, index }))
+    .filter(({ condition }) => !condition.field.startsWith('custom:'));
+  const found = native?.length
+    ? collectionWhereIssues(ordersCatalog, {
+        match: query.where?.match ?? 'all',
+        conditions: native.map(({ condition }) => condition),
+      })[0]
+    : undefined;
+  const issue = found && {
+    ...found,
+    index: found.index === null ? null : (native?.[found.index]?.index ?? null),
+  };
+  const message = issue
+    ? `Condition ${(issue.index ?? 0) + 1}: ${issue.message}.`
+    : query.group
+      ? collectionGroupIssue(
+          ordersCatalog,
+          query.group.field,
+          query.group.granularity,
+        )
+      : query.groupKey !== undefined
+        ? 'Choose a grouping to read one group'
+        : null;
+  if (message)
+    throw Object.assign(
+      new Error(message.endsWith('.') ? message : `${message}.`),
+      { statusCode: 400, expose: true },
+    );
+}
+
 /** Exposes the tenant's order list, order details and change plans to readers with `orders.read`. */
 export function orderRoutes(service?: OrderWorkspace) {
   const os = implement(apiContract.orders).$context<HttpContext>();
@@ -51,6 +92,8 @@ export function orderRoutes(service?: OrderWorkspace) {
             'SERVICE_UNAVAILABLE',
             'Orders are unavailable',
           );
+
+        validateOrderListQuery(query);
 
         return orderListSchema.parse(
           await service.list(request.tenantContext, query),

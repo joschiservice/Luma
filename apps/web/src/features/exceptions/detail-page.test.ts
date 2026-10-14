@@ -3,6 +3,7 @@ import { expect, it } from 'vitest';
 
 import { createQueryClient } from '../../lib/query-client';
 import { routeTree } from '../../routeTree.gen';
+import { caseView } from './data';
 
 const organizationId = '11111111-1111-4111-8111-111111111111';
 const exceptionId = '22222222-2222-4222-8222-222222222222';
@@ -56,7 +57,9 @@ it('supports a direct full-page URL with default inbox state', () => {
     `/app/${organizationId}/exceptions/${exceptionId}/detail`,
     { view: 'invalid', severity: 'invalid' },
   );
-  expect(matches.at(-1)?.search).toMatchObject({ view: 'needs_you' });
+  // An unknown view stays in the URL and resolves to the default view; invalid filters drop.
+  expect(matches.at(-1)?.search).toMatchObject({ view: 'invalid' });
+  expect(caseView('invalid')).toBe('needs_you');
   expect(matches.at(-1)?.search).toMatchObject({ severity: undefined });
   expect(matches.at(-1)?.params).toMatchObject({ organizationId, exceptionId });
 });

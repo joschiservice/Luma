@@ -129,12 +129,12 @@ test('opens contextual issue guides and preserves the investigation across help 
     .waitFor();
   await help
     .getByRole('navigation', { name: 'On this page' })
-    .getByRole('link', { name: 'Filter the list' })
+    .getByRole('link', { name: 'Find issues' })
     .click();
   await expect
     .poll(() =>
       help
-        .locator('#help-filter-the-list')
+        .locator('#help-find-issues')
         .evaluate((element) => element === document.activeElement),
     )
     .toBe(true);

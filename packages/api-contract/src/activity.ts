@@ -24,6 +24,33 @@ export const activityTypes = [
   'access',
 ] as const;
 
+/**
+ * Actor filter values besides user IDs: `me` is the reader, `luma` is Luma itself and Luma
+ * support, `workflow` is any event a workflow run recorded.
+ */
+const activityActorFilters = ['me', 'luma', 'workflow'] as const;
+
+const activityActorValue = z.union([
+  z.enum(activityActorFilters),
+  z
+    .string()
+    .regex(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      'Expected me, luma, workflow or a user ID',
+    )
+    .transform((id) => id.toLowerCase()),
+]);
+
+/** The `actor` parameter: comma-separated actor filter values, at most 20. */
+const activityActorParameter = z
+  .string()
+  .max(800)
+  .transform((text) => text.split(','))
+  .pipe(z.array(activityActorValue).min(1).max(20))
+  .describe(
+    'Comma-separated actors, matching any: `me` (the reader), `luma` (Luma and Luma support), `workflow` (events a workflow run recorded) or user IDs. A person also matches workflow runs that act for them.',
+  );
+
 export const activityQuerySchema = z
   .object({
     from: z.string().datetime(),
@@ -33,6 +60,7 @@ export const activityQuerySchema = z
     connectionId: z.string().uuid().optional(),
     type: z.enum(activityTypes).optional(),
     outcome: z.enum(activityOutcomes).optional(),
+    actor: activityActorParameter.optional(),
     limit: z.coerce.number().int().min(1).max(100).default(30),
     cursor: z.string().max(2048).optional(),
   })

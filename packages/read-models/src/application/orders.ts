@@ -11,11 +11,52 @@ import type {
 } from '@luma/orders';
 import type { ActivityActor } from '@luma/resolution';
 
+import type {
+  CollectionGrouping,
+  CollectionGroupKey,
+  CollectionGroupResult,
+  CollectionWhere,
+} from './collections.js';
 import type { ReturnListItem } from './returns.js';
 
+/** Order statuses in the order lists show and group them. */
+export const orderStatuses = [
+  'open',
+  'completed',
+  'cancelled',
+  'unknown',
+] as const;
+
+/** Payment statuses in the order lists show and group them. */
+export const orderPaymentStatuses = [
+  'pending',
+  'authorized',
+  'paid',
+  'partially_refunded',
+  'refunded',
+  'failed',
+  'unknown',
+] as const;
+
+/** Fulfillment states in the order lists show and group them. */
+export const orderFulfillmentStates = [
+  'unfulfilled',
+  'partial',
+  'fulfilled',
+  'not_required',
+  'no_lines',
+] as const;
+
+/** Source comparison states in the order lists show and group them. */
+export const orderComparisonStates = [
+  'matching',
+  'pending',
+  'confirmed',
+  'inconclusive',
+] as const;
+
 /** Fulfillment across an order's lines, from shipped, delivered or completed work of the same source. */
-type FulfillmentState =
-  'unfulfilled' | 'partial' | 'fulfilled' | 'not_required' | 'no_lines';
+type FulfillmentState = (typeof orderFulfillmentStates)[number];
 
 /** A source disagreement with immutable evidence and the current workspace authority. */
 export interface OrderDifference extends ComparisonDifference {
@@ -25,7 +66,16 @@ export interface OrderDifference extends ComparisonDifference {
 export type OrderView =
   'all' | 'outstanding' | 'overdue' | 'needs_you' | 'differs' | 'stuck';
 
-export type OrderSort = 'updated' | 'placed' | 'number' | 'due';
+export type OrderSort =
+  | 'updated'
+  | 'placed'
+  | 'number'
+  | 'due'
+  | 'total'
+  | 'status'
+  | 'paymentStatus'
+  | 'fulfillment'
+  | 'lineCount';
 
 /** Internal saved-view constraints; record owners authorize every referenced field. */
 export interface OrderAdaptiveSelection {
@@ -60,7 +110,21 @@ export interface OrderListQuery {
   placedBefore?: string | undefined;
   updatedFrom?: string | undefined;
   updatedBefore?: string | undefined;
-  sort: OrderSort;
+  /**
+   * Catalog conditions (validated against the Orders catalog by the caller). Warehouse needs
+   * `fulfillment.read`, stock-blocked also `inventory.read`, customer `customers.read`.
+   */
+  where?: CollectionWhere | undefined;
+  /** Groups rows; each group carries its count and first `groupLimit` rows. */
+  group?: CollectionGrouping | undefined;
+  /** Reads one group's rows, paged by `cursor` and `limit`, instead of every group. */
+  groupKey?: CollectionGroupKey | undefined;
+  /** Rows per group when grouping without `groupKey`. */
+  groupLimit?: number | undefined;
+  /** IANA zone for relative dates, `today` and date groups. */
+  timeZone?: string | undefined;
+  /** A native sort, or `custom:<field ID>` for a readable single-value custom field. */
+  sort: OrderSort | `custom:${string}`;
   direction: 'asc' | 'desc';
   limit: number;
   cursor?: string | undefined;
@@ -102,12 +166,20 @@ export interface OrderListItem {
   sources: OrderSource[];
   observedAt: string;
   sourceUpdatedAt: string | null;
+  /** Commercial facts of the selected source; absent while order projections rebuild. */
+  channel?: string | null;
+  tags?: string[];
+  test?: boolean | null;
 }
 
 export interface OrderList {
   items: OrderListItem[];
   totalCount: number | null;
   nextCursor: string | null;
+  /** Present when grouping: groups in display order, or the one group `groupKey` named. */
+  groups?: CollectionGroupResult[];
+  /** True when more groups match than the list returns. */
+  groupsTruncated?: boolean;
   asOf: string;
 }
 

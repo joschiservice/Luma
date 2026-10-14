@@ -1,7 +1,17 @@
 import type { OrderStateQueries } from '@luma/orders';
 
-import type { OrderSort, OrderView } from '../../application/orders.js';
-import { orderSearchPredicate } from './search-query.js';
+import type { OrderView } from '../../application/orders.js';
+import {
+  type CollectionOrdering,
+  keysetCandidates,
+  sortColumns,
+  sortOrder,
+} from '../collection/keyset.js';
+import type { OrderFieldPart } from './collection-fields.js';
+import {
+  orderCustomerSearchPredicate,
+  orderSearchPredicate,
+} from './search-query.js';
 
 /** Owner-provided SQL composed into the Orders reads. */
 export interface OrderReadQueries {
@@ -24,36 +34,94 @@ const viewFilters: Record<OrderView, string> = {
   differs: 'o.differs',
 };
 
+const uuidPattern =
+  '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
+
+// Orders with an unresolved issue about the order or one of its fulfillments, whether or not
+// it currently needs a person. Issues name records by Luma ID or by source ID in a connection.
+const issueOrders = `issue_orders AS MATERIALIZED (
+ SELECT m.canonical_id AS order_id FROM exceptions e JOIN connector_source_mappings m ON m.tenant_id=e.tenant_id
+  AND m.resource='order' AND m.external_id=e.subject_id AND m.connection_id::text=e.document->'subject'->'scope'->>0
+ WHERE e.tenant_id=$1 AND e.state<>'resolved' AND e.subject_kind='order'
+ UNION SELECT e.subject_id::uuid FROM exceptions e
+ WHERE e.tenant_id=$1 AND e.state<>'resolved' AND e.subject_kind='order' AND e.subject_id ~* '${uuidPattern}'
+ UNION SELECT r.order_id FROM exceptions e JOIN connector_source_mappings m ON m.tenant_id=e.tenant_id
+  AND m.resource='fulfillment' AND m.scope_key='' AND m.external_id=e.subject_id AND m.connection_id::text=e.document->'subject'->'scope'->>0
+ JOIN orders_relationships r ON r.tenant_id=m.tenant_id AND r.child_id=m.canonical_id
+ WHERE e.tenant_id=$1 AND e.state<>'resolved' AND e.subject_kind='fulfillment'
+ UNION SELECT r.order_id FROM exceptions e JOIN orders_relationships r ON r.tenant_id=e.tenant_id
+  AND r.child_id=CASE WHEN e.subject_id ~* '${uuidPattern}' THEN e.subject_id::uuid END
+ WHERE e.tenant_id=$1 AND e.state<>'resolved' AND e.subject_kind='fulfillment'
+)`;
+
+/** How the native list query selects the rows it returns. */
+export type OrderPageMode =
+  | { kind: 'keyset' }
+  | { kind: 'adaptive'; sort: string | undefined; offsetParameter: string }
+  /** `ctes` come from `groupCtes` over `filtered`; the page holds every group's head rows. */
+  | { kind: 'groups'; ctes: string; json: string; headIds: string };
+
+/** Options of the native list query. Every SQL fragment is trusted, parameterized SQL. */
+export interface OrderListSqlOptions {
+  view: OrderView;
+  ordering: CollectionOrdering;
+  search: false | 'selective' | 'broad';
+  /** A broad search also matches the customer's name and email address. */
+  customerSearch?: boolean;
+  connection: boolean;
+  exactCount: boolean;
+  /** Parameter number binding the customer's order IDs. */
+  customer?: number | undefined;
+  /** Extra predicates over the list row `o`, such as compiled conditions. */
+  predicates: readonly string[];
+  /** Query parts the predicates or groups read. */
+  requires: ReadonlySet<OrderFieldPart>;
+  page: OrderPageMode;
+}
+
 /**
- * Builds the list query. Parameters: $1 tenant, $2 as-of time, $3 connection, $4 status,
- * $5 payment status, $6–$7 placed range, $8–$9 source update range, $10 page size plus one,
- * $11–$13 cursor rank, key and order ID. Selective search binds order IDs at $14. Broad search binds text at $14 and
- * its escaped ILIKE pattern at $15. `customer` names the parameter that binds the allowed order IDs.
+ * Builds the native list query over maintained orders_list rows. Parameters: $1 tenant,
+ * $2 as-of time, $3 connection, $4 status, $5 payment status, $6–$7 placed range, $8–$9 source
+ * update range, $10 page size plus one, $11–$13 cursor rank, keys (text[]) and order ID.
+ * Selective search binds order IDs at $14; broad search binds text at $14 and its escaped
+ * ILIKE pattern at $15. Later parameters are bound by the caller's fragments.
+ *
+ * Returns one row: `totalCount` (null unless exact), `items` in page order with their cursor
+ * positions, and `groups` (JSON, grouped pages only).
  */
 export function listSql(
   queries: OrderReadQueries,
-  view: OrderView,
-  sort: OrderSort,
-  direction: 'asc' | 'desc',
-  search: false | 'selective' | 'broad',
-  connection = false,
-  exactCount = false,
-  customer?: number,
-  adaptive?: {
-    predicate: string;
-    sort: string | undefined;
-    offsetParameter: string;
-  },
-  fulfillmentPredicate?: string,
+  options: OrderListSqlOptions,
 ) {
-  const op = direction === 'desc' ? '<' : '>';
-  const rank = `${sort}_rank`,
-    key = `${sort}_key`;
-  const order = `${rank},${key} ${direction},entity_id ${direction}`;
+  const { view, ordering, search, connection, page, requires } = options;
   const attention = `attention AS MATERIALIZED (
     SELECT order_id,array_agg(DISTINCT issue_id ORDER BY issue_id) AS issue_ids
     FROM (${view === 'needs_you' ? queries.attention : (queries.attentionFor?.('page') ?? queries.attention)}) a GROUP BY order_id
   )`;
+  const parts = [
+    ...(view === 'needs_you' ? [attention] : []),
+    ...(requires.has('needsYou')
+      ? [
+          `needs_you_orders AS MATERIALIZED (${view === 'needs_you' ? 'SELECT order_id FROM attention' : `SELECT DISTINCT order_id FROM (${queries.attention}) a`})`,
+        ]
+      : []),
+    ...(requires.has('hasIssue') ? [issueOrders] : []),
+  ];
+  const pageSql =
+    page.kind === 'adaptive'
+      ? `page AS MATERIALIZED (
+ SELECT o.*,${sortColumns(ordering)},row_number() OVER(ORDER BY ${page.sort ?? sortOrder(ordering)}) AS page_position
+ FROM filtered o ORDER BY ${page.sort ?? sortOrder(ordering)} LIMIT $10 OFFSET ${page.offsetParameter}
+)`
+      : page.kind === 'groups'
+        ? `${page.ctes}, page AS MATERIALIZED (
+ SELECT o.*,0 AS sort_rank,'{}'::text[] AS sort_keys,0 AS page_position FROM filtered o WHERE o.entity_id IN (SELECT id::uuid FROM (${page.headIds}) h)
+)`
+        : `page AS MATERIALIZED (
+ SELECT o.*,row_number() OVER(ORDER BY ${sortOrder(ordering)}) AS page_position FROM (
+  ${keysetCandidates('filtered', ordering, '$10', { rank: '$11::int', keys: '$12::text[]', id: '$13::uuid' })}
+ ) o ORDER BY ${sortOrder(ordering)} LIMIT $10
+)`;
 
   // The common path reads maintained scalar rows. Only observations from the future need
   // progress evaluated against the read clock instead of the stored complete state.
@@ -62,17 +130,17 @@ export function listSql(
  FROM orders_list WHERE tenant_id=$1 AND state_valid_from>$2
  AND ${connection ? 'connection_id=$3' : 'selected'}
 ), ${queries.state.orderProgress('future_sources')},
- ${view === 'needs_you' ? `${attention},` : ''}
+ ${parts.map((part) => `${part},`).join('\n ')}
  filtered AS NOT MATERIALIZED (
  SELECT o.* FROM orders_list o
  WHERE o.tenant_id=$1 AND NOT o.deleted AND ${connection ? 'o.connection_id=$3' : 'o.selected AND ($3::uuid IS NULL)'}
  AND ($4::text IS NULL OR o.status=$4) AND ($5::text IS NULL OR o.payment_status=$5)
  AND ($6::timestamptz IS NULL OR o.placed_at >= $6) AND ($7::timestamptz IS NULL OR o.placed_at < $7)
  AND ($8::timestamptz IS NULL OR o.source_updated_at >= $8) AND ($9::timestamptz IS NULL OR o.source_updated_at < $9)
- ${search === 'broad' ? `AND ${orderSearchPredicate}` : search === 'selective' ? 'AND o.entity_id=ANY($14::uuid[])' : ''}
- ${customer ? `AND o.entity_id=ANY($${customer}::uuid[])` : ''}
- ${fulfillmentPredicate ? `AND (${fulfillmentPredicate})` : ''}
- ${adaptive ? `AND (${adaptive.predicate}) AND ($11::int IS NULL OR $11 IS NOT NULL) AND ($12::text IS NULL OR $12 IS NOT NULL) AND ($13::uuid IS NULL OR $13 IS NOT NULL)` : ''}
+ AND ($10::int IS NOT NULL) AND ($11::int IS NULL OR $11 IS NOT NULL) AND ($12::text[] IS NULL OR $12 IS NOT NULL) AND ($13::uuid IS NULL OR $13 IS NOT NULL)
+ ${search === 'broad' ? `AND (${orderSearchPredicate}${options.customerSearch ? ` OR ${orderCustomerSearchPredicate}` : ''})` : search === 'selective' ? 'AND o.entity_id=ANY($14::uuid[])' : ''}
+ ${options.customer ? `AND o.entity_id=ANY($${options.customer}::uuid[])` : ''}
+ ${options.predicates.map((predicate) => `AND (${predicate})`).join('\n ')}
  AND ${
    view === 'outstanding' || view === 'overdue'
      ? `((o.state_valid_from <= $2 AND o.open IS TRUE) OR (o.state_valid_from > $2 AND EXISTS
@@ -81,21 +149,7 @@ export function listSql(
        ? `o.differs AND (${queries.state.comparisonState('o')})='confirmed'`
        : viewFilters[view]
  }
-), page AS MATERIALIZED (
- ${
-   adaptive
-     ? `SELECT *,${rank} AS sort_rank,${key} AS sort_key,row_number() OVER(ORDER BY ${adaptive.sort ?? order}) AS adaptive_rank FROM filtered ORDER BY ${adaptive.sort ?? order} LIMIT $10 OFFSET ${adaptive.offsetParameter}`
-     : ` SELECT *,${rank} AS sort_rank,${key} AS sort_key FROM (
-  (SELECT * FROM filtered WHERE ${rank}=0 AND ($11::int IS NULL OR
-    ($11=0 AND (${key},entity_id) ${op} ($12 COLLATE "C",$13::uuid)))
-   ORDER BY ${key} ${direction},entity_id ${direction} LIMIT $10)
-  UNION ALL
-  (SELECT * FROM filtered WHERE ${rank}=1 AND ($11::int IS NULL OR $11=0 OR
-    ($11=1 AND (${key},entity_id) ${op} ($12 COLLATE "C",$13::uuid)))
-   ORDER BY ${key} ${direction},entity_id ${direction} LIMIT $10)
- ) candidates ORDER BY ${order} LIMIT $10`
- }
-), ${view !== 'needs_you' ? `${attention},` : ''} rows AS MATERIALIZED (
+), ${pageSql}, ${view !== 'needs_you' ? `${attention},` : ''} rows AS MATERIALIZED (
  SELECT p.*,${queries.state.comparisonState('p')} AS current_comparison_state,CASE WHEN p.state_valid_from>$2 THEN f.open ELSE p.open END AS current_open,
  CASE WHEN p.state_valid_from>$2 THEN f.fulfillment ELSE p.fulfillment END AS current_fulfillment
  FROM page p LEFT JOIN order_state f ON f.entity_id=p.entity_id AND f.connection_id=p.connection_id
@@ -106,7 +160,8 @@ SELECT o.entity_id AS id,o.display_number AS "displayNumber",o.placed_at AS "pla
  CASE WHEN o.current_open=false THEN false WHEN o.current_open IS NULL OR o.due_at IS NULL THEN NULL ELSE o.due_at < $2 END AS overdue,o.due_at AS "dueAt",
  CASE WHEN o.deleted THEN '{}'::uuid[] ELSE COALESCE(a.issue_ids,'{}'::uuid[]) END AS "issueIds",
  o.current_comparison_state='confirmed' AS differs,o.current_comparison_state AS "comparisonState",src.sources,o.observed_at AS "observedAt",o.source_updated_at AS "sourceUpdatedAt",
- ${adaptive ? 'o.adaptive_rank AS "adaptiveRank",' : ''}o.sort_rank AS "sortRank",o.sort_key AS "sortKey"
+ o.channel,o.test,(SELECT COALESCE(array_agg(t.value ORDER BY t.value),'{}'::text[]) FROM orders_list_facets t WHERE t.tenant_id=$1 AND t.entity_id=o.entity_id AND t.connection_id=o.connection_id AND t.kind='tag') AS tags,
+ o.page_position AS "pagePosition",o.sort_rank AS "sortRank",o.sort_keys AS "sortKeys"
 FROM rows o
 LEFT JOIN attention a ON a.order_id=o.entity_id
 CROSS JOIN LATERAL (
@@ -122,6 +177,7 @@ CROSS JOIN LATERAL (
  LEFT JOIN LATERAL (SELECT external_id FROM connector_source_mappings WHERE tenant_id=$1 AND connection_id=c.connection_id
   AND resource='order' AND canonical_id=c.entity_id ORDER BY created_at,id LIMIT 1) m ON true
 ) src)
-SELECT ${exactCount ? '(SELECT count(*) FROM filtered)::int' : 'NULL::int'} AS "totalCount",
- COALESCE((SELECT jsonb_agg(to_jsonb(i) ORDER BY ${adaptive ? 'i."adaptiveRank"' : `i."sortRank",i."sortKey" ${direction},i.id ${direction}`} ) FROM items i),'[]'::jsonb) AS items`;
+SELECT ${options.exactCount ? '(SELECT count(*) FROM filtered)::int' : 'NULL::int'} AS "totalCount",
+ COALESCE((SELECT jsonb_agg(to_jsonb(i) ORDER BY i."pagePosition",i.id) FROM items i),'[]'::jsonb) AS items,
+ ${page.kind === 'groups' ? page.json : 'NULL::jsonb'} AS groups`;
 }

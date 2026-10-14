@@ -23,28 +23,40 @@ import {
   urgencies,
 } from '../../domain/decisions.js';
 import { createActionDiffReader } from '../action-diffs.js';
+import { collectionQueryError } from '../collection/parameters.js';
+import {
+  compareKeys,
+  decisionGroupKey,
+  decisionKeys,
+  filterDecisions,
+  groupDecisions,
+  type RankedDecision,
+} from './list.js';
 
 const cursorSchema = z
   .object({
     context: z.string(),
     asOf: z.string().datetime({ offset: true }),
-    rank: z.number().int().min(0).max(2),
-    deadline: z.string().min(1).max(64),
-    requestedAt: z.string().min(1).max(64),
-    id: z.string().min(1).max(200),
+    keys: z.array(z.union([z.string().max(200), z.number()])).max(6),
   })
   .strict();
 
 type Cursor = z.infer<typeof cursorSchema>;
 
-type PageRow = {
+type QueueRow = {
   id: string;
   rank: 0 | 1 | 2;
   deadlineKey: string;
   requestedAt: string;
   facts: CaseDecisionFacts | null;
   assignment: DecisionItem['assignment'];
-  record: DecisionItem['record'];
+  /** The record lookup columns; `kind` is null when the decision affects no record. */
+  record: {
+    kind: string | null;
+    id: string | null;
+    connection: string | null;
+    external: string | null;
+  };
 };
 
 const emptyCounts = <K extends string>(keys: readonly K[]) =>
@@ -70,8 +82,9 @@ const reasons = [
 // their owners before this query and only contribute ranking and record lookup columns.
 // Rank 0: the deadline falls within the expiring window; 1: high impact; 2: the rest. Unknown
 // impact is not ranked below known low impact. Binds: $1 tenant, $2 evaluation time, $3 external rows,
-// $4 expiring window minutes, $5 view, $6 reader, $7 domain, $8 reason, $9-$12 cursor,
-// $13 page size + 1, $14 one item ID, $15 whether the reader may read issues.
+// $4 expiring window minutes, $5 view, $6 reader, $7 domain, $8 reason, $9 one item ID, $10 whether
+// the reader may read issues. Returns every decision of the view; the queue is bounded to work
+// waiting on a person, and conditions, search, sorting and paging run on the presented items.
 function queueSql(cases: string) {
   return `WITH case_rows AS (${cases}),
  cases AS (
@@ -89,7 +102,7 @@ function queueSql(cases: string) {
    NULL::text AS record_id,c.subject->'scope'->>0 AS record_connection,c.subject->>'subjectId' AS record_external,
    to_jsonb(c) AS facts,
    CASE WHEN to_jsonb(c)->'owner'->>'userId' IS NOT NULL THEN jsonb_build_object('assigneeId',to_jsonb(c)->'owner'->'userId','assignedBy',to_jsonb(c)->'owner'->'assignedBy','assignedAt',to_jsonb(c)->'owner'->'assignedAt','revision',to_jsonb(c)->'owner'->'revision') END AS owner_assignment
-  FROM case_rows c WHERE $15::boolean),
+  FROM case_rows c WHERE $10::boolean),
  external AS (
   SELECT x.id,x.reason,x.domain,x.impact,x.requested_at,x.deadline,x.record_kind,x.record_id,
    x.record_connection,x.record_external,NULL::jsonb AS facts,x.owner_assignment
@@ -102,17 +115,11 @@ function queueSql(cases: string) {
    COALESCE(c.deadline,'infinity'::timestamptz) AS deadline_key
   FROM (SELECT * FROM cases UNION ALL SELECT * FROM external) c
   LEFT JOIN decision_assignments a ON a.tenant_id=$1 AND a.decision_id=c.id
-  WHERE $14::text IS NULL OR c.id=$14),
+  WHERE $9::text IS NULL OR c.id=$9),
  in_view AS (SELECT * FROM ranked WHERE $5='all' OR ($5='mine' AND assignee_id=$6::uuid)
   OR ($5='unassigned' AND assignee_id IS NULL)),
- filtered AS (SELECT * FROM in_view WHERE ($7::text IS NULL OR domain=$7) AND ($8::text IS NULL OR reason=$8)),
- page AS (SELECT * FROM filtered
-  WHERE $9::integer IS NULL OR (rank,deadline_key,requested_at,id)>($9,$10::timestamptz,$11::timestamptz,$12::text)
-  ORDER BY rank,deadline_key,requested_at,id LIMIT $13)
- SELECT (SELECT count(*)::integer FROM filtered) AS total_count,
-  (SELECT count(*)::integer FROM filtered WHERE $9::integer IS NOT NULL
-   AND (rank,deadline_key,requested_at,id)<=($9,$10::timestamptz,$11::timestamptz,$12::text)) AS offset,
-  (SELECT jsonb_build_object('all',count(*),'mine',count(*) FILTER (WHERE assignee_id=$6::uuid),
+ filtered AS (SELECT * FROM in_view WHERE ($7::text IS NULL OR domain=$7) AND ($8::text IS NULL OR reason=$8))
+ SELECT (SELECT jsonb_build_object('all',count(*),'mine',count(*) FILTER (WHERE assignee_id=$6::uuid),
    'unassigned',count(*) FILTER (WHERE assignee_id IS NULL)) FROM ranked) AS views,
   (SELECT COALESCE(jsonb_object_agg(domain,n),'{}'::jsonb) FROM (SELECT domain,count(*) AS n FROM in_view
    WHERE $8::text IS NULL OR reason=$8 GROUP BY domain) d) AS domains,
@@ -122,15 +129,19 @@ function queueSql(cases: string) {
    'requestedAt',p.requested_at,'facts',p.facts,
    'assignment',CASE WHEN p.revision IS NULL THEN NULL ELSE jsonb_build_object('assigneeId',p.assignee_id,
     'assignedBy',p.assigned_by,'assignedAt',p.assigned_at,'revision',p.revision) END,
-   'record',CASE WHEN p.record_kind IS NOT NULL AND COALESCE(p.record_id,mapped.id::text) IS NOT NULL
-    THEN jsonb_build_object('kind',p.record_kind,'id',COALESCE(p.record_id,mapped.id::text)) END)
+   'record',jsonb_build_object('kind',p.record_kind,'id',p.record_id,'connection',p.record_connection,'external',p.record_external))
    ORDER BY p.rank,p.deadline_key,p.requested_at,p.id)
-   FROM page p
-   LEFT JOIN LATERAL (SELECT m.canonical_id AS id FROM connector_source_mappings m
-    WHERE p.record_id IS NULL AND m.tenant_id=$1 AND m.resource=p.record_kind AND m.external_id=p.record_external
-    AND m.connection_id::text=p.record_connection AND m.scope_key='' ORDER BY m.canonical_id LIMIT 1) mapped ON true),
+   FROM filtered p),
   '[]'::jsonb) AS items`;
 }
+
+// Resolves the canonical records of the decisions a page shows. Binds: $1 tenant, $2 rows.
+const recordSql = `SELECT x.id,x.kind,COALESCE(x.record_id,mapped.id::text) AS record_id
+ FROM jsonb_to_recordset($2::jsonb) AS x(id text,kind text,record_id text,connection text,external text)
+ LEFT JOIN LATERAL (SELECT m.canonical_id AS id FROM connector_source_mappings m
+  WHERE x.record_id IS NULL AND m.tenant_id=$1 AND m.resource=x.kind AND m.external_id=x.external
+  AND m.connection_id::text=x.connection AND m.scope_key='' ORDER BY m.canonical_id LIMIT 1) mapped ON true
+ WHERE x.kind IS NOT NULL`;
 
 const encode = (cursor: Cursor) =>
   Buffer.from(JSON.stringify(cursor)).toString('base64url');
@@ -152,6 +163,16 @@ function decode(value: string, context: string): Cursor {
     );
   }
 }
+
+// Decisions whose diff compares against the evidence they were proposed on.
+const diffObservedKinds = new Set<string>([
+  'case',
+  'replenishment',
+  'inventory_correction',
+  'fulfillment_recovery',
+  'order_edit',
+  'shipment_publication',
+]);
 
 /**
  * Creates the Needs you queue over the exceptions owner's case attention rules and the owners'
@@ -184,20 +205,55 @@ export function createDecisionQueue(
     requireTenant(fresh, context.tenantId);
     if (fresh.actor.id !== context.actor.id)
       throw new IdentityError(403, 'FORBIDDEN', 'Sign in again to continue.');
-    const scope = createHash('sha256')
-      .update(
-        JSON.stringify([
-          'decisions-v1',
-          fresh.tenantId,
-          fresh.actor.id,
-          query.view,
-          query.domain ?? null,
-          query.reason ?? null,
-          query.limit,
-        ]),
-      )
-      .digest('hex');
-    const cursor = query.cursor ? decode(query.cursor, scope) : null;
+    if (query.groupKey !== undefined && !query.group)
+      throw collectionQueryError('Choose a grouping to read one group.');
+    if (query.group?.granularity)
+      throw collectionQueryError('This field cannot be grouped');
+    const groupOf = query.group
+      ? decisionGroupKey(query.group.field)
+      : undefined;
+    const grouped = !!groupOf && query.groupKey === undefined;
+    if (grouped && query.cursor)
+      throw collectionQueryError(
+        'Use a group’s page link together with its group key.',
+      );
+    const timeZone = query.timeZone ?? 'UTC';
+    try {
+      new Intl.DateTimeFormat('en', { timeZone });
+    } catch {
+      throw collectionQueryError(
+        'Use an IANA time zone, such as Europe/Berlin.',
+      );
+    }
+    const sort = query.sort ?? 'urgency';
+    const direction = query.direction ?? 'asc';
+    // A page link continues only the same reader's view, conditions, search, sort and grouping;
+    // within one group it leaves out page sizes, so a group's first rows and pages may differ.
+    const scope = (groupKey: DecisionQuery['groupKey']) =>
+      createHash('sha256')
+        .update(
+          JSON.stringify([
+            'decisions-v2',
+            fresh.tenantId,
+            fresh.actor.id,
+            query.view,
+            query.domain ?? null,
+            query.reason ?? null,
+            query.q?.trim() ?? '',
+            query.where ?? null,
+            query.group ?? null,
+            timeZone,
+            sort,
+            direction,
+            groupKey === undefined
+              ? ['page', query.limit]
+              : ['group', groupKey],
+          ]),
+        )
+        .digest('hex');
+    const cursor = query.cursor
+      ? decode(query.cursor, scope(query.groupKey))
+      : null;
     // Keep one ranking time across pages so expiring items don't move between them.
     const asOf = cursor?.asOf ?? now().toISOString();
 
@@ -214,6 +270,8 @@ export function createDecisionQueue(
     const answers = await Promise.allSettled(
       providers.map((provider) => provider.pending(fresh)),
     );
+    // Groups are incomplete while an owner's decisions are missing.
+    const complete = answers.every((answer) => answer.status === 'fulfilled');
     const external = new Map<string, DecisionCandidate>();
     answers.forEach((answer) => {
       if (answer.status === 'fulfilled')
@@ -239,20 +297,17 @@ export function createDecisionQueue(
           : null,
     }));
 
-    const result = await db.transaction(
+    return db.transaction(
       fresh.tenantId,
       async (tx) => {
         await tx.query("SET LOCAL statement_timeout = '4000ms'");
         await tx.query('SET LOCAL jit = off');
-
-        return (
+        const result = (
           await tx.query<{
-            total_count: number;
-            offset: number;
             views: Record<string, number>;
             domains: Record<string, number>;
             reasons: Record<string, number>;
-            items: PageRow[];
+            items: QueueRow[];
           }>(sql, [
             fresh.tenantId,
             asOf,
@@ -262,123 +317,218 @@ export function createDecisionQueue(
             fresh.actor.id,
             query.domain ?? null,
             query.reason ?? null,
-            cursor?.rank ?? null,
-            cursor?.deadline ?? null,
-            cursor?.requestedAt ?? null,
-            cursor?.id ?? null,
-            query.limit + 1,
             only,
             readsCases,
           ])
         ).rows[0]!;
+
+        const references = new Map<
+          string,
+          NonNullable<DecisionCandidate['actionReference']>
+        >();
+        const queue = result.items.flatMap(
+          (row): (RankedDecision & { row: QueueRow })[] => {
+            const candidate = row.facts
+              ? presentCase(row.facts, reader, asOf)
+              : external.get(row.id);
+            if (!candidate) return [];
+            const { actionReference, ...visible } = candidate;
+            if (actionReference) references.set(row.id, actionReference);
+
+            return [
+              {
+                row,
+                rank: row.rank,
+                deadlineKey: row.deadlineKey,
+                item: {
+                  ...visible,
+                  urgency: urgencies[row.rank],
+                  evidence: {
+                    ...candidate.evidence,
+                    state: evidenceState(candidate.evidence.validUntil, asOf),
+                  },
+                  assignment: row.assignment,
+                  record: null,
+                },
+              },
+            ];
+          },
+        );
+        const matching = filterDecisions(queue, query.where, query.q, {
+          readerId: fresh.actor.id,
+          now: new Date(asOf),
+          timeZone,
+        });
+        const keys = (decision: RankedDecision) => decisionKeys(decision, sort);
+        const sorted = matching.sort((left, right) =>
+          compareKeys(keys(left), keys(right), direction),
+        );
+
+        /** Presents decisions with the records the reader may open. */
+        const present = async (shown: readonly (typeof queue)[number][]) => {
+          const lookups = shown.flatMap(({ row }) =>
+            row.record.kind
+              ? [
+                  {
+                    id: row.id,
+                    kind: row.record.kind,
+                    record_id: row.record.id,
+                    connection: row.record.connection,
+                    external: row.record.external,
+                  },
+                ]
+              : [],
+          );
+          const records = new Map(
+            lookups.length
+              ? (
+                  await tx.query<{
+                    id: string;
+                    kind: NonNullable<DecisionItem['record']>['kind'];
+                    record_id: string | null;
+                  }>(recordSql, [fresh.tenantId, JSON.stringify(lookups)])
+                ).rows.flatMap((record) =>
+                  record.record_id
+                    ? [[record.id, { kind: record.kind, id: record.record_id }]]
+                    : [],
+                )
+              : [],
+          );
+
+          const items = shown.map(({ item }): DecisionItem => {
+            const record = records.get(item.id);
+
+            return {
+              ...item,
+              record:
+                record && canReadRecord(fresh, record.kind) ? record : null,
+            };
+          });
+          const reviewed = items.flatMap((item) => {
+            const reference = references.get(item.id);
+
+            return reference ? [{ item, reference }] : [];
+          });
+          if (reviewed.length && (await deps.diffEnabled?.(fresh.tenantId))) {
+            const reviews = await createActionDiffReader(db)(
+              fresh,
+              reviewed.map(({ item, reference }) => ({
+                id: item.id,
+                reference,
+                observedAt:
+                  (item.owner.kind === 'workflow_run' &&
+                    item.owner.followUpProposalId) ||
+                  diffObservedKinds.has(item.kind)
+                    ? item.evidence.observedAt
+                    : null,
+                canonical: item.record,
+                ...(item.owner.kind === 'case'
+                  ? {
+                      evidenceLink: `/app/${fresh.tenantId}/exceptions/${item.owner.exceptionId}/detail`,
+                    }
+                  : {}),
+              })),
+            );
+            for (const item of items) item.diff = reviews.get(item.id) ?? null;
+          }
+
+          return items;
+        };
+        const base = {
+          schemaVersion: 1 as const,
+          asOf,
+          counts: {
+            views: { ...emptyCounts(views), ...result.views },
+            domains: { ...emptyCounts(domains), ...result.domains },
+            reasons: { ...emptyCounts(reasons), ...result.reasons },
+          },
+          sources: [
+            ...(readsCases
+              ? [{ id: 'cases', label: 'Issues', state: 'available' as const }]
+              : []),
+            ...providers.map((provider, index) => ({
+              id: provider.id,
+              label: provider.label,
+              state:
+                answers[index]!.status === 'fulfilled'
+                  ? ('available' as const)
+                  : ('unavailable' as const),
+            })),
+          ],
+        };
+
+        if (grouped && query.group) {
+          const grouping = groupDecisions(
+            sorted,
+            query.group.field,
+            { domain: domains, reason: reasons },
+            Math.min(Math.max(query.groupLimit ?? 10, 1), 50),
+            complete,
+            (key, last) =>
+              encode({ context: scope(key), asOf, keys: keys(last) }),
+          );
+          const shown = new Set(grouping.shown.map(({ item }) => item.id));
+
+          return {
+            ...base,
+            items: await present(
+              sorted.filter(({ item }) => shown.has(item.id)),
+            ),
+            nextCursor: null,
+            totalCount: matching.length,
+            offset: 0,
+            groups: grouping.groups,
+            groupsTruncated: grouping.truncated,
+          };
+        }
+
+        const members = groupOf
+          ? sorted.filter(
+              ({ item }) => groupOf(item) === (query.groupKey ?? null),
+            )
+          : sorted;
+        const after = cursor
+          ? members.filter(
+              (decision) =>
+                compareKeys(keys(decision), cursor.keys, direction) > 0,
+            )
+          : members;
+        const page = after.slice(0, query.limit);
+        const last = page.at(-1);
+        const nextCursor =
+          after.length > query.limit && last
+            ? encode({
+                context: scope(query.groupKey),
+                asOf,
+                keys: keys(last),
+              })
+            : null;
+        const items = await present(page);
+
+        return {
+          ...base,
+          items,
+          nextCursor,
+          totalCount: members.length,
+          offset: members.length - after.length,
+          ...(groupOf
+            ? {
+                groups: [
+                  {
+                    key: query.groupKey ?? null,
+                    count: members.length,
+                    complete,
+                    itemIds: items.map((item) => item.id),
+                    nextCursor,
+                    sums: [],
+                  },
+                ],
+              }
+            : {}),
+        };
       },
       { readOnlySnapshot: true },
     );
-
-    const page = result.items.slice(0, query.limit);
-    const references = new Map<
-      string,
-      NonNullable<DecisionCandidate['actionReference']>
-    >();
-    const items = page.flatMap((row): DecisionItem[] => {
-      const candidate = row.facts
-        ? presentCase(row.facts, reader, asOf)
-        : external.get(row.id);
-      if (!candidate) return [];
-      const { actionReference, ...visible } = candidate;
-      if (actionReference) references.set(row.id, actionReference);
-
-      return [
-        {
-          ...visible,
-          urgency: urgencies[row.rank],
-          evidence: {
-            ...candidate.evidence,
-            state: evidenceState(candidate.evidence.validUntil, asOf),
-          },
-          assignment: row.assignment,
-          record:
-            row.record && canReadRecord(fresh, row.record.kind)
-              ? row.record
-              : null,
-        },
-      ];
-    });
-    if (references.size && (await deps.diffEnabled?.(fresh.tenantId))) {
-      const reviews = await createActionDiffReader(db)(
-        fresh,
-        [...references].map(([id, reference]) => ({
-          id,
-          reference,
-          observedAt: (() => {
-            const item = items.find((item) => item.id === id);
-
-            return item &&
-              ((item.owner.kind === 'workflow_run' &&
-                item.owner.followUpProposalId) ||
-                [
-                  'case',
-                  'replenishment',
-                  'inventory_correction',
-                  'fulfillment_recovery',
-                  'order_edit',
-                  'shipment_publication',
-                ].includes(item.kind))
-              ? item.evidence.observedAt
-              : null;
-          })(),
-          canonical: items.find((item) => item.id === id)?.record ?? null,
-          ...(() => {
-            const item = items.find((item) => item.id === id);
-
-            return item?.owner.kind === 'case'
-              ? {
-                  evidenceLink: `/app/${fresh.tenantId}/exceptions/${item.owner.exceptionId}/detail`,
-                }
-              : {};
-          })(),
-        })),
-      );
-      for (const item of items) item.diff = reviews.get(item.id) ?? null;
-    }
-    const last = page.at(-1);
-
-    return {
-      schemaVersion: 1,
-      asOf,
-      items,
-      nextCursor:
-        result.items.length > query.limit && last
-          ? encode({
-              context: scope,
-              asOf,
-              rank: last.rank,
-              deadline: last.deadlineKey,
-              requestedAt: last.requestedAt,
-              id: last.id,
-            })
-          : null,
-      totalCount: result.total_count,
-      offset: result.offset,
-      counts: {
-        views: { ...emptyCounts(views), ...result.views },
-        domains: { ...emptyCounts(domains), ...result.domains },
-        reasons: { ...emptyCounts(reasons), ...result.reasons },
-      },
-      sources: [
-        ...(readsCases
-          ? [{ id: 'cases', label: 'Issues', state: 'available' as const }]
-          : []),
-        ...providers.map((provider, index) => ({
-          id: provider.id,
-          label: provider.label,
-          state:
-            answers[index]!.status === 'fulfilled'
-              ? ('available' as const)
-              : ('unavailable' as const),
-        })),
-      ],
-    };
   }
 
   return {

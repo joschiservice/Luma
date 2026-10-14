@@ -78,6 +78,40 @@ it('reads deterministic tenant history, safe provenance, bounded filters and rol
   expect((await read({ q: 'ACTIVITY-OWNER' })).body.items.length).toBe(10);
   expect((await read({ q: 'activity-outsider' })).body.items).toEqual([]);
   expect((await read({ q: 'must-not-appear' })).body.items).toEqual([]);
+  // The actor filter narrows by who recorded each event; `me` is each reader.
+  const mine = (await read({ actor: 'me', limit: '100' })).body.items;
+  expect(mine.length).toBeGreaterThan(30);
+  expect(mine.every((i) => i.actor.id === owner.userId)).toBe(true);
+  expect(
+    (await read({ actor: owner.userId, limit: '100' })).body.items.map(
+      (i) => i.id,
+    ),
+  ).toEqual(mine.map((i) => i.id));
+  expect((await read({ actor: member.userId })).body.items).toEqual([]);
+  expect((await read({ actor: 'me' }, member.cookie)).body.items).toEqual([]);
+  expect(
+    (await read({ actor: 'luma', limit: '100' })).body.items.every((i) =>
+      ['luma', 'support'].includes(i.actor.kind),
+    ),
+  ).toBe(true);
+  // Naming a person never reveals events the reader's role can't see.
+  const ownersForMember = (
+    await read({ actor: owner.userId, limit: '100' }, member.cookie)
+  ).body;
+  expect(ownersForMember.visibility).toBe('member');
+  expect(
+    ownersForMember.items.every(
+      (i) => i.type !== 'connection' && i.type !== 'access',
+    ),
+  ).toBe(true);
+  await read({ actor: 'everyone' }, owner.cookie, 400);
+  const firstMine = (await read({ actor: 'me' })).body;
+  expect(firstMine.nextCursor).toBeTruthy();
+  await read(
+    { actor: 'luma', cursor: firstMine.nextCursor },
+    owner.cookie,
+    400,
+  );
   expect(
     (await read({}, member.cookie)).body.items.every(
       (i) => i.type !== 'connection',

@@ -1,6 +1,14 @@
 import { z } from 'zod';
 
 import {
+  collectionGroupKeyParameter,
+  collectionGroupLimitParameter,
+  collectionGroupParameter,
+  collectionGroupSchema,
+  collectionTimeZoneParameter,
+  collectionWhereParameter,
+} from './collections.js';
+import {
   orderActivitySchema,
   orderIssueSchema,
   orderWorkflowRunSchema,
@@ -39,7 +47,16 @@ const fulfillmentKindSchema = z.enum([
   'unknown',
 ]);
 
-export const fulfillmentSortSchema = z.enum(['waiting', 'recent', 'deadline']);
+export const fulfillmentSortSchema = z.enum([
+  'waiting',
+  'recent',
+  'deadline',
+  'fulfillBy',
+  'estimatedDelivery',
+  'orderPlaced',
+  'orderNumber',
+  'location',
+]);
 
 const fulfillmentStatusSchema = z.enum([
   'pending',
@@ -144,7 +161,28 @@ export const fulfillmentQuerySchema = z
     connectionId: z.string().uuid().optional(),
     locationId: z.string().uuid().optional(),
     kind: z.enum(['fulfillment_order', 'shipment']).optional(),
-    sort: fulfillmentSortSchema.default('waiting'),
+    where: collectionWhereParameter.optional(),
+    group: collectionGroupParameter.optional(),
+    groupKey: collectionGroupKeyParameter.optional(),
+    groupLimit: collectionGroupLimitParameter,
+    timeZone: collectionTimeZoneParameter,
+    sort: fulfillmentSortSchema
+      .default('waiting')
+      .describe(
+        '`waiting` and `recent` order by last progress. `deadline` orders work with a deadline first, then the rest by last progress. Other sorts use their field; rows without a value come last in both directions.',
+      ),
+    direction: z
+      .enum(['asc', 'desc'])
+      .optional()
+      .describe(
+        'Defaults to the sort’s natural direction: descending for `recent` and `orderPlaced`, ascending otherwise.',
+      ),
+    count: z
+      .literal('exact')
+      .optional()
+      .describe(
+        'Accepted for every list; fulfillment counts are always exact.',
+      ),
     cursor: z.string().min(1).max(8192).optional(),
     limit: z.coerce.number().int().min(1).max(50).default(50),
   })
@@ -166,6 +204,18 @@ export const fulfillmentListSchema = z.object({
     z.number().int().nonnegative(),
   ),
   nextCursor: z.string().nullable(),
+  groups: z
+    .array(collectionGroupSchema)
+    .optional()
+    .describe(
+      'With `group`: each group in display order with its exact count and first rows, whose items are in `items`. With `groupKey`: the one group, with this page of its rows. `complete` is false while a source is still importing its fulfillment history.',
+    ),
+  groupsTruncated: z
+    .boolean()
+    .optional()
+    .describe(
+      'More than 50 groups match; narrow the conditions to see the rest.',
+    ),
   /** Open work without reported progress for this long is stalled. */
   stalledAfterHours: z.number().int().positive(),
   asOf: timestamp,
@@ -240,5 +290,8 @@ export type FulfillmentSignal = z.infer<typeof fulfillmentSignalSchema>;
 export type FulfillmentItem = z.infer<typeof fulfillmentItemSchema>;
 
 export type FulfillmentList = z.infer<typeof fulfillmentListSchema>;
+
+/** The fulfillment list query as clients send it: conditions and group keys are JSON text. */
+export type FulfillmentQueryInput = z.input<typeof fulfillmentQuerySchema>;
 
 export type FulfillmentDetail = z.infer<typeof fulfillmentDetailSchema>;

@@ -30,8 +30,11 @@ import type {
   LinkRow,
   MessagingStore,
   MessagingTransaction,
+  ThreadPosition,
   ThreadRow,
+  ThreadSort,
   ThreadView,
+  ThreadWhere,
 } from './store.js';
 import type { MailboxView, ThreadDetail, ThreadSummary } from './views.js';
 import {
@@ -70,10 +73,26 @@ export interface RuleInput {
 export interface ThreadQuery {
   view: ThreadView;
   connectionId?: string | undefined;
+  /** Searches subjects and correspondents; it holds personal data and is never logged. */
   q?: string | undefined;
+  /** Conditions on structured thread properties, validated against the inbox catalog. */
+  where?: ThreadWhere | undefined;
+  group?:
+    | { field: string; granularity?: 'day' | 'week' | 'month' | undefined }
+    | undefined;
+  /** Reads one group's threads, paged by `cursor` and `limit`, instead of every group. */
+  groupKey?: string | number | boolean | null | undefined;
+  /** Threads per group when reading every group, 1 to 50. */
+  groupLimit?: number | undefined;
+  timeZone?: string | undefined;
+  sort?: ThreadSort | undefined;
+  direction?: 'asc' | 'desc' | undefined;
   cursor?: string | undefined;
   limit: number;
 }
+
+/** Groups a grouped read returns at most; `groupsTruncated` says when more match. */
+const maxThreadGroups = 50;
 
 /** Threads due within this window count for Needs you, as its ranking treats them as urgent. */
 const dueSoonMs = 30 * 60_000;
@@ -86,30 +105,54 @@ function notFound(message: string): never {
   throw new IdentityError(404, 'NOT_FOUND', message);
 }
 
-/** Encodes a keyset position for the thread list. */
-function encodeCursor(thread: Pick<ThreadRow, 'lastMessageAt' | 'id'>) {
+/** A thread's place in the list's sort; threads without a deadline come last for `due`. */
+function threadPosition(thread: ThreadRow, sort: ThreadSort): ThreadPosition {
+  if (sort === 'activity')
+    return { missing: 0, at: thread.lastMessageAt, id: thread.id };
+
+  return thread.replyDueAt
+    ? { missing: 0, at: thread.replyDueAt, id: thread.id }
+    : { missing: 1, at: new Date(0).toISOString(), id: thread.id };
+}
+
+/** Encodes a keyset position within the query whose scope is `context`. */
+function encodeCursor(context: string, position: ThreadPosition) {
   return Buffer.from(
-    JSON.stringify([thread.lastMessageAt, thread.id]),
+    JSON.stringify([context, position.missing, position.at, position.id]),
   ).toString('base64url');
 }
 
-function decodeCursor(cursor: string | undefined) {
+/** Decodes a position of the same query; anything else is a 422 validation error. */
+function decodeCursor(
+  cursor: string | undefined,
+  context: string,
+): ThreadPosition | undefined {
   if (!cursor) return undefined;
   try {
-    const [lastMessageAt, id] = JSON.parse(
+    const [scope, missing, at, id] = JSON.parse(
       Buffer.from(cursor, 'base64url').toString('utf8'),
-    ) as [unknown, unknown];
+    ) as unknown[];
     if (
-      typeof lastMessageAt === 'string' &&
-      !Number.isNaN(Date.parse(lastMessageAt)) &&
+      scope === context &&
+      (missing === 0 || missing === 1) &&
+      typeof at === 'string' &&
+      !Number.isNaN(Date.parse(at)) &&
       typeof id === 'string' &&
       /^[0-9a-f-]{36}$/i.test(id)
     )
-      return { lastMessageAt, id };
+      return { missing, at, id };
   } catch {
     // Reported below.
   }
-  throw new IdentityError(422, 'CONFLICT', 'This list position is not valid.');
+  throw new IdentityError(
+    422,
+    'VALIDATION_ERROR',
+    'This list position is not valid. Start from the first page.',
+  );
+}
+
+function invalid(message: string): never {
+  throw new IdentityError(422, 'VALIDATION_ERROR', message);
 }
 
 /**
@@ -816,38 +859,150 @@ export function createMessagingService(deps: MessagingDependencies) {
 
       return oneMailbox(context, connectionId);
     },
-    /** Lists threads of one view, newest activity first, with counts for every view. */
+    /**
+     * Lists threads of one view in the query's sort (newest activity first by default), or
+     * every group's first threads, with counts for every view. View counts follow the search
+     * and mailbox, never the conditions, so the built-in views keep their numbers. A page link
+     * continues only the same reader's query.
+     */
     async threads(context: TenantContext, query: ThreadQuery) {
       context = await authorize(context, 'messages.read');
-      const after = decodeCursor(query.cursor);
+      if (query.groupKey !== undefined && !query.group)
+        invalid('Choose a grouping to read one group.');
+      if (query.group?.granularity) invalid('This field cannot be grouped.');
+      const groupKey = query.groupKey;
+      if (
+        groupKey !== undefined &&
+        groupKey !== null &&
+        typeof groupKey !== 'string'
+      )
+        invalid('This group does not exist.');
+      const grouped = !!query.group && groupKey === undefined;
+      if (grouped && query.cursor)
+        invalid('Use a group’s page link together with its group key.');
+      const sort = query.sort ?? 'activity';
+      const direction =
+        query.direction ?? (sort === 'activity' ? 'desc' : 'asc');
+      const q = query.q?.trim() || undefined;
+      // Within one group the scope leaves out page sizes, so a group's first threads and its
+      // later pages may differ in size.
+      const scope = (key: string | null | undefined) =>
+        deps.digest({
+          list: 'threads-v2',
+          actorId: context.actor.id,
+          view: query.view,
+          connectionId: query.connectionId ?? null,
+          q: q ?? null,
+          where: query.where ?? null,
+          group: query.group ?? null,
+          timeZone: query.timeZone ?? 'UTC',
+          sort,
+          direction,
+          page: key === undefined ? ['page', query.limit] : ['group', key],
+        });
+      const after = decodeCursor(query.cursor, scope(groupKey));
       const now = deps.now().toISOString();
       const filter = {
         actorId: context.actor.id,
         now,
         connectionId: query.connectionId,
-        q: query.q?.trim() || undefined,
+        q,
       };
-      const { rows, counts } = await deps.store.transaction(
+      const listed = {
+        ...filter,
+        view: query.view,
+        where: query.where,
+        timeZone: query.timeZone,
+        sort,
+        direction,
+      } as const;
+
+      if (grouped && query.group) {
+        const field = query.group.field;
+        const { result, counts } = await deps.store.transaction(
+          context.tenantId,
+          async (tx) => ({
+            result: await tx.threads.groups({
+              ...listed,
+              field,
+              perGroup: Math.min(Math.max(query.groupLimit ?? 10, 1), 50),
+              maxGroups: maxThreadGroups,
+            }),
+            counts: await tx.threads.counts(filter),
+          }),
+        );
+        const byId = new Map(result.rows.map((row) => [row.id, row]));
+
+        return {
+          items: await present(context, result.rows),
+          nextCursor: null,
+          counts,
+          groups: result.groups.map((group) => {
+            const last = byId.get(group.ids.at(-1) ?? '');
+
+            return {
+              key: group.key,
+              count: group.count,
+              complete: true,
+              itemIds: group.ids,
+              nextCursor:
+                last && group.count > group.ids.length
+                  ? encodeCursor(scope(group.key), threadPosition(last, sort))
+                  : null,
+              sums: [],
+            };
+          }),
+          groupsTruncated: result.truncated,
+        };
+      }
+
+      const member =
+        query.group && groupKey !== undefined
+          ? { field: query.group.field, key: groupKey }
+          : undefined;
+      const { rows, counts, total } = await deps.store.transaction(
         context.tenantId,
         async (tx) => ({
           rows: await tx.threads.list({
-            ...filter,
-            view: query.view,
+            ...listed,
+            member,
             after,
             limit: query.limit + 1,
           }),
           counts: await tx.threads.counts(filter),
+          // A group page reports its group's size, as grouped lists do.
+          total: member
+            ? await tx.threads.count({ ...listed, member })
+            : undefined,
         }),
       );
       const page = rows.slice(0, query.limit);
+      const nextCursor =
+        rows.length > query.limit
+          ? encodeCursor(
+              scope(groupKey),
+              threadPosition(page[page.length - 1]!, sort),
+            )
+          : null;
 
       return {
         items: await present(context, page),
-        nextCursor:
-          rows.length > query.limit
-            ? encodeCursor(page[page.length - 1]!)
-            : null,
+        nextCursor,
         counts,
+        ...(member
+          ? {
+              groups: [
+                {
+                  key: member.key,
+                  count: total ?? page.length,
+                  complete: true,
+                  itemIds: page.map((thread) => thread.id),
+                  nextCursor,
+                  sums: [],
+                },
+              ],
+            }
+          : {}),
       };
     },
     /** Reads a thread with messages, links, notes, timeline, documents and replies. */

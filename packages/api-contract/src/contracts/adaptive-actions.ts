@@ -7,7 +7,7 @@ import {
   adaptiveActionRequestSchema,
   adaptiveActionResultsSchema,
 } from '../adaptive-actions.js';
-import { adaptiveViewDomainSchema } from '../adaptive-views.js';
+import { adaptiveViewDomainSchema } from '../adaptive-view-query.js';
 import { anyMember, endpoint, organizationParamsSchema } from '../common.js';
 
 const viewParams = organizationParamsSchema.extend({

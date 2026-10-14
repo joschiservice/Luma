@@ -43,6 +43,7 @@ function recordTypeOptions() {
     { value: 'product', label: m.adaptive_product() },
     { value: 'supplier', label: m.adaptive_supplier() },
     { value: 'purchase_order', label: m.adaptive_purchase_order() },
+    { value: 'customer', label: m.adaptive_customer() },
   ] satisfies { value: AdaptiveRecordType; label: string }[];
 }
 

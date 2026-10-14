@@ -157,6 +157,9 @@ export function violation(from, to) {
         'apps/api/src/commerce.integration.test.ts',
         'apps/api/src/commerce-sync.integration.test.ts',
         'apps/api/src/orders.integration.test.ts',
+        'apps/api/src/catalog-lists.integration.test.ts',
+        'apps/api/src/procurement-lists.integration.test.ts',
+        'apps/api/src/adaptive-views.integration.test.ts',
         'apps/api/src/activity.integration.test.ts',
         'apps/api/src/execution.integration.test.ts',
         'apps/api/src/diagnosis-reread.test.ts',
@@ -226,6 +229,7 @@ export function violation(from, to) {
         (source.name === 'adaptive' &&
           (from.endsWith('/infrastructure/fields-validation.ts') ||
             from.endsWith('/infrastructure/views-validation.ts') ||
+            from.endsWith('/infrastructure/collections-validation.ts') ||
             from.endsWith('/infrastructure/package-configuration.ts')))) &&
       (to === 'packages/api-contract/' ||
         (source.name === 'staff' && to === 'packages/api-contract/staff'))

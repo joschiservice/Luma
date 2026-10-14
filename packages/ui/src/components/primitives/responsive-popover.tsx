@@ -6,18 +6,25 @@ import { type ReactElement, type ReactNode } from 'react';
 import { useSmallScreen } from '../../lib/use-small-screen';
 import { Button } from './button';
 
-/** Anchors a picker to its trigger on desktop and presents a modal bottom sheet on small screens. */
+/**
+ * Anchors a picker to its trigger on desktop and presents a modal bottom sheet on small screens.
+ * `wide` suits panels with several sections, such as display options.
+ */
 export function ResponsivePopover({
   trigger,
   title,
   open,
   onOpenChange,
+  size = 'default',
+  align = 'start',
   children,
 }: {
   trigger: ReactElement;
   title: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  size?: 'default' | 'wide' | undefined;
+  align?: 'start' | 'end' | undefined;
   children: ReactNode;
 }) {
   const mobile = useSmallScreen();
@@ -29,10 +36,10 @@ export function ResponsivePopover({
         {mobile && <Popover.Backdrop className="ui-picker-backdrop" />}
         <Popover.Positioner
           sideOffset={6}
-          align="start"
+          align={align}
           className="ui-picker-positioner"
         >
-          <Popover.Popup className="ui-picker-popup">
+          <Popover.Popup className="ui-picker-popup" data-size={size}>
             <div className="ui-picker-heading">
               <Popover.Title>{title}</Popover.Title>
               <Popover.Close

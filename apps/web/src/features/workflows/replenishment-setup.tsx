@@ -475,7 +475,7 @@ function ReplenishmentSetupForm({
           <Link
             to="/app/$organizationId/procurement"
             params={{ organizationId }}
-            search={{ view: 'suppliers', q: '', status: '' }}
+            search={{ tab: 'suppliers' }}
           >
             {m.workflows_rules_add_supplier()} <ArrowRight size={13} />
           </Link>

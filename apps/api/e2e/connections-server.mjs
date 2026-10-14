@@ -4,8 +4,11 @@ import { createAppHost } from '@luma/app-catalog';
 import { createApp as jtl } from '@luma/app-jtl';
 import { createApp as shopify } from '@luma/app-shopify';
 import { buildRuntimeApp } from '@luma/application-runtime';
-import { readIdentityConfig } from '@luma/config';
-import { createTenantDatabase } from '@luma/platform/composition';
+import { readIdentityConfig, readObservabilityConfig } from '@luma/config';
+import {
+  createObservability,
+  createTenantDatabase,
+} from '@luma/platform/composition';
 import { Pool } from 'pg';
 
 // A deterministic provider boundary; HTTP, authentication, encryption and persistence are real.
@@ -14,7 +17,13 @@ const pool = new Pool({ connectionString: process.env.IDENTITY_DATABASE_URL });
 const app = await buildRuntimeApp(
   readIdentityConfig(process.env),
   { logger: false },
-  undefined,
+  // Journeys that release features pass FEATURE_FLAG_OVERRIDES.
+  process.env.FEATURE_FLAG_OVERRIDES
+    ? createObservability({
+        ...readObservabilityConfig(process.env),
+        sampleRate: 0,
+      })
+    : undefined,
   undefined,
   (identity) =>
     createAppHost(createTenantDatabase(pool), {

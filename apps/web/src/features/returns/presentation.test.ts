@@ -1,6 +1,8 @@
+import { returnsCatalog } from '@luma/api-contract';
 import { describe, expect, it } from 'vitest';
 
-import { returnListQuery } from './data';
+import { builtinState } from '../../kit/collections/state';
+import { returnListQuery, viewConditionIndex } from './data';
 import {
   accessMessage,
   nextStep,
@@ -138,18 +140,59 @@ describe('return progress', () => {
   });
 });
 
-it('opens on pending work, oldest first, and maps sorting to the API', () => {
-  expect(returnListQuery({})).toMatchObject({
+it('opens on pending work, oldest first, and maps the view to the API', () => {
+  const view = (segment: string) => builtinState(returnsCatalog, segment);
+  expect(returnListQuery(view('action'), { q: '' }, 'UTC')).toMatchObject({
     view: 'action',
     sort: 'requested',
     direction: 'asc',
   });
-  expect(returnListQuery({ view: 'done' })).toMatchObject({
+  expect(returnListQuery(view('done'), { q: '' }, 'UTC')).toMatchObject({
+    sort: 'requested',
     direction: 'desc',
   });
-  expect(returnListQuery({ sort: 'activity', q: ' #1001 ' })).toMatchObject({
+  expect(
+    returnListQuery(
+      { ...view('all'), sort: { field: 'activity', direction: 'desc' } },
+      { q: ' #1001 ' },
+      'Europe/Berlin',
+    ),
+  ).toMatchObject({
     sort: 'activity',
     direction: 'desc',
     q: '#1001',
+    timeZone: 'Europe/Berlin',
   });
+});
+
+it('sends one chosen stage separately so the stage counts keep the other stages', () => {
+  const stage = {
+    field: 'stage',
+    op: 'any_of' as const,
+    value: ['refund_failed'],
+  };
+  const reason = {
+    field: 'reasons',
+    op: 'any_of' as const,
+    value: ['Damaged'],
+  };
+  const state = {
+    ...builtinState(returnsCatalog, 'all'),
+    where: { match: 'all' as const, conditions: [stage, reason] },
+  };
+  const query = returnListQuery(state, { q: '' }, 'UTC');
+  expect(query.stage).toBe('refund_failed');
+  expect(JSON.parse(String(query.where))).toEqual({
+    match: 'all',
+    conditions: [reason],
+  });
+  // The list names the second condition it received; that is the view's second condition.
+  expect(viewConditionIndex(state, 0)).toBe(1);
+  expect(
+    returnListQuery(
+      { ...state, where: { match: 'any', conditions: [stage, reason] } },
+      { q: '' },
+      'UTC',
+    ).stage,
+  ).toBeUndefined();
 });

@@ -227,42 +227,29 @@ export function WorkspaceSearch({
   // Procurement records are Luma-owned, so they are searched here rather than in Records.
   const purchasing = open && recordQuery.length >= 2 && can('procurement.read');
   const procurementOrders = useQuery({
-    ...ordersOptions(organizationId),
+    ...ordersOptions(organizationId, { q: recordQuery, limit: 5 }),
     enabled: purchasing,
   });
   const procurementSuppliers = useQuery({
-    ...suppliersOptions(organizationId),
+    ...suppliersOptions(organizationId, { q: recordQuery, limit: 3 }),
     enabled: purchasing,
   });
   const purchaseResults = purchasing
     ? [
-        ...(procurementSuppliers.data?.items ?? [])
-          .filter((s) => matches(recordQuery, s.name))
-          .slice(0, 3)
-          .map((s) => ({
-            key: `supplier:${s.id}`,
-            label: s.name,
-            detail: m.identity_search_supplier(),
-            supplierId: s.id,
-          })),
-        ...(procurementOrders.data?.items ?? [])
-          .filter((o) =>
-            matches(
-              recordQuery,
-              [o.reference, o.supplierName, ...o.lines.map((l) => l.sku)].join(
-                ' ',
-              ),
-            ),
-          )
-          .slice(0, 5)
-          .map((o) => ({
-            key: `purchase_order:${o.id}`,
-            label: o.reference,
-            detail: m.identity_search_purchase_order({
-              supplier: o.supplierName,
-            }),
-            purchaseOrderId: o.id,
-          })),
+        ...(procurementSuppliers.data?.items ?? []).map((s) => ({
+          key: `supplier:${s.id}`,
+          label: s.name,
+          detail: m.identity_search_supplier(),
+          supplierId: s.id,
+        })),
+        ...(procurementOrders.data?.items ?? []).map((o) => ({
+          key: `purchase_order:${o.id}`,
+          label: o.reference,
+          detail: m.identity_search_purchase_order({
+            supplier: o.supplierName,
+          }),
+          purchaseOrderId: o.id,
+        })),
       ]
     : [];
   const pages = workspaceDestinations.filter(

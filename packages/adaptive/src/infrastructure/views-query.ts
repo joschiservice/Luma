@@ -9,14 +9,14 @@ import type { ViewReadAdapter, ViewReadResult } from '../application/views.js';
 import type { AdaptiveRecordType, CustomField } from '../domain/fields.js';
 import type {
   AdaptiveViewPreview,
-  AdaptiveViewQuery,
+  ViewExecutionQuery,
 } from '../domain/views.js';
 import { customFieldSchema } from './fields-validation.js';
 
 const candidateLimit = 2000;
 const pageLimit = 50;
 
-function cursorScope(context: TenantContext, query: AdaptiveViewQuery) {
+function cursorScope(context: TenantContext, query: ViewExecutionQuery) {
   return createHash('sha256')
     .update(canonicalJson({ tenantId: context.tenantId, query }))
     .digest('hex');

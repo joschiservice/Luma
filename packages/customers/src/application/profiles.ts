@@ -31,7 +31,9 @@ export interface CustomerProfiles {
   /**
    * Records which source customer placed each order of one connection, replacing an order's
    * earlier customer unless the stored link was observed later. Orders without a customer, or
-   * whose customer was erased, lose their link. Order keys must be unique. Requires `sync.manage`.
+   * whose customer was erased, lose their link. Each affected profile's last order date becomes
+   * the latest reported placed date of its linked orders. Order keys must be unique. Requires
+   * `sync.manage`.
    */
   recordOrders(
     context: TenantContext,

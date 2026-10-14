@@ -34,6 +34,11 @@ const sorts = members<OrderQuery['sort']>({
   placed: true,
   number: true,
   due: true,
+  total: true,
+  status: true,
+  paymentStatus: true,
+  fulfillment: true,
+  lineCount: true,
 });
 // Canonical order and payment statuses, as the Orders API filters them.
 const statuses = ['open', 'completed', 'cancelled', 'unknown'] as const;

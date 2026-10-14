@@ -7,21 +7,54 @@ Bestellungen zeigt alle aktuellen Bestellungen, die deine verbundenen Shops und 
 
 ## Bestellung finden [#find-an-order]
 
-Wähle über der Liste eine Ansicht:
+Wähle im Ansichtsmenü über der Liste eine Ansicht:
 
 - **Alle Bestellungen** zeigt alle aktuellen Bestellungen aus deinen verbundenen Systemen.
 - **Ausstehend** zeigt offene Bestellungen mit Einheiten, die noch zu erfüllen sind.
 - **Überfällig** zeigt ausstehende Bestellungen, deren Frist aus der Quelle überschritten ist.
 - **Wartet auf dich** zeigt Bestellungen mit einem Problem, das deine Entscheidung oder Prüfung braucht.
 - **Quellen weichen ab** zeigt Bestellungen, bei denen Status, Zahlung, Summe oder bestellte Artikel zwischen den Quellen abweichen.
+- **Ablauf prüfen** findet bezahlte offene Bestellungen ohne erfasste Luma-Reservierung nach vier Stunden sowie Sendungen ohne Reservierung. Prüfe diese Hinweise mit dem Lagerteam und der meldenden Quelle. Externe Reservierungen sind womöglich nicht gelesen. Diese Ansicht braucht Zugriff auf Bestand und Fulfillment.
 
-Suche nach Bestellnummer, der ID der Bestellung in ihrer Quelle oder einer SKU in einer Position. Grenze die Liste mit **Status**, **Zahlung**, **Quelle**, **Bestellt** und **Aktualisiert** ein, und sortiere nach **Zuletzt aktualisiert**, **Bestelldatum**, **Bestellnummer** oder **Fälligkeitsdatum**. Auf schmalen Bildschirmen siehst du alle Filter unter **Filter**.
+Das Ansichtsmenü listet auch die Ansichten, die du und dein Team gespeichert habt. Öffnest du **Bestellungen** über die Seitenleiste, kehrst du zur zuletzt genutzten Ansicht zurück, auch mit Änderungen, die du noch nicht gespeichert hast.
 
-Ansicht, Filter, Sortierung und Seite sind Teil der Seitenadresse. So kannst du die Liste teilen oder an die Seitenleiste anheften. Ausstehend, Überfällig und Wartet auf dich zählen dieselben Bestellungen wie die Bestellzahlen auf der Startseite und in den [Auswertungen](/docs/insights). Wenn du dort eine Zahl wählst, öffnet sich hier die passende Ansicht.
+Suche nach Bestellnummer, der ID der Bestellung in ihrer Quelle oder einer SKU in einer Position. Darfst du Kunden ansehen, findet die Suche Bestellungen auch über Name oder E-Mail-Adresse des Kunden. Deshalb bleibt dein Suchtext auf der Seite: Er wird weder in der Seitenadresse noch in Ansichten gespeichert und ist leer, wenn du die Seite verlässt oder neu lädst. Öffnet ein Link Bestellungen mit einer Suche, etwa die Bestellungen eines Produkts, übernimmt die Seite die Suche und entfernt sie aus der Adresse. **Status**, **Zahlung**, **Quelle** und **Lager** über der Liste grenzen sie mit einem Klick ein. Für alles andere wählst du **Filter**, dann ein Feld wie **Bestellt**, **Positionen**, **Summe**, **Verkaufskanal**, **Tags** oder ein eigenes Feld, eine Bedingung und einen Wert. Gelten zwei oder mehr Filter, wählst du, ob Bestellungen alle oder mindestens einen erfüllen müssen. Das Sortiermenü nach **Darstellung** nennt die aktuelle Reihenfolge, etwa **Zuletzt aktualisiert**; wähle es, um nach einem anderen Feld oder in umgekehrter Richtung zu sortieren. In der Tabelle sortiert ein Spaltenkopf nach dieser Spalte, und sein Menü bietet **Nach dieser Spalte filtern**. **Leeren** entfernt alle Filter und die Suche.
+
+Ausstehend, Überfällig und Wartet auf dich zählen dieselben Bestellungen wie die Bestellzahlen auf der Startseite und in den [Auswertungen](/docs/insights). Wenn du dort eine Zahl wählst, öffnet sich hier die passende Ansicht mit denselben Filtern.
 
 **Abdeckung** über der Liste zeigt, ob die Liste vollständig ist, zum Beispiel solange ältere Daten noch importiert werden oder wenn eine Quelle nur neuere Bestellungen teilt. Siehe [Datenabgleich](/docs/data-sync).
 
-**Keine passenden Bestellungen** bedeutet, dass Suche, Ansicht oder Filter alle Bestellungen ausschließen. **Noch keine Bestellungen** bedeutet, dass noch kein verbundener Shop und kein ERP eine Bestellung gemeldet hat. Passt ein Seitenlink nicht mehr zu seinen Filtern, wähle **Zur ersten Seite**.
+**Keine passenden Bestellungen** bedeutet, dass Suche, Ansicht oder Filter alle Bestellungen ausschließen. **Noch keine Bestellungen** bedeutet, dass noch kein verbundener Shop und kein ERP eine Bestellung gemeldet hat. Passt ein Seitenlink nicht mehr zu seinen Filtern, wähle **Erste Seite**. Nutzt eine Ansicht einen Filter oder eine Gruppierung, die du nicht verwenden kannst, etwa weil deine Rolle keine Lager sieht, sagt Luma das, statt mehr Bestellungen zu zeigen, als die Ansicht meint. Wähle dann **Nicht unterstützte Bedingungen entfernen**.
+
+## Liste anordnen [#arrange-the-list]
+
+Unter **Darstellung** änderst du, wie die Liste aussieht:
+
+- **Layout**: **Tabelle** zeigt Spalten, **Liste** zeigt eine Zeile pro Bestellung mit den Eigenschaften deiner Wahl, und **Board** zeigt eine Spalte pro Gruppe.
+- **Spalten** oder **Eigenschaften**: Wähle, was jede Bestellung zeigt, und zieh die Einträge in die gewünschte Reihenfolge. In der Tabelle kannst du Spalten außerdem über ihr Menü in der Breite ändern, verschieben, fixieren und ausblenden.
+- **Gruppieren nach**: Gruppiere Bestellungen nach Status, Zahlung, Fulfillment, Quelle, Lager, Verkaufskanal, Tags oder anderen Feldern und Daten nach Tag, Woche oder Monat. Jede Gruppe zeigt, wie viele Bestellungen sie hat, und die Summe je Währung. **Unvollständig** bedeutet, dass in der Zahl Bestellungen fehlen können. Wähle den Namen einer Gruppe, um sie einzuklappen, und **Mehr in …**, um weitere Bestellungen zu sehen. **Leere Gruppen anzeigen** listet auch Status und andere Auswahlwerte, die keine Bestellung hat.
+- **Dichte**: **Kompakt** zeigt mehr Bestellungen auf einmal. Dichte, Spaltenbreiten und eingeklappte Gruppen sind deine eigenen Einstellungen.
+- **Datensätze in einer Vorschau öffnen**: Eine gewählte Bestellung erscheint als Zusammenfassung neben der Liste, statt sich zu öffnen. In der Vorschau kannst du die Liste auf Status, Zahlung, Fulfillment oder Quelle der Bestellung eingrenzen oder diese Werte ausblenden. **Ganze Bestellung öffnen** öffnet die Bestellung.
+
+Auf dem Board kannst du Bestellungen nicht zwischen Spalten verschieben, weil Status, Zahlung und Fulfillment aus deinen verbundenen Systemen stammen.
+
+## Ansichten speichern und teilen [#save-and-share-views]
+
+Änderst du Filter, Sortierung, Gruppierung oder Darstellung, ist die Ansicht **Geändert**. Wähle **Speichern**, um eine gespeicherte Ansicht zu aktualisieren, die du bearbeiten darfst, **Als neue Ansicht speichern**, um deine Änderungen als neue Ansicht zu behalten, oder **Zurücksetzen**, um zur gespeicherten Fassung zurückzukehren. Eine neue Ansicht ist privat, bis du sie mit deinem Workspace oder mit Rollen teilst; siehe [Gespeicherte Ansichten](/docs/saved-views). Eine geteilte Ansicht gibt niemandem Zugriff auf Bestellungen, die er nicht sehen darf.
+
+Hat jemand anderes die Ansicht gespeichert, nachdem du sie geöffnet hast, behält Luma deine Änderungen. Du kannst sie als neue Ansicht speichern oder stattdessen die andere Fassung laden.
+
+Ansicht und Änderungen sind Teil der Seitenadresse. Unter **Ansichtsoptionen** kopierst du den Link oder heftest die Ansicht an die Seitenleiste an. **Als meinen Standard für diese Seite festlegen** öffnet diese Ansicht, wenn du zu Bestellungen kommst. **Seite auf Standard zurücksetzen** löscht, was sich Bestellungen für dich merkt; mit **Rückgängig** holst du es zurück.
+
+## Mit der Tastatur arbeiten [#work-from-the-keyboard]
+
+- **J** und **K** oder die Pfeiltasten bewegen dich durch die Bestellungen. Auf dem Board wechseln die Pfeiltasten auch zwischen Spalten.
+- **Enter** öffnet die Bestellung, auf der du stehst.
+- Die **Leertaste** öffnet oder schließt sie in der Vorschau, wenn die Vorschau eingeschaltet ist. Solange sie offen ist, zeigen **J** und **K** die nächste und vorherige Bestellung.
+- **X** wählt eine Bestellung aus, **Umschalt**+**X** einen Bereich, und **Esc** hebt die Auswahl auf oder schließt die Vorschau.
+- **/** springt zur Suche, **F** fügt einen Filter hinzu und **?** listet diese Tastenkürzel.
+
+Tastenkürzel wirken nicht, während du in ein Feld tippst.
 
 ## Bestellung lesen [#read-an-order]
 

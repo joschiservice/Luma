@@ -1,9 +1,29 @@
 import type { TenantContext } from '@luma/identity';
 
 import type { StockPosition } from '../domain/inventory.js';
+import type {
+  CollectionGroupedResult,
+  CollectionListParameters,
+} from './collections.js';
 
-export type CatalogField =
-  'title' | 'status' | 'published' | 'price' | 'barcode';
+/** Listing fields compared across sources, in the order lists show and group them. */
+export const catalogFields = [
+  'title',
+  'status',
+  'published',
+  'price',
+  'barcode',
+] as const;
+
+export type CatalogField = (typeof catalogFields)[number];
+
+/** Listing statuses in the order lists show and group them. */
+export const catalogStatuses = [
+  'active',
+  'draft',
+  'archived',
+  'unknown',
+] as const;
 
 /** One source's current catalog entry for a canonical SKU. */
 export type CatalogListing = {
@@ -58,20 +78,34 @@ export type CatalogSource = {
 
 export type CatalogView = 'all' | 'differs' | 'missing' | 'unlinked';
 
-export interface ProductQuery {
+/**
+ * Catalog orders. `price` is the lowest price in the alphabetically first reported currency;
+ * `updated` the latest source update of any listing. SKUs without a value come last.
+ */
+export type ProductSort =
+  'rank' | 'sku' | 'title' | 'price' | 'updated' | 'differences' | 'listings';
+
+export interface ProductQuery extends CollectionListParameters {
   q: string;
   view: CatalogView;
   connectionId?: string | undefined;
   missingFrom?: string | undefined;
+  /**
+   * Defaults to `rank`: SKUs with a code, then with only a title, alphabetically.
+   * `custom:<field ID>` sorts by a readable custom product field that holds one value.
+   */
+  sort?: ProductSort | `custom:${string}` | undefined;
+  direction?: 'asc' | 'desc' | undefined;
+  count?: 'exact' | undefined;
   cursor?: string | undefined;
   /** Page size, 1 to 50; defaults to 50. */
   limit?: number | undefined;
 }
 
-interface ProductList {
+interface ProductList extends CollectionGroupedResult {
   items: CatalogItem[];
   sources: CatalogSource[];
-  /** Matching SKUs per view for the current search and source filters. */
+  /** Matching SKUs per view for the current search, source filters and conditions. */
   counts: Record<CatalogView, number>;
   nextCursor: string | null;
   asOf: string;

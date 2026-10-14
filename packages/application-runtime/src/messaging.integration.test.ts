@@ -699,6 +699,244 @@ describe.skipIf(!databaseUrl)('operations inbox on PostgreSQL', () => {
     expect(mine.counts).toMatchObject({ mine: 1, overdue: 3 });
   });
 
+  it('filters, sorts and groups threads by structured properties only', async () => {
+    const t1 = (await threadByProvider('t1')).thread.id;
+    const member = context(memberId, 'member');
+    const list = (query: Record<string, unknown>, as = member) =>
+      messaging.service.threads(as, { view: 'all', limit: 50, ...query });
+    const where = (...conditions: unknown[]) => ({
+      match: 'all' as const,
+      conditions: conditions as {
+        field: string;
+        op: string;
+        value?: unknown;
+      }[],
+    });
+    const all = (await list({})).items;
+    expect(all.length).toBeGreaterThan(1);
+    const ids = async (query: Record<string, unknown>, as = member) =>
+      (await list(query, as)).items.map((thread) => thread.id).sort();
+    const expected = (keep: (thread: (typeof all)[number]) => boolean) =>
+      all
+        .filter(keep)
+        .map((thread) => thread.id)
+        .sort();
+
+    expect(
+      await ids({
+        where: where({
+          field: 'owner',
+          op: 'any_of',
+          value: [{ dynamic: 'me' }],
+        }),
+      }),
+    ).toEqual([t1]);
+    expect(
+      await ids(
+        {
+          where: where({
+            field: 'owner',
+            op: 'any_of',
+            value: [{ dynamic: 'me' }],
+          }),
+        },
+        adminContext(),
+      ),
+    ).toEqual(expected((thread) => thread.ownerId === adminId));
+    expect(
+      await ids({ where: where({ field: 'owner', op: 'empty' }) }),
+    ).toEqual(expected((thread) => thread.ownerId === null));
+    for (const value of [true, false])
+      expect(
+        await ids({
+          where: where({ field: 'hasAttachments', op: 'is', value }),
+        }),
+      ).toEqual(expected((thread) => thread.attachmentCount > 0 === value));
+    for (const value of [true, false])
+      expect(
+        await ids({
+          where: where({ field: 'awaitingReply', op: 'is', value }),
+        }),
+      ).toEqual(expected((thread) => thread.awaitingReply === value));
+    expect(
+      await ids({
+        where: where({ field: 'factsToReview', op: 'is', value: true }),
+      }),
+    ).toEqual(expected((thread) => thread.factsToReview > 0));
+    expect(
+      await ids({
+        where: where({
+          field: 'linkedRecord',
+          op: 'any_of',
+          value: ['purchase_order'],
+        }),
+      }),
+    ).toEqual(
+      expected((thread) =>
+        thread.links.some((link) => link.kind === 'purchase_order'),
+      ),
+    );
+    expect(
+      await ids({
+        where: where({
+          field: 'linkedRecord',
+          op: 'none_of',
+          value: ['purchase_order'],
+        }),
+      }),
+    ).toEqual(
+      expected(
+        (thread) =>
+          !thread.links.some((link) => link.kind === 'purchase_order'),
+      ),
+    );
+    expect(
+      await ids({
+        where: where({
+          field: 'linkedRecord',
+          op: 'all_of',
+          value: ['purchase_order', 'supplier'],
+        }),
+      }),
+    ).toContain(t1);
+    expect(
+      await ids({
+        where: where({
+          field: 'mailbox',
+          op: 'none_of',
+          value: [connectionId],
+        }),
+      }),
+    ).toEqual([]);
+    const from = new Date(now - 2 * hour).toISOString();
+    const to = new Date(now).toISOString();
+    expect(
+      await ids({
+        where: where({ field: 'due', op: 'between', value: { from, to } }),
+      }),
+    ).toEqual(
+      expected(
+        (thread) =>
+          thread.replyDueAt !== null &&
+          thread.replyDueAt >= from &&
+          thread.replyDueAt <= to,
+      ),
+    );
+    expect(await ids({ where: where({ field: 'due', op: 'empty' }) })).toEqual(
+      expected((thread) => thread.replyDueAt === null),
+    );
+    expect(
+      await ids({
+        where: {
+          match: 'any',
+          conditions: [
+            { field: 'owner', op: 'not_empty' },
+            { field: 'hasAttachments', op: 'is', value: false },
+          ],
+        },
+      }),
+    ).toEqual(
+      expected(
+        (thread) => thread.ownerId !== null || thread.attachmentCount === 0,
+      ),
+    );
+    // Message text is never a condition, and conditions never change the view counts.
+    await expect(
+      list({ where: where({ field: 'subject', op: 'contains', value: 'PO' }) }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    expect(
+      (await list({ where: where({ field: 'owner', op: 'empty' }) })).counts,
+    ).toEqual((await list({})).counts);
+
+    // Newest activity first by default; deadlines put threads without one last both ways.
+    const order = async (query: Record<string, unknown>) =>
+      (await list(query)).items;
+    const times = (items: typeof all, key: 'lastMessageAt' | 'replyDueAt') =>
+      items.map((thread) => thread[key]);
+    const newest = await order({});
+    expect(times(newest, 'lastMessageAt')).toEqual(
+      [...times(newest, 'lastMessageAt')].sort().reverse(),
+    );
+    const oldest = await order({ direction: 'asc' });
+    expect(oldest.map((thread) => thread.id)).toEqual(
+      newest.map((thread) => thread.id).reverse(),
+    );
+    for (const direction of ['asc', 'desc'] as const) {
+      const due = times(await order({ sort: 'due', direction }), 'replyDueAt');
+      const set = due.filter((at): at is string => at !== null);
+      expect(due).toEqual([
+        ...[...set].sort((a, b) =>
+          direction === 'asc' ? a.localeCompare(b) : b.localeCompare(a),
+        ),
+        ...due.filter((at) => at === null),
+      ]);
+    }
+
+    const owners = await list({ group: { field: 'owner' } });
+    expect(owners.groups?.at(-1)?.key ?? null).toBe(
+      all.some((thread) => thread.ownerId === null) ? null : memberId,
+    );
+    expect(
+      owners.groups?.find((group) => group.key === memberId),
+    ).toMatchObject({ count: 1, itemIds: [t1] });
+    const mailboxes = await list({
+      group: { field: 'mailbox' },
+      groupLimit: 1,
+    });
+    expect(mailboxes.groups).toEqual([
+      expect.objectContaining({
+        key: connectionId,
+        count: all.length,
+        itemIds: [newest[0]!.id],
+      }),
+    ]);
+    expect(mailboxes.items.map((thread) => thread.id)).toEqual([newest[0]!.id]);
+    const rest = await list({
+      group: { field: 'mailbox' },
+      groupKey: connectionId,
+      cursor: mailboxes.groups![0]!.nextCursor!,
+    });
+    expect(rest.items.map((thread) => thread.id)).toEqual(
+      newest.slice(1).map((thread) => thread.id),
+    );
+    expect(rest.groups?.[0]).toMatchObject({
+      count: all.length,
+      nextCursor: null,
+    });
+    expect(
+      (await list({ group: { field: 'status' } })).groups?.map(
+        (group) => group.key,
+      ),
+    ).toEqual(
+      ['open', 'waiting', 'closed'].filter((status) =>
+        all.some((thread) => thread.status === status),
+      ),
+    );
+
+    // Page links continue only the same query of the same reader.
+    const first = await list({ limit: 1 });
+    expect(
+      (await list({ limit: 1, cursor: first.nextCursor! })).items.map(
+        (thread) => thread.id,
+      ),
+    ).toEqual([newest[1]!.id]);
+    for (const [query, as] of [
+      [{ limit: 1, sort: 'due' }, member],
+      [{ limit: 1, where: where({ field: 'owner', op: 'empty' }) }, member],
+      [{ limit: 1, q: 'order' }, member],
+      [{ limit: 1 }, adminContext()],
+    ] as const)
+      await expect(
+        list({ ...query, cursor: first.nextCursor! }, as),
+      ).rejects.toMatchObject({ statusCode: 422 });
+    expect(
+      await ids(
+        { where: where({ field: 'owner', op: 'empty' }) },
+        context(adminId, 'admin', otherTenant),
+      ),
+    ).toEqual([]);
+  });
+
   it('records notes, deadlines, status and links on the timeline, and reopens on new mail', async () => {
     let detail = await threadByProvider('t1');
     const id = detail.thread.id;

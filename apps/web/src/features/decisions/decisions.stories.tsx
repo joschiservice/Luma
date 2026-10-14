@@ -10,10 +10,15 @@ import {
 import { useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 
+import { groupId } from '../../kit/collections/groups';
 import appStyles from '../../styles.css?inline';
 import type { NeedsYouSearch } from './data';
 import { DecisionInspector, type Member } from './inspector';
-import { NeedsYouView } from './page';
+import {
+  decisionGroupLabel,
+  type NeedsYouGrouping,
+  NeedsYouView,
+} from './page';
 
 const org = '33333333-3333-4333-8333-333333333333';
 const alex = '44444444-4444-4444-8444-444444444444';
@@ -285,11 +290,45 @@ function Content({
             }
           : list;
   const item = shown?.items.find((entry) => entry.id === search.item);
+  // Grouped by cause, as the queue's server groups would return them.
+  const causes = [...new Set(list.items.map((entry) => entry.group.key))];
+  const grouped: NeedsYouGrouping | undefined =
+    search.group === 'cause'
+      ? {
+          grouping: { field: 'cause', showEmpty: false },
+          groups: causes.map((key) => {
+            const rows = list.items.filter((entry) => entry.group.key === key);
+
+            return {
+              id: groupId(key),
+              group: {
+                key,
+                count: rows.length,
+                complete: true,
+                itemIds: rows.map((entry) => entry.id),
+                nextCursor: null,
+                sums: [],
+              },
+              rows,
+              more: undefined,
+            };
+          }),
+          label: (key) =>
+            decisionGroupLabel('cause', key, {
+              items: list.items,
+              members,
+              self: alex,
+            }),
+          collapsed: [],
+          onCollapsedChange: () => {},
+        }
+      : undefined;
 
   return (
     <NeedsYouView
       organizationId={org}
       search={search}
+      grouped={grouped}
       list={shown}
       loading={state === 'loading'}
       error={state === 'error' ? 'Try Refresh.' : undefined}
@@ -415,7 +454,7 @@ export const SelectedNarrow: Story = {
 };
 
 export const Grouped: Story = {
-  args: { initial: { grouped: true } },
+  args: { initial: { group: 'cause' } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(

@@ -33,7 +33,7 @@ import { useId, useState } from 'react';
 
 import { SignInRedirect } from '../../kit/identity/common';
 import { usePermissions } from '../../kit/identity/permissions';
-import { suppliersOptions } from '../procurement/data';
+import { allSuppliersOptions } from '../../shared/procurement/suppliers';
 import { CommandFeedback } from './command-feedback';
 import {
   addRule,
@@ -508,7 +508,7 @@ function RuleForm({
   const { can } = usePermissions(organizationId);
   const canReadSuppliers = can('procurement.read');
   const suppliers = useQuery({
-    ...suppliersOptions(organizationId),
+    ...allSuppliersOptions(organizationId),
     enabled: canReadSuppliers,
   });
   const [kind, setKind] = useState<MailboxRuleKind>('sender_domain');

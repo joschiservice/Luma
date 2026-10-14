@@ -20,16 +20,42 @@ any observations exist, not whether they are complete or healthy; connection ava
 is read separately from the connection API.
 
 Unknown impact stays unknown. Expired or resolved investigations hide their old
-recommendations. A selected case stays open when it leaves the current filter. View,
-filter and pagination state lives in validated search parameters.
+recommendations. A selected case stays open when it leaves the current filter.
 
 ## Lists and pagination
 
-Lists filter by view, class, severity, state and responsible person (including unassigned), with 25 items per page by default and at
-most 100. Keyset order is severity descending, attention time (or detection time)
-ascending, then ID. List items omit diagnosis evidence. Cursors bind the tenant, filters
-and page size. Cases move between pages as their state changes, so refresh restarts from
-the first page and clients deduplicate by ID.
+The issue list is a configurable list (see [shared list model](frontend-ui.md)): views keep
+their conditions, sort, grouping, layout and properties, while search text stays in page state
+because it can match record IDs. The list API takes conditions on the issues catalog fields:
+class, state, severity, record type, owner (`me` resolves to each reader, empty is
+unassigned), source system, attention reason, freshness, investigation status, resolution and
+the detected, last-activity and waiting-since dates. The older `ownerId`, `class`,
+`severity` and `state` parameters still work, and the web turns old links that use them into
+conditions.
+
+Filtered values are computed by the same rules the list presents, at the read time:
+
+- Freshness is `fresh` only while the investigation's validity has not ended, `stale` after it
+  and `unknown` without one. Stale and unknown evidence never match `fresh`.
+- The investigation status reads `insufficient_evidence` once the evidence is stale or exceeds
+  the display limit, as the detail does.
+- Sources are the provider systems the shown evidence names. An issue with several sources
+  belongs to each source's group.
+
+Conditions, search and sorting are bound parameters over the attention projection; the view
+counts (Needs you, active) are unchanged by them. Search matches the summary the API returns,
+in English, and the record ID and type.
+
+The default order is urgency: severity descending, attention time (or detection time)
+ascending, then ID. Detected, last activity and waiting since sort either way; issues that wait
+on nobody come last for waiting since in both directions. Groups (class, owner, severity, state
+and source) return exact counts and their first rows, at most 50 groups. The board groups by
+state and is read-only: state changes only through verification and dispositions.
+
+Pages hold 25 items by default and at most 100. List items omit diagnosis evidence. Cursors
+bind the tenant, reader, conditions, search, sort and page size; within a group they bind the
+group key instead of the size. Cases move between pages as their state changes, so refresh
+restarts from the first page and clients deduplicate by ID.
 
 ## Case detail and evidence
 

@@ -85,6 +85,10 @@ function fixture() {
           tenant === tenantId && id === recordId,
         personExists: async () => person,
         values: async () => [...values.values()],
+        valuesMany: async (_type, ids) =>
+          ids.includes(recordId)
+            ? [...values.values()].map((value) => ({ ...value, recordId }))
+            : [],
         setValue: async (_type, _id, value) => {
           values.set(value.fieldId, value);
         },

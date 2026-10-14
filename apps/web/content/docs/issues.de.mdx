@@ -22,13 +22,38 @@ Probleme decken nur Daten ab, die Luma lesen kann. Ist ein System nicht verbunde
 - **Alle offenen** zeigt alle ungelösten Probleme, auch solche, die Luma noch untersucht oder behebt.
 - **Verlauf** zeigt abgeschlossene Probleme. Bei jedem steht, ob eine neue Prüfung die Korrektur bestätigt oder eine Person es geschlossen hat.
 
+Das Ansichtsmenü vor den Reitern listet auch die Ansichten, die du und dein Team gespeichert habt. Öffnest du **Probleme** über die Seitenleiste, kommst du zur zuletzt genutzten Ansicht zurück.
+
 Die Zahlen über der Liste zeigen, wie viele Probleme zu prüfen sind, wie viele offen sind und wie viele in den letzten 24 Stunden bestätigt wurden. Sie gelten für den ganzen Workspace und ändern sich nicht mit deinen Filtern.
 
-## Liste filtern [#filter-the-list]
+## Probleme finden [#find-issues]
 
-Wähle **Filter** oder einen Filternamen über der Liste, um nach **Schweregrad**, **Problemtyp** oder **Status** einzugrenzen. Ein Problem erscheint nur, wenn es zu allen gesetzten Filtern passt. Jeder gesetzte Filter steht über der Liste: Wähle ihn, um den Wert zu ändern, sein **×**, um ihn zu entfernen, oder **Leeren**, um alle zu entfernen.
+Suche nach der Zusammenfassung oder nach dem Datensatz, um den es geht, etwa einer Bestellnummer oder SKU. Dein Suchtext bleibt auf der Seite: Er wird weder in der Seitenadresse noch in Ansichten gespeichert und ist leer, wenn du die Seite verlässt oder neu lädst. Zusammenfassungen werden auf Englisch durchsucht.
 
-Ansicht und Filter sind Teil der Seitenadresse. Du kannst sie also als Lesezeichen speichern oder in der oberen Leiste **Diese Seite an die Seitenleiste anheften** wählen. Wirkt die Liste veraltet, wähle **Probleme aktualisieren**. Danach siehst du wieder die erste Seite.
+**Fallverantwortliche Person**, **Problemtyp**, **Status** und **Schweregrad** über der Liste grenzen sie mit einem Klick ein. Über die verantwortliche Person findest du deine Probleme, Probleme ohne verantwortliche Person oder die Probleme einer bestimmten Person; eine mit **Ich** gespeicherte Ansicht zeigt allen ihre eigenen Probleme. Für alles andere wählst du **Filter**, dann ein Feld, eine Bedingung und einen Wert:
+
+- **Quelle**: das System, aus dem die Nachweise stammen, etwa Shopify.
+- **Warum es geprüft werden muss**: Genehmigung, manueller Schritt oder unklare Nachweise.
+- **Aktualität der Nachweise**: **Aktuell** nur, solange die Nachweise der Untersuchung gültig sind. Veraltete Nachweise oder solche, deren Gültigkeit Luma nicht kennt, werden nie als aktuell angezeigt.
+- **Untersuchung**, **Abschluss** und **Datensatztyp**.
+- **Erkannt**, **Letzte Aktivität** und **Wartet seit**, als Zeitraum oder als die letzten Tage.
+
+Ein Problem erscheint nur, wenn es zu allen Filtern passt, außer du wählst, dass einer reicht. **Leeren** entfernt alle Filter und die Suche.
+
+Die Liste beginnt mit dem Dringendsten: zuerst hoher Schweregrad, dann das Problem, das am längsten wartet. Das Sortiermenü nach **Darstellung** nennt die aktuelle Reihenfolge. Wähle es, um nach Erkennungszeit, letzter Aktivität oder Wartezeit auf eine Person zu sortieren oder die Richtung umzukehren. Probleme, die auf niemanden warten, stehen beim Sortieren nach Wartezeit am Ende.
+
+Ansicht, Filter und Sortierung sind Teil der Seitenadresse. Du kannst sie also als Lesezeichen speichern oder in der oberen Leiste **Diese Seite an die Seitenleiste anheften** wählen. Links aus der Zeit vor Ansichten, etwa zu einem Problemtyp in Insights, öffnen dieselben Filter. Wirkt die Liste veraltet, wähle **Probleme aktualisieren**. Danach siehst du wieder die erste Seite.
+
+## Liste anordnen [#arrange-the-list]
+
+Unter **Darstellung** änderst du, wie die Liste aussieht:
+
+- **Layout**: **Liste** zeigt eine Zeile pro Problem, und **Board** zeigt eine Spalte pro Gruppe, nach Status, solange du keine andere Gruppierung wählst. Du kannst Probleme nicht zwischen Spalten verschieben: Der Status ändert sich nur, wenn eine neue Prüfung eine Lösung bestätigt oder eine Person entscheidet.
+- **Eigenschaften**: Wähle, was jedes Problem zeigt, etwa **Schweregrad**, **Status**, **Quelle**, **Aktualität der Nachweise** oder **Letzte Aktivität**, und zieh die Einträge in die gewünschte Reihenfolge. Art, Datensatz und die verantwortliche Person stehen unter der Zusammenfassung, die übrigen Eigenschaften in Spalten.
+- **Gruppieren nach**: Gruppiere Probleme nach Typ, verantwortlicher Person, Schweregrad, Status oder Quelle. Jede Gruppe zeigt, wie viele Probleme sie hat; **Mehr in …** lädt weitere. Ein Problem mit Nachweisen aus mehreren Systemen erscheint in der Gruppe jeder Quelle.
+- **Dichte**: **Kompakt** zeigt mehr Probleme auf einmal und lässt die zweite Zeile weg.
+
+Geänderte Filter, Sortierung, Gruppierung oder Darstellung markieren die Ansicht als **Geändert**. Wähle **Als neue Ansicht speichern**, um sie zu behalten, **Speichern**, um eine gespeicherte Ansicht zu aktualisieren, die du bearbeiten darfst, oder **Zurücksetzen**, um sie zu verwerfen. Dichte und eingeklappte Gruppen sind deine eigenen Einstellungen und ändern die Ansicht für andere nicht. Eine geteilte Ansicht gibt niemandem Zugriff auf Probleme, die er nicht sehen darf; siehe [Gespeicherte Ansichten](/docs/saved-views).
 
 ## Problem öffnen [#open-an-issue]
 
@@ -38,6 +63,16 @@ Wähle ein Problem, um es neben der Liste zu lesen. Auf schmalen Bildschirmen er
 - **Als ganze Seite öffnen** gibt dem Problem mehr Platz und einen Link, den du mit Personen in deinem Workspace teilen kannst.
 - **Bereich schließen** oder Esc führt zurück zur Liste. Ansicht und Filter bleiben erhalten.
 
+Du kannst die Liste auch mit der Tastatur bearbeiten:
+
+- **J** und **K** oder die Pfeiltasten bewegen dich durch die Liste.
+- Die **Leertaste** öffnet das Problem, auf dem du stehst, neben der Liste oder schließt es wieder. Solange es offen ist, öffnen **J** und **K** das nächste und vorherige Problem.
+- **Enter** öffnet das Problem, auf dem du stehst.
+- **Esc** schließt das Problem und bringt dich zu seiner Zeile zurück.
+- **/** springt zur Suche, **F** fügt einen Filter hinzu und **?** listet diese Tastenkürzel.
+
+Tastenkürzel wirken nicht, während du in ein Feld tippst.
+
 Ändert sich ein Problem, während du es liest, etwa weil jemand seine Änderung genehmigt hat, kann es aus deiner Ansicht verschwinden. Luma weist darauf hin und lässt es geöffnet, bis du fertig bist.
 
 Wie du ein Problem liest, erfährst du unter [Problem untersuchen](/docs/issues/investigate).
@@ -45,7 +80,7 @@ Wie du ein Problem liest, erfährst du unter [Problem untersuchen](/docs/issues/
 ## Wenn die Liste leer ist [#when-the-list-is-empty]
 
 - **Keine Probleme warten auf deine Prüfung**: In dieser Ansicht braucht gerade nichts eine Person. Probleme, an denen Luma noch arbeitet, findest du unter **Alle offenen**.
-- **Keine passenden Probleme**: Deine Filter schließen alle Probleme aus. Ändere oder entferne sie.
+- **Keine passenden Probleme**: Deine Suche oder deine Filter schließen alle Probleme aus. Ändere oder entferne sie.
 - **Keine offenen Probleme in dieser Ansicht** oder **Noch keine abgeschlossenen Probleme**: Diese Ansicht hat nichts anzuzeigen.
 - **Noch keine Daten empfangen**: Luma hat noch keine Daten aus einem verbundenen System gelesen und kann daher noch keine Probleme gefunden haben.
 - **Keine aktiven Verbindungen**: Verbinde unter [Apps](/docs/apps-and-connections) ein System, damit Luma mit der Prüfung beginnen kann.
@@ -54,7 +89,8 @@ Eine leere Liste heißt nicht, dass in deinem Betrieb alles in Ordnung ist. Sie 
 
 ## Wenn etwas nicht geladen werden konnte [#when-something-couldnt-load]
 
-- **Probleme konnten nicht aktualisiert werden**: Luma konnte die aktuelle Liste nicht laden. Die angezeigten Probleme sind möglicherweise veraltet. Wähle **Probleme aktualisieren**, um es erneut zu versuchen.
+- **Die Liste konnte nicht aktualisiert werden**: Luma konnte die aktuelle Liste nicht laden. Die angezeigten Probleme sind möglicherweise veraltet. Wähle **Erneut versuchen**.
+- **Diese Ansicht nutzt Filter oder eine Gruppierung, die du hier nicht verwenden kannst**: Eine gespeicherte Ansicht verlangt etwas, das du nicht mehr nutzen kannst. Wähle **Nicht unterstützte Bedingungen entfernen**, um den Rest der Ansicht zu behalten.
 - **Übersicht nicht verfügbar**: Die Zahlen über der Liste konnten nicht geladen werden. Die Liste selbst funktioniert weiter.
 - **Verbindungen konnten nicht geprüft werden**: Luma konnte deine Verbindungen nicht prüfen. Deine Probleme werden trotzdem angezeigt.
 - **Problem nicht verfügbar**: Das Problem existiert nicht mehr, oder du hast keinen Zugriff mehr darauf.

@@ -1,6 +1,7 @@
 import {
   adaptiveViewInputSchema,
   customFieldInputSchema,
+  upgradeAdaptiveViewQuery,
 } from '@luma/api-contract';
 import { IdentityError, isPermission } from '@luma/identity';
 import { z } from 'zod';
@@ -10,7 +11,10 @@ import type {
   PackageConfiguration,
 } from '../domain/packages.js';
 
-/** Resolves the maintained purchasing parameters into validated definitions without customer data. */
+/**
+ * Resolves the maintained purchasing parameters into validated definitions without customer data.
+ * View queries come out in format 2.
+ */
 export function configurePurchasingPackage(
   definition: OperationalPackage,
   config: PackageConfiguration,
@@ -51,6 +55,8 @@ export function configurePurchasingPackage(
         ...z.record(z.string(), z.unknown()).parse(view.definition),
         commandId: '00000000-0000-4000-8000-000000000000',
       });
+      // Reviewed definitions are always format 2, whatever format a package version used.
+      const query = upgradeAdaptiveViewQuery(value.query);
 
       return {
         ...view,
@@ -58,8 +64,8 @@ export function configurePurchasingPackage(
           ...value,
           sharing: config.sharing,
           query: {
-            ...value.query,
-            actions: value.query.actions.map((action) => ({
+            ...query,
+            actions: query.actions.map((action) => ({
               ...action,
               inputs: {
                 ...action.inputs,

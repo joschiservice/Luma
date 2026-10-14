@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { writeFile } from 'node:fs/promises';
 
 import { expect, it } from 'vitest';
 
@@ -223,8 +224,44 @@ it('pages positions without duplicates and rejects a cursor for different filter
     52,
   );
   const positions = [...first.items, ...next.items];
-  expect(positions.map((item) => item.id)).toEqual(
-    positions.map((item) => item.id).sort(),
+  // The default order is SKU, then location.
+  const labels = positions.map((item) => `${item.sku}\u0000${item.location}`);
+  expect(labels).toEqual(
+    [...labels].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
+  );
+  // Quantity sorts use the lowest value any source reports; positions without one come last.
+  const lowest = (item) => {
+    const values = item.sources
+      .map((source) => source.available)
+      .filter((value) => value !== null)
+      .map(Number);
+
+    return values.length ? Math.min(...values) : null;
+  };
+  const byAvailable = [];
+  let cursor;
+  do {
+    const page = await f.request(
+      f.member,
+      `${f.base}/inventory?sort=available&direction=desc&limit=20&count=exact${cursor ? `&cursor=${cursor}` : ''}`,
+    );
+    expect(page.totalCount).toBe(52);
+    byAvailable.push(...page.items);
+    cursor = page.nextCursor;
+  } while (cursor);
+  expect(new Set(byAvailable.map((item) => item.id)).size).toBe(52);
+  const available = byAvailable.map(lowest);
+  const reported = available.filter((value) => value !== null);
+  expect(reported).toEqual([...reported].sort((a, b) => b - a));
+  expect(
+    available.slice(reported.length).every((value) => value === null),
+  ).toBe(true);
+  await f.request(
+    f.member,
+    `${f.base}/inventory?sort=onHand&cursor=${first.nextCursor}`,
+    'GET',
+    undefined,
+    400,
   );
   const searched = await f.request(f.member, `${f.base}/inventory?q=SKU`);
   expect(searched.items).toEqual(first.items);
@@ -272,3 +309,189 @@ it('pages positions without duplicates and rejects a cursor for different filter
     400,
   );
 });
+
+it('filters and groups positions by source quantities without treating missing as zero', async (t) => {
+  const f = await settingsFixture(t);
+  const stock = await inventoryFixture(t, f);
+  await stock.stock({
+    external: 'SKU-300',
+    sku: 'SKU-300',
+    location: 'Osaka',
+    amount: '0',
+    states: { tracked: false },
+  });
+  await stock.stock({
+    connectionId: stock.erp,
+    external: 'erp-301',
+    sku: 'SKU-301',
+    amount: '-1',
+  });
+  const where = (conditions, match = 'all') =>
+    `where=${encodeURIComponent(JSON.stringify({ match, conditions }))}`;
+  const labels = async (query) =>
+    (await f.request(f.member, `${f.base}/inventory?${query}`)).items.map(
+      (item) => `${item.sku}@${item.location}`,
+    );
+
+  expect(
+    await labels(where([{ field: 'available', op: 'lte', value: 0 }])),
+  ).toEqual(['SKU-300@Osaka', 'SKU-301@Tokyo']);
+  expect(
+    await labels(
+      where([{ field: 'available', op: 'lte', value: 9, source: 'lowest' }]),
+    ),
+  ).toEqual(['SKU-100@Tokyo', 'SKU-300@Osaka', 'SKU-301@Tokyo']);
+  expect(
+    await labels(
+      where([{ field: 'available', op: 'lte', value: 9, source: 'every' }]),
+    ),
+  ).toEqual(['SKU-300@Osaka', 'SKU-301@Tokyo']);
+  // No source reports on-hand stock for these positions: unknown is never zero.
+  expect(
+    await labels(
+      where([
+        { field: 'onHand', op: 'eq', value: 0 },
+        { field: 'tracked', op: 'is', value: false },
+      ]),
+    ),
+  ).toEqual([]);
+  expect(
+    await labels(
+      where([
+        { field: 'source', op: 'any_of', value: [stock.erp] },
+        {
+          field: 'location',
+          op: 'none_of',
+          value: [stock.position.locationId],
+        },
+      ]),
+    ),
+  ).toEqual([]);
+
+  const byLocation = await f.request(
+    f.member,
+    `${f.base}/inventory?group=location&groupLimit=1`,
+  );
+  const tokyo = byLocation.groups.find(
+    (group) => group.key === stock.position.locationId,
+  );
+  expect(tokyo.count).toBe(2);
+  expect(byLocation.groups.map((group) => group.count).sort()).toEqual([1, 2]);
+  const rest = await f.request(
+    f.member,
+    `${f.base}/inventory?group=location&groupKey=${encodeURIComponent(JSON.stringify(tokyo.key))}&cursor=${tokyo.nextCursor}`,
+  );
+  expect(rest.items.map((item) => item.id)).not.toContain(tokyo.itemIds[0]);
+  expect(rest.groups[0]).toMatchObject({ count: 2, nextCursor: null });
+  const bySource = await f.request(
+    f.member,
+    `${f.base}/inventory?group=source`,
+  );
+  expect(
+    Object.fromEntries(
+      bySource.groups.map((group) => [group.key, group.count]),
+    ),
+  ).toEqual({ [stock.store]: 2, [stock.erp]: 2 });
+
+  for (const query of [
+    where([{ field: 'tracked', op: 'is', value: true, source: 'lowest' }]),
+    where([{ field: 'sku', op: 'contains', value: 'SKU' }]),
+    where([{ field: 'differences', op: 'any_of', value: ['committed'] }]),
+    'group=available',
+  ])
+    await f.request(
+      f.member,
+      `${f.base}/inventory?${query}`,
+      'GET',
+      undefined,
+      400,
+    );
+});
+
+// Set LUMA_INVENTORY_BENCHMARK to a position count (for example 20000) to time stock list reads
+// through the API at that size. Every position has two sources.
+it.skipIf(!process.env.LUMA_INVENTORY_BENCHMARK)(
+  'reads a large stock list within the request budget',
+  { timeout: 600_000 },
+  async (t) => {
+    const count = Number(process.env.LUMA_INVENTORY_BENCHMARK);
+    const f = await settingsFixture(t);
+    const stock = await inventoryFixture(t, f);
+    // Copy each current source snapshot of the fixture position to new SKUs and locations.
+    await f.db.owner.query(
+      `INSERT INTO inventory_entities(id,tenant_id,kind,reconciliation_key)
+       SELECT gen_random_uuid(),$1,kind,kind||'-bench-'||n FROM generate_series(1,$2::int) n,
+       (VALUES ('sku'),('location')) k(kind) WHERE kind='sku' OR n<=50`,
+      [f.org.id, count],
+    );
+    await f.db.owner.query(
+      `WITH sources AS (
+        SELECT s.* FROM inventory_projections p
+        JOIN inventory_snapshots s ON s.tenant_id=p.tenant_id AND s.id=p.snapshot_id
+        WHERE p.tenant_id=$1 AND p.entity_id=$3
+       ), targets AS (
+        SELECT n,gen_random_uuid() AS entity_id,sku.id AS sku_id,loc.id AS location_id
+        FROM generate_series(1,$2::int) n
+        JOIN inventory_entities sku ON sku.tenant_id=$1 AND sku.reconciliation_key='sku-bench-'||n
+        JOIN inventory_entities loc ON loc.tenant_id=$1 AND loc.reconciliation_key='location-bench-'||(n%50+1)
+       ), entities AS (
+        INSERT INTO inventory_entities(id,tenant_id,kind,reconciliation_key)
+        SELECT entity_id,$1,'position','position-bench-'||n FROM targets RETURNING id
+       ), snapshots AS (
+        INSERT INTO inventory_snapshots(id,tenant_id,entity_id,kind,connection_id,observation_id,
+         normalizer_version,mapping_version,source_updated_at,observed_at,document)
+        SELECT gen_random_uuid(),$1,t.entity_id,'position',s.connection_id,s.observation_id,
+         s.normalizer_version,s.mapping_version,s.source_updated_at,s.observed_at,
+         jsonb_set(jsonb_set(jsonb_set(jsonb_set(s.document,'{entityId}',to_jsonb(t.entity_id::text)),
+          '{data,skuId}',to_jsonb(t.sku_id::text)),'{data,locationId}',to_jsonb(t.location_id::text)),
+          '{data,available}',to_jsonb(((t.n*7)%40-5)::text))
+        FROM targets t CROSS JOIN sources s WHERE EXISTS(SELECT 1 FROM entities e WHERE e.id=t.entity_id)
+        RETURNING id,entity_id,connection_id
+       )
+       INSERT INTO inventory_projections(tenant_id,entity_id,connection_id,snapshot_id)
+       SELECT $1,entity_id,connection_id,id FROM snapshots`,
+      [f.org.id, count, stock.position.id],
+    );
+    await f.db.owner.query('ANALYZE');
+    const timings = {};
+    const time = async (name, path) => {
+      const runs = [];
+      let body;
+      for (let run = 0; run < 3; run++) {
+        const start = performance.now();
+        body = await f.request(f.member, `${f.base}/inventory${path}`);
+        runs.push(performance.now() - start);
+      }
+      timings[name] = Math.round(Math.min(...runs));
+
+      return body;
+    };
+    const where = (conditions) =>
+      `?where=${encodeURIComponent(JSON.stringify({ match: 'all', conditions }))}`;
+    const first = await time('first page', '');
+    expect(first.items).toHaveLength(50);
+    await time('second page', `?cursor=${first.nextCursor}`);
+    await time('sorted by available', '?sort=available');
+    await time('exact count', '?count=exact');
+    await time(
+      'available at most zero in any source',
+      where([{ field: 'available', op: 'lte', value: 0 }]),
+    );
+    await time(
+      'lowest available below five',
+      where([{ field: 'available', op: 'lt', value: 5, source: 'lowest' }]),
+    );
+    await time(
+      'differs in available',
+      where([{ field: 'differences', op: 'any_of', value: ['available'] }]),
+    );
+    await time('grouped by location', '?group=location');
+    await time('grouped by SKU', '?group=sku');
+    await time('grouped by source', '?group=source');
+    await time('search', '?q=sku-bench-123');
+    await writeFile(
+      `/tmp/luma-inventory-${count}.json`,
+      JSON.stringify({ count, timings }, null, 2),
+    );
+  },
+);

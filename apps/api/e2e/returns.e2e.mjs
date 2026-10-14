@@ -73,6 +73,44 @@ it('follows imported returns by stage and never counts a requested refund as mon
     `${f.base}/returns?view=action&direction=asc`,
   );
   expect(action.items.map((item) => item.name)).toEqual(['#1001-R1']);
+  // Value sorts compare amounts within a currency; returns without a value come last.
+  const values = (
+    await f.request(f.member, `${f.base}/returns?view=all&sort=value`)
+  ).items.map((item) => item.value);
+  const valued = values.filter((value) => value !== null);
+  expect(valued).toEqual(
+    [...valued].sort(
+      (a, b) =>
+        b.currency.localeCompare(a.currency) ||
+        Number(b.amount) - Number(a.amount),
+    ),
+  );
+  expect(values.slice(valued.length).every((value) => value === null)).toBe(
+    true,
+  );
+  const stages = (
+    await f.request(
+      f.member,
+      `${f.base}/returns?view=all&sort=stage&direction=asc`,
+    )
+  ).items.map((item) => item.stage);
+  const lifecycle = [
+    'requested',
+    'awaiting_items',
+    'awaiting_refund',
+    'refund_pending',
+    'refund_failed',
+    'ready_to_close',
+    'refunded',
+    'refund_recorded',
+    'closed',
+    'declined',
+    'cancelled',
+    'unknown',
+  ];
+  expect(stages).toEqual(
+    [...stages].sort((a, b) => lifecycle.indexOf(a) - lifecycle.indexOf(b)),
+  );
   expect(
     (await f.request(f.member, `${f.base}/returns?stage=closed`)).items.map(
       (item) => item.name,
@@ -257,6 +295,172 @@ it('pages with a cursor bound to its filters and keeps other tenants out', async
   );
 });
 
+/** Encodes list conditions as the list API expects them. */
+const conditions = (...items) =>
+  `where=${encodeURIComponent(JSON.stringify({ match: 'all', conditions: items }))}`;
+
+it('filters and groups returns by catalog conditions and finds them by their customer', async (t) => {
+  const f = await settingsFixture(t);
+  const r = await returnsFixture(t, f);
+  // #1001 now reports one of two units received.
+  await r.returnRecord(
+    1001,
+    { receivedAt: '2026-09-21T09:00:00Z' },
+    { receivedQuantity: '1' },
+    new Date().toISOString(),
+  );
+  const list = (query) => f.request(f.member, `${f.base}/returns?${query}`);
+  const names = async (...items) =>
+    (await list(conditions(...items))).items
+      .map((item) => item.name ?? item.kind)
+      .sort();
+
+  expect(
+    await names({ field: 'kind', op: 'any_of', value: ['refund'] }),
+  ).toEqual(['refund']);
+  expect(
+    await names({
+      field: 'refundState',
+      op: 'any_of',
+      value: ['pending', 'none'],
+    }),
+  ).toEqual(['#1001-R1', '#1002-R1']);
+  expect(await names({ field: 'failedAttempts', op: 'gte', value: 1 })).toEqual(
+    ['#1002-R1'],
+  );
+  expect(
+    await names({ field: 'reasons', op: 'any_of', value: ['Defective'] }),
+  ).toEqual(['#1002-R1']);
+  // Amounts compare only within their currency.
+  expect(
+    await names({
+      field: 'value',
+      op: 'gte',
+      value: { amount: '40', currency: 'EUR' },
+    }),
+  ).toEqual(['#1001-R1', '#1002-R1', '#1003-R1']);
+  expect(
+    await names({
+      field: 'value',
+      op: 'gte',
+      value: { amount: '40', currency: 'USD' },
+    }),
+  ).toEqual([]);
+  // A refund without a return reports no receipt: partial receipt is unknown for it.
+  expect(
+    await names({ field: 'partiallyReceived', op: 'is', value: true }),
+  ).toEqual(['#1001-R1']);
+  expect(
+    await names({ field: 'partiallyReceived', op: 'is', value: false }),
+  ).toEqual(['#1002-R1', '#1003-R1']);
+  expect(await names({ field: 'partiallyReceived', op: 'unknown' })).toEqual([
+    'refund',
+  ]);
+  expect(
+    await names({
+      field: 'stage',
+      op: 'none_of',
+      value: ['closed', 'refunded'],
+    }),
+  ).toEqual(['#1001-R1', '#1002-R1']);
+  expect(
+    await names({ field: 'source', op: 'any_of', value: [r.erp] }),
+  ).toEqual([]);
+  // Conditions narrow the counts too.
+  expect(
+    (await list(conditions({ field: 'kind', op: 'any_of', value: ['return'] })))
+      .counts.views.all,
+  ).toBe(3);
+
+  // Stages group in lifecycle order with per-currency value sums.
+  const byStage = await list('group=stage&groupLimit=1');
+  expect(byStage.groups.map((group) => [group.key, group.count])).toEqual([
+    ['awaiting_items', 1],
+    ['refund_pending', 1],
+    ['refunded', 1],
+    ['closed', 1],
+  ]);
+  expect(byStage.groups[0].sums).toEqual([
+    { field: 'value', currency: 'EUR', amount: '48.000000' },
+  ]);
+  const byReason = await list('group=reasons');
+  expect(byReason.groups.map((group) => [group.key, group.count])).toEqual([
+    ['Defective', 1],
+    ['Size too small', 2],
+    [null, 1],
+  ]);
+  const small = byReason.groups[1];
+  const page = await list(
+    `group=reasons&groupKey=${encodeURIComponent('"Size too small"')}&limit=1`,
+  );
+  expect(page.groups[0]).toMatchObject({ key: 'Size too small', count: 2 });
+  const next = await list(
+    `group=reasons&groupKey=${encodeURIComponent('"Size too small"')}&limit=1&cursor=${page.nextCursor}`,
+  );
+  expect([...page.items, ...next.items].map((item) => item.id).sort()).toEqual(
+    [...small.itemIds].sort(),
+  );
+  await f.request(
+    f.member,
+    `${f.base}/returns?limit=1&cursor=${page.nextCursor}`,
+    'GET',
+    undefined,
+    400,
+  );
+  for (const query of [
+    conditions({ field: 'name', op: 'contains', value: '#1' }),
+    conditions({ field: 'value', op: 'gt', value: 40 }),
+    'group=value',
+    'group=requested',
+  ])
+    await f.request(
+      f.member,
+      `${f.base}/returns?${query}`,
+      'GET',
+      undefined,
+      400,
+    );
+
+  // Search finds returns by the order's customer, only for readers with customer access.
+  const profile = randomUUID();
+  await f.db.owner.query(
+    `INSERT INTO customer_profiles(tenant_id,connection_id,external_id,id,display_name,email,phone,address,state,
+      tags,contact_shared,address_shared,observed_at,observation_id)
+     VALUES($1,$2,'gid://shopify/Customer/5',$3,'Mira Sato','mira@example.test',NULL,NULL,'enabled','{}',true,false,now(),$4)`,
+    [f.org.id, r.store, profile, randomUUID()],
+  );
+  await f.db.owner.query(
+    `INSERT INTO customer_orders(tenant_id,connection_id,order_scope_key,order_external_id,customer_external_id,observed_at)
+     VALUES($1,$2,'','gid://shopify/Order/1002','gid://shopify/Customer/5',now())`,
+    [f.org.id, r.store],
+  );
+  const search = async (q) =>
+    (await list(`q=${encodeURIComponent(q)}`)).items
+      .map((item) => item.name ?? item.kind)
+      .sort();
+  expect(await search('mira sato')).toEqual(['#1002-R1', 'refund']);
+  expect(await search('MIRA@example')).toEqual(['#1002-R1', 'refund']);
+  const created = await f.app.inject({
+    method: 'POST',
+    url: `${f.base}/roles`,
+    headers: {
+      origin: f.config.baseURL,
+      cookie: f.owner.cookie,
+      'x-command-id': randomUUID(),
+    },
+    payload: {
+      name: 'Returns only',
+      description: '',
+      permissions: ['returns.read'],
+    },
+  });
+  expect(created.statusCode, created.body).toBe(201);
+  await f.request(f.owner, `${f.base}/members/${f.membership.id}`, 'PATCH', {
+    roleId: created.json().id,
+  });
+  expect(await search('mira')).toEqual([]);
+});
+
 // Set LUMA_RETURN_BENCHMARK to a return count (for example 20000) to time return reads through
 // the API at that size. Copies of one return spread across stages and request dates.
 it.skipIf(!process.env.LUMA_RETURN_BENCHMARK)(
@@ -293,7 +497,8 @@ it.skipIf(!process.env.LUMA_RETURN_BENCHMARK)(
        t.status,(ARRAY['requested','awaiting_items','awaiting_refund','refund_pending','closed','closed'])[1 + e.n % 6],
        (ARRAY['action','waiting','action','waiting','done','done'])[1 + e.n % 6],t.refund_state,t.quantity,
        t.received,t.refunded_units,t.value_amount,t.value_currency,t.currency,t.refunded_amount,t.pending_amount,
-       t.failed_attempts,t.reasons,now() - e.n * interval '1 hour',now() - e.n * interval '1 hour',
+       t.failed_attempts,ARRAY[(ARRAY['Defective','Size too small','Changed mind'])[1 + e.n % 3]],
+       now() - e.n * interval '1 hour',now() - e.n * interval '1 hour',
        now() - e.n * interval '30 minutes',now(),NULL,false
       FROM projected p JOIN entities e ON e.id=p.entity_id CROSS JOIN template t`,
       [f.org.id, r.returns.received, count],
@@ -319,6 +524,38 @@ it.skipIf(!process.env.LUMA_RETURN_BENCHMARK)(
     await time('search by order number', '?view=all&q=%23B1234');
     await time('deep page', `?view=all&cursor=${all.nextCursor}`);
     await time('detail', `/${r.returns.received}`);
+    const where = (...conditions) =>
+      `where=${encodeURIComponent(JSON.stringify({ match: 'all', conditions }))}`;
+    await time(
+      'value and reason conditions',
+      `?view=all&${where(
+        { field: 'value', op: 'gte', value: { amount: '40', currency: 'EUR' } },
+        { field: 'reasons', op: 'any_of', value: ['Defective'] },
+      )}`,
+    );
+    await time(
+      'requested this week',
+      `?view=all&${where({ field: 'requested', op: 'within_last', value: { amount: 7, unit: 'day' } })}`,
+    );
+    const stages = await time('stage board', '?view=all&group=stage');
+    await time('reason groups', '?view=all&group=reasons');
+    const group = stages.groups.find((item) => item.nextCursor);
+    await time(
+      'page within a group',
+      `?view=all&group=stage&groupKey=${encodeURIComponent(JSON.stringify(group.key))}&cursor=${group.nextCursor}`,
+    );
+    await f.db.owner.query(
+      `INSERT INTO customer_profiles(tenant_id,connection_id,external_id,id,display_name,email,state,contact_shared,
+        address_shared,observed_at,observation_id)
+       VALUES($1,$2,'gid://shopify/Customer/5',gen_random_uuid(),'Mira Sato','mira@example.test','enabled',true,false,now(),gen_random_uuid())`,
+      [f.org.id, r.store],
+    );
+    await f.db.owner.query(
+      `INSERT INTO customer_orders(tenant_id,connection_id,order_scope_key,order_external_id,customer_external_id,observed_at)
+       VALUES($1,$2,'','gid://shopify/Order/1002','gid://shopify/Customer/5',now())`,
+      [f.org.id, r.store],
+    );
+    await time('search by customer name', '?view=all&q=Mira');
     await writeFile(
       `/tmp/luma103-returns-${count}.json`,
       JSON.stringify({ count, timings }, null, 2),

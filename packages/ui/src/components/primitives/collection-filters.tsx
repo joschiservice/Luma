@@ -1,3 +1,4 @@
+import { formatList } from '@luma/i18n/format';
 import { m } from '@luma/i18n/messages';
 import { Check, type LucideIcon } from 'lucide-react';
 import {
@@ -37,6 +38,8 @@ interface FilterBase {
  * One filter a collection can present.
  *
  * - `choice` picks one option or Any. It is offered while it has options or a value.
+ * - `multi-choice` picks any number of options; none means Any. The picker stays open while
+ *   options are toggled.
  * - `date-range` picks an inclusive calendar range with presets ending `today`. With `fallback`
  *   it always applies: unset, it shows the fallback name and cannot be removed.
  * - `applied` is set elsewhere, such as from a link to one SKU. It shows as a removable chip
@@ -48,6 +51,13 @@ export type CollectionFilter =
       value: string | undefined;
       options: readonly CollectionFilterOption[];
       onChange: (value: string | undefined) => void;
+    })
+  | (FilterBase & {
+      kind: 'multi-choice';
+      /** Chosen option values; undefined or empty means Any. */
+      value: readonly string[] | undefined;
+      options: readonly CollectionFilterOption[];
+      onChange: (value: string[] | undefined) => void;
     })
   | (FilterBase & {
       kind: 'date-range';
@@ -73,13 +83,14 @@ export type CollectionFilter =
 /** Whether the filter narrows the collection beyond its defaults. */
 export function filterApplied(filter: CollectionFilter) {
   if (filter.kind === 'date-range') return !!(filter.from || filter.to);
+  if (filter.kind === 'multi-choice') return !!filter.value?.length;
 
   return filter.value !== undefined;
 }
 
 /** Whether the reader can choose a value for the filter. Applied-only filters are never offered. */
 export function filterOffered(filter: CollectionFilter) {
-  if (filter.kind === 'choice')
+  if (filter.kind === 'choice' || filter.kind === 'multi-choice')
     return filter.options.length > 0 || filterApplied(filter);
 
   return filter.kind === 'date-range';
@@ -93,6 +104,18 @@ export function filterValueLabel(filter: CollectionFilter) {
       filter.value ??
       ''
     );
+  if (filter.kind === 'multi-choice') {
+    const labels = (filter.value ?? []).map(
+      (value) =>
+        filter.options.find((option) => option.value === value)?.label ?? value,
+    );
+    if (labels.length <= 3) return formatList(labels, { type: 'disjunction' });
+
+    return m.ui_condition_values_more({
+      values: formatList(labels.slice(0, 2), { type: 'unit' }),
+      count: labels.length - 2,
+    });
+  }
   if (filter.kind === 'date-range')
     return filterApplied(filter)
       ? describeCalendarRange(filter, filter.today)
@@ -103,15 +126,17 @@ export function filterValueLabel(filter: CollectionFilter) {
 
 /** Returns the filter to its default. */
 export function clearFilter(filter: CollectionFilter) {
-  if (filter.kind === 'choice') filter.onChange(undefined);
+  if (filter.kind === 'choice' || filter.kind === 'multi-choice')
+    filter.onChange(undefined);
   else if (filter.kind === 'date-range') filter.onChange({});
   else filter.onRemove();
 }
 
 /**
  * Lists the values for one filter. Choosing a value applies it at once and calls `done`, which
- * closes a picker; inline layouts pass nothing and stay open. `inline` collapses the custom date
- * range so a column of filters stays scannable.
+ * closes a picker; inline layouts pass nothing and stay open. Multi-choice filters apply each
+ * toggle at once and offer Done instead. `inline` collapses the custom date range so a column of
+ * filters stays scannable.
  */
 export function FilterEditor({
   filter,
@@ -124,6 +149,8 @@ export function FilterEditor({
 }) {
   if (filter.kind === 'choice')
     return <ChoiceOptions filter={filter} done={done} inline={inline} />;
+  if (filter.kind === 'multi-choice')
+    return <MultiChoiceOptions filter={filter} done={done} inline={inline} />;
   if (filter.kind === 'date-range')
     return <DateRangeOptions filter={filter} done={done} inline={inline} />;
 
@@ -184,6 +211,77 @@ function ChoiceOptions({
       ))}
       {!options.length ? (
         <p className="collection-filter-none">{m.ui_select_no_matches()}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function MultiChoiceOptions({
+  filter,
+  done,
+  inline,
+}: {
+  filter: Extract<CollectionFilter, { kind: 'multi-choice' }>;
+  done: (() => void) | undefined;
+  inline: boolean;
+}) {
+  const [query, setQuery] = useState('');
+  const chosen = filter.value ?? [];
+  const options = filter.options.filter((option) =>
+    option.label.toLowerCase().includes(query.trim().toLowerCase()),
+  );
+  const toggle = (value: string) => {
+    const next = chosen.includes(value)
+      ? chosen.filter((item) => item !== value)
+      : [...chosen, value];
+    filter.onChange(next.length ? next : undefined);
+  };
+
+  return (
+    <div className="collection-filter-multi">
+      <div
+        className="collection-filter-options"
+        role="group"
+        aria-label={m.ui_filter_options_label({ filter: filter.label })}
+      >
+        {filter.options.length >
+        searchableOptions[inline ? 'inline' : 'picker'] ? (
+          <Input
+            type="search"
+            aria-label={m.ui_filter_find_label()}
+            placeholder={m.ui_filter_find_placeholder()}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        ) : null}
+        {query ? null : (
+          <Option
+            label={m.ui_filter_any()}
+            active={!chosen.length}
+            onClick={() => filter.onChange(undefined)}
+          />
+        )}
+        {options.map((option) => (
+          <Option
+            key={option.value}
+            label={option.label}
+            active={chosen.includes(option.value)}
+            onClick={() => toggle(option.value)}
+          />
+        ))}
+        {!options.length ? (
+          <p className="collection-filter-none">{m.ui_select_no_matches()}</p>
+        ) : null}
+      </div>
+      {done ? (
+        <Button
+          variant="outline"
+          size="sm"
+          className="collection-filter-multi-done"
+          onClick={done}
+        >
+          {m.common_done()}
+        </Button>
       ) : null}
     </div>
   );

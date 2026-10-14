@@ -3,12 +3,14 @@ import { expect, test } from './browser-fixtures.mjs';
 import { availablePort, startProcess } from './helpers.mjs';
 import { procurementFixture } from './procurement-fixture.mjs';
 
-test('creates and reviews procurement records with safe retries on desktop and mobile', async ({
+test('creates, reviews and lists procurement records with saved views and safe retries on desktop and mobile', async ({
   resources: t,
 }) => {
   const port = await availablePort();
   const origin = `http://127.0.0.1:${port}`;
-  const f = await procurementFixture(t, origin);
+  const f = await procurementFixture(t, origin, {
+    FEATURE_FLAG_OVERRIDES: 'adaptive-saved-views=true',
+  });
   const web = startProcess(
     t,
     'e2e/web-server.mjs',
@@ -121,6 +123,74 @@ test('creates and reviews procurement records with safe retries on desktop and m
   await page
     .getByRole('button', { name: 'Clear filters', exact: true })
     .click();
+  await page.getByRole('link', { name: /PO-2026-001/ }).waitFor();
+  const param = (name) => new URL(page.url()).searchParams.get(name);
+  // The overview's counts open built-in views; pressing one again returns to all orders.
+  // An open order that was never sent is still a draft to the supplier.
+  await page
+    .getByRole('button', { name: 'Show draft purchase orders', exact: true })
+    .click();
+  await page.waitForURL((url) => url.searchParams.get('view') === 'draft');
+  await page.getByRole('link', { name: /PO-2026-001/ }).waitFor();
+  const waiting = page.getByRole('button', {
+    name: 'Show orders waiting for the supplier to confirm',
+    exact: true,
+  });
+  await waiting.click();
+  await page.waitForURL(
+    (url) => url.searchParams.get('view') === 'awaiting_confirmation',
+  );
+  await page
+    .getByRole('heading', { name: 'No matching purchase orders' })
+    .waitFor();
+  await expect(waiting).toHaveAttribute('aria-pressed', 'true');
+  await waiting.click();
+  await page.waitForURL((url) => url.searchParams.get('view') === 'all');
+  await page.getByRole('link', { name: /PO-2026-001/ }).waitFor();
+  // A supplier condition is kept as a personal view and comes back when the page reopens.
+  await page
+    .getByRole('button', { name: 'Add Supplier filter', exact: true })
+    .click();
+  await page
+    .getByRole('dialog', { name: 'Supplier' })
+    .getByRole('button', { name: 'Northstar Supply', exact: true })
+    .click();
+  await page.keyboard.press('Escape');
+  await expect
+    .poll(() => JSON.parse(param('where') ?? '{}').conditions?.[0]?.field)
+    .toBe('supplier');
+  await page.getByRole('link', { name: /PO-2026-001/ }).waitFor();
+  await page.getByRole('button', { name: 'Save as new view' }).click();
+  const save = page.getByRole('dialog', { name: 'Save as new view' });
+  await save.getByLabel('Name').fill('Northstar orders');
+  await save.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.waitForURL((url) =>
+    /^[0-9a-f-]{36}$/.test(url.searchParams.get('view') ?? ''),
+  );
+  const viewId = param('view');
+  await expect
+    .poll(
+      async () =>
+        (
+          await f.api.request(
+            `/v1/organizations/${f.org.id}/collections/procurement/state`,
+            { cookie: f.owner.cookie },
+          )
+        ).body.state?.view,
+    )
+    .toBe(viewId);
+  await page.goto(`/app/${f.org.id}/procurement`);
+  await page.waitForURL((url) => url.searchParams.get('view') === viewId);
+  await page
+    .getByRole('button', {
+      name: 'Edit Supplier filter: Northstar Supply',
+      exact: true,
+    })
+    .waitFor();
+  await page.getByRole('link', { name: /PO-2026-001/ }).waitFor();
+  // Older links that named a stage open the same orders as conditions or built-in views.
+  await page.goto(`/app/${f.org.id}/procurement?view=orders&stage=attention`);
+  await page.waitForURL((url) => url.searchParams.get('view') === 'attention');
   await page.getByRole('tab', { name: /Suppliers 1/ }).click();
   await page
     .getByRole('rowheader', { name: 'Northstar Supply', exact: true })

@@ -162,6 +162,7 @@ export async function startApi(
   db,
   browserOrigin = 'http://localhost:3000',
   script = 'dist/composition/bootstrap.js',
+  env = {},
 ) {
   const process = startProcess(
     t,
@@ -174,6 +175,7 @@ export async function startApi(
       BETTER_AUTH_SECRET: secret,
       BETTER_AUTH_URL: browserOrigin,
       OBSERVABILITY_ENVIRONMENT: 'test',
+      ...env,
     },
     true,
   );

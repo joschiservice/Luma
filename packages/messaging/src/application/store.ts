@@ -201,14 +201,52 @@ export interface OutboundRow {
 export type ThreadView =
   'open' | 'mine' | 'unassigned' | 'overdue' | 'review' | 'closed' | 'all';
 
+/** One condition on an inbox catalog field: structured thread properties only. */
+export interface ThreadCondition {
+  field: string;
+  op: string;
+  value?: unknown;
+  source?: string | undefined;
+}
+
+/** Conditions combined with AND (`all`) or OR (`any`). */
+export interface ThreadWhere {
+  match: 'all' | 'any';
+  conditions: ThreadCondition[];
+}
+
+/** Orders the thread list: by latest message or by reply deadline. */
+export type ThreadSort = 'activity' | 'due';
+
+/** A thread's place in a sort: whether its value is missing, the value, then its ID. */
+export interface ThreadPosition {
+  missing: 0 | 1;
+  at: string;
+  id: string;
+}
+
 export interface ThreadFilter {
   view: ThreadView;
   actorId: string;
   now: string;
   connectionId?: string | undefined;
   q?: string | undefined;
-  after?: { lastMessageAt: string; id: string } | undefined;
+  where?: ThreadWhere | undefined;
+  /** IANA zone for days and relative periods in conditions; UTC by default. */
+  timeZone?: string | undefined;
+  sort?: ThreadSort | undefined;
+  direction?: 'asc' | 'desc' | undefined;
+  /** Only threads in one group of a grouping; `key` null is the group without a value. */
+  member?: { field: string; key: string | null } | undefined;
+  after?: ThreadPosition | undefined;
   limit: number;
+}
+
+/** One group of a grouped thread read, with its first threads in sort order. */
+interface ThreadGroupRow {
+  key: string | null;
+  count: number;
+  ids: string[];
 }
 
 interface MailboxRepository {
@@ -254,9 +292,33 @@ interface ThreadRepository {
   insert(thread: ThreadRow): Promise<void>;
   /** Writes every mutable field. */
   update(thread: ThreadRow): Promise<void>;
-  /** One page, newest activity first, after the keyset position. */
+  /**
+   * One page in the filter's sort, newest activity first by default, after the keyset
+   * position. Throws a 400 error for malformed conditions.
+   */
   list(filter: ThreadFilter): Promise<ThreadRow[]>;
-  counts(filter: Omit<ThreadFilter, 'view' | 'after' | 'limit'>): Promise<{
+  /**
+   * Groups the filtered threads by a catalog field: every group's exact count and its first
+   * `perGroup` threads in sort order, at most `maxGroups` groups in group order, and whether
+   * more groups exist. Throws a 400 error for fields the inbox can't group by.
+   */
+  groups(
+    filter: Omit<ThreadFilter, 'after' | 'limit' | 'member'> & {
+      field: string;
+      perGroup: number;
+      maxGroups: number;
+    },
+  ): Promise<{
+    groups: ThreadGroupRow[];
+    truncated: boolean;
+    rows: ThreadRow[];
+  }>;
+  /** Counts the threads the filter matches, for the size of one group. */
+  count(filter: Omit<ThreadFilter, 'after' | 'limit'>): Promise<number>;
+  /** View counts under the search and mailbox; conditions don't change them. */
+  counts(
+    filter: Pick<ThreadFilter, 'actorId' | 'now' | 'connectionId' | 'q'>,
+  ): Promise<{
     open: number;
     mine: number;
     unassigned: number;

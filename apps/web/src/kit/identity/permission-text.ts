@@ -158,6 +158,10 @@ const permissionText: Record<
     m.permissions_assistant_use_label,
     m.permissions_assistant_use_description,
   ],
+  'lists.export': [
+    m.permissions_lists_export_label,
+    m.permissions_lists_export_description,
+  ],
   'activity.read': [
     m.permissions_activity_read_label,
     m.permissions_activity_read_description,

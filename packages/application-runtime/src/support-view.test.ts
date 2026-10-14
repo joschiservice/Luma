@@ -120,6 +120,7 @@ it('lists every route with a request body that support views may call', () => {
       .sort(),
   ).toEqual([
     'adaptiveActions.preview',
+    'adaptiveFields.readMany',
     'adaptivePackages.preview',
     'adaptiveViews.preview',
     'metrics.operationalQuery',

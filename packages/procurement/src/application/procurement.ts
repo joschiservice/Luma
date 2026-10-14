@@ -22,6 +22,58 @@ import type {
   TransitionInput,
 } from '../domain/procurement.js';
 import { nextStatuses, purchaseOrderProblem } from '../domain/procurement.js';
+import {
+  type CustomFieldDefinition,
+  customFieldIds,
+  customListFields,
+  customSortField,
+  readableCustomFields,
+  withCustomReader,
+} from './custom-fields.js';
+import { type ListFields, planListWhere } from './list-conditions.js';
+import {
+  type ListCustomField,
+  type ListPosition,
+  listScope,
+  listTimeZone,
+  readListCursor,
+  supplierDirection,
+  type SupplierFilter,
+  type SupplierListQuery,
+  type SupplierRow,
+  type SupplierSort,
+  writeListCursor,
+} from './lists.js';
+
+/**
+ * Supplier list fields. Every condition runs in SQL: `hasOpenOrders` means a purchase order with
+ * status open, and `confirmationOverdue` an order with an open `confirmation_overdue` item.
+ */
+export const supplierFields: ListFields<Supplier> = {
+  created: {
+    kind: 'instant',
+    operators: [
+      'before',
+      'after',
+      'between',
+      'within_last',
+      'within_next',
+      'empty',
+      'not_empty',
+    ],
+    stored: [
+      'before',
+      'after',
+      'between',
+      'within_last',
+      'within_next',
+      'empty',
+      'not_empty',
+    ],
+  },
+  hasOpenOrders: { kind: 'flag', operators: ['is'], stored: ['is'] },
+  confirmationOverdue: { kind: 'flag', operators: ['is'], stored: ['is'] },
+};
 
 export interface ProcurementEvent {
   id: string;
@@ -37,6 +89,26 @@ export interface ProcurementEvent {
 export interface ProcurementTransaction {
   /** Lists tenant-owned supplier records. */
   suppliers(): Promise<Supplier[]>;
+  /**
+   * Suppliers matching `filter` with their purchase-order count, in `order` after
+   * `order.after`, at most `limit` rows.
+   */
+  supplierPage?(
+    filter: SupplierFilter,
+    order: {
+      sort: SupplierSort;
+      direction: 'asc' | 'desc';
+      after: ListPosition | null;
+    },
+    limit: number,
+  ): Promise<SupplierRow[]>;
+  /** Counts suppliers matching `filter`. */
+  countSuppliers?(filter: SupplierFilter): Promise<number>;
+  /** Live custom fields of suppliers among `ids`; archived and unknown IDs are absent. */
+  customFields?(
+    recordType: 'supplier',
+    ids: string[],
+  ): Promise<CustomFieldDefinition[]>;
   /** Lists tenant-owned purchase orders, newest first. */
   orders(): Promise<PurchaseOrder[]>;
   /** Returns a tenant supplier or null. */
@@ -209,6 +281,113 @@ export function createProcurementService(deps: {
       );
 
       return { items, canManage: hasPermission(context, 'procurement.manage') };
+    },
+    /**
+     * Lists one page of suppliers, searched, filtered and sorted on the server, with their
+     * order counts. A `confirmationOverdue` condition needs the suppliers that currently have
+     * an overdue confirmation in `options`; they come from a separate read, so they can be
+     * slightly newer than this page. Conditions and the sort may name readable custom supplier
+     * fields. Throws a 400 error for invalid conditions, cursors issued for another query and
+     * archived or unknown custom fields, and a 403 error for custom fields the reader may not
+     * read.
+     */
+    async listSuppliers(
+      context: TenantContext,
+      query: SupplierListQuery,
+      options: { confirmationOverdue?: string[] | undefined } = {},
+    ) {
+      context = await authorize(context);
+      const direction = supplierDirection(query);
+      const timeZone = listTimeZone(query.timeZone);
+      const scope = listScope(deps.digest, 'suppliers-v2', context.tenantId, {
+        q: query.q,
+        where: query.where ?? null,
+        timeZone,
+        sort: query.sort,
+        direction,
+      });
+      const cursor = query.cursor
+        ? readListCursor(query.cursor, scope, 'supplier')
+        : null;
+      // Relative dates keep the first page's time, so later pages do not shift.
+      const asOf = cursor?.asOf ?? deps.now().toISOString();
+      const after: ListPosition | null = cursor
+        ? { rank: cursor.rank, keys: cursor.keys, id: cursor.id }
+        : null;
+      if (
+        query.where?.conditions.some(
+          (condition) => condition.field === 'confirmationOverdue',
+        ) &&
+        !options.confirmationOverdue
+      )
+        throw new IdentityError(
+          503,
+          'SERVICE_UNAVAILABLE',
+          'Confirmation status is unavailable. Try again later.',
+        );
+      const customIds = customFieldIds(query.where, query.sort);
+      const where = withCustomReader(query.where, context.actor.id);
+      const { rows, total } = await deps.store.transaction(
+        context.tenantId,
+        false,
+        async (tx) => {
+          if (!tx.supplierPage || !tx.countSuppliers)
+            throw new IdentityError(
+              503,
+              'SERVICE_UNAVAILABLE',
+              'Supplier lists are unavailable',
+            );
+          // Custom field definitions come from the snapshot whose values they filter.
+          let custom: ListCustomField[] = [];
+          if (customIds.length) {
+            if (!tx.customFields)
+              throw new IdentityError(
+                503,
+                'SERVICE_UNAVAILABLE',
+                'Custom fields are unavailable.',
+              );
+            custom = readableCustomFields(
+              context,
+              customIds,
+              await tx.customFields('supplier', customIds),
+            );
+            customSortField(custom, query.sort);
+          }
+          const plan = planListWhere(
+            where,
+            { ...supplierFields, ...customListFields<Supplier>(custom) },
+            { now: new Date(asOf), timeZone },
+          );
+          const filter: SupplierFilter = {
+            q: query.q,
+            conditions: plan.stored ?? undefined,
+            confirmationOverdue: options.confirmationOverdue,
+            customFields: custom,
+          };
+
+          return {
+            rows: await tx.supplierPage(
+              filter,
+              { sort: query.sort, direction, after },
+              query.limit + 1,
+            ),
+            total:
+              query.count === 'exact' ? await tx.countSuppliers(filter) : null,
+          };
+        },
+      );
+      const page = rows.slice(0, query.limit);
+      const last = page.at(-1);
+
+      return {
+        items: page.map((row) => row.record),
+        canManage: hasPermission(context, 'procurement.manage'),
+        totalCount: total,
+        nextCursor:
+          rows.length > query.limit && last
+            ? writeListCursor(scope, last.position, asOf)
+            : null,
+      };
     },
     /** Changes correspondence contact using a revision check, request deduplication and audit. */
     async updateSupplierContact(

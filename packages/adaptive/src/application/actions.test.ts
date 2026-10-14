@@ -75,14 +75,19 @@ function fixture() {
     },
   };
   const query: AdaptiveViewQuery = {
-    version: 1,
+    version: 2,
     domain: 'procurement',
-    filters: {},
-    customFilters: [],
-    columns: ['id', 'reference'],
-    sort: null,
-    groupBy: null,
-    layout: 'table',
+    state: {
+      segment: null,
+      where: { match: 'all', conditions: [] },
+      sort: null,
+      group: null,
+      layout: 'table',
+      density: 'comfortable',
+      columns: [{ id: 'reference' }],
+      properties: [],
+      preview: false,
+    },
     metrics: [],
     charts: [],
     actions: [
@@ -228,10 +233,15 @@ it('release withdrawal blocks both preview and execution without weakening owner
 
 it('rejects incompatible row mappings and invalid literals before saving and duplicates only visible bindings', async () => {
   const f = fixture();
-  f.query.columns.push('total');
+  f.query.state.columns.push({ id: 'total' });
   f.query.actions[0]!.inputs.reference = { source: 'row', field: 'total' };
   await expect(f.service.validate(f.context, f.query)).rejects.toMatchObject({
     statusCode: 422,
+  });
+  f.query.actions[0]!.inputs.reference = { source: 'row', field: 'supplier' };
+  await expect(f.service.validate(f.context, f.query)).rejects.toMatchObject({
+    statusCode: 422,
+    message: 'Choose a supported visible row field for each action input.',
   });
   f.query.actions[0]!.inputs.reference = {
     source: 'literal',

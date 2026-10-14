@@ -35,10 +35,23 @@ The queue asks each provider for the refreshed reader, then runs one repeatable-
 assignments and resolves source record identities through tenant mappings.
 
 Rank 0 is a deadline within 30 minutes, rank 1 is high impact, rank 2 is the rest. Unknown
-impact is not ranked below low. Items then sort by deadline, request time and ID. Keyset
-cursors bind the tenant, reader, view, filters and page size, and carry the first page's
-evaluation time so expiring items do not move between pages. Provider rows are recomputed per
-request; clients refresh from the first page and deduplicate by ID.
+impact is not ranked below low. Items then sort by deadline, request time and ID. Provider
+rows are recomputed per request; clients refresh from the first page and deduplicate by ID.
+
+The queue holds only work waiting on a person, and owners present their decisions in memory
+before ranking, so the query returns the whole view and the queue applies conditions, search,
+sorting, grouping and paging to the presented items. Conditions use the decisions catalog:
+owner (`me` resolves to each reader, empty is unassigned), area, reason, impact, deadline and
+request time. Search matches titles. Sorts are urgency (the default), deadline and waiting
+since; decisions without a deadline come last in both directions. Groups are area, reason,
+owner and cause (the owner's `group` key); a group is incomplete while an owner is
+unavailable. The older `domain` and `reason` parameters still work.
+
+View, area and reason counts follow the view and the older parameters only, never conditions
+or search, so Home's attention module and the sidebar count keep matching the queue. Keyset
+cursors bind the tenant, reader, view, conditions, search, sort and page size (or the group
+key within a group), and carry the first page's evaluation time so expiring items do not move
+between pages.
 
 A provider that throws is reported in `sources` as `unavailable`. Its decisions are missing,
 not resolved, and the rest of the queue still loads.
@@ -74,6 +87,11 @@ claim tables, message threads, document facts and replies, and assignments. Reco
 stream's 30-second reconciliation. The web queue and the sidebar count refetch when an event
 lists `decisions`, coalescing bursts over 500 ms and letting active reads finish, and poll
 every 30 seconds as a fallback.
+
+The web queue tracks the focused and open decision by ID, so a refresh that reorders the queue
+leaves the reader where they were. Saved views keep conditions, sort, grouping and properties;
+search text stays in page state. Older links with an area, a reason or the cause switch open
+the same conditions and grouping.
 
 Reading the queue must not write to a `decisions` table unless state changes; otherwise each
 read wakes the next one. Shopify claim settlement therefore updates only unsettled claims. An opened item that leaves the queue stays visible, labeled

@@ -64,3 +64,24 @@ export const orderSearchPredicate = `(EXISTS (
  AND m.resource='sku' AND ($3::uuid IS NULL OR m.connection_id=$3) AND m.external_id ILIKE $15
  WHERE s.tenant_id=$1 AND s.entity_id=o.entity_id AND ($3::uuid IS NULL OR s.connection_id=$3) OFFSET 0)
  OR o.entity_id=CASE WHEN $14 ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN $14::uuid END)`;
+
+// Customer profiles live in the erasable customer store, so their names are matched there and
+// joined to orders through the order links of the customer's own connection, never copied into
+// the order search postings. Only profiles whose source shares contact details have names.
+const customerOrders = `FROM customer_profiles p
+ JOIN customer_orders c ON c.tenant_id=p.tenant_id AND c.connection_id=p.connection_id AND c.customer_external_id=p.external_id
+ JOIN connector_source_mappings m ON m.tenant_id=c.tenant_id AND m.connection_id=c.connection_id
+  AND m.resource='order' AND m.scope_key=c.order_scope_key AND m.external_id=c.order_external_id
+ WHERE p.tenant_id=$1 AND p.contact_shared AND ($3::uuid IS NULL OR m.connection_id=$3)`;
+
+/**
+ * Order IDs whose customer's name or email address contains the search text, at most 1,001.
+ * $1 is the tenant, $3 the connection filter and $15 the escaped ILIKE pattern. Callers add it
+ * only for readers who can read customers.
+ */
+export const orderCustomerSearchHits = `SELECT DISTINCT m.canonical_id AS id ${customerOrders}
+ AND (p.display_name ILIKE $15 OR p.email ILIKE $15) LIMIT 1001`;
+
+/** Checks one ordered row `o` for a customer whose name or email contains the search text. */
+export const orderCustomerSearchPredicate = `EXISTS (SELECT 1 ${customerOrders}
+ AND m.canonical_id=o.entity_id AND (p.display_name ILIKE $15 OR p.email ILIKE $15) OFFSET 0)`;

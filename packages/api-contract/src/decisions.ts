@@ -1,12 +1,20 @@
 import { z } from 'zod';
 
 import { actionDiffSchema } from './action-diff.js';
+import {
+  collectionGroupKeyParameter,
+  collectionGroupLimitParameter,
+  collectionGroupParameter,
+  collectionGroupSchema,
+  collectionTimeZoneParameter,
+  collectionWhereParameter,
+} from './collections.js';
 import { recordKindSchema } from './records.js';
 
 const timestamp = z.string().datetime({ offset: true });
 
-/** The owner whose authoritative decision an item projects. */
-const decisionKindSchema = z.enum([
+/** The owners whose authoritative decisions Needs you projects. */
+export const decisionKinds = [
   'case',
   'custom_field',
   'return_case',
@@ -19,28 +27,42 @@ const decisionKindSchema = z.enum([
   'workflow_handover',
   'human_task',
   'message_reply',
-]);
+] as const;
+
+/** The owner whose authoritative decision an item projects. */
+const decisionKindSchema = z.enum(decisionKinds);
 
 /**
  * Why a person is needed: `approval` waits for an approve or reject; `run` is an approved change
  * waiting for its requester; `recovery` is an accepted or uncertain write that needs a check;
  * `manual_intervention` is a step Luma can't take; `uncertainty` is evidence Luma won't act on.
  */
-const decisionReasonSchema = z.enum([
+export const decisionReasons = [
   'approval',
   'run',
   'recovery',
   'manual_intervention',
   'uncertainty',
-]);
+] as const;
 
-const decisionDomainSchema = z.enum([
+const decisionReasonSchema = z.enum(decisionReasons);
+
+/** Operational areas a decision affects. */
+export const decisionDomains = [
   'orders',
   'fulfillment',
   'inventory',
   'procurement',
   'operations',
-]);
+] as const;
+
+const decisionDomainSchema = z.enum(decisionDomains);
+
+/** How much a decision affects operations; `unknown` when its owner can't tell. */
+export const decisionImpacts = ['high', 'medium', 'low', 'unknown'] as const;
+
+/** Orders the Needs you queue accepts. */
+const decisionSorts = ['urgency', 'deadline', 'requested'] as const;
 
 /**
  * What the reader can do now: `decide` approve or reject; `run` the approved change they requested;
@@ -131,7 +153,7 @@ const decisionItemSchema = z.object({
   /** The exact proposed change or affected facts, such as source, location and quantity. */
   change: z.array(z.object({ label: z.string(), value: z.string() })).max(12),
   impact: z.object({
-    level: z.enum(['high', 'medium', 'low', 'unknown']),
+    level: z.enum(decisionImpacts),
     text: z.string().nullable(),
   }),
   /** `expiring` proposals lose their authority within 30 minutes. */
@@ -161,6 +183,27 @@ export const decisionQuerySchema = z.object({
   view: decisionViewSchema.default('all'),
   domain: decisionDomainSchema.optional(),
   reason: decisionReasonSchema.optional(),
+  q: z
+    .string()
+    .trim()
+    .max(120)
+    .default('')
+    .describe('Matches the title, ignoring case. Never stored in saved views.'),
+  where: collectionWhereParameter.optional(),
+  group: collectionGroupParameter.optional(),
+  groupKey: collectionGroupKeyParameter.optional(),
+  groupLimit: collectionGroupLimitParameter,
+  timeZone: collectionTimeZoneParameter,
+  sort: z
+    .enum(decisionSorts)
+    .default('urgency')
+    .describe(
+      '`urgency` puts proposals that expire within 30 minutes first, then high impact, then the earliest deadline and the oldest request. `deadline` and `requested` (waiting since) put decisions without one last in both directions.',
+    ),
+  direction: z
+    .enum(['asc', 'desc'])
+    .default('asc')
+    .describe('Ascending puts the most urgent, earliest or oldest first.'),
   cursor: z.string().max(2000).optional(),
   /** Reads only this decision, for direct links; its counts cover that item alone. */
   id: z.string().min(1).max(200).optional(),
@@ -195,6 +238,18 @@ export const decisionListSchema = z.object({
     ),
   }),
   sources: z.array(decisionSourceSchema),
+  groups: z
+    .array(collectionGroupSchema)
+    .optional()
+    .describe(
+      'With `group`: each group in display order with its exact count and first rows, whose decisions are in `items`. With `groupKey`: the one group, with this page of its rows. `complete` is false while an owner is unavailable.',
+    ),
+  groupsTruncated: z
+    .boolean()
+    .optional()
+    .describe(
+      'More than 50 groups match; narrow the conditions to see the rest.',
+    ),
 });
 
 export const decisionAssignInputSchema = z

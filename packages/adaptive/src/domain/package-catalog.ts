@@ -1,6 +1,39 @@
 import type { OperationalPackage } from './packages.js';
+import type { AdaptiveViewQuery } from './views.js';
 
 const actionId = 'fd645336-6d1e-50e5-a55d-f850e3acdd0d';
+
+/** Purchase orders with one kind of overdue supplier attention, grouped by supplier. */
+function overdueQuery(
+  attention: 'confirmation_overdue' | 'delivery_overdue',
+): AdaptiveViewQuery {
+  return {
+    version: 2,
+    domain: 'procurement',
+    state: {
+      segment: null,
+      where: {
+        match: 'all',
+        conditions: [{ field: 'attention', op: 'any_of', value: [attention] }],
+      },
+      sort: null,
+      group: { field: 'supplier', showEmpty: false },
+      layout: 'table',
+      density: 'comfortable',
+      columns: [
+        { id: 'reference' },
+        { id: 'supplier' },
+        { id: 'confirmationDue' },
+        { id: 'attention' },
+      ],
+      properties: [],
+      preview: false,
+    },
+    metrics: [],
+    charts: [],
+    actions: [],
+  };
+}
 
 /** One maintained purchasing definition; configuration is resolved by the reviewed install. */
 export const purchasingPackage: OperationalPackage = {
@@ -108,19 +141,7 @@ export const purchasingPackage: OperationalPackage = {
         sharing: { scope: 'workspace', roleIds: [] },
         reviewed: true,
         query: {
-          version: 1,
-          domain: 'procurement',
-          filters: { attention: 'confirmation_overdue' },
-          customFilters: [],
-          columns: [
-            'reference',
-            'supplierName',
-            'confirmationDueAt',
-            'attentionKey',
-          ],
-          sort: null,
-          groupBy: 'supplierName',
-          layout: 'table',
+          ...overdueQuery('confirmation_overdue'),
           metrics: [{ id: 'overdue', operation: 'count', field: null }],
           charts: [],
           actions: [
@@ -130,7 +151,7 @@ export const purchasingPackage: OperationalPackage = {
               target: { kind: 'capability', id: 'supplier.follow-up' },
               inputs: {
                 connectionId: { source: 'literal', value: '' },
-                attentionKey: { source: 'row', field: 'attentionKey' },
+                attentionKey: { source: 'row', field: 'attention' },
                 nextCheckHours: { source: 'literal', value: 48 },
                 reason: {
                   source: 'literal',
@@ -198,24 +219,7 @@ export const purchasingPackageNext: OperationalPackage = {
         description: 'Promised deliveries needing a fresh check.',
         sharing: { scope: 'workspace', roleIds: [] },
         reviewed: true,
-        query: {
-          version: 1,
-          domain: 'procurement',
-          filters: { attention: 'delivery_overdue' },
-          customFilters: [],
-          columns: [
-            'reference',
-            'supplierName',
-            'confirmationDueAt',
-            'attentionKey',
-          ],
-          sort: null,
-          groupBy: 'supplierName',
-          layout: 'table',
-          metrics: [],
-          charts: [],
-          actions: [],
-        },
+        query: overdueQuery('delivery_overdue'),
       },
     },
   ],

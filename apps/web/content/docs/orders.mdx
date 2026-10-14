@@ -7,22 +7,54 @@ Orders lists every current order your connected stores and ERPs report. Use it t
 
 ## Find an order
 
-Choose a view above the list:
+Choose a view in the view menu above the list:
 
-- **Journey checks** finds paid open orders without a recorded Luma reservation after four hours, and shipments without one. Investigate these hints with the inventory team and the reporting source. External reservations may be unread. This view requires inventory and fulfillment access.
 - **All orders** shows every current order from your connected systems.
 - **Outstanding** shows open orders with units still to fulfill.
 - **Overdue** shows outstanding orders past the deadline set in their source.
 - **Needs you** shows orders linked to an issue that needs your decision or review.
 - **Differs by source** shows orders whose status, payment, total or ordered items differ between sources.
+- **Journey checks** finds paid open orders without a recorded Luma reservation after four hours, and shipments without one. Investigate these hints with the inventory team and the reporting source. External reservations may be unread. This view requires inventory and fulfillment access.
 
-Search by order number, the order’s ID in its source or a SKU on an order line. Narrow the list with **Status**, **Payment**, **Source**, **Placed** and **Updated**, and sort by **Last updated**, **Date placed**, **Order number** or **Due date**. On a narrow screen, choose **Filters** to see every filter at once.
+The view menu also lists the views you and your team saved. Opening **Orders** from the sidebar returns to the view you used last, with any changes you hadn't saved.
 
-The view, filters, sort and page are part of the page address, so you can share the list or pin it to the sidebar. Outstanding, Overdue and Needs you count the same orders as the order counts on Home and in [Insights](/docs/insights). Choosing a count there opens the matching view here.
+Search by order number, the order’s ID in its source or a SKU on an order line. When you can view customers, search also finds orders by the customer’s name or email address, so your search text stays on the page: it isn’t saved in the page address or in views, and it’s cleared when you leave or reload the page. A link that opens Orders with a search, such as a product’s orders, fills in the search and then removes it from the address. **Status**, **Payment**, **Source** and **Warehouse** above the list narrow it in one click. For anything else, choose **Filter** and pick a field, such as **Placed**, **Lines**, **Total**, **Sales channel**, **Tags** or a custom field, then a condition and a value. When two or more filters apply, choose whether orders must match all of them or any. The sort menu after **Display** names the current order, such as **Updated**; choose it to sort by another field or flip the direction. In the table, a column header sorts by that column, and its menu offers **Filter by this column**. **Clear** removes every filter and the search.
+
+Outstanding, Overdue and Needs you count the same orders as the order counts on Home and in [Insights](/docs/insights). Choosing a count there opens the matching view here, with the same filters.
 
 **Coverage** above the list says whether the list is complete, for example while older history is still importing or when a source shares only recent orders. See [Data sync](/docs/data-sync).
 
-**No orders match** means the search, view or filters exclude every order. **No orders yet** means no connected store or ERP has reported an order. If a page link no longer matches its filters, choose **Go to first page**.
+**No orders match** means the search, view or filters exclude every order. **No orders yet** means no connected store or ERP has reported an order. If a page link no longer matches its filters, choose **First page**. When a view uses a filter or grouping you can't use, for example because your role can't see warehouses, Luma says so instead of showing more orders than the view means; choose **Remove unsupported conditions**.
+
+## Arrange the list
+
+Choose **Display** to change how the list looks:
+
+- **Layout**: **Table** shows columns, **List** shows one row per order with the properties you choose, and **Board** shows a column per group.
+- **Columns** or **Properties**: choose what each order shows and drag them into order. In the table you can also resize, move, pin and hide columns from each column’s menu.
+- **Group by**: group orders by status, payment, fulfillment, source, warehouse, sales channel, tags or other fields, and dates by day, week or month. Each group shows how many orders it has and the total per currency. **Incomplete** means the count may be missing orders. Choose a group’s name to collapse it, and **Show more** to see more of its orders. **Show empty groups** lists statuses and other choices that no order has.
+- **Density**: **Compact** fits more orders on screen. Density, column widths and collapsed groups are your own settings.
+- **Open records in a preview**: choosing an order shows its summary beside the list instead of opening it. From the preview, you can narrow the list to an order’s status, payment, fulfillment or source, or hide it. **Open full order** opens the order.
+
+On the board you can’t move orders between columns, because their status, payment and fulfillment come from your connected systems.
+
+## Save and share views
+
+When you change filters, sorting, grouping or display, the view is marked **Modified**. Choose **Save** to update a saved view you can edit, **Save as new view** to keep your changes as a new view, or **Reset** to return to the view as it was saved. A new view is private unless you share it with your workspace or with roles; see [Saved views](/docs/saved-views). Sharing a view never gives anyone access to orders they can't see.
+
+If someone else saved the view after you opened it, Luma keeps your changes and lets you save them as a new view or load theirs instead.
+
+The view and your changes are part of the page address, so you can copy the link or pin the view to the sidebar from **View options**. **Make my default for this page** opens that view when you come to Orders. **Reset page to default** clears what Orders remembers for you; choose **Undo** to bring it back.
+
+## Work from the keyboard
+
+- **J** and **K**, or the arrow keys, move through the orders. On a board, the arrow keys also move between columns.
+- **Enter** opens the order you're on.
+- **Space** opens or closes it in the preview, when the preview is on. While it's open, **J** and **K** show the next and previous order.
+- **X** selects an order, **Shift**+**X** selects a range, and **Esc** clears the selection or closes the preview.
+- **/** goes to search, **F** adds a filter and **?** lists these shortcuts.
+
+Shortcuts don't work while you type in a field.
 
 ## Read an order
 

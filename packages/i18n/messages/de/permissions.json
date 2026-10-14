@@ -136,7 +136,9 @@
   "permissions_adaptive_fields_manage_label": "Benutzerdefinierte Felder verwalten",
   "permissions_adaptive_fields_manage_description": "Definiere und archiviere typisierte benutzerdefinierte Felder und ihre Zugriffsregeln.",
   "permissions_adaptive_views_manage_label": "Geteilte Ansichten verwalten",
-  "permissions_adaptive_views_manage_description": "Bearbeite und archiviere Ansichten anderer Mitglieder des Arbeitsbereichs.",
+  "permissions_adaptive_views_manage_description": "Ansichten mit dem Workspace oder Rollen teilen und Ansichten anderer Mitglieder bearbeiten und archivieren.",
   "permissions_adaptive_packages_manage_label": "Operative Pakete verwalten",
-  "permissions_adaptive_packages_manage_description": "Prüfe, installiere und entferne Definitionen operativer Pakete."
+  "permissions_adaptive_packages_manage_description": "Prüfe, installiere und entferne Definitionen operativer Pakete.",
+  "permissions_lists_export_label": "Listen exportieren",
+  "permissions_lists_export_description": "Listen mit den für dich sichtbaren Spalten als CSV-Datei herunterladen. Jeder Export wird im Audit-Protokoll festgehalten."
 }

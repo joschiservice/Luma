@@ -41,6 +41,11 @@ const fulfillmentSorts = members<FulfillmentQuery['sort']>({
   waiting: true,
   recent: true,
   deadline: true,
+  fulfillBy: true,
+  estimatedDelivery: true,
+  orderPlaced: true,
+  orderNumber: true,
+  location: true,
 });
 const fulfillmentKinds = members<NonNullable<FulfillmentQuery['kind']>>({
   fulfillment_order: true,
@@ -69,6 +74,9 @@ const returnStages = members<NonNullable<ReturnQuery['stage']>>({
 const returnSorts = members<ReturnQuery['sort']>({
   requested: true,
   activity: true,
+  value: true,
+  pendingRefund: true,
+  stage: true,
 });
 
 const stockInput = z

@@ -483,7 +483,6 @@
   "authoring_coordination_owner": "Fallverantwortliche Person",
   "authoring_coordination_unassigned": "Nicht zugewiesen",
   "authoring_coordination_clear": "Zuweisung entfernen",
-  "authoring_coordination_owner_all": "Alle Verantwortlichen",
   "authoring_coordination_subscriptions": "Start-Abonnements",
   "authoring_coordination_subscription_default": "Veröffentlichten Auslöser verwenden",
   "authoring_coordination_subscription_schedule": "Zukünftige Starts planen",

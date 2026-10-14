@@ -1399,6 +1399,12 @@
   min-width: 260px;
 }
 
+.settings-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 /* Policy cards keep review evidence and controls readable as the workspace narrows. */
 .settings-autonomy-policy {
   display: grid;

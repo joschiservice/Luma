@@ -1,5 +1,14 @@
 import { z } from 'zod';
 
+import {
+  collectionGroupKeyParameter,
+  collectionGroupLimitParameter,
+  collectionGroupParameter,
+  collectionGroupSchema,
+  collectionTimeZoneParameter,
+  collectionWhereParameter,
+} from './collections.js';
+
 const timestamp = z.string().datetime({ offset: true });
 
 export const customerStateSchema = z.enum([
@@ -10,7 +19,14 @@ export const customerStateSchema = z.enum([
   'unknown',
 ]);
 
-export const customerSortSchema = z.enum(['created', 'orders', 'name']);
+export const customerSortSchema = z.enum([
+  'created',
+  'orders',
+  'name',
+  'amountSpent',
+  'updated',
+  'lastOrder',
+]);
 
 const customerListItemSchema = z.object({
   id: z.string().uuid(),
@@ -34,6 +50,19 @@ const customerListItemSchema = z.object({
     .describe(
       'When a complete read of the source first no longer found this customer; null while the source still has them. Luma removes customers that stay missing for 30 days.',
     ),
+  country: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      'Country of the shared address as the source reports it, upper-cased; null when the source shares no address or reports no country.',
+    ),
+  lastOrderAt: timestamp
+    .nullable()
+    .optional()
+    .describe(
+      'Latest placed date of the imported orders this source attributes to the customer; null when none reports one. Omitted without access to orders.',
+    ),
 });
 
 const customerSourceSchema = z.object({
@@ -56,8 +85,22 @@ export const customerQuerySchema = z
     state: customerStateSchema.optional(),
     connectionId: z.string().uuid().optional(),
     externalId: z.string().min(1).max(1024).optional(),
-    sort: customerSortSchema.default('created'),
+    where: collectionWhereParameter.optional(),
+    group: collectionGroupParameter.optional(),
+    groupKey: collectionGroupKeyParameter.optional(),
+    groupLimit: collectionGroupLimitParameter,
+    timeZone: collectionTimeZoneParameter,
+    sort: z
+      .union([customerSortSchema, z.templateLiteral(['custom:', z.uuid()])])
+      .default('created')
+      .describe(
+        '`amountSpent` orders by currency, then amount, so amounts compare only within one currency. `updated` is the source’s last change. `lastOrder` needs access to orders. `custom:<field ID>` sorts by a readable custom customer field that holds one value. Customers without a value come last in both directions.',
+      ),
     direction: z.enum(['asc', 'desc']).default('desc'),
+    count: z
+      .literal('exact')
+      .optional()
+      .describe('Accepted for every list; customer counts are always exact.'),
     cursor: z.string().min(1).max(4096).optional(),
     limit: z.coerce.number().int().min(1).max(50).default(50),
   })
@@ -68,6 +111,18 @@ export const customerListSchema = z.object({
   sources: z.array(customerSourceSchema),
   totalCount: z.number().int().nonnegative(),
   nextCursor: z.string().nullable(),
+  groups: z
+    .array(collectionGroupSchema)
+    .optional()
+    .describe(
+      'With `group`: each group in display order with its exact count, first rows (whose items are in `items`) and per-currency amounts spent. With `groupKey`: the one group, with this page of its rows. `complete` is false while a source is still importing its customers.',
+    ),
+  groupsTruncated: z
+    .boolean()
+    .optional()
+    .describe(
+      'More than 50 groups match; narrow the conditions to see the rest.',
+    ),
   asOf: timestamp,
 });
 
@@ -88,8 +143,6 @@ export const customerDetailSchema = z.object({
 });
 
 export type CustomerState = z.infer<typeof customerStateSchema>;
-
-export type CustomerSort = z.infer<typeof customerSortSchema>;
 
 export type CustomerListItem = z.infer<typeof customerListItemSchema>;
 

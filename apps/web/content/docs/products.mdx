@@ -14,7 +14,15 @@ Search by SKU code, product or variant title, barcode, vendor, or the product or
 - **Not in every source** shows SKUs that at least one catalog doesn’t list. Some items are sold or managed in one system only on purpose, such as packaging kept only in your ERP.
 - **Possible matches** shows SKUs with a SKU of the same code in another source that isn’t linked yet.
 
-Use **Listed in** and **Missing from** to answer questions such as “what’s in the ERP but not in the store.” Views and filters are part of the page address, so you can share them or pin them to the sidebar.
+The tabs above the list show how many SKUs each view holds under your search and filters; the view menu also lists the views you and your team saved. Opening **Products** from the sidebar returns to the view you used last.
+
+**Listed in** and **Status** above the list narrow it in one click. For anything else, choose **Filter** and pick a field, such as **Missing from**, **Differs in**, **Vendor**, **Price**, **Barcode**, **Sales channel**, **Bundle**, **Updated** or a custom field. Listing fields such as status, vendor and price let you choose a **Source**: **Any source** matches when one listing matches, **Every source** needs every listing to match, and a named source reads only that source's listings. Prices compare only within the condition's currency. The sort menu starts with **Catalog order**; choose it to sort by SKU, title, price, last update, differing fields, number of listings or a custom field, or flip the direction. SKUs without the sorted value come last.
+
+## Arrange and save the list
+
+Choose **Display** to switch between **Table** and **List**, choose columns, and group SKUs by vendor, status or differing field. A SKU with listings in two statuses appears in both groups. Each catalog source has its own listing column, such as **Listing in JTL-Wawi**, so you can show only the sources you compare. Custom product fields can be columns too. You see only the custom fields your role can read; a SKU without a value shows **—** and matches **is empty**. A custom field that was retired shows as archived, and a view that filters or sorts by it, or by a field your role can’t read, shows a notice: choose **Remove unsupported conditions** to see the list. **Open records in a preview** shows a SKU's listings, stock and recent sales beside the list.
+
+When you change filters, sorting, grouping or display, the view is marked **Modified**. Choose **Save as new view** to keep it; see [Saved views](/docs/saved-views). **J** and **K** move through the SKUs, **Enter** opens one, **Space** previews it, **/** goes to search, **F** adds a filter and **?** lists every shortcut.
 
 **Coverage** above the list shows how much of each catalog Luma has imported. **No products imported yet** means no connected store or ERP has shared its catalog; check [Data sync](/docs/data-sync) for progress.
 

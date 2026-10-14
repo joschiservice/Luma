@@ -3,16 +3,21 @@ import { createHash } from 'node:crypto';
 import type {
   AdaptiveFields,
   AdaptiveViews,
+  CollectionStates,
   OperationalPackages,
   PackageResource,
   ViewActionCapability,
   ViewActions,
+  ViewExports,
   ViewReadAdapter,
+  ViewReaderDomain,
 } from '@luma/adaptive';
 import {
   purchasingPackage,
   purchasingPackageNext,
-  viewColumns,
+  viewReaderColumns,
+  viewReaderDomains,
+  viewReaderKeys,
 } from '@luma/adaptive';
 import {
   configurePurchasingPackage,
@@ -22,7 +27,9 @@ import {
   createAdaptivePackages,
   createAdaptiveViewReadAdapter,
   createAdaptiveViews,
+  createCollectionStates,
   createPackageStore,
+  createViewExportsService,
 } from '@luma/adaptive/composition';
 import {
   adaptiveViewInputSchema,
@@ -33,6 +40,9 @@ import {
   inventoryQuerySchema,
   orderListQuerySchema,
   productQuerySchema,
+  purchaseOrderListQuerySchema,
+  returnQuerySchema,
+  upgradeAdaptiveViewQuery,
 } from '@luma/api-contract';
 import { createAuditLog } from '@luma/audit/composition';
 import type { CaseService } from '@luma/exceptions';
@@ -63,6 +73,7 @@ import type {
   InventoryWorkspace,
   OrderWorkspace,
   ProductWorkspace,
+  ReturnWorkspace,
 } from '@luma/read-models';
 import { createAdaptiveViewIdentities } from '@luma/read-models/composition';
 import type { WorkflowCatalog } from '@luma/workflows';
@@ -115,13 +126,13 @@ function uuid(value: string) {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
-const columns = viewColumns;
-
 export interface AdaptiveWorkspaceRuntime {
   fields: AdaptiveFields;
   views: AdaptiveViews;
   actions: ViewActions;
   packages: OperationalPackages;
+  collections: CollectionStates;
+  exports: ViewExports;
   availability(context: TenantContext): Promise<{
     fields: boolean;
     views: boolean;
@@ -142,6 +153,7 @@ export function createAdaptiveWorkspaceRuntime(options: {
     orders: OrderWorkspace;
     inventory: InventoryWorkspace;
     fulfillment: FulfillmentWorkspace;
+    returns: ReturnWorkspace;
     customers: CustomerWorkspace;
     products: ProductWorkspace;
     decisions: DecisionQueue;
@@ -161,7 +173,7 @@ export function createAdaptiveWorkspaceRuntime(options: {
     refreshContext: identity.refreshContext,
     released: (c) => released(c, 'adaptive-custom-fields'),
   });
-  const plain: Record<keyof typeof columns, ViewReadAdapter> = {
+  const plain: Record<ViewReaderDomain, ViewReadAdapter> = {
     orders: {
       supportsCustomQueries: true,
       read: async (c, q, view, selectedRecordIds) => {
@@ -206,6 +218,18 @@ export function createAdaptiveWorkspaceRuntime(options: {
         );
 
         return { ...v, items: v.items.map((item) => ({ ...item })) };
+      },
+    },
+    returns: {
+      read: async (c, q) => {
+        const v = await owners.returns.list(c, returnQuerySchema.parse(q));
+
+        return {
+          ...v,
+          warnings: sourceWarnings(v.sources),
+          totalCount: v.counts.views.all,
+          items: v.items.map((item) => ({ ...item })),
+        };
       },
     },
     customers: {
@@ -256,32 +280,68 @@ export function createAdaptiveWorkspaceRuntime(options: {
     procurement: {
       read: async (c, q) => {
         requirePermission(c, 'procurement.read');
-        const records = await owners.commitments.pending(c);
-        const items = records
-          .filter(
-            (item) =>
-              (!q.attention || item.attention.kind === q.attention) &&
-              (!q.supplierId || item.order.supplierId === q.supplierId) &&
-              (!q.status || item.order.status === q.status),
-          )
-          .map((item) => ({
-            id: item.order.id,
-            reference: item.order.reference,
-            supplierId: item.order.supplierId,
-            supplierName: item.supplierName,
-            status: item.order.status,
-            confirmationDueAt: item.attention.dueAt,
-            attentionKey: item.attention.key,
-            nextCheckAt: null,
-            createdAt: item.order.createdAt,
-            updatedAt: item.order.updatedAt,
-          }));
+        // The same list the Procurement page reads: built-in views as `stage`, catalog
+        // conditions as `where`, with stage, attention and dates from the progress rules.
+        const query = purchaseOrderListQuerySchema.parse(q);
+        const list = await owners.commitments.listOrders(c, query);
+        // Row actions such as a supplier follow-up need the key of one open item, which the
+        // list summarizes by kind only; read the open items once when a row has any.
+        const open = list.items.some((item) => item.summary.attention > 0)
+          ? await owners.commitments.pending(c)
+          : [];
+        const requested = new Set(
+          (query.where?.conditions ?? []).flatMap((condition) =>
+            condition.field === 'attention' &&
+            ['any_of', 'all_of'].includes(condition.op) &&
+            Array.isArray(condition.value)
+              ? condition.value.filter(
+                  (value): value is string => typeof value === 'string',
+                )
+              : [],
+          ),
+        );
+        const attentionKey = (order: (typeof list.items)[number]) => {
+          const items = open
+            .filter((item) => item.order.id === order.id)
+            .map((item) => item.attention)
+            .filter((item) =>
+              (order.summary.attentionKinds ?? []).includes(item.kind),
+            );
+
+          return (
+            (items.find((item) => requested.has(item.kind)) ?? items[0])?.key ??
+            null
+          );
+        };
+        const items = list.items.map((order) => ({
+          id: order.id,
+          reference: order.reference,
+          number: order.summary.externalOrderNumber,
+          supplierId: order.supplierId,
+          supplierName: order.supplierName,
+          status: order.status,
+          stage: order.summary.stage,
+          attentionKey: attentionKey(order),
+          expectedDate: order.summary.expectedDate,
+          confirmationDueAt: order.summary.confirmationDueAt ?? null,
+          nextCheckAt: order.summary.nextCheckAt ?? null,
+          nextOwner: order.summary.nextOwner,
+          lines: order.lines.length,
+          createdAt: order.createdAt,
+          updatedAt: order.updatedAt,
+          authority: order.authority,
+          locationIds: [
+            ...new Set(order.lines.flatMap((line) => line.locationId ?? [])),
+          ],
+          skus: [...new Set(order.lines.map((line) => line.sku))],
+          value: order.summary.value ?? null,
+        }));
 
         return {
           items,
-          nextCursor: null,
-          asOf: new Date().toISOString(),
-          totalCount: items.length,
+          nextCursor: list.nextCursor,
+          asOf: list.asOf,
+          totalCount: list.totalCount,
         };
       },
     },
@@ -289,30 +349,34 @@ export function createAdaptiveWorkspaceRuntime(options: {
   const readers = {
     orders: createAdaptiveViewReadAdapter(database, plain.orders, {
       recordType: 'order',
-      columns: columns.orders,
+      columns: viewReaderKeys('orders'),
     }),
     inventory: createAdaptiveViewReadAdapter(database, plain.inventory, {
-      columns: columns.inventory,
+      columns: viewReaderKeys('inventory'),
     }),
     fulfillment: createAdaptiveViewReadAdapter(database, plain.fulfillment, {
-      columns: columns.fulfillment,
+      columns: viewReaderKeys('fulfillment'),
+    }),
+    returns: createAdaptiveViewReadAdapter(database, plain.returns, {
+      columns: viewReaderKeys('returns'),
     }),
     customers: createAdaptiveViewReadAdapter(database, plain.customers, {
-      columns: columns.customers,
+      recordType: 'customer',
+      columns: viewReaderKeys('customers'),
     }),
     products: createAdaptiveViewReadAdapter(database, plain.products, {
       recordType: 'product',
-      columns: columns.products,
+      columns: viewReaderKeys('products'),
     }),
     procurement: createAdaptiveViewReadAdapter(database, plain.procurement, {
       recordType: 'purchase_order',
-      columns: columns.procurement,
+      columns: viewReaderKeys('procurement'),
     }),
     decisions: createAdaptiveViewReadAdapter(database, plain.decisions, {
-      columns: columns.decisions,
+      columns: viewReaderKeys('decisions'),
     }),
     issues: createAdaptiveViewReadAdapter(database, plain.issues, {
-      columns: columns.issues,
+      columns: viewReaderKeys('issues'),
     }),
   };
   const followUp: ViewActionCapability = {
@@ -434,20 +498,23 @@ export function createAdaptiveWorkspaceRuntime(options: {
       return view;
     },
     rows: async (c, v, ids) => {
+      // Rows carry every field an action maps, keyed by catalog column ID.
+      const fields = new Set([
+        ...v.query.state.columns.map((column) => column.id),
+        ...v.query.actions.flatMap((action) =>
+          Object.values(action.inputs).flatMap((input) =>
+            input.source === 'row' ? [input.field] : [],
+          ),
+        ),
+      ]);
       const data = await views.preview(
         c,
         {
           ...v.query,
-          columns: [
-            ...new Set([
-              ...v.query.columns,
-              ...v.query.actions.flatMap((action) =>
-                Object.values(action.inputs).flatMap((input) =>
-                  input.source === 'row' ? [input.field] : [],
-                ),
-              ),
-            ]),
-          ],
+          state: {
+            ...v.query.state,
+            columns: [...fields].map((id) => ({ id })),
+          },
         },
         undefined,
         ids,
@@ -457,7 +524,7 @@ export function createAdaptiveWorkspaceRuntime(options: {
     },
     rowTypes: async (c, domain) => {
       const types: Record<string, 'string' | 'number' | 'boolean'> = {};
-      const numeric = new Set(['lineCount', 'orderCount']);
+      const numeric = new Set(['lineCount', 'orderCount', 'lines']);
       const booleans = new Set(['overdue', 'differs', 'open']);
       const scalarStrings = new Set([
         'id',
@@ -467,6 +534,7 @@ export function createAdaptiveWorkspaceRuntime(options: {
         'fulfillment',
         'placedAt',
         'dueAt',
+        'comparisonState',
         'observedAt',
         'skuId',
         'sku',
@@ -508,17 +576,25 @@ export function createAdaptiveWorkspaceRuntime(options: {
         'response',
         'requestedAt',
         'deadline',
+        'name',
+        'stage',
+        'quantity',
+        'activityAt',
+        'expectedDate',
+        'nextOwner',
+        'authority',
       ]);
-      const available =
-        Object.entries(columns).find(([key]) => key === domain)?.[1] ?? [];
-      for (const column of available) {
-        if (numeric.has(column)) types[column] = 'number';
-        else if (booleans.has(column)) types[column] = 'boolean';
+      const reader = viewReaderDomains.find((item) => item === domain);
+      const available = reader ? Object.entries(viewReaderColumns[reader]) : [];
+      types.id = 'string';
+      for (const [id, column] of available) {
+        if (numeric.has(column)) types[id] = 'number';
+        else if (booleans.has(column)) types[id] = 'boolean';
         else if (
           scalarStrings.has(column) &&
           !(domain === 'fulfillment' && column === 'location')
         )
-          types[column] = 'string';
+          types[id] = 'string';
       }
       const recordType =
         domain === 'orders'
@@ -527,7 +603,9 @@ export function createAdaptiveWorkspaceRuntime(options: {
             ? 'product'
             : domain === 'procurement'
               ? 'purchase_order'
-              : null;
+              : domain === 'customers'
+                ? 'customer'
+                : null;
       if (
         recordType &&
         (await released(c, 'adaptive-custom-fields')) &&
@@ -703,7 +781,11 @@ export function createAdaptiveWorkspaceRuntime(options: {
             ? 'product'
             : domain === 'procurement'
               ? 'purchase_order'
-              : null;
+              : domain === 'suppliers'
+                ? 'supplier'
+                : domain === 'customers'
+                  ? 'customer'
+                  : null;
       if (
         !type ||
         !(await released(c, 'adaptive-custom-fields')) ||
@@ -907,7 +989,7 @@ export function createAdaptiveWorkspaceRuntime(options: {
           ...z.record(z.string(), z.unknown()).parse(view.definition),
           commandId: uuid(`preview:${c.tenantId}:${d.id}:${view.key}`),
         });
-        await actions.validate(c, checked.query);
+        await actions.validate(c, upgradeAdaptiveViewQuery(checked.query));
       }
       for (const workflow of configured.workflows)
         compileProcessWorkflow({
@@ -971,5 +1053,23 @@ export function createAdaptiveWorkspaceRuntime(options: {
     };
   };
 
-  return { fields, views, actions, packages, availability };
+  const collections = createCollectionStates(database, {
+    refreshContext: identity.refreshContext,
+  });
+
+  const exports = createViewExportsService({
+    views,
+    refreshContext: identity.refreshContext,
+    audit: createAuditLog(database),
+  });
+
+  return {
+    fields,
+    views,
+    actions,
+    packages,
+    collections,
+    exports,
+    availability,
+  };
 }

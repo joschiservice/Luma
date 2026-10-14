@@ -4,6 +4,7 @@ import {
   apiContract,
   decisionAssignResultSchema,
   decisionListSchema,
+  decisionsCatalog,
 } from '@luma/api-contract';
 import { IdentityError } from '@luma/identity';
 import type { HttpContext } from '@luma/identity/http';
@@ -13,8 +14,12 @@ import type {
   DecisionAssignments,
   DecisionQueue,
 } from '../application/decisions.js';
+import { validateCollectionQuery } from './collection-validation.js';
 
-/** Exposes the Needs you queue, filtered by the reader's permissions, and assignment changes to its owner. */
+/**
+ * Exposes the Needs you queue, filtered by the reader's permissions, and assignment changes to
+ * its owner. Conditions and grouping are checked against the decisions catalog first.
+ */
 export function decisionRoutes(
   queue?: DecisionQueue,
   assignments?: DecisionAssignments,
@@ -36,6 +41,8 @@ export function decisionRoutes(
             'SERVICE_UNAVAILABLE',
             'Needs you is unavailable',
           );
+
+        validateCollectionQuery(decisionsCatalog, query);
 
         return decisionListSchema.parse(
           await queue.list(request.tenantContext, query),

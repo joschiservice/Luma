@@ -8,6 +8,7 @@ import { appsContract } from './contracts/apps.js';
 import { assistantContract } from './contracts/assistant.js';
 import { sourceAuthorityContract } from './contracts/authority.js';
 import { exceptionsContract } from './contracts/cases.js';
+import { collectionsContract } from './contracts/collections.js';
 import { connectionsContract } from './contracts/connections.js';
 import { customersContract } from './contracts/customers.js';
 import { decisionsContract } from './contracts/decisions.js';
@@ -56,6 +57,7 @@ type ApiContract = {
   adaptiveViews: typeof adaptiveViewsContract;
   adaptiveFields: typeof adaptiveFieldsContract;
   adaptive: typeof adaptiveContract;
+  collections: typeof collectionsContract;
   shadow: typeof shadowContract;
   activity: typeof activityContract;
   playbooks: typeof playbooksContract;
@@ -110,6 +112,7 @@ export const apiContract: ApiContract = {
   adaptiveViews: adaptiveViewsContract,
   adaptiveFields: adaptiveFieldsContract,
   adaptive: adaptiveContract,
+  collections: collectionsContract,
   shadow: shadowContract,
   activity: activityContract,
   playbooks: playbooksContract,
@@ -300,6 +303,14 @@ export type { PurchaseOrderChangeInput } from './purchase-order-changes.js';
 export * from './adaptive-fields.js';
 
 export * from './adaptive-views.js';
+
+export * from './collections.js';
+
+export * from './collection-catalog.js';
+
+export * from './collection-catalogs.js';
+
+export * from './adaptive-view-query.js';
 
 export * from './adaptive-actions.js';
 

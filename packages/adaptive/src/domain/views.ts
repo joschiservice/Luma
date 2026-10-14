@@ -1,4 +1,7 @@
-export type AdaptiveViewDomain =
+import type { ViewAction } from './actions.js';
+
+/** Record lists the view engine can read: format 1 domains. */
+export type ViewReaderDomain =
   | 'orders'
   | 'inventory'
   | 'fulfillment'
@@ -6,13 +9,35 @@ export type AdaptiveViewDomain =
   | 'products'
   | 'procurement'
   | 'issues'
-  | 'decisions';
+  | 'decisions'
+  | 'returns';
+
+/** Record lists a saved view can describe; each is one list page. */
+export type AdaptiveViewDomain =
+  ViewReaderDomain | 'transfers' | 'suppliers' | 'inbox' | 'activity';
 
 type ViewScalar = string | number | boolean | null;
 
-export interface AdaptiveViewQuery {
+interface ViewMetric {
+  id: string;
+  operation: 'count' | 'sum' | 'average';
+  field: string | null;
+}
+
+interface ViewChart {
+  id: string;
+  type: 'bar' | 'line';
+  groupBy: string;
+  metricId: string;
+}
+
+/**
+ * Format 1 of a saved view. It is also the shape the view engine runs: owner list parameters as
+ * `filters`, custom field predicates, and reader item keys for columns, sorting and grouping.
+ */
+export interface AdaptiveViewQueryV1 {
   version: 1;
-  domain: AdaptiveViewDomain;
+  domain: ViewReaderDomain;
   filters: Record<string, ViewScalar>;
   customFilters: {
     fieldId: string;
@@ -24,46 +49,106 @@ export interface AdaptiveViewQuery {
   sort: { field: string; direction: 'asc' | 'desc' } | null;
   groupBy: string | null;
   layout: 'table' | 'board';
-  metrics: {
-    id: string;
-    operation: 'count' | 'sum' | 'average';
-    field: string | null;
-  }[];
-  charts: {
-    id: string;
-    type: 'bar' | 'line';
-    groupBy: string;
-    metricId: string;
-  }[];
-  actions: {
-    id: string;
-    label: { en: string; de: string };
-    target: {
-      kind: 'capability' | 'workflow';
-      id: string;
-      version?: string | undefined;
-    };
-    inputs: Record<
-      string,
-      | { source: 'row'; field: string }
-      | { source: 'literal'; value: ViewScalar }
-    >;
-  }[];
+  metrics: ViewMetric[];
+  charts: ViewChart[];
+  actions: ViewAction[];
 }
 
+/** A query compiled for the view engine from a saved view; never stored or returned. */
+export type ViewExecutionQuery = AdaptiveViewQueryV1;
+
+type ViewConditionOperator =
+  | 'is'
+  | 'is_not'
+  | 'any_of'
+  | 'none_of'
+  | 'all_of'
+  | 'contains'
+  | 'not_contains'
+  | 'eq'
+  | 'ne'
+  | 'gt'
+  | 'gte'
+  | 'lt'
+  | 'lte'
+  | 'between'
+  | 'before'
+  | 'after'
+  | 'within_last'
+  | 'within_next'
+  | 'empty'
+  | 'not_empty'
+  | 'unknown';
+
+type ConditionScalar = string | number | boolean;
+
+type DynamicValue = { dynamic: 'me' | 'today' };
+
+type MoneyValue = { amount: string; currency: string };
+
+type RangeBound = ConditionScalar | MoneyValue | DynamicValue | null;
+
+type ViewConditionValue =
+  | ConditionScalar
+  | DynamicValue
+  | { amount: number; unit: 'day' | 'week' | 'month' }
+  | MoneyValue
+  | { from: RangeBound; to: RangeBound }
+  | (ConditionScalar | DynamicValue)[];
+
+/** One condition of a list: a catalog field ID or `custom:<id>`, operator and value. */
+export interface ViewCondition {
+  field: string;
+  op: ViewConditionOperator;
+  value?: ViewConditionValue | undefined;
+  source?: string | undefined;
+}
+
+/** A list page's shareable state, as the list catalog describes it. */
+interface ViewState {
+  segment: string | null;
+  where: { match: 'all' | 'any'; conditions: ViewCondition[] };
+  sort: { field: string; direction: 'asc' | 'desc' } | null;
+  group: {
+    field: string;
+    granularity?: 'day' | 'week' | 'month' | undefined;
+    showEmpty: boolean;
+  } | null;
+  layout: 'table' | 'list' | 'board';
+  density: 'comfortable' | 'compact';
+  columns: { id: string; width?: number | undefined }[];
+  properties: string[];
+  preview: boolean;
+}
+
+/**
+ * Format 2 of a saved view, the only format stored and returned: a list page's state with field
+ * IDs from the list catalog, plus optional metrics, charts and governed actions.
+ */
+export interface AdaptiveViewQuery {
+  version: 2;
+  domain: AdaptiveViewDomain;
+  state: ViewState;
+  metrics: ViewMetric[];
+  charts: ViewChart[];
+  actions: ViewAction[];
+}
+
+/** A reviewed view to save; format 1 queries are upgraded before validation. */
 export interface AdaptiveViewInput {
   commandId: string;
   name: string;
   description: string;
   sharing: { scope: 'private' | 'workspace' | 'roles'; roleIds: string[] };
-  query: AdaptiveViewQuery;
+  query: AdaptiveViewQuery | AdaptiveViewQueryV1;
   reviewed: true;
 }
 
-export interface StoredAdaptiveView extends Omit<
-  AdaptiveViewInput,
-  'reviewed' | 'commandId'
-> {
+export interface StoredAdaptiveView {
+  name: string;
+  description: string;
+  sharing: AdaptiveViewInput['sharing'];
+  query: AdaptiveViewQuery;
   id: string;
   tenantId: string;
   ownerId: string;
@@ -108,6 +193,13 @@ export interface AdaptiveViewDraft {
 
 export type ViewHistory = { items: AdaptiveViewRevision[]; truncated: boolean };
 
+/** Live personal views each member may keep. */
+export const personalViewLimit = 50;
+
+/** Live views a workspace may share with the workspace or roles. */
+export const sharedViewLimit = 200;
+
+/** Permission needed to read each list, as its catalog states. */
 export const viewPermissions: Record<AdaptiveViewDomain, string> = {
   orders: 'orders.read',
   inventory: 'inventory.read',
@@ -117,132 +209,177 @@ export const viewPermissions: Record<AdaptiveViewDomain, string> = {
   procurement: 'procurement.read',
   issues: 'issues.read',
   decisions: 'issues.read',
+  transfers: 'inventory.read',
+  returns: 'returns.read',
+  suppliers: 'procurement.read',
+  inbox: 'messages.read',
+  activity: 'activity.read',
 };
 
-export const viewColumns: Record<AdaptiveViewDomain, readonly string[]> = {
-  orders: [
-    'id',
-    'displayNumber',
-    'status',
-    'paymentStatus',
-    'fulfillment',
-    'placedAt',
-    'dueAt',
-    'total',
-    'lineCount',
-    'overdue',
-    'differs',
-    'observedAt',
-  ],
-  inventory: [
-    'id',
-    'skuId',
-    'sku',
-    'locationId',
-    'location',
-    'unit',
-    'sources',
-    'differences',
-    'sync',
-  ],
-  fulfillment: [
-    'id',
-    'connectionId',
-    'externalId',
-    'kind',
-    'status',
-    'open',
-    'signals',
-    'holds',
-    'location',
-    'method',
-    'fulfillAt',
-    'fulfillBy',
-    'estimatedDeliveryAt',
-    'progressAt',
-    'order',
-    'units',
-    'unit',
-    'observedAt',
-  ],
-  customers: [
-    'id',
-    'connectionId',
-    'externalId',
-    'displayName',
-    'email',
-    'phone',
-    'state',
-    'sourceCreatedAt',
-    'orderCount',
-    'amountSpent',
-    'tags',
-    'sourceUpdatedAt',
-    'observedAt',
-  ],
-  products: [
-    'id',
-    'skuId',
-    'sku',
-    'skuKey',
-    'title',
-    'listings',
-    'differences',
-    'gaps',
-  ],
-  procurement: [
-    'id',
-    'supplierId',
-    'supplierName',
-    'reference',
-    'number',
-    'status',
-    'attentionKey',
-    'confirmationDueAt',
-    'nextCheckAt',
-    'connectionId',
-    'lines',
-    'createdAt',
-    'updatedAt',
-  ],
-  issues: [
-    'id',
-    'class',
-    'state',
-    'severity',
-    'summary',
-    'subject',
-    'detectedAt',
-    'lastActivityAt',
-    'owner',
-    'attention',
-  ],
-  decisions: [
-    'id',
-    'kind',
-    'domain',
-    'reason',
-    'title',
-    'why',
-    'response',
-    'owner',
-    'assignment',
-    'requestedAt',
-    'deadline',
-    'evidence',
-    'impact',
-  ],
+/**
+ * The item key each view reader returns for a catalog column. Previews compile catalog IDs to
+ * these keys and key their rows by catalog ID again; a column missing here is unavailable.
+ */
+export const viewReaderColumns: Record<
+  ViewReaderDomain,
+  Readonly<Record<string, string>>
+> = {
+  orders: {
+    number: 'displayNumber',
+    placed: 'placedAt',
+    updated: 'observedAt',
+    due: 'dueAt',
+    status: 'status',
+    paymentStatus: 'paymentStatus',
+    fulfillment: 'fulfillment',
+    total: 'total',
+    lineCount: 'lineCount',
+    comparison: 'comparisonState',
+    overdue: 'overdue',
+  },
+  inventory: {
+    sku: 'sku',
+    location: 'location',
+    sources: 'sources',
+    differences: 'differences',
+    sync: 'sync',
+  },
+  fulfillment: {
+    order: 'order',
+    kind: 'kind',
+    source: 'connectionId',
+    status: 'status',
+    signals: 'signals',
+    holds: 'holds',
+    location: 'location',
+    method: 'method',
+    fulfillAt: 'fulfillAt',
+    fulfillBy: 'fulfillBy',
+    estimatedDelivery: 'estimatedDeliveryAt',
+    progress: 'progressAt',
+    units: 'units',
+    updated: 'observedAt',
+  },
+  customers: {
+    name: 'displayName',
+    email: 'email',
+    phone: 'phone',
+    state: 'state',
+    source: 'connectionId',
+    created: 'sourceCreatedAt',
+    updated: 'sourceUpdatedAt',
+    orders: 'orderCount',
+    spent: 'amountSpent',
+    tags: 'tags',
+  },
+  products: {
+    sku: 'sku',
+    title: 'title',
+    listings: 'listings',
+    differences: 'differences',
+    missing: 'gaps',
+  },
+  // `attention` is the key of one open item, so row actions such as a supplier follow-up can
+  // name it; the list's conditions and groups use the item kinds.
+  procurement: {
+    reference: 'reference',
+    number: 'number',
+    supplier: 'supplierName',
+    status: 'status',
+    stage: 'stage',
+    attention: 'attentionKey',
+    expected: 'expectedDate',
+    confirmationDue: 'confirmationDueAt',
+    nextCheck: 'nextCheckAt',
+    nextOwner: 'nextOwner',
+    lines: 'lines',
+    created: 'createdAt',
+    updated: 'updatedAt',
+    authority: 'authority',
+    location: 'locationIds',
+    sku: 'skus',
+    value: 'value',
+  },
+  issues: {
+    summary: 'summary',
+    class: 'class',
+    state: 'state',
+    severity: 'severity',
+    subject: 'subject',
+    owner: 'owner',
+    attention: 'attention',
+    detected: 'detectedAt',
+    lastActivity: 'lastActivityAt',
+  },
+  decisions: {
+    title: 'title',
+    kind: 'kind',
+    domain: 'domain',
+    reason: 'reason',
+    owner: 'owner',
+    requested: 'requestedAt',
+    deadline: 'deadline',
+    impact: 'impact',
+  },
+  returns: {
+    name: 'name',
+    kind: 'kind',
+    stage: 'stage',
+    items: 'quantity',
+    refund: 'refund',
+    value: 'value',
+    reasons: 'reasons',
+    requested: 'requestedAt',
+    activity: 'activityAt',
+    source: 'connectionId',
+  },
 };
+
+/** Item keys a view reader may group, aggregate or show: `id` and its catalog columns. */
+export function viewReaderKeys(domain: ViewReaderDomain): readonly string[] {
+  return ['id', ...Object.values(viewReaderColumns[domain])];
+}
+
+/** Lists the view engine can read, in the order drafts describe them. */
+export const viewReaderDomains: readonly ViewReaderDomain[] = [
+  'orders',
+  'inventory',
+  'fulfillment',
+  'customers',
+  'products',
+  'procurement',
+  'issues',
+  'decisions',
+  'returns',
+];
+
+/** Whether the view engine has a reader for a list. */
+export function isViewReaderDomain(
+  domain: AdaptiveViewDomain,
+): domain is ViewReaderDomain {
+  return viewReaderDomains.some((item) => item === domain);
+}
 
 function defaultViewQuery(
-  input: Pick<AdaptiveViewQuery, 'version' | 'domain' | 'filters' | 'columns'>,
+  domain: ViewReaderDomain,
+  segment: string,
+  columns: string[],
+  conditions: ViewCondition[] = [],
 ): AdaptiveViewQuery {
   return {
-    ...input,
-    customFilters: [],
-    sort: null,
-    groupBy: null,
-    layout: 'table',
+    version: 2,
+    domain,
+    state: {
+      segment,
+      where: { match: 'all', conditions },
+      sort: null,
+      group: null,
+      layout: 'table',
+      density: 'comfortable',
+      columns: columns.map((id) => ({ id })),
+      properties: [],
+      preview: false,
+    },
     metrics: [],
     charts: [],
     actions: [],
@@ -253,31 +390,31 @@ export const builtInViews = [
   {
     id: 'stuck-orders',
     name: { en: 'Stuck orders', de: 'Festhängende Bestellungen' },
-    query: defaultViewQuery({
-      version: 1,
-      domain: 'orders',
-      filters: { view: 'stuck' },
-      columns: ['displayNumber', 'status', 'fulfillment', 'dueAt'],
-    }),
+    query: defaultViewQuery('orders', 'stuck', [
+      'number',
+      'status',
+      'fulfillment',
+      'due',
+    ]),
   },
   {
     id: 'inventory-discrepancies',
     name: { en: 'Inventory discrepancies', de: 'Bestandsabweichungen' },
-    query: defaultViewQuery({
-      version: 1,
-      domain: 'inventory',
-      filters: { view: 'differs' },
-      columns: ['sku', 'location', 'differences', 'sources'],
-    }),
+    query: defaultViewQuery('inventory', 'differs', [
+      'sku',
+      'location',
+      'differences',
+      'sources',
+    ]),
   },
   {
     id: 'supplier-decisions',
     name: { en: 'Supplier decisions', de: 'Lieferantenentscheidungen' },
-    query: defaultViewQuery({
-      version: 1,
-      domain: 'decisions',
-      filters: { domain: 'procurement' },
-      columns: ['kind', 'reason', 'title', 'response'],
-    }),
+    query: defaultViewQuery(
+      'decisions',
+      'all',
+      ['kind', 'reason', 'title'],
+      [{ field: 'domain', op: 'any_of', value: ['procurement'] }],
+    ),
   },
 ] as const;
